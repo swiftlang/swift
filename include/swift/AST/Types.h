@@ -4714,13 +4714,11 @@ public:
   /// Register a nested type with the given name.
   void registerNestedType(Identifier name, Type nested);
 
-  /// Return the root archetype parent of this archetype if it's
-  /// a primary archetype, null if the archetype is neither a primary archetype
-  /// nor nested under one.
-  PrimaryArchetypeType *getPrimary() const;
-  
   /// Return the root archetype parent of this archetype.
   ArchetypeType *getRoot() const;
+  
+  /// Get the generic environment this archetype lives in.
+  GenericEnvironment *getGenericEnvironment() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -4792,18 +4790,17 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
   /// The substitutions into the interface signature of the opaque type.
   SubstitutionMap Substitutions;
   
-  /// The generic signature used to build out this archetype, and its
-  /// nested archetypes.
-  GenericSignature *BoundSignature;
+  /// A GenericEnvironment with this opaque archetype bound to the interface
+  /// type of the output type from the OpaqueDecl.
+  GenericEnvironment *Environment;
   
 public:
   /// Get 
   
   /// Get an opaque archetype representing the underlying type of the given
   /// opaque type decl.
-  static OpaqueTypeArchetypeType *
-  get(OpaqueTypeDecl *Decl,
-      SubstitutionMap Substitutions);
+  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl,
+                                      SubstitutionMap Substitutions);
   
   OpaqueTypeDecl *getOpaqueDecl() const {
     return OpaqueDecl;
@@ -4816,8 +4813,11 @@ public:
   /// equivalent to the OpaqueTypeDecl's interface generic signature, with
   /// all of the generic parameters aside from the opaque type's interface
   /// type same-type-constrained to their substitutions for this type.
-  GenericSignature *getBoundSignature() const {
-    return BoundSignature;
+  GenericSignature *getBoundSignature() const;
+  
+  /// Get a generic environment that has this opaque archetype bound within it.
+  GenericEnvironment *getGenericEnvironment() const {
+    return Environment;
   }
   
   static bool classof(const TypeBase *T) {
@@ -4836,7 +4836,6 @@ private:
   OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
                           SubstitutionMap Substitutions,
                           RecursiveTypeProperties Props,
-                          GenericSignature *BoundSignature,
                           Type InterfaceType,
                           ArrayRef<ProtocolDecl*> ConformsTo,
                           Type Superclass, LayoutConstraint Layout);
@@ -4870,7 +4869,8 @@ class OpenedArchetypeType final : public ArchetypeType,
 {
   friend TrailingObjects;
   friend ArchetypeType;
-      
+  
+  GenericEnvironment *Environment;
   TypeBase *Opened;
   UUID ID;
 public:
@@ -4899,12 +4899,19 @@ public:
     return Opened;
   }
   
+  /// Get a generic environment with this opened type bound to its generic
+  /// parameter.
+  GenericEnvironment *getGenericEnvironment() const {
+    return Environment;
+  }
+  
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;
   }
   
 private:
-  OpenedArchetypeType(const ASTContext &Ctx, Type Existential,
+  OpenedArchetypeType(const ASTContext &Ctx,
+                      Type Existential,
                       ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
                       LayoutConstraint Layout, UUID uuid);
 };
@@ -4940,6 +4947,10 @@ public:
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NestedArchetype;
+  }
+  
+  DependentMemberType *getInterfaceType() const {
+    return cast<DependentMemberType>(InterfaceType.getPointer());
   }
 
 private:

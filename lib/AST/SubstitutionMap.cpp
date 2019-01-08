@@ -310,7 +310,9 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    type = archetype->getInterfaceType()->getCanonicalType();
+    if (!isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
+      type = archetype->getInterfaceType()->getCanonicalType();
+    }
   }
 
   // Error path: if we don't have a type parameter, there is no conformance.

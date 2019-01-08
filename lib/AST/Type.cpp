@@ -2378,8 +2378,18 @@ ArchetypeType *ArchetypeType::getRoot() const {
   return archetype;
 }
 
-PrimaryArchetypeType *ArchetypeType::getPrimary() const {
-  return dyn_cast<PrimaryArchetypeType>(getRoot());
+GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
+  auto root = getRoot();
+  if (auto primary = dyn_cast<PrimaryArchetypeType>(root)) {
+    return primary->getGenericEnvironment();
+  }
+  if (auto opened = dyn_cast<OpenedArchetypeType>(root)) {
+    return opened->getGenericEnvironment();
+  }
+  if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(root)) {
+    return opaque->getGenericEnvironment();
+  }
+  llvm_unreachable("unhandled root archetype kind?!");
 }
 
 PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
@@ -2424,7 +2434,6 @@ NestedArchetypeType::NestedArchetypeType(const ASTContext &Ctx,
 OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
                                    SubstitutionMap Substitutions,
                                    RecursiveTypeProperties Props,
-                                   GenericSignature *BoundSignature,
                                    Type InterfaceType,
                                    ArrayRef<ProtocolDecl*> ConformsTo,
                                    Type Superclass, LayoutConstraint Layout)
@@ -2432,9 +2441,12 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
                   Props,
                   InterfaceType, ConformsTo, Superclass, Layout),
     OpaqueDecl(OpaqueDecl),
-    Substitutions(Substitutions),
-    BoundSignature(BoundSignature)
+    Substitutions(Substitutions)
 {
+}
+
+GenericSignature *OpaqueTypeArchetypeType::getBoundSignature() const {
+  return Environment->getGenericSignature();
 }
 
 Type ReplaceOpaqueTypesWithUnderlyingTypes::operator()(
@@ -2476,8 +2488,15 @@ ReplaceOpaqueTypesWithUnderlyingTypes::operator()(CanType maybeOpaqueType,
 
   // If we got here, we should've replaced an opaque archetype in the
   // TypeSubstitutionFn above.
-  auto archetype = cast<ArchetypeType>(maybeOpaqueType);
-  auto opaqueRoot = cast<OpaqueTypeArchetypeType>(archetype->getRoot());
+  auto archetype = dyn_cast<ArchetypeType>(maybeOpaqueType);
+  if (!archetype) {
+    assert(maybeOpaqueType->isTypeParameter());
+    return ProtocolConformanceRef(protocol);
+  }
+  auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(archetype->getRoot());
+  if (!opaqueRoot) {
+    return ProtocolConformanceRef(protocol);
+  }
   auto subs = opaqueRoot->getOpaqueDecl()->getUnderlyingTypeSubstitutions();
   assert(subs.hasValue());
 
@@ -3087,6 +3106,11 @@ static Type substType(Type derivedType,
     auto substOrig = dyn_cast<SubstitutableType>(type);
     if (!substOrig)
       return None;
+    // Opaque types can't normally be directly substituted unless we
+    // specifically were asked to substitute them.
+    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+        && isa<OpaqueTypeArchetypeType>(substOrig))
+      return None;
 
     // If we have a substitution for this type, use it.
     if (auto known = substitutions(substOrig))
@@ -3110,17 +3134,6 @@ static Type substType(Type derivedType,
     // error.
     if (isa<OpenedArchetypeType>(substOrig))
       return Type(type);
-    // Opaque types also can't be directly substituted, but we can substitute
-    // the generic arguments.
-    if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(substOrig)) {
-      if (!opaque->hasArchetype()
-          && !opaque->hasTypeParameter())
-        return Type(type);
-      
-      auto newSubs = opaque->getSubstitutions().subst(substitutions, lookupConformances);
-      auto newTy = OpaqueTypeArchetypeType::get(opaque->getOpaqueDecl(), newSubs);
-      return Type(newTy);
-    }
 
     // For nested archetypes, we can substitute the parent.
     auto nestedArchetype = cast<NestedArchetypeType>(substOrig);
@@ -3494,7 +3507,6 @@ case TypeKind::Id:
 #include "swift/AST/TypeNodes.def"
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
@@ -3687,6 +3699,22 @@ case TypeKind::Id:
        LookUpConformanceInModule(opaque->getOpaqueDecl()->getModuleContext()));
     return OpaqueTypeArchetypeType::get(opaque->getOpaqueDecl(),
                                         newSubMap);
+  }
+  case TypeKind::NestedArchetype: {
+    // Transform the root type of a nested opaque archetype.
+    auto nestedType = cast<NestedArchetypeType>(base);
+    auto root = dyn_cast<OpaqueTypeArchetypeType>(nestedType->getRoot());
+    if (!root)
+      return *this;
+    
+    auto substRoot = Type(root).transformRec(fn);
+    if (substRoot.getPointer() == root) {
+      return *this;
+    }
+    
+    // Substitute the new root into the root of the interface type.
+    return nestedType->getInterfaceType()->substBaseType(substRoot,
+        LookUpConformanceInModule(root->getOpaqueDecl()->getModuleContext()));
   }
 
   case TypeKind::ExistentialMetatype: {
