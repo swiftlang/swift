@@ -893,10 +893,9 @@ extension Sequence {
 
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements into a ring buffer to save space. Once all
-    // elements are consumed, reorder the ring buffer into an `Array`
-    // and return it. This saves memory for sequences particularly longer
-    // than `maxLength`.
-    var ringBuffer: [Element] = []
+    // elements are consumed, reorder the ring buffer into a copy and return it.
+    // This saves memory for sequences particularly longer than `maxLength`.
+    var ringBuffer = ContiguousArray<Element>()
     ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedCount))
 
     var i = 0
@@ -906,19 +905,18 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i += 1
-        i %= maxLength
+        i = (i + 1) % maxLength
       }
     }
 
     if i != ringBuffer.startIndex {
-      var rotated: [Element] = []
+      var rotated = ContiguousArray<Element>()
       rotated.reserveCapacity(ringBuffer.count)
       rotated += ringBuffer[i..<ringBuffer.endIndex]
       rotated += ringBuffer[0..<i]
-      return rotated
-    } else {      
-      return ringBuffer
+      return Array(rotated)
+    } else {
+      return Array(ringBuffer)
     }
   }
 
@@ -976,8 +974,8 @@ extension Sequence {
     // holding tank into the result, an `Array`. This saves
     // `k` * sizeof(Element) of memory, because slices keep the entire
     // memory of an `Array` alive.
-    var result: [Element] = []
-    var ringBuffer: [Element] = []
+    var result = ContiguousArray<Element>()
+    var ringBuffer = ContiguousArray<Element>()
     var i = ringBuffer.startIndex
 
     for element in self {
@@ -986,11 +984,10 @@ extension Sequence {
       } else {
         result.append(ringBuffer[i])
         ringBuffer[i] = element
-        i += 1
-        i %= k
+        i = (i + 1) % k
       }
     }
-    return result
+    return Array(result)
   }
 
   /// Returns a sequence by skipping the initial, consecutive elements that
@@ -1072,7 +1069,7 @@ extension Sequence {
   public __consuming func prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> [Element] {
-    var result: [Element] = []
+    var result = ContiguousArray<Element>()
 
     for element in self {
       guard try predicate(element) else {
@@ -1080,7 +1077,7 @@ extension Sequence {
       }
       result.append(element)
     }
-    return result
+    return Array(result)
   }
 }
 
