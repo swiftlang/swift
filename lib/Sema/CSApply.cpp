@@ -2578,8 +2578,92 @@ namespace {
             /*implicit=*/expr->isImplicit(), Type(), getType);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
+			
+      // Check for ambiguous member if the base is an Optional
+      if (baseTy->getOptionalObjectType()) {
+        diagnoseAmbiguousNominalMember(baseTy, result);
+      }
 
       return coerceToType(result, resultTy, cs.getConstraintLocator(expr));
+    }
+    
+    /// Diagnose if the base type is optional, we're referring to a nominal
+    /// type member via the dot syntax and the member name matches
+    /// Optional<T>.{member name}
+    void diagnoseAmbiguousNominalMember(Type baseTy, Expr *result) {
+      if (auto baseTyUnwrapped = baseTy->lookThroughAllOptionalTypes()) {
+        // Return if the base type doesn't have a nominal type decl
+        if (!baseTyUnwrapped->getNominalOrBoundGenericNominal()) {
+          return;
+        }
+        
+        // Otherwise, continue digging
+        if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
+          auto calledValue = DSCE->getCalledValue();
+          auto isOptional = false;
+          Identifier memberName;
+          
+          // Try cast the assigned value to an enum case
+          //
+          // This will always succeed if the base is Optional<T> & the
+          // assigned case comes from Optional<T>
+          if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
+            isOptional = EED->getParentEnum()->isOptionalDecl();
+            memberName = EED->getBaseName().getIdentifier();
+          }
+          
+          // Return if the enum case doesn't come from Optional<T>
+          if (!isOptional) {
+            return;
+          }
+          
+          // Look up the enum case in the unwrapped type to check if it exists
+          // as a member
+          auto baseTyNominalDecl = baseTyUnwrapped
+                                   ->getNominalOrBoundGenericNominal();
+          auto &tc = cs.getTypeChecker();
+          auto results = tc.lookupMember(baseTyNominalDecl->getModuleContext(),
+                                         baseTyUnwrapped,
+                                         memberName,
+                                         defaultMemberLookupOptions);
+          
+          // Lookup didn't find anything, so return
+          if (results.empty()) {
+            return;
+          }
+          
+          if (auto member = results.front().getValueDecl()) {
+            // Lookup returned a member that is an instance member,
+            // so return
+            if (member->isInstanceMember()) {
+              return;
+            }
+            
+            // Return if the member is an enum case w/ assoc values, as we only
+            // care (for now) about cases with no assoc values (like none)
+            if (auto EED = dyn_cast<EnumElementDecl>(member)) {
+              if (EED->hasAssociatedValues()) {
+                return;
+              }
+            }
+            
+            // Emit a diagnostic with some fixits
+            auto baseTyName = baseTy->getCanonicalType().getString();
+            auto baseTyUnwrappedName = baseTyUnwrapped->getString();
+            auto loc = DSCE->getLoc();
+            auto startLoc = DSCE->getStartLoc();
+            
+            tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
+                        baseTyName, baseTyUnwrappedName, memberName.str());
+            
+            tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
+              .fixItInsert(startLoc, "Optional");
+            tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
+                        baseTyUnwrappedName, memberName.str())
+              .fixItInsert(startLoc, baseTyUnwrappedName);
+          }
+        }
+      }
     }
     
   private:
