@@ -77,16 +77,14 @@ static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  if (isa<OpenedArchetypeType>(A))
+  auto root = dyn_cast<PrimaryArchetypeType>(A->getRoot());
+  if (!root)
     return true;
-
-  // Find the primary archetype.
-  auto P = A->getPrimary();
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (P->getGenericEnvironment() == genericEnv)
+    if (root->getGenericEnvironment() == genericEnv)
       return true;
 
   return false;

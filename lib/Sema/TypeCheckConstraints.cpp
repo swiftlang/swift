@@ -2950,9 +2950,13 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       if (found != types.end())
         return found->second;
 
-      if (isa<NestedArchetypeType>(origType))
-        return Type();
-      else if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
+      if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
+        auto root = archetypeType->getRoot();
+        // For other nested types, fail here so the default logic in subst()
+        // for nested types applies.
+        if (root != archetypeType)
+          return Type();
+        
         auto locator = cs.getConstraintLocator(nullptr);
         auto replacement = cs.createTypeVariable(locator);
 
