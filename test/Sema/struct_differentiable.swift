@@ -54,15 +54,30 @@ _ = pullback(at: Nested(simple: simple, mixed: mixed, generic: genericSame)) { m
   model.simple + model.simple
 }
 
-// Test type whose stored properties doesn't conform to `AdditiveArithmetic`.
+// Test type that does not conform to `AdditiveArithmetic` but whose members do.
 // Thus, `Self` cannot be used as `TangentVector` or `CotangentVector`.
 // Vector space structs types must be synthesized.
 // Note: it would be nice to emit a warning if conforming `Self` to
 // `AdditiveArithmetic` is possible.
-struct NotAdditiveArithmetic : Differentiable {
+struct AllMembersAdditiveArithmetic : Differentiable {
   var w: Float
   var b: Float
 }
+
+// Test type `AllMembersVectorNumeric` whose members conforms to `VectorNumeric`,
+// in which case we should make `TangentVector` and `CotangentVector` conform to
+// `VectorNumeric`.
+struct MyVector : VectorNumeric, Differentiable {
+  var w: Float
+  var b: Float
+}
+struct AllMembersVectorNumeric : Differentiable {
+  var w: MyVector
+  var b: MyVector
+}
+func testVectorNumeric<T: VectorNumeric>(_ x: T.Type) {}
+testVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
+testVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
 
 // Test type with immutable, differentiable stored property.
 struct ImmutableStoredProperty : Differentiable {

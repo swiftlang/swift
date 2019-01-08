@@ -460,7 +460,28 @@ getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
-  TypeLoc inherited[2] = {diffableType, addArithType};
+  auto *vecNumProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
+  auto vecNumType = TypeLoc::withoutLoc(vecNumProto->getDeclaredType());
+  TypeLoc inherited[2] {diffableType, addArithType};
+
+  // Cache original members and their associated vector space types for later
+  // use.
+  SmallVector<VarDecl *, 8> diffProperties;
+  getStoredPropertiesForDifferentiation(nominal, diffProperties);
+
+  // If all members also conform to `VectorNumeric` with the same `Scalar` type,
+  // make the vector space struct conform to `VectorNumeric` instead of just
+  // `AdditiveArithmetic`.
+  auto canDeriveVectorNumericForVectorSpace =
+      !diffProperties.empty() && llvm::all_of(
+          diffProperties, [&](VarDecl *var) {
+            return TC.conformsToProtocol(getVectorSpaceType(var, nominal, kind),
+                                         vecNumProto, nominal,
+                                         ConformanceCheckFlags::Used);
+          });
+  if (canDeriveVectorNumericForVectorSpace)
+    inherited[1] = vecNumType;
+
   auto *structDecl = new (C) StructDecl(SourceLoc(), vectorSpaceId, SourceLoc(),
                                         /*Inherited*/ C.AllocateCopy(inherited),
                                         /*GenericParams*/ {}, parentDC);
@@ -470,19 +491,16 @@ getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
                                  FieldwiseProductSpaceAttr(/*Implicit*/ true));
 
   // Add members to vector space struct.
-  for (auto *member : nominal->getStoredProperties()) {
-    // Skip members with `@noDerivative`.
-    if (member->getAttrs().hasAttribute<NoDerivativeAttr>())
-      continue;
+  for (auto *member : diffProperties) {
     // Add this member's corresponding vector space to the parent's vector space
     // struct.
-    auto memberAssocType = getVectorSpaceType(member, nominal, kind);
     auto newMember = new (C) VarDecl(
         member->isStatic(), member->getSpecifier(), member->isCaptureList(),
         /*NameLoc*/ SourceLoc(), member->getName(), structDecl);
     // NOTE: `newMember` is not marked as implicit here, because that affects
     // memberwise initializer synthesis.
 
+    auto memberAssocType = getVectorSpaceType(member, nominal, kind);
     auto memberAssocInterfaceType = memberAssocType->hasArchetype()
                                         ? memberAssocType->mapTypeOutOfContext()
                                         : memberAssocType;
