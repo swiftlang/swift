@@ -667,7 +667,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
             self.logs['info'])
 
     def test_benchmark_runtime_range(self):
-        """Optimized benchmark should run in less then 1000 μs.
+        """Optimized benchmark should have runtime between 20 μs and 1000 μs.
 
         Even on calm machine, benchmark with runtime of 2500 μs has 1:4 chance
         of being interrupted in the middle of measurement due to elapsed 10 ms
@@ -687,6 +687,8 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
         with captured_output() as (out, _):
             doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock([]))
+            doctor.analyze(measurements('Sylph', 0))
+            doctor.analyze(measurements('Unicorn', 3))
             doctor.analyze(measurements('Cheetah', 200))
             doctor.analyze(measurements('Hare', 1001))
             doctor.analyze(measurements('Tortoise', 500000))
@@ -697,6 +699,18 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
         self.assertIn('runtime: ', output)
         self.assertNotIn('Cheetah', output)
+        self.assert_contains(["'Sylph' execution took 0 μs."],
+                             self.logs['error'])
+        self.assert_contains(
+            ["Ensure the workload of 'Sylph' has a properly measurable size"
+             " (runtime > 20 μs) and is not eliminated by the compiler (use "
+             "`blackHole` function if necessary)."],
+            self.logs['info'])
+        self.assert_contains(["'Unicorn' execution took 3 μs."],
+                             self.logs['warning'])
+        self.assert_contains(
+            ["Increase the workload of 'Unicorn' to be more than 20 μs."],
+            self.logs['info'])
         self.assert_contains(["'Hare' execution took at least 1001 μs."],
                              self.logs['warning'])
         self.assert_contains(
