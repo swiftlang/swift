@@ -349,7 +349,8 @@ function(_compile_swift_files
 
   swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
     FILES ${module_outputs}
-    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+    OPTIONAL)
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
   set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
