@@ -198,9 +198,9 @@ struct PatternIsGeneric2<
 
 // PATTERN_IS_GENERIC_2: Begin completions
 // Generic parameters of the struct.
-// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
-// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
-// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
+// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
+// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
+// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
 // Generic parameters of the function.
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
