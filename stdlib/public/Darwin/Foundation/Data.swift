@@ -866,12 +866,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
-        var hashValue: Int {
-            let count: Int = numericCast(length)
-            return Swift.withUnsafeBytes(of: bytes) { (rawBuffer) -> Int in
-                return Int(bitPattern: CFHashBytes(UnsafeMutablePointer(mutating: rawBuffer.baseAddress?.assumingMemoryBound(to: UInt8.self)), count))
-            }
+        @inlinable @inline(__always) // This should always be inlined into _Representation.hash(into:).
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(length)
+            Swift.withUnsafeBytes(of: bytes) { hasher.combine(bytes: $0) }
         }
     }
 
@@ -1084,11 +1082,14 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             storage.copyBytes(to: pointer, from: range)
         }
 
-        @inlinable
-        var hashValue: Int {
-            let hashRange = startIndex..<Swift.min(startIndex + 80, endIndex)
-            return storage.withUnsafeBytes(in: hashRange) {
-                return Int(bitPattern: CFHashBytes(UnsafeMutablePointer(mutating: $0.baseAddress?.assumingMemoryBound(to: UInt8.self)), $0.count))
+        @inlinable @inline(__always) // This should always be inlined into _Representation.hash(into:).
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(count)
+
+            // At most, hash the first 80 bytes of this data.
+            let range = startIndex ..< Swift.min(startIndex + 80, endIndex)
+            storage.withUnsafeBytes(in: range) {
+                hasher.combine(bytes: $0)
             }
         }
     }
@@ -1271,11 +1272,14 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             storage.copyBytes(to: pointer, from: range)
         }
 
-        @inlinable
-        var hashValue: Int {
-            let hashRange = startIndex..<Swift.min(startIndex + 80, endIndex)
-            return storage.withUnsafeBytes(in: hashRange) {
-                return Int(bitPattern: CFHashBytes(UnsafeMutablePointer(mutating: $0.baseAddress?.assumingMemoryBound(to: UInt8.self)), CFIndex($0.count)))
+        @inlinable @inline(__always) // This should always be inlined into _Representation.hash(into:).
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(count)
+
+            // Hash at most the first 80 bytes of this data.
+            let range = startIndex ..< Swift.min(startIndex + 80, endIndex)
+            storage.withUnsafeBytes(in: range) {
+                hasher.combine(bytes: $0)
             }
         }
     }
@@ -1847,17 +1851,17 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
         
-        @inlinable
-        var hashValue: Int {
+        @inlinable @inline(__always) // This should always be inlined into Data.hash(into:).
+        func hash(into hasher: inout Hasher) {
             switch self {
             case .empty:
-                return Int(bitPattern: CFHashBytes(nil, 0))
+                hasher.combine(Int(bitPattern: CFHashBytes(nil, 0)))
             case .inline(let inline):
-                return inline.hashValue
+                inline.hash(into: &hasher)
             case .slice(let slice):
-                return slice.hashValue
-            case .large(let slice):
-                return slice.hashValue
+                slice.hash(into: &hasher)
+            case .large(let large):
+                large.hash(into: &hasher)
             }
         }
     }
@@ -2508,9 +2512,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     //
     
     /// The hash value for the data.
-    @inlinable
-    public var hashValue: Int {
-        return _representation.hashValue
+    @inline(never) // This is not inlinable as emission into clients could cause cross-module inconsistencies if they are not all recompiled together.
+    public func hash(into hasher: inout Hasher) {
+        _representation.hash(into: &hasher)
     }
     
     @inlinable
