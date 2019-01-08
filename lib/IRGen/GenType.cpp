@@ -1421,7 +1421,7 @@ const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Get the primary archetype.
-  auto primary = t->getPrimary();
+  auto primary = dyn_cast<PrimaryArchetypeType>(t->getRoot());
   
   // If there is no primary (IOW, it's an opened archetype), the archetype is
   // an exemplar.
@@ -2135,7 +2135,7 @@ void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
 
 #ifndef NDEBUG
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
-  auto primary = arch->getPrimary();
+  auto primary = dyn_cast<PrimaryArchetypeType>(arch->getRoot());
   if (!primary) return true;
   auto genericEnv = primary->getGenericEnvironment();
 

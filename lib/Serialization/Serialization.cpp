@@ -3809,9 +3809,10 @@ void Serializer::writeType(Type ty) {
   case TypeKind::PrimaryArchetype:
   case TypeKind::NestedArchetype: {
     auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
+    assert(isa<PrimaryArchetypeType>(archetypeTy->getRoot())
+           && "need to implement for nested archetypes of opened/opaque types");
 
-    auto env = archetypeTy->getPrimary()->getGenericEnvironment();
-    assert(env && "Primary archetype without generic environment?");
+    auto env = archetypeTy->getGenericEnvironment();
 
     GenericEnvironmentID envID = addGenericEnvironmentRef(env);
     Type interfaceType = archetypeTy->getInterfaceType();

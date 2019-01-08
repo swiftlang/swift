@@ -1972,8 +1972,9 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
       if (replacement->hasDependentMember())
         return None;
 
-      if (replacement->hasArchetype())
+      if (replacement->hasArchetype()) {
         replacement = replacement->mapTypeOutOfContext();
+      }
 
       result->push_back({assocType, replacement});
     }
