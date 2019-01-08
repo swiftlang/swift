@@ -850,7 +850,6 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
   // and if so, whether this is a reference to one of them.
   while (!DC->isModuleScopeContext()) {
     GenericParamList *GenericParams = nullptr;
-    const ValueDecl *BaseDecl = nullptr;
     Type ExtendedType;
     auto LS = LookupState::makeUnqualified();
 
@@ -874,7 +873,6 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
     if (auto *SE = dyn_cast<SubscriptDecl>(DC)) {
       ExtendedType = SE->getDeclContext()->getSelfTypeInContext();
       DC = DC->getParent();
-      BaseDecl = DC->getSelfNominalTypeDecl();
     } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
 
       // Look for local variables; normally, the parser resolves these
@@ -897,7 +895,6 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
 
       if (AFD->getDeclContext()->isTypeContext()) {
         ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
-        BaseDecl = AFD->getImplicitSelfDecl();
         DC = DC->getParent();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
@@ -913,11 +910,8 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
       }
     } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getSelfTypeInContext();
-      if (ExtendedType)
-        BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
     } else if (auto ND = dyn_cast<NominalTypeDecl>(DC)) {
       ExtendedType = ND->getSelfTypeInContext();
-      BaseDecl = ND;
     }
 
     // If we're inside a function context, we've already moved to
@@ -943,7 +937,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
       dcGenericParams = dcGenericParams->getOuterParameters();
     }
 
-    if (BaseDecl && ExtendedType)
+    if (ExtendedType)
       ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC, LS, Reason,
                                  TypeResolver, nullptr);
 
