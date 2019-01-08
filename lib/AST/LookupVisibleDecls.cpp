@@ -679,6 +679,23 @@ template <> struct DenseMapInfo<FoundDeclTy> {
 
 } // namespace llvm
 
+// If a class 'Base' conforms to 'Proto', and my base type is a subclass
+// 'Derived' of 'Base', use 'Base' not 'Derived' as the 'Self' type in the
+// substitution map.
+static Type getBaseTypeForMember(ModuleDecl *M, ValueDecl *OtherVD, Type BaseTy) {
+  if (auto *Proto = OtherVD->getDeclContext()->getSelfProtocolDecl()) {
+    if (BaseTy->getClassOrBoundGenericClass()) {
+      if (auto Conformance = M->lookupConformance(BaseTy, Proto)) {
+        auto *Superclass = Conformance->getConcrete()->getRootConformance()
+            ->getType()->getClassOrBoundGenericClass();
+        return BaseTy->getSuperclassForDecl(Superclass);
+      }
+    }
+  }
+
+  return BaseTy;
+}
+
 namespace {
 
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
@@ -789,7 +806,8 @@ public:
       auto OtherSignature = OtherVD->getOverloadSignature();
       auto OtherSignatureType = OtherVD->getOverloadSignatureType();
       if (OtherSignatureType && shouldSubst) {
-        auto subs = BaseTy->getMemberSubstitutionMap(M, OtherVD);
+        auto ActualBaseTy = getBaseTypeForMember(M, OtherVD, BaseTy);
+        auto subs = ActualBaseTy->getMemberSubstitutionMap(M, OtherVD);
         if (auto CT = OtherSignatureType.subst(subs))
           OtherSignatureType = CT->getCanonicalType();
       }
