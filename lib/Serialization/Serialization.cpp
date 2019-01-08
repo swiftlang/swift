@@ -3888,8 +3888,12 @@ void Serializer::writeType(Type ty) {
   case TypeKind::OpaqueTypeArchetype:
     llvm_unreachable("todo");
 
-  case TypeKind::PrimaryArchetype: {
-    auto archetypeTy = cast<PrimaryArchetypeType>(ty.getPointer());
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::NestedArchetype: {
+    auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
+    assert(isa<PrimaryArchetypeType>(archetypeTy->getRoot())
+           && "need to implement for nested archetypes of opened/opaque types");
+
     auto env = archetypeTy->getGenericEnvironment();
 
     GenericEnvironmentID envID = addGenericEnvironmentRef(env);
