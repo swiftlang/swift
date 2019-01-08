@@ -17,7 +17,7 @@ import Darwin
 #elseif os(Linux)
 import Glibc
 
-@inlinable
+@inlinable // This is inlinable as it is trivially computable.
 fileprivate func malloc_good_size(_ size: Int) -> Int {
     return size
 }
@@ -1233,6 +1233,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
 
+    // The actual storage for Data's various representations.
+    // Inlinability strategy: almost everything should be inlinable as forwarding the underlying implementations. (Inlining can also help avoid retain-release traffic around pulling values out of enums.)
     @usableFromInline
     @_frozen
     internal enum _Representation {
@@ -1241,7 +1243,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         case slice(InlineSlice)
         case large(LargeSlice)
 
-        @inlinable
+        @inlinable // This is @inlinable as a trivial initializer.
         init(_ buffer: UnsafeRawBufferPointer) {
             if buffer.count == 0 {
                 self = .empty
@@ -1254,7 +1256,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a trivial initializer.
         init(_ buffer: UnsafeRawBufferPointer, owner: AnyObject) {
             if buffer.count == 0 {
                 self = .empty
@@ -1273,7 +1275,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a trivial initializer.
         init(capacity: Int) {
             if capacity == 0 {
                 self = .empty
@@ -1286,7 +1288,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a trivial initializer.
         init(count: Int) {
             if count == 0 {
                 self = .empty
@@ -1299,7 +1301,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a trivial initializer.
         init(_ storage: _DataStorage, count: Int) {
             if count == 0 {
                 self = .empty
@@ -1312,7 +1314,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @usableFromInline // This is not @inlinable as it is a non-trivial, non-generic function.
         mutating func reserveCapacity(_ minimumCapacity: Int) {
             guard minimumCapacity > 0 else { return }
             switch self {
@@ -1355,7 +1357,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         var count: Int {
             get {
                 switch self {
@@ -1366,6 +1368,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 }
             }
             set(newValue) {
+                // HACK: The definition of this inline function takes an inout reference to self, giving the optimizer a unique referencing guarantee.
+                //       This allows us to avoid excessive retain-release traffic around modifying enum values, and inlining the function then avoids the additional frame.
                 @inline(__always)
                 func apply(_ representation: inout _Representation, _ newValue: Int) -> _Representation? {
                     switch representation {
@@ -1430,7 +1434,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a generic, trivially forwarding function.
         func withUnsafeBytes<Result>(_ apply: (UnsafeRawBufferPointer) throws -> Result) rethrows -> Result {
             switch self {
             case .empty:
@@ -1445,7 +1449,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a generic, trivially forwarding function.
         mutating func withUnsafeMutableBytes<Result>(_ apply: (UnsafeMutableRawBufferPointer) throws -> Result) rethrows -> Result {
             switch self {
             case .empty:
@@ -1465,7 +1469,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a generic, trivially forwarding function.
         func withInteriorPointerReference<T>(_ work: (NSData) throws -> T) rethrows -> T {
             switch self {
             case .empty:
@@ -1481,7 +1485,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @usableFromInline // This is not @inlinable as it is a non-trivial, non-generic function.
         func enumerateBytes(_ block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Index, _ stop: inout Bool) -> Void) {
             switch self {
             case .empty:
@@ -1499,7 +1503,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         mutating func append(contentsOf buffer: UnsafeRawBufferPointer) {
             switch self {
             case .empty:
@@ -1535,7 +1539,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         mutating func resetBytes(in range: Range<Index>) {
             switch self {
             case .empty:
@@ -1553,7 +1557,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 }
                 break
             case .inline(var inline):
-
                 if inline.count < range.upperBound {
                     if InlineSlice.canStore(count: range.upperBound) {
                         var slice = InlineSlice(inline)
@@ -1588,7 +1591,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @usableFromInline // This is not @inlinable as it is a non-trivial, non-generic function.
         mutating func replaceSubrange(_ subrange: Range<Index>, with bytes: UnsafeRawPointer?, count cnt: Int) {
             switch self {
             case .empty:
@@ -1671,7 +1674,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially forwarding.
         subscript(index: Index) -> UInt8 {
             get {
                 switch self {
@@ -1699,7 +1702,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
         
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         subscript(bounds: Range<Index>) -> Data {
             get {
                 switch self {
@@ -1749,7 +1752,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially forwarding.
         var startIndex: Int {
             switch self {
             case .empty: return 0
@@ -1759,7 +1762,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially forwarding.
         var endIndex: Int {
             switch self {
             case .empty: return 0
@@ -1769,7 +1772,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially forwarding.
         func bridgedReference() -> NSData {
             switch self {
             case .empty: return NSData()
@@ -1784,7 +1787,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially forwarding.
         func copyBytes(to pointer: UnsafeMutableRawPointer, from range: Range<Int>) {
             switch self {
             case .empty:
