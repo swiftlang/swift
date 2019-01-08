@@ -297,6 +297,10 @@ struct OwnershipModelEliminator : SILModuleTransform {
       if (F.wasDeserializedCanonical())
         continue;
 
+      // If F does not have ownership, skip it. We have no further work to do.
+      if (!F.hasOwnership())
+        continue;
+
       // Set F to have unqualified ownership.
       F.setOwnershipEliminated();
 

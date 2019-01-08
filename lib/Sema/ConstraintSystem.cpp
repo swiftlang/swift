@@ -2205,8 +2205,16 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   {
     DiagnosticTransaction transaction(TC.Diags);
 
-    TC.diagnose(commonAnchor->getLoc(), diag::ambiguous_reference_to_decl,
-                decl->getDescriptiveKind(), decl->getFullName());
+    const auto *fix = viableSolutions.front().second;
+    if (fix->getKind() == FixKind::UseSubscriptOperator) {
+      auto *UDE = cast<UnresolvedDotExpr>(commonAnchor);
+      TC.diagnose(commonAnchor->getLoc(),
+                  diag::could_not_find_subscript_member_did_you_mean,
+                  getType(UDE->getBase()));
+    } else {
+      TC.diagnose(commonAnchor->getLoc(), diag::ambiguous_reference_to_decl,
+                  decl->getDescriptiveKind(), decl->getFullName());
+    }
 
     for (const auto &viable : viableSolutions) {
       // Create scope so each applied solution is rolled back.

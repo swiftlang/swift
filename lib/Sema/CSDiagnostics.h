@@ -143,6 +143,10 @@ protected:
   /// \returns true is locator hasn't been simplified down to expression.
   bool hasComplexLocator() const { return HasComplexLocator; }
 
+  /// \returns A parent expression if sub-expression is contained anywhere
+  /// in the root expression or `nullptr` otherwise.
+  Expr *findParentExpr(Expr *subExpr) const;
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
@@ -182,15 +186,8 @@ public:
     if (!expr)
       return;
 
-    auto *anchor = getAnchor();
-    expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
-      auto *AE = dyn_cast<ApplyExpr>(subExpr);
-      if (!AE || AE->getFn() != anchor)
-        return subExpr;
-
-      Apply = AE;
-      return nullptr;
-    });
+    if (auto *parentExpr = findParentExpr(getAnchor()))
+      Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
   unsigned getRequirementIndex() const {
@@ -637,6 +634,16 @@ public:
       : FailureDiagnostic(root, cs, locator) {}
 
   bool diagnoseAsError() override;
+};
+
+class SubscriptMisuseFailure final : public FailureDiagnostic {
+public:
+  SubscriptMisuseFailure(Expr *root, ConstraintSystem &cs,
+                         ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 } // end namespace constraints

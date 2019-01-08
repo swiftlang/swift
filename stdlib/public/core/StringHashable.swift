@@ -24,10 +24,9 @@ extension String : Hashable {
         hasher.combine(bytes: UnsafeRawBufferPointer($0))
       }
       hasher.combine(0xFF as UInt8) // terminator
-      return
+    } else {
+      _gutsSlice._normalizedHash(into: &hasher)
     }
-
-    _gutsSlice._normalizedHash(into: &hasher)
   }
 }
 
@@ -52,12 +51,10 @@ extension _StringGutsSlice {
         hasher.combine(bytes: UnsafeRawBufferPointer($0))
       }
     } else {
-      self.withNFCCodeUnitsIterator_2 {
-        let selfIter = $0
-        for cu in selfIter { hasher.combine(cu) }
+      _withNFCCodeUnits {
+        hasher.combine($0)
       }
     }
-
     hasher.combine(0xFF as UInt8) // terminator
   }
 }
