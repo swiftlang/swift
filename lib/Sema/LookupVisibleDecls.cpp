@@ -466,92 +466,6 @@ lookupVisibleMemberDeclsImpl(Type BaseTy, VisibleDeclConsumer &Consumer,
                              GenericSignatureBuilder *GSB,
                              VisitedSet &Visited);
 
-// Filters out restated declarations from a protocol hierarchy
-// or equivalent requirements from protocol composition types.
-class RestateFilteringConsumer : public VisibleDeclConsumer {
-  LazyResolver *resolver;
-
-  using FoundDecl = std::pair<ValueDecl*, DeclVisibilityKind>;
-  using NameAndType = std::pair<DeclName, CanType>;
-
-  llvm::DenseMap<DeclName, FoundDecl> foundVars;
-  llvm::DenseMap<NameAndType, FoundDecl> foundFuncs;
-  llvm::MapVector<ValueDecl*, DeclVisibilityKind> declsToReport;
-
-  template <typename K>
-  void addDecl(llvm::DenseMap<K, FoundDecl> &Map, K Key, FoundDecl FD) {
-    // Add the declaration if we haven't found an equivalent yet, otherwise
-    // replace the equivalent if the found decl has a higher access level.
-    auto existingDecl = Map.find(Key);
-
-    if ((existingDecl == Map.end()) ||
-        (Map[Key].first->getFormalAccess() < FD.first->getFormalAccess())) {
-      if (existingDecl != Map.end())
-        declsToReport.erase({existingDecl->getSecond().first});
-      Map[Key] = FD;
-      declsToReport.insert(FD);
-    }
-  }
-
-  CanType stripSelfRequirementsIfNeeded(ValueDecl *VD,
-                                        GenericFunctionType *GFT) const {
-    // Preserve the generic signature if this is a subscript, which are uncurried,
-    // or if we have generic params other than Self. Otherwise, use
-    // the resultType of the curried function type.
-    // When we keep the generic signature, we remove the requirements
-    // from Self to make sure they don't prevent us from recognizing restatements.
-    auto params = GFT->getGenericParams();
-    if (params.size() == 1 && !isa<SubscriptDecl>(VD)) {
-      return GFT->getResult()->getCanonicalType();
-    }
-    auto Self = VD->getDeclContext()->getSelfInterfaceType();
-    SmallVector<Requirement, 4> newReqs;
-    for (auto req: GFT->getRequirements()) {
-      if (!Self->isEqual(req.getFirstType()))
-        newReqs.push_back(req);
-    }
-    auto newSig = GenericSignature::get(params, newReqs, false);
-
-    return GenericFunctionType::get(newSig, GFT->getParams(),
-                                    GFT->getResult(), GFT->getExtInfo())
-      ->getCanonicalType();
-  }
-
-public:
-  RestateFilteringConsumer(Type baseTy, const DeclContext *DC,
-                           LazyResolver *resolver)
-  : resolver(resolver) {
-    assert(DC && baseTy && !baseTy->hasLValueType());
-  }
-
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    assert(VD);
-    // If this isn't a protocol context, don't look further into the decl.
-    if (!isa<ProtocolDecl>(VD->getDeclContext())) {
-      declsToReport.insert({VD, Reason});
-      return;
-    }
-    if (resolver)
-      resolver->resolveDeclSignature(VD);
-
-    if (!VD->hasInterfaceType()) {
-      declsToReport.insert({VD, Reason});
-      return;
-    }
-    if (auto GFT = VD->getInterfaceType()->getAs<GenericFunctionType>()) {
-      auto type = stripSelfRequirementsIfNeeded(VD, GFT);
-      addDecl(foundFuncs, {VD->getFullName(), type}, {VD, Reason});
-      return;
-    }
-    addDecl(foundVars, VD->getFullName(), {VD, Reason});
-  }
-
-  void feedResultsToConsumer(VisibleDeclConsumer &Consumer) const {
-    for (const auto entry: declsToReport)
-      Consumer.foundDecl(entry.first, entry.second);
-  }
-};
-
 static void
   lookupVisibleProtocolMemberDecls(Type BaseTy, ProtocolType *PT,
                                    VisibleDeclConsumer &Consumer,
@@ -637,12 +551,11 @@ static void lookupVisibleMemberDeclsImpl(
     for (auto Proto : Archetype->getConformsTo())
       lookupVisibleProtocolMemberDecls(
           BaseTy, Proto->getDeclaredType(), Consumer, CurrDC, LS,
-          getReasonForSuper(Reason), TypeResolver, GSB, Visited);
+          Reason, TypeResolver, GSB, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
       lookupVisibleMemberDeclsImpl(superclass, Consumer, CurrDC, LS,
-                                   getReasonForSuper(Reason), TypeResolver,
-                                   GSB, Visited);
+                                   Reason, TypeResolver, GSB, Visited);
     return;
   }
 
@@ -763,17 +676,6 @@ template <> struct DenseMapInfo<FoundDeclTy> {
 
 namespace {
 
-/// Hack to guess at whether substituting into the type of a declaration will
-/// be okay.
-/// FIXME: This is awful. We should either have Type::subst() work for
-/// GenericFunctionType, or we should kill it outright.
-static bool shouldSubstIntoDeclType(Type type) {
-  auto genericFnType = type->getAs<GenericFunctionType>();
-  if (!genericFnType) return true;
-
-  return false;
-}
-
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
 public:
   std::set<ValueDecl *> AllFoundDecls;
@@ -782,16 +684,12 @@ public:
   Type BaseTy;
   const DeclContext *DC;
   LazyResolver *TypeResolver;
-  bool IsTypeLookup = false;
 
   OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC,
                             LazyResolver *resolver)
-      : BaseTy(BaseTy), DC(DC), TypeResolver(resolver) {
+      : BaseTy(BaseTy->getMetatypeInstanceType()),
+        DC(DC), TypeResolver(resolver) {
     assert(!BaseTy->hasLValueType());
-    if (auto *MetaTy = BaseTy->getAs<AnyMetatypeType>()) {
-      BaseTy = MetaTy->getInstanceType();
-      IsTypeLookup = true;
-    }
     assert(DC && BaseTy);
   }
 
@@ -801,7 +699,9 @@ public:
 
     // If this kind of declaration doesn't participate in overriding, there's
     // no filtering to do here.
-    if (!isa<AbstractFunctionDecl>(VD) && !isa<AbstractStorageDecl>(VD)) {
+    if (!isa<AbstractFunctionDecl>(VD) &&
+        !isa<AbstractStorageDecl>(VD) &&
+        !isa<AssociatedTypeDecl>(VD)) {
       DeclsToReport.insert(FoundDeclTy(VD, Reason));
       return;
     }
@@ -852,7 +752,8 @@ public:
     // don't substitute either.
     bool shouldSubst = (!BaseTy->isAnyObject() &&
                         !BaseTy->hasTypeVariable() &&
-                        BaseTy->getNominalOrBoundGenericNominal() &&
+                        (BaseTy->getNominalOrBoundGenericNominal() ||
+                         BaseTy->is<ArchetypeType>()) &&
                         VD->getDeclContext()->isTypeContext());
     ModuleDecl *M = DC->getParentModule();
 
@@ -865,8 +766,7 @@ public:
 
     auto FoundSignature = VD->getOverloadSignature();
     auto FoundSignatureType = VD->getOverloadSignatureType();
-    if (FoundSignatureType && shouldSubst &&
-        shouldSubstIntoDeclType(FoundSignatureType)) {
+    if (FoundSignatureType && shouldSubst) {
       auto subs = BaseTy->getMemberSubstitutionMap(M, VD);
       if (auto CT = FoundSignatureType.subst(subs))
         FoundSignatureType = CT->getCanonicalType();
@@ -883,8 +783,7 @@ public:
 
       auto OtherSignature = OtherVD->getOverloadSignature();
       auto OtherSignatureType = OtherVD->getOverloadSignatureType();
-      if (OtherSignatureType && shouldSubst &&
-          shouldSubstIntoDeclType(OtherSignatureType)) {
+      if (OtherSignatureType && shouldSubst) {
         auto subs = BaseTy->getMemberSubstitutionMap(M, OtherVD);
         if (auto CT = OtherSignatureType.subst(subs))
           OtherSignatureType = CT->getCanonicalType();
@@ -926,13 +825,11 @@ static void lookupVisibleMemberDecls(
     LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver,
     GenericSignatureBuilder *GSB) {
   OverrideFilteringConsumer overrideConsumer(BaseTy, CurrDC, TypeResolver);
-  RestateFilteringConsumer restateConsumer(BaseTy, CurrDC, TypeResolver);
   VisitedSet Visited;
-  lookupVisibleMemberDeclsImpl(BaseTy, restateConsumer, CurrDC, LS, Reason,
+  lookupVisibleMemberDeclsImpl(BaseTy, overrideConsumer, CurrDC, LS, Reason,
                                TypeResolver, GSB, Visited);
 
   // Report the declarations we found to the real consumer.
-  restateConsumer.feedResultsToConsumer(overrideConsumer);
   for (const auto &DeclAndReason : overrideConsumer.DeclsToReport)
     Consumer.foundDecl(DeclAndReason.D, DeclAndReason.Reason);
 }
