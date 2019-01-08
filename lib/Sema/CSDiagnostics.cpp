@@ -1327,8 +1327,7 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
 
 bool SubscriptMisuseFailure::diagnoseAsNote() {
   if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
-    emitDiagnostic(overload->choice.getDecl(),
-                   diag::ambiguous_subscript_candidate_requires_operator);
+    emitDiagnostic(overload->choice.getDecl(), diag::found_candidate);
     return true;
   }
   return false;

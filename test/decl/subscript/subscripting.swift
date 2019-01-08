@@ -266,11 +266,9 @@ func testGenSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 
 struct SubscriptTest1 {
   subscript(keyword:String) -> Bool { return true }
-  // expected-note@-1 2 {{found this candidate}}
-  // expected-note@-2 2 {{candidate requires use of the subscript operator}}
+  // expected-note@-1 4 {{found this candidate}}
   subscript(keyword:String) -> String? {return nil }
-  // expected-note@-1 2 {{found this candidate}}
-  // expected-note@-2 2 {{candidate requires use of the subscript operator}}
+  // expected-note@-1 4 {{found this candidate}}
 
   subscript(arg: SubClass) -> Bool { return true } // expected-note {{declared here}}
   subscript(arg: Protocol) -> Bool { return true } // expected-note 2 {{declared here}}
@@ -303,9 +301,9 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   // expected-error@-1 {{cannot invoke 'subscript' with an argument list of type '(SuperClass)'}}
   // expected-note@-2 {{overloads for 'subscript' exist with these partially matching parameter lists: (Protocol), (String), (SubClass)}}
   _ = s1.subscript("hello")
-  // expected-error@-1 {{ambiguous reference to subscript 'subscript(_:)'}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
   _ = s1.subscript("hello"
-  // expected-error@-1 {{ambiguous reference to subscript 'subscript(_:)'}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
   // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]
