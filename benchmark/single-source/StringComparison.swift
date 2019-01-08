@@ -140,52 +140,52 @@ public let StringHashing: [BenchmarkInfo] = [
   ),
 ]
 
-public let NormalizedIterator: [BenchmarkInfo] = [
+public let StringNormalization: [BenchmarkInfo] = [
   BenchmarkInfo(
     name: "NormalizedIterator_ascii",
-    runFunction: run_NormalizedIterator_ascii,
+    runFunction: run_StringNormalization_ascii,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_ascii) }
   ),
   BenchmarkInfo(
     name: "NormalizedIterator_latin1",
-    runFunction: run_NormalizedIterator_latin1,
+    runFunction: run_StringNormalization_latin1,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_latin1) }
   ),
   BenchmarkInfo(
     name: "NormalizedIterator_fastPrenormal",
-    runFunction: run_NormalizedIterator_fastPrenormal,
+    runFunction: run_StringNormalization_fastPrenormal,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_fastPrenormal) }
   ),
   BenchmarkInfo(
     name: "NormalizedIterator_slowerPrenormal",
-    runFunction: run_NormalizedIterator_slowerPrenormal,
+    runFunction: run_StringNormalization_slowerPrenormal,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_slowerPrenormal) }
   ),
   BenchmarkInfo(
     name: "NormalizedIterator_nonBMPSlowestPrenormal",
-    runFunction: run_NormalizedIterator_nonBMPSlowestPrenormal,
+    runFunction: run_StringNormalization_nonBMPSlowestPrenormal,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_nonBMPSlowestPrenormal) }
   ),
   BenchmarkInfo(
     name: "NormalizedIterator_emoji",
-    runFunction: run_NormalizedIterator_emoji,
+    runFunction: run_StringNormalization_emoji,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_emoji) }
   ),
   BenchmarkInfo(
     name: "NormalizedIterator_abnormal",
-    runFunction: run_NormalizedIterator_abnormal,
+    runFunction: run_StringNormalization_abnormal,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_abnormal) }
   ),
   BenchmarkInfo(
     name: "NormalizedIterator_zalgo",
-    runFunction: run_NormalizedIterator_zalgo,
+    runFunction: run_StringNormalization_zalgo,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_zalgo) }
   ),
@@ -435,7 +435,7 @@ public func run_StringHashing_zalgo(_ N: Int) {
 
 
 @inline(never)
-public func run_NormalizedIterator_ascii(_ N: Int) {
+public func run_StringNormalization_ascii(_ N: Int) {
   let workload: Workload = Workload.ascii
   let tripCount = workload.tripCount
   let payload = workload.payload
@@ -449,7 +449,7 @@ public func run_NormalizedIterator_ascii(_ N: Int) {
 }
 
 @inline(never)
-public func run_NormalizedIterator_latin1(_ N: Int) {
+public func run_StringNormalization_latin1(_ N: Int) {
   let workload: Workload = Workload.latin1
   let tripCount = workload.tripCount
   let payload = workload.payload
@@ -463,7 +463,7 @@ public func run_NormalizedIterator_latin1(_ N: Int) {
 }
 
 @inline(never)
-public func run_NormalizedIterator_fastPrenormal(_ N: Int) {
+public func run_StringNormalization_fastPrenormal(_ N: Int) {
   let workload: Workload = Workload.fastPrenormal
   let tripCount = workload.tripCount
   let payload = workload.payload
@@ -477,7 +477,7 @@ public func run_NormalizedIterator_fastPrenormal(_ N: Int) {
 }
 
 @inline(never)
-public func run_NormalizedIterator_slowerPrenormal(_ N: Int) {
+public func run_StringNormalization_slowerPrenormal(_ N: Int) {
   let workload: Workload = Workload.slowerPrenormal
   let tripCount = workload.tripCount
   let payload = workload.payload
@@ -491,7 +491,7 @@ public func run_NormalizedIterator_slowerPrenormal(_ N: Int) {
 }
 
 @inline(never)
-public func run_NormalizedIterator_nonBMPSlowestPrenormal(_ N: Int) {
+public func run_StringNormalization_nonBMPSlowestPrenormal(_ N: Int) {
   let workload: Workload = Workload.nonBMPSlowestPrenormal
   let tripCount = workload.tripCount
   let payload = workload.payload
@@ -505,7 +505,7 @@ public func run_NormalizedIterator_nonBMPSlowestPrenormal(_ N: Int) {
 }
 
 @inline(never)
-public func run_NormalizedIterator_emoji(_ N: Int) {
+public func run_StringNormalization_emoji(_ N: Int) {
   let workload: Workload = Workload.emoji
   let tripCount = workload.tripCount
   let payload = workload.payload
@@ -519,7 +519,7 @@ public func run_NormalizedIterator_emoji(_ N: Int) {
 }
 
 @inline(never)
-public func run_NormalizedIterator_abnormal(_ N: Int) {
+public func run_StringNormalization_abnormal(_ N: Int) {
   let workload: Workload = Workload.abnormal
   let tripCount = workload.tripCount
   let payload = workload.payload
@@ -533,7 +533,7 @@ public func run_NormalizedIterator_abnormal(_ N: Int) {
 }
 
 @inline(never)
-public func run_NormalizedIterator_zalgo(_ N: Int) {
+public func run_StringNormalization_zalgo(_ N: Int) {
   let workload: Workload = Workload.zalgo
   let tripCount = workload.tripCount
   let payload = workload.payload
@@ -545,6 +545,7 @@ public func run_NormalizedIterator_zalgo(_ N: Int) {
     }
   }
 }
+
 
 
 struct Workload {

@@ -101,7 +101,6 @@ set(SWIFTLIB_ESSENTIAL
   NativeDictionary.swift
   NativeSet.swift
   NewtypeWrapper.swift
-  NormalizedCodeUnitIterator.swift
   ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
