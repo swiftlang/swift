@@ -1089,6 +1089,8 @@ ConstraintSystem::solveImpl(Expr *&expr,
   if (auto generatedExpr = generateConstraints(expr))
     expr = generatedExpr;
   else {
+    if (listener)
+      listener->constraintGenerationFailed(expr);
     return SolutionKind::Error;
   }
 

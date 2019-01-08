@@ -181,7 +181,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
     def test_gets_list_of_precommit_benchmarks(self):
         self.subprocess_mock.expect(
             '/benchmarks/Benchmark_O --list --delim=\t'.split(' '),
-            '#\tTest\t[Tags]\n1\tBenchmark1\t[t1, t2]\n1\tBenchmark2\t[t3]\n')
+            '#\tTest\t[Tags]\n1\tBenchmark1\t[t1, t2]\n2\tBenchmark2\t[t3]\n')
         driver = BenchmarkDriver(
             self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
@@ -189,6 +189,8 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
                           ['Benchmark1', 'Benchmark2'])
         self.assertEquals(driver.all_tests,
                           ['Benchmark1', 'Benchmark2'])
+        self.assertEquals(driver.test_number['Benchmark1'], "1")
+        self.assertEquals(driver.test_number['Benchmark2'], "2")
 
     list_all_tests = (
         '/benchmarks/Benchmark_O --list --delim=\t --skip-tags='.split(' '),
@@ -281,14 +283,39 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b', '--num-iters=1'))
 
+    def test_run_benchmark_for_specified_time(self):
+        self.driver.run('b', sample_time=0.5)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b', '--sample-time=0.5'))
+
     def test_run_benchmark_in_verbose_mode(self):
         self.driver.run('b', verbose=True)
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b', '--verbose'))
 
+    def test_run_batch(self):
+        """Run all active tests in a single execution of the Benchmark_X.
+
+        Known test names are passed to the harness in a compressed form as test
+        numbers.
+        """
+        self.driver.tests = ['b1', 'bx']
+        self.driver.run()
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', '1', 'bx'))
+
     def test_parse_results_from_running_benchmarks(self):
-        self.driver.run('b')
+        """Parse measurements results using LogParser.
+
+        Individual test run returns the first PerformanceTestResult directly.
+        Batch run returns the dictionary of PerformanceTestResults.
+        """
+        r = self.driver.run('b')
         self.assertTrue(self.parser_stub.results_from_string_called)
+        self.assertEquals(r.name, 'b1')  # non-matching name, just 1st result
+        r = self.driver.run()
+        self.assertTrue(isinstance(r, dict))
+        self.assertEquals(r['b1'].name, 'b1')
 
     def test_measure_memory(self):
         self.driver.run('b', measure_memory=True)

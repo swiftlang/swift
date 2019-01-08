@@ -29,6 +29,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Statistic.h"
@@ -1914,6 +1915,11 @@ Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
 
+void ExprTypeCheckListener::preCheckFailed(Expr *expr) {}
+void ExprTypeCheckListener::constraintGenerationFailed(Expr *expr) {}
+void ExprTypeCheckListener::applySolutionFailed(Solution &solution,
+                                                Expr *expr) {}
+
 void ParentConditionalConformance::diagnoseConformanceStack(
     DiagnosticEngine &diags, SourceLoc loc,
     ArrayRef<ParentConditionalConformance> conformances) {
@@ -1941,6 +1947,88 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
   return false;
 }
 
+/// Sometimes constraint solver fails without producing any diagnostics,
+/// that leads to crashes down the line in AST Verifier or SILGen
+/// which, as a result, are much harder to figure out.
+///
+/// This class is intended to guard against situations like that by
+/// keeping track of failures of different type-check phases, and
+/// emitting fallback fatal error if any of them fail without producing
+/// error diagnostic, and there were no errors emitted or scheduled to be
+/// emitted previously.
+class FallbackDiagnosticListener : public ExprTypeCheckListener {
+  TypeChecker &TC;
+  TypeCheckExprOptions Options;
+  ExprTypeCheckListener *BaseListener;
+
+public:
+  FallbackDiagnosticListener(TypeChecker &TC, TypeCheckExprOptions options,
+                             ExprTypeCheckListener *base)
+      : TC(TC), Options(options), BaseListener(base) {}
+
+  bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
+    return BaseListener ? BaseListener->builtConstraints(cs, expr) : false;
+  }
+
+  Expr *foundSolution(Solution &solution, Expr *expr) override {
+    return BaseListener ? BaseListener->foundSolution(solution, expr) : expr;
+  }
+
+  Expr *appliedSolution(Solution &solution, Expr *expr) override {
+    return BaseListener ? BaseListener->appliedSolution(solution, expr) : expr;
+  }
+
+  void preCheckFailed(Expr *expr) override {
+    if (BaseListener)
+      BaseListener->preCheckFailed(expr);
+    maybeProduceFallbackDiagnostic(expr);
+  }
+
+  void constraintGenerationFailed(Expr *expr) override {
+    if (BaseListener)
+      BaseListener->constraintGenerationFailed(expr);
+    maybeProduceFallbackDiagnostic(expr);
+  }
+
+  void applySolutionFailed(Solution &solution, Expr *expr) override {
+    if (BaseListener)
+      BaseListener->applySolutionFailed(solution, expr);
+
+    if (hadAnyErrors())
+      return;
+
+    // If solution involves invalid or incomplete conformances that's
+    // a probable cause of failure to apply it without producing an error,
+    // which is going to be diagnosed later, so let's not produce
+    // fallback diagnostic in this case.
+    if (llvm::any_of(
+            solution.Conformances,
+            [](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
+                   &conformance) -> bool {
+              auto &ref = conformance.second;
+              return ref.isConcrete() && ref.getConcrete()->isInvalid();
+            }))
+      return;
+
+    maybeProduceFallbackDiagnostic(expr);
+  }
+
+private:
+  bool hadAnyErrors() const { return TC.Context.Diags.hadAnyError(); }
+
+  void maybeProduceFallbackDiagnostic(Expr *expr) const {
+    if (Options.contains(TypeCheckExprFlags::SubExpressionDiagnostics) ||
+        Options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+      return;
+
+    // Before producing fatal error here, let's check if there are any "error"
+    // diagnostics already emitted or waiting to be emitted. Because they are
+    // a better indication of the problem.
+    if (!(hadAnyErrors() || TC.Context.hasDelayedConformanceErrors()))
+      TC.diagnose(expr->getLoc(), diag::failed_to_produce_diagnostic);
+  }
+};
+
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
@@ -1948,13 +2036,26 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
+  FallbackDiagnosticListener diagListener(*this, options, listener);
+  return typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
+                                 options, diagListener, baseCS);
+}
+
+Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
+                                          TypeLoc convertType,
+                                          ContextualTypePurpose convertTypePurpose,
+                                          TypeCheckExprOptions options,
+                                          ExprTypeCheckListener &listener,
+                                          ConstraintSystem *baseCS) {
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (preCheckExpression(expr, dc))
+  if (preCheckExpression(expr, dc)) {
+    listener.preCheckFailed(expr);
     return Type();
+  }
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
@@ -2009,10 +2110,9 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
     convertTo = getOptionalType(expr->getLoc(), var);
   }
 
-  // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (cs.solve(expr, convertTo, listener, viable,
-               allowFreeTypeVariables))
+  // Attempt to solve the constraint system.
+  if (cs.solve(expr, convertTo, &listener, viable, allowFreeTypeVariables))
     return Type();
 
   // If the client allows the solution to have unresolved type expressions,
@@ -2026,29 +2126,26 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   auto result = expr;
   auto &solution = viable[0];
-  if (listener) {
-    result = listener->foundSolution(solution, result);
-    if (!result)
-      return Type();
-  }
+  result = listener.foundSolution(solution, result);
+  if (!result)
+    return Type();
 
   // Apply the solution to the expression.
   result = cs.applySolution(
       solution, result, convertType.getType(),
       options.contains(TypeCheckExprFlags::IsDiscarded),
       options.contains(TypeCheckExprFlags::SkipMultiStmtClosures));
+
   if (!result) {
+    listener.applySolutionFailed(solution, expr);
     // Failure already diagnosed, above, as part of applying the solution.
     return Type();
   }
 
-  // If there's a listener, notify it that we've applied the solution.
-  if (listener) {
-    result = listener->appliedSolution(solution, result);
-    if (!result) {
-      return Type();
-    }
-  }
+  // Notify listener that we've applied the solution.
+  result = listener.appliedSolution(solution, result);
+  if (!result)
+    return Type();
 
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
