@@ -3180,19 +3180,25 @@ public:
     Kind = LookupKind::ValueExpr;
     NeedLeadingDot = !HaveDot;
 
-    // This is horrible
     ExprType = ExprType->getRValueType();
+    assert(!ExprType->hasTypeParameter());
+
     this->ExprType = ExprType;
-    if (ExprType->hasTypeParameter()) {
-      DeclContext *DC = nullptr;
-      if (VD)
-        DC = VD->getInnermostDeclContext();
-      else if (auto NTD = ExprType->getInOutObjectType()
-                   ->getMetatypeInstanceType()->getAnyNominal())
-        DC = NTD;
-      if (DC)
-        ExprType = DC->mapTypeIntoContext(ExprType);
+
+    // Open existential types, so that lookupVisibleMemberDecls() can properly
+    // substitute them.
+    bool WasOptional = false;
+    if (auto OptionalType = ExprType->getOptionalObjectType()) {
+      ExprType = OptionalType;
+      WasOptional = true;
     }
+
+    if (!ExprType->getMetatypeInstanceType()->isAnyObject())
+      if (ExprType->isAnyExistentialType())
+        ExprType = OpenedArchetypeType::getAny(ExprType);
+
+    if (WasOptional)
+      ExprType = OptionalType::get(ExprType);
 
     // Handle special cases
     bool isIUO = VD && VD->getAttrs()
@@ -4188,13 +4194,12 @@ public:
     }
   }
 
-  void addDesignatedInitializers(Type CurrTy) {
+  void addDesignatedInitializers(NominalTypeDecl *NTD) {
     if (hasFuncIntroducer || hasVarIntroducer || hasTypealiasIntroducer ||
         hasOverridabilityModifier)
       return;
 
-    assert(CurrTy);
-    const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
+    const auto *CD = dyn_cast<ClassDecl>(NTD);
     if (!CD)
       return;
     if (!CD->hasSuperclass())
@@ -4211,13 +4216,11 @@ public:
     }
   }
 
-  void addAssociatedTypes(Type CurrTy) {
+  void addAssociatedTypes(NominalTypeDecl *NTD) {
     if (!hasTypealiasIntroducer &&
         (hasFuncIntroducer || hasVarIntroducer || hasInitializerModifier ||
          hasOverride || hasOverridabilityModifier))
       return;
-
-    NominalTypeDecl *NTD = CurrTy->getAnyNominal();
 
     for (auto Conformance : NTD->getAllConformances()) {
       auto Proto = Conformance->getProtocol();
@@ -4244,13 +4247,14 @@ public:
     if (isa<ProtocolDecl>(CurrDeclContext))
       return;
 
-    Type CurrTy = CurrDeclContext->getDeclaredTypeInContext();
+    Type CurrTy = CurrDeclContext->getSelfTypeInContext();
+    auto *NTD = CurrDeclContext->getSelfNominalTypeDecl();
     if (CurrTy && !CurrTy->is<ErrorType>()) {
       lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
                                TypeResolver,
                                /*includeInstanceMembers=*/false);
-      addDesignatedInitializers(CurrTy);
-      addAssociatedTypes(CurrTy);
+      addDesignatedInitializers(NTD);
+      addAssociatedTypes(NTD);
     }
   }
 };

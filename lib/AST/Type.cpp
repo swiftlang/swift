@@ -432,7 +432,7 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
                              genericFn->getExtInfo());
   }
 
-  auto selfTy = dc->getDeclaredInterfaceType();
+  auto selfTy = dc->getSelfInterfaceType();
   auto selfParam = AnyFunctionType::Param(selfTy);
   if (sig)
     return GenericFunctionType::get(sig, {selfParam}, type);
@@ -853,7 +853,6 @@ Type TypeBase::getMetatypeInstanceType() {
   if (auto metaTy = getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
-  // For mutable value type methods, we need to dig through inout types.
   return this;
 }
 
