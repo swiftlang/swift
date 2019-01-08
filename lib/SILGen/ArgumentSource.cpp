@@ -269,6 +269,7 @@ void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
   case Kind::Expr:
     out << "Expr\n";
     Storage.get<Expr*>(StoredKind)->dump(out); // FIXME: indent
+    out << "\n";
     return;
   }
   llvm_unreachable("bad kind");

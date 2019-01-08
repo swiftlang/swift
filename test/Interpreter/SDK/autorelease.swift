@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3 | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -11,7 +11,7 @@ import Foundation
 
 class PrintOnDeinit: NSObject {
   // Result should get autoreleased.
-  dynamic class func create() -> PrintOnDeinit {
+  @objc dynamic class func create() -> PrintOnDeinit {
     return PrintOnDeinit()
   }
 

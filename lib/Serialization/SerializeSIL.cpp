@@ -385,6 +385,15 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (F.hasClangNode())
     clangNodeOwnerID = S.addDeclRef(F.getClangNodeOwner());
 
+  IdentifierID replacedFunctionID = 0;
+  if (auto *fun = F.getDynamicallyReplacedFunction()) {
+    addReferencedSILFunction(fun, true);
+    replacedFunctionID = S.addUniquedStringRef(fun->getName());
+  }
+  else if (F.hasObjCReplacement()) {
+    replacedFunctionID =
+        S.addUniquedStringRef(F.getObjCReplacement().str());
+  }
   unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
@@ -393,7 +402,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasQualifiedOwnership(),
-      F.isWeakLinked(), FnID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(), FnID,
+      replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
@@ -411,6 +421,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   BasicBlockMap.clear();
   // Assign a value ID to each SILInstruction that has value and to each basic
   // block argument.
+  //
+  // FIXME: Add reverse iteration to SILSuccessor and convert this to a "stable"
+  // RPO order. Currently, the serializer inverts the order of successors each
+  // time they are processed.
   unsigned ValueID = 0;
   llvm::ReversePostOrderTraversal<SILFunction *> RPOT(
       const_cast<SILFunction *>(&F));
@@ -1277,6 +1291,34 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Use SILOneOperandLayout to specify the function type and the function
     // name (IdentifierID).
     const FunctionRefInst *FRI = cast<FunctionRefInst>(&SI);
+    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(), 0,
+        S.addTypeRef(FRI->getType().getASTType()),
+        (unsigned)FRI->getType().getCategory(),
+        addSILFunctionRef(ReferencedFunction));
+
+    break;
+  }
+  case SILInstructionKind::DynamicFunctionRefInst: {
+    // Use SILOneOperandLayout to specify the function type and the function
+    // name (IdentifierID).
+    const auto *FRI = cast<DynamicFunctionRefInst>(&SI);
+    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(), 0,
+        S.addTypeRef(FRI->getType().getASTType()),
+        (unsigned)FRI->getType().getCategory(),
+        addSILFunctionRef(ReferencedFunction));
+
+    break;
+  }
+  case SILInstructionKind::PreviousDynamicFunctionRefInst: {
+    // Use SILOneOperandLayout to specify the function type and the function
+    // name (IdentifierID).
+    const auto *FRI = cast<PreviousDynamicFunctionRefInst>(&SI);
     SILFunction *ReferencedFunction = FRI->getReferencedFunction();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2382,6 +2424,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // decl blocks and sil blocks.
   registerSILAbbr<decls_block::AbstractProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
+  registerSILAbbr<decls_block::SelfProtocolConformanceLayout>();
   registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceIdLayout>();

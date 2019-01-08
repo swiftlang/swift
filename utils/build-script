@@ -474,6 +474,7 @@ class BuildScriptInvocation(object):
             "--xctest-build-type", args.build_variant,
             "--swiftpm-build-type", args.build_variant,
             "--swiftsyntax-build-type", args.build_variant,
+            "--skstresstester-build-type", args.build_variant,
             "--llbuild-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
@@ -593,6 +594,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-swiftpm"]
         if not args.build_swiftsyntax:
             impl_args += ["--skip-build-swiftsyntax"]
+        if not args.build_skstresstester:
+            impl_args += ["--skip-build-skstresstester"]
         if not args.build_playgroundsupport:
             impl_args += ["--skip-build-playgroundsupport"]
         if args.build_swift_dynamic_stdlib:
@@ -637,6 +640,7 @@ class BuildScriptInvocation(object):
                           "--skip-test-llbuild",
                           "--skip-test-swiftpm",
                           "--skip-test-swiftsyntax",
+                          "--skip-test-skstresstester",
                           "--skip-test-xctest",
                           "--skip-test-foundation",
                           "--skip-test-libdispatch",

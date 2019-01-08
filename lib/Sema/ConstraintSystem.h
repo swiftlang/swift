@@ -636,19 +636,6 @@ public:
                      bool ignoreTopLevelInjection = false,
                      Optional<Pattern*> typeFromPattern = None) const;
 
-  /// \brief Convert the given expression to a logic value.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce. The type of this expression
-  /// must conform to the LogicValue protocol.
-  ///
-  /// \param locator Locator used to describe the location of this expression.
-  ///
-  /// \returns the expression converted to a logic value (Builtin i1).
-  Expr *convertBooleanTypeToBuiltinI1(Expr *expr,
-                                      ConstraintLocator *locator) const;
-
   /// \brief Convert the given optional-producing expression to a Bool
   /// indicating whether the optional has a value.
   ///
@@ -823,6 +810,10 @@ enum class ConstraintSystemFlags {
   /// system is not applied to the expression AST, but the ConstraintSystem is
   /// left in-tact.
   AllowUnresolvedTypeVariables = 0x10,
+
+  /// If set, constraint system always reuses type of pre-typechecked
+  /// expression, and doesn't dig into its subexpressions.
+  ReusePrecheckedType = 0x20,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -906,8 +897,28 @@ struct MemberLookupResult {
   }
   
 };
-  
-  
+
+/// \brief Stores the required methods for @dynamicCallable types.
+struct DynamicCallableMethods {
+  llvm::DenseSet<FuncDecl *> argumentsMethods;
+  llvm::DenseSet<FuncDecl *> keywordArgumentsMethods;
+
+  void addArgumentsMethod(FuncDecl *method) {
+    argumentsMethods.insert(method);
+  }
+
+  void addKeywordArgumentsMethod(FuncDecl *method) {
+    keywordArgumentsMethods.insert(method);
+  }
+
+  /// \brief Returns true if type defines either of the @dynamicCallable
+  /// required methods. Returns false iff type does not satisfy @dynamicCallable
+  /// requirements.
+  bool isValid() const {
+    return !argumentsMethods.empty() || !keywordArgumentsMethods.empty();
+  }
+};
+
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -1061,10 +1072,13 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
 
-  /// This is a cache that keeps track of whether a given type is known (or not)
-  /// to be a @dynamicMemberLookup type.
-  ///
-  llvm::DenseMap<CanType, bool> IsDynamicMemberLookupCache;
+  /// A cache that stores the @dynamicCallable required methods implemented by
+  /// types.
+  llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
+
+  /// A cache that stores whether types are valid @dynamicMemberLookup types.
+  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
+
 private:
   /// \brief Describe the candidate expression for partial solving.
   /// This class used by shrink & solve methods which apply
@@ -1166,12 +1180,6 @@ private:
     /// \brief Maximum depth reached so far in exploring solutions.
     unsigned maxDepth = 0;
 
-    /// \brief Count of the number of leaf scopes we've created. These
-    /// either result in a failure to solve, or in a solution, unlike
-    /// all the intermediate scopes. They are interesting to track as
-    /// part of a metric of whether an expression is too complex.
-    unsigned leafScopes = 0;
-
     /// \brief Whether to record failures or not.
     bool recordFixes = false;
 
@@ -1268,7 +1276,7 @@ private:
 
       unsigned countScopesExplored = NumStatesExplored - scope->scopeNumber;
       if (countScopesExplored == 1)
-        ++leafScopes;
+        CS.incrementLeafScopes();
 
       SolverScope *savedScope;
       // The position of last retired constraint before given scope.
@@ -1307,6 +1315,10 @@ private:
     /// current path, this list is used in LIFO fashion when constraints
     /// are added back to the circulation.
     ConstraintList retiredConstraints;
+
+    /// The set of constraints which were active at the time of this state
+    /// creating, it's used to re-activate them on destruction.
+    SmallVector<Constraint *, 4> activeConstraints;
 
     /// The current set of generated constraints.
     SmallVector<Constraint *, 4> generatedConstraints;
@@ -1434,6 +1446,7 @@ private:
   }
 
   void incrementScopeCounter();
+  void incrementLeafScopes();
 
 public:
   /// \brief Introduces a new solver scope, which any changes to the
@@ -1757,15 +1770,19 @@ public:
 public:
 
   /// \brief Whether we should attempt to fix problems.
-  bool shouldAttemptFixes() {
+  bool shouldAttemptFixes() const {
     if (!(Options & ConstraintSystemFlags::AllowFixes))
       return false;
 
     return !solverState || solverState->recordFixes;
   }
 
-  bool shouldSuppressDiagnostics() {
+  bool shouldSuppressDiagnostics() const {
     return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);
+  }
+
+  bool shouldReusePrecheckedType() const {
+    return Options.contains(ConstraintSystemFlags::ReusePrecheckedType);
   }
 
   /// \brief Log and record the application of the fix. Return true iff any
@@ -2298,12 +2315,6 @@ public:
   /// \returns a possibly-sanitized expression, or null if an error occurred.
   Expr *generateConstraints(Expr *E);
 
-  /// \brief Generate constraints for the given top-level expression,
-  /// assuming that its children are already type-checked.
-  ///
-  /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraintsShallow(Expr *E);
-
   /// \brief Generate constraints for binding the given pattern to the
   /// value of the given expression.
   ///
@@ -2656,6 +2667,13 @@ private:
                                       TypeMatchOptions flags,
                                       ConstraintLocatorBuilder locator);
 
+  /// \brief Attempt to simplify the DynamicCallableApplicableFunction constraint.
+  SolutionKind simplifyDynamicCallableApplicableFnConstraint(
+                                      Type type1,
+                                      Type type2,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator);
+
   /// \brief Attempt to simplify the given DynamicTypeOf constraint.
   SolutionKind simplifyDynamicTypeOfConstraint(
                                          Type type1, Type type2,
@@ -2793,8 +2811,7 @@ private:
   };
 
   struct PotentialBindings {
-    using BindingScore =
-        std::tuple<bool, bool, bool, bool, unsigned char, unsigned int>;
+    using BindingScore = std::tuple<bool, bool, bool, bool, unsigned char, int>;
 
     TypeVariableType *TypeVar;
 
@@ -3067,10 +3084,13 @@ public:
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
+  /// \param allowFixes Whether to allow fixes in the solution.
+  ///
   /// \returns a solution if a single unambiguous one could be found, or None if
   /// ambiguous or unsolvable.
   Optional<Solution> solveSingle(FreeTypeVariableBinding allowFreeTypeVariables
-                                    = FreeTypeVariableBinding::Disallow);
+                                 = FreeTypeVariableBinding::Disallow,
+                                 bool allowFixes = false);
 
 private:
   /// \brief Solve the system of constraints.
@@ -3133,11 +3153,6 @@ public:
                       Type convertType, bool discardedExpr,
                       bool skipClosures);
 
-  /// \brief Apply a given solution to the expression to the top-level
-  /// expression, producing a fully type-checked expression.
-  Expr *applySolutionShallow(const Solution &solution, Expr *expr,
-                             bool suppressDiagnostics);
-  
   /// \brief Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
@@ -3234,6 +3249,25 @@ public:
   };
 
   bool haveTypeInformationForAllArguments(FunctionType *fnType);
+
+  typedef std::function<bool(unsigned index, Constraint *)> ConstraintMatcher;
+  typedef std::function<void(ArrayRef<Constraint *>, ConstraintMatcher)>
+      ConstraintMatchLoop;
+  typedef std::function<void(SmallVectorImpl<unsigned> &options)>
+      PartitionAppendCallback;
+
+  // Attempt to sort nominalTypes based on what we can discover about
+  // calls into the overloads in the disjunction that bindOverload is
+  // a part of.
+  void sortDesignatedTypes(SmallVectorImpl<NominalTypeDecl *> &nominalTypes,
+                           Constraint *bindOverload);
+
+  // Partition the choices in a disjunction based on those that match
+  // the designated types for the operator that the disjunction was
+  // formed for.
+  void partitionForDesignatedTypes(ArrayRef<Constraint *> Choices,
+                                   ConstraintMatchLoop forEachChoice,
+                                   PartitionAppendCallback appendPartition);
 
   // Partition the choices in the disjunction into groups that we will
   // iterate over in an order appropriate to attempt to stop before we
@@ -3379,7 +3413,7 @@ matchCallArguments(ConstraintSystem &cs,
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.
 bool areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
-                                               unsigned parameterDepth,
+                                               bool hasCurriedSelf,
                                                ArrayRef<Identifier> labels,
                                                bool hasTrailingClosure);
 
@@ -3418,6 +3452,13 @@ void simplifyLocator(Expr *&anchor,
 /// \returns the anchor expression if it fully describes the locator, or
 /// null otherwise.
 Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
+
+/// Retrieve argument at specified index from given expression.
+/// The expression could be "application", "subscript" or "member" call.
+///
+/// \returns argument expression or `nullptr` if given "base" expression
+/// wasn't of one of the kinds listed above.
+Expr *getArgumentExpr(Expr *expr, unsigned index);
 
 class DisjunctionChoice {
   unsigned Index;
@@ -3775,6 +3816,9 @@ bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC, DeclContext *DC,
 bool exprNeedsParensOutsideFollowingOperator(
     TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr,
     PrecedenceGroupDecl *followingPG);
+
+/// Determine whether this is a SIMD operator.
+bool isSIMDOperator(ValueDecl *value);
 
 } // end namespace swift
 

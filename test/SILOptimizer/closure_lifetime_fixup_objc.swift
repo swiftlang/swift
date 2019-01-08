@@ -1,7 +1,8 @@
-// RUN: %target-swift-frontend %s -emit-sil -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -enable-sil-ownership -sil-verify-all -emit-sil -o - -I %S/Inputs/usr/include | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
+import ClosureLifetimeFixupObjC
 
 @objc
 public protocol DangerousEscaper {
@@ -100,3 +101,10 @@ class C: NSObject {
     getDispatchQueue().sync(execute: { _ = self })
   }
 }
+
+// Make sure that we obey ownership invariants when we emit load_borrow.
+internal typealias MyBlock = @convention(block) () -> Void
+func getBlock(noEscapeBlock: () -> Void ) -> MyBlock {
+  return block_create_noescape(noEscapeBlock)
+}
+

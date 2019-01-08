@@ -51,13 +51,13 @@ extension SCNVector3 {
   }
 }
 
-extension float3 {
+extension SIMD3 where Scalar == Float {
   public init(_ v: SCNVector3) {
     self.init(Float(v.x), Float(v.y), Float(v.z))
   }
 }
 
-extension double3 {
+extension SIMD3 where Scalar == Double {
   public init(_ v: SCNVector3) {
     self.init(Double(v.x), Double(v.y), Double(v.z))
   }
@@ -86,13 +86,13 @@ extension SCNVector4 {
   }
 }
 
-extension float4 {
+extension SIMD4 where Scalar == Float {
   public init(_ v: SCNVector4) {
     self.init(Float(v.x), Float(v.y), Float(v.z), Float(v.w))
   }
 }
 
-extension double4 {
+extension SIMD4 where Scalar == Double {
   public init(_ v: SCNVector4) {
     self.init(Double(v.x), Double(v.y), Double(v.z), Double(v.w))
   }
@@ -179,15 +179,21 @@ extension SCNGeometryElement {
 extension SCNGeometrySource {
   @nonobjc
   public convenience init(vertices: [SCNVector3]) {
-    self.init(vertices: vertices, count: vertices.count)
+    fatalError()
+    // FIXME: <rdar://problem/43534146>
+    // self.init(__vertices: vertices, count: vertices.count)
   }
   @nonobjc
   public convenience init(normals: [SCNVector3]) {
-    self.init(normals: normals, count: normals.count)
+    fatalError()
+    // FIXME: <rdar://problem/43534146>
+    // self.init(__normals: normals, count: normals.count)
   }
   @nonobjc
   public convenience init(textureCoordinates: [CGPoint]) {
-    self.init(textureCoordinates: textureCoordinates, count: textureCoordinates.count)
+    fatalError()
+    // FIXME: <rdar://problem/43534146>
+    // self.init(__textureCoordinates: textureCoordinates, count: textureCoordinates.count)
   }
 }
 

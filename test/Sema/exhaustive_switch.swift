@@ -360,6 +360,10 @@ enum MyNever {}
 func ~= (_ : MyNever, _ : MyNever) -> Bool { return true }
 func myFatalError() -> MyNever { fatalError() }
 
+@_frozen public enum UninhabitedT4<A> {
+  case x(A)
+}
+
 func checkUninhabited() {
   // Scrutinees of uninhabited type may match any number and kind of patterns
   // that Sema is willing to accept at will.  After all, it's quite a feat to
@@ -378,6 +382,10 @@ func checkUninhabited() {
     case myFatalError(): break
     case myFatalError(): break
     }
+  }
+
+  func test4(x: UninhabitedT4<Never>) {
+    switch x {} // No diagnostic.
   }
 }
 

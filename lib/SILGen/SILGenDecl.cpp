@@ -242,31 +242,6 @@ void TemporaryInitialization::finishInitialization(SILGenFunction &SGF) {
 }
 
 namespace {
-class EndBorrowCleanup : public Cleanup {
-  SILValue original;
-  SILValue borrowed;
-
-public:
-  EndBorrowCleanup(SILValue original, SILValue borrowed)
-      : original(original), borrowed(borrowed) {}
-
-  void emit(SILGenFunction &SGF, CleanupLocation l,
-            ForUnwind_t forUnwind) override {
-    SGF.B.createEndBorrow(l, borrowed, original);
-  }
-
-  void dump(SILGenFunction &) const override {
-#ifndef NDEBUG
-    llvm::errs() << "EndBorrowCleanup "
-                 << "State:" << getState() << "\n"
-                 << "original:" << original << "\n"
-                 << "borrowed:" << borrowed << "\n";
-#endif
-  }
-};
-} // end anonymous namespace
-
-namespace {
 class ReleaseValueCleanup : public Cleanup {
   SILValue v;
 public:
@@ -721,9 +696,12 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
        getUnmanagedValue();
   }
 
+  assert(testBool->getType().getASTType()->isBool());
+  auto i1Value = SGF.emitUnwrapIntegerResult(loc, testBool);
+
   SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
   auto falseBB = SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
-  SGF.B.createCondBranch(loc, testBool, contBB, falseBB);
+  SGF.B.createCondBranch(loc, i1Value, contBB, falseBB);
 
   SGF.B.setInsertionPoint(contBB);
 }
@@ -1020,13 +998,7 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
   assert(isInit && "Only initialization is supported for refutable patterns");
 
   // Extract the i1 from the Bool struct.
-  StructDecl *BoolStruct = cast<StructDecl>(SGF.getASTContext().getBoolDecl());
-  auto Members = BoolStruct->lookupDirect(SGF.getASTContext().Id_value_);
-  assert(Members.size() == 1 &&
-         "Bool should have only one property with name '_value'");
-  auto Member = dyn_cast<VarDecl>(Members[0]);
-  assert(Member &&"Bool should have a property with name '_value' of type Int1");
-  auto *i1Val = SGF.B.createStructExtract(loc, value.forward(SGF), Member);
+  auto i1Value = SGF.emitUnwrapIntegerResult(loc, value.forward(SGF));
 
   // Branch on the boolean based on whether we're testing for true or false.
   SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
@@ -1035,7 +1007,7 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
 
   if (!pattern->getValue())
     std::swap(trueBB, falseBB);
-  SGF.B.createCondBranch(loc, i1Val, trueBB, falseBB);
+  SGF.B.createCondBranch(loc, i1Value, trueBB, falseBB);
   SGF.B.setInsertionPoint(contBB);
 }
 
@@ -1264,7 +1236,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 /// specified JumpDest.  The insertion point is left in the block where the
 /// condition has matched and any bound variables are in scope.
 ///
-void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
+void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
                                        SILLocation loc,
                                        ProfileCounter NumTrueTaken,
                                        ProfileCounter NumFalseTaken) {
@@ -1279,7 +1251,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
     switch (elt.getKind()) {
     case StmtConditionElement::CK_PatternBinding: {
       InitializationPtr initialization =
-      InitializationForPattern(*this, FailDest).visit(elt.getPattern());
+      InitializationForPattern(*this, FalseDest).visit(elt.getPattern());
 
       // Emit the initial value into the initialization.
       FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
@@ -1293,6 +1265,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
       // Evaluate the condition as an i1 value (guaranteed by Sema).
       FullExpr Scope(Cleanups, CleanupLocation(expr));
       booleanTestValue = emitRValue(expr).forwardAsSingleValue(*this, expr);
+      booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
       booleanTestLoc = expr;
       break;
     }
@@ -1320,8 +1293,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
     
     // Just branch on the condition.  On failure, we unwind any active cleanups,
     // on success we fall through to a new block.
+    auto FailBB = Cleanups.emitBlockForCleanups(FalseDest, loc);
     SILBasicBlock *ContBB = createBasicBlock();
-    auto FailBB = Cleanups.emitBlockForCleanups(FailDest, loc);
     B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB,
                        NumTrueTaken, NumFalseTaken);
 
@@ -1421,7 +1394,19 @@ void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
   lastEmittedConformance = root;
 }
 
+static bool isDeclaredInPrimaryFile(SILModule &M, Decl *d) {
+  auto *dc = d->getDeclContext();
+  if (auto *sf = dyn_cast<SourceFile>(dc->getModuleScopeContext()))
+    if (M.isWholeModule() || M.getAssociatedContext() == sf)
+      return true;
+
+  return false;
+}
+
 void SILGenModule::emitExternalDefinition(Decl *d) {
+  if (isDeclaredInPrimaryFile(M, d))
+    return;
+
   switch (d->getKind()) {
   case DeclKind::Func:
   case DeclKind::Accessor: {
@@ -1541,7 +1526,7 @@ struct FormalAccessReleaseValueCleanup : Cleanup {
       getEvaluation(SGF).setFinished();
     }
 
-    state = newState;
+    Cleanup::setState(SGF, newState);
   }
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
@@ -1573,7 +1558,7 @@ struct FormalAccessReleaseValueCleanup : Cleanup {
 ManagedValue
 SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
                                                          SILValue addr) {
-  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
+  assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(addr->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(addr);
@@ -1588,7 +1573,7 @@ SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
 ManagedValue
 SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
                                                          SILValue value) {
-  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
+  assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(value->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(value);
@@ -1602,7 +1587,7 @@ SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
 
 CleanupHandle SILGenFunction::enterDormantFormalAccessTemporaryCleanup(
     SILValue addr, SILLocation loc, const TypeLowering &tempTL) {
-  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
+  assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   if (tempTL.isTrivial())
     return CleanupHandle::invalid();
 

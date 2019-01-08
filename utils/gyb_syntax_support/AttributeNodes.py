@@ -17,6 +17,7 @@ ATTRIBUTE_NODES = [
     #                | availability-spec-list
     #                | specialize-attr-spec-list
     #                | implements-attr-arguments
+    #                | named-attribute-string-argument
     #              )? ')'?
     Node('Attribute', kind='Syntax',
          description='''
@@ -42,6 +43,8 @@ ATTRIBUTE_NODES = [
                        Child('ObjCName', kind='ObjCSelector'),
                        Child('ImplementsArguments', 
                              kind='ImplementsAttributeArguments'),
+                       Child('NamedAttributeString',
+                             kind='NamedAttributeStringArgument'),
                    ], description='''
                    The arguments of the attribute. In case the attribute  \
                    takes multiple arguments, they are gather in the \
@@ -95,7 +98,38 @@ ATTRIBUTE_NODES = [
                    A trailing comma if this argument is followed by another one
                    '''),
          ]),
-
+    # The argument of '@_dynamic_replacement(for:)' or '@_private(sourceFile:)'
+    # named-attribute-string-arg -> 'name': string-literal
+    Node('NamedAttributeStringArgument', kind='Syntax',
+         description='''
+         The argument for the `@_dynamic_replacement` or `@_private` \
+         attribute of the form `for: "function()"` or `sourceFile: \
+         "Src.swift"`
+         ''',
+         children=[
+             Child('NameTok', kind='Token',
+                   description='The label of the argument'),
+             Child('Colon', kind='ColonToken',
+                   description='The colon separating the label and the value'),
+             Child('StringOrDeclname', kind='Syntax', node_choices=[
+                 Child('String', kind='StringLiteralToken'),
+                 Child('Declname', kind='DeclName'),
+             ]),
+         ]),
+    Node('DeclName', kind='Syntax', children=[
+         Child('DeclBaseName', kind='Syntax', description='''
+               The base name of the protocol\'s requirement.
+               ''',
+               node_choices=[
+                   Child('Identifier', kind='IdentifierToken'),
+                   Child('Operator', kind='PrefixOperatorToken'),
+               ]),
+         Child('DeclNameArguments', kind='DeclNameArguments',
+               is_optional=True, description='''
+               The argument labels of the protocol\'s requirement if it \
+               is a function requirement.
+               '''),
+         ]),
     # The argument of '@_implements(...)'
     # implements-attr-arguments -> simple-type-identifier ',' 
     #                              (identifier | operator) decl-name-arguments

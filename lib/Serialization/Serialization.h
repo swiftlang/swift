@@ -34,7 +34,8 @@ namespace serialization {
 
 using FilenamesTy = ArrayRef<std::string>;
 
-class Serializer {
+class SerializerBase {
+protected:
   SmallVector<char, 0> Buffer;
   llvm::BitstreamWriter Out{Buffer};
 
@@ -50,6 +51,21 @@ class Serializer {
   /// serialized. Any other decls will be cross-referenced instead.
   const SourceFile *SF = nullptr;
 
+  /// Record the name of a block.
+  void emitBlockID(unsigned ID, StringRef name,
+                   SmallVectorImpl<unsigned char> &nameBuffer);
+
+  /// Record the name of a record within a block.
+  void emitRecordID(unsigned ID, StringRef name,
+                    SmallVectorImpl<unsigned char> &nameBuffer);
+
+  void writeToStream(raw_ostream &os);
+
+public:
+  SerializerBase(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC);
+};
+
+class Serializer : public SerializerBase {
 public:
   /// Stores a declaration or a type to be written to the AST file.
   ///
@@ -313,15 +329,9 @@ private:
   /// Writes the BLOCKINFO block for the serialized module file.
   void writeBlockInfoBlock();
 
-  /// Writes the BLOCKINFO block for the module documentation file.
-  void writeDocBlockInfoBlock();
-
   /// Writes the Swift module file header and name, plus metadata determining
   /// if the module can be loaded.
   void writeHeader(const SerializationOptions &options = {});
-
-  /// Writes the Swift doc module file header and name.
-  void writeDocHeader();
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
@@ -332,8 +342,8 @@ private:
   /// Writes the given pattern, recursively.
   void writePattern(const Pattern *pattern, DeclContext *owningDC);
 
-  /// Writes a generic parameter list.
-  bool writeGenericParams(const GenericParamList *genericParams);
+  /// Writes a generic parameter list, if non-null.
+  void writeGenericParams(const GenericParamList *genericParams);
 
   /// Writes the body text of the provided funciton, if the function is
   /// inlinable and has body text.
@@ -439,20 +449,14 @@ private:
   void writeAST(ModuleOrSourceFile DC,
                 bool enableNestedTypeLookupTable);
 
-  void writeToStream(raw_ostream &os);
-
-  template <size_t N>
-  Serializer(const unsigned char (&signature)[N], ModuleOrSourceFile DC);
+  using SerializerBase::SerializerBase;
+  using SerializerBase::writeToStream;
 
 public:
   /// Serialize a module to the given stream.
   static void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                             const SILModule *M,
                             const SerializationOptions &options);
-
-  /// Serialize module documentation to the given stream.
-  static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               StringRef GroupInfoPath, ASTContext &Ctx);
 
   /// Records the use of the given Type.
   ///
@@ -484,6 +488,13 @@ public:
   IdentifierID addUniquedStringRef(StringRef str) {
     return addUniquedString(str).second;
   }
+
+  /// Records the use of the given file name.
+  ///
+  /// The Identifier will be scheduled for serialization if necessary.
+  ///
+  /// \returns The ID for the given file name in this module.
+  IdentifierID addFilename(StringRef filename);
 
   /// Records the use of the given Decl.
   ///
@@ -562,6 +573,10 @@ public:
   void writeGenericRequirements(ArrayRef<Requirement> requirements,
                                 const std::array<unsigned, 256> &abbrCodes);
 };
+
+/// Serialize module documentation to the given stream.
+void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                      StringRef GroupInfoPath);
 } // end namespace serialization
 } // end namespace swift
 #endif

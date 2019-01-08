@@ -17,9 +17,53 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
+
+/// Does the given coroutine make any stack allocations that are live across
+/// its yields?
+static bool allocatesStackAcrossYields(SILFunction *F) {
+  assert(F->getLoweredFunctionType()->isCoroutine());
+
+  return hasStackDifferencesAt(&F->getEntryBlock()->front(),
+                               [](SILInstruction *i) -> InstructionMatchResult {
+    if (isa<YieldInst>(i)) {
+      return {
+        /*matches*/ true,
+        /*halt*/ i->getFunction()->getLoweredFunctionType()->getCoroutineKind()
+                       == SILCoroutineKind::YieldOnce
+      };
+    }
+
+    // Otherwise, search until the end of the function.
+    return { false, false };
+  });
+}
+
+static bool isEndOfApply(SILInstruction *i, BeginApplyInst *beginApply) {
+  if (auto endApply = dyn_cast<EndApplyInst>(i)) {
+    return endApply->getBeginApply() == beginApply;
+  } else if (auto abortApply = dyn_cast<AbortApplyInst>(i)) {
+    return abortApply->getBeginApply() == beginApply;
+  } else {
+    return false;
+  }
+}
+
+/// Are there any stack differences from the given begin_apply to any
+/// corresponding end_apply/abort_apply?
+static bool hasStackDifferencesAtEnds(BeginApplyInst *apply) {
+  return hasStackDifferencesAt(apply, [apply](SILInstruction *i)
+                                                     -> InstructionMatchResult {
+    // Search for ends of the original apply.  We can stop searching
+    // at these points.
+    if (isEndOfApply(i, apply))
+      return { true, true };
+    return { false, false };
+  });
+}
 
 static bool canInlineBeginApply(BeginApplyInst *BA) {
   // Don't inline if we have multiple resumption sites (i.e. end_apply or
@@ -62,6 +106,9 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
 }
 
 bool SILInliner::canInlineApplySite(FullApplySite apply) {
+  if (!apply.canOptimize())
+    return false;
+
   if (auto BA = dyn_cast<BeginApplyInst>(apply))
     return canInlineBeginApply(BA);
 
@@ -72,9 +119,10 @@ namespace swift {
 /// Utility class for rewiring control-flow of inlined begin_apply functions.
 class BeginApplySite {
   SILLocation Loc;
-  SILBuilder &Builder;
+  SILBuilder *Builder;
   BeginApplyInst *BeginApply;
   bool HasYield = false;
+  bool NeedsStackCorrection;
 
   EndApplyInst *EndApply = nullptr;
   SILBasicBlock *EndApplyBB = nullptr;
@@ -86,15 +134,31 @@ class BeginApplySite {
 
 public:
   BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
-                 SILBuilder &Builder)
-      : Loc(Loc), Builder(Builder), BeginApply(BeginApply) {}
+                 SILBuilder *Builder, bool NeedsStackCorrection)
+      : Loc(Loc), Builder(Builder), BeginApply(BeginApply),
+        NeedsStackCorrection(NeedsStackCorrection) {}
 
   static Optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
-                                      SILBuilder &Builder) {
+                                      SILBuilder *Builder) {
     auto *BeginApply = dyn_cast<BeginApplyInst>(AI);
     if (!BeginApply)
       return None;
-    return BeginApplySite(BeginApply, Loc, Builder);
+
+    // We need stack correction if there are both:
+    //   - stack allocations in the callee that are live across the yield and
+    //   - stack differences in the caller from the begin_apply to any
+    //     end_apply or abort_apply.
+    // In these cases, naive cloning will cause the allocations to become
+    // improperly nested.
+    //
+    // We need to compute this here before we do any splitting in the parent
+    // function.
+    bool NeedsStackCorrection = false;
+    if (allocatesStackAcrossYields(BeginApply->getReferencedFunction()) &&
+        hasStackDifferencesAtEnds(BeginApply))
+      NeedsStackCorrection = true;
+
+    return BeginApplySite(BeginApply, Loc, Builder, NeedsStackCorrection);
   }
 
   void preprocess(SILBasicBlock *returnToBB) {
@@ -132,7 +196,7 @@ public:
   bool processTerminator(
       TermInst *terminator, SILBasicBlock *returnToBB,
       llvm::function_ref<SILBasicBlock *(SILBasicBlock *)> remapBlock,
-      llvm::function_ref<SILValue(SILValue)> remapValue) {
+      llvm::function_ref<SILValue(SILValue)> getMappedValue) {
     // A yield branches to the begin_apply return block passing the yielded
     // results as branch arguments. Collect the yields target block for
     // resuming later. Pass an integer token to the begin_apply return block
@@ -147,21 +211,21 @@ public:
       auto callerYields = BeginApply->getYieldedValues();
       assert(calleeYields.size() == callerYields.size());
       for (auto i : indices(calleeYields)) {
-        auto remappedYield = remapValue(calleeYields[i]);
+        auto remappedYield = getMappedValue(calleeYields[i]);
         callerYields[i]->replaceAllUsesWith(remappedYield);
       }
-      Builder.createBranch(Loc, returnToBB);
+      Builder->createBranch(Loc, returnToBB);
 
       // Add branches at the resumption sites to the resume/unwind block.
       if (EndApply) {
-        SavedInsertionPointRAII savedIP(Builder, EndApplyBB);
+        SavedInsertionPointRAII savedIP(*Builder, EndApplyBB);
         auto resumeBB = remapBlock(yield->getResumeBB());
-        Builder.createBranch(EndApply->getLoc(), resumeBB);
+        Builder->createBranch(EndApply->getLoc(), resumeBB);
       }
       if (AbortApply) {
-        SavedInsertionPointRAII savedIP(Builder, AbortApplyBB);
+        SavedInsertionPointRAII savedIP(*Builder, AbortApplyBB);
         auto unwindBB = remapBlock(yield->getUnwindBB());
-        Builder.createBranch(AbortApply->getLoc(), unwindBB);
+        Builder->createBranch(AbortApply->getLoc(), unwindBB);
       }
       return true;
     }
@@ -175,9 +239,9 @@ public:
       bool isNormal = isa<ReturnInst>(terminator);
       auto returnBB = isNormal ? EndApplyReturnBB : AbortApplyReturnBB;
       if (returnBB) {
-        Builder.createBranch(Loc, returnBB);
+        Builder->createBranch(Loc, returnBB);
       } else {
-        Builder.createUnreachable(Loc);
+        Builder->createUnreachable(Loc);
       }
       return true;
     }
@@ -200,18 +264,18 @@ public:
     if (!HasYield) {
       // Make sure the split resumption blocks have terminators.
       if (EndApplyBB) {
-        SavedInsertionPointRAII savedIP(Builder, EndApplyBB);
-        Builder.createUnreachable(Loc);
+        SavedInsertionPointRAII savedIP(*Builder, EndApplyBB);
+        Builder->createUnreachable(Loc);
       }
       if (AbortApplyBB) {
-        SavedInsertionPointRAII savedIP(Builder, AbortApplyBB);
-        Builder.createUnreachable(Loc);
+        SavedInsertionPointRAII savedIP(*Builder, AbortApplyBB);
+        Builder->createUnreachable(Loc);
       }
 
       // Replace all the yielded values in the callee with undef.
       for (auto calleeYield : BeginApply->getYieldedValues()) {
-        calleeYield->replaceAllUsesWith(SILUndef::get(calleeYield->getType(),
-                                                      Builder.getModule()));
+        calleeYield->replaceAllUsesWith(
+            SILUndef::get(calleeYield->getType(), Builder->getModule()));
       }
     }
 
@@ -222,6 +286,11 @@ public:
       AbortApply->eraseFromParent();
 
     assert(!BeginApply->hasUsesOfAnyResult());
+
+    // Correct the stack if necessary.
+    if (NeedsStackCorrection) {
+      StackNesting().correctStackNesting(BeginApply->getFunction());
+    }
   }
 };
 } // namespace swift
@@ -380,7 +449,7 @@ SILInlineCloner::SILInlineCloner(
   assert(CallSiteScope->getParentFunction() == &F);
 
   // Set up the coroutine-specific inliner if applicable.
-  BeginApply = BeginApplySite::get(apply, Loc.getValue(), getBuilder());
+  BeginApply = BeginApplySite::get(apply, Loc.getValue(), &getBuilder());
 }
 
 // Clone the entire callee function into the caller function at the apply site.
@@ -471,14 +540,14 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
             [=](SILBasicBlock *Block) -> SILBasicBlock * {
               return this->remapBasicBlock(Block);
             },
-            [=](SILValue Val) -> SILValue { return this->remapValue(Val); }))
+            [=](SILValue Val) -> SILValue { return this->getMappedValue(Val); }))
       return;
   }
 
   // Modify return terminators to branch to the return-to BB, rather than
   // trying to clone the ReturnInst.
   if (auto *RI = dyn_cast<ReturnInst>(BB->getTerminator())) {
-    auto returnedValue = remapValue(RI->getOperand());
+    auto returnedValue = getMappedValue(RI->getOperand());
     getBuilder().createBranch(Loc.getValue(), ReturnToBB, returnedValue);
     return;
   }
@@ -499,7 +568,7 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
       return;
     case FullApplySiteKind::TryApplyInst:
       auto tryAI = cast<TryApplyInst>(Apply);
-      auto returnedValue = remapValue(TI->getOperand());
+      auto returnedValue = getMappedValue(TI->getOperand());
       getBuilder().createBranch(Loc.getValue(), tryAI->getErrorBB(),
                                 returnedValue);
       return;
@@ -620,6 +689,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::PreviousDynamicFunctionRefInst:
+  case SILInstructionKind::DynamicFunctionRefInst:
   case SILInstructionKind::FunctionRefInst:
   case SILInstructionKind::AllocGlobalInst:
   case SILInstructionKind::GlobalAddrInst:

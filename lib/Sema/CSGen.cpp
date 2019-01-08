@@ -127,14 +127,20 @@ namespace {
   class LinkedExprCollector : public ASTWalker {
     
     llvm::SmallVectorImpl<Expr*> &LinkedExprs;
+    ConstraintSystem &CS;
 
   public:
-    
-    LinkedExprCollector(llvm::SmallVectorImpl<Expr*> &linkedExprs) :
-        LinkedExprs(linkedExprs) {}
-    
+    LinkedExprCollector(llvm::SmallVectorImpl<Expr *> &linkedExprs,
+                        ConstraintSystem &cs)
+        : LinkedExprs(linkedExprs), CS(cs) {}
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
+
       // Store top-level binary exprs for further analysis.
       if (isa<BinaryExpr>(expr) ||
           
@@ -195,6 +201,11 @@ namespace {
         LTI(lti), CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
       
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
@@ -290,12 +301,6 @@ namespace {
         CS.optimizeConstraints(IE->getElseExpr());
         return { false, expr };
       }      
-
-      // TODO: The systems that we need to solve for interpolated string expressions
-      // require bespoke logic that don't currently work with this approach.
-      if (isa<InterpolatedStringLiteralExpr>(expr)) {
-        return { false, expr };
-      }
 
       // For exprs of a structural type that are not modeling argument lists,
       // avoid merging the type variables. (We need to allow for cases like
@@ -940,6 +945,11 @@ namespace {
       CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
       
       if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
         if (isa<PrefixUnaryExpr>(applyExpr) ||
@@ -1203,44 +1213,6 @@ namespace {
       if (!protocol)
         return nullptr;
 
-      // Make sure that MaxIntegerType is defined if it would used later
-      // during constraint solving (CSApply).
-      if (isa<IntegerLiteralExpr>(expr) ||
-          (isa<MagicIdentifierLiteralExpr>(expr) &&
-           dyn_cast<MagicIdentifierLiteralExpr>(expr)->isColumn())) {
-
-        auto maxIntType = CS.TC.getMaxIntegerType(CS.DC);
-        if (maxIntType.isNull()) {
-          CS.TC.diagnose(expr->getLoc(), diag::no_MaxBuiltinIntegerType_found);
-          return nullptr;
-        }
-
-        // In the case of integer literal, make sure that the literal value
-        // will fit within the bit width of the maximum integer type.
-        if (IntegerLiteralExpr *intLit = dyn_cast<IntegerLiteralExpr>(expr)) {
-          unsigned maxWidth =
-              maxIntType->castTo<BuiltinIntegerType>()->getGreatestWidth();
-          APInt magnitude = intLit->getRawMagnitude();
-          unsigned magWidth = magnitude.getActiveBits();
-          bool isNegative = intLit->isNegative();
-
-          // Compute the literal bit width in the signed two's complement form.
-          // This is generally one more than the magnitude width, but is the
-          // same when the literal is of the form -2^i (for some Nat `i`).
-          unsigned signedLitWidth =
-              (isNegative && (magnitude.countTrailingZeros() == magWidth - 1))
-                  ? magWidth
-                  : (magWidth + 1);
-
-          if (signedLitWidth > maxWidth) { // overflow?
-            CS.TC.diagnose(expr->getLoc(),
-                           diag::integer_literal_overflows_maxwidth, maxWidth,
-                           signedLitWidth);
-            return nullptr;
-          }
-        }
-      }
-
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
@@ -1268,6 +1240,33 @@ namespace {
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
                        interpolationProto->getDeclaredType(),
                        locator);
+
+      if (auto semanticExpr = expr->getSemanticExpr()) {
+        // The semanticExpr must have the same type as this node.
+        auto semanticTV = CS.getType(semanticExpr);
+        auto semanticLocator = CS.getConstraintLocator(semanticExpr);
+        CS.addConstraint(ConstraintKind::Bind, tv, semanticTV,
+                         semanticLocator);
+      }
+      else if (auto appendingExpr = expr->getAppendingExpr()) {
+        auto associatedTypeArray = 
+          interpolationProto->lookupDirect(tc.Context.Id_StringInterpolation);
+        if (associatedTypeArray.empty()) {
+          tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
+          return nullptr;
+        }
+        auto associatedTypeDecl =
+          cast<AssociatedTypeDecl>(associatedTypeArray.front());
+        auto interpolationTV = DependentMemberType::get(tv, associatedTypeDecl);
+
+        auto appendingExprType = CS.getType(appendingExpr);
+        auto appendingLocator = CS.getConstraintLocator(appendingExpr);
+
+        // Must be Conversion; if it's Equal, then in semi-rare cases, the 
+        // interpolation temporary variable cannot be @lvalue.
+        CS.addConstraint(ConstraintKind::Conversion, appendingExprType,
+                         interpolationTV, appendingLocator);
+      }
 
       return tv;
     }
@@ -1323,7 +1322,7 @@ namespace {
       // use the right labels before forming the call to the initializer.
       DeclName constrName = tc.getObjectLiteralConstructorName(expr);
       assert(constrName);
-      ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
+      auto constrs = protocol->lookupDirect(constrName);
       if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front())) {
         tc.diagnose(protocol, diag::object_literal_broken_proto);
         return nullptr;
@@ -1726,9 +1725,18 @@ namespace {
       if (!optTy)
         return Type();
 
-      CS.addConstraint(ConstraintKind::OptionalObject,
-                       optTy, CS.getType(expr->getSubExpr()),
-                       CS.getConstraintLocator(expr));
+      // Prior to Swift 5, 'try?' always adds an additional layer of optionality,
+      // even if the sub-expression was already optional.
+      if (CS.getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5)) {
+        CS.addConstraint(ConstraintKind::Conversion,
+                         CS.getType(expr->getSubExpr()), optTy,
+                         CS.getConstraintLocator(expr));
+      }
+      else {
+        CS.addConstraint(ConstraintKind::OptionalObject,
+                         optTy, CS.getType(expr->getSubExpr()),
+                         CS.getConstraintLocator(expr));
+      }
       return optTy;
     }
 
@@ -3102,6 +3110,23 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
 
+    Type visitTapExpr(TapExpr *expr) {
+      DeclContext *varDC = expr->getVar()->getDeclContext();
+      assert(varDC == CS.DC || (varDC && isa<AbstractClosureExpr>(varDC) &&
+              cast<AbstractClosureExpr>(varDC)->hasSingleExpressionBody()) &&
+             "TapExpr var should be in the same DeclContext we're checking it in!");
+      
+      auto locator = CS.getConstraintLocator(expr);
+      auto tv = CS.createTypeVariable(locator);
+
+      if (auto subExpr = expr->getSubExpr()) {
+        auto subExprType = CS.getType(subExpr);
+        CS.addConstraint(ConstraintKind::Bind, subExprType, tv, locator);
+      }
+
+      return tv;
+    }
+
     enum class TypeOperation { None,
                                Join,
                                JoinInout,
@@ -3231,6 +3256,12 @@ namespace {
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       while (true) {
+
+        // If we should reuse pre-checked types, don't sanitize the expression
+        // if it's already type-checked.
+        if (CS.shouldReusePrecheckedType() && expr->getType())
+          return { false, expr };
+
         // OpenExistentialExpr contains OpaqueValueExpr in its sub expression.
         if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
           auto archetypeVal = OOE->getOpaqueValue();
@@ -3282,22 +3313,6 @@ namespace {
           continue;
         }
 
-        // Strip off 'Bool' to 'Builtin.Int1' conversion. Otherwise, we'll have
-        // to handle multiple ways of type-checking.
-        if (expr->isImplicit()) {
-          if (auto call = dyn_cast<CallExpr>(expr)) {
-            if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(call->getFn())) {
-              auto RefD = DSCE->getFn()->getReferencedDecl().getDecl();
-              if (RefD->getBaseName() == TC.Context.Id_getBuiltinLogicValue &&
-                  RefD->getDeclContext()->getSelfNominalTypeDecl() ==
-                      TC.Context.getBoolDecl()) {
-                expr = DSCE->getBase();
-                continue;
-              }
-            }
-          }
-        }
-
         // Remove any semantic expression injected by typechecking.
         if (auto CE = dyn_cast<CollectionExpr>(expr)) {
           CE->setSemanticExpr(nullptr);
@@ -3337,6 +3352,20 @@ namespace {
       assert(!isa<ImplicitConversionExpr>(expr) &&
              "ImplicitConversionExpr should be eliminated in walkToExprPre");
 
+      auto buildMemberRef = [&](Type memberType, Expr *base, SourceLoc dotLoc,
+                                ConcreteDeclRef member, DeclNameLoc memberLoc,
+                                bool implicit) -> Expr * {
+        auto *memberRef = new (TC.Context)
+            MemberRefExpr(base, dotLoc, member, memberLoc, implicit);
+
+        if (memberType) {
+          memberRef->setType(memberType);
+          return CS.cacheType(memberRef);
+        }
+
+        return memberRef;
+      };
+
       // A DotSyntaxCallExpr is a member reference that has already been
       // type-checked down to a call; turn it back into an overloaded
       // member reference expression.
@@ -3346,21 +3375,23 @@ namespace {
                                                        memberLoc);
         if (memberAndFunctionRef.first) {
           assert(!isa<ImplicitConversionExpr>(dotCall->getBase()));
-          return new (TC.Context) MemberRefExpr(dotCall->getBase(),
-                                                dotCall->getDotLoc(),
-                                                memberAndFunctionRef.first,
-                                                memberLoc, expr->isImplicit());
+          return buildMemberRef(dotCall->getType(),
+                                dotCall->getBase(),
+                                dotCall->getDotLoc(),
+                                memberAndFunctionRef.first,
+                                memberLoc, expr->isImplicit());
         }
       }
 
       if (auto *dynamicMember = dyn_cast<DynamicMemberRefExpr>(expr)) {
         if (auto memberRef = dynamicMember->getMember()) {
           assert(!isa<ImplicitConversionExpr>(dynamicMember->getBase()));
-          return new (TC.Context) MemberRefExpr(dynamicMember->getBase(),
-                                                dynamicMember->getDotLoc(),
-                                                memberRef,
-                                                dynamicMember->getNameLoc(),
-                                                expr->isImplicit());
+          return buildMemberRef(dynamicMember->getType(),
+                                dynamicMember->getBase(),
+                                dynamicMember->getDotLoc(),
+                                memberRef,
+                                dynamicMember->getNameLoc(),
+                                expr->isImplicit());
         }
       }
 
@@ -3374,10 +3405,11 @@ namespace {
                                                        memberLoc);
         if (memberAndFunctionRef.first) {
           assert(!isa<ImplicitConversionExpr>(dotIgnored->getLHS()));
-          return new (TC.Context) MemberRefExpr(dotIgnored->getLHS(),
-                                                dotIgnored->getDotLoc(),
-                                                memberAndFunctionRef.first,
-                                                memberLoc, expr->isImplicit());
+          return buildMemberRef(dotIgnored->getType(),
+                                dotIgnored->getLHS(),
+                                dotIgnored->getDotLoc(),
+                                memberAndFunctionRef.first,
+                                memberLoc, expr->isImplicit());
         }
       }
       return expr;
@@ -3400,6 +3432,15 @@ namespace {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
+        if (expr->getType()) {
+          assert(!expr->getType()->hasTypeVariable());
+          CG.getConstraintSystem().cacheType(expr);
+          return { false, expr };
+        }
+      }
+
       // Note that the subexpression of a #selector expression is
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
@@ -3607,26 +3648,6 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   return result;
 }
 
-Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
-  // Sanitize the expression.
-  expr = SanitizeExpr(*this).walkToExprPost(expr);
-
-  cacheSubExprTypes(expr);
-
-  // Visit the top-level expression generating constraints.
-  ConstraintGenerator cg(*this);
-  auto type = cg.visit(expr);
-  if (!type)
-    return nullptr;
-  
-  this->optimizeConstraints(expr);
-  
-  auto &CS = CG.getConstraintSystem();
-  CS.setType(expr, type);
-
-  return expr;
-}
-
 Type ConstraintSystem::generateConstraints(Pattern *pattern,
                                            ConstraintLocatorBuilder locator) {
   ConstraintGenerator cg(*this);
@@ -3640,7 +3661,7 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   SmallVector<Expr *, 16> linkedExprs;
   
   // Collect any linked expressions.
-  LinkedExprCollector collector(linkedExprs);
+  LinkedExprCollector collector(linkedExprs, *this);
   e->walk(collector);
   
   // Favor types, as appropriate.

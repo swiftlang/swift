@@ -48,8 +48,8 @@ public func testBase(b: Base) -> Int32
 // P.boo() -> Int32
 sil @_TFE10SILDeclRefPS_1P3boofT_Vs5Int32 : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> Int32
 
-// Int32.init(_builtinIntegerLiteral : Builtin.Int2048) -> Int32
-sil public_external [transparent] [serialized] @_TFVs5Int32CfT22_builtinIntegerLiteralBi2048__S_ : $@convention(method) (Builtin.Int2048, @thin Int32.Type) -> Int32
+// Int32.init(_builtinIntegerLiteral : Builtin.IntLiteral) -> Int32
+sil public_external [transparent] [serialized] @_TFVs5Int32CfT22_builtinIntegerLiteralBI__S_ : $@convention(method) (Builtin.IntLiteral, @thin Int32.Type) -> Int32
 
 // Base.foo() -> Int32
 sil @_TFC10SILDeclRef4Base3foofT_Vs5Int32 : $@convention(method) (@guaranteed Base) -> Int32

@@ -1,4 +1,4 @@
-add_swift_library(swiftSwiftPrivatePthreadExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+add_swift_target_library(swiftSwiftPrivatePthreadExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   SwiftPrivatePthreadExtras.swift

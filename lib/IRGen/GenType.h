@@ -99,6 +99,7 @@ private:
   const TypeInfo *TypeMetadataPtrTI = nullptr;
   const TypeInfo *ObjCClassPtrTI = nullptr;
   const LoadableTypeInfo *EmptyTI = nullptr;
+  const LoadableTypeInfo *IntegerLiteralTI = nullptr;
 
   const TypeInfo *AccessibleResilientStructTI = nullptr;
   const TypeInfo *InaccessibleResilientStructTI = nullptr;
@@ -168,6 +169,7 @@ public:
   const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();
+  const LoadableTypeInfo &getIntegerLiteralTypeInfo();
   const TypeInfo &getResilientStructTypeInfo(IsABIAccessible_t abiAccessible);
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P, ProtocolInfoKind kind);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,

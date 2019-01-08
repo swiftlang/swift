@@ -348,7 +348,7 @@
 ///
 /// Note that in this example, `imagePaths` is subscripted using a dictionary
 /// index. Unlike the key-based subscript, the index-based subscript returns
-/// the corresponding key-value pair as a nonoptional tuple.
+/// the corresponding key-value pair as a non-optional tuple.
 ///
 ///     print(imagePaths[glyphIndex!])
 ///     // Prints "("star", "/glyphs/star.png")"
@@ -414,8 +414,8 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   are reference types).
   @inlinable
   public // SPI(Foundation)
-  init(_immutableCocoaDictionary: __owned _NSDictionary) {
-    _sanityCheck(
+  init(_immutableCocoaDictionary: __owned AnyObject) {
+    _internalInvariant(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
       """
@@ -481,7 +481,10 @@ public struct Dictionary<Key: Hashable, Value> {
     var native = _NativeDictionary<Key, Value>(
       capacity: keysAndValues.underestimatedCount)
     // '_MergeError.keyCollision' is caught and handled with an appropriate
-    // error message one level down, inside native.merge(_:...).
+    // error message one level down, inside native.merge(_:...). We throw an
+    // error instead of calling fatalError() directly because we want the
+    // message to include the duplicate key, and the closure only has access to
+    // the conflicting values.
     try! native.merge(
       keysAndValues,
       isUnique: true,
@@ -618,6 +621,8 @@ extension Dictionary {
 }
 
 extension Dictionary: Collection {
+  public typealias SubSequence = Slice<Dictionary>
+  
   /// The position of the first element in a nonempty dictionary.
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
@@ -728,19 +733,6 @@ extension Dictionary: Collection {
   public var isEmpty: Bool {
     return count == 0
   }
-
-  /// The first element of the dictionary.
-  ///
-  /// The first element of the dictionary is not necessarily the first element
-  /// added to the dictionary. Don't expect any particular ordering of
-  /// dictionary elements.
-  ///
-  /// If the dictionary is empty, the value of this property is `nil`.
-  @inlinable
-  public var first: Element? {
-    var it = makeIterator()
-    return it.next()
-  }
 }
 
 extension Dictionary {
@@ -802,44 +794,8 @@ extension Dictionary {
       }
     }
     _modify {
-      // FIXME: This code should be moved to _variant, with Dictionary.subscript
-      // yielding `&_variant[key]`.
-
-      let (bucket, found) = _variant.mutatingFind(key)
-
-      // FIXME: Mark this entry as being modified in hash table metadata
-      // so that lldb can recognize it's not valid.
-
-      // Move the old value (if any) out of storage, wrapping it into an
-      // optional before yielding it.
-      let native = _variant.asNative
-      var value: Value?
-      if found {
-        value = (native._values + bucket.offset).move()
-      } else {
-        value = nil
-      }
-      yield &value
-
-      // Value is now potentially different. Check which one of the four
-      // possible cases apply.
-      switch (value, found) {
-      case (let value?, true): // Mutation
-        // Initialize storage to new value.
-        (native._values + bucket.offset).initialize(to: value)
-      case (let value?, false): // Insertion
-        // Insert the new entry at the correct place.
-        // We've already ensured we have enough capacity.
-        native._insert(at: bucket, key: key, value: value)
-      case (nil, true): // Removal
-        // We've already removed the value; deinitialize and remove the key too.
-        (native._values + bucket.offset).deinitialize(count: 1)
-        native._delete(at: bucket)
-      case (nil, false): // Noop
-        // Easy!
-        break
-      }
-      _fixLifetime(self)
+      defer { _fixLifetime(self) }
+      yield &_variant[key]
     }
   }
 }
@@ -942,8 +898,8 @@ extension Dictionary {
         native._insert(at: bucket, key: key, value: value)
       }
       let address = native._values + bucket.offset
+      defer { _fixLifetime(self) }
       yield &address.pointee
-      _fixLifetime(self)
     }
   }
 
@@ -967,7 +923,7 @@ extension Dictionary {
   /// Returns a new dictionary containing only the key-value pairs that have
   /// non-`nil` values as the result from the transform by the given closure.
   ///
-  /// Use this method to receive a dictionary of nonoptional values when your
+  /// Use this method to receive a dictionary of non-optional values when your
   /// transformation can produce an optional value.
   ///
   /// In this example, note the difference in the result of using `mapValues`
@@ -1316,14 +1272,10 @@ extension Dictionary {
       return Values(_dictionary: self)
     }
     _modify {
-      var values: Values
-      do {
-        var temp = _Variant(dummy: ())
-        swap(&temp, &_variant)
-        values = Values(_variant: temp)
-      }
+      var values = Values(_variant: _Variant(dummy: ()))
+      swap(&values._variant, &_variant)
+      defer { self._variant = values._variant }
       yield &values
-      self._variant = values._variant
     }
   }
 
@@ -1333,6 +1285,7 @@ extension Dictionary {
     : Collection, Equatable,
       CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Key
+    public typealias SubSequence = Slice<Dictionary.Keys>
 
     @usableFromInline
     internal var _variant: Dictionary<Key, Value>._Variant
@@ -1505,8 +1458,8 @@ extension Dictionary {
         let native = _variant.ensureUniqueNative()
         let bucket = native.validatedBucket(for: position)
         let address = native._values + bucket.offset
+        defer { _fixLifetime(self) }
         yield &address.pointee
-        _fixLifetime(self)
       }
     }
 
@@ -1889,8 +1842,8 @@ extension Dictionary.Index {
       }
       let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
       _variant = .native(dummy)
+      defer { _variant = .cocoa(cocoa) }
       yield &cocoa
-      _variant = .cocoa(cocoa)
     }
   }
 #endif
@@ -1942,7 +1895,7 @@ extension Dictionary.Index: Hashable {
 #if _runtime(_ObjC)
     guard _isNative else {
       hasher.combine(1 as UInt8)
-      hasher.combine(_asCocoa.storage.currentKeyIndex)
+      hasher.combine(_asCocoa._offset)
       return
     }
     hasher.combine(0 as UInt8)
@@ -2034,7 +1987,7 @@ extension Dictionary.Iterator {
         return nativeIterator
 #if _runtime(_ObjC)
       case .cocoa:
-        _sanityCheckFailure("internal error: does not contain a native index")
+        _internalInvariantFailure("internal error: does not contain a native index")
 #endif
       }
     }
@@ -2049,7 +2002,7 @@ extension Dictionary.Iterator {
     get {
       switch _variant {
       case .native:
-        _sanityCheckFailure("internal error: does not contain a Cocoa index")
+        _internalInvariantFailure("internal error: does not contain a Cocoa index")
       case .cocoa(let cocoa):
         return cocoa
       }
@@ -2138,7 +2091,7 @@ extension Dictionary {
   public // FIXME(reserveCapacity): Should be inlinable
   mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variant.reserveCapacity(minimumCapacity)
-    _sanityCheck(self.capacity >= minimumCapacity)
+    _internalInvariant(self.capacity >= minimumCapacity)
   }
 }
 

@@ -117,3 +117,10 @@ protocol Foo {
 }
 
 protocol Wibble : Foo where Bar.EvenMoreNonsense == Int { } // expected-error{{'EvenMoreNonsense' is not a member type of 'Self.Bar'}}
+
+// rdar://45271500 - failure to emit a diagnostic
+enum Cat<A> {}
+protocol Tail { associatedtype T }
+struct Dog<B, C : Tail> where C.T == B {}
+func foo<B, A>() -> Dog<B, Cat<A>> {}
+// expected-error@-1 {{type 'Cat<A>' does not conform to protocol 'Tail'}}

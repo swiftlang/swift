@@ -16,9 +16,9 @@ struct D {
 
 // CHECK-LABEL: sil hidden [transparent] @$s19default_constructor1DV1iSivpfi : $@convention(thin) () -> (Int, Double)
 // CHECK:      [[METATYPE:%.*]] = metatype $@thin Int.Type
-// CHECK-NEXT: [[VALUE:%.*]] = integer_literal $Builtin.Int2048, 2
-// CHECK:      [[FN:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK-NEXT: [[LEFT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK-NEXT: [[VALUE:%.*]] = integer_literal $Builtin.IntLiteral, 2
+// CHECK:      [[FN:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK-NEXT: [[LEFT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Double.Type
 // CHECK-NEXT: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x400C000000000000|0x4000E000000000000000}}
 // CHECK:      [[FN:%.*]] = function_ref @$sSd20_builtinFloatLiteralSdBf{{64|80}}__tcfC : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
@@ -43,13 +43,14 @@ class E {
   var i = Int64()
 }
 
-// FIXME(integers): the following checks should be updated for the new way +
-// gets invoked. <rdar://problem/29939484>
-// XCHECK-LABEL: sil hidden [transparent] @$s19default_constructor1EC1is5Int64Vvfi : $@convention(thin) () -> Int64
-// XCHECK:      [[FN:%.*]] = function_ref @$ss5Int64VABycfC : $@convention(method) (@thin Int64.Type) -> Int64
-// XCHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Int64.Type
-// XCHECK-NEXT: [[VALUE:%.*]] = apply [[FN]]([[METATYPE]]) : $@convention(method) (@thin Int64.Type) -> Int64
-// XCHECK-NEXT: return [[VALUE]] : $Int64
+// CHECK-LABEL: sil hidden [transparent] @$s19default_constructor1EC1is5Int64Vvpfi : $@convention(thin) () -> Int64
+// CHECK:      [[IADDR:%[0-9]+]] = alloc_stack $Int64
+// CHECK:      [[INTTYPE:%[0-9]+]] = metatype $@thick Int64.Type
+// CHECK:      [[INIT:%[0-9]+]] = function_ref @$sSzsExycfC : $@convention(method)
+// CHECK-NEXT: apply [[INIT]]<Int64>([[IADDR]], [[INTTYPE]])
+// CHECK-NEXT: [[VALUE:%[0-9]+]] = load [trivial] [[IADDR]]
+// CHECK-NEXT: dealloc_stack [[IADDR]]
+// CHECK-NEXT: return [[VALUE]] : $Int64
 
 // CHECK-LABEL: sil hidden @$s19default_constructor1EC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned E) -> @owned E
 // CHECK: bb0([[SELFIN:%[0-9]+]] : @owned $E)

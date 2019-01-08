@@ -90,6 +90,8 @@ ERROR(func_self_access_change,none,"%0 has self access kind changing from %1 to 
 
 ERROR(param_ownership_change,none,"%0 has %1 changing from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
 
+ERROR(type_witness_change,none,"%0 has type witness type for %1 changing from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

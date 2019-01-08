@@ -182,7 +182,10 @@ class TestCalendar : TestCalendarSuper {
             
             expectEqual(Date(timeIntervalSince1970: 1468652400.0), c.startOfDay(for: d))
             
-            expectEqual(.orderedSame, c.compare(d, to: d + 10, toGranularity: .minute))
+            if #available(iOS 8, macOS 10.10, *) {
+              // Mac OS X 10.9 and iOS 7 had a bug in NSCalendar for hour, minute, and second granularities.
+              expectEqual(.orderedSame, c.compare(d, to: d + 10, toGranularity: .minute))
+            }
             
             expectFalse(c.isDate(d, equalTo: d + 10, toGranularity: .second))
             expectTrue(c.isDate(d, equalTo: d + 10, toGranularity: .day))

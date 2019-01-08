@@ -511,12 +511,12 @@ bb0:
 // dead cond_fail instructions.
 sil @fold_condfail_instructions : $@convention(thin) () -> Int64 {
 bb0:
-  %0 = integer_literal $Builtin.Int2048, 1        // user: %2
-  %2 = builtin "s_to_s_checked_trunc_Int2048_Int64"(%0 : $Builtin.Int2048) : $(Builtin.Int64, Builtin.Int1) // user: %3
+  %0 = integer_literal $Builtin.IntLiteral, 1        // user: %2
+  %2 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1) // user: %3
   %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int1), 0 // user: %4
   %4 = struct $Int64 (%3 : $Builtin.Int64)        // users: %14, %5
-  %6 = integer_literal $Builtin.Int2048, 2        // user: %8
-  %8 = builtin "s_to_s_checked_trunc_Int2048_Int64"(%6 : $Builtin.Int2048) : $(Builtin.Int64, Builtin.Int1) // user: %9
+  %6 = integer_literal $Builtin.IntLiteral, 2        // user: %8
+  %8 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%6 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1) // user: %9
   %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0 // user: %10
   %10 = struct $Int64 (%9 : $Builtin.Int64)       // users: %15, %11
   %12 = integer_literal $Builtin.Int1, -1         // user: %16
@@ -545,25 +545,25 @@ bb0:
 sil @properly_handle_eliminated_instructions_in_worklist : $@convention(method) (Bool, @inout UInt) -> () {
 bb0(%0 : $Bool, %1 : $*UInt):
   %2 = load %1 : $*UInt
-  %3 = integer_literal $Builtin.Int2048, 1
-  %5 = builtin "s_to_u_checked_trunc_Int2048_Word"(%3 : $Builtin.Int2048) : $(Builtin.Word, Builtin.Int1)
+  %3 = integer_literal $Builtin.IntLiteral, 1
+  %5 = builtin "s_to_u_checked_trunc_IntLiteral_Word"(%3 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
   %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
   %7 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 1
   %8 = struct $UInt (%6 : $Builtin.Word)
-  %9 = integer_literal $Builtin.Int2048, 0
-  %11 = builtin "s_to_u_checked_trunc_Int2048_Word"(%9 : $Builtin.Int2048) : $(Builtin.Word, Builtin.Int1)
+  %9 = integer_literal $Builtin.IntLiteral, 0
+  %11 = builtin "s_to_u_checked_trunc_IntLiteral_Word"(%9 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
   %12 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 0
   %13 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 1
   %14 = struct $UInt (%12 : $Builtin.Word)
-  %15 = integer_literal $Builtin.Int2048, 1
-  %17 = builtin "s_to_u_checked_trunc_Int2048_Word"(%15 : $Builtin.Int2048) : $(Builtin.Word, Builtin.Int1)
+  %15 = integer_literal $Builtin.IntLiteral, 1
+  %17 = builtin "s_to_u_checked_trunc_IntLiteral_Word"(%15 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
   %18 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 0
   %19 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 1
   %20 = struct $UInt (%18 : $Builtin.Word)
   %22 = struct_extract %14 : $UInt, #UInt.value
   %23 = struct_extract %20 : $UInt, #UInt.value
-  %25 = integer_literal $Builtin.Int2048, 0
-  %27 = builtin "s_to_s_checked_trunc_Int2048_Word"(%25 : $Builtin.Int2048) : $(Builtin.Word, Builtin.Int1)
+  %25 = integer_literal $Builtin.IntLiteral, 0
+  %27 = builtin "s_to_s_checked_trunc_IntLiteral_Word"(%25 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
   %28 = tuple_extract %27 : $(Builtin.Word, Builtin.Int1), 0
   %29 = tuple_extract %27 : $(Builtin.Word, Builtin.Int1), 1
   %30 = struct $Int (%28 : $Builtin.Word)

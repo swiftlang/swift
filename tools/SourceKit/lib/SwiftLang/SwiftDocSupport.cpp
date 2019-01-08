@@ -397,6 +397,14 @@ static bool initDocEntityInfo(const Decl *D,
             VD, SynthesizedTarget, OS);
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
+    } else if (auto *E = dyn_cast<ExtensionDecl>(D)) {
+      if (auto *Sig = E->getGenericSignature()) {
+        // The extension under printing is potentially part of a synthesized
+        // extension. Thus it's hard to print the fully annotated decl. We
+        // need to at least print the generic signature here.
+        llvm::raw_svector_ostream OS(Info.FullyAnnotatedGenericSig);
+        SwiftLangSupport::printFullyAnnotatedGenericReq(Sig, OS);
+      }
     }
   }
 

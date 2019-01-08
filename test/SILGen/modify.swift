@@ -224,7 +224,7 @@ class HasStoredDidSet {
 class HasWeak {
   weak var weakvar: HasWeak?
 }
-// CHECK-LABEL: sil hidden [transparent] @$s6modify7HasWeakC7weakvarACSgXwvM : $@yield_once @convention(method) (@guaranteed HasWeak) -> @yields @inout Optional<HasWeak> {
+// CHECK-LABEL: sil hidden [transparent] @$s6modify7HasWeakC7weakvarACSgvM : $@yield_once @convention(method) (@guaranteed HasWeak) -> @yields @inout Optional<HasWeak> {
 // CHECK: bb0([[SELF:%.*]] : @guaranteed $HasWeak):
 // CHECK:   [[PROP:%.*]] = ref_element_addr [[SELF]] : $HasWeak, #HasWeak.weakvar
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[PROP]] : $*@sil_weak Optional<HasWeak>

@@ -223,13 +223,10 @@ func testCaptureLocal() -> ()->() {
 // CHECK:   end_access
 // CHECK:   [[CAPTURE:%.*]] = copy_value %0 : ${ var Int }
 // CHECK:   partial_apply [callee_guaranteed] %{{.*}}([[CAPTURE]]) : $@convention(thin) (@guaranteed { var Int }) -> ()
-// CHECK:   alloc_stack $Int
-// CHECK:   [[UNINIT:%.*]] = mark_uninitialized [var]
 // CHECK:   begin_access [read] [unknown] [[PROJ]]
 // CHECK:   [[VAL:%.*]] = load [trivial]
 // CHECK:   end_access
 // CHECK-NOT: begin_access
-// CHECK:   assign [[VAL]] to [[UNINIT]] : $*Int
 // CHECK:   return {{.*}} : $@callee_guaranteed () -> ()
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify16testCaptureLocalyycyF'
 
@@ -379,7 +376,7 @@ enum IntEnum {
 // CHECK-LABEL: sil hidden @$s20access_marker_verify7IntEnumO8getValueSivg : $@convention(method) (@guaranteed IntEnum) -> Int {
 // CHECK: bb0(%0 : @guaranteed $IntEnum):
 // CHECK:   switch_enum %{{.*}} : $IntEnum, case #IntEnum.int!enumelt.1: bb1
-// CHECK: bb1(%{{.*}} : @owned ${ var Int }):
+// CHECK: bb1(%{{.*}} : @guaranteed ${ var Int }):
 // CHECK:   [[PROJ:%.*]] = project_box
 // CHECK-NOT: begin_access
 // CHECK:   load [trivial] [[PROJ]] : $*Int
@@ -398,7 +395,7 @@ enum RefEnum {
 // CHECK-LABEL: sil hidden @$s20access_marker_verify7RefEnumO8getValueAA9BaseClassCvg : $@convention(method) (@guaranteed RefEnum) -> @owned BaseClass {
 // CHECK: bb0(%0 : @guaranteed $RefEnum):
 // CHECK:   switch_enum %{{.*}} : $RefEnum, case #RefEnum.ref!enumelt.1: bb1
-// CHECK: bb1(%{{.*}} : @owned ${ var BaseClass }):
+// CHECK: bb1(%{{.*}} : @guaranteed ${ var BaseClass }):
 // CHECK:   [[PROJ:%.*]] = project_box %{{.*}} : ${ var BaseClass }, 0
 // CHECK-NOT: begin_access
 // CHECK:   load_borrow [[PROJ]] : $*BaseClass
@@ -480,23 +477,9 @@ func accessOptionalArray(_ dict : MyDict<Int, [Int]>) {
 // ----- access the temporary array result of the getter
 // CHECK:   [[TEMPACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMP]]
 // CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[TEMPACCESS]]
-// CHECK:   cond_br [[HAS_VALUE]], bb2, bb1
+// CHECK:   cond_br [[HAS_VALUE]], [[TRUEBB:bb[0-9]+]], [[FALSEBB:bb[0-9]+]]
 //
-// CHECK: bb1:
-// CHECK:   [[TEMPARRAY:%.*]] = load [copy] [[TEMPACCESS]]
-// CHECK:   [[WRITEBACK:%.*]] = alloc_stack $Optional<Array<Int>>
-// CHECK-NOT: begin_access
-// CHECK:   store [[TEMPARRAY]] to [init] [[WRITEBACK]]
-// CHECK:   [[TEMP3:%.*]] = alloc_stack $Int
-// CHECK-NOT: begin_access
-// CHECK:   store %{{.*}} to [trivial] [[TEMP3]] : $*Int
-// Call MyDict.subscript.setter
-// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
-// CHECK:   end_access [[TEMPACCESS]] : $*Optional<Array<Int>>
-// CHECK:   end_access [[BOXACCESS]] : $*MyDict<Int, Array<Int>>
-// CHECK:   br
-//
-// CHECK: bb2:
+// CHECK: [[TRUEBB]]:
 // CHECK-NOT: begin_access
 // CHECK:   [[TEMPARRAYADR:%.*]] = unchecked_take_enum_data_addr [[TEMPACCESS]] : $*Optional<Array<Int>>, #Optional.some!enumelt.1
 // ----- call Array.append
@@ -511,6 +494,22 @@ func accessOptionalArray(_ dict : MyDict<Int, [Int]>) {
 // CHECK:   store %{{.*}} to [trivial]
 // ----- call MyDict.subscript.setter
 // CHECK: apply %{{.*}}<Int, [Int]>([[ARRAYCOPY]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
+// CHECK:   br [[RETBB:bb[0-9]+]]
+//
+// CHECK: [[FALSEBB]]:
+// CHECK:   [[TEMPARRAY:%.*]] = load [copy] [[TEMPACCESS]]
+// CHECK:   [[WRITEBACK:%.*]] = alloc_stack $Optional<Array<Int>>
+// CHECK-NOT: begin_access
+// CHECK:   store [[TEMPARRAY]] to [init] [[WRITEBACK]]
+// CHECK:   [[TEMP3:%.*]] = alloc_stack $Int
+// CHECK-NOT: begin_access
+// CHECK:   store %{{.*}} to [trivial] [[TEMP3]] : $*Int
+// Call MyDict.subscript.setter
+// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
+// CHECK:   end_access [[TEMPACCESS]] : $*Optional<Array<Int>>
+// CHECK:   end_access [[BOXACCESS]] : $*MyDict<Int, Array<Int>>
+// CHECK:   br [[RETBB]]
+//
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify0A13OptionalArrayyyAA6MyDictVySiSaySiGGF'
 
 // --- Optional map.
@@ -946,15 +945,12 @@ func testLocalExistential() {
 // CHECK: partial_apply [callee_guaranteed] %{{.*}}([[PROJ]]) : $@convention(thin) (@inout_aliasable P) -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply
-// CHECK: [[TMP:%.*]] = alloc_stack $P
-// CHECK: [[UNINIT:%.*]] = mark_uninitialized [var] [[TMP]] : $*P
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJ]] : $*P
 // CHECK: [[COPY:%.*]] = alloc_stack $P
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [[ACCESS]] to [initialization] [[COPY]] : $*P
 // CHECK: end_access
 // CHECK-NOT: begin_access
-// CHECK: copy_addr [take] [[COPY]] to [[UNINIT]] : $*P
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify20testLocalExistentialyyF'
 
 // --- address-only argument.

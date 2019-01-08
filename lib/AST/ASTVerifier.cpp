@@ -86,15 +86,23 @@ struct is_apply_expr
               std::is_same<Ty, ConstructorRefCallExpr>::value> {};
 
 template <typename Ty>
+struct is_subscript_expr
+    : public std::integral_constant<
+          bool, std::is_same<Ty, SubscriptExpr>::value ||
+                    std::is_same<Ty, DynamicSubscriptExpr>::value> {};
+
+template <typename Ty>
 struct is_autoclosure_expr
     : public std::integral_constant<bool,
                                     std::is_same<Ty, AutoClosureExpr>::value> {
 };
 
 template <typename Ty>
-struct is_apply_or_autoclosure_expr
-    : public std::integral_constant<
-          bool, is_apply_expr<Ty>::value || is_autoclosure_expr<Ty>::value> {};
+struct is_apply_subscript_or_autoclosure_expr
+    : public std::integral_constant<bool, is_apply_expr<Ty>::value ||
+                                              is_subscript_expr<Ty>::value ||
+                                              is_autoclosure_expr<Ty>::value> {
+};
 
 template <typename Verifier, typename Kind>
 std::pair<bool, Expr *> dispatchVisitPreExprHelper(
@@ -106,6 +114,22 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
     // Record any inout_to_pointer or array_to_pointer that we see in
     // the proper position.
     V.maybeRecordValidPointerConversion(node, node->getArg());
+    return {true, node};
+  }
+  V.cleanup(node);
+  return {false, node};
+}
+
+template <typename Verifier, typename Kind>
+std::pair<bool, Expr *> dispatchVisitPreExprHelper(
+    Verifier &V,
+    typename std::enable_if<
+        is_subscript_expr<typename std::remove_pointer<Kind>::type>::value,
+        Kind>::type node) {
+  if (V.shouldVerify(node)) {
+    // Record any inout_to_pointer or array_to_pointer that we see in
+    // the proper position.
+    V.maybeRecordValidPointerConversion(node, node->getIndex());
     return {true, node};
   }
   V.cleanup(node);
@@ -131,7 +155,7 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
 template <typename Verifier, typename Kind>
 std::pair<bool, Expr *> dispatchVisitPreExprHelper(
     Verifier &V, typename std::enable_if<
-                     !is_apply_or_autoclosure_expr<
+                     !is_apply_subscript_or_autoclosure_expr<
                          typename std::remove_pointer<Kind>::type>::value,
                      Kind>::type node) {
   if (V.shouldVerify(node)) {
@@ -471,7 +495,7 @@ public:
         // they do not have a type on them.
         if (!isa<IntegerLiteralExpr>(E)) {
           Out << "expression has no type\n";
-          E->print(Out);
+          E->dump(Out);
           abort();
         }
       }
@@ -565,7 +589,7 @@ public:
         // they do not have a type on them.
         if (!isa<IntegerLiteralExpr>(E)) {
           Out << "expression has no type\n";
-          E->print(Out);
+          E->dump(Out);
           abort();
         }
         return;
@@ -972,7 +996,7 @@ public:
       case StmtConditionElement::CK_Boolean: {
         auto *E = elt.getBoolean();
         if (shouldVerifyChecked(E))
-          checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
+          checkSameType(E->getType(), Ctx.getBoolDecl()->getDeclaredType(),
                         "condition type");
         break;
       }
@@ -1026,6 +1050,7 @@ public:
         Out << "reference with inout type "
           << E->getType().getString() << "\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
       if (E->getType()->is<GenericFunctionType>()) {
@@ -1033,6 +1058,7 @@ public:
         Out << "unspecialized reference with polymorphic type "
           << E->getType().getString() << "\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
       verifyCheckedBase(E);
@@ -1100,7 +1126,7 @@ public:
       if (!Ty->is<FunctionType>()) {
         PrettyStackTraceExpr debugStack(Ctx, "verifying closure", E);
         Out << "a closure should have a function type";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1122,7 +1148,7 @@ public:
         discriminatorSet.set(discriminator);
       } else if (discriminatorSet.test(discriminator)) {
         Out << "a closure must have a unique discriminator in its context\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       } else {
@@ -1141,13 +1167,13 @@ public:
         if (!isa<Initializer>(parentDC)) {
           Out << "a closure in non-local context should be parented "
                  "by an initializer or REPL context";
-          E->print(Out);
+          E->dump(Out);
           Out << "\n";
           abort();
         } else if (parentDC->getParent() != enclosingDC) {
           Out << "closure in non-local context not grandparented by its "
                  "enclosing function";
-          E->print(Out);
+          E->dump(Out);
           Out << "\n";
           abort();
         }
@@ -1155,14 +1181,14 @@ public:
                  Functions[Functions.size() - 2] != E->getParent()) {
         Out << "closure in local context not parented by its "
                "enclosing function";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
 
       if (E->getDiscriminator() == AbstractClosureExpr::InvalidDiscriminator) {
         Out << "a closure expression should have a valid discriminator\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1178,7 +1204,7 @@ public:
 
       if (destTy->isEqual(srcTy)) {
         Out << "trivial MetatypeConversionExpr:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1195,14 +1221,14 @@ public:
       
       if (!srcTy->mayHaveSuperclass()) {
         Out << "ClassMetatypeToObject with non-class metatype:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
       
       if (!E->getType()->isEqual(Ctx.getAnyObjectType())) {
         Out << "ClassMetatypeToObject does not produce AnyObject:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1218,21 +1244,21 @@ public:
       if (!E->getSubExpr()->getType()->is<ExistentialMetatypeType>()) {
         Out << "ExistentialMetatypeToObject with non-existential "
                "metatype:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
       if (!srcTy->isClassExistentialType()) {
         Out << "ExistentialMetatypeToObject with non-class existential "
                "metatype:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
       
       if (!E->getType()->isEqual(Ctx.getAnyObjectType())) {
         Out << "ExistentialMetatypeToObject does not produce AnyObject:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1247,14 +1273,14 @@ public:
       if (E->getSubExpr()->getType()->is<ExistentialMetatypeType>()) {
         Out << "ProtocolMetatypeToObject with existential "
                "metatype:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
 
       if (!srcTy->isExistentialType()) {
         Out << "ProtocolMetatypeToObject with non-existential metatype:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1264,14 +1290,14 @@ public:
           !layout.isObjC() ||
           layout.getProtocols().size() != 1) {
         Out << "ProtocolMetatypeToObject with non-ObjC-protocol metatype:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
 
       if (!E->getType()->getClassOrBoundGenericClass()) {
         Out << "ProtocolMetatypeToObject does not produce class:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1286,7 +1312,7 @@ public:
       
       if (!fromElement || !toElement) {
         Out << "PointerToPointer does not convert between pointer types:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1298,7 +1324,7 @@ public:
 
       if (!ValidInOutToPointerExprs.count(E)) {
         Out << "InOutToPointerExpr in unexpected position!\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1308,7 +1334,7 @@ public:
       
       if (!E->getSubExpr()->getType()->is<InOutType>() && !toElement) {
         Out << "InOutToPointer does not convert from inout to pointer:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1319,7 +1345,7 @@ public:
           && toElement->isEqual(Ctx.TheEmptyTupleType)) {
         Out << "InOutToPointer is converting an array to a void pointer; "
                "ArrayToPointer should be used instead:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1331,7 +1357,7 @@ public:
 
       if (!ValidArrayToPointerExprs.count(E)) {
         Out << "ArrayToPointer in invalid position?!\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1341,7 +1367,7 @@ public:
       
       if (fromArray->getNominalOrBoundGenericNominal() != Ctx.getArrayDecl()) {
         Out << "ArrayToPointer does not convert from array:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1350,7 +1376,7 @@ public:
 
       if (!toElement) {
         Out << "ArrayToPointer does not convert to pointer:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1363,7 +1389,7 @@ public:
       if (E->getSubExpr()->getType()->getNominalOrBoundGenericNominal()
             != Ctx.getStringDecl()) {
         Out << "StringToPointer does not convert from string:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1372,13 +1398,13 @@ public:
       auto toElement = E->getType()->getAnyPointerElementType(PTK);
       if (!toElement) {
         Out << "StringToPointer does not convert to pointer:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
       if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeRawPointer) {
         Out << "StringToPointer converts to non-const pointer:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1396,7 +1422,7 @@ public:
       auto srcTy = E->getSubExpr()->getType();
       if (destTy->isEqual(srcTy)) {
         Out << "trivial DerivedToBaseExpr:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1405,7 +1431,7 @@ public:
           !(srcTy->getClassOrBoundGenericClass() ||
             srcTy->is<DynamicSelfType>())) {
         Out << "DerivedToBaseExpr does not involve class types:\n";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
@@ -1618,7 +1644,7 @@ public:
               expr = bind->getSubExpr();
             } else {
               Out << "malformed optional pointer conversion\n";
-              origSubExpr->print(Out);
+              origSubExpr->dump(Out);
               Out << '\n';
               abort();
             }
@@ -1728,23 +1754,27 @@ public:
         FT->printParams(Out);
         Out << "\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
 
       if (!E->isThrowsSet()) {
         Out << "apply expression is not marked as throwing or non-throwing\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       } else if (E->throws() && !FT->throws()) {
         Out << "apply expression is marked as throwing, but function operand"
                "does not have a throwing function type\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
 
       if (E->isSuper() != E->getArg()->isSuperExpr()) {
         Out << "Function application's isSuper() bit mismatch.\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
       verifyCheckedBase(E);
@@ -1756,6 +1786,7 @@ public:
       if (!E->getMember()) {
         Out << "Member reference is missing declaration\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
       
@@ -1764,6 +1795,7 @@ public:
             ->isAnyExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
 
@@ -1775,6 +1807,7 @@ public:
           if (!VD || VD->getAllAccessors().empty()) {
             Out << "member_ref_expr on value of inout type\n";
             E->dump(Out);
+            Out << "\n";
             abort();
           }
         }
@@ -1794,6 +1827,7 @@ public:
             ->isAnyExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
 
@@ -1813,6 +1847,7 @@ public:
             ->isAnyExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
 
@@ -1829,6 +1864,7 @@ public:
             ->isAnyExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
 
@@ -1848,7 +1884,7 @@ public:
 
       if (objectType->is<LValueType>() != optionalType->is<LValueType>()) {
         Out << "optional operation must preserve lvalue-ness of base\n";
-        E->print(Out);
+        E->dump(Out);
         abort();
       }
     }
@@ -1856,7 +1892,7 @@ public:
     void verifyChecked(OptionalEvaluationExpr *E) {
       if (E->getType()->hasLValueType()) {
         Out << "Optional evaluation should not produce an lvalue";
-        E->print(Out);
+        E->dump(Out);
         abort();
       }
       checkSameType(E->getType(), E->getSubExpr()->getType(),
@@ -1868,7 +1904,7 @@ public:
 
       if (E->getDepth() >= OptionalEvaluations.size()) {
         Out << "BindOptional expression is out of its depth\n";
-        E->print(Out);
+        E->dump(Out);
         abort();
       }
       
@@ -1922,15 +1958,21 @@ public:
     void verifyChecked(OptionalTryExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying OptionalTryExpr", E);
 
-      Type unwrappedType = E->getType()->getOptionalObjectType();
-      if (!unwrappedType) {
-        Out << "OptionalTryExpr result type is not optional\n";
-        abort();
+      if (Ctx.LangOpts.isSwiftVersionAtLeast(5)) {
+        checkSameType(E->getType(), E->getSubExpr()->getType(),
+                      "OptionalTryExpr and sub-expression");
       }
-
-      checkSameType(unwrappedType, E->getSubExpr()->getType(),
-                    "OptionalTryExpr and sub-expression");
-
+      else {
+        Type unwrappedType = E->getType()->getOptionalObjectType();
+        if (!unwrappedType) {
+          Out << "OptionalTryExpr result type is not optional\n";
+          abort();
+        }
+        
+        checkSameType(unwrappedType, E->getSubExpr()->getType(),
+                      "OptionalTryExpr and sub-expression");
+      }
+      
       verifyCheckedBase(E);
     }
 
@@ -2027,10 +2069,9 @@ public:
     void verifyChecked(IfExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying IfExpr", E);
 
-      auto condTy
-        = E->getCondExpr()->getType()->getAs<BuiltinIntegerType>();
-      if (!condTy || !condTy->isFixedWidth() || condTy->getFixedWidth() != 1) {
-        Out << "IfExpr condition is not an i1\n";
+      auto condTy = E->getCondExpr()->getType();
+      if (!condTy->isBool()) {
+        Out << "IfExpr condition is not Bool\n";
         abort();
       }
 
@@ -2245,6 +2286,7 @@ public:
       if (isa<ParenExpr>(subExpr) || isa<ForceValueExpr>(subExpr)) {
         Out << "Immediate ParenExpr/ForceValueExpr should preceed a LoadExpr\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
 
@@ -2702,6 +2744,48 @@ public:
       verifyCheckedBase(nominal);
     }
 
+    void verifyCheckedAlways(GenericTypeParamDecl *GTPD) {
+      PrettyStackTraceDecl debugStack("verifying GenericTypeParamDecl", GTPD);
+
+      const DeclContext *DC = GTPD->getDeclContext();
+      if (!GTPD->getDeclContext()->isInnermostContextGeneric()) {
+        Out << "DeclContext of GenericTypeParamDecl does not have "
+               "generic params\n";
+        abort();
+      }
+
+      GenericParamList *paramList =
+          static_cast<const GenericContext *>(DC)->getGenericParams();
+      if (!paramList) {
+        Out << "DeclContext of GenericTypeParamDecl does not have "
+               "generic params\n";
+        abort();
+      }
+
+      unsigned currentDepth = paramList->getDepth();
+      if (currentDepth < GTPD->getDepth()) {
+        Out << "GenericTypeParamDecl has incorrect depth\n";
+        abort();
+      }
+      while (currentDepth > GTPD->getDepth()) {
+        paramList = paramList->getOuterParameters();
+        --currentDepth;
+      }
+      assert(paramList && "this is guaranteed by the parameter list's depth");
+
+      if (paramList->size() <= GTPD->getIndex() ||
+          paramList->getParams()[GTPD->getIndex()] != GTPD) {
+        if (llvm::is_contained(paramList->getParams(), GTPD))
+          Out << "GenericTypeParamDecl has incorrect index\n";
+        else
+          Out << "GenericTypeParamDecl not found in GenericParamList; "
+                 "incorrect depth or wrong DeclContext\n";
+        abort();
+      }
+
+      verifyCheckedBase(GTPD);
+    }
+
     void verifyChecked(ExtensionDecl *ext) {
       // Make sure that the protocol conformances are complete.
       for (auto conformance : ext->getLocalConformances()) {
@@ -2997,10 +3081,9 @@ public:
           abort();
         }
 
-        if (AD->getAccessorKind() != AccessorKind::Read &&
-            AD->getAccessorKind() != AccessorKind::Modify) {
-          Out << "hasForcedStaticDispatch() set on accessor other than "
-                 "read or modify\n";
+        if (AD->getStorage()->requiresOpaqueAccessor(AD->getAccessorKind())) {
+          Out << "hasForcedStaticDispatch() set on accessor that's opaque "
+                 "for its storage\n";
           abort();
         }
       }
@@ -3064,9 +3147,28 @@ public:
           Out << "Property and accessor do not match for 'final'\n";
           abort();
         }
-        if (FD->isDynamic() != storageDecl->isDynamic()) {
+        if (FD->isDynamic() != storageDecl->isDynamic() &&
+            // We allow a non dynamic setter if there is a dynamic modify,
+            // observer, or mutable addressor.
+            !(FD->isSetter() &&
+              (storageDecl->getWriteImpl() == WriteImplKind::Modify ||
+               storageDecl->getWriteImpl() ==
+                   WriteImplKind::StoredWithObservers ||
+               storageDecl->getWriteImpl() == WriteImplKind::MutableAddress) &&
+              storageDecl->isNativeDynamic()) &&
+            // We allow a non dynamic getter if there is a dynamic read.
+            !(FD->isGetter() &&
+              (storageDecl->getReadImpl() == ReadImplKind::Read ||
+               storageDecl->getReadImpl() == ReadImplKind::Address) &&
+              storageDecl->isNativeDynamic())) {
           Out << "Property and accessor do not match for 'dynamic'\n";
           abort();
+        }
+        if (FD->isDynamic()) {
+          if (FD->isObjC() != storageDecl->isObjC()) {
+            Out << "Property and accessor do not match for '@objc'\n";
+            abort();
+          }
         }
       }
 
@@ -3074,28 +3176,6 @@ public:
       if (storedAccessor != FD) {
         Out << "storage declaration has different accessor for this kind\n";
         abort();
-      }
-
-      switch (FD->getAccessorKind()) {
-      case AccessorKind::Get:
-      case AccessorKind::Set:
-      case AccessorKind::WillSet:
-      case AccessorKind::DidSet:
-      case AccessorKind::Read:
-      case AccessorKind::Modify:
-        if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
-          Out << "non-addressor accessor has an addressor kind\n";
-          abort();
-        }
-        break;
-
-      case AccessorKind::Address:
-      case AccessorKind::MutableAddress:
-        if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
-          Out << "addressor does not have an addressor kind\n";
-          abort();
-        }
-        break;
       }
 
       verifyCheckedBase(FD);
@@ -3342,20 +3422,20 @@ public:
           return;
 
         Out << "invalid source range for expression: ";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
       if (!isGoodSourceRange(E->getSourceRange())) {
         Out << "bad source range for expression: ";
-        E->print(Out);
+        E->dump(Out);
         Out << "\n";
         abort();
       }
       // FIXME: Re-visit this to always do the check.
       if (!E->isImplicit())
         checkSourceRanges(E->getSourceRange(), Parent,
-                          [&]{ E->print(Out); } );
+                          [&]{ E->dump(Out); } );
     }
 
     void checkSourceRanges(Stmt *S) {
@@ -3368,18 +3448,18 @@ public:
           return;
 
         Out << "invalid source range for statement: ";
-        S->print(Out);
+        S->dump(Out);
         Out << "\n";
         abort();
       }
       if (!isGoodSourceRange(S->getSourceRange())) {
         Out << "bad source range for statement: ";
-        S->print(Out);
+        S->dump(Out);
         Out << "\n";
         abort();
       }
       checkSourceRanges(S->getSourceRange(), Parent,
-                        [&]{ S->print(Out); });
+                        [&]{ S->dump(Out); });
     }
 
     void checkSourceRanges(IfConfigDecl *ICD) {

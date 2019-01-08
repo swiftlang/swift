@@ -42,17 +42,14 @@ func multipleLabelsLet(e: E) {
   // CHECK:      [[FN:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
   // CHECK-NEXT: apply [[FN]]([[X_PHI]]
   // CHECK-NEXT: destroy_addr [[X_PHI]]
-  // CHECK-NEXT: br bb6
+  // CHECK-NEXT: br bb5
 
   // CHECK:      bb4:
+  // CHECK-NEXT: destroy_addr [[E_COPY]]
+  // CHECK-NEXT: dealloc_stack [[E_COPY]]
   // CHECK-NEXT: br bb5
 
   // CHECK:      bb5:
-  // CHECK-NEXT: destroy_addr [[E_COPY]]
-  // CHECK-NEXT: dealloc_stack [[E_COPY]]
-  // CHECK-NEXT: br bb6
-
-  // CHECK:      bb6:
   // CHECK-NEXT: dealloc_stack [[X_PHI]]
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return
@@ -106,17 +103,14 @@ func multipleLabelsVar(e: E) {
   // CHECK-NEXT: destroy_addr [[ANY_STACK]]
   // CHECK-NEXT: dealloc_stack [[ANY_STACK]]
   // CHECK-NEXT: destroy_value [[ANY_BOX]]
-  // CHECK-NEXT: br bb6
+  // CHECK-NEXT: br bb5
 
   // CHECK:      bb4:
+  // CHECK-NEXT: destroy_addr [[E_COPY]]
+  // CHECK-NEXT: dealloc_stack [[E_COPY]]
   // CHECK-NEXT: br bb5
 
   // CHECK:      bb5:
-  // CHECK-NEXT: destroy_addr [[E_COPY]]
-  // CHECK-NEXT: dealloc_stack [[E_COPY]]
-  // CHECK-NEXT: br bb6
-
-  // CHECK:      bb6:
   // CHECK-NEXT: dealloc_stack [[X_PHI]]
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return
@@ -163,17 +157,14 @@ func fallthroughWithValue(e: E) {
   // CHECK:      [[FN2:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
   // CHECK-NEXT: apply [[FN2]]([[X_PHI]]
   // CHECK-NEXT: destroy_addr [[X_PHI]]
-  // CHECK-NEXT: br bb6
+  // CHECK-NEXT: br bb5
   
   // CHECK:      bb4:
+  // CHECK-NEXT: destroy_addr [[E_COPY]]
+  // CHECK-NEXT: dealloc_stack [[E_COPY]]
   // CHECK-NEXT: br bb5
   
   // CHECK:      bb5:
-  // CHECK-NEXT: destroy_addr [[E_COPY]]
-  // CHECK-NEXT: dealloc_stack [[E_COPY]]
-  // CHECK-NEXT: br bb6
-  
-  // CHECK:      bb6:
   // CHECK-NEXT: dealloc_stack [[X_PHI]]
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return

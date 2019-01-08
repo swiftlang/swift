@@ -6,8 +6,8 @@ import Builtin
 import Swift
 
 class X {
-  @sil_stored var a: Int32
-  @sil_stored var x: X
+  @_hasStorage var a: Int32
+  @_hasStorage var x: X
 
   init()
 }

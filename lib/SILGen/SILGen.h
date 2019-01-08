@@ -296,7 +296,7 @@ public:
 
   /// Get or emit the witness table for a protocol conformance.
   SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
-  
+
   /// Emit a protocol witness entry point.
   SILFunction *
   emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,
@@ -306,6 +306,9 @@ public:
 
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);
+
+  /// Emit the self-conformance witness table for a protocol.
+  void emitSelfConformanceWitnessTable(ProtocolDecl *protocol);
 
   /// Emit the lazy initializer function for a global pattern binding
   /// declaration.
@@ -406,6 +409,9 @@ public:
 
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
+
+  SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
+                                             KeyPathTypeKind typeKind);
 
   /// Report a diagnostic.
   template<typename...T, typename...U>

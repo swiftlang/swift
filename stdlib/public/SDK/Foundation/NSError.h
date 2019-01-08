@@ -27,11 +27,9 @@ namespace swift {
 /// The items that ErrorObject.mm needs for bridging. The
 /// ERROR_BRIDGING_SYMBOL_NAME symbol will contain an instance of this struct.
 struct ErrorBridgingInfo {
-  const SWIFT_CC(swift) WitnessTable *(*GetCFErrorErrorConformance)();
-  
-  const SWIFT_CC(swift) hashable_support::HashableWitnessTable *
-    (*GetNSObjectHashableConformance)();
-  
+  const ProtocolConformanceDescriptor *CFErrorErrorConformance;
+  const ProtocolConformanceDescriptor *NSObjectHashableConformance;
+
   SWIFT_CC(swift) NSDictionary *(*GetErrorDefaultUserInfo)(const OpaqueValue *error,
                                                            const Metadata *T,
                                                            const WitnessTable *Error);

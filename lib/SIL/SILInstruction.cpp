@@ -155,7 +155,7 @@ void SILInstruction::dropAllReferences() {
 
   // If we have a function ref inst, we need to especially drop its function
   // argument so that it gets a proper ref decrement.
-  if (auto *FRI = dyn_cast<FunctionRefInst>(this)) {
+  if (auto *FRI = dyn_cast<FunctionRefBaseInst>(this)) {
     if (!FRI->getReferencedFunction())
       return;
     FRI->dropReferencedFunction();
@@ -449,6 +449,15 @@ namespace {
 
     bool visitFunctionRefInst(const FunctionRefInst *RHS) {
       auto *X = cast<FunctionRefInst>(LHS);
+      return X->getReferencedFunction() == RHS->getReferencedFunction();
+    }
+    bool visitDynamicFunctionRefInst(const DynamicFunctionRefInst *RHS) {
+      auto *X = cast<DynamicFunctionRefInst>(LHS);
+      return X->getReferencedFunction() == RHS->getReferencedFunction();
+    }
+    bool visitPreviousDynamicFunctionRefInst(
+        const PreviousDynamicFunctionRefInst *RHS) {
+      auto *X = cast<PreviousDynamicFunctionRefInst>(LHS);
       return X->getReferencedFunction() == RHS->getReferencedFunction();
     }
 
@@ -1091,7 +1100,7 @@ namespace {
       Result = Cloned;
       SILCloner<TrivialCloner>::postProcess(Orig, Cloned);
     }
-    SILValue remapValue(SILValue Value) {
+    SILValue getMappedValue(SILValue Value) {
       return Value;
     }
     SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
@@ -1171,6 +1180,11 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // begin_apply creates a token that has to be directly used by the
   // corresponding end_apply and abort_apply.
   if (isa<BeginApplyInst>(this))
+    return false;
+
+  // dynamic_method_br is not duplicatable because IRGen does not support phi
+  // nodes of objc_method type.
+  if (isa<DynamicMethodBranchInst>(this))
     return false;
 
   // If you add more cases here, you should also update SILLoop:canDuplicate.

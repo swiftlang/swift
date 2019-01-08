@@ -353,19 +353,17 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       return None;
     };
 
+  // Check whether the superclass conforms.
+  if (auto superclass = genericSig->getSuperclassBound(type)) {
+    LookUpConformanceInSignature lookup(*getGenericSignature());
+    if (auto conformance = lookup(type->getCanonicalType(), superclass, proto))
+      return conformance;
+  }
+
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.
-  if (!genericSig->conformsToProtocol(type, proto)) {
-    // Check whether the superclass conforms.
-    if (auto superclass = genericSig->getSuperclassBound(type)) {
-      return LookUpConformanceInSignature(*getGenericSignature())(
-                                                 type->getCanonicalType(),
-                                                 superclass,
-                                                 proto);
-    }
-
+  if (!genericSig->conformsToProtocol(type, proto))
     return None;
-  }
 
   auto accessPath =
     genericSig->getConformanceAccessPath(type, proto);
@@ -525,7 +523,7 @@ SubstitutionMap::getOverrideSubstitutions(
   // For overrides within a protocol hierarchy, substitute the Self type.
   if (auto baseProto = baseDecl->getDeclContext()->getSelfProtocolDecl()) {
     if (auto derivedProtoSelf =
-          derivedDecl->getDeclContext()->getProtocolSelfType()) {
+          derivedDecl->getDeclContext()->getSelfInterfaceType()) {
       return SubstitutionMap::getProtocolSubstitutions(
                                              baseProto,
                                              derivedProtoSelf,

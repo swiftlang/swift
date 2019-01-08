@@ -1,4 +1,4 @@
-add_swift_library(swiftFrontend STATIC
+add_swift_host_library(swiftFrontend STATIC
   ArgsToFrontendInputsConverter.cpp
   ArgsToFrontendOptionsConverter.cpp
   ArgsToFrontendOutputsConverter.cpp

@@ -9,7 +9,7 @@ import Swift
 import SwiftShims
 
 class Node {
-  @sil_stored var index: Int { get set }
+  @_hasStorage var index: Int { get set }
   init(index: Int)
   func check() -> Int
   @objc deinit

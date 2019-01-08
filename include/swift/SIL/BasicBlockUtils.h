@@ -13,12 +13,45 @@
 #ifndef SWIFT_SIL_DEADENDBLOCKS_H
 #define SWIFT_SIL_DEADENDBLOCKS_H
 
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 
 class SILFunction;
 class SILBasicBlock;
+class TermInst;
+class DominanceInfo;
+class SILLoopInfo;
+
+/// \brief Replace a branch target.
+///
+/// \param T The terminating instruction to modify.
+/// \param edgeIdx The successor edges index that will be replaced.
+/// \param newDest The new target block.
+/// \param preserveArgs If set, preserve arguments on the replaced edge.
+void changeBranchTarget(TermInst *T, unsigned edgeIdx, SILBasicBlock *newDest,
+                        bool preserveArgs);
+
+/// Returns the arguments values on the specified CFG edge. If necessary, may
+/// add create new SILPHIArguments, using `NewEdgeBB` as the placeholder.
+void getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
+                 llvm::SmallVectorImpl<SILValue> &args);
+
+/// \brief Splits the edge from terminator.
+///
+/// Also updates dominance and loop information if not null.
+///
+/// Returns the newly created basic block.
+SILBasicBlock *splitEdge(TermInst *T, unsigned edgeIdx,
+                         DominanceInfo *DT = nullptr,
+                         SILLoopInfo *LI = nullptr);
+
+/// \brief Merge a basic block ending in a branch with its successor
+/// if possible.
+void mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
+                                        SILBasicBlock *succBB);
 
 /// A utility for finding dead-end blocks.
 ///

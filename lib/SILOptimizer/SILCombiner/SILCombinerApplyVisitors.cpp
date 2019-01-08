@@ -623,6 +623,12 @@ void SILCombiner::replaceWitnessMethodInst(
 SILInstruction *
 SILCombiner::propagateSoleConformingType(FullApplySite Apply,
                                          WitnessMethodInst *WMI) {
+  // Disable this optimization for now since it causes miscompiles.
+  //
+  // rdar://46409354
+#if 1
+  return nullptr;
+#else
   // If WMI has concrete conformance, it can be optimized.
   if (WMI->getConformance().isConcrete())
     return nullptr;
@@ -700,6 +706,7 @@ SILCombiner::propagateSoleConformingType(FullApplySite Apply,
   /// Create the new apply instruction using the concrete type.
   auto *NewAI = createApplyWithConcreteType(Apply, CEIs, BuilderCtx);
   return NewAI;
+#endif
 }
 
 /// Given an Apply and an argument value produced by InitExistentialAddrInst,
@@ -721,6 +728,13 @@ static bool canReplaceCopiedArg(FullApplySite Apply,
   // Only init_existential_addr may be copied.
   SILValue existentialAddr =
       cast<InitExistentialAddrInst>(InitExistential)->getOperand();
+
+  // If we peeked through an InitEnumDataAddr or some such, then don't assume we
+  // can reuse the copied value. It's likely destroyed by
+  // UncheckedTakeEnumDataInst before the copy.
+  auto *ASI = dyn_cast<AllocStackInst>(existentialAddr);
+  if (!ASI)
+    return false;
 
   // Return true only if the given value is guaranteed to be initialized across
   // the given call site.
@@ -747,9 +761,13 @@ static bool canReplaceCopiedArg(FullApplySite Apply,
       if (!DT->properlyDominates(AI, user))
         return false;
     } else {
+      // The caller has to guarantee that there are no other instructions which
+      // use the address. This is done in findInitExistential called from
+      // the constructor of ConcreteExistentialInfo.
       assert(isa<CopyAddrInst>(user) || isa<InitExistentialAddrInst>(user) ||
              isa<OpenExistentialAddrInst>(user) ||
              isa<DeallocStackInst>(user) ||
+             isa<ApplyInst>(user) || isa<TryApplyInst>(user) ||
              user->isDebugInstruction() && "Unexpected instruction");
     }
   }

@@ -91,8 +91,10 @@ func test_property_of_lvalue(_ x: Error) -> String {
 // CHECK:         [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
 // CHECK:         [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK:         copy_addr [[VALUE]] to [initialization] [[COPY]]
+// CHECK:         [[BORROW:%.*]] = alloc_stack $[[VALUE_TYPE]]
+// CHECK:         copy_addr [[COPY]] to [initialization] [[BORROW]]
 // CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter.1
-// CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]])
+// CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[BORROW]])
 // CHECK:         destroy_addr [[COPY]]
 // CHECK:         dealloc_stack [[COPY]]
 // CHECK:         destroy_value [[VALUE_BOX]]
@@ -220,4 +222,22 @@ func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
 
     return plusOneError()
   }
+}
+
+extension Error {
+  var myError: Error {
+    return self
+  }
+}
+
+// Make sure we don't assert on this.
+// CHECK-LABEL: sil hidden @$s18boxed_existentials4testyyF
+// CHECK:  [[ERROR_ADDR:%.*]] = alloc_stack $Error
+// CHECK:  [[ARRAY_GET:%.*]] = function_ref @$sSayxSicig
+// CHECK:  apply [[ARRAY_GET]]<Error>([[ERROR_ADDR]]
+// CHECK:  [[ERROR:%.*]] = load [take] [[ERROR_ADDR]] : $*Error
+// CHECK:  open_existential_box [[ERROR]]
+func test() {
+  var errors: [Error] = []
+  test_property(errors[0].myError)
 }

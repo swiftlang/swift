@@ -21,7 +21,7 @@ public protocol ReaderWriterType {
 }
 
 public final class ArrayClassReaderWriter : ReaderWriterType {
-  @sil_stored private final var elements: [Int32] { get set }
+  @_hasStorage private final var elements: [Int32] { get set }
   @inline(never) public init()
   @inline(never) public final func read(index: Int32) -> Int32
   public final func write(index: Int32, value: Int32)

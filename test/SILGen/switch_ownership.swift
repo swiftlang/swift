@@ -69,27 +69,24 @@ func test_switch_two_nontrivial_unions(x: NonTrivialFoo, y: NonTrivialFoo) {
   // CHECK:   [[T0:%.*]] = tuple ([[ARG0_COPY]] : $NonTrivialFoo, [[ARG1_COPY]] : $NonTrivialFoo)
   // CHECK:   ([[X:%.*]], [[Y:%.*]]) = destructure_tuple [[T0]]
   // CHECK:   [[BORROWED_Y:%.*]] = begin_borrow [[Y]]
-  // CHECK:   [[BORROWED_Y_COPY:%.*]] = copy_value [[BORROWED_Y]]
-  // CHECK:   switch_enum [[BORROWED_Y_COPY]] : $NonTrivialFoo, case #NonTrivialFoo.A!enumelt.1: [[IS_CASE1:bb[0-9]+]], default [[IS_NOT_CASE1:bb[0-9]+]]
+  // CHECK:   switch_enum [[BORROWED_Y]] : $NonTrivialFoo, case #NonTrivialFoo.A!enumelt.1: [[IS_CASE1:bb[0-9]+]], default [[IS_NOT_CASE1:bb[0-9]+]]
 
   switch (x, y) {
-  // CHECK: [[IS_CASE1]]({{%.*}} : @owned $Klass)
+  // CHECK: [[IS_CASE1]]({{%.*}} : @guaranteed $Klass)
   case (_, NonTrivialFoo.A):
   // CHECK:   function_ref @$s6switch1ayyF
     a()
 
-  // CHECK: [[IS_NOT_CASE1]]({{%.*}} : @owned $NonTrivialFoo):
+  // CHECK: [[IS_NOT_CASE1]]({{%.*}} : @guaranteed $NonTrivialFoo):
   // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
-  // CHECK:   [[BORROWED_X_COPY:%.*]] = copy_value [[BORROWED_X]]
-  // CHECK:   switch_enum [[BORROWED_X_COPY]] : $NonTrivialFoo, case #NonTrivialFoo.B!enumelt.1: [[IS_CASE2:bb[0-9]+]], default [[IS_NOT_CASE2:bb[0-9]+]]
-  // CHECK: [[IS_CASE2]]({{%.*}} : @owned $Klass)
+  // CHECK:   switch_enum [[BORROWED_X]] : $NonTrivialFoo, case #NonTrivialFoo.B!enumelt.1: [[IS_CASE2:bb[0-9]+]], default [[IS_NOT_CASE2:bb[0-9]+]]
+  // CHECK: [[IS_CASE2]]({{%.*}} : @guaranteed $Klass)
   case (NonTrivialFoo.B, _):
   // CHECK:   function_ref @$s6switch1byyF
     b()
 
-  // CHECK: [[IS_NOT_CASE2]]({{%.*}} : @owned $NonTrivialFoo)
-  // CHECK:   [[Y_COPY:%.*]] = copy_value [[Y]]
-  // CHECK:   switch_enum [[Y_COPY]] : $NonTrivialFoo, case #NonTrivialFoo.B!enumelt.1: [[IS_CASE3:bb[0-9]+]], default [[UNREACHABLE:bb[0-9]+]]
+  // CHECK: [[IS_NOT_CASE2]]({{%.*}} : @guaranteed $NonTrivialFoo)
+  // CHECK:   switch_enum [[Y]] : $NonTrivialFoo, case #NonTrivialFoo.B!enumelt.1: [[IS_CASE3:bb[0-9]+]], default [[UNREACHABLE:bb[0-9]+]]
   // CHECK: [[IS_CASE3]]({{%.*}} : @owned $Klass):
   case (_, NonTrivialFoo.B):
   // CHECK:   function_ref @$s6switch1cyyF

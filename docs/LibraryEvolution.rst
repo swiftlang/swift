@@ -395,7 +395,7 @@ polar representation::
 and the ``x`` and ``y`` properties have now disappeared. To avoid this, the
 bodies of inlinable functions have the following restrictions:
 
-- They may not define any local types (other than typealiases).
+- They may not define any local types.
 
 - They must not reference any ``private`` or ``fileprivate`` entities.
 
@@ -415,12 +415,12 @@ Default argument expressions for functions that are public, versioned, or
 inlinable are implemented very similar to inlinable functions and thus are
 subject to similar restrictions:
 
-- They may not define any local types (other than typealiases).
+- They may not define any local types.
 
 - They must not reference any non-``public`` entities.
 
 - They must not reference any entities from the current module introduced
-  after the function was made inlinable, except under appropriate availability
+  after the default argument was added, except under appropriate availability
   guards.
 
 A default argument implicitly has the same availability as the function it is
@@ -438,6 +438,8 @@ changes are permitted:
 - Adding or removing a non-public, non-versioned setter.
 - Changing from a stored variable to a computed variable, or vice versa, as
   long as a previously versioned setter is not removed.
+- As a special case of the above, adding or removing ``lazy`` from a stored
+  property.
 - Changing the body of an accessor.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing variable. This is effectively the same as modifying the body of a
@@ -482,6 +484,7 @@ amount:
 - Adding or removing a non-public, non-versioned setter is still permitted.
 - Changing from stored to computed or vice versa is forbidden, because it would
   break existing clients.
+- Similarly, adding or removing ``lazy`` is forbidden.
 - Changing the body of an accessor is a `binary-compatible source-breaking
   change`.
 - Adding/removing observing accessors is likewise a `binary-compatible
@@ -530,6 +533,8 @@ the following changes are permitted:
 - Reordering any existing members, including stored properties.
 - Adding any new members, including stored properties.
 - Changing existing properties from stored to computed or vice versa.
+- As a special case of the above, adding or removing ``lazy`` from a stored
+  property.
 - Changing the body of any methods, initializers, or accessors.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing property. This is effectively the same as modifying the body of a
@@ -651,8 +656,10 @@ properties in a ``@fixedContents`` struct are implicitly declared
   Reordering all other members is still permitted.
 - Adding new stored instance properties (public or non-public) is not permitted.
   Adding any other new members is still permitted.
-- Existing instance properties may not be changed from stored to computed or
-  vice versa.
+- Changing existing instance properties from stored to computed or
+  vice versa is not permitted.
+- Similarly, adding or removing ``lazy`` from a stored property is not
+  permitted.
 - Changing the body of any *existing* methods, initializers, computed property
   accessors, or non-instance stored property accessors is permitted. Changing
   the body of a stored instance property observing accessor is permitted if the
@@ -669,6 +676,12 @@ properties in a ``@fixedContents`` struct are implicitly declared
 Additionally, if the type of any stored instance property includes a struct or
 enum, that struct or enum must be `versioned <versioned entity>`. This includes
 generic parameters and members of tuples.
+
+.. note::
+
+    The above restrictions do not apply to ``static`` properties of
+    ``@fixedContents`` structs. Static members effectively behave as top-level
+    functions and variables.
 
 .. note::
 
@@ -787,9 +800,8 @@ clients that the enum cases are exhaustive. In particular:
 
 - Adding new cases is not permitted.
 - Reordering existing cases is not permitted.
-- Adding a raw type to an enum that does not have one is not permitted -- it's
-  used for optimization.
 - Removing a non-public case is not applicable.
+- Adding a raw type is still permitted.
 - Adding any other members is still permitted.
 - Removing any non-public, non-versioned members is still permitted.
 - Adding a new protocol conformance is still permitted.
@@ -825,11 +837,7 @@ Protocols
 
 There are very few safe changes to make to protocols and their members:
 
-- A new non-type requirement may be added to a protocol, as long as it has an
-  unconstrained default implementation.
 - A default may be added to an associated type.
-- Removing a default from an associated type is a `binary-compatible
-  source-breaking change`.
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
 - Changing *internal* parameter names of function and subscript requirements
@@ -840,30 +848,32 @@ There are very few safe changes to make to protocols and their members:
   be added to a function requirement without any additional versioning
   information.
 
+New requirements can be added to a protocol. However, restrictions around
+existential types mean that adding new associated types or non-type requirements
+involving ``Self`` can break source compatibility. For this reason, the following
+are `binary-compatible source-breaking changes <binary-compatible source-breaking change>`:
+
+- A new non-type requirement may be added to a protocol, as long as it has an
+  unconstrained default implementation in a protocol extension of the
+  protocol itself or some other protocol it refines.
+- A new associated type requirement may be added as long as it has a
+  default.
+
 All other changes to the protocol itself are forbidden, including:
 
-- Adding a new associated type.
+- Adding or removing refined protocols.
 - Removing any existing requirements (type or non-type).
+- Removing the default type of an associated type.
 - Making an existing requirement optional.
 - Making a non-``@objc`` protocol ``@objc`` or vice versa.
-- Adding or removing constraints from an associated type, including inherited
-  associated types.
+- Adding or removing protocols and superclasses from the inheritance
+  clause of an associated type.
+- Adding or removing constraints from the ``where`` clause of
+  the protocol or an associated type.
 
 Protocol extensions may be more freely modified; `see below`__.
 
 __ #protocol-extensions
-
-.. note::
-
-    A protocol's associated types are used in computing the "generic signature"
-    that uniquely identifies a generic function. Adding an associated type
-    could perturb the generic signature and thus change the identity of a
-    function, breaking binary compatibility.
-    
-    It may be possible to allow adding associated types as long as they have
-    proper availability annotations, but this is not in scope for the initial
-    version of Swift ABI stability.
-
 
 Classes
 ~~~~~~~
@@ -874,6 +884,8 @@ support all of the following changes:
 
 - Reordering any existing members, including stored properties.
 - Changing existing properties from stored to computed or vice versa.
+- As a special case of the above, adding or removing ``lazy`` from a stored
+  property.
 - Changing the body of any methods, initializers, or accessors.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing property. This is effectively the same as modifying the body of a
@@ -1090,13 +1102,20 @@ additive feature, it can be added to the model at any time.
 Extensions
 ~~~~~~~~~~
 
-Non-protocol extensions largely follow the same rules as the types they extend.
+Extensions largely follow the same rules as the types they extend.
 The following changes are permitted:
 
 - Adding new extensions and removing empty extensions (that is, extensions that
   declare neither members nor protocol conformances).
 - Moving a member from one extension to another within the same module, as long
   as both extensions have the exact same constraints.
+- Adding any new member.
+- Reordering members.
+- Removing any non-public, non-versioned member.
+- Changing the body of any methods, initializers, or accessors.
+
+Additionally, non-protocol extensions allow a few additional changes:
+
 - Moving a member from an unconstrained extension to the declaration of the
   base type, provided that the declaration is in the same module. The reverse
   is permitted for all members except stored properties, although note that
@@ -1104,24 +1123,6 @@ The following changes are permitted:
   implicitly synthesized.
 - Adding a new protocol conformance (with proper availability annotations).
 - Removing conformances to non-public protocols.
-
-Adding, removing, reordering, and modifying members follow the same rules as
-the base type; see the sections on structs, enums, and classes above.
-
-
-Protocol Extensions
--------------------
-
-Protocol extensions follow slightly different rules from other extensions; the
-following changes are permitted:
-
-- Adding new extensions and removing empty extensions.
-- Moving a member from one extension to another within the same module, as long
-  as both extensions have the exact same constraints.
-- Adding any new member.
-- Reordering members.
-- Removing any non-public, non-versioned member.
-- Changing the body of any methods, initializers, or accessors.
 
 .. note::
 

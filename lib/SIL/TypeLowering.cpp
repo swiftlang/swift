@@ -187,6 +187,7 @@ namespace {
     }
 
     IMPL(BuiltinInteger, Trivial)
+    IMPL(BuiltinIntegerLiteral, Trivial)
     IMPL(BuiltinFloat, Trivial)
     IMPL(BuiltinRawPointer, Trivial)
     IMPL(BuiltinNativeObject, Reference)
@@ -956,7 +957,8 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      if (isa<FunctionRefInst>(value))
+      if (isa<FunctionRefInst>(value) || isa<DynamicFunctionRefInst>(value) ||
+          isa<PreviousDynamicFunctionRefInst>(value))
         return value;
 
       if (B.getFunction().hasQualifiedOwnership())
@@ -1470,9 +1472,16 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
     auto extInfo = substFnType->getExtInfo();
     if (getSILFunctionLanguage(extInfo.getSILRepresentation())
           == SILFunctionLanguage::C) {
+      // The importer only applies fully-reversible bridging to the
+      // component types of C function pointers.
+      auto bridging = Bridgeability::Full;
+      if (extInfo.getSILRepresentation()
+                        == SILFunctionTypeRepresentation::CFunctionPointer)
+        bridging = Bridgeability::None;
+
       // Bridge the parameters and result of the function type.
       auto bridgedFnType = getBridgedFunctionType(origType, substFnType,
-                                                  extInfo);
+                                                  extInfo, bridging);
       substFnType = bridgedFnType;
 
       // Also rewrite the type of the abstraction pattern.
@@ -1618,7 +1627,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      ValueDecl *VD,
                                                      DeclContext *DC,
                                                      unsigned DefaultArgIndex) {
-  auto resultTy = getDefaultArgumentInfo(VD, DefaultArgIndex).second;
+  auto resultTy = getParameterAt(VD, DefaultArgIndex)->getInterfaceType();
   assert(resultTy && "Didn't find default argument?");
 
   // The result type might be written in terms of type parameters

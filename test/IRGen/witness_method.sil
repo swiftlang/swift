@@ -66,7 +66,7 @@ struct SyncUp<Deliverable> : Synergy {
 // CHECK: entry:
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s14witness_method6SyncUpVMa"([[INT]] 0, %swift.type* %T)
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK:   [[WTABLE:%.*]] = call i8** @"$s14witness_method6SyncUpVyxGAA7SynergyAAWa"(%swift.type* [[METADATA]], i8*** undef)
+// CHECK:   [[WTABLE:%.*]] = call i8** @swift_getWitnessTable(
 // CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[WTABLE]], i32 2
 // CHECK:   [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK:   [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, i8**)*

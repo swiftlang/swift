@@ -13,7 +13,7 @@ class SomeDerivedClass : Parent {
   override init() {
     y = 42
 // CHECK-LABEL: sil hidden @$s30auto_generated_super_init_call16SomeDerivedClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned SomeDerivedClass) -> @owned SomeDerivedClass
-// CHECK: integer_literal $Builtin.Int2048, 42
+// CHECK: integer_literal $Builtin.IntLiteral, 42
 // CHECK: [[SELFLOAD:%[0-9]+]] = load [take] [[SELF:%[0-9]+]] : $*SomeDerivedClass
 // CHECK-NEXT: [[PARENT:%[0-9]+]] = upcast [[SELFLOAD]] : $SomeDerivedClass to $Parent
 // CHECK-NEXT: // function_ref
@@ -40,7 +40,7 @@ class SomeDerivedClass : Parent {
 // Check that we are emitting the super.init expr into the epilog block.
     
 // CHECK-LABEL: sil hidden @$s30auto_generated_super_init_call16SomeDerivedClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
-// CHECK: bb4:
+// CHECK: bb5:
 // SEMANTIC ARC TODO: Another case of needing a mutable load_borrow.
 // CHECK-NEXT: [[SELFLOAD:%[0-9]+]] = load [take] [[SELF:%[0-9]+]] : $*SomeDerivedClass
 // CHECK-NEXT: [[SELFLOAD_PARENT_CAST:%.*]] = upcast [[SELFLOAD]]

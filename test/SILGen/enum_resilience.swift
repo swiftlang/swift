@@ -56,13 +56,13 @@ func resilientSwitchDefault(_ m: Medium) -> Int32 {
   // CHECK: switch_enum_addr %2 : $*Medium, case #Medium.Paper!enumelt: [[PAPER:[^ ]+]], case #Medium.Canvas!enumelt: [[CANVAS:[^ ]+]], default [[DEFAULT:[^ ]+]]
   switch m {
   // CHECK: [[PAPER]]:
-  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: integer_literal $Builtin.IntLiteral, 0
   case .Paper: return 0
   // CHECK: [[CANVAS]]:
-  // CHECK: integer_literal $Builtin.Int2048, 1
+  // CHECK: integer_literal $Builtin.IntLiteral, 1
   case .Canvas: return 1
   // CHECK: [[DEFAULT]]:
-  // CHECK: integer_literal $Builtin.Int2048, -1
+  // CHECK: integer_literal $Builtin.IntLiteral, -1
   default: return -1
   }
 } // CHECK: end sil function '$s15enum_resilience22resilientSwitchDefaultys5Int32V0c1_A06MediumOF'
@@ -72,13 +72,13 @@ func resilientSwitchUnknownCase(_ m: Medium) -> Int32 {
   // CHECK: switch_enum_addr %2 : $*Medium, case #Medium.Paper!enumelt: [[PAPER:[^ ]+]], case #Medium.Canvas!enumelt: [[CANVAS:[^ ]+]], default [[DEFAULT:[^ ]+]]
   switch m {
   // CHECK: [[PAPER]]:
-  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: integer_literal $Builtin.IntLiteral, 0
   case .Paper: return 0
   // CHECK: [[CANVAS]]:
-  // CHECK: integer_literal $Builtin.Int2048, 1
+  // CHECK: integer_literal $Builtin.IntLiteral, 1
   case .Canvas: return 1
   // CHECK: [[DEFAULT]]:
-  // CHECK: integer_literal $Builtin.Int2048, -1
+  // CHECK: integer_literal $Builtin.IntLiteral, -1
   @unknown case _: return -1
   }
 } // CHECK: end sil function '$s15enum_resilience26resilientSwitchUnknownCaseys5Int32V0c1_A06MediumOF'
@@ -88,19 +88,19 @@ func resilientSwitchUnknownCaseExhaustive(_ m: Medium) -> Int32 {
   // CHECK: switch_enum_addr %2 : $*Medium, case #Medium.Paper!enumelt: [[PAPER:[^ ]+]], case #Medium.Canvas!enumelt: [[CANVAS:[^ ]+]], case #Medium.Pamphlet!enumelt.1: [[PAMPHLET:[^ ]+]], case #Medium.Postcard!enumelt.1: [[POSTCARD:[^ ]+]], default [[DEFAULT:[^ ]+]]
   switch m {
   // CHECK: [[PAPER]]:
-  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: integer_literal $Builtin.IntLiteral, 0
   case .Paper: return 0
   // CHECK: [[CANVAS]]:
-  // CHECK: integer_literal $Builtin.Int2048, 1
+  // CHECK: integer_literal $Builtin.IntLiteral, 1
   case .Canvas: return 1
   // CHECK: [[PAMPHLET]]:
-  // CHECK: integer_literal $Builtin.Int2048, 2
+  // CHECK: integer_literal $Builtin.IntLiteral, 2
   case .Pamphlet: return 2
   // CHECK: [[POSTCARD]]:
-  // CHECK: integer_literal $Builtin.Int2048, 3
+  // CHECK: integer_literal $Builtin.IntLiteral, 3
   case .Postcard: return 3
   // CHECK: [[DEFAULT]]:
-  // CHECK: integer_literal $Builtin.Int2048, -1
+  // CHECK: integer_literal $Builtin.IntLiteral, -1
   @unknown case _: return -1
   }
 }

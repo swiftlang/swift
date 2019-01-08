@@ -19,7 +19,7 @@
 
 // Protocol descriptor
 // CHECK-DEFINITION-LABEL: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" ={{( protected)?}} constant
-// CHECK-DEFINITION-SAME: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0TN"
+// CHECK-DEFINITION-SAME: @"default associated conformance2T218resilient_protocol29ProtocolWithAssocTypeDefaultsP_AB014OtherResilientD0"
 
 // Associated type default + flags
 // CHECK-DEFINITION-SAME: [[INT]] add
@@ -28,6 +28,9 @@
 
 // Protocol requirements base descriptor
 // CHECK-DEFINITION: @"$s18resilient_protocol21ResilientBaseProtocolTL" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr (%swift.protocol_requirement, %swift.protocol_requirement* getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>, <{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>* @"$s18resilient_protocol21ResilientBaseProtocolMp", i32 0, i32 6), i32 -1)
+
+// Associated conformance descriptor for inherited protocol
+// CHECK-DEFINITION-LABEL: s18resilient_protocol24ResilientDerivedProtocolPAA0c4BaseE0Tb" ={{( dllexport)?}}{{( protected)?}} alias
 
 // Associated type and conformance
 
@@ -56,17 +59,18 @@ public protocol P { }
 public struct ConditionallyConforms<Element> { }
 public struct Y { }
 
+// CHECK-USAGE-LABEL: @"$s31protocol_resilience_descriptors1YV010resilient_A022OtherResilientProtocolAAMc" =
+// CHECK-USAGE-SAME: i32 131072,
+// CHECK-USAGE-SAME: i16 0,
+// CHECK-USAGE-SAME: i16 0,
+// CHECK-USAGE-SAME: i32 0
+extension Y: OtherResilientProtocol { }
+
 // CHECK-USAGE: @"$s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAMc" =
 // CHECK-USAGE-SAME: $s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn
-// CHECK-USAGE-SAME: $s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2AdEP_AD014OtherResilientI0PWT
+// CHECK-USAGE-SAME: @"associated conformance 31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2AdEP_AD014OtherResilientI0"
 public struct ConformsWithAssocRequirements : ProtocolWithAssocTypeDefaults {
 }
-
-// CHECK-USAGE: @"$sx1T18resilient_protocol24ProtocolWithRequirementsP_MXA" =
-// CHECK-USAGE-SAME: i32 0
-// CHECK-USAGE-SAME: @"{{got.|__imp_}}$s18resilient_protocol24ProtocolWithRequirementsMp"
-// CHECK-USAGE-SAME: @"$sx1T18resilient_protocol24ProtocolWithRequirementsP_MXA"
-// CHECK-USAGE-SAME: %swift.protocol_requirement** @"{{got.|__imp_}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl"
 
 // CHECK-USAGE: @"$s31protocol_resilience_descriptors21ConditionallyConformsVyxG010resilient_A024ProtocolWithRequirementsAaeFRzAA1YV1TRtzlMc"
 extension ConditionallyConforms: ProtocolWithRequirements
@@ -74,6 +78,12 @@ where Element: ProtocolWithRequirements, Element.T == Y {
   public typealias T = Element.T
   public func first() { }
   public func second() { }
+}
+
+// CHECK-USAGE: @"$s31protocol_resilience_descriptors17ConformsToDerivedV010resilient_A009ResilientF8ProtocolAAMc" =
+// CHECK-SAME: @"associated conformance 31protocol_resilience_descriptors17ConformsToDerivedV010resilient_A009ResilientF8ProtocolAaD0h4BaseI0"
+public struct ConformsToDerived : ResilientDerivedProtocol {
+  public func requirement() -> Int { return 0 }
 }
 
 // ----------------------------------------------------------------------------
@@ -90,7 +100,6 @@ func useOtherResilientProtocol<T: OtherResilientProtocol>(_: T.Type) { }
 
 // CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s31protocol_resilience_descriptors23extractAssocConformanceyyx010resilient_A0012ProtocolWithE12TypeDefaultsRzlF"
 public func extractAssocConformance<T: ProtocolWithAssocTypeDefaults>(_: T) {
-  // CHECK-USAGE: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.ProtocolWithAssocTypeDefaults, [[INT]] udiv ([[INT]] sub ([[INT]] ptrtoint (%swift.protocol_requirement* @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn" to [[INT]]), [[INT]] ptrtoint (%swift.protocol_requirement* @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsTL" to [[INT]])), [[INT]] 8)
-  // CHECK-USAGE: load i8*, i8** [[WITNESS_ADDR]]
+  // CHECK-USAGE: swift_getAssociatedConformanceWitness
   useOtherResilientProtocol(T.T2.self)
 }

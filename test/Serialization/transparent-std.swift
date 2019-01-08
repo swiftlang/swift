@@ -31,8 +31,8 @@ func test_tuple(x: (Builtin.Int64, Builtin.NativeObject),
 func test_conversion(c: C, t32: Builtin.Int32) {
 // SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$s19def_transparent_std22class_to_native_object1cBoAA1CC_tF : $@convention(thin) (@guaranteed C) -> @owned Builtin.NativeObject {
 // SIL: bb0(%0 : $C):
-// SIL: unchecked_ref_cast %0 : $C to $Builtin.NativeObject
 // SIL-NEXT: strong_retain
+// SIL-NEXT: unchecked_ref_cast %0 : $C to $Builtin.NativeObject
 // SIL-NEXT: return
   var b = class_to_native_object(c: c)
 

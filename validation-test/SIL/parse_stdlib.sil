@@ -3,6 +3,3 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true %t.sil > /dev/null
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test
-
-// <rdar://problem/36754225> Swift CI: parse_stdlib.sil tests failing with vtable verification
-// XFAIL: (objc_interop && asserts)

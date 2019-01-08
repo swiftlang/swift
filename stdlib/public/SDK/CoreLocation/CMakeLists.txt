@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
-add_swift_library(swiftCoreLocation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_target_library(swiftCoreLocation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CLError.swift
   NSValue.swift.gyb
 

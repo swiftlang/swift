@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILValue.h"
-#include "ValueOwnershipKindClassifier.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILInstruction.h"
@@ -242,12 +241,6 @@ ValueOwnershipKind::getProjectedOwnershipKind(SILModule &M,
   if (Proj.isTrivial(M))
     return ValueOwnershipKind::Trivial;
   return *this;
-}
-
-ValueOwnershipKind SILValue::getOwnershipKind() const {
-  // Once we have multiple return values, this must be changed.
-  sil::ValueOwnershipKindClassifier Classifier;
-  return Classifier.visit(const_cast<ValueBase *>(Value));
 }
 
 #if 0

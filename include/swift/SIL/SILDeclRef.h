@@ -252,6 +252,12 @@ struct SILDeclRef {
     return kind == Kind::IVarInitializer || kind == Kind::IVarDestroyer;
   }
 
+  /// True if the SILDeclRef references an allocating or deallocating entry
+  /// point.
+  bool isInitializerOrDestroyer() const {
+    return kind == Kind::Initializer || kind == Kind::Destroyer;
+  }
+
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
   /// \brief True if the function should have its body serialized.
@@ -383,6 +389,8 @@ struct SILDeclRef {
   /// this is not a method, there is no such class, or the class cannot be
   /// subclassed.
   SubclassScope getSubclassScope() const;
+
+  bool isDynamicallyReplaceable() const;
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;

@@ -14,7 +14,7 @@ struct ArrayOf<T> : _DestructorSafeContainer {
 }
 
 struct Foo {
-  @sil_stored var subFoos: ArrayOf<Foo>
+  @_hasStorage var subFoos: ArrayOf<Foo>
   init()
 }
 

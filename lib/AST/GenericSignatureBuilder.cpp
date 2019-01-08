@@ -34,6 +34,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/GraphTraits.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -43,6 +44,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
+#include "GenericSignatureBuilderImpl.h"
 
 using namespace swift;
 using llvm::DenseMap;
@@ -1855,96 +1857,6 @@ void EquivalenceClass::addMember(PotentialArchetype *pa) {
   }
 }
 
-class GenericSignatureBuilder::ResolvedType {
-  llvm::PointerUnion<PotentialArchetype *, Type> type;
-  EquivalenceClass *equivClass;
-
-  /// For a type that could not be resolved further unless the given
-  /// equivalence class changes.
-  ResolvedType(EquivalenceClass *equivClass)
-    : type(), equivClass(equivClass) { }
-
-public:
-  /// A specific resolved potential archetype.
-  ResolvedType(PotentialArchetype *pa)
-    : type(pa), equivClass(pa->getEquivalenceClassIfPresent()) { }
-
-  /// A resolved type within the given equivalence class.
-  ResolvedType(Type type, EquivalenceClass *equivClass)
-      : type(type), equivClass(equivClass) {
-    assert(type->isTypeParameter() == static_cast<bool>(equivClass) &&
-           "type parameters must have equivalence classes");
-  }
-
-  /// Return an unresolved result, which could be resolved when we
-  /// learn more information about the given equivalence class.
-  static ResolvedType forUnresolved(EquivalenceClass *equivClass) {
-    return ResolvedType(equivClass);
-  }
-
-  /// Return a result for a concrete type.
-  static ResolvedType forConcrete(Type concreteType) {
-    return ResolvedType(concreteType, nullptr);
-  }
-
-  /// Determine whether this result was resolved.
-  explicit operator bool() const { return !type.isNull(); }
-
-  /// Retrieve the dependent type.
-  Type getDependentType(GenericSignatureBuilder &builder) const;
-
-  /// Retrieve the concrete type, or a null type if this result doesn't store
-  /// a concrete type.
-  Type getAsConcreteType() const {
-    assert(*this && "Doesn't contain any result");
-    if (equivClass) return Type();
-    return type.dyn_cast<Type>();
-  }
-
-  /// Realize a potential archetype for this type parameter.
-  PotentialArchetype *realizePotentialArchetype(
-                                            GenericSignatureBuilder &builder);
-
-  /// Retrieve the potential archetype, if already known.
-  PotentialArchetype *getPotentialArchetypeIfKnown() const {
-    return type.dyn_cast<PotentialArchetype *>();
-  }
-
-  /// Retrieve the equivalence class into which a resolved type refers.
-  EquivalenceClass *getEquivalenceClass(
-                     GenericSignatureBuilder &builder) const {
-    assert(*this && "Only for resolved types");
-    if (equivClass) return equivClass;
-
-    // Create the equivalence class now.
-    return type.get<PotentialArchetype *>()
-             ->getOrCreateEquivalenceClass(builder);
-  }
-
-  /// Retrieve the equivalence class into which a resolved type refers.
-  EquivalenceClass *getEquivalenceClassIfPresent() const {
-    assert(*this && "Only for resolved types");
-    if (equivClass) return equivClass;
-
-    // Create the equivalence class now.
-    return type.get<PotentialArchetype *>()->getEquivalenceClassIfPresent();
-  }
-
-  /// Retrieve the unresolved result.
-  EquivalenceClass *getUnresolvedEquivClass() const {
-    assert(!*this);
-    return equivClass;
-  }
-
-  /// Return an unresolved type.
-  ///
-  /// This loses equivalence-class information that could be useful, which
-  /// is unfortunate.
-  UnresolvedType getUnresolvedType() const {
-    return type;
-  }
-};
-
 bool EquivalenceClass::recordConformanceConstraint(
                                  GenericSignatureBuilder &builder,
                                  ResolvedType type,
@@ -3543,11 +3455,11 @@ GenericSignatureBuilder::Implementation::getRewriteTreeRootIfPresent(
 RewriteTreeNode *
 GenericSignatureBuilder::Implementation::getOrCreateRewriteTreeRoot(
                                           CanType anchor) {
-  auto known = RewriteTreeRoots.find(anchor);
-  if (known != RewriteTreeRoots.end()) return known->second.get();
+  if (auto *root = getRewriteTreeRootIfPresent(anchor))
+    return root;
 
   auto &root = RewriteTreeRoots[anchor];
-  root = std::unique_ptr<RewriteTreeNode>(new RewriteTreeNode(nullptr));
+  root = llvm::make_unique<RewriteTreeNode>(nullptr);
   return root.get();
 }
 
@@ -3874,6 +3786,12 @@ static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
       // .. unless it's recursive.
       if (equivClass->recursiveConcreteType)
         return ErrorType::get(Type(type));
+
+      // Prevent recursive substitution.
+      equivClass->recursiveConcreteType = true;
+      SWIFT_DEFER {
+        equivClass->recursiveConcreteType = false;
+      };
 
       return resolveDependentMemberTypes(builder, equivClass->concreteType);
     }
@@ -4900,6 +4818,8 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
     equivClass = T1->getOrCreateEquivalenceClass(*this);
 
   // Record this same-type constraint.
+  // Let's keep type order in the new constraint the same as it's written
+  // in source, which makes it much easier to diagnose later.
   equivClass->sameTypeConstraints.push_back({depType1, depType2, source});
 
   // Determine the anchor types of the two equivalence classes.
@@ -4923,11 +4843,10 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   };
 
   // Consider the second equivalence class to be modified.
-  if (equivClass2)
-    equivClass->modified(*this);
-
-  // Same-type requirements.
+  // Transfer Same-type requirements and delayed requirements.
   if (equivClass2) {
+    // Mark as modified and transfer deplayed requirements to the primary queue.
+    equivClass2->modified(*this);
     equivClass->sameTypeConstraints.insert(
                                    equivClass->sameTypeConstraints.end(),
                                    equivClass2->sameTypeConstraints.begin(),
@@ -4935,20 +4854,14 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   }
 
   // Combine the rewrite rules.
-  if (auto rewriteRoot2 = Impl->getOrCreateRewriteTreeRoot(anchor2)) {
-    if (auto rewriteRoot1 = Impl->getOrCreateRewriteTreeRoot(anchor1)) {
-      // Merge the second rewrite tree into the first.
-      if (rewriteRoot2->mergeInto(rewriteRoot1))
-        ++Impl->RewriteGeneration;
-      Impl->RewriteTreeRoots.erase(anchor2);
-    } else {
-      // Take the second rewrite tree and make it the first.
-      auto root2Entry = Impl->RewriteTreeRoots.find(anchor2);
-      auto root2Ptr = std::move(root2Entry->second);
-      Impl->RewriteTreeRoots.erase(root2Entry);
-      (void)Impl->RewriteTreeRoots.insert({anchor1, std::move(root2Ptr)});
-    }
-  }
+  auto *rewriteRoot1 = Impl->getOrCreateRewriteTreeRoot(anchor1);
+  auto *rewriteRoot2 = Impl->getOrCreateRewriteTreeRoot(anchor2);
+  assert(rewriteRoot1 && rewriteRoot2 &&
+         "Couldn't create/retrieve rewrite tree root");
+  // Merge the second rewrite tree into the first.
+  if (rewriteRoot2->mergeInto(rewriteRoot1))
+    ++Impl->RewriteGeneration;
+  Impl->RewriteTreeRoots.erase(anchor2);
 
   // Add a rewrite rule to map the anchor of T2 down to the anchor of T1.
   if (addSameTypeRewriteRule(anchor2, anchor1))
@@ -5157,8 +5070,18 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementBetweenConcrete(
     }
   } matcher(*this, source, type1, type2, diagnoseMismatch);
 
-  return matcher.match(type1, type2) ? ConstraintResult::Resolved
-                                     : ConstraintResult::Conflicting;
+  if (matcher.match(type1, type2)) {
+    // Warn if neither side of the requirement contains a type parameter.
+    if (source.isTopLevel() && source.getLoc().isValid()) {
+      Diags.diagnose(source.getLoc(),
+                     diag::requires_no_same_type_archetype,
+                     type1, type2);
+    }
+
+    return ConstraintResult::Resolved;
+  }
+
+  return ConstraintResult::Conflicting;
 }
 
 ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
@@ -5344,19 +5267,6 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
   case RequirementKind::SameType: {
     auto secondType = subst(req.getSecondType());
 
-    // Warn if neither side of the requirement contains a type parameter.
-    if (reqRepr &&
-        !req.getFirstType()->hasTypeParameter() &&
-        !req.getSecondType()->hasTypeParameter() &&
-        !req.getFirstType()->hasError() &&
-        !req.getSecondType()->hasError()) {
-      Diags.diagnose(reqRepr->getSeparatorLoc(),
-                     diag::requires_no_same_type_archetype,
-                     req.getFirstType(), req.getSecondType())
-        .highlight(reqRepr->getFirstTypeLoc().getSourceRange())
-        .highlight(reqRepr->getSecondTypeLoc().getSourceRange());
-    }
-
     if (inferForModule) {
       inferRequirements(*inferForModule, firstType,
                         RequirementRepr::getFirstTypeRepr(reqRepr),
@@ -5462,11 +5372,7 @@ void GenericSignatureBuilder::inferRequirements(
 
 void GenericSignatureBuilder::inferRequirements(
                                           ModuleDecl &module,
-                                          ParameterList *params,
-                                          GenericParamList *genericParams) {
-  if (genericParams == nullptr)
-    return;
-
+                                          ParameterList *params) {
   for (auto P : *params) {
     inferRequirements(module, P->getTypeLoc().getType(),
                       P->getTypeLoc().getTypeRepr(),
@@ -6916,34 +6822,126 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // connect all of the components, or else we wouldn't have an equivalence
   // class.
   if (intercomponentEdges.size() > numComponents - 1) {
-    std::vector<bool> connected(numComponents, false);
-    const auto &firstEdge = intercomponentEdges.front();
-    for (const auto &edge : intercomponentEdges) {
-      // If both the source and target are already connected, this edge is
-      // not part of the spanning tree.
-      if (connected[edge.source] && connected[edge.target]) {
-        if (edge.constraint.source->shouldDiagnoseRedundancy(true) &&
-            firstEdge.constraint.source->shouldDiagnoseRedundancy(false)) {
-          Diags.diagnose(edge.constraint.source->getLoc(),
-                         diag::redundant_same_type_constraint,
-                         edge.constraint.getSubjectDependentType(
-                                                          genericParams),
-                         edge.constraint.value);
+    // First let's order all of the intercomponent edges
+    // as written in source, this helps us to diagnose
+    // all of the duplicate constraints in correct order.
+    std::vector<IntercomponentEdge *> sourceOrderedEdges;
+    for (auto &edge : intercomponentEdges)
+      sourceOrderedEdges.push_back(&edge);
 
-          Diags.diagnose(firstEdge.constraint.source->getLoc(),
-                         diag::previous_same_type_constraint,
-                         firstEdge.constraint.source->classifyDiagKind(),
-                         firstEdge.constraint.getSubjectDependentType(
-                                                          genericParams),
-                         firstEdge.constraint.value);
+    llvm::array_pod_sort(
+        sourceOrderedEdges.begin(), sourceOrderedEdges.end(),
+        [](IntercomponentEdge *const *a, IntercomponentEdge *const *b) -> int {
+          auto &sourceMgr = (*a)->constraint.value->getASTContext().SourceMgr;
+
+          auto locA = (*a)->constraint.source->getLoc();
+          auto locB = (*b)->constraint.source->getLoc();
+
+          // Put invalid locations after valid ones.
+          if (locA.isInvalid() || locB.isInvalid()) {
+            if (locA.isInvalid() != locB.isInvalid())
+              return locA.isValid() ? 1 : -1;
+
+            return 0;
+          }
+
+          auto bufferA = sourceMgr.findBufferContainingLoc(locA);
+          auto bufferB = sourceMgr.findBufferContainingLoc(locB);
+
+          if (bufferA != bufferB)
+            return bufferA < bufferB ? -1 : 1;
+
+          auto offsetA = sourceMgr.getLocOffsetInBuffer(locA, bufferA);
+          auto offsetB = sourceMgr.getLocOffsetInBuffer(locB, bufferB);
+
+          return offsetA < offsetB ? -1 : (offsetA == offsetB ? 0 : 1);
+        });
+
+    auto isDiagnosable = [](const IntercomponentEdge &edge, bool isPrimary) {
+      return edge.constraint.source->shouldDiagnoseRedundancy(isPrimary);
+    };
+
+    using EquivClass = llvm::DenseMap<Type, unsigned>;
+    llvm::DenseMap<Type, EquivClass> equivalences;
+    // The idea here is to form an equivalence class per representative
+    // (picked from each edge constraint in type parameter order) and
+    // propagate all new equivalent types up the chain until duplicate
+    // entry is found, that entry is going to point to previous
+    // declaration and is going to mark current edge as a duplicate of
+    // such entry.
+    for (auto edgeIdx : indices(sourceOrderedEdges)) {
+      const auto &edge = *sourceOrderedEdges[edgeIdx];
+
+      Type lhs = edge.constraint.getSubjectDependentType(genericParams);
+      Type rhs = edge.constraint.value;
+
+      // Make sure that representative for equivalence class is picked
+      // in canonical type parameter order.
+      if (compareDependentTypes(rhs, lhs) < 0)
+        std::swap(lhs, rhs);
+
+      // Index of the previous declaration of the same-type constraint
+      // which current edge might be a duplicate of.
+      Optional<unsigned> previousIndex;
+
+      bool isDuplicate = false;
+      auto &representative = equivalences[lhs];
+      if (representative.insert({rhs, edgeIdx}).second) {
+        // Since this is a new equivalence, and right-hand side might
+        // be a representative of some other equivalence class,
+        // its existing members have to be merged up.
+        auto RHSEquivClass = equivalences.find(rhs);
+        if (RHSEquivClass != equivalences.end()) {
+          auto &equivClass = RHSEquivClass->getSecond();
+          representative.insert(equivClass.begin(), equivClass.end());
         }
 
-        continue;
+        // If left-hand side is involved in any other equivalences
+        // let's propagate new information up the chain.
+        for (auto &e : equivalences) {
+          auto &repr = e.first;
+          auto &equivClass = e.second;
+
+          if (repr->isEqual(lhs) || !equivClass.count(lhs))
+            continue;
+
+          if (!equivClass.insert({rhs, edgeIdx}).second) {
+            // Even if "previous" edge is not diagnosable we
+            // still need to produce diagnostic about main duplicate.
+            isDuplicate = true;
+
+            auto prevIdx = equivClass[rhs];
+            if (!isDiagnosable(intercomponentEdges[prevIdx],
+                               /*isPrimary=*/false))
+              continue;
+
+            // If there is a diagnosable duplicate equivalence,
+            // it means that we've found our previous declaration.
+            previousIndex = prevIdx;
+            break;
+          }
+        }
+      } else {
+        // Looks like this is a situation like T.A == T.B, ..., T.B == T.A
+        previousIndex = representative[rhs];
+        isDuplicate = true;
       }
 
-      // Put the source and target into the spanning tree.
-      connected[edge.source] = true;
-      connected[edge.target] = true;
+      if (!isDuplicate || !isDiagnosable(edge, /*isPrimary=*/true))
+        continue;
+
+      Diags.diagnose(edge.constraint.source->getLoc(),
+                     diag::redundant_same_type_constraint,
+                     edge.constraint.getSubjectDependentType(genericParams),
+                     edge.constraint.value);
+
+      if (previousIndex) {
+        auto &prevEquiv = sourceOrderedEdges[*previousIndex]->constraint;
+        Diags.diagnose(
+            prevEquiv.source->getLoc(), diag::previous_same_type_constraint,
+            prevEquiv.source->classifyDiagKind(),
+            prevEquiv.getSubjectDependentType(genericParams), prevEquiv.value);
+      }
     }
   }
 

@@ -189,12 +189,6 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
   ParamDecl *selfDecl = nullptr;
   if (storage->getDeclContext()->isTypeContext()) {
     if (storage->getAttrs().hasAttribute<LazyAttr>()) {
-      // The getter is considered mutating if it's on a value type.
-      if (!storage->getDeclContext()->getSelfClassDecl() &&
-          !storage->isStatic()) {
-        storage->setIsGetterMutating(true);
-      }
-
       // For lazy properties, steal the 'self' from the initializer context.
       auto *varDecl = cast<VarDecl>(storage);
       auto *bindingDecl = varDecl->getParentPatternBinding();
@@ -222,7 +216,7 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
 
   auto getter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ loc,
-      AccessorKind::Get, AddressorKind::NotAddressor, storage,
+      AccessorKind::Get, storage,
       staticLoc, StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams,
@@ -232,10 +226,10 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
   getter->setImplicit();
 
   // If we're stealing the 'self' from a lazy initializer, set it now.
-  if (selfDecl) {
+  // Note that we don't re-parent the 'self' declaration to be part of
+  // the getter until we synthesize the body of the getter later.
+  if (selfDecl)
     *getter->getImplicitSelfDeclStorage() = selfDecl;
-    selfDecl->setDeclContext(getter);
-  }
 
   // We need to install the generic environment here because:
   // 1) validating the getter will change the implicit self decl's DC to it,
@@ -254,6 +248,9 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
 
   if (storage->isStatic())
     getter->setStatic();
+
+  if (!storage->requiresOpaqueAccessor(AccessorKind::Get))
+    getter->setForcedStaticDispatch(true);
 
   // Always add the getter to the context immediately after the storage.
   addMemberToContextIfNeeded(getter, storage->getDeclContext(), storage);
@@ -284,7 +281,7 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   auto setter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ SourceLoc(),
-      AccessorKind::Set, AddressorKind::NotAddressor, storage,
+      AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params,
@@ -298,20 +295,16 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
   if (isStatic)
     setter->setStatic();
 
+  // All mutable storage requires a setter.
+  assert(storage->requiresOpaqueAccessor(AccessorKind::Set));
+
   // Always add the setter to the context immediately after the getter.
   if (!getter) getter = storage->getGetter();
-  assert(getter && "always synthesize setter prototype after getter");
+  if (!getter) getter = storage->getReadCoroutine();
+  assert(getter && "always synthesize setter prototype after get/read");
   addMemberToContextIfNeeded(setter, storage->getDeclContext(), getter);
 
   return setter;
-}
-
-// True if the storage is dynamic or imported from Objective-C. In these cases,
-// we need to emit static coroutine accessors that dynamically dispatch
-// to 'get' and 'set', rather than the normal dynamically dispatched
-// opaque accessors that peer dispatch to 'get' and 'set'.
-static bool needsDynamicCoroutineAccessors(AbstractStorageDecl *storage) {
-  return storage->isDynamic() || storage->hasClangNode();
 }
 
 /// Mark the accessor as transparent if we can.
@@ -401,7 +394,7 @@ createCoroutineAccessorPrototype(TypeChecker &TC,
 
   auto *accessor = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
-      kind, AddressorKind::NotAddressor, storage,
+      kind, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params, TypeLoc::withoutLoc(retTy), dc);
@@ -417,11 +410,11 @@ createCoroutineAccessorPrototype(TypeChecker &TC,
   if (storage->isFinal())
     makeFinal(ctx, accessor);
 
-  // If the storage is dynamic or ObjC-native, we can't add a dynamically-
-  // dispatched method entry for the accessor, so force it to be
-  // statically dispatched. ("final" would be inappropriate because the
-  // property can still be overridden.)
-  if (needsDynamicCoroutineAccessors(storage))
+  // If the storage does not provide this accessor as an opaque accessor,
+  // we can't add a dynamically-dispatched method entry for the accessor,
+  // so force it to be statically dispatched. ("final" would be inappropriate
+  // because the property can still be overridden.)
+  if (!storage->requiresOpaqueAccessor(kind))
     accessor->setForcedStaticDispatch(true);
 
   // Make sure the coroutine is available enough to access
@@ -486,6 +479,16 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*isImplicit=*/true);
     else if (param->isVariadic())
       ref = new (ctx) VarargExpansionExpr(ref, /*implicit*/ true);
+    else if (param->isAutoClosure()) {
+      // If parameter is marked as `@autoclosure` it means
+      // that it has to be called.
+      auto arg = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                        /*implicit=*/true);
+      ref = CallExpr::create(ctx, ref, arg, {}, {},
+                             /*hasTrailingClosure=*/false,
+                             /*implicit=*/true);
+    }
+
     args.push_back(ref);
     
     labels.push_back(param->getArgumentName());
@@ -1074,6 +1077,11 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
     if (isOnDemandAccessor(storage, kind)) {
       auto synthKind = getSynthKindForAccessorKind(kind);
       triggerSynthesis(*this, storage->getAccessor(kind), synthKind);
+
+      // Make sure SILGen emits the accessor; on-demand accessors have shared
+      // linkage, and if its defined in a different translation unit from the
+      // conformance we cannot simply generate an external declaration.
+      Context.addExternalDecl(storage->getAccessor(kind));
     }
   });
 
@@ -1205,6 +1213,16 @@ namespace {
           CLE.Init->setDeclContext(NewDC);
         }
       }
+      
+      // Unlike a closure, a TapExpr is not a DeclContext, so we need to
+      // recontextualize its variable and then anything else in its body.
+      // FIXME: Might be better to change walkToDeclPre() and walkToStmtPre()
+      // below, but I don't know what other effects that might have.
+      if (auto TE = dyn_cast<TapExpr>(E)) {
+        TE->getVar()->setDeclContext(NewDC);
+        for (auto node : TE->getBody()->getElements())
+          node.walk(RecontextualizeClosures(NewDC));
+      }
 
       return { true, E };
     }
@@ -1297,6 +1315,7 @@ static void synthesizeLazyGetterBody(TypeChecker &TC, AccessorDecl *Get,
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
+  Get->getImplicitSelfDecl()->setDeclContext(Get);
   InitValue->walk(RecontextualizeClosures(Get));
 
   // Wrap the initializer in a LazyInitializerExpr to avoid problems with
@@ -2023,6 +2042,11 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
     return;
 
   if (!dc->isTypeContext()) {
+    // dynamic globals need accessors.
+    if (dc->isModuleScopeContext() && storage->isNativeDynamic()) {
+      addTrivialAccessorsToStorage(storage, TC);
+      return;
+    }
     // Fixed-layout global variables don't get accessors.
     if (!storage->isResilient())
       return;
@@ -2082,6 +2106,11 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
 }
 
 static void synthesizeGetterBody(TypeChecker &TC, AccessorDecl *getter) {
+  if (getter->hasForcedStaticDispatch()) {
+    synthesizeTrivialGetterBody(TC, getter, TargetImpl::Ordinary);
+    return;
+  }
+
   switch (getter->getStorage()->getReadImpl()) {
   case ReadImplKind::Stored:
     synthesizeTrivialGetterBody(TC, getter);
@@ -2449,11 +2478,12 @@ configureInheritedDesignatedInitAttributes(TypeChecker &tc,
   }
 
   // Wire up the overrides.
-  ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
   ctor->setOverriddenDecl(superclassCtor);
 
   if (superclassCtor->isRequired())
-    ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));
+    ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/false));
+  else
+    ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/false));
 
   // If the superclass constructor is @objc but the subclass constructor is
   // not representable in Objective-C, add @nonobjc implicitly.

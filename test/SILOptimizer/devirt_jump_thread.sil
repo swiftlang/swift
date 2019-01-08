@@ -17,7 +17,7 @@ class Bar {
 }
 
 public class FooClass {
-  @sil_stored var value: Int32 { get set }
+  @_hasStorage var value: Int32 { get set }
   @inline(never) func foo(x: Int32) -> Int32
   init(value: Int32)
    deinit
@@ -435,9 +435,6 @@ bb14(%48 : $Int32):
   strong_release %0 : $AnyObject
   return %48 : $Int32
 }
-
-
-sil [transparent] [serialized] @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method) (Bool) -> Builtin.Int1
 
 
 sil [serialized] @_TZFsoi3eeeFTGSqPs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool

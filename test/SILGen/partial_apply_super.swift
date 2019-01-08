@@ -1,10 +1,18 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule %S/../Inputs/resilient_class.swift
+
+// Note: we build fixed_layout_class without -enable-resilience, since with
+// -enable-resilience even @_fixed_layout classes have resilient metadata, and
+// we want to test the fragile access pattern here.
+
+// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
+
 // RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name partial_apply_super -enable-resilience -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
+import fixed_layout_class
 
 func doFoo(_ f: () -> ()) {
   f()
@@ -34,9 +42,8 @@ class Child : Parent {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $Child):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[CASTED_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Child to $Parent
-  // CHECK:   [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
   // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @$s19partial_apply_super6ParentC6methodyyFTcTd : $@convention(thin) (@guaranteed Parent) -> @owned @callee_guaranteed () -> ()
-  // CHECK:   [[PARTIAL_APPLY:%.*]] = apply [[SUPER_METHOD]]([[BORROWED_CASTED_SELF_COPY]]) : $@convention(thin) (@guaranteed Parent) -> @owned @callee_guaranteed () -> ()
+  // CHECK:   [[PARTIAL_APPLY:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(thin) (@guaranteed Parent) -> @owned @callee_guaranteed () -> ()
   // CHECK:   [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_APPLY]]
   // CHECK:   [[DOFOO:%.*]] = function_ref @$s19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK:   apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
@@ -61,9 +68,8 @@ class Child : Parent {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $Child):
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:     [[CASTED_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Child to $Parent
-  // CHECK:     [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
   // CHECK:     [[SUPER_METHOD:%.*]] = function_ref @$s19partial_apply_super6ParentC11finalMethodyyFTc : $@convention(thin) (@guaranteed Parent) -> @owned @callee_guaranteed () -> ()
-  // CHECK:     [[APPLIED_SELF:%.*]] = apply [[SUPER_METHOD]]([[BORROWED_CASTED_SELF_COPY]]) : $@convention(thin) (@guaranteed Parent) -> @owned @callee_guaranteed () -> ()
+  // CHECK:     [[APPLIED_SELF:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(thin) (@guaranteed Parent) -> @owned @callee_guaranteed () -> ()
   // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[APPLIED_SELF]]
   // CHECK:     [[DOFOO:%.*]] = function_ref @$s19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
@@ -94,9 +100,8 @@ class GenericChild<A> : GenericParent<A> {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $GenericChild<A>):
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:     [[CASTED_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $GenericChild<A> to $GenericParent<A>
-  // CHECK:     [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
   // CHECK:     [[SUPER_METHOD:%.*]] = function_ref @$s19partial_apply_super13GenericParentC6methodyyFTcTd : $@convention(thin) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> @owned @callee_guaranteed () -> ()
-  // CHECK:     [[PARTIAL_APPLY:%.*]] = apply [[SUPER_METHOD]]<A>([[BORROWED_CASTED_SELF_COPY]]) : $@convention(thin) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> @owned @callee_guaranteed () -> ()
+  // CHECK:     [[PARTIAL_APPLY:%.*]] = apply [[SUPER_METHOD]]<A>([[CASTED_SELF_COPY]]) : $@convention(thin) <τ_0_0> (@guaranteed GenericParent<τ_0_0>) -> @owned @callee_guaranteed () -> ()
   // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_APPLY]]
   // CHECK:     [[DOFOO:%.*]] = function_ref @$s19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // CHECK:     apply [[DOFOO]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
@@ -124,14 +129,8 @@ class ChildToFixedOutsideParent : OutsideParent {
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[CASTED_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $ChildToFixedOutsideParent to $OutsideParent
   // CHECK:   [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
-  // CHECK:   [[CASTED_SELF_COPY:%.*]] = copy_value [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:   [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
   // CHECK:   [[DOWNCAST_BORROWED_CASTED_SELF_COPY:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_SELF_COPY]]
-  // Semantic SIL TODO: This super_method used to take
-  // ChildToFixedOutsideParent. Since super_method IIRC goes through
-  // objc_runtime, this shouldn't matter, but we should look into it before we
-  // turn on +0.
-  // CHECK:   [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $OutsideParent, #OutsideParent.method!1 : (OutsideParent) -> () -> (), $@convention(method) (@guaranteed OutsideParent) -> ()
+  // CHECK:   [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $ChildToFixedOutsideParent, #OutsideParent.method!1 : (OutsideParent) -> () -> (), $@convention(method) (@guaranteed OutsideParent) -> ()
   // CHECK:   [[PARTIAL_APPLY:%.*]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(method) (@guaranteed OutsideParent) -> ()
   // CHECK:   [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_APPLY]]
   // CHECK:   [[DOFOO:%.*]] = function_ref @$s19partial_apply_super5doFooyyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
@@ -160,10 +159,8 @@ class ChildToResilientOutsideParent : ResilientOutsideParent {
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[CASTED_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $ChildToResilientOutsideParent to $ResilientOutsideParent
   // CHECK:   [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
-  // CHECK:   [[CASTED_SELF_COPY:%.*]] = copy_value [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:   [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
   // CHECK:   [[DOWNCAST_BORROWED_CASTED_SELF_COPY:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:   [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $ResilientOutsideParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
+  // CHECK:   [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $ChildToResilientOutsideParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   // CHECK:   end_borrow [[BORROWED_CASTED_SELF_COPY]]
   // CHECK:   [[PARTIAL_APPLY:%.*]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   // CHECK:   [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_APPLY]]
@@ -193,10 +190,8 @@ class GrandchildToFixedOutsideChild : OutsideChild {
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:     [[CASTED_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $GrandchildToFixedOutsideChild to $OutsideChild
   // CHECK:     [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
-  // CHECK:     [[CASTED_SELF_COPY:%.*]] = copy_value [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:     [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
   // CHECK:     [[DOWNCAST_BORROWED_CASTED_SELF_COPY:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:     [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $OutsideChild, #OutsideChild.method!1 : (OutsideChild) -> () -> (), $@convention(method) (@guaranteed OutsideChild) -> ()
+  // CHECK:     [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $GrandchildToFixedOutsideChild, #OutsideChild.method!1 : (OutsideChild) -> () -> (), $@convention(method) (@guaranteed OutsideChild) -> ()
   // CHECK:     end_borrow [[BORROWED_CASTED_SELF_COPY]]
   // CHECK:     [[PARTIAL_APPLY:%.*]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(method) (@guaranteed OutsideChild) -> ()
   // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_APPLY]]
@@ -226,10 +221,8 @@ class GrandchildToResilientOutsideChild : ResilientOutsideChild {
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:     [[CASTED_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $GrandchildToResilientOutsideChild to $ResilientOutsideChild
   // CHECK:     [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
-  // CHECK:     [[CASTED_SELF_COPY:%.*]] = copy_value [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:     [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
   // CHECK:     [[DOWNCAST_BORROWED_CASTED_SELF_COPY:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:     [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $ResilientOutsideChild, #ResilientOutsideChild.method!1 : (ResilientOutsideChild) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideChild) -> ()
+  // CHECK:     [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $GrandchildToResilientOutsideChild, #ResilientOutsideChild.method!1 : (ResilientOutsideChild) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideChild) -> ()
   // CHEC:      end_borrow [[BORROWED_CASTED_SELF_COPY]]
   // CHECK:     [[PARTIAL_APPLY:%.*]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]([[CASTED_SELF_COPY]]) : $@convention(method) (@guaranteed ResilientOutsideChild) -> ()
   // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_APPLY]]
@@ -259,10 +252,8 @@ class GenericChildToFixedGenericOutsideParent<A> : GenericOutsideParent<A> {
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:     [[CASTED_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $GenericChildToFixedGenericOutsideParent<A> to $GenericOutsideParent<A>
   // CHECK:     [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
-  // CHECK:     [[CASTED_SELF_COPY:%.*]] = copy_value [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:     [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
   // CHECK:     [[DOWNCAST_BORROWED_CASTED_SELF_COPY:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:     [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $GenericOutsideParent<A>, #GenericOutsideParent.method!1 : <A> (GenericOutsideParent<A>) -> () -> (), $@convention(method) <τ_0_0> (@guaranteed GenericOutsideParent<τ_0_0>) -> ()
+  // CHECK:     [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $GenericChildToFixedGenericOutsideParent<A>, #GenericOutsideParent.method!1 : <A> (GenericOutsideParent<A>) -> () -> (), $@convention(method) <τ_0_0> (@guaranteed GenericOutsideParent<τ_0_0>) -> ()
   // CHECK:     end_borrow [[BORROWED_CASTED_SELF_COPY]]
   // CHECK:     [[PARTIAL_APPLY:%.*]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]<A>([[CASTED_SELF_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed GenericOutsideParent<τ_0_0>) -> ()
   // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_APPLY]]
@@ -292,10 +283,8 @@ class GenericChildToResilientGenericOutsideParent<A> : ResilientGenericOutsidePa
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:     [[CASTED_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $GenericChildToResilientGenericOutsideParent<A> to $ResilientGenericOutsideParent<A>
   // CHECK:     [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
-  // CHECK:     [[CASTED_SELF_COPY:%.*]] = copy_value [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:     [[BORROWED_CASTED_SELF_COPY:%.*]] = begin_borrow [[CASTED_SELF_COPY]]
   // CHECK:     [[DOWNCAST_BORROWED_CASTED_SELF_COPY:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_SELF_COPY]]
-  // CHECK:     [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $ResilientGenericOutsideParent<A>, #ResilientGenericOutsideParent.method!1 : <A> (ResilientGenericOutsideParent<A>) -> () -> (), $@convention(method) <τ_0_0> (@guaranteed ResilientGenericOutsideParent<τ_0_0>) -> ()
+  // CHECK:     [[SUPER_METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_CASTED_SELF_COPY]] : $GenericChildToResilientGenericOutsideParent<A>, #ResilientGenericOutsideParent.method!1 : <A> (ResilientGenericOutsideParent<A>) -> () -> (), $@convention(method) <τ_0_0> (@guaranteed ResilientGenericOutsideParent<τ_0_0>) -> ()
   // CHECK:     end_borrow [[BORROWED_CASTED_SELF_COPY]]
   // CHECK:     [[PARTIAL_APPLY:%.*]] = partial_apply [callee_guaranteed] [[SUPER_METHOD]]<A>([[CASTED_SELF_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed ResilientGenericOutsideParent<τ_0_0>) -> ()
   // CHECK:     [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_APPLY]]

@@ -41,7 +41,12 @@ namespace swift {
   class SourceFile;
   class SILOptions;
   class ValueDecl;
+  class GenericSignature;
   enum class AccessorKind;
+
+namespace syntax {
+  class SourceFileSyntax;
+}
 
 namespace ide {
   class CodeCompletionCache;
@@ -111,7 +116,7 @@ public:
   static void reportDocumentStructure(swift::SourceFile &SrcFile,
                                       EditorConsumer &Consumer);
 
-  const llvm::Optional<swift::SourceFileSyntax> &getSyntaxTree() const;
+  const llvm::Optional<swift::syntax::SourceFileSyntax> &getSyntaxTree() const;
 
   std::string getFilePath() const;
 
@@ -373,6 +378,9 @@ public:
                                             swift::TypeOrExtensionDecl Target,
                                             llvm::raw_ostream &OS);
 
+  static void
+  printFullyAnnotatedGenericReq(const swift::GenericSignature *Sig,
+                                llvm::raw_ostream &OS);
   /// Tries to resolve the path to the real file-system path. If it fails it
   /// returns the original path;
   static std::string resolvePathSymlinks(StringRef FilePath);

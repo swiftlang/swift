@@ -64,7 +64,7 @@ func test_cast_to_nserror() {
   // CHECK: unconditional_checked_cast_addr AnyObject in {{%.*}} : $*AnyObject to NSError in {{%.*}} : $*NSError
   let nsForcedCast = (e as AnyObject) as! NSError
 
-  // CHECK: checked_cast_addr_br {{.*}} Error in {{%.*}} : $*Error to NSError in {{%.*}} : $*NSError, bb3, bb4
+  // CHECK: checked_cast_addr_br {{.*}} Error in {{%.*}} : $*Error to NSError in {{%.*}} : $*NSError, bb1, bb2
   do {
     throw e
   } catch _ as NSError {

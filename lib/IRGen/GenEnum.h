@@ -373,15 +373,28 @@ public:
 
   virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
 
+  // Only ever called for fixed types.
   virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src,
                                                SILType T,
                                                bool isOutlined) const = 0;
+  // Only ever called for fixed types.
   virtual void storeExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest,
                                     SILType T,
                                     bool isOutlined) const = 0;
+  virtual llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                               llvm::Value *numEmptyCases,
+                                               Address enumAddr,
+                                               SILType T,
+                                               bool isOutlined) const = 0;
+  virtual void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *whichCase,
+                                         llvm::Value *numEmptyCases,
+                                         Address enumAddr,
+                                         SILType T,
+                                         bool isOutlined) const = 0;
   
   /// \group Delegated FixedTypeInfo operations
   

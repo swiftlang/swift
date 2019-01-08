@@ -193,9 +193,9 @@ static inline void _swift_dispatch_after(
 
 static inline void _swift_dispatch_apply_current(
     size_t iterations,
-    void SWIFT_DISPATCH_NOESCAPE (^block)(long)) {
+    void SWIFT_DISPATCH_NOESCAPE (^block)(intptr_t)) {
   dispatch_apply(iterations, (dispatch_queue_t _Nonnull)0, ^(size_t i){
-    block((long)i);
+    block((intptr_t)i);
   });
 }
 
@@ -239,7 +239,7 @@ static inline void _swift_dispatch_source_set_registration_handler(
 }
 
 #if defined(__ANDROID__)
-extern void _dispatch_install_thread_detach_callback(dispatch_function_t cb);
+extern void _dispatch_install_thread_detach_callback(void (*cb)(void));
 #endif
 
 static inline void _swift_dispatch_retain(dispatch_object_t object) {

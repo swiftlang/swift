@@ -3,10 +3,10 @@
 // RUN: echo "{\"%s\": {\"assembly\": \"/build/multi-threaded.s\"}, \"%S/Inputs/main.swift\": {\"assembly\": \"/build/main.s\"}}" > %t/ofms.json
 // RUN: %target-swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -output-file-map %t/ofms.json -S | %FileCheck -check-prefix=ASSEMBLY %s
 // RUN: %target-swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -c | %FileCheck -check-prefix=OBJECT %s
-// RUN: %target-swiftc_driver -parseable-output -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -c 2> %t/parseable-output
+// RUN: (cd %t && %target-swiftc_driver -parseable-output -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -c) 2> %t/parseable-output
 // RUN: cat %t/parseable-output | %FileCheck -check-prefix=PARSEABLE %s
 // RUN: (cd %t && env TMPDIR=/tmp %swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -o a.out ) | %FileCheck -check-prefix=EXEC %s
-// RUN: echo "{\"%s\": {\"llvm-bc\": \"multi-threaded.bc\", \"object\": \"%t/multi-threaded.o\"}, \"%S/Inputs/main.swift\": {\"llvm-bc\": \"main.bc\", \"object\": \"%t/main.o\"}}" > %t/ofmo.json
+// RUN: echo "{\"%s\": {\"llvm-bc\": \"%t/multi-threaded.bc\", \"object\": \"%t/multi-threaded.o\"}, \"%S/Inputs/main.swift\": {\"llvm-bc\": \"%t/main.bc\", \"object\": \"%t/main.o\"}}" > %t/ofmo.json
 // RUN: %target-swiftc_driver -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s  -emit-dependencies -output-file-map %t/ofmo.json -c
 // RUN: cat %t/*.d | %FileCheck -check-prefix=DEPENDENCIES %s
 
@@ -42,9 +42,9 @@
 // BITCODE: -frontend
 // BITCODE-DAG: -num-threads 4
 // BITCODE-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift 
-// BITCODE-DAG: -o main.bc -o multi-threaded.bc
-// BITCODE-DAG: -frontend -c -primary-file main.bc {{.*}} -o {{[^ ]*}}main.o
-// BITCODE-DAG: -frontend -c -primary-file multi-threaded.bc {{.*}} -o {{[^ ]*}}multi-threaded.o
+// BITCODE-DAG: -o {{.*}}/main.bc -o {{.*}}/multi-threaded.bc
+// BITCODE-DAG: -frontend -c -primary-file {{.*}}/main.bc {{.*}} -o {{[^ ]*}}main.o
+// BITCODE-DAG: -frontend -c -primary-file {{.*}}/multi-threaded.bc {{.*}} -o {{[^ ]*}}multi-threaded.o
 // BITCODE-NOT: ld
 
 // PARSEABLE: "outputs": [
@@ -63,16 +63,16 @@
 
 // PARSEABLE2: "name": "compile"
 // PARSEABLE2: "outputs": [
-// PARSEABLE2: "path": "main.bc"
-// PARSEABLE2: "path": "multi-threaded.bc"
+// PARSEABLE2: "path": "{{.*}}/main.bc"
+// PARSEABLE2: "path": "{{.*}}/multi-threaded.bc"
 // PARSEABLE2: "name": "backend"
 // PARSEABLE2: "inputs": [
-// PARSEABLE2:   "main.bc"
+// PARSEABLE2:   "{{.*}}/main.bc"
 // PARSEABLE2: "outputs": [
 // PARSEABLE2:   "path": "{{.*}}/main.o"
 // PARSEABLE2: "name": "backend"
 // PARSEABLE2: "inputs": [
-// PARSEABLE2:   "multi-threaded.bc"
+// PARSEABLE2:   "{{.*}}/multi-threaded.bc"
 // PARSEABLE2: "outputs": [
 // PARSEABLE2:   "path": "{{.*}}/multi-threaded.o"
 

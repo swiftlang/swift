@@ -42,6 +42,10 @@ SILType SILType::getRawPointerType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheRawPointerType);
 }
 
+SILType SILType::getBuiltinIntegerLiteralType(const ASTContext &C) {
+  return getPrimitiveObjectType(C.TheIntegerLiteralType);
+}
+
 SILType SILType::getBuiltinIntegerType(unsigned bitWidth,
                                        const ASTContext &C) {
   return getPrimitiveObjectType(CanType(BuiltinIntegerType::get(bitWidth, C)));

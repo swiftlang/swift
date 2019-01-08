@@ -11,7 +11,7 @@ protocol Protocol1 {
   subscript(arg1: Int, arg2: Int) -> String { get set } //expected-note{{protocol requires subscript with type '(Int, Int) -> String'; do you want to add a stub?}} {{27-27=\n    func foo(arg1: Int, arg2: String) -> String {\n        <#code#>\n    \}\n\n    func bar() throws -> String {\n        <#code#>\n    \}\n\n    func generic<T>(t: T) {\n        <#code#>\n    \}\n\n    required init(arg: Int) {\n        <#code#>\n    \}\n\n    var baz: Int\n\n    var baz2: Int\n\n    subscript(arg: Int) -> String {\n        <#code#>\n    \}\n\n    subscript(arg1: Int, arg2: Int) -> String {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
 }
 
-class Adopter: Protocol1 { // expected-error{{type 'Adopter' does not conform to protocol 'Protocol1'}} expected-note{{candidate has non-matching type '()'}}
+class Adopter: Protocol1 { // expected-error{{type 'Adopter' does not conform to protocol 'Protocol1'}}
 }
 
 
@@ -26,7 +26,7 @@ protocol Protocol2 {
   subscript(arg1: Int, arg2: Int) -> String { get set } //expected-note{{protocol requires subscript with type '(Int, Int) -> String'; do you want to add a stub?}} {{32-32=\n    func foo(arg1: Int, arg2: String) -> String {\n        <#code#>\n    \}\n\n    func bar() throws -> String {\n        <#code#>\n    \}\n\n    var baz: Int {\n        <#code#>\n    \}\n\n    var baz2: Int {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n\n    subscript(arg: Int) -> String {\n        <#code#>\n    \}\n\n    subscript(arg1: Int, arg2: Int) -> String {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
 }
 
-class Adopter2 {} //  expected-note{{candidate has non-matching type '()'}}
+class Adopter2 {}
 
 extension Adopter2: Protocol2 { // expected-error{{ype 'Adopter2' does not conform to protocol 'Protocol2'}}
 }
@@ -131,19 +131,19 @@ public class Adopter11: ProtocolWithPrivateAccess3, ProtocolWithPrivateAccess4 {
 protocol ProtocolRequiresInit1 {
   init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'; do you want to add a stub?}} {{48-48=\n    init(arg: Int) {\n        <#code#>\n    \}\n}}
 }
-final class Adopter12 : ProtocolRequiresInit1 {} //expected-error {{type 'Adopter12' does not conform to protocol 'ProtocolRequiresInit1'}} // expected-note{{candidate}}
+final class Adopter12 : ProtocolRequiresInit1 {} //expected-error {{type 'Adopter12' does not conform to protocol 'ProtocolRequiresInit1'}}
 
 protocol ProtocolRequiresInit2 {
   init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'; do you want to add a stub?}} {{46-46=\n    convenience init(arg: Int) {\n        <#code#>\n    \}\n}}
 }
-final class Adopter13 {} // expected-note{{candidate}}
+final class Adopter13 {}
 extension Adopter13 : ProtocolRequiresInit2 {} //expected-error {{type 'Adopter13' does not conform to protocol 'ProtocolRequiresInit2'}}
 
 protocol ProtocolRequiresInit3 {
   init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'; do you want to add a stub?}} {{46-46=\n    init(arg: Int) {\n        <#code#>\n    \}\n}}
 }
 
-struct Adopter14 {} // expected-note{{candidate}}
+struct Adopter14 {}
 extension Adopter14 : ProtocolRequiresInit3 {} //expected-error {{type 'Adopter14' does not conform to protocol 'ProtocolRequiresInit3'}}
 
 protocol ProtocolChain1 {

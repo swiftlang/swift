@@ -626,8 +626,7 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(ModuleDecl &module, ParameterList *params,
-                         GenericParamList *genericParams);
+  void inferRequirements(ModuleDecl &module, ParameterList *params);
 
   /// \brief Finalize the set of requirements and compute the generic
   /// signature.
@@ -1451,6 +1450,11 @@ public:
 
   /// Whether this is an explicitly-stated requirement.
   bool isExplicit() const;
+
+  /// Whether this is a top-level requirement written in source.
+  /// FIXME: This is a hack because expandConformanceRequirement()
+  /// is too eager; we should remove this once we fix it properly.
+  bool isTopLevel() const { return kind == Explicit; }
 
   /// Return the "inferred" version of this source, if it isn't already
   /// inferred.

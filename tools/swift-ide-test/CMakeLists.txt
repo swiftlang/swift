@@ -6,8 +6,6 @@ add_swift_host_tool(swift-ide-test
     swiftDriver
     swiftFrontend
     swiftIDE
-  LLVM_COMPONENT_DEPENDS
-    DebugInfoCodeView
   SWIFT_COMPONENT tools
 )
 

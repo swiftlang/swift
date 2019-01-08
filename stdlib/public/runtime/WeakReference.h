@@ -189,7 +189,7 @@ class WeakReference {
 
  public:
   
-  WeakReference() = default;
+  WeakReference() : nativeValue() {}
 
   WeakReference(std::nullptr_t)
     : nativeValue(WeakReferenceBits(nullptr)) { }

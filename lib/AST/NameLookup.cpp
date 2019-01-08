@@ -249,6 +249,24 @@ static void recordShadowedDeclsAfterSignatureMatch(
         break;
       }
 
+      // Prefer declarations in the any module over those in the standard
+      // library module.
+      if (auto swiftModule = ctx.getStdlibModule()) {
+        if ((firstModule == swiftModule) != (secondModule == swiftModule)) {
+          // If the second module is the standard library module, the second
+          // declaration is shadowed by the first.
+          if (secondModule == swiftModule) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+
+          // Otherwise, the first declaration is shadowed by the second. There is
+          // no point in continuing to compare the first declaration to others.
+          shadowed.insert(firstDecl);
+          break;
+        }
+      }
+
       // Prefer declarations in an overlay to similar declarations in
       // the Clang module it customizes.
       if (firstDecl->hasClangNode() != secondDecl->hasClangNode()) {
@@ -331,26 +349,33 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
       }
     }
 
-    // We need an interface type here.
-    if (typeResolver)
-      typeResolver->resolveDeclSignature(decl);
+    CanType signature;
 
-    // If the decl is currently being validated, this is likely a recursive
-    // reference and we'll want to skip ahead so as to avoid having its type
-    // attempt to desugar itself.
-    if (!decl->hasValidSignature())
+    if (!isa<TypeDecl>(decl)) {
+      // We need an interface type here.
+      if (typeResolver)
+        typeResolver->resolveDeclSignature(decl);
+
+      // If the decl is currently being validated, this is likely a recursive
+      // reference and we'll want to skip ahead so as to avoid having its type
+      // attempt to desugar itself.
+      if (!decl->hasValidSignature())
+        continue;
+
+      // FIXME: the canonical type makes a poor signature, because we don't
+      // canonicalize away default arguments.
+      signature = decl->getInterfaceType()->getCanonicalType();
+
+      // FIXME: The type of a variable or subscript doesn't include
+      // enough context to distinguish entities from different
+      // constrained extensions, so use the overload signature's
+      // type. This is layering a partial fix upon a total hack.
+      if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
+        signature = asd->getOverloadSignatureType();
+    } else if (decl->getDeclContext()->isTypeContext()) {
+      // Do not apply shadowing rules for member types.
       continue;
-
-    // FIXME: the canonical type makes a poor signature, because we don't
-    // canonicalize away default arguments.
-    auto signature = decl->getInterfaceType()->getCanonicalType();
-
-    // FIXME: The type of a variable or subscript doesn't include
-    // enough context to distinguish entities from different
-    // constrained extensions, so use the overload signature's
-    // type. This is layering a partial fix upon a total hack.
-    if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
-      signature = asd->getOverloadSignatureType();
+    }
 
     // Record this declaration based on its signature.
     auto &known = collisions[signature];
@@ -999,8 +1024,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
           // Look in the generic parameters after checking our local declaration.
           GenericParams = AFD->getGenericParams();
-        } else if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
-          GenericParams = SD->getGenericParams();
         } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC)) {
           // Look for local variables; normally, the parser resolves these
           // for us, but it can't do the right thing inside local types.
@@ -1042,18 +1065,44 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           continue;
         } else {
           assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC) ||
-                 isa<TypeAliasDecl>(DC));
+                 isa<TypeAliasDecl>(DC) || isa<SubscriptDecl>(DC));
           if (!isCascadingUse.hasValue())
             isCascadingUse = DC->isCascadingContextForLookup(false);
         }
 
-        // Check the generic parameters for something with the given name.
+        // If we're inside a function context, we've already moved to
+        // the parent DC, so we have to check the function's generic
+        // parameters first.
         if (GenericParams) {
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkGenericParams(GenericParams);
 
           if (shouldReturnBasedOnResults())
             return;
+        }
+
+        // Check the generic parameters of our context.
+        GenericParamList *dcGenericParams = nullptr;
+        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
+          dcGenericParams = nominal->getGenericParams();
+        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
+          dcGenericParams = ext->getGenericParams();
+        else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
+          dcGenericParams = subscript->getGenericParams();
+
+        while (dcGenericParams) {
+          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+          localVal.checkGenericParams(dcGenericParams);
+
+          if (shouldReturnBasedOnResults())
+            return;
+
+          // Extensions of nested types have multiple levels of
+          // generic parameters, so we have to visit them explicitly.
+          if (!isa<ExtensionDecl>(DC))
+            break;
+
+          dcGenericParams = dcGenericParams->getOuterParameters();
         }
 
         if (BaseDC && !lookupDecls.empty()) {
@@ -1071,12 +1120,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             // Classify this declaration.
             FoundAny = true;
 
-            // Types are local or metatype members.
+            // Types are formally members of the metatype.
             if (auto TD = dyn_cast<TypeDecl>(Result)) {
-              if (isa<GenericTypeParamDecl>(TD))
-                Results.push_back(LookupResultEntry(Result));
-              else
-                Results.push_back(LookupResultEntry(MetaBaseDC, Result));
+              Results.push_back(LookupResultEntry(MetaBaseDC, Result));
               continue;
             }
 
@@ -1106,29 +1152,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                 return;
             }
           }
-        }
-
-        // Check the generic parameters if our context is a generic type or
-        // extension thereof.
-        GenericParamList *dcGenericParams = nullptr;
-        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
-          dcGenericParams = nominal->getGenericParams();
-        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
-          dcGenericParams = ext->getGenericParams();
-        else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
-          dcGenericParams = subscript->getGenericParams();
-
-        while (dcGenericParams) {
-          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-          localVal.checkGenericParams(dcGenericParams);
-
-          if (shouldReturnBasedOnResults())
-            return;
-
-          if (!isa<ExtensionDecl>(DC))
-            break;
-
-          dcGenericParams = dcGenericParams->getOuterParameters();
         }
 
         DC = DC->getParentForLookup();
@@ -1170,6 +1193,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                                : ResolutionKind::Overloadable;
   lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
                  resolutionKind, TypeResolver, DC, extraImports);
+
+  // Always perform name shadowing for type lookup.
+  if (options.contains(Flags::TypeLookup)) {
+    removeShadowedDecls(CurModuleResults, &M);
+  }
 
   for (auto VD : CurModuleResults)
     Results.push_back(LookupResultEntry(VD));
@@ -1258,12 +1286,6 @@ public:
   /// \brief Add the given members to the lookup table.
   void addMembers(DeclRange members);
 
-  /// \brief The given extension has been extended with new members; add them
-  /// if appropriate.
-  void addExtensionMembers(NominalTypeDecl *nominal,
-                           ExtensionDecl *ext,
-                           DeclRange members);
-
   /// Iterator into the lookup table.
   typedef LookupTable::iterator iterator;
 
@@ -1272,6 +1294,30 @@ public:
 
   iterator find(DeclName name) {
     return Lookup.find(name);
+  }
+
+  void dump(llvm::raw_ostream &os) const {
+    os << "LastExtensionIncluded:\n";
+    if (LastExtensionIncluded)
+      LastExtensionIncluded->printContext(os, 2);
+    else
+      os << "  nullptr\n";
+
+    os << "Lookup:\n  ";
+    for (auto &pair : Lookup) {
+      pair.getFirst().print(os) << ":\n  ";
+      for (auto &decl : pair.getSecond()) {
+        os << "- ";
+        decl->dumpRef(os);
+        os << "\n  ";
+      }
+    }
+    os << "\n";
+  }
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger") {
+    dump(llvm::errs());
   }
 
   // \brief Mark all Decls in this table as not-resident in a table, drop
@@ -1375,26 +1421,6 @@ void MemberLookupTable::addMembers(DeclRange members) {
   }
 }
 
-void MemberLookupTable::addExtensionMembers(NominalTypeDecl *nominal,
-                                            ExtensionDecl *ext,
-                                            DeclRange members) {
-  // We have not processed any extensions yet, so there's nothing to do.
-  if (!LastExtensionIncluded)
-    return;
-
-  // If this extension shows up in the list of extensions not yet included
-  // in the lookup table, there's nothing to do.
-  for (auto notIncluded = LastExtensionIncluded->NextExtension.getPointer();
-       notIncluded;
-       notIncluded = notIncluded->NextExtension.getPointer()) {
-    if (notIncluded == ext)
-      return;
-  }
-
-  // Add the new members to the lookup table.
-  addMembers(members);
-}
-
 void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
   // If the last extension we included is the same as the last known extension,
   // we're already up-to-date.
@@ -1418,6 +1444,11 @@ void NominalTypeDecl::addedMember(Decl *member) {
   }
 }
 
+void NominalTypeDecl::addedExtension(ExtensionDecl * ext) {
+  if (hasLazyMembers())
+    setLookupTablePopulated(false);
+}
+
 void ExtensionDecl::addedMember(Decl *member) {
   if (NextExtension.getInt()) {
     auto nominal = getExtendedNominal();
@@ -1425,7 +1456,7 @@ void ExtensionDecl::addedMember(Decl *member) {
       return;
 
     if (nominal->LookupTable.getPointer() &&
-        nominal->LookupTable.getInt()) {
+        nominal->isLookupTablePopulated()) {
       // Make sure we have the complete list of extensions.
       // FIXME: This is completely unnecessary. We want to determine whether
       // our own extension has already been included in the lookup table.
@@ -1559,6 +1590,14 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
   return false;
 }
 
+bool NominalTypeDecl::isLookupTablePopulated() const {
+  return LookupTable.getInt();
+}
+
+void NominalTypeDecl::setLookupTablePopulated(bool value) {
+  LookupTable.setInt(value);
+}
+
 void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
   // If we haven't allocated the lookup table yet, do so now.
   if (!LookupTable.getPointer()) {
@@ -1571,24 +1610,28 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
     // from those members already in the IDC member list_ such as implicits or
     // globals-as-members, then update table entries from the extensions that
     // have the same names as any such initial-population members.
-    if (!LookupTable.getInt()) {
-      LookupTable.setInt(true);
+    if (!isLookupTablePopulated()) {
+      setLookupTablePopulated(true);
       LookupTable.getPointer()->addMembers(getCurrentMembersWithoutLoading());
-      for (auto *m : getCurrentMembersWithoutLoading()) {
-        if (auto v = dyn_cast<ValueDecl>(m)) {
-          populateLookupTableEntryFromExtensions(getASTContext(),
-                                                 *LookupTable.getPointer(),
-                                                 this, v->getBaseName(),
-                                                 ignoreNewExtensions);
-        }
+
+      llvm::SetVector<DeclName> baseNamesPresent;
+      for (auto entry : *LookupTable.getPointer()) {
+        baseNamesPresent.insert(entry.getFirst().getBaseName());
+      }
+      
+      for (auto baseName : baseNamesPresent) {
+        populateLookupTableEntryFromExtensions(getASTContext(),
+                                               *LookupTable.getPointer(),
+                                               this, baseName,
+                                               ignoreNewExtensions);
       }
     }
 
   } else {
     // No lazy members: if the table needs population, populate the table
     // en-masse; and in either case update the extensions.
-    if (!LookupTable.getInt()) {
-      LookupTable.setInt(true);
+    if (!isLookupTablePopulated()) {
+      setLookupTablePopulated(true);
       LookupTable.getPointer()->addMembers(getMembers());
     }
     if (!ignoreNewExtensions) {
@@ -1654,8 +1697,9 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       name.getBaseName() == DeclBaseName::createConstructor())
     useNamedLazyMemberLoading = false;
 
-  LLVM_DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
-        << ", lookupTable.getInt()=" << LookupTable.getInt()
+  LLVM_DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect("
+             << name << ", " << ignoreNewExtensions << ")"
+        << ", isLookupTablePopulated()=" << isLookupTablePopulated()
         << ", hasLazyMembers()=" << hasLazyMembers()
         << ", useNamedLazyMemberLoading=" << useNamedLazyMemberLoading
         << "\n");
@@ -1672,7 +1716,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       // that is either currently out of date or soon to be out of date.
       // This can happen two ways:
       //
-      //   - We've not yet indexed the members we have (LookupTable.getInt()
+      //   - We've not yet indexed the members we have (isLookupTablePopulated()
       //     is zero).
       //
       //   - We've still got more lazy members left to load; this can happen
@@ -1681,9 +1725,9 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       // In either of these cases, we want to reset the table to empty and
       // mark it as needing reconstruction.
       if (LookupTable.getPointer() &&
-          (hasLazyMembers() || !LookupTable.getInt())) {
+          (hasLazyMembers() || !isLookupTablePopulated())) {
         LookupTable.getPointer()->clear();
-        LookupTable.setInt(false);
+        setLookupTablePopulated(false);
       }
 
       (void)getMembers();

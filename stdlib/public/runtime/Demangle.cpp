@@ -46,6 +46,9 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
     [&](const ContextDescriptor *context) -> NodePointer {
       if (demangledGenerics.empty())
         return nullptr;
+
+      if (context->getKind() == ContextDescriptorKind::Anonymous)
+        return nullptr;
       
       auto generics = context->getGenericContext();
       if (!generics)
@@ -307,6 +310,8 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 }
 
 // Build a demangled type tree for a type.
+//
+// FIXME: This should use MetadataReader.h.
 Demangle::NodePointer
 swift::_swift_buildDemanglingForMetadata(const Metadata *type,
                                          Demangle::Demangler &Dem) {
@@ -493,14 +498,21 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     NodePointer totalInput = nullptr;
     switch (inputs.size()) {
     case 1: {
-      auto &singleParam = inputs.front();
+      auto singleParam = inputs.front();
+
+      // If the sole unlabeled parameter has a non-tuple type, encode
+      // the parameter list as a single type.
       if (!singleParam.second) {
-        totalInput = singleParam.first;
-        break;
+        auto singleType = singleParam.first;
+        if (singleType->getKind() == Node::Kind::Type)
+          singleType = singleType->getFirstChild();
+        if (singleType->getKind() != Node::Kind::Tuple) {
+          totalInput = singleParam.first;
+          break;
+        }
       }
 
-      // If single parameter has a variadic marker it
-      // requires a tuple wrapper.
+      // Otherwise it requires a tuple wrapper.
       LLVM_FALLTHROUGH;
     }
 

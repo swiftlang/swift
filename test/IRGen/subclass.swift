@@ -10,30 +10,30 @@
 // CHECK-DAG: [[INT:%TSi]] = type <{ i64 }>
 // CHECK-DAG: [[B:%T8subclass1BC]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
 
-// CHECK: @_DATA__TtC8subclass1A = private constant {{.*\* } }}{
-// CHECK: @"$s8subclass1ACMf" = internal global [[A_METADATA:<{.*i64 }>]] <{
-// CHECK:   void ([[A]]*)* @"$s8subclass1ACfD",
-// CHECK:   i8** @"$sBoWV",
-// CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @"$s8subclass1ACMm" to i64),
-// CHECK:   [[OBJC_CLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
-// CHECK:   [[OPAQUE]]* @_objc_empty_cache,
-// CHECK:   [[OPAQUE]]* null,
-// CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1A to i64), i64 1),
-// CHECK:   i64 ([[A]]*)* @"$s8subclass1AC1fSiyF",
-// CHECK:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
-// CHECK: }>
-// CHECK: @_DATA__TtC8subclass1B = private constant {{.*\* } }}{
+// CHECK: @_DATA__TtC8subclass1A = private constant {{.* } }}{
+// CHECK: @"$s8subclass1ACMf" = internal global [[A_METADATA:<{.* }>]] <{
+// CHECK-SAME:   void ([[A]]*)* @"$s8subclass1ACfD",
+// CHECK-SAME:   i8** @"$sBoWV",
+// CHECK-SAME:   i64 ptrtoint ([[OBJC_CLASS]]* @"$s8subclass1ACMm" to i64),
+// CHECK-SAME:   [[OBJC_CLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
+// CHECK-SAME:   [[OPAQUE]]* @_objc_empty_cache,
+// CHECK-SAME:   [[OPAQUE]]* null,
+// CHECK-SAME:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1A to i64), i64 1),
+// CHECK-SAME:   i64 ([[A]]*)* @"$s8subclass1AC1fSiyF",
+// CHECK-SAME:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
+// CHECK-SAME: }>
+// CHECK: @_DATA__TtC8subclass1B = private constant {{.* } }}{
 // CHECK: @"$s8subclass1BCMf" = internal global <{ {{.*}} }> <{
-// CHECK:   void ([[B]]*)* @"$s8subclass1BCfD",
-// CHECK:   i8** @"$sBoWV",
-// CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @"$s8subclass1BCMm" to i64),
-// CHECK:   [[TYPE]]* {{.*}} @"$s8subclass1ACMf",
-// CHECK:   [[OPAQUE]]* @_objc_empty_cache,
-// CHECK:   [[OPAQUE]]* null,
-// CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 1),
-// CHECK:   i64 ([[B]]*)* @"$s8subclass1BC1fSiyF",
-// CHECK:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
-// CHECK: }>
+// CHECK-SAME:   void ([[B]]*)* @"$s8subclass1BCfD",
+// CHECK-SAME:   i8** @"$sBoWV",
+// CHECK-SAME:   i64 ptrtoint ([[OBJC_CLASS]]* @"$s8subclass1BCMm" to i64),
+// CHECK-SAME:   [[TYPE]]* {{.*}} @"$s8subclass1ACMf",
+// CHECK-SAME:   [[OPAQUE]]* @_objc_empty_cache,
+// CHECK-SAME:   [[OPAQUE]]* null,
+// CHECK-SAME:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 1),
+// CHECK-SAME:   i64 ([[B]]*)* @"$s8subclass1BC1fSiyF",
+// CHECK-SAME:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
+// CHECK-SAME: }>
 // CHECK: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @"$s8subclass1ACN" {{.*}}, i8* {{.*}} @"$s8subclass1BCN" {{.*}}]
 
 class A {

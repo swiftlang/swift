@@ -45,7 +45,7 @@
 public func zip<Sequence1, Sequence2>(
   _ sequence1: Sequence1, _ sequence2: Sequence2
 ) -> Zip2Sequence<Sequence1, Sequence2> {
-  return Zip2Sequence(_sequence1: sequence1, _sequence2: sequence2)
+  return Zip2Sequence(sequence1, sequence2)
 }
 
 /// A sequence of pairs built out of two underlying sequences.
@@ -77,8 +77,7 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> {
   /// Creates an instance that makes pairs of elements from `sequence1` and
   /// `sequence2`.
   @inlinable // generic-performance
-  public // @testable
-  init(_sequence1 sequence1: Sequence1, _sequence2 sequence2: Sequence2) {
+  internal init(_ sequence1: Sequence1, _ sequence2: Sequence2) {
     (_sequence1, _sequence2) = (sequence1, sequence2)
   }
 }

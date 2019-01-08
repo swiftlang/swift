@@ -90,7 +90,7 @@ bb0(%0 : $C):
 }
 
 
-sil [transparent] [serialized] @$ss5Int32V22_builtinIntegerLiteralABBi2048__tcfC : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32
+sil [transparent] [serialized] @$ss5Int32V22_builtinIntegerLiteralABBI__tcfC : $@convention(thin) (Builtin.IntLiteral, @thin Int32.Type) -> Int32
 
 
 sil @$s14optimize_never1CCfD : $@convention(method) (@owned C) -> () {
@@ -226,7 +226,7 @@ bb0(%0 : $C):
 }
 
 
-sil [transparent] [serialized] @$sSi22_builtinIntegerLiteralSiBi2048__tcfC : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+sil [transparent] [serialized] @$sSi22_builtinIntegerLiteralSiBI__tcfC : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
 
 
 sil @$s14optimize_never10transform2ys5Int32VADF : $@convention(thin) (Int32) -> Int32 {

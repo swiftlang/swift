@@ -11,6 +11,14 @@
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD2 | %FileCheck %s -check-prefix=OVERLOAD2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | %FileCheck %s -check-prefix=OVERLOAD3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | %FileCheck %s -check-prefix=OVERLOAD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD5 | %FileCheck %s -check-prefix=OVERLOAD5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD6 | %FileCheck %s -check-prefix=OVERLOAD6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD7 | %FileCheck %s -check-prefix=OVERLOAD6
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR1 | %FileCheck %s -check-prefix=HASERROR1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR2 | %FileCheck %s -check-prefix=HASERROR2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR3 | %FileCheck %s -check-prefix=HASERROR3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR4 | %FileCheck %s -check-prefix=HASERROR4
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | %FileCheck %s -check-prefix=MEMBER1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | %FileCheck %s -check-prefix=MEMBER2
@@ -51,6 +59,13 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_1 | %FileCheck %s -check-prefix=SHUFFLE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_2 | %FileCheck %s -check-prefix=SHUFFLE_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_3 | %FileCheck %s -check-prefix=SHUFFLE_3
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1 | %FileCheck %s -check-prefix=SUBSCRIPT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_1_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_2 | %FileCheck %s -check-prefix=SUBSCRIPT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_2_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_2_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_3 | %FileCheck %s -check-prefix=SUBSCRIPT_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_3_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_3_DOT
 
 var i1 = 1
 var i2 = 2
@@ -208,11 +223,23 @@ class C3 {
   func f2() {
     foo2(C2I, #^OVERLOAD2^#)
   }
-  func f2() {
+  func f3() {
     foo2(C1I, b1: #^OVERLOAD3^#)
   }
-  func f2() {
+  func f4() {
     foo2(C2I, b2: #^OVERLOAD4^#)
+  }
+
+  func f5() {
+    foo2(#^OVERLOAD5^#
+  }
+
+  func overloaded(_ a1: C1, b1: C2) {}
+  func overloaded(a2: C2, b2: C1) {}
+
+  func f6(obj: C3) {
+    overloaded(#^OVERLOAD6^#
+    obj.overloaded(#^OVERLOAD7^#
   }
 }
 
@@ -243,6 +270,49 @@ class C3 {
 
 // FIXME: This should be a negative test case
 // NEGATIVE_OVERLOAD4-NOT: Decl[Class]{{.*}} C2
+
+// OVERLOAD5: Begin completions
+// OVERLOAD5-DAG: Pattern/CurrModule:                 ['(']{#(a): C1#}, {#b1: C2#}[')'][#Void#]; name=a: C1, b1: C2
+// OVERLOAD5-DAG: Pattern/CurrModule:                 ['(']{#(a): C2#}, {#b2: C1#}[')'][#Void#]; name=a: C2, b2: C1
+// OVERLOAD5-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
+// OVERLOAD5-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C2I[#C2#]; name=C2I
+// OVERLOAD5: End completions
+
+// OVERLOAD6: Begin completions
+// OVERLOAD6-DAG: Pattern/CurrModule:                 ['(']{#(a1): C1#}, {#b1: C2#}[')'][#Void#]; name=a1: C1, b1: C2
+// OVERLOAD6-DAG: Pattern/CurrModule:                 ['(']{#a2: C2#}, {#b2: C1#}[')'][#Void#]; name=a2: C2, b2: C1
+// OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
+// OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
+// OVERLOAD6: End completions
+
+extension C3 {
+  func hasError(a1: C1, b1: TypeInvalid) -> Int {}
+
+  func f7(obj: C3) {
+    let _ = obj.hasError(#^HASERROR1^#
+    let _ = obj.hasError(a1: #^HASERROR2^#
+    let _ = obj.hasError(a1: IC1, #^HASERROR3^#
+    let _ = obj.hasError(a1: IC1, b1: #^HASERROR4^#
+  }
+}
+
+// HASERROR1: Begin completions
+// HASERROR1-DAG: Pattern/CurrModule:                 ['(']{#a1: C1#}, {#b1: <<error type>>#}[')'][#Int#];
+// HASERROR1: End completions
+
+// HASERROR2: Begin completions
+// HASERROR2-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#];
+// HASERROR2-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#];
+// HASERROR2: End completions
+
+// HASERROR3: Begin completions
+// HASERROR3-DAG: Keyword/ExprSpecific:               b1: [#Argument name#];
+// HASERROR3: End completions
+
+// HASERROR4: Begin completions
+// HASERROR4-DAG: Decl[InstanceVar]/CurrNominal:      C1I[#C1#];
+// HASERROR4-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#];
+// HASERROR4: End completions
 
 class C4 {
   func f1(_ G : Gen) {
@@ -398,11 +468,9 @@ struct EmptyOverload {
   init(foo: Int) {}
 }
 _ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2^#)
-// FIXME: we should have a TypeRelation[Identical] here for Ints. For now just
-// check it's not empty.
 // EMPTY_OVERLOAD: Begin completions
-// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local{{.*}}: i2[#Int#];
-// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local{{.*}}: i1[#Int#];
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local/TypeRelation[Identical]: i2[#Int#];
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local/TypeRelation[Identical]: i1[#Int#];
 // EMPTY_OVERLOAD: End completions
 
 public func fopen() -> TestBoundGeneric1! { fatalError() }
@@ -462,3 +530,45 @@ func testTupleShuffle() {
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     foo[#SimpleEnum#]; name=foo
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     bar[#SimpleEnum#]; name=bar
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     baz[#SimpleEnum#]; name=baz
+
+class HasSubscript {
+  subscript(idx: Int) -> String {}
+  subscript(idx: Int, default defaultValue: String) -> String {}
+}
+func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
+  let _ = obj[#^SUBSCRIPT_1^#
+// SUBSCRIPT_1: Begin completions
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i1[#Int#]; name=i1
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i2[#Int#]; name=i2
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule: s1[#String#]; name=s1
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule: s2[#String#]; name=s2
+
+  let _ = obj[.#^SUBSCRIPT_1_DOT^#
+// SUBSCRIPT_1_DOT: Begin completions
+// SUBSCRIPT_1_DOT-NOT: i1
+// SUBSCRIPT_1_DOT-NOT: s1
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              max[#Int#]; name=max
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              min[#Int#]; name=min
+
+  let _ = obj[42, #^SUBSCRIPT_2^#
+// SUBSCRIPT_2: Begin completions, 1 items
+// SUBSCRIPT_2-NEXT: Keyword/ExprSpecific:               default: [#Argument name#]; name=default: 
+
+  let _ = obj[42, .#^SUBSCRIPT_2_DOT^#
+// SUBSCRIPT_2_DOT-NOT: Begin completions
+
+  let _ = obj[42, default: #^SUBSCRIPT_3^#
+// SUBSCRIPT_3: Begin completions
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule: i1[#Int#]; name=i1
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule: i2[#Int#]; name=i2
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s1[#String#]; name=s1
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
+
+  let _ = obj[42, default: .#^SUBSCRIPT_3_DOT^#
+// SUBSCRIPT_3_DOT: Begin completions
+// SUBSCRIPT_3_DOT-NOT: i1
+// SUBSCRIPT_3_DOT-NOT: s1
+// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#String#]; name=init()
+// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#(c): Character#})[#String#]; name=init(c: Character)
+
+}

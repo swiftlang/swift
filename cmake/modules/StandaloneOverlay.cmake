@@ -32,11 +32,13 @@ list(APPEND CMAKE_MODULE_PATH
   ${LLVM_CMAKE_MODULES_PATH}
 )
 
-message(STATUS "FINDING LIPO")
-  execute_process(
-  COMMAND "xcrun" "-find" "lipo"
-  OUTPUT_VARIABLE LIPO
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
+set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
+    "The name of the toolchain to pass to 'xcrun'")
+
+include(SwiftToolchainUtils)
+if(NOT SWIFT_LIPO)
+  find_toolchain_tool(SWIFT_LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+endif()
 
 include(AddLLVM)
 include(SwiftUtils)
@@ -55,6 +57,10 @@ precondition(SWIFT_SOURCE_ROOT)
 precondition(SWIFT_DEST_ROOT)
 precondition(SWIFT_HOST_VARIANT_SDK)
 precondition(TOOLCHAIN_DIR)
+
+# Some overlays include the runtime's headers,
+# and some of those headers are generated at build time.
+add_subdirectory("${SWIFT_SOURCE_DIR}/include" "swift/include")
 
 # Without this line, installing components is broken. This needs refactoring.
 swift_configure_components()

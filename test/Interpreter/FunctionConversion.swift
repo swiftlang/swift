@@ -272,8 +272,9 @@ FunctionConversionTestSuite.test("CollectionUpCastsInFuncParameters") {
 protocol X: Hashable {}
 class B: X {
   var hashValue: Int { return 42 }
+  func hash(into hasher: inout Hasher) {}
   static func == (lhs: B, rhs: B) -> Bool {
-    return lhs.hashValue == rhs.hashValue
+    return true
   }
 }
 

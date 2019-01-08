@@ -560,7 +560,7 @@ Runtime.test("SwiftError layout constants for LLDB") {
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
 #elseif os(Android)
   #if arch(arm)
-    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0xffffffff)
+    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0xffffffff as UInt)
   #elseif arch(arm64)
     let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
   #else
@@ -666,13 +666,25 @@ Reflection.test("ObjectIdentifier/CustomDebugStringConvertible") {
 
 }
 
+class C: Q1 & Codable { }
+
+Reflection.test("multiprotocolTypes") {
+  // [SR-8158]: Printing type(of: Codable & Protocol type ) EXC_BAD_ACCESS
+  // This use of String(reflecting:) exercises a previously incorrect cast in
+  // NonFixedExistentialMetatypeBox::Container::getNumWitnessTables.
+  let obj: Q1 & Codable = C()
+  let t = type(of: obj)
+  let x = String(reflecting: t)
+  expectEqual("a.C", x)
+}
+
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 BitTwiddlingTestSuite.test("_pointerSize") {
 #if arch(i386) || arch(arm)
   expectEqual(4, MemoryLayout<Optional<AnyObject>>.size)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(8, MemoryLayout<Optional<AnyObject>>.size)
 #else
   fatalError("implement")

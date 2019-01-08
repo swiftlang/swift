@@ -37,10 +37,8 @@ func test1() {
   case _:
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @$s18switch_fallthrough1cyyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
     c()
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s18switch_fallthrough1dyyF
   d()
 }
@@ -65,10 +63,8 @@ func test2() {
   case _:
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @$s18switch_fallthrough1cyyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
     c()
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s18switch_fallthrough1dyyF
   d()
 }
@@ -98,10 +94,8 @@ func test3() {
   case (_, _):
   // CHECK: [[CASE4]]:
   // CHECK:   function_ref @$s18switch_fallthrough1dyyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
     d()
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s18switch_fallthrough1eyyF
   e()
 }

@@ -1064,17 +1064,9 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
 
   //===--- Hashable -------------------------------------------------------===//
 
-  public var hashValue: Int {
-#if arch(i386) || arch(arm)
-    let p: UInt = 16777619
-    let h: UInt = (2166136261 &* p) ^ (isNegative ? 1 : 0)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-    let p: UInt = 1099511628211
-    let h: UInt = (14695981039346656037 &* p) ^ (isNegative ? 1 : 0)
-#else
-    fatalError("Unimplemented")
-#endif
-    return Int(bitPattern: _data.reduce(h, { ($0 &* p) ^ UInt($1) }))
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(isNegative)
+    hasher.combine(_data)
   }
 
   //===--- Bit shifting operators -----------------------------------------===//
@@ -1282,8 +1274,8 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
 
   // Hashable, CustomStringConvertible
 
-  var hashValue: Int {
-    return Int(value)
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
 
   var description: String {

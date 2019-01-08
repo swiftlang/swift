@@ -34,9 +34,9 @@ extension Sub {
     // CHECK: [[BORROWED_SELF_COPY_CAST:%.*]] = begin_borrow [[SELF_COPY_CAST]]
     // CHECK: [[CAST_BACK:%.*]] = unchecked_ref_cast [[BORROWED_SELF_COPY_CAST]] : $Base to $Sub
     // CHECK: [[SUPER_METHOD:%.*]] = objc_super_method [[CAST_BACK]] : $Sub, #Base.prop!getter.1.foreign
-    // CHECK: end_borrow [[BORROWED_SELF_COPY_CAST]]
-    // CHECK: [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[SELF_COPY_CAST]])
+    // CHECK: [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[BORROWED_SELF_COPY_CAST]])
     // CHECK: bb3(
+    // CHECK: end_borrow [[BORROWED_SELF_COPY_CAST]]
     // CHECK: destroy_value [[SELF_COPY_CAST]]
     // CHECK: } // end sil function '$s15objc_extensions3SubC4propSSSgvg'
 
@@ -68,8 +68,7 @@ extension Sub {
     // CHECK:   [[BORROWED_UPCAST_SELF_COPY:%.*]] = begin_borrow [[UPCAST_SELF_COPY]]
     // CHECK:   [[CAST_BACK:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF_COPY]] : $Base to $Sub
     // CHECK:   [[GET_SUPER_METHOD:%.*]] = objc_super_method [[CAST_BACK]] : $Sub, #Base.prop!getter.1.foreign : (Base) -> () -> String?, $@convention(objc_method) (Base) -> @autoreleased Optional<NSString>
-    // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY]]
-    // CHECK:   [[OLD_NSSTRING:%.*]] = apply [[GET_SUPER_METHOD]]([[UPCAST_SELF_COPY]])
+    // CHECK:   [[OLD_NSSTRING:%.*]] = apply [[GET_SUPER_METHOD]]([[BORROWED_UPCAST_SELF_COPY]])
 
     // CHECK: bb3([[OLD_NSSTRING_BRIDGED:%.*]] : @owned $Optional<String>):
     // This next line is completely not needed. But we are emitting it now.

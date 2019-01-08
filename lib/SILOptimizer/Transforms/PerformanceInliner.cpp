@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-inliner"
 #include "swift/AST/Module.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -100,6 +101,11 @@ class SILPerformanceInliner {
     /// specialization for a call.
     GenericSpecializationBenefit = RemovedCallBenefit + 300,
 
+    /// The benefit of inlining an exclusivity-containing callee.
+    /// The exclusivity needs to be: dynamic,
+    /// has no nested conflict and addresses known storage
+    ExclusivityBenefit = RemovedCallBenefit + 300,
+
     /// The benefit of inlining class methods with -Osize.
     /// We only inline very small class methods with -Osize.
     OSizeClassMethodBenefit = 5,
@@ -108,8 +114,8 @@ class SILPerformanceInliner {
     /// increasing the code size.
     TrivialFunctionThreshold = 18,
 
-    /// Configuration for the "soft" caller block limit. When changing, make sure
-    /// you update BlockLimitMaxIntNumerator.
+    /// Configuration for the "soft" caller block limit. When changing, make
+    /// sure you update BlockLimitMaxIntNumerator.
     BlockLimitDenominator = 3000,
 
     /// Computations with BlockLimitDenominator will overflow with numerators
@@ -255,8 +261,12 @@ bool SILPerformanceInliner::isProfitableToInline(
   int BaseBenefit = RemovedCallBenefit;
 
   // Osize heuristic.
+  //
+  // As a hack, don't apply this at all to coroutine inlining; avoiding
+  // coroutine allocation overheads is extremely valuable.  There might be
+  // more principled ways of getting this effect.
   bool isClassMethodAtOsize = false;
-  if (OptMode == OptimizationMode::ForSize) {
+  if (OptMode == OptimizationMode::ForSize && !isa<BeginApplyInst>(AI)) {
     // Don't inline into thunks.
     if (AI.getFunction()->isThunk())
       return false;
@@ -298,9 +308,18 @@ bool SILPerformanceInliner::isProfitableToInline(
   SILBasicBlock *CalleeEntry = &Callee->front();
   DominanceOrder domOrder(CalleeEntry, DT, Callee->size());
 
+  // We don't want to blow up code-size
+  // We will only inline if *ALL* dynamic accesses are
+  // known and have no nested conflict
+  bool AllAccessesBeneficialToInline = true;
+
   // Calculate the inlining cost of the callee.
   int CalleeCost = 0;
   int Benefit = 0;
+  // We don’t know if we want to update the benefit with
+  // the exclusivity heuristic or not. We can *only* do that
+  // if AllAccessesBeneficialToInline is true
+  int ExclusivityBenefitWeight = 0;
 
   SubstitutionMap CalleeSubstMap = AI.getSubstitutionMap();
 
@@ -392,6 +411,21 @@ bool SILPerformanceInliner::isProfitableToInline(
       } else if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
         if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
           BlockW.updateBenefit(Benefit, FastPathBuiltinBenefit);
+      } else if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
+        if (BAI->getEnforcement() == SILAccessEnforcement::Dynamic) {
+          // The access is dynamic and has no nested conflict
+          // See if the storage location is considered by
+          // access enforcement optimizations
+          AccessedStorage storage =
+              findAccessedStorageNonNested(BAI->getSource());
+          if (BAI->hasNoNestedConflict() &&
+              (storage.isUniquelyIdentified() ||
+               storage.getKind() == AccessedStorage::Class)) {
+            BlockW.updateBenefit(ExclusivityBenefitWeight, ExclusivityBenefit);
+          } else {
+            AllAccessesBeneficialToInline = false;
+          }
+        }
       }
     }
     // Don't count costs in blocks which are dead after inlining.
@@ -405,6 +439,10 @@ bool SILPerformanceInliner::isProfitableToInline(
     } else {
       domOrder.pushChildren(block);
     }
+  }
+
+  if (AllAccessesBeneficialToInline) {
+    Benefit = std::max(Benefit, ExclusivityBenefitWeight);
   }
 
   if (AI.getFunction()->isThunk()) {
@@ -618,6 +656,10 @@ addToBBCounts(llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap,
   }
 }
 
+static bool isInlineAlwaysCallSite(SILFunction *Callee) {
+  return Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent();
+}
+
 static void
 calculateBBWeights(SILFunction *Caller, DominanceInfo *DT,
                    llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
@@ -753,6 +795,23 @@ void SILPerformanceInliner::collectAppliesToInline(
 
       auto *Callee = getEligibleFunction(AI, WhatToInline);
       if (Callee) {
+        // Check if we have an always_inline or transparent function. If we do,
+        // just add it to our final Applies list and continue.
+        if (isInlineAlwaysCallSite(Callee)) {
+          NumCallerBlocks += Callee->size();
+          Applies.push_back(AI);
+          continue;
+        }
+
+        // Next make sure that we do not have more blocks than our overall
+        // caller block limit at this point. In such a case, we continue. This
+        // will ensure that any further non inline always functions are skipped,
+        // but we /do/ inline any inline_always functions remaining.
+        if (NumCallerBlocks > OverallCallerBlockLimit)
+          continue;
+
+        // Otherwise, calculate our block weights and determine if we want to
+        // inline this.
         if (!BlockWeight.isValid())
           BlockWeight = SPA->getWeight(block, Weight(0, 0));
 
@@ -764,8 +823,6 @@ void SILPerformanceInliner::collectAppliesToInline(
           InitialCandidates.push_back(AI);
       }
     }
-    if (NumCallerBlocks > OverallCallerBlockLimit)
-      break;
 
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
       if (CBI.isSlowPath(block, child)) {

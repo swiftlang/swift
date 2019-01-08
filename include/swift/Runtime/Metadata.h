@@ -22,6 +22,37 @@
 
 namespace swift {
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+
+/// The buffer used by a yield-once coroutine (such as the generalized
+/// accessors `read` and `modify`).
+struct YieldOnceBuffer {
+  void *Data[NumWords_YieldOnceBuffer];
+};
+using YieldOnceContinuation =
+  SWIFT_CC(swift) void (YieldOnceBuffer *buffer, bool forUnwind);
+
+/// The return type of a call to a yield-once coroutine.  The function
+/// must be declared with the swiftcall calling convention.
+template <class ResultTy>
+struct YieldOnceResult {
+  YieldOnceContinuation *Continuation;
+  ResultTy YieldValue;
+};
+
+template <class FnTy>
+struct YieldOnceCoroutine;
+
+/// A template which generates the type of the ramp function of a
+/// yield-once coroutine.
+template <class ResultTy, class... ArgTys>
+struct YieldOnceCoroutine<ResultTy(ArgTys...)> {
+  using type =
+    SWIFT_CC(swift) YieldOnceResult<ResultTy> (YieldOnceBuffer *buffer,
+                                               ArgTys...);
+};
+
 #if SWIFT_OBJC_INTEROP
 
   // Const cast shorthands for ObjC types.
@@ -59,56 +90,26 @@ OpaqueValue *swift_copyPOD(OpaqueValue *dest,
                            OpaqueValue *src,
                            const Metadata *self);
  
-/// A value-witness table with extra inhabitants entry points.
-/// These entry points are available only if the HasExtraInhabitants flag bit is
-/// set in the 'flags' field.
-struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
-#define WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES
-#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
-  ValueWitnessTypes::LOWER_ID LOWER_ID;
-#include "swift/ABI/ValueWitness.def"
-
-#define SET_WITNESS(NAME) base.NAME,
-
-  constexpr ExtraInhabitantsValueWitnessTable()
-    : ValueWitnessTable{}, extraInhabitantFlags(),
-      storeExtraInhabitant(nullptr),
-      getExtraInhabitantIndex(nullptr) {}
-  constexpr ExtraInhabitantsValueWitnessTable(
-                            const ValueWitnessTable &base,
-                            ValueWitnessTypes::extraInhabitantFlags eif,
-                            ValueWitnessTypes::storeExtraInhabitant sei,
-                            ValueWitnessTypes::getExtraInhabitantIndex geii)
-    : ValueWitnessTable(base),
-      extraInhabitantFlags(eif),
-      storeExtraInhabitant(sei),
-      getExtraInhabitantIndex(geii) {}
-
-  static bool classof(const ValueWitnessTable *table) {
-    return table->flags.hasExtraInhabitants();
-  }
-};
-
 /// A value-witness table with enum entry points.
 /// These entry points are available only if the HasEnumWitnesses flag bit is
 /// set in the 'flags' field.
-struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
+struct EnumValueWitnessTable : ValueWitnessTable {
 #define WANT_ONLY_ENUM_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
   ValueWitnessTypes::LOWER_ID LOWER_ID;
 #include "swift/ABI/ValueWitness.def"
 
   constexpr EnumValueWitnessTable()
-    : ExtraInhabitantsValueWitnessTable(),
+    : ValueWitnessTable{},
       getEnumTag(nullptr),
       destructiveProjectEnumData(nullptr),
       destructiveInjectEnumTag(nullptr) {}
   constexpr EnumValueWitnessTable(
-          const ExtraInhabitantsValueWitnessTable &base,
+          const ValueWitnessTable &base,
           ValueWitnessTypes::getEnumTag getEnumTag,
           ValueWitnessTypes::destructiveProjectEnumData destructiveProjectEnumData,
           ValueWitnessTypes::destructiveInjectEnumTag destructiveInjectEnumTag)
-    : ExtraInhabitantsValueWitnessTable(base),
+    : ValueWitnessTable(base),
       getEnumTag(getEnumTag),
       destructiveProjectEnumData(destructiveProjectEnumData),
       destructiveInjectEnumTag(destructiveInjectEnumTag) {}
@@ -124,47 +125,44 @@ struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
 /// extra inhabitants, and miscellaneous flags about the type.
 struct TypeLayout {
   ValueWitnessTypes::size size;
-  ValueWitnessTypes::flags flags;
   ValueWitnessTypes::stride stride;
+  ValueWitnessTypes::flags flags;
+  ValueWitnessTypes::extraInhabitantCount extraInhabitantCount;
 
 private:
-  // Only available if the "hasExtraInhabitants" flag is set.
-  ValueWitnessTypes::extraInhabitantFlags extraInhabitantFlags;
-
   void _static_assert_layout();
 public:
   TypeLayout() = default;
   constexpr TypeLayout(ValueWitnessTypes::size size,
-                       ValueWitnessTypes::flags flags,
                        ValueWitnessTypes::stride stride,
-                       ValueWitnessTypes::extraInhabitantFlags eiFlags =
-                         ValueWitnessTypes::extraInhabitantFlags())
-    : size(size), flags(flags), stride(stride),
-      extraInhabitantFlags(eiFlags) {}
-
-  ValueWitnessTypes::extraInhabitantFlags getExtraInhabitantFlags() const {
-    assert(flags.hasExtraInhabitants());
-    return extraInhabitantFlags;
-  }
+                       ValueWitnessTypes::flags flags,
+                       ValueWitnessTypes::extraInhabitantCount xiCount)
+    : size(size), stride(stride), flags(flags), extraInhabitantCount(xiCount) {}
 
   const TypeLayout *getTypeLayout() const { return this; }
 
   /// The number of extra inhabitants, that is, bit patterns that do not form
   /// valid values of the type, in this type's binary representation.
-  unsigned getNumExtraInhabitants() const;
+  unsigned getNumExtraInhabitants() const {
+    return extraInhabitantCount;
+  }
+
+  bool hasExtraInhabitants() const {
+    return extraInhabitantCount != 0;
+  }
 };
 
 inline void TypeLayout::_static_assert_layout() {
   #define CHECK_TYPE_LAYOUT_OFFSET(FIELD)                               \
-    static_assert(offsetof(ExtraInhabitantsValueWitnessTable, FIELD)    \
-                    - offsetof(ExtraInhabitantsValueWitnessTable, size) \
+    static_assert(offsetof(ValueWitnessTable, FIELD)                    \
+                    - offsetof(ValueWitnessTable, size)                 \
                   == offsetof(TypeLayout, FIELD),                       \
                   "layout of " #FIELD " in TypeLayout doesn't match "   \
                   "value witness table")
   CHECK_TYPE_LAYOUT_OFFSET(size);
   CHECK_TYPE_LAYOUT_OFFSET(flags);
+  CHECK_TYPE_LAYOUT_OFFSET(extraInhabitantCount);
   CHECK_TYPE_LAYOUT_OFFSET(stride);
-  CHECK_TYPE_LAYOUT_OFFSET(extraInhabitantFlags);
 
   #undef CHECK_TYPE_LAYOUT_OFFSET
 }
@@ -173,6 +171,7 @@ template <>
 inline void ValueWitnessTable::publishLayout(const TypeLayout &layout) {
   size = layout.size;
   stride = layout.stride;
+  extraInhabitantCount = layout.extraInhabitantCount;
 
   // Currently there is nothing in the runtime or ABI which tries to
   // asynchronously check completion, so we can just do a normal store here.
@@ -190,81 +189,32 @@ template <> inline bool ValueWitnessTable::checkIsComplete() const {
 }
 
 template <>
-inline const ExtraInhabitantsValueWitnessTable *
-ValueWitnessTable::_asXIVWT() const {
-  assert(ExtraInhabitantsValueWitnessTable::classof(this));
-  return static_cast<const ExtraInhabitantsValueWitnessTable *>(this);
-}
-
-template <>
 inline const EnumValueWitnessTable *ValueWitnessTable::_asEVWT() const {
   assert(EnumValueWitnessTable::classof(this));
   return static_cast<const EnumValueWitnessTable *>(this);
 }
 
-template <> inline unsigned ValueWitnessTable::getNumExtraInhabitants() const {
-  // If the table does not have extra inhabitant witnesses, then there are zero.
-  if (!flags.hasExtraInhabitants())
-    return 0;
-  return this->_asXIVWT()->extraInhabitantFlags.getNumExtraInhabitants();
-}
-
-inline unsigned TypeLayout::getNumExtraInhabitants() const {
-  // If the table does not have extra inhabitant witnesses, then there are zero.
-  if (!flags.hasExtraInhabitants())
-    return 0;
-  return extraInhabitantFlags.getNumExtraInhabitants();
-}
-
 // Standard value-witness tables.
 
-// The "Int" tables are used for arbitrary POD data with the matching
-// size/alignment characteristics.
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi8_);   // Builtin.Int8
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi16_);  // Builtin.Int16
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi32_);  // Builtin.Int32
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi64_);  // Builtin.Int64
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi128_); // Builtin.Int128
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi256_); // Builtin.Int256
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi512_); // Builtin.Int512
-
-// The object-pointer table can be used for arbitrary Swift refcounted
-// pointer types.
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bo); // Builtin.NativeObject
-
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bb); // Builtin.BridgeObject
-
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bp); // Builtin.RawPointer
-
-#if SWIFT_OBJC_INTEROP
-// The ObjC-pointer table can be used for arbitrary ObjC pointer types.
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(BO); // Builtin.UnknownObject
-#endif
+#define BUILTIN_TYPE(Symbol, _) \
+  SWIFT_RUNTIME_EXPORT const ValueWitnessTable VALUE_WITNESS_SYM(Symbol);
+#define BUILTIN_POINTER_TYPE(Symbol, _) \
+  SWIFT_RUNTIME_EXPORT const ValueWitnessTable VALUE_WITNESS_SYM(Symbol);
+#include "swift/Runtime/BuiltinTypes.def"
 
 // The () -> () table can be used for arbitrary function types.
 SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable
+const ValueWitnessTable
   VALUE_WITNESS_SYM(FUNCTION_MANGLING);     // () -> ()
 
 // The @escaping () -> () table can be used for arbitrary escaping function types.
 SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable
+const ValueWitnessTable
   VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING);     // @noescape () -> ()
 
 // The @convention(thin) () -> () table can be used for arbitrary thin function types.
 SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable
+const ValueWitnessTable
   VALUE_WITNESS_SYM(THIN_FUNCTION_MANGLING);    // @convention(thin) () -> ()
 
 // The () table can be used for arbitrary empty types.
@@ -273,7 +223,7 @@ const ValueWitnessTable VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING);        // ()
 
 // The table for aligned-pointer-to-pointer types.
 SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable METATYPE_VALUE_WITNESS_SYM(Bo); // Builtin.NativeObject.Type
+const ValueWitnessTable METATYPE_VALUE_WITNESS_SYM(Bo); // Builtin.NativeObject.Type
 
 /// Return the value witnesses for unmanaged pointers.
 static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
@@ -286,7 +236,7 @@ static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
 
 /// Return value witnesses for a pointer-aligned pointer type.
 static inline
-const ExtraInhabitantsValueWitnessTable &
+const ValueWitnessTable &
 getUnmanagedPointerPointerValueWitnesses() {
   return METATYPE_VALUE_WITNESS_SYM(Bo);
 }
@@ -385,18 +335,13 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_checkMetadataState(MetadataRequest request,
                                           const Metadata *type);
 
-/// Instantiate a resilient or generic protocol witness table.
+/// Retrieve a witness table based on a given conformance.
 ///
 /// \param conformance - The protocol conformance descriptor, which
-///   contains the generic witness table record. It may either have fields
-///   that require runtime initialization, or be missing requirements at the
-///   end for which default witnesses are available.
+///   contains any information required to form the witness table.
 ///
 /// \param type - The conforming type, used to form a uniquing key
-///   for the conformance. If the witness table is not dependent on
-///   the substituted type of the conformance, this can be set to
-///   nullptr, in which case there will only be one instantiated
-///   witness table per witness table template.
+///   for the conformance.
 ///
 /// \param instantiationArgs - An opaque pointer that's forwarded to
 ///   the instantiation function, used for conditional conformances.
@@ -406,9 +351,9 @@ MetadataResponse swift_checkMetadataState(MetadataRequest request,
 ///   conformances.
 SWIFT_RUNTIME_EXPORT
 const WitnessTable *
-swift_instantiateWitnessTable(ProtocolConformanceDescriptor *conformance,
-                              const Metadata *type,
-                              void **const *instantiationArgs);
+swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
+                      const Metadata *type,
+                      const void * const *instantiationArgs);
 
 /// Retrieve an associated type witness from the given witness table.
 ///
@@ -425,6 +370,24 @@ MetadataResponse swift_getAssociatedTypeWitness(
                                           const Metadata *conformingType,
                                           const ProtocolRequirement *reqBase,
                                           const ProtocolRequirement *assocType);
+
+/// Retrieve an associated conformance witness table from the given witness
+/// table.
+///
+/// \param wtable The witness table.
+/// \param conformingType Metadata for the conforming type.
+/// \param assocType Metadata for the associated type.
+/// \param reqBase "Base" requirement used to compute the witness index
+/// \param assocConformance Associated conformance descriptor.
+///
+/// \returns corresponding witness table.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+const WitnessTable *swift_getAssociatedConformanceWitness(
+                                  WitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance);
 
 /// \brief Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
@@ -479,6 +442,11 @@ SWIFT_RUNTIME_EXPORT
 const ClassMetadata *
 swift_getObjCClassFromMetadata(const Metadata *theClass);
 
+// Get the ObjC class object from class type metadata,
+// or nullptr if the type isn't an ObjC class.
+const ClassMetadata *
+swift_getObjCClassFromMetadataConditional(const Metadata *theClass);
+
 SWIFT_RUNTIME_EXPORT
 const ClassMetadata *
 swift_getObjCClassFromObject(HeapObject *object);
@@ -489,13 +457,6 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
 swift_getForeignTypeMetadata(MetadataRequest request,
                              ForeignTypeMetadata *nonUnique);
-
-/// \brief Fetch a unique witness table for a foreign witness table.
-SWIFT_RUNTIME_EXPORT
-const WitnessTable *
-swift_getForeignWitnessTable(const WitnessTable *nonUniqueWitnessCandidate,
-                             const TypeContextDescriptor *forForeignType,
-                             const ProtocolDescriptor *forProtocol);
 
 /// \brief Fetch a uniqued metadata for a tuple type.
 ///
@@ -601,8 +562,8 @@ void swift_initStructMetadata(StructMetadata *self,
 /// swift_initClassMetadata().
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
-swift_relocateClassMetadata(ClassDescriptor *descriptor,
-                            ResilientClassMetadataPattern *pattern);
+swift_relocateClassMetadata(const ClassDescriptor *descriptor,
+                            const ResilientClassMetadataPattern *pattern);
 
 /// Initialize various fields of the class metadata.
 ///
@@ -658,9 +619,9 @@ void swift_updateClassMetadata(ClassMetadata *self,
 /// the same class or a subclass of the descriptor.
 SWIFT_RUNTIME_EXPORT
 void *
-swift_lookUpClassMethod(ClassMetadata *metadata,
-                        MethodDescriptor *method,
-                        ClassDescriptor *description);
+swift_lookUpClassMethod(const ClassMetadata *metadata,
+                        const MethodDescriptor *method,
+                        const ClassDescriptor *description);
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
@@ -827,6 +788,36 @@ const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type
 // Defined in KeyPath.swift in the standard library.
 SWIFT_RUNTIME_EXPORT
 const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
+
+/// Given a pointer to a borrowed value of type `Root` and a
+/// `KeyPath<Root, Value>`, project a pointer to a borrowed value of type
+/// `Value`.
+SWIFT_RUNTIME_EXPORT
+YieldOnceCoroutine<const OpaqueValue* (const OpaqueValue *root,
+                                       void *keyPath)>::type
+swift_readAtKeyPath;
+
+/// Given a pointer to a mutable value of type `Root` and a
+/// `WritableKeyPath<Root, Value>`, project a pointer to a mutable value
+/// of type `Value`.
+SWIFT_RUNTIME_EXPORT
+YieldOnceCoroutine<OpaqueValue* (OpaqueValue *root, void *keyPath)>::type
+swift_modifyAtWritableKeyPath;
+
+/// Given a pointer to a borrowed value of type `Root` and a
+/// `ReferenceWritableKeyPath<Root, Value>`, project a pointer to a
+/// mutable value of type `Value`.
+SWIFT_RUNTIME_EXPORT
+YieldOnceCoroutine<OpaqueValue* (const OpaqueValue *root, void *keyPath)>::type
+swift_modifyAtReferenceWritableKeyPath;
+
+SWIFT_RUNTIME_EXPORT
+void swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope);
+
+SWIFT_RUNTIME_EXPORT
+void swift_disableDynamicReplacementScope(const DynamicReplacementScope *scope);
+
+#pragma clang diagnostic pop
 
 } // end namespace swift
 

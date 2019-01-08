@@ -1,11 +1,6 @@
 set(swift_runtime_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 set(swift_runtime_linker_flags ${SWIFT_RUNTIME_CORE_LINK_FLAGS})
 
-if(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT)
-  list(APPEND swift_runtime_compile_flags
-      "-DSWIFT_DARWIN_ENABLE_STABLE_ABI_BIT=1")
-endif()
-
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   list(APPEND swift_runtime_compile_flags
       "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
@@ -56,12 +51,14 @@ set(swift_runtime_sources
     ImageInspectionMachO.cpp
     ImageInspectionELF.cpp
     ImageInspectionCOFF.cpp
+    KeyPaths.cpp
     KnownMetadata.cpp
     LLVMSupport.cpp
     Metadata.cpp
     MetadataLookup.cpp
     MutexPThread.cpp
     MutexWin32.cpp
+    Numeric.cpp
     Once.cpp
     Portability.cpp
     ProtocolConformance.cpp
@@ -105,7 +102,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   string(TOLOWER "${sdk}" lowercase_sdk)
 
   # These two libraries are only used with the static swiftcore
-  add_swift_library(swiftImageInspectionShared TARGET_LIBRARY STATIC
+  add_swift_target_library(swiftImageInspectionShared TARGET_LIBRARY STATIC
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}
@@ -161,14 +158,14 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   endforeach()
   add_dependencies(static_binary_magic ${swift_image_inspection_static_primary_arch})
 
-  add_swift_library(swiftImageInspectionSharedObject OBJECT_LIBRARY TARGET_LIBRARY
+  add_swift_target_library(swiftImageInspectionSharedObject OBJECT_LIBRARY TARGET_LIBRARY
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}
     INSTALL_IN_COMPONENT never_install)
 endif()
 
-add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
+add_swift_target_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
@@ -186,7 +183,7 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   endif()
 endforeach()
 
-add_swift_library(swiftImageRegistrationObjectELF
+add_swift_target_library(swiftImageRegistrationObjectELF
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
                   SwiftRT-ELF.cpp
                   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
@@ -195,7 +192,7 @@ add_swift_library(swiftImageRegistrationObjectELF
                   INSTALL_IN_COMPONENT none)
 # FIXME(compnerd) this should be compiled twice, once for static and once for
 # shared.  The static version should be used for building the standard library.
-add_swift_library(swiftImageRegistrationObjectCOFF
+add_swift_target_library(swiftImageRegistrationObjectCOFF
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
                   SwiftRT-COFF.cpp
                   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
@@ -214,8 +211,15 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       # to a version which supports it.
       # set(swiftrtObject "$<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}>")
       set(swiftrtObject ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}.dir/SwiftRT-${SWIFT_SDK_${sdk}_OBJECT_FORMAT}.cpp${CMAKE_C_OUTPUT_EXTENSION})
-      set(shared_runtime_registrar "${SWIFTLIB_DIR}/${arch_subdir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
-      set(static_runtime_registrar "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
+
+      if(sdk STREQUAL WINDOWS)
+        set(extension .obj)
+      else()
+        set(extension .o)
+      endif()
+
+      set(shared_runtime_registrar "${SWIFTLIB_DIR}/${arch_subdir}/swiftrt${extension}")
+      set(static_runtime_registrar "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swiftrt${extension}")
 
       add_custom_command_target(swiftImageRegistration-${arch_suffix}
                                 COMMAND

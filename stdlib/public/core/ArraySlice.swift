@@ -161,31 +161,6 @@ extension ArraySlice {
     return _buffer.capacity
   }
 
-  /// - Precondition: The array has a native buffer.
-  @inlinable
-  @_semantics("array.owner")
-  internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
-    return Builtin.unsafeCastToNativeObject(_buffer.nativeOwner)
-  }
-
-  /// - Precondition: The array has a native buffer.
-  @inlinable
-  @inline(__always)
-  internal func _getOwner_native() -> Builtin.NativeObject {
-#if _runtime(_ObjC)
-    if _isClassOrObjCExistential(Element.self) {
-      // We are hiding the access to '_buffer.owner' behind
-      // _getOwner() to help the compiler hoist uniqueness checks in
-      // the case of class or Objective-C existential typed array
-      // elements.
-      return _getOwnerWithSemanticLabel_native()
-    }
-#endif
-    // In the value typed case the extra call to
-    // _getOwnerWithSemanticLabel_native hinders optimization.
-    return Builtin.unsafeCastToNativeObject(_buffer.owner)
-  }
-
   @inlinable
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
@@ -227,6 +202,7 @@ extension ArraySlice {
   }
 
   @_semantics("array.get_element")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public // @testable
   func _getElement(
@@ -846,7 +822,7 @@ extension ArraySlice: RangeReplaceableCollection {
       _buffer = _Buffer(
         _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
-    _sanityCheck(capacity >= minimumCapacity)
+    _internalInvariant(capacity >= minimumCapacity)
   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
@@ -874,9 +850,9 @@ extension ArraySlice: RangeReplaceableCollection {
   @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // This is a performance optimization. This code used to be in an ||
-    // statement in the _sanityCheck below.
+    // statement in the _internalInvariant below.
     //
-    //   _sanityCheck(_buffer.capacity == 0 ||
+    //   _internalInvariant(_buffer.capacity == 0 ||
     //                _buffer.isMutableAndUniquelyReferenced())
     //
     // SR-6437
@@ -891,7 +867,7 @@ extension ArraySlice: RangeReplaceableCollection {
     // This specific case is okay because we will make the buffer unique in this
     // function because we request a capacity > 0 and therefore _copyToNewBuffer
     // will be called creating a new buffer.
-    _sanityCheck(capacity ||
+    _internalInvariant(capacity ||
                  _buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
@@ -905,8 +881,8 @@ extension ArraySlice: RangeReplaceableCollection {
     _ oldCount: Int,
     newElement: __owned Element
   ) {
-    _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
-    _sanityCheck(_buffer.capacity >= _buffer.count + 1)
+    _internalInvariant(_buffer.isMutableAndUniquelyReferenced())
+    _internalInvariant(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
     (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
@@ -1100,6 +1076,26 @@ extension ArraySlice: RangeReplaceableCollection {
   }
 
   @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeMutableBufferPointer {
+      (bufferPointer) -> R in
+      return try body(&bufferPointer)
+    }
+  }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeBufferPointer {
+      (bufferPointer) -> R in
+      return try body(bufferPointer)
+    }
+  }
+
+  @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
       return ContiguousArray(_buffer: n)
@@ -1217,6 +1213,7 @@ extension ArraySlice {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
+  @inlinable // FIXME(inline-always)
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary

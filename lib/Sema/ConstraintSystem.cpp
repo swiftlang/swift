@@ -83,11 +83,15 @@ ConstraintSystem::~ConstraintSystem() {
 }
 
 void ConstraintSystem::incrementScopeCounter() {
-  SWIFT_FUNC_STAT;
   CountScopes++;
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (TC.Context.Stats)
     TC.Context.Stats->getFrontendCounters().NumConstraintScopes++;
+}
+
+void ConstraintSystem::incrementLeafScopes() {
+  if (TC.Context.Stats)
+    TC.Context.Stats->getFrontendCounters().NumLeafScopes++;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
@@ -1185,6 +1189,7 @@ ConstraintSystem::getTypeOfMemberReference(
     OpenedTypeMap *replacementsPtr) {
   // Figure out the instance type used for the base.
   Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
+
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
@@ -1438,6 +1443,40 @@ static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
   }
 }
 
+/// If there are any SIMD operators in the overload set, partition the set so
+/// that the SIMD operators come at the end.
+static ArrayRef<OverloadChoice> partitionSIMDOperators(
+                                  ArrayRef<OverloadChoice> choices,
+                                  SmallVectorImpl<OverloadChoice> &scratch) {
+  // If the first element isn't an operator, none of them are.
+  if (!choices[0].isDecl() ||
+      !isa<FuncDecl>(choices[0].getDecl()) ||
+      !cast<FuncDecl>(choices[0].getDecl())->isOperator() ||
+      choices[0].getDecl()->getASTContext().LangOpts
+        .SolverEnableOperatorDesignatedTypes)
+    return choices;
+
+  // Check whether we have any SIMD operators.
+  bool foundSIMDOperator = false;
+  for (const auto &choice : choices) {
+    if (isSIMDOperator(choice.getDecl())) {
+      foundSIMDOperator = true;
+      break;
+    }
+  }
+
+  if (!foundSIMDOperator)
+    return choices;
+
+  scratch.assign(choices.begin(), choices.end());
+  std::stable_partition(scratch.begin(), scratch.end(),
+                        [](const OverloadChoice &choice) {
+                          return !isSIMDOperator(choice.getDecl());
+                        });
+
+  return scratch;
+}
+
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
@@ -1453,6 +1492,9 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   }
 
   tryOptimizeGenericDisjunction(*this, choices, favoredChoice);
+
+  SmallVector<OverloadChoice, 4> scratchChoices;
+  choices = partitionSIMDOperators(choices, scratchChoices);
 
   SmallVector<Constraint *, 4> overloads;
   
@@ -1556,7 +1598,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     FunctionType::Param arg(escapeClosure);
     auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*autoclosure*/ false,
                               /*noescape*/ true,
                               /*throws*/ true));
     FunctionType::Param args[] = {
@@ -1566,7 +1607,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*autoclosure*/ false,
                             /*noescape*/ false,
                             /*throws*/ true));
     openedFullType = refType;
@@ -1587,7 +1627,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*autoclosure*/ false,
                               /*noescape*/ true,
                               /*throws*/ true));
     FunctionType::Param args[] = {
@@ -1596,7 +1635,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     };
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*autoclosure*/ false,
                             /*noescape*/ false,
                             /*throws*/ true));
     openedFullType = refType;
@@ -2045,15 +2083,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     SolverState state(expr, *this, FreeTypeVariableBinding::Disallow);
     state.recordFixes = true;
 
-    // Retry all inactive and failed constraints
-    if (failedConstraint) {
-      addUnsolvedConstraint(failedConstraint);
-      failedConstraint = nullptr;
-    }
-    ActiveConstraints.splice(ActiveConstraints.end(), InactiveConstraints);
-    for (auto &constraint : ActiveConstraints)
-      constraint.setActive(true);
-
     // Solve the system.
     solve(viable);
 
@@ -2364,4 +2393,24 @@ Expr *constraints::simplifyLocatorToAnchor(ConstraintSystem &cs,
     return nullptr;
 
   return locator->getAnchor();
+}
+
+Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {
+  Expr *argExpr = nullptr;
+  if (auto *AE = dyn_cast<ApplyExpr>(expr))
+    argExpr = AE->getArg();
+  else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr))
+    argExpr = UME->getArgument();
+  else if (auto *SE = dyn_cast<SubscriptExpr>(expr))
+    argExpr = SE->getIndex();
+  else
+    return nullptr;
+
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    assert(index == 0);
+    return PE->getSubExpr();
+  }
+
+  assert(isa<TupleExpr>(argExpr));
+  return cast<TupleExpr>(argExpr)->getElement(index);
 }

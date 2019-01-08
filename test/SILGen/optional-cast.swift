@@ -12,9 +12,6 @@ class B : A {}
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:      switch_enum [[ARG_COPY]] : $Optional<A>, case #Optional.some!enumelt.1: [[IS_PRESENT:bb[0-9]+]], case #Optional.none!enumelt: [[NOT_PRESENT:bb[0-9]+]]
 //
-// CHECK:    [[NOT_PRESENT]]:
-// CHECK:      br [[NOT_PRESENT_FINISH:bb[0-9]+]]
-//
 //   If so, pull the value out and check whether it's a B.
 // CHECK:    [[IS_PRESENT]]([[VAL:%.*]] :
 // CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
@@ -44,7 +41,7 @@ class B : A {}
 // CHECK-NEXT: return
 //
 //   Finish the not-present path.
-// CHECK:    [[NOT_PRESENT_FINISH]]:
+// CHECK:    [[NOT_PRESENT]]:
 // CHECK-NEXT: inject_enum_addr [[PB]] {{.*}}none
 // CHECK-NEXT: br [[RETURN_BB]]
 func foo(_ y : A?) {
@@ -73,15 +70,9 @@ func foo(_ y : A?) {
 // CHECK:    [[PP]]([[VALUE_OOA:%.*]] :
 // CHECK-NEXT: switch_enum [[VALUE_OOA]] : ${{.*}}, case #Optional.some!enumelt.1: [[PPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_3:bb[0-9]+]]
 //
-// CHECK: [[NIL_DEPTH_3]]:
-// CHECK:   br [[FINISH_NIL_1:bb[0-9]+]]
-//
 //   If so, drill down another level and check for some(some(some(some(...)))).
 // CHECK:    [[PPP]]([[VALUE_OA:%.*]] :
 // CHECK-NEXT: switch_enum [[VALUE_OA]] : ${{.*}}, case #Optional.some!enumelt.1: [[PPPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_4:bb[0-9]+]]
-//
-// CHECK: [[NIL_DEPTH_4]]:
-// CHECK:   br [[FINISH_NIL_2:bb[0-9]+]]
 //
 //   If so, pull out the A and check whether it's a B.
 // CHECK:    [[PPPP]]([[VAL:%.*]] :
@@ -117,18 +108,18 @@ func foo(_ y : A?) {
 //   Set X := some(OOB).
 // CHECK:    [[DONE_DEPTH1]]
 // CHECK-NEXT: enum $Optional<Optional<Optional<B>>>, #Optional.some!enumelt.1,
-// CHECK: br [[DONE_DEPTH2:bb[0-9]+]]
+// CHECK:      br [[DONE_DEPTH2:bb[0-9]+]]
 // CHECK:    [[DONE_DEPTH2]]
 // CHECK-NEXT: destroy_value [[X]]
 // CHECK-NOT: destroy_value %0
 // CHECK:      return
 //
 //   On various failure paths, set OOB := nil.
-// CHECK:    [[FINISH_NIL_2]]:
+// CHECK: [[NIL_DEPTH_4]]:
 // CHECK-NEXT: enum $Optional<B>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE_DEPTH0]]
 //
-// CHECK:    [[FINISH_NIL_1]]:
+// CHECK: [[NIL_DEPTH_3]]:
 // CHECK-NEXT: enum $Optional<Optional<B>>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE_DEPTH1]]
 //
@@ -148,7 +139,7 @@ func bar(_ y : A????) {
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:         switch_enum [[ARG_COPY]]
-// CHECK:       bb2([[VAL:%.*]] : @owned $AnyObject):
+// CHECK:       bb1([[VAL:%.*]] : @owned $AnyObject):
 // CHECK-NEXT:    [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
 // CHECK-NEXT:    checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 // CHECK:       [[IS_B]]([[CASTED_VALUE:%.*]] : @owned $B):

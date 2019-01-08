@@ -12,7 +12,7 @@ struct MMStorage<Key : Hashable, Value> {
 func ==(lhs: MMObject, rhs: MMObject) -> Bool
 
 class MMObject : Hashable {
-  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
 }
 
 class MMString : MMObject {

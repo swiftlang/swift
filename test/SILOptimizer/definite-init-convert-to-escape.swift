@@ -10,16 +10,16 @@ import Foundation
 // CHECK: bb0
 // CHECK:  retain_value %0
 // CHECK:  retain_value %0
-// CHECK: bb2
+// CHECK: bb1
 // CHECK:  convert_escape_to_noescape %
 // CHECK:  strong_release
+// CHECK: bb5
+// CHECK:  retain_value %1
+// CHECK:  retain_value %1
 // CHECK: bb6
-// CHECK:  retain_value %1
-// CHECK:  retain_value %1
-// CHECK: bb8
 // CHECK:  convert_escape_to_noescape %
 // CHECK:  strong_release
-// CHECK: bb12
+// CHECK: bb10
 // CHECK:  [[F:%.*]] = function_ref @noescapeBlock3
 // CHECK:  apply [[F]]
 // CHECK:  release_value {{.*}} : $Optional<NSString>
@@ -42,11 +42,11 @@ public func returnOptionalEscape() -> (() ->())?
 // CHECK:  [[V0:%.*]] = function_ref @_returnOptionalEscape
 // CHECK:  [[V1:%.*]] = apply [[V0]]
 // CHECK:  retain_value [[V1]]
-// CHECK:  switch_enum {{.*}}bb2
-// CHECK: bb2([[V2:%.*]]: $@callee_guaranteed () -> ()):
+// CHECK:  switch_enum {{.*}}bb1
+// CHECK: bb1([[V2:%.*]]: $@callee_guaranteed () -> ()):
 // CHECK:  convert_escape_to_noescape %
 // CHECK:  strong_release [[V2]]
-// CHECK: bb6({{.*}} : $Optional<@convention(block) @noescape () -> ()>)
+// CHECK: bb5({{.*}} : $Optional<@convention(block) @noescape () -> ()>)
 // CHECK:  [[F:%.*]] = function_ref @noescapeBlock
 // CHECK:  apply [[F]]({{.*}})
 // CHECK:  release_value [[V1]] : $Optional<@callee_guaranteed () -> ()>
@@ -59,15 +59,15 @@ public func returnOptionalEscape() -> (() ->())?
 // NOPEEPHOLE:  store [[NONE]] to [[SLOT]]
 // NOPEEPHOLE:  [[V0:%.*]] = function_ref @_returnOptionalEscape
 // NOPEEPHOLE:  [[V1:%.*]] = apply [[V0]]
-// NOPEEPHOLE:  switch_enum {{.*}}bb2
-// NOPEEPHOLE: bb2([[V2:%.*]]: $@callee_guaranteed () -> ()):
+// NOPEEPHOLE:  switch_enum {{.*}}bb1
+// NOPEEPHOLE: bb1([[V2:%.*]]: $@callee_guaranteed () -> ()):
 // NOPEEPHOLE:  destroy_addr [[SLOT]]
 // NOPEEPHOLE:  [[SOME:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt.1, [[V2]]
 // NOPEEPHOLE:  store [[SOME]] to [[SLOT]]
 // NOPEEPHOLE:  convert_escape_to_noescape %
 // NOPEEPHOLE-NOT:  strong_release
 // NOPEEPHOLE:  br
-// NOPEEPHOLE: bb6({{.*}} : $Optional<@convention(block) @noescape () -> ()>)
+// NOPEEPHOLE: bb5({{.*}} : $Optional<@convention(block) @noescape () -> ()>)
 // NOPEEPHOLE:  [[F:%.*]] = function_ref @noescapeBlock
 // NOPEEPHOLE:  apply [[F]]({{.*}})
 // NOPEEPHOLE:  destroy_addr [[SLOT]]

@@ -9,7 +9,7 @@ class C { }
 sil_vtable C { }
 
 struct S {
-  @sil_stored unowned(unsafe) var uu: @sil_unmanaged C? { get set }
+  @_hasStorage unowned(unsafe) var uu: @sil_unmanaged C? { get set }
 }
 
 func example(_ os: S?)

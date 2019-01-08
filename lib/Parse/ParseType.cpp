@@ -502,9 +502,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                                specifierLoc));
 }
 
-bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
-                                   SourceLoc &LAngleLoc,
-                                   SourceLoc &RAngleLoc) {
+ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
+                                           SourceLoc &LAngleLoc,
+                                           SourceLoc &RAngleLoc) {
   SyntaxParsingContext GenericArgumentsContext(
       SyntaxContext, SyntaxKind::GenericArgumentClause);
 
@@ -523,7 +523,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
       if (Ty.isNull() || Ty.hasCodeCompletion()) {
         // Skip until we hit the '>'.
         RAngleLoc = skipUntilGreaterInTypeList();
-        return true;
+        return ParserStatus(Ty);
       }
 
       Args.push_back(Ty.get());
@@ -540,12 +540,12 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 
     // Skip until we hit the '>'.
     RAngleLoc = skipUntilGreaterInTypeList();
-    return true;
+    return makeParserError();
   } else {
     RAngleLoc = consumeStartingGreater();
   }
 
-  return false;
+  return makeParserSuccess();
 }
 
 /// parseTypeIdentifier
@@ -597,8 +597,9 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       SourceLoc LAngle, RAngle;
       SmallVector<TypeRepr*, 8> GenericArgs;
       if (startsWithLess(Tok)) {
-        if (parseGenericArguments(GenericArgs, LAngle, RAngle))
-          return nullptr;
+        auto genericArgsStatus = parseGenericArguments(GenericArgs, LAngle, RAngle);
+        if (genericArgsStatus.isError())
+          return genericArgsStatus;
       }
       EndLoc = Loc;
 
@@ -645,13 +646,15 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }
 
-  if (Status.hasCodeCompletion() && CodeCompletion) {
+  if (Status.hasCodeCompletion()) {
     if (Tok.isNot(tok::code_complete)) {
       // We have a dot.
       consumeToken();
-      CodeCompletion->completeTypeIdentifierWithDot(ITR);
+      if (CodeCompletion)
+        CodeCompletion->completeTypeIdentifierWithDot(ITR);
     } else {
-      CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
+      if (CodeCompletion)
+        CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
     }
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);

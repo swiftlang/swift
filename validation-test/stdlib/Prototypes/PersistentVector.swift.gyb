@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/PersistentVector.swift
-// RUN: %line-directive %t/PersistentVector.swift -- %target-build-swift -parse-stdlib %t/PersistentVector.swift -o %t/a.out
+// RUN: %line-directive %t/PersistentVector.swift -- %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %t/PersistentVector.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %line-directive %t/PersistentVector.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
@@ -99,6 +99,7 @@ Memory layout:
 */
 
 import Swift
+import SwiftPrivate
 import SwiftShims
 
 // This prototype is only partially implemented, and it relies on specific hash
@@ -124,6 +125,15 @@ func deallocBytes(
 ) {
   pointer.deallocate()
 }
+
+@_transparent
+func _swift_stdlib_atomicStoreUInt64(
+  object target: UnsafeMutablePointer<UInt64>,
+  desired: UInt64
+) {
+  Builtin.atomicstore_seqcst_Int64(target._rawValue, desired._value)
+}
+
 
 func _swift_stdlib_atomicStoreInt(
   object target: UnsafeMutablePointer<Int>,

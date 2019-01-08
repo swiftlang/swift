@@ -7,9 +7,9 @@
 // CHECK:   %0 = alloc_box ${ var Int }, var, name "x", loc {{.*}}:32:7, scope 3
 // CHECK:   %1 = project_box %0 : ${ var Int }, 0, loc {{.*}}:32:7, scope 3
 // CHECK:   %2 = metatype $@thin Int.Type, loc {{.*}}:32:11, scope 3
-// CHECK:   %3 = integer_literal $Builtin.Int2048, 1, loc {{.*}}:32:11, scope 3
-// CHECK:   %4 = function_ref @$sSi22_builtinIntegerLiteralSiBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int, loc {{.*}}:32:11, scope 3
-// CHECK:   %5 = apply %4(%3, %2) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int, loc {{.*}}:32:11, scope 3
+// CHECK:   %3 = integer_literal $Builtin.IntLiteral, 1, loc {{.*}}:32:11, scope 3
+// CHECK:   %4 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int, loc {{.*}}:32:11, scope 3
+// CHECK:   %5 = apply %4(%3, %2) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int, loc {{.*}}:32:11, scope 3
 // CHECK:   store %5 to [trivial] %1 : $*Int, loc {{.*}}:32:11, scope 3
 // CHECK:   %7 = copy_value %0 : ${ var Int }, loc {{.*}}:33:11, scope 3
 // CHECK:   %8 = project_box %7 : ${ var Int }, 0, loc {{.*}}:33:11, scope 3

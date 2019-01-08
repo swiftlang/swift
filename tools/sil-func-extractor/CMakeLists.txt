@@ -6,7 +6,5 @@ add_swift_host_tool(sil-func-extractor
     swiftSILOptimizer
     swiftSerialization
     swiftClangImporter
-  LLVM_COMPONENT_DEPENDS
-    DebugInfoCodeView
   SWIFT_COMPONENT tools
 )

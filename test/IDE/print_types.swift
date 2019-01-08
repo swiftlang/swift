@@ -14,46 +14,46 @@ func testVariableTypes(_ param: Int, param2: inout Double) {
 
   var a1 = 42
 // CHECK: VarDecl '''a1''' Int{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Builtin.IntLiteral{{$}}
 // FULL:  VarDecl '''a1''' Swift.Int{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.IntLiteral{{$}}
   a1 = 17; _ = a1
 
   
   var a2 : Int = 42
 // CHECK: VarDecl '''a2''' Int{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Builtin.IntLiteral{{$}}
 // FULL:  VarDecl '''a2''' Swift.Int{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.IntLiteral{{$}}
   a2 = 17; _ = a2
 
   var a3 = Int16(42)
 // CHECK: VarDecl '''a3''' Int16{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Builtin.IntLiteral{{$}}
 // FULL:  VarDecl '''a3''' Swift.Int16{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.IntLiteral{{$}}
   a3 = 17; _ = a3
 
 
   var a4 = Int32(42)
 // CHECK: VarDecl '''a4''' Int32{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Builtin.IntLiteral{{$}}
 // FULL:  VarDecl '''a4''' Swift.Int32{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.IntLiteral{{$}}
   a4 = 17; _ = a4
 
   var a5 : Int64 = 42
 // CHECK: VarDecl '''a5''' Int64{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Builtin.IntLiteral{{$}}
 // FULL:  VarDecl '''a5''' Swift.Int64{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.IntLiteral{{$}}
   a5 = 17; _ = a5
 
   var typealias1 : MyInt = 42
 // CHECK: VarDecl '''typealias1''' MyInt{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Builtin.IntLiteral{{$}}
 // FULL:  VarDecl '''typealias1''' MyInt{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.IntLiteral{{$}}
   _ = typealias1 ; typealias1 = 1
 
   var optional1 = Optional<Int>.none

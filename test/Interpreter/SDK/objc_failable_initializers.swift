@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -20,7 +20,7 @@ class Canary {
 }
 
 extension NSDate {
-  convenience init?(b: Bool) {
+  @objc convenience init?(b: Bool) {
     guard b else { return nil }
     self.init()
   }

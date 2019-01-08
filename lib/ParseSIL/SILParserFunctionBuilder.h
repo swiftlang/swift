@@ -26,9 +26,9 @@ public:
   SILFunction *createFunctionForForwardReference(StringRef name,
                                                  CanSILFunctionType ty,
                                                  SILLocation loc) {
-    auto *result =
-        builder.createFunction(SILLinkage::Private, name, ty, nullptr, loc,
-                               IsNotBare, IsNotTransparent, IsNotSerialized);
+    auto *result = builder.createFunction(
+        SILLinkage::Private, name, ty, nullptr, loc, IsNotBare,
+        IsNotTransparent, IsNotSerialized, IsNotDynamic);
     result->setDebugScope(new (builder.mod) SILDebugScope(loc, result));
     return result;
   }

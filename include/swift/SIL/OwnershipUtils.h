@@ -114,9 +114,12 @@ bool isGuaranteedForwardingValueKind(SILNodeKind kind);
 
 bool isGuaranteedForwardingValue(SILValue value);
 
+bool isOwnershipForwardingInst(SILInstruction *i);
+
 bool isGuaranteedForwardingInst(SILInstruction *i);
 
-bool isOwnershipForwardingInst(SILInstruction *i);
+bool getUnderlyingBorrowIntroducers(SILValue inputValue,
+                                    SmallVectorImpl<SILValue> &out);
 
 } // namespace swift
 

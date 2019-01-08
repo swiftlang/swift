@@ -201,6 +201,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -749,7 +750,7 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
 
 SmallBitVector
 swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                         const ValueDecl *paramOwner, unsigned level) {
+                         const ValueDecl *paramOwner, bool skipCurriedSelf) {
   SmallBitVector resultVector(params.size());
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -762,15 +763,15 @@ swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
   const ParameterList *paramList = nullptr;
   if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
     if (func->hasImplicitSelfDecl()) {
-      if (level == 1)
+      if (skipCurriedSelf)
         paramList = func->getParameters();
-    } else if (level == 0)
+    } else if (!skipCurriedSelf)
       paramList = func->getParameters();
   } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
-    if (level == 1)
+    if (skipCurriedSelf)
       paramList = subscript->getIndices();
   } else if (auto *enumElement = dyn_cast<EnumElementDecl>(paramOwner)) {
-    if (level == 1)
+    if (skipCurriedSelf)
       paramList = enumElement->getParameterList();
   }
 
@@ -1423,16 +1424,20 @@ Type TypeBase::getSuperclass(bool useArchetypes) {
 }
 
 bool TypeBase::isExactSuperclassOf(Type ty) {
-  // For there to be a superclass relationship, we must be a superclass, and
-  // the potential subtype must be a class or superclass-bounded archetype.
-  if (!getClassOrBoundGenericClass() || !ty->mayHaveSuperclass())
+  // For there to be a superclass relationship, we must be a class, and
+  // the potential subtype must be a class, superclass-bounded archetype,
+  // or subclass existential involving an imported class and @objc
+  // protocol.
+  if (!getClassOrBoundGenericClass() ||
+      !(ty->mayHaveSuperclass() ||
+        (ty->isObjCExistentialType() &&
+         ty->getSuperclass() &&
+         ty->getSuperclass()->getAnyNominal()->hasClangNode())))
     return false;
 
   do {
     if (ty->isEqual(this))
       return true;
-    if (ty->getAnyNominal() && ty->getAnyNominal()->isInvalid())
-      return false;
   } while ((ty = ty->getSuperclass()));
   return false;
 }
@@ -4014,6 +4019,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinUnsafeValueBuffer:

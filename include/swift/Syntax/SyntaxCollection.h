@@ -15,6 +15,8 @@
 
 #include "swift/Syntax/Syntax.h"
 
+#include <iterator>
+
 namespace swift {
 namespace syntax {
 
@@ -173,8 +175,11 @@ public:
 
   /// Return a new collection with the element removed at index i.
   SyntaxCollection<CollectionKind, Element> removing(size_t i) const {
-    auto NewLayout = getRaw()->Layout;
-    NewLayout.erase(NewLayout.begin() + i);
+    assert(i <= size());
+    std::vector<RC<RawSyntax>> NewLayout = getRaw()->getLayout();
+    auto iterator = NewLayout.begin();
+    std::advance(iterator, i);
+    NewLayout.erase(iterator);
     auto Raw = RawSyntax::make(CollectionKind, NewLayout, getRaw()->getPresence());
     return Data->replaceSelf<SyntaxCollection<CollectionKind, Element>>(Raw);
   }

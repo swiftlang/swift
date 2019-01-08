@@ -33,10 +33,8 @@ enum ValueEnum {
   // CHECK-NEXT:   [[INIT_STATE:%.*]] = integer_literal $Builtin.Int1, 0
   // CHECK-NEXT:   store [[INIT_STATE]] to [[STATE]]
   // CHECK:        [[BOOL:%.*]] = struct_extract %0 : $Bool, #Bool._value
-  // CHECK-NEXT:   cond_br [[BOOL]], bb2, bb1
+  // CHECK-NEXT:   cond_br [[BOOL]], bb1, bb2
   // CHECK:      bb1:
-  // CHECK-NEXT:   br bb3
-  // CHECK:      bb2:
   // CHECK-NEXT:   [[METATYPE:%.*]] = metatype $@thin ValueEnum.Type
   // CHECK-NEXT:   [[NEW_SELF:%.*]] = enum $ValueEnum, #ValueEnum.b!enumelt
   // CHECK-NEXT:   [[SELF_ACCESS:%.*]] = begin_access [modify] [static] [[SELF_BOX]]
@@ -45,16 +43,18 @@ enum ValueEnum {
   // CHECK-NEXT:   store [[NEW_SELF]] to [[SELF_ACCESS]]
   // CHECK-NEXT:   end_access [[SELF_ACCESS]]
   // CHECK-NEXT:   br bb3
+  // CHECK:      bb2:
+  // CHECK-NEXT:   br bb3
   // CHECK:      bb3:
   // CHECK-NEXT:   [[METATYPE:%.*]] = metatype $@thin ValueEnum.Type
   // CHECK-NEXT:   [[NEW_SELF:%.*]] = enum $ValueEnum, #ValueEnum.c!enumelt
   // CHECK-NEXT:   [[SELF_ACCESS:%.*]] = begin_access [modify] [static] [[SELF_BOX]]
   // CHECK-NEXT:   [[STATE_VALUE:%.*]] = load [[STATE]]
-  // CHECK-NEXT:   cond_br [[STATE_VALUE]], bb5, bb4
+  // CHECK-NEXT:   cond_br [[STATE_VALUE]], bb4, bb5
   // CHECK:      bb4:
+  // CHECK-NEXT:   destroy_addr [[SELF_BOX]]
   // CHECK-NEXT:   br bb6
   // CHECK:      bb5:
-  // CHECK-NEXT:   destroy_addr [[SELF_BOX]]
   // CHECK-NEXT:   br bb6
   // CHECK:      bb6:
   // CHECK-NEXT:   [[NEW_STATE:%.*]] = integer_literal $Builtin.Int1, -1

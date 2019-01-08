@@ -136,7 +136,7 @@ def process_stack(binary, dyn_libs, stack):
         try:
             framePC = int(stack_tokens[2], 16)
             symbol_offset = int(stack_tokens[-1], 10)
-        except:
+        except Exception:
             full_stack.append({"line": line, "framePC": 0, "dynlib_fname": ""})
             continue
 
@@ -161,7 +161,7 @@ def process_stack(binary, dyn_libs, stack):
         try:
             sym_line = symbolicate_one(frame_addr, frame_idx, dynlib_fname)
             print(sym_line)
-        except:
+        except Exception:
             print(frame["line"].rstrip())
         frame_idx = frame_idx + 1
 

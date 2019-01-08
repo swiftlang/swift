@@ -37,15 +37,12 @@ using llvm::BCRecordLayout;
 using llvm::BCVBR;
 
 /// Magic number for serialized module files.
-const unsigned char MODULE_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x0E };
-
-/// Magic number for serialized documentation files.
-const unsigned char MODULE_DOC_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x07 };
+const unsigned char SWIFTMODULE_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x0E };
 
 /// Serialized module format major version number.
 ///
 /// Always 0 for Swift 1.x - 4.x.
-const uint16_t VERSION_MAJOR = 0;
+const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 
 /// Serialized module format minor version number.
 ///
@@ -55,7 +52,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 454; // Last change: multiple nominal types for operators
+const uint16_t SWIFTMODULE_VERSION_MINOR = 469; // @_hasStorage
 
 using DeclIDField = BCFixed<31>;
 
@@ -111,9 +108,10 @@ using CharOffsetField = BitOffsetField;
 
 using FileSizeField = BCVBR<16>;
 using FileModTimeField = BCVBR<16>;
+using FileHashField = BCVBR<16>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class OpaqueReadOwnership : uint8_t {
   Owned,
   Borrowed,
@@ -122,7 +120,7 @@ enum class OpaqueReadOwnership : uint8_t {
 using OpaqueReadOwnershipField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class ReadImplKind : uint8_t {
   Stored = 0,
   Get,
@@ -133,7 +131,7 @@ enum class ReadImplKind : uint8_t {
 using ReadImplKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class WriteImplKind : uint8_t {
   Immutable = 0,
   Stored,
@@ -146,7 +144,7 @@ enum class WriteImplKind : uint8_t {
 using WriteImplKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class ReadWriteImplKind : uint8_t {
   Immutable = 0,
   Stored,
@@ -157,7 +155,7 @@ enum class ReadWriteImplKind : uint8_t {
 using ReadWriteImplKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class StaticSpellingKind : uint8_t {
   None = 0,
   KeywordStatic,
@@ -166,7 +164,7 @@ enum class StaticSpellingKind : uint8_t {
 using StaticSpellingKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class FunctionTypeRepresentation : uint8_t {
   Swift = 0,
   Block,
@@ -186,7 +184,7 @@ enum class ForeignErrorConventionKind : uint8_t {
 using ForeignErrorConventionKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class SILFunctionTypeRepresentation : uint8_t {
   Thick = 0,
   Block,
@@ -202,7 +200,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
 using SILFunctionTypeRepresentationField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class SILCoroutineKind : uint8_t {
   None = 0,
   YieldOnce = 1,
@@ -211,7 +209,7 @@ enum class SILCoroutineKind : uint8_t {
 using SILCoroutineKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum OperatorKind : uint8_t {
   Infix = 0,
   Prefix,
@@ -222,7 +220,7 @@ enum OperatorKind : uint8_t {
 using OperatorKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum AccessorKind : uint8_t {
   Get = 0,
   Set,
@@ -238,7 +236,7 @@ using AccessorKindField = BCFixed<4>;
 using AccessorCountField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum CtorInitializerKind : uint8_t {
   Designated = 0,
   Convenience = 1,
@@ -248,7 +246,7 @@ enum CtorInitializerKind : uint8_t {
 using CtorInitializerKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class VarDeclSpecifier : uint8_t {
   Let = 0,
   Var,
@@ -259,7 +257,7 @@ enum class VarDeclSpecifier : uint8_t {
 using VarDeclSpecifierField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class ParameterConvention : uint8_t {
   Indirect_In,
   Indirect_Inout,
@@ -273,7 +271,7 @@ enum class ParameterConvention : uint8_t {
 using ParameterConventionField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class ResultConvention : uint8_t {
   Indirect,
   Owned,
@@ -284,21 +282,14 @@ enum class ResultConvention : uint8_t {
 using ResultConventionField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum MetatypeRepresentation : uint8_t {
   MR_None, MR_Thin, MR_Thick, MR_ObjC
 };
 using MetatypeRepresentationField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
-enum class AddressorKind : uint8_t {
-  NotAddressor, Unsafe, Owning, NativeOwning
-};
-using AddressorKindField = BCFixed<3>;
- 
-// These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class SelfAccessKind : uint8_t {
   NonMutating = 0,
   Mutating,
@@ -322,7 +313,7 @@ static inline OperatorKind getStableFixity(DeclKind kind) {
 }
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum GenericRequirementKind : uint8_t {
   Conformance = 0,
   SameType    = 1,
@@ -332,7 +323,7 @@ enum GenericRequirementKind : uint8_t {
 using GenericRequirementKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum LayoutRequirementKind : uint8_t {
   UnknownLayout = 0,
   TrivialOfExactSize = 1,
@@ -346,7 +337,7 @@ enum LayoutRequirementKind : uint8_t {
 using LayoutRequirementKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum Associativity : uint8_t {
   NonAssociative = 0,
   LeftAssociative,
@@ -355,7 +346,7 @@ enum Associativity : uint8_t {
 using AssociativityField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum ReferenceOwnership : uint8_t {
   Strong = 0,
   Weak,
@@ -365,7 +356,7 @@ enum ReferenceOwnership : uint8_t {
 using ReferenceOwnershipField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum ValueOwnership : uint8_t {
   Default = 0,
   InOut,
@@ -375,7 +366,7 @@ enum ValueOwnership : uint8_t {
 using ValueOwnershipField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class DefaultArgumentKind : uint8_t {
   None = 0,
   Normal,
@@ -392,7 +383,7 @@ enum class DefaultArgumentKind : uint8_t {
 using DefaultArgumentField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum LibraryKind : uint8_t {
   Library = 0,
   Framework
@@ -400,7 +391,7 @@ enum LibraryKind : uint8_t {
 using LibraryKindField = BCFixed<1>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class AccessLevel : uint8_t {
   Private = 0,
   FilePrivate,
@@ -411,7 +402,7 @@ enum class AccessLevel : uint8_t {
 using AccessLevelField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class OptionalTypeKind : uint8_t {
   None,
   Optional,
@@ -420,7 +411,7 @@ enum class OptionalTypeKind : uint8_t {
 using OptionalTypeKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class DeclNameKind: uint8_t {
   Normal,
   Subscript,
@@ -429,7 +420,7 @@ enum class DeclNameKind: uint8_t {
 };
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum SpecialIdentifierID : uint8_t {
   /// Special IdentifierID value for the Builtin module.
   BUILTIN_MODULE_ID = 0,
@@ -451,7 +442,7 @@ enum SpecialIdentifierID : uint8_t {
 };
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class EnumElementRawValueKind : uint8_t {
   /// No raw value serialized.
   None = 0,
@@ -461,7 +452,7 @@ enum class EnumElementRawValueKind : uint8_t {
 };
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
+// the module version.
 enum class ResilienceExpansion : uint8_t {
   Minimal = 0,
   Maximal,
@@ -472,8 +463,8 @@ using EnumElementRawValueKindField = BCFixed<4>;
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
 ///
-/// These IDs must \em not be renumbered or reordered without incrementing
-/// VERSION_MAJOR.
+/// Some of these are shared with the swiftdoc format, which is a stable format.
+/// Be very very careful when renumbering them.
 enum BlockID {
   /// The module block, which contains all of the other blocks (and in theory
   /// allows a single file to contain multiple modules).
@@ -481,6 +472,8 @@ enum BlockID {
 
   /// The control block, which contains all of the information that needs to
   /// be validated prior to committing to loading the serialized module.
+  ///
+  /// This is part of a stable format and must not be renumbered!
   ///
   /// \sa control_block
   CONTROL_BLOCK_ID,
@@ -529,27 +522,34 @@ enum BlockID {
   /// \sa options_block
   OPTIONS_BLOCK_ID,
 
+  /// The declaration member-tables index block, a sub-block of the index block.
+  ///
+  /// \sa decl_member_tables_block
+  DECL_MEMBER_TABLES_BLOCK_ID,
+
   /// The module documentation container block, which contains all other
   /// documentation blocks.
+  ///
+  /// This is part of a stable format and must not be renumbered!
   MODULE_DOC_BLOCK_ID = 96,
 
   /// The comment block, which contains documentation comments.
   ///
+  /// This is part of a stable format and must not be renumbered!
+  ///
   /// \sa comment_block
   COMMENT_BLOCK_ID,
-
-  /// The declaration member-tables index block, a sub-blocb of the index block.
-  ///
-  /// \sa decl_member_tables_block
-  DECL_MEMBER_TABLES_BLOCK_ID
 };
 
 /// The record types within the control block.
 ///
+/// Be VERY VERY careful when changing this block; it is also used by the
+/// swiftdoc format, which \e must \e remain \e stable. Adding new records is
+/// okay---they will be ignored---but modifying existing ones must be done
+/// carefully. You may need to update the swiftdoc version in DocFormat.h.
+///
 /// \sa CONTROL_BLOCK_ID
 namespace control_block {
-  // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
   enum {
     METADATA = 1,
     MODULE_NAME,
@@ -581,14 +581,13 @@ namespace control_block {
 ///
 /// \sa OPTIONS_BLOCK_ID
 namespace options_block {
-  // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
   enum {
     SDK_PATH = 1,
     XCC,
     IS_SIB,
     IS_TESTABLE,
-    RESILIENCE_STRATEGY
+    RESILIENCE_STRATEGY,
+    ARE_PRIVATE_IMPORTS_ENABLED
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -610,6 +609,10 @@ namespace options_block {
     IS_TESTABLE
   >;
 
+  using ArePrivateImportsEnabledLayout = BCRecordLayout<
+    ARE_PRIVATE_IMPORTS_ENABLED
+  >;
+
   using ResilienceStrategyLayout = BCRecordLayout<
     RESILIENCE_STRATEGY,
     BCFixed<2>
@@ -620,15 +623,14 @@ namespace options_block {
 ///
 /// \sa INPUT_BLOCK_ID
 namespace input_block {
-  // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
   enum {
     IMPORTED_MODULE = 1,
     LINK_LIBRARY,
     IMPORTED_HEADER,
     IMPORTED_HEADER_CONTENTS,
     MODULE_FLAGS, // [unused]
-    SEARCH_PATH
+    SEARCH_PATH,
+    FILE_DEPENDENCY
   };
 
   using ImportedModuleLayout = BCRecordLayout<
@@ -651,7 +653,7 @@ namespace input_block {
     IMPORTED_HEADER,
     BCFixed<1>, // exported?
     FileSizeField, // file size (for validation)
-    FileModTimeField, // file mtime (for validation)
+    FileHashField, // file hash (for validation)
     BCBlob // file path
   >;
 
@@ -666,14 +668,19 @@ namespace input_block {
     BCFixed<1>, // system?
     BCBlob      // path
   >;
+
+  using FileDependencyLayout = BCRecordLayout<
+    FILE_DEPENDENCY,
+    FileSizeField,    // file size (for validation)
+    FileModTimeField, // file mtime (for validation)
+    BCBlob            // path
+  >;
 }
 
 /// The record types within the "decls-and-types" block.
 ///
 /// \sa DECLS_AND_TYPES_BLOCK_ID
 namespace decls_block {
-  // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
   enum RecordKind : uint8_t {
 #define RECORD(Id) Id,
 #define RECORD_VAL(Id, Value) Id = Value,
@@ -731,7 +738,6 @@ namespace decls_block {
     FUNCTION_TYPE,
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
-    BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // noescape?
     BCFixed<1>   // throws?
 
@@ -1018,6 +1024,7 @@ namespace decls_block {
     VarDeclSpecifierField, // specifier
     TypeIDField,           // interface type
     BCFixed<1>,            // isVariadic?
+    BCFixed<1>,            // isAutoClosure?
     DefaultArgumentField,  // default argument kind
     BCBlob                 // default argument text
   >;
@@ -1069,7 +1076,6 @@ namespace decls_block {
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
-    AddressorKindField, // addressor kind
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // default argument resilience expansion
@@ -1246,13 +1252,8 @@ namespace decls_block {
   >;
 
   using GenericParamListLayout = BCRecordLayout<
-    GENERIC_PARAM_LIST
-    // The actual parameters and requirements trail the record.
-  >;
-
-  using GenericParamLayout = BCRecordLayout<
-    GENERIC_PARAM,
-    DeclIDField // Typealias
+    GENERIC_PARAM_LIST,
+    BCArray<DeclIDField>        // the GenericTypeParamDecls
   >;
 
   using GenericSignatureLayout = BCRecordLayout<
@@ -1301,6 +1302,11 @@ namespace decls_block {
     BCVBR<2> // context-scoped discriminator counter
   >;
 
+  using FilenameForPrivateLayout = BCRecordLayout<
+    FILENAME_FOR_PRIVATE,
+    IdentifierIDField  // the file name, as an identifier
+  >;
+
   /// A placeholder for lack of concrete conformance information.
   using AbstractProtocolConformanceLayout = BCRecordLayout<
     ABSTRACT_PROTOCOL_CONFORMANCE,
@@ -1323,6 +1329,11 @@ namespace decls_block {
     // The array contains type witnesses, then value witnesses.
     // Requirement signature conformances follow, then the substitution records
     // for the associated types.
+  >;
+
+  using SelfProtocolConformanceLayout = BCRecordLayout<
+    SELF_PROTOCOL_CONFORMANCE,
+    DeclIDField // the protocol
   >;
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
@@ -1403,7 +1414,8 @@ namespace decls_block {
 
   using XRefGenericParamPathPieceLayout = BCRecordLayout<
     XREF_GENERIC_PARAM_PATH_PIECE,
-    BCVBR<5> // index
+    BCVBR<5>, // depth
+    BCVBR<5>  // index
   >;
 
   using SILGenNameDeclAttrLayout = BCRecordLayout<
@@ -1504,6 +1516,7 @@ namespace decls_block {
     = BCRecordLayout<RestatedObjCConformance_DECL_ATTR>;
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
+  using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,
@@ -1567,6 +1580,14 @@ namespace decls_block {
   >;
 #include "swift/AST/Attr.def"
 
+  using DynamicReplacementDeclAttrLayout = BCRecordLayout<
+    DynamicReplacement_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    DeclIDField, // replaced function
+    BCVBR<4>,   // # of arguments (+1) or zero if no name
+    BCArray<IdentifierIDField>
+  >;
+
 }
 
 /// Returns the encoding kind for the given decl.
@@ -1622,8 +1643,6 @@ namespace identifier_block {
 ///
 /// \sa INDEX_BLOCK_ID
 namespace index_block {
-  // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
   enum RecordKind {
     TYPE_OFFSETS = 1,
     DECL_OFFSETS,
@@ -1725,28 +1744,7 @@ namespace decl_member_tables_block {
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // maps from DeclIDs to DeclID vectors
   >;
-
 }
-
-/// \sa COMMENT_BLOCK_ID
-namespace comment_block {
-  enum RecordKind {
-    DECL_COMMENTS = 1,
-    GROUP_NAMES = 2,
-  };
-
-  using DeclCommentListLayout = BCRecordLayout<
-    DECL_COMMENTS, // record ID
-    BCVBR<16>,     // table offset within the blob (see below)
-    BCBlob         // map from Decl IDs to comments
-  >;
-
-  using GroupNamesLayout = BCRecordLayout<
-    GROUP_NAMES,    // record ID
-    BCBlob          // actual names
-  >;
-
-} // namespace comment_block
 
 } // end namespace serialization
 } // end namespace swift

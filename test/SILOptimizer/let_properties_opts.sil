@@ -1,0 +1,77 @@
+// RUN: %target-sil-opt -let-properties-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// Test initialization of a constant aggregate "let".
+// <rdar://problem/45691574> [SR-9146] IBAnimatable - SILCloner crash in LetPropertiesOpt.
+
+struct Point {
+  var x: Int64
+  var y: Int64
+}
+class HasCenter {
+
+  let centerPoint: Point = Point(x: 0, y: 0)
+
+  public func getCenter() -> Int64
+}
+
+sil hidden @$s19let_properties_opts5PointV1x1yACSi_SitcfC : $@convention(method) (Int64, Int64, @thin Point.Type) -> Point {
+bb0(%0 : $Int64, %1 : $Int64, %2 : $@thin Point.Type):
+  %3 = struct $Point (%0 : $Int64, %1 : $Int64)
+  return %3 : $Point
+}
+
+// variable initialization expression of HasCenter.centerPoint
+sil hidden [transparent] @$s19let_properties_opts9HasCenterC11centerPointAA0E0Vvpfi : $@convention(thin) () -> Point {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = struct $Point (%1 : $Int64, %1 : $Int64)
+  return %2 : $Point
+}
+
+// HasCenter.centerPoint.getter
+// CHECK-LABEL: sil hidden [transparent] @$s19let_properties_opts9HasCenterC11centerPointAA0E0Vvg : $@convention(method) (@guaranteed HasCenter) -> Point {
+// CHECK: bb0(%0 : $HasCenter):
+// CHECK: [[LIT:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK: [[INT:%.*]] = struct $Int64 ([[LIT]] : $Builtin.Int64)
+// CHECK: [[PNT:%.*]] = struct $Point ([[INT]] : $Int64, [[INT]] : $Int64)
+// CHECK: return [[PNT]] : $Point
+// CHECK-LABEL: } // end sil function '$s19let_properties_opts9HasCenterC11centerPointAA0E0Vvg'
+sil hidden [transparent] @$s19let_properties_opts9HasCenterC11centerPointAA0E0Vvg : $@convention(method) (@guaranteed HasCenter) -> Point {
+bb0(%0 : $HasCenter):
+  %1 = ref_element_addr %0 : $HasCenter, #HasCenter.centerPoint
+  %2 = load %1 : $*Point
+  return %2 : $Point
+}
+
+// HasCenter.getCenter()
+// CHECK-LABEL: sil hidden @$s19let_properties_opts9HasCenterC9getCenterSiyF : $@convention(method) (@guaranteed HasCenter) -> Int64 {
+// CHECK: [[LIT:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK: [[INT:%.*]] = struct $Int64 ([[LIT]] : $Builtin.Int64)
+// CHECK: [[PNT:%.*]] = struct $Point ([[INT]] : $Int64, [[INT]] : $Int64)
+// CHECK: [[X:%.*]] = struct_extract [[PNT]] : $Point, #Point.x
+// CHECK: return [[X]] : $Int64
+// CHECK-LABEL: } // end sil function '$s19let_properties_opts9HasCenterC9getCenterSiyF'
+sil hidden @$s19let_properties_opts9HasCenterC9getCenterSiyF : $@convention(method) (@guaranteed HasCenter) -> Int64 {
+bb0(%0 : $HasCenter):
+  %1 = ref_element_addr %0 : $HasCenter, #HasCenter.centerPoint
+  %2 = struct_element_addr %1 : $*Point, #Point.x
+  %3 = load %2 : $*Int64
+  return %3 : $Int64
+}
+
+// HasCenter.init()
+sil hidden @$s19let_properties_opts9HasCenterCACycfc : $@convention(method) (@owned HasCenter) -> @owned HasCenter {
+bb0(%0 : $HasCenter):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %3 = struct $Point (%2 : $Int64, %2 : $Int64)
+  %4 = ref_element_addr %0 : $HasCenter, #HasCenter.centerPoint
+  store %3 to %4 : $*Point
+  return %0 : $HasCenter
+}

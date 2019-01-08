@@ -175,7 +175,6 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
             .Case("array.get_count", ArrayCallKind::kGetCount)
             .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
             .Case("array.get_element", ArrayCallKind::kGetElement)
-            .Case("array.owner", ArrayCallKind::kGetArrayOwner)
             .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
             .Case("array.get_element_address",
                   ArrayCallKind::kGetElementAddress)
@@ -732,12 +731,13 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
   SILValue ArrRef = SemanticsCall->getArgument(1);
   SILBuilderWithScope Builder(SemanticsCall);
   auto Loc = SemanticsCall->getLoc();
-  auto *FnRef = Builder.createFunctionRef(Loc, AppendFn);
+  auto *FnRef = Builder.createFunctionRefFor(Loc, AppendFn);
 
   if (Vals.size() > 1) {
     // Create a call to reserveCapacityForAppend() to reserve space for multiple
     // elements.
-    FunctionRefInst *ReserveFnRef = Builder.createFunctionRef(Loc, ReserveFn);
+    FunctionRefBaseInst *ReserveFnRef =
+        Builder.createFunctionRefFor(Loc, ReserveFn);
     SILFunctionType *ReserveFnTy =
       ReserveFnRef->getType().castTo<SILFunctionType>();
     assert(ReserveFnTy->getNumParameters() == 2);

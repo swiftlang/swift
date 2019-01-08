@@ -218,6 +218,54 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
 }
 
 
+llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
+    StringRef symbolName,
+    unsigned alignment,
+    bool shouldSetLowBit,
+    llvm::function_ref<ConstantInitFuture (ConstantInitBuilder &)> body) {
+  // Call this to form the return value.
+  auto returnValue = [&](llvm::Constant *addr) {
+    if (!shouldSetLowBit)
+      return addr;
+
+    auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
+    return llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+  };
+
+  // Check whether we already have an entry with this name.
+  auto &entry = StringsForTypeRef[symbolName];
+  if (entry.second) {
+    return returnValue(entry.second);
+  }
+
+  // Construct the initializer.
+  ConstantInitBuilder builder(*this);
+  auto finished = body(builder);
+
+  auto var = new llvm::GlobalVariable(Module, finished.getType(),
+                                      /*constant*/ true,
+                                      llvm::GlobalValue::LinkOnceODRLinkage,
+                                      nullptr,
+                                      symbolName);
+
+  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
+    llvm::GlobalValue::HiddenVisibility,
+    llvm::GlobalValue::DefaultStorageClass})
+  .to(var);
+  if (alignment)
+    var->setAlignment(alignment);
+  setTrueConstGlobal(var);
+  var->setSection(getReflectionTypeRefSectionName());
+
+  finished.installInGlobal(var);
+
+  // Drill down to the i8* at the beginning of the constant.
+  auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
+  StringsForTypeRef[symbolName] = { var, addr };
+
+  return returnValue(addr);
+}
+
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str,
                                                        MangledTypeRefRole role){
   return getAddrOfStringForTypeRef(SymbolicMangling{str, {}}, role);
@@ -317,7 +365,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
                                       llvm::GlobalValue::LinkOnceODRLinkage,
                                       nullptr,
                                       symbolName);
-  var->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
   var->setAlignment(2);
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
@@ -843,31 +891,31 @@ namespace {
   public:
     EmitTypeMetadataRef(IRGenFunction &IGF) : IGF(IGF) {}
 
-#define TREAT_AS_OPAQUE(KIND)                                             \
-    MetadataResponse visit##KIND##Type(Can##KIND##Type type,              \
-                                       DynamicMetadataRequest request) {  \
-      return visitOpaqueType(type);                                       \
-    }
-    TREAT_AS_OPAQUE(BuiltinInteger)
-    TREAT_AS_OPAQUE(BuiltinFloat)
-    TREAT_AS_OPAQUE(BuiltinVector)
-    TREAT_AS_OPAQUE(BuiltinRawPointer)
-#undef TREAT_AS_OPAQUE
-
     MetadataResponse emitDirectMetadataRef(CanType type) {
       return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
     }
 
     /// The given type should use opaque type info.  We assume that
-    /// the runtime always provides an entry for such a type;  right
-    /// now, that mapping is as one of the power-of-two integer types.
-    MetadataResponse visitOpaqueType(CanType type) {
+    /// the runtime always provides an entry for such a type.
+    MetadataResponse visitBuiltinIntegerType(CanBuiltinIntegerType type,
+                                             DynamicMetadataRequest request) {
+      // If the size isn't a power up two, round up to the next power of two
+      // and use the corresponding integer type.
       auto &opaqueTI = cast<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(type));
       unsigned numBits = opaqueTI.getFixedSize().getValueInBits();
-      if (!llvm::isPowerOf2_32(numBits))
+      if (!llvm::isPowerOf2_32(numBits)) {
         numBits = llvm::NextPowerOf2(numBits);
-      auto intTy = BuiltinIntegerType::get(numBits, IGF.IGM.Context);
-      return emitDirectMetadataRef(CanType(intTy));
+        type = CanBuiltinIntegerType(
+                 BuiltinIntegerType::get(numBits, IGF.IGM.Context));
+      }
+
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinIntegerLiteralType(CanBuiltinIntegerLiteralType type,
+                                   DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
     }
 
     MetadataResponse
@@ -891,6 +939,24 @@ namespace {
     MetadataResponse
     visitBuiltinUnsafeValueBufferType(CanBuiltinUnsafeValueBufferType type,
                                       DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
+                               DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinFloatType(CanBuiltinFloatType type,
+                          DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinVectorType(CanBuiltinVectorType type,
+                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
 
@@ -947,8 +1013,9 @@ namespace {
       // flags.
       auto getABIParameterFlags = [](ParameterTypeFlags flags) {
         return ParameterFlags()
-                 .withValueOwnership(flags.getValueOwnership())
-                 .withVariadic(flags.isVariadic());
+            .withValueOwnership(flags.getValueOwnership())
+            .withVariadic(flags.isVariadic())
+            .withAutoClosure(flags.isAutoClosure());
       };
 
       bool hasFlags = false;

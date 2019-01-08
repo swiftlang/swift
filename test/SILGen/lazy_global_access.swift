@@ -22,3 +22,16 @@ func useProps() -> (Int, Int) {
   return (globalProp, Fooo.staticProp)
 }
 
+// rdar://46472759
+// We used to crash tying to double-emit the setter.
+struct Bar {
+  mutating func mutate() {}
+}
+func useGlobalBar() -> Bar {
+  globalBar = Bar()
+  globalBar.mutate()
+  return globalBar
+}
+private var globalBar = Bar() {
+  willSet {}
+}

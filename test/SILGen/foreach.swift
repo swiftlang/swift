@@ -59,15 +59,12 @@ protocol GenericCollection : Collection {
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   switch_enum [[IND_VAR:%.*]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[NONE_BB]]:
-// CHECK:   br [[CONT_BLOCK:bb[0-9]+]]
-//
 // CHECK: [[SOME_BB]]([[VAR:%.*]] : @trivial $Int):
 // CHECK:   [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_END_FUNC]]()
 // CHECK:   br [[LOOP_DEST]]
 //
-// CHECK: [[CONT_BLOCK]]:
+// CHECK: [[NONE_BB]]:
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -123,9 +120,6 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   [[IND_VAR:%.*]] = load [trivial] [[GET_ELT_STACK]]
 // CHECK:   switch_enum [[IND_VAR]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[NONE_BB]]:
-// CHECK:   br [[CONT_BLOCK_JUMP:bb[0-9]+]]
-//
 // CHECK: [[SOME_BB]]([[VAR:%.*]] : @trivial $Int):
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
@@ -147,7 +141,7 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   apply [[LOOP_BODY_FUNC]]()
 // CHECK:   br [[LOOP_DEST]]
 //
-// CHECK: [[CONT_BLOCK_JUMP]]:
+// CHECK: [[NONE_BB]]:
 // CHECK:   br [[CONT_BLOCK]]
 //
 // CHECK: [[CONT_BLOCK]]
@@ -225,9 +219,6 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   apply [[FUNC_REF]]<[P]>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<P>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[NONE_BB]]:
-// CHECK:   br [[CONT_BLOCK_JUMP:bb[0-9]+]]
-//
 // CHECK: [[SOME_BB]]:
 // CHECK:   [[T0:%.*]] = alloc_stack $P, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<P>, #Optional.some!enumelt.1
@@ -258,7 +249,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   dealloc_stack [[T0]]
 // CHECK:   br [[LOOP_DEST]]
 //
-// CHECK: [[CONT_BLOCK_JUMP]]:
+// CHECK: [[NONE_BB]]:
 // CHECK:   br [[CONT_BLOCK]]
 //
 // CHECK: [[CONT_BLOCK]]
@@ -388,9 +379,6 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   apply [[FUNC_REF]]<[GenericStruct<T>]>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[NONE_BB]]:
-// CHECK:   br [[CONT_BLOCK_JUMP:bb[0-9]+]]
-//
 // CHECK: [[SOME_BB]]:
 // CHECK:   [[T0:%.*]] = alloc_stack $GenericStruct<T>, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, #Optional.some!enumelt.1
@@ -421,7 +409,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   dealloc_stack [[T0]]
 // CHECK:   br [[LOOP_DEST]]
 //
-// CHECK: [[CONT_BLOCK_JUMP]]:
+// CHECK: [[NONE_BB]]:
 // CHECK:   br [[CONT_BLOCK]]
 //
 // CHECK: [[CONT_BLOCK]]
@@ -497,9 +485,6 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK:   apply [[GET_NEXT_FUNC]]<T.Iterator>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<T.Element>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[NONE_BB]]:
-// CHECK:   br [[CONT_BLOCK_JUMP:bb[0-9]+]]
-//
 // CHECK: [[SOME_BB]]:
 // CHECK:   [[T0:%.*]] = alloc_stack $T.Element, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<T.Element>, #Optional.some!enumelt.1
@@ -530,7 +515,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK:   dealloc_stack [[T0]]
 // CHECK:   br [[LOOP_DEST]]
 //
-// CHECK: [[CONT_BLOCK_JUMP]]:
+// CHECK: [[NONE_BB]]:
 // CHECK:   br [[CONT_BLOCK]]
 //
 // CHECK: [[CONT_BLOCK]]
@@ -562,27 +547,27 @@ func genericCollectionContinueBreak<T : Collection>(_ xx: T) {
 
 // CHECK-LABEL: sil hidden @$s7foreach13tupleElementsyySayAA1CC_ADtGF
 func tupleElements(_ xx: [(C, C)]) {
-  // CHECK: bb3([[PAYLOAD:%.*]] : @owned $(C, C)):
+  // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
   // CHECK: destroy_value [[B]]
   // CHECK: destroy_value [[A]]
   for (a, b) in xx {}
-  // CHECK: bb7([[PAYLOAD:%.*]] : @owned $(C, C)):
+  // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
   // CHECK: destroy_value [[B]]
   // CHECK: destroy_value [[A]]
   for (a, _) in xx {}
-  // CHECK: bb11([[PAYLOAD:%.*]] : @owned $(C, C)):
+  // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
   // CHECK: destroy_value [[A]]
   // CHECK: destroy_value [[B]]
   for (_, b) in xx {}
-  // CHECK: bb15([[PAYLOAD:%.*]] : @owned $(C, C)):
+  // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
   // CHECK: destroy_value [[B]]
   // CHECK: destroy_value [[A]]
   for (_, _) in xx {}
-  // CHECK: bb19([[PAYLOAD:%.*]] : @owned $(C, C)):
+  // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
   // CHECK: destroy_value [[B]]
   // CHECK: destroy_value [[A]]
@@ -598,9 +583,6 @@ func tupleElements(_ xx: [(C, C)]) {
 //
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   switch_enum [[OPT_VAL:%.*]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
-//
-// CHECK: [[NONE_BB]]:
-// CHECK:   br [[CONT_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]([[VAL:%.*]]  : @trivial $Int):
 // CHECK:   [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()

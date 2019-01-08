@@ -103,6 +103,10 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mm");
   }
 
+  std::string mangleObjCMetadataUpdateFunction(const ClassDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "MU");
+  }
+
   std::string mangleClassMetadataBaseOffset(const ClassDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mo");
   }
@@ -193,10 +197,24 @@ public:
       const ProtocolDecl *requirement) {
     beginMangling();
     appendAnyGenericType(proto);
-    bool isFirstAssociatedTypeIdentifier = true;
-    appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    if (isa<GenericTypeParamType>(subject)) {
+      appendType(subject);
+    } else {
+      bool isFirstAssociatedTypeIdentifier = true;
+      appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    }
     appendProtocolName(requirement);
     appendOperator("Tn");
+    return finalize();
+  }
+
+  std::string mangleBaseConformanceDescriptor(
+      const ProtocolDecl *proto,
+      const ProtocolDecl *requirement) {
+    beginMangling();
+    appendAnyGenericType(proto);
+    appendProtocolName(requirement);
+    appendOperator("Tb");
     return finalize();
   }
 
@@ -214,12 +232,7 @@ public:
   }
 
   std::string mangleProtocolConformanceDescriptor(
-                                 const ProtocolConformance *Conformance) {
-    beginMangling();
-    appendProtocolConformance(Conformance);
-    appendOperator("Mc");
-    return finalize();
-  }
+                                   const RootProtocolConformance *conformance);
   
   std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
     beginMangling();
@@ -242,10 +255,6 @@ public:
     return finalize();
   }
 
-  std::string mangleDirectProtocolWitnessTable(const ProtocolConformance *C) {
-    return mangleConformanceSymbol(Type(), C, "WP");
-  }
-
   std::string mangleProtocolWitnessTablePattern(const ProtocolConformance *C) {
     return mangleConformanceSymbol(Type(), C, "Wp");
   }
@@ -253,11 +262,6 @@ public:
   std::string mangleGenericProtocolWitnessTableInstantiationFunction(
                                                 const ProtocolConformance *C) {
     return mangleConformanceSymbol(Type(), C, "WI");
-  }
-
-  std::string mangleProtocolWitnessTableAccessFunction(
-                                                const ProtocolConformance *C) {
-    return mangleConformanceSymbol(Type(), C, "Wa");
   }
 
   std::string mangleProtocolWitnessTableLazyAccessFunction(Type type,
@@ -283,14 +287,13 @@ public:
     return finalize();
   }
 
-  std::string mangleAssociatedTypeGenericParamRef(unsigned baseOrdinal,
-                                                  CanType member) {
+  std::string mangleBaseWitnessTableAccessFunction(
+                                      const ProtocolConformance *Conformance,
+                                      const ProtocolDecl *BaseProto) {
     beginMangling();
-    bool isFirstAssociatedTypeIdentifier = true;
-    appendType(GenericTypeParamType::get(0, baseOrdinal,
-                                         member->getASTContext()));
-    appendAssociatedTypePath(member, isFirstAssociatedTypeIdentifier);
-    appendOperator("MXA");
+    appendProtocolConformance(Conformance);
+    appendAnyGenericType(BaseProto);
+    appendOperator("Wb");
     return finalize();
   }
 
@@ -425,6 +428,20 @@ public:
   std::string mangleSymbolNameForSymbolicMangling(
                                               const SymbolicMangling &mangling,
                                               MangledTypeRefRole role);
+
+  std::string mangleSymbolNameForAssociatedConformanceWitness(
+                                  const NormalProtocolConformance *conformance,
+                                  CanType associatedType,
+                                  const ProtocolDecl *proto);
+
+  std::string mangleSymbolNameForKeyPathMetadata(
+                                           const char *kind,
+                                           CanGenericSignature genericSig,
+                                           CanType type,
+                                           ProtocolConformanceRef conformance);
+
+  std::string mangleSymbolNameForGenericEnvironment(
+                                                CanGenericSignature genericSig);
 protected:
   SymbolicMangling
   withSymbolicReferences(IRGenModule &IGM,

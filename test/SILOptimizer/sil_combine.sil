@@ -614,6 +614,30 @@ bb0(%0 : $Builtin.RawPointer):
   return %2 : $Builtin.RawPointer
 }
 
+sil @test_closure : $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: sil @dead_closure_elimination
+// CHECK:      bb0(%0 : $C):
+// CHECK-NEXT:   cond_br
+// CHECK-NOT:  strong_release
+// CHECK:      bb2:
+// CHECK-NEXT:   strong_release %0
+// CHECK         return
+sil @dead_closure_elimination : $@convention(thin) (@owned C) -> () {
+bb0(%0 : $C):
+  %1 = function_ref @test_closure : $@convention(thin) (@guaranteed C) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb1, bb2
+bb1:
+  strong_retain %2 : $@callee_guaranteed () -> ()
+  strong_release %2 : $@callee_guaranteed () -> ()
+  br bb2
+bb2:
+  release_value %2 : $@callee_guaranteed () -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
 ////////////////////////////////////////////
 // Load Proj To GEP Load Canonicalization //
 ////////////////////////////////////////////
@@ -2352,10 +2376,8 @@ bb0:
 
 // CHECK-LABEL:   sil @remove_dead_code_after_unreachable
 // CHECK-NEXT:      bb0
-// CHECK-NOT:       integer_literal $Builtin.Int32, -2
 // CHECK-NEXT:      unreachable
-// CHECK-NOT:       integer_literal $Builtin.Int32, -2
-// CHECK-NEXT:      }
+// CHECK-NEXT:      } // end sil function 'remove_dead_code_after_unreachable'
 sil @remove_dead_code_after_unreachable : $@convention(thin) () -> (Int32) {
 bb0:
   unreachable
@@ -3217,7 +3239,7 @@ extension PM {
 
 
 public final class VV {
-  @sil_stored final var m: PM { get set }
+  @_hasStorage final var m: PM { get set }
   init()
   deinit
 }
@@ -3511,6 +3533,8 @@ bb0(%0 : $*Builtin.Int64, %1 : $B):
   return %4 : $Builtin.Int64
 }
 
+protocol _NSArrayCore {}
+
 // CHECK-LABEL: sil @mark_dependence_base2
 // CHECK: bb0(
 // CHECK-NOT: open_existential_ref
@@ -3637,3 +3661,54 @@ bb0:
   return %36 : $Builtin.Int64
 }
 
+// CHECK-LABEL: sil @conversion_to_and_from_bridge_object
+// CHECK:      bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT:   return %0
+sil @conversion_to_and_from_bridge_object : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = struct $UInt64 (%0 : $Builtin.Int64)
+  %2 = value_to_bridge_object %1 : $UInt64
+  %3 = bridge_object_to_word %2 : $Builtin.BridgeObject to $Builtin.Word
+  %4 = builtin "zextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// <rdar://46746188> crash in swift_getObjCClassFromObject
+// class TestDocument: NSPersistentDocument {
+//   override init() {
+//     super.init()
+//   }
+//   convenience init(type: String) throws {
+//     self.init()
+//   }
+// }
+// After inlining the __allocating_init, we have two uses of the value_metatype.
+// The second use goes through a thick_to_objc_metatype. When SILCombine replaces 
+// thick_to_objc_metatype with value_metatype, it cannot extend the liverange
+// of value_metatype's operand.
+@objc class TestObjCInit {
+  init()
+
+  convenience init(type: String) throws
+}
+// CHECK-LABEL: sil hidden [thunk] @objc_init_partial_dealloc : $@convention(objc_method) (@owned TestObjCInit) -> Optional<TestObjCInit> {
+// CHECK: bb0(%0 : $TestObjCInit):
+// CHECK:   [[VMT2:%.*]] = value_metatype $@objc_metatype TestObjCInit.Type, %0 : $TestObjCInit
+// CHECK:   [[VMT:%.*]] = value_metatype $@thick TestObjCInit.Type, %0 : $TestObjCInit
+// CHECK:   dealloc_partial_ref %0 : $TestObjCInit, [[VMT]] : $@thick TestObjCInit.Type
+// CHECK-NOT: value_metatype
+// CHECK:   [[O:%.*]] = alloc_ref_dynamic [objc] [[VMT2]] : $@objc_metatype TestObjCInit.Type, $TestObjCInit
+// CHECK:   [[M:%.*]] = objc_method [[O]] : $TestObjCInit, #TestObjCInit.init!initializer.1.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+// CHECK:   apply [[M]]([[O]]) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+// CHECK-LABEL: } // end sil function 'objc_init_partial_dealloc'
+sil hidden [thunk] @objc_init_partial_dealloc : $@convention(objc_method) (@owned TestObjCInit) -> Optional<TestObjCInit> {
+bb0(%2 : $TestObjCInit):
+  %8 = value_metatype $@thick TestObjCInit.Type, %2 : $TestObjCInit
+  dealloc_partial_ref %2 : $TestObjCInit, %8 : $@thick TestObjCInit.Type
+  %11 = thick_to_objc_metatype %8 : $@thick TestObjCInit.Type to $@objc_metatype TestObjCInit.Type
+  %12 = alloc_ref_dynamic [objc] %11 : $@objc_metatype TestObjCInit.Type, $TestObjCInit
+  %13 = objc_method %12 : $TestObjCInit, #TestObjCInit.init!initializer.1.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+  %14 = apply %13(%12) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+  %19 = enum $Optional<TestObjCInit>, #Optional.some!enumelt.1, %14 : $TestObjCInit
+  return %19 : $Optional<TestObjCInit>
+}

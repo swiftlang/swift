@@ -108,7 +108,7 @@ enum {
 /// \sa SIL_INDEX_BLOCK_ID
 namespace sil_index_block {
   // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
+  // the module version.
   enum RecordKind {
     SIL_FUNC_NAMES = 1,
     SIL_FUNC_OFFSETS,
@@ -140,7 +140,7 @@ namespace sil_index_block {
 /// \sa SIL_BLOCK_ID
 namespace sil_block {
   // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
+  // the module version.
   enum RecordKind : uint8_t {
     SIL_FUNCTION = 1,
     SIL_BASIC_BLOCK,
@@ -181,7 +181,6 @@ namespace sil_block {
     INHERITED_PROTOCOL_CONFORMANCE
       = decls_block::INHERITED_PROTOCOL_CONFORMANCE,
     INVALID_PROTOCOL_CONFORMANCE = decls_block::INVALID_PROTOCOL_CONFORMANCE,
-    GENERIC_PARAM = decls_block::GENERIC_PARAM,
     GENERIC_REQUIREMENT = decls_block::GENERIC_REQUIREMENT,
     LAYOUT_REQUIREMENT = decls_block::LAYOUT_REQUIREMENT,
   };
@@ -290,7 +289,9 @@ namespace sil_block {
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
+                     BCFixed<1>,  // is dynamically replacable
                      TypeIDField, // SILFunctionType
+                     DeclIDField,  // SILFunction name or 0 (replaced function)
                      GenericEnvironmentIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute

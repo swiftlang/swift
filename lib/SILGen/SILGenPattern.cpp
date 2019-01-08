@@ -477,10 +477,11 @@ private:
                       ConsumableManagedValue src,
                       const SpecializationHandler &handleSpec,
                       const FailureHandler &failure);
-  void emitEnumElementDispatchWithOwnership(
-      ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
-      const SpecializationHandler &handleSpec, const FailureHandler &failure,
-      ProfileCounter defaultCaseCount);
+  void emitEnumElementObjectDispatch(ArrayRef<RowToSpecialize> rows,
+                                     ConsumableManagedValue src,
+                                     const SpecializationHandler &handleSpec,
+                                     const FailureHandler &failure,
+                                     ProfileCounter defaultCaseCount);
   void emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
@@ -740,22 +741,28 @@ forwardIntoSubtree(SILGenFunction &SGF, SILLocation loc,
 
   auto consumptionKind = outerCMV.getFinalConsumption();
   (void)consumptionKind;
+
+  // If we have an object and it is take always, we need to borrow the value
+  // since we do not own the value at this point.
+  if (outerMV.getType().isObject()) {
+    assert(consumptionKind == CastConsumptionKind::TakeAlways &&
+           "Object without cleanup that is not take_always?!");
+    return {outerMV.borrow(SGF, loc), CastConsumptionKind::BorrowAlways};
+  }
+
+  // Only address only values use TakeOnSuccess.
+  assert(outerMV.getType().isAddressOnly(SGF.getModule()) &&
+         "TakeOnSuccess can only be used with address only values");
+
   assert((consumptionKind == CastConsumptionKind::TakeAlways ||
           consumptionKind == CastConsumptionKind::TakeOnSuccess) &&
          "non-+1 consumption with a cleanup?");
   scope.pushCleanupState(outerMV.getCleanup(),
                          CleanupState::PersistentlyActive);
 
-  // If SILOwnership is enabled and we have an object, borrow instead of take on
-  // success.
-  if (SGF.F.getModule().getOptions().EnableSILOwnership &&
-      outerMV.getType().isObject()) {
-    return {outerMV.borrow(SGF, loc), CastConsumptionKind::BorrowAlways};
-  }
-
   // Success means that we won't end up in the other branch,
   // but failure doesn't.
-  return { outerMV, CastConsumptionKind::TakeOnSuccess };
+  return {outerMV, CastConsumptionKind::TakeOnSuccess};
 }
 
 /// Forward a value down into an irrefutable branch of the decision tree.
@@ -982,6 +989,11 @@ chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
 /// Recursively emit a decision tree from the given pattern matrix.
 void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
                                         const FailureHandler &outerFailure) {
+  if (clauses.rows() == 0) {
+    SGF.B.createUnreachable(SILLocation(PatternMatchStmt));
+    return;
+  }
+
   unsigned firstRow = 0;
   while (true) {
     // If there are no rows remaining, then we fail.
@@ -1198,7 +1210,9 @@ void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
     testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();
   }
 
-  SGF.B.createCondBranch(loc, testBool, trueBB, falseBB);
+  // Extract the i1 from the Bool struct.
+  auto i1Value = SGF.emitUnwrapIntegerResult(loc, testBool);
+  SGF.B.createCondBranch(loc, i1Value, trueBB, falseBB);
 
   SGF.B.setInsertionPoint(falseBB);
   failure(loc);
@@ -1462,12 +1476,38 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     auto &fieldTL = SGF.getTypeLowering(fieldTy);
 
     SILValue member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
-    if (!fieldTL.isAddressOnly()) {
-      member =
-          fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
+    ConsumableManagedValue memberCMV;
+
+    // If we have a loadable sub-type of our tuple...
+    if (fieldTL.isLoadable()) {
+      switch (src.getFinalConsumption()) {
+      case CastConsumptionKind::TakeAlways: {
+        // and our consumption is take always, perform a load [take] and
+        // continue.
+        auto memberMV = ManagedValue::forUnmanaged(member);
+        memberCMV = {SGF.B.createLoadTake(loc, memberMV),
+                     CastConsumptionKind::TakeAlways};
+        break;
+      }
+      case CastConsumptionKind::TakeOnSuccess:
+      case CastConsumptionKind::CopyOnSuccess: {
+        // otherwise we have take on success or copy on success perform a
+        // load_borrow.
+        auto memberMV = ManagedValue::forUnmanaged(member);
+        memberCMV = {SGF.B.createLoadBorrow(loc, memberMV),
+                     CastConsumptionKind::BorrowAlways};
+        break;
+      }
+      case CastConsumptionKind::BorrowAlways:
+        llvm_unreachable("Borrow always can not be used on objects");
+      }
+    } else {
+      // Otherwise, if we have an address only type, just get the managed
+      // subobject.
+      memberCMV =
+          getManagedSubobject(SGF, member, fieldTL, src.getFinalConsumption());
     }
-    auto memberCMV = getManagedSubobject(SGF, member, fieldTL,
-                                         src.getFinalConsumption());
+
     destructured.push_back(memberCMV);
   }
 
@@ -1528,36 +1568,42 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   SGFContext ctx;
   if (requiresAddress) {
     init = SGF.emitTemporary(loc, srcAbstractTL);
-
-    // Okay, if all we need to do is drop the value in an address,
-    // this is easy.
-    if (!hasAbstraction) {
-      ManagedValue finalValue = src.getFinalManagedValue();
-      if (finalValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
-        finalValue = finalValue.copy(SGF, loc);
-      SGF.B.emitStoreValueOperation(loc, finalValue.forward(SGF),
-                                    init->getAddress(),
-                                    StoreOwnershipQualifier::Init);
-      init->finishInitialization(SGF);
-      ConsumableManagedValue result =
-        { init->getManagedAddress(), src.getFinalConsumption() };
-      if (ArgUnforwarder::requiresUnforwarding(SGF, src))
-        borrowedValues.push_back(result);
-      return result;
-    }
-
     ctx = SGFContext(init.get());
   }
 
-  assert(hasAbstraction);
-  assert(src.getType().isObject() &&
-         "address-only type with abstraction difference?");
-
-  // Produce the value at +1.
   ManagedValue substValue = SGF.getManagedValue(loc, src);
-  ManagedValue origValue = 
-    SGF.emitSubstToOrigValue(loc, substValue, abstraction, sourceType);
-  return ConsumableManagedValue::forOwned(origValue);
+  ManagedValue finalValue;
+  if (hasAbstraction) {
+    assert(src.getType().isObject() &&
+           "address-only type with abstraction difference?");
+    // Produce the value at +1.
+    finalValue = SGF.emitSubstToOrigValue(loc, substValue,
+                                          abstraction, sourceType, ctx);
+  } else {
+    finalValue = substValue;
+  }
+
+  if (requiresAddress) {
+    if (finalValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+      finalValue = finalValue.copy(SGF, loc);
+    SGF.B.emitStoreValueOperation(loc, finalValue.forward(SGF),
+                                  init->getAddress(),
+                                  StoreOwnershipQualifier::Init);
+    init->finishInitialization(SGF);
+
+    // If we had borrow_always, we need to switch to copy_on_success since
+    // that is the address only variant of borrow_always.
+    auto consumption = src.getFinalConsumption();
+    if (consumption == CastConsumptionKind::BorrowAlways)
+      consumption = CastConsumptionKind::CopyOnSuccess;
+    ConsumableManagedValue result = {init->getManagedAddress(), consumption};
+    if (ArgUnforwarder::requiresUnforwarding(SGF, src))
+      borrowedValues.push_back(result);
+
+    return result;
+  }
+
+  return ConsumableManagedValue::forOwned(finalValue);
 }
 
 /// Perform specialized dispatch for a sequence of IsPatterns.
@@ -1570,9 +1616,8 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
 
   // Make any abstraction modifications necessary for casting.
   SmallVector<ConsumableManagedValue, 4> borrowedValues;
-  ConsumableManagedValue operand =
-    emitCastOperand(SGF, rows[0].Pattern, src, sourceType, targetType,
-                          borrowedValues);
+  ConsumableManagedValue operand = emitCastOperand(
+      SGF, rows[0].Pattern, src, sourceType, targetType, borrowedValues);
 
   // Emit the 'is' check.
 
@@ -1590,8 +1635,8 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
 
   SILLocation loc = rows[0].Pattern;
 
-  ConsumableManagedValue castOperand = operand.asBorrowedOperand();
-  
+  ConsumableManagedValue castOperand = operand.asBorrowedOperand(SGF, loc);
+
   // Chain inner failures onto the outer failure.
   const FailureHandler *innerFailure = &failure;
   FailureHandler specializedFailure = [&](SILLocation loc) {
@@ -1744,7 +1789,7 @@ CaseBlocks::CaseBlocks(
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an
 /// OptionalSomePattern.
-void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
+void PatternMatchEmission::emitEnumElementObjectDispatch(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     const SpecializationHandler &handleCase, const FailureHandler &outerFailure,
     ProfileCounter defaultCastCount) {
@@ -1758,9 +1803,9 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
 
   SILLocation loc = PatternMatchStmt;
   loc.setDebugLoc(rows[0].Pattern);
-  // SEMANTIC SIL TODO: Once we have the representation of a switch_enum that
-  // can take a +0 value, this extra copy should be a borrow.
-  SILValue srcValue = src.getFinalManagedValue().copy(SGF, loc).forward(SGF);
+  bool isPlusZero =
+      src.getFinalConsumption() == CastConsumptionKind::BorrowAlways;
+  SILValue srcValue = src.getFinalManagedValue().forward(SGF);
   SGF.B.createSwitchEnum(loc, srcValue, blocks.getDefaultBlock(),
                          blocks.getCaseBlocks(), blocks.getCounts(),
                          defaultCastCount);
@@ -1816,32 +1861,38 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     } else {
       auto *eltTL = &SGF.getTypeLowering(eltTy);
 
-      SILValue eltValue =
-          caseBB->createPhiArgument(eltTy, ValueOwnershipKind::Owned);
+      SILValue eltValue;
+      if (isPlusZero) {
+        origCMV = {SGF.B.createGuaranteedPhiArgument(eltTy),
+                   CastConsumptionKind::BorrowAlways};
+      } else {
+        origCMV = {SGF.B.createOwnedPhiArgument(eltTy),
+                   CastConsumptionKind::TakeAlways};
+      }
 
-      // We performed a copy early, so we get a +1 value here.
-      origCMV = getManagedSubobject(SGF, eltValue, *eltTL,
-                                    CastConsumptionKind::TakeAlways);
       eltCMV = origCMV;
 
       // If the payload is boxed, project it.
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
-        SILValue boxedValue =
-            SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
-        eltTL = &SGF.getTypeLowering(boxedValue->getType());
-        if (eltTL->isLoadable()) {
-          ManagedValue newLoadedBoxValue = SGF.B.createLoadBorrow(
-              loc, ManagedValue::forUnmanaged(boxedValue));
-          boxedValue = newLoadedBoxValue.getUnmanagedValue();
-        }
+        ManagedValue boxedValue =
+            SGF.B.createProjectBox(loc, origCMV.getFinalManagedValue(), 0);
+        eltTL = &SGF.getTypeLowering(boxedValue.getType());
 
-        // The boxed value may be shared, so we always have to copy it.
-        eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
-                                     CastConsumptionKind::CopyOnSuccess);
+        // TODO: If we have something that is not loadable
+        if (eltTL->isLoadable()) {
+          // The boxed value may be shared, so we need to load the value at +0
+          // to make sure that we copy if we try to use it outside of the switch
+          // statement itself.
+          boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
+          eltCMV = {boxedValue, CastConsumptionKind::BorrowAlways};
+        } else {
+          // Otherwise, we have an address only payload and we use
+          // copy on success instead.
+          eltCMV = {boxedValue, CastConsumptionKind::CopyOnSuccess};
+        }
       }
 
       // Reabstract to the substituted type, if needed.
-
       CanType substEltTy =
           sourceType
               ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), elt,
@@ -1853,6 +1904,8 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
                ? AbstractionPattern(substEltTy)
                : SGF.SGM.M.Types.getAbstractionPattern(elt));
 
+      // If we reabstracted, we may have a +1 value returned. We are ok with
+      // that as long as it is TakeAlways.
       eltCMV = emitReabstractedSubobject(SGF, loc, eltCMV, *eltTL, origEltTy,
                                          substEltTy);
     }
@@ -1864,7 +1917,11 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
   // Emit the default block if we needed one.
   if (SILBasicBlock *defaultBB = blocks.getDefaultBlock()) {
     SGF.B.setInsertionPoint(defaultBB);
-    SGF.B.createOwnedPhiArgument(src.getType());
+    if (isPlusZero) {
+      SGF.B.createGuaranteedPhiArgument(src.getType());
+    } else {
+      SGF.B.createOwnedPhiArgument(src.getType());
+    }
     outerFailure(rows.back().Pattern);
   }
 }
@@ -1875,55 +1932,73 @@ void PatternMatchEmission::emitEnumElementDispatch(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     const SpecializationHandler &handleCase, const FailureHandler &outerFailure,
     ProfileCounter defaultCaseCount) {
-  // If sil ownership is enabled and we have that our source type is an object,
-  // use the dispatch code path.
-  if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
-    return emitEnumElementDispatchWithOwnership(rows, src, handleCase,
-                                                outerFailure, defaultCaseCount);
+  // Why do we need to do this here (I just cargo culted this).
+  SILLocation loc = PatternMatchStmt;
+  loc.setDebugLoc(rows[0].Pattern);
+
+  // If our source is an address that is loadable, perform a load_borrow.
+  if (src.getType().isAddress() && src.getType().isLoadable(SGF.getModule())) {
+    src = {SGF.B.createLoadBorrow(loc, src.getFinalManagedValue()),
+           CastConsumptionKind::BorrowAlways};
   }
+
+  // If we have an object...
+  if (src.getType().isObject()) {
+    // And we have a non-trivial object type that we are asked to perform take
+    // on success for, borrow the value instead.
+    //
+    // The reason why do this for TakeOnSuccess is that we want to not have to
+    // deal with unforwarding of aggregate tuples in failing cases since that
+    // causes ownership invariants to be violated since we already forwarded the
+    // aggregate to create cleanups on its elements.
+    //
+    // In contrast, we do still want to allow for TakeAlways variants to not
+    // need to borrow, so we do not borrow if we take always.
+    if (!src.getType().isTrivial(SGF.getModule()) &&
+        src.getFinalConsumption() == CastConsumptionKind::TakeOnSuccess) {
+      src = {src.getFinalManagedValue().borrow(SGF, loc),
+             CastConsumptionKind::BorrowAlways};
+    }
+
+    // Finally perform the enum element dispatch.
+    return emitEnumElementObjectDispatch(rows, src, handleCase, outerFailure,
+                                         defaultCaseCount);
+  }
+
+  // After this point we now that we must have an address only type.
+  assert(src.getType().isAddressOnly(SGF.getModule()) &&
+         "Should have an address only type here");
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
   // Collect the cases and specialized rows.
   CaseBlocks blocks{SGF, rows, sourceType, SGF.B.getInsertionBB()};
 
-  // Emit the switch_enum{_addr} instruction.
-  bool addressOnlyEnum = src.getType().isAddress();
-
   // We lack a SIL instruction to nondestructively project data from an
   // address-only enum, so we can only do so in place if we're allowed to take
   // the source always. Copy the source if we can't.
-  if (addressOnlyEnum) {
-    switch (src.getFinalConsumption()) {
-    case CastConsumptionKind::TakeAlways:
-    case CastConsumptionKind::CopyOnSuccess:
-    case CastConsumptionKind::BorrowAlways:
-      // No change to src necessary.
+  switch (src.getFinalConsumption()) {
+  case CastConsumptionKind::TakeAlways:
+  case CastConsumptionKind::CopyOnSuccess:
+  case CastConsumptionKind::BorrowAlways:
+    // No change to src necessary.
+    break;
+
+  case CastConsumptionKind::TakeOnSuccess:
+    // If any of the specialization cases is refutable, we must copy.
+    if (!blocks.hasAnyRefutableCase())
       break;
 
-    case CastConsumptionKind::TakeOnSuccess:
-      // If any of the specialization cases is refutable, we must copy.
-      if (!blocks.hasAnyRefutableCase())
-        break;
-
-      src = ConsumableManagedValue(ManagedValue::forUnmanaged(src.getValue()),
-                                   CastConsumptionKind::CopyOnSuccess);
-      break;
-    }
+    src = ConsumableManagedValue(ManagedValue::forUnmanaged(src.getValue()),
+                                 CastConsumptionKind::CopyOnSuccess);
+    break;
   }
 
+  // Emit the switch_enum_addr instruction.
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
-  SILLocation loc = PatternMatchStmt;
-  loc.setDebugLoc(rows[0].Pattern);
-  if (addressOnlyEnum) {
-    SGF.B.createSwitchEnumAddr(loc, srcValue, blocks.getDefaultBlock(),
-                               blocks.getCaseBlocks(), blocks.getCounts(),
-                               defaultCaseCount);
-  } else {
-    SGF.B.createSwitchEnum(loc, srcValue, blocks.getDefaultBlock(),
-                           blocks.getCaseBlocks(), blocks.getCounts(),
-                           defaultCaseCount);
-  }
+  SGF.B.createSwitchEnumAddr(loc, srcValue, blocks.getDefaultBlock(),
+                             blocks.getCaseBlocks(), blocks.getCounts(),
+                             defaultCaseCount);
 
   // Okay, now emit all the cases.
   blocks.forEachCase([&](EnumElementDecl *elt, SILBasicBlock *caseBB,
@@ -1988,53 +2063,59 @@ void PatternMatchEmission::emitEnumElementDispatch(
       }
 
       SILValue eltValue;
-      if (addressOnlyEnum) {
-        // We can only project destructively from an address-only enum, so
-        // copy the value if we can't consume it.
-        // TODO: Should have a more efficient way to copy payload
-        // nondestructively from an enum.
-        switch (eltConsumption) {
-        case CastConsumptionKind::TakeAlways:
-          eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, srcValue,
-                                                           elt, eltTy);
-          break;
-        case CastConsumptionKind::BorrowAlways:
-          // If we reach this point, we know that we have a loadable
-          // element type from an enum with mixed address
-          // only/loadable cases. Since we had an address only type,
-          // we assume that we will not have BorrowAlways since
-          // address only types do not support BorrowAlways.
-          llvm_unreachable("not allowed");
-        case CastConsumptionKind::CopyOnSuccess: {
-          auto copy = SGF.emitTemporaryAllocation(loc, srcValue->getType());
-          SGF.B.createCopyAddr(loc, srcValue, copy,
-                               IsNotTake, IsInitialization);
-          // We can always take from the copy.
-          eltConsumption = CastConsumptionKind::TakeAlways;
-          eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, copy,
-                                                           elt, eltTy);
-          break;
-        }
-
-        // We can't conditionally take, since UncheckedTakeEnumDataAddr
-        // invalidates the enum.
-        case CastConsumptionKind::TakeOnSuccess:
-          llvm_unreachable("not allowed");
-        }
-        
-        // Load a loadable data value.
-        if (eltTL->isLoadable())
-          eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
-                                     LoadOwnershipQualifier::Take);
-      } else {
-        eltValue = caseBB->createPhiArgument(eltTy, ValueOwnershipKind::Owned);
+      // We can only project destructively from an address-only enum, so
+      // copy the value if we can't consume it.
+      // TODO: Should have a more efficient way to copy payload
+      // nondestructively from an enum.
+      switch (eltConsumption) {
+      case CastConsumptionKind::TakeAlways:
+        eltValue =
+            SGF.B.createUncheckedTakeEnumDataAddr(loc, srcValue, elt, eltTy);
+        break;
+      case CastConsumptionKind::BorrowAlways:
+        // If we reach this point, we know that we have a loadable
+        // element type from an enum with mixed address
+        // only/loadable cases. Since we had an address only type,
+        // we assume that we will not have BorrowAlways since
+        // address only types do not support BorrowAlways.
+        llvm_unreachable("not allowed");
+      case CastConsumptionKind::CopyOnSuccess: {
+        auto copy = SGF.emitTemporaryAllocation(loc, srcValue->getType());
+        SGF.B.createCopyAddr(loc, srcValue, copy, IsNotTake, IsInitialization);
+        // We can always take from the copy.
+        eltConsumption = CastConsumptionKind::TakeAlways;
+        eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, copy, elt, eltTy);
+        break;
       }
 
-      origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
+      // We can't conditionally take, since UncheckedTakeEnumDataAddr
+      // invalidates the enum.
+      case CastConsumptionKind::TakeOnSuccess:
+        llvm_unreachable("not allowed");
+      }
+
+      // If we have a loadable payload despite the enum being address only, load
+      // the value. This invariant makes it easy to specialize code for
+      // ownership.
+      if (eltTL->isLoadable()) {
+        // If we do not have a loadable value, just use getManagedSubObject
+        // Load a loadable data value.
+        auto managedEltValue = ManagedValue::forUnmanaged(eltValue);
+        if (eltConsumption == CastConsumptionKind::CopyOnSuccess) {
+          managedEltValue = SGF.B.createLoadBorrow(loc, managedEltValue);
+          eltConsumption = CastConsumptionKind::BorrowAlways;
+        } else {
+          assert(eltConsumption == CastConsumptionKind::TakeAlways);
+          managedEltValue = SGF.B.createLoadTake(loc, managedEltValue);
+        }
+        origCMV = {managedEltValue, eltConsumption};
+      } else {
+        origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
+      }
+
       eltCMV = origCMV;
 
       // If the payload is boxed, project it.
-
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
         SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
@@ -2042,15 +2123,28 @@ void PatternMatchEmission::emitEnumElementDispatch(
           UnenforcedAccess access;
           SILValue accessAddress =
             access.beginAccess(SGF, loc, boxedValue, SILAccessKind::Read);
-          ManagedValue newLoadedBoxValue = SGF.B.createLoadBorrow(
-            loc, ManagedValue::forUnmanaged(accessAddress));
+
+          // If we needed to do another begin_access, we need to perform a
+          // load_copy. This is because we are going to immediately close the
+          // access here. If we are already in a different access, we can
+          // perform a load_borrow instead here.
+          auto accessMV = ManagedValue::forUnmanaged(accessAddress);
+          ManagedValue newLoadedBoxValue;
+          if (accessAddress == boxedValue) {
+            newLoadedBoxValue = SGF.B.createLoadBorrow(loc, accessMV);
+          } else {
+            newLoadedBoxValue = SGF.B.createLoadCopy(loc, accessMV);
+          }
           boxedValue = newLoadedBoxValue.getUnmanagedValue();
           access.endAccess(SGF);
-        }
 
-        // The boxed value may be shared, so we always have to copy it.
-        eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
-                                     CastConsumptionKind::CopyOnSuccess);
+          // Since we made a copy, send down TakeAlways.
+          eltCMV = {newLoadedBoxValue, CastConsumptionKind::TakeAlways};
+        } else {
+          // The boxed value may be shared, so we always have to copy it.
+          eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
+                                       CastConsumptionKind::CopyOnSuccess);
+        }
       }
 
       // Reabstract to the substituted type, if needed.
@@ -2158,15 +2252,8 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
 
   // Extract the i1 from the Bool struct.
-  StructDecl *BoolStruct = cast<StructDecl>(Context.getBoolDecl());
-  auto Members = BoolStruct->lookupDirect(Context.Id_value_);
-  assert(Members.size() == 1 &&
-         "Bool should have only one property with name '_value'");
-  auto Member = dyn_cast<VarDecl>(Members[0]);
-  assert(Member &&"Bool should have a property with name '_value' of type Int1");
-  auto *ETI = SGF.B.createStructExtract(loc, srcValue, Member);
-
-  SGF.B.createSwitchValue(loc, SILValue(ETI), defaultBB, caseBBs);
+  auto i1Value = SGF.emitUnwrapIntegerResult(loc, srcValue);
+  SGF.B.createSwitchValue(loc, i1Value, defaultBB, caseBBs);
 
   // Okay, now emit all the cases.
   for (unsigned i = 0, e = caseInfos.size(); i != e; ++i) {
@@ -2445,6 +2532,7 @@ public:
 static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
                                                   SILLocation loc,
                                                   ManagedValue value,
+                                                  Type subjectTy,
                                                   const EnumDecl *enumDecl) {
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCaseValue(nullptr);
@@ -2458,10 +2546,9 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
   assert(value.getType().isTrivial(SGF.getModule()));
 
   // Get the enum type as an Any.Type value.
-  CanType switchedValueSwiftType = value.getType().getASTType();
   SILType metatypeType = SGF.getLoweredType(
-      CanMetatypeType::get(switchedValueSwiftType,
-                           MetatypeRepresentation::Thick));
+      AbstractionPattern::getOpaque(),
+      MetatypeType::get(subjectTy));
   SILValue metatype = SGF.B.createMetatype(loc, metatypeType);
 
   // Bitcast the enum value to its raw type. (This is only safe for @objc
@@ -2482,7 +2569,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
         assert(genericParam->getIndex() < 2);
         switch (genericParam->getIndex()) {
         case 0:
-          return switchedValueSwiftType;
+          return subjectTy;
 
         case 1:
           return enumDecl->getRawType();
@@ -2501,7 +2588,8 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
 
 static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
                                              SILLocation loc,
-                                             ManagedValue value) {
+                                             ManagedValue value,
+                                             Type subjectTy) {
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCase(nullptr);
   if (!diagnoseFailure) {
@@ -2510,16 +2598,15 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
   }
 
   // Get the switched-upon value's type.
-  CanType switchedValueSwiftType = value.getType().getASTType();
   SILType metatypeType = SGF.getLoweredType(
-      CanMetatypeType::get(switchedValueSwiftType,
-                           MetatypeRepresentation::Thick));
+      AbstractionPattern::getOpaque(),
+      MetatypeType::get(subjectTy)->getCanonicalType());
   ManagedValue metatype = SGF.B.createValueMetatype(loc, metatypeType, value);
 
   auto diagnoseSignature = diagnoseFailure->getGenericSignature();
   auto genericArgsMap = SubstitutionMap::get(
       diagnoseSignature,
-      [&](SubstitutableType *type) -> Type { return switchedValueSwiftType; },
+      [&](SubstitutableType *type) -> Type { return subjectTy; },
       LookUpConformanceInSignature(*diagnoseSignature));
 
   SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, genericArgsMap,
@@ -2529,11 +2616,14 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   LLVM_DEBUG(llvm::dbgs() << "emitting switch stmt\n";
-             S->print(llvm::dbgs());
+             S->dump(llvm::dbgs());
              llvm::dbgs() << '\n');
+
+  auto subjectTy = S->getSubjectExpr()->getType();
+
   // If the subject expression is uninhabited, we're already dead.
   // Emit an unreachable in place of the switch statement.
-  if (S->getSubjectExpr()->getType()->isStructurallyUninhabited()) {
+  if (subjectTy->isStructurallyUninhabited()) {
     emitIgnoredExpr(S->getSubjectExpr());
     B.createUnreachable(S);
     return;
@@ -2651,9 +2741,39 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   PatternMatchContext switchContext = { emission };
   SwitchStack.push_back(&switchContext);
 
-  // Emit the subject value. Dispatching will consume it.
-  ManagedValue subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
-  auto subject = ConsumableManagedValue::forOwned(subjectMV);
+  // Emit the subject value. If at +1, dispatching will consume it. If it is at
+  // +0, we just forward down borrows.
+  ManagedValue subjectMV = emitRValueAsSingleValue(
+      S->getSubjectExpr(), SGFContext::AllowGuaranteedPlusZero);
+
+  // Inline constructor for subject.
+  auto subject = ([&]() -> ConsumableManagedValue {
+    // If we have a plus one value...
+    if (subjectMV.isPlusOne(*this)) {
+      // And we have an address that is loadable, perform a load [take].
+      if (subjectMV.getType().isAddress() &&
+          subjectMV.getType().isLoadable(getModule())) {
+        subjectMV = B.createLoadTake(S, subjectMV);
+      }
+      return {subjectMV, CastConsumptionKind::TakeAlways};
+    }
+
+    // If we have a loadable address and +0, perform a load borrow.
+    if (subjectMV.getType().isAddress() &&
+        subjectMV.getType().isLoadable(getModule())) {
+      subjectMV = B.createLoadBorrow(S, subjectMV);
+    }
+
+    // If then we have an object, return it at +0.
+    if (subjectMV.getType().isObject()) {
+      return {subjectMV, CastConsumptionKind::BorrowAlways};
+    }
+
+    // If we have an address only type returned without a cleanup, we
+    // need to do a copy just to be safe. So for efficiency we pass it
+    // down take_always.
+    return {subjectMV.copy(*this, S), CastConsumptionKind::TakeAlways};
+  }());
 
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, we trap. This can happen with a switch
@@ -2668,12 +2788,13 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       if (singleEnumDecl->isObjC()) {
         emitDiagnoseOfUnexpectedEnumCaseValue(*this, location,
                                               subject.getFinalManagedValue(),
-                                              singleEnumDecl);
+                                              subjectTy, singleEnumDecl);
         return;
       }
     }
     emitDiagnoseOfUnexpectedEnumCase(*this, location,
-                                     subject.getFinalManagedValue());
+                                     subject.getFinalManagedValue(),
+                                     subjectTy);
   };
 
   // Set up an initial clause matrix.
@@ -2778,13 +2899,14 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
 
   // Set up an initial clause matrix.
   ClauseMatrix clauseMatrix(clauseRows);
-  ConsumableManagedValue subject;
-  if (F.getModule().getOptions().EnableSILOwnership &&
-      exn.getType().isObject()) {
-    subject = {exn.borrow(*this, S), CastConsumptionKind::BorrowAlways};
-  } else {
-    subject = {exn, CastConsumptionKind::TakeOnSuccess};
-  }
+
+  assert(exn.getType().isObject() &&
+         "Error is special and should always be an object");
+  // Our model is that sub-cases get the exception at +0 and the throw (if we
+  // need to rethrow the exception) gets the exception at +1 since we need to
+  // trampoline it's ownership to our caller.
+  ConsumableManagedValue subject = {exn.borrow(*this, S),
+                                    CastConsumptionKind::BorrowAlways};
 
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, just rethrow the exception.
@@ -2797,7 +2919,10 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
       return;
     }
 
-    // Don't actually kill the exception's cleanup.
+    // Since we borrowed exn before sending it to our subcases, we know that it
+    // must be at +1 at this point. That being said, SILGenPattern will
+    // potentially invoke this for each of the catch statements, so we need to
+    // copy before we pass it into the throw.
     CleanupStateRestorationScope scope(Cleanups);
     if (exn.hasCleanup()) {
       scope.pushCleanupState(exn.getCleanup(),

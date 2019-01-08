@@ -150,3 +150,11 @@ public class FinalFuncContainer {
   public func NewFinalFunc() {}
   public final func NoLongerFinalFunc() {}
 }
+
+public protocol AssociatedTypesProtocol {
+  associatedtype T
+}
+
+public class TChangesFromIntToString: AssociatedTypesProtocol {
+  public typealias T = Int
+}

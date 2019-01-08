@@ -203,10 +203,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
         Base = Conv->getSubExpr();
 
-      // Record call arguments.
-      if (auto Call = dyn_cast<CallExpr>(Base))
-        CallArgs.insert(Call->getArg());
-
       if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
         // Verify metatype uses.
         if (isa<TypeDecl>(DRE->getDecl())) {
@@ -235,7 +231,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
+      if (auto *TSE = dyn_cast<TupleShuffleExpr>(E)) {
+        if (CallArgs.count(TSE))
+          CallArgs.insert(TSE->getSubExpr());
+      }
+
       if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
+        CallArgs.insert(SE->getIndex());
+
         // Implicit InOutExpr's are allowed in the base of a subscript expr.
         if (auto *IOE = dyn_cast<InOutExpr>(SE->getBase()))
           if (IOE->isImplicit())
@@ -246,6 +249,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
             checkNoEscapeParameterUse(DRE, SE, OperandKind::Argument);
         });
+      }
+
+      if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+        for (auto Comp : KPE->getComponents()) {
+          if (auto *Arg = Comp.getIndexExpr())
+            CallArgs.insert(Arg);
+        }
       }
 
       if (auto *AE = dyn_cast<CollectionExpr>(E)) {
@@ -266,6 +276,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
+        // Record call arguments.
+        CallArgs.insert(Call->getArg());
+
         // Warn about surprising implicit optional promotions.
         checkOptionalPromotions(Call);
         
@@ -378,6 +391,18 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           TC.diagnose(E->getLoc(), diag::init_delegation_nested,
                       isChainToSuper, !IsExprStmt);
+        }
+      }
+
+      // Diagnose single-element tuple expressions.
+      if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
+        if (!CallArgs.count(tupleExpr)) {
+          if (tupleExpr->getNumElements() == 1) {
+            TC.diagnose(tupleExpr->getElementNameLoc(0),
+                        diag::tuple_single_element)
+              .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
+                                tupleExpr->getElement(0)->getStartLoc());
+          }
         }
       }
 
@@ -3751,38 +3776,122 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       }
     }
 
+    enum class UnintendedInterpolationKind: bool {
+      Optional,
+      Function
+    };
+
     void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
-      // Warn about interpolated segments that contain optionals or function.
-      for (auto &segment : E->getSegments()) {
-        // Allow explicit casts.
-        if (auto paren = dyn_cast<ParenExpr>(segment))
-          if (isa<ExplicitCastExpr>(paren->getSubExpr()))
-            continue;
+      E->forEachSegment(TC.Context,
+          [&](bool isInterpolation, CallExpr *segment) -> void {
+        if (isInterpolation) {
+          diagnoseIfUnintendedInterpolation(segment,
+                              UnintendedInterpolationKind::Optional);
+          diagnoseIfUnintendedInterpolation(segment,
+                              UnintendedInterpolationKind::Function);
+        }
+      });
+    }
 
-        bool isOptional = bool(segment->getType()->getRValueType()->getOptionalObjectType());
-        bool isFunction = segment->getType()->getRValueType()->is<AnyFunctionType>();
+    void diagnoseIfUnintendedInterpolation(CallExpr *segment,
+                                           UnintendedInterpolationKind kind) {
+      if (interpolationWouldBeUnintended(segment->getCalledValue(), kind))
+        if (auto firstArg =
+              getFirstArgIfUnintendedInterpolation(segment->getArg(), kind))
+          diagnoseUnintendedInterpolation(firstArg, kind);
+    }
 
-        // Bail out if we don't have an optional and a function.
-        if (!isOptional && !isFunction)
-          continue;
+    bool interpolationWouldBeUnintended(ConcreteDeclRef appendMethod,
+                                        UnintendedInterpolationKind kind) {
+      ValueDecl * fnDecl = appendMethod.getDecl();
 
-        TC.diagnose(segment->getStartLoc(),
-                    diag::debug_description_in_string_interpolation_segment, isFunction)
-          .highlight(segment->getSourceRange());
+      // If things aren't set up right, just hope for the best.
+      if (!fnDecl || !fnDecl->getInterfaceType() ||
+           fnDecl->getInterfaceType()->hasError())
+        return false;
 
-        // Suggest 'String(describing: <expr>)'.
-        auto segmentStart = segment->getStartLoc().getAdvancedLoc(1);
-        TC.diagnose(segment->getLoc(),
-                    diag::silence_debug_description_in_interpolation_segment_call)
-          .highlight(segment->getSourceRange())
-          .fixItInsert(segmentStart, "String(describing: ")
-          .fixItInsert(segment->getEndLoc(), ")");
+      // If the decl expects an optional, that's fine.
+      auto uncurriedType = fnDecl->getInterfaceType()->getAs<AnyFunctionType>();
+      auto curriedType = uncurriedType->getResult()->getAs<AnyFunctionType>();
 
-        // Suggest inserting a default value about an optional.
-        if (isOptional)
-            TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
-              .highlight(segment->getSourceRange())
-              .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
+      // I don't know why you'd use a zero-arg interpolator, but it obviously 
+      // doesn't interpolate an optional.
+      if (curriedType->getNumParams() == 0)
+        return false;
+
+      // If the first parameter explicitly accepts the type, this method 
+      // presumably doesn't want us to warn about optional use.
+      auto firstParamType =
+        curriedType->getParams().front().getPlainType()->getRValueType();
+      if (kind == UnintendedInterpolationKind::Optional) {
+        if (firstParamType->getOptionalObjectType())
+          return false;
+      } else {
+        if (firstParamType->is<AnyFunctionType>())
+          return false;
+      }
+
+      return true;
+    }
+
+    Expr *
+    getFirstArgIfUnintendedInterpolation(Expr *args,
+                                         UnintendedInterpolationKind kind) {
+      // Just check the first argument, which is usually the value 
+      // being interpolated.
+      Expr *firstArg;
+      if (auto parenExpr = dyn_cast_or_null<ParenExpr>(args)) {
+        firstArg = parenExpr->getSubExpr();
+      } else if (auto tupleExpr = dyn_cast_or_null<TupleExpr>(args)) {
+        if (tupleExpr->getNumElements())
+          firstArg = tupleExpr->getElement(0);
+        else
+          return nullptr;
+      }
+      else {
+        firstArg = args;
+      }
+
+      // Allow explicit casts.
+      if (isa<ExplicitCastExpr>(firstArg->getSemanticsProvidingExpr()))
+        return nullptr;
+
+      // If we don't have a type, assume the best.
+      if (!firstArg->getType() || firstArg->getType()->hasError())
+        return nullptr;
+
+      // Bail out if we don't have an optional.
+      if (kind == UnintendedInterpolationKind::Optional) {
+        if (!firstArg->getType()->getRValueType()->getOptionalObjectType())
+          return nullptr;
+      }
+      else if (kind == UnintendedInterpolationKind::Function) {
+        if (!firstArg->getType()->getRValueType()->is<AnyFunctionType>())
+          return nullptr;
+      }
+
+      return firstArg;
+    }
+
+    void diagnoseUnintendedInterpolation(Expr * arg, UnintendedInterpolationKind kind) {
+      TC.diagnose(arg->getStartLoc(),
+                  diag::debug_description_in_string_interpolation_segment,
+                  (bool)kind)
+        .highlight(arg->getSourceRange());
+
+      // Suggest 'String(describing: <expr>)'.
+      auto argStart = arg->getStartLoc();
+      TC.diagnose(arg->getLoc(),
+                  diag::silence_debug_description_in_interpolation_segment_call)
+        .highlight(arg->getSourceRange())
+        .fixItInsert(argStart, "String(describing: ")
+        .fixItInsertAfter(arg->getEndLoc(), ")");
+
+      if (kind == UnintendedInterpolationKind::Optional) {
+        // Suggest inserting a default value.
+        TC.diagnose(arg->getLoc(), diag::default_optional_to_any)
+          .highlight(arg->getSourceRange())
+          .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
       }
     }
 

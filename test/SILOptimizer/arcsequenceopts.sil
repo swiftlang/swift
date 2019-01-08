@@ -50,7 +50,7 @@ class C {
 sil @cls_use : $@convention(thin) (@owned Cls) -> ()
 
 class Container {
-  @sil_stored var c : Cls
+  @_hasStorage var c : Cls
   init()
 }
 

@@ -594,7 +594,7 @@ func rdar35702810() {
   let fn_map: ([Int: Z]) -> Void = { _ in }
 
   // CHECK: function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
-  // CHECK: apply %5<A, Z>(%6) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: apply %5<A, Z>(%4) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
   foo_arr(type: A.self, fn_arr)
 
   // CHECK: function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
@@ -605,10 +605,8 @@ func rdar35702810() {
 
 protocol X: Hashable {}
 class B: X {
-  var hashValue: Int { return 42 }
-  static func == (lhs: B, rhs: B) -> Bool {
-    return lhs.hashValue == rhs.hashValue
-  }
+  func hash(into hasher: inout Hasher) {}
+  static func == (lhs: B, rhs: B) -> Bool { return true }
 }
 
 func bar_arr<T: X>(type: T.Type, _ fn: ([T]?) -> Void) {}

@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -c -sdk /fake/sdk/path -Xcc -DA -Xcc -DB -emit-module -o %t %S/ASTSection.swift -swift-version 3
+// RUN: %target-swift-frontend -c -sdk /fake/sdk/path -Xcc -DA -Xcc -DB -emit-module -o %t %S/ASTSection.swift -swift-version 4
 // RUN: %swift-ide-test -test-CompilerInvocation-from-module -source-filename=%t/ASTSection.swiftmodule
 
 // Test the inline section mechanism.
@@ -16,7 +16,7 @@
 // REQUIRES: OS=macosx
 
 // CHECK: - Swift Version: {{.+}}.{{.+}}
-// CHECK: - Compatibility Version: 3
+// CHECK: - Compatibility Version: 4
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
 // CHECK: - SDK path: /fake/sdk/path{{$}}
 // CHECK: - -Xcc options: -working-directory {{.+}} -DA -DB

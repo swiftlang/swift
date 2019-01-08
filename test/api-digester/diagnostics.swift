@@ -1,3 +1,4 @@
+// REQUIRES: rdar45592562
 // REQUIRES: OS=macosx
 // RUN: not %api-digester -deserialize-sdk -input-paths %S/diagnostics.json -o - 2>&1 | %FileCheck %s
 

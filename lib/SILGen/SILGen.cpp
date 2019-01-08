@@ -381,6 +381,93 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   return *NSErrorConformanceToError;
 }
 
+SILFunction *
+SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
+                                            KeyPathTypeKind typeKind) {
+  bool isBaseInout;
+  bool isResultInout;
+  StringRef functionName;
+  NominalTypeDecl *keyPathDecl;
+  if (isReadAccess) {
+    assert(typeKind == KPTK_KeyPath ||
+           typeKind == KPTK_WritableKeyPath ||
+           typeKind == KPTK_ReferenceWritableKeyPath);
+    functionName = "swift_readAtKeyPath";
+    isBaseInout = false;
+    isResultInout = false;
+    keyPathDecl = getASTContext().getKeyPathDecl();
+  } else if (typeKind == KPTK_WritableKeyPath) {
+    functionName = "swift_modifyAtWritableKeyPath";
+    isBaseInout = true;
+    isResultInout = true;
+    keyPathDecl = getASTContext().getWritableKeyPathDecl();
+  } else if (typeKind == KPTK_ReferenceWritableKeyPath) {
+    functionName = "swift_modifyAtReferenceWritableKeyPath";
+    isBaseInout = false;
+    isResultInout = true;
+    keyPathDecl = getASTContext().getReferenceWritableKeyPathDecl();
+  } else {
+    llvm_unreachable("bad combination");
+  }
+
+  auto fn = M.lookUpFunction(functionName);
+  if (fn) return fn;
+
+  auto rootType = CanGenericTypeParamType::get(0, 0, getASTContext());
+  auto valueType = CanGenericTypeParamType::get(0, 1, getASTContext());
+
+  // Build the generic signature <A, B>.
+  auto sig = GenericSignature::get({rootType, valueType}, {});
+
+  auto keyPathTy = BoundGenericType::get(keyPathDecl, Type(),
+                                         { rootType, valueType })
+    ->getCanonicalType();
+
+  // (@in_guaranteed/@inout Root, @guaranteed KeyPath<Root, Value>)
+  SILParameterInfo params[] = {
+    { rootType,
+      isBaseInout ? ParameterConvention::Indirect_Inout
+                  : ParameterConvention::Indirect_In_Guaranteed },
+    { keyPathTy, ParameterConvention::Direct_Guaranteed },
+  };
+
+  // -> @yields @in_guaranteed/@inout Value
+  SILYieldInfo yields[] = {
+    { valueType,
+      isResultInout ? ParameterConvention::Indirect_Inout
+                    : ParameterConvention::Indirect_In_Guaranteed },
+  };
+
+  auto extInfo =
+    SILFunctionType::ExtInfo(SILFunctionTypeRepresentation::Thin,
+                             /*pseudogeneric*/false,
+                             /*non-escaping*/false);
+
+  auto functionTy = SILFunctionType::get(sig, extInfo,
+                                         SILCoroutineKind::YieldOnce,
+                                         ParameterConvention::Direct_Unowned,
+                                         params,
+                                         yields,
+                                         /*results*/ {},
+                                         /*error result*/ {},
+                                         getASTContext());
+
+  auto env = sig->createGenericEnvironment();
+
+  SILGenFunctionBuilder builder(*this);
+  fn = builder.createFunction(SILLinkage::PublicExternal,
+                              functionName,
+                              functionTy,
+                              env,
+                              /*location*/ None,
+                              IsNotBare,
+                              IsNotTransparent,
+                              IsNotSerialized,
+                              IsNotDynamic);
+
+  return fn;
+}
+
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
@@ -441,8 +528,8 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   SILGenFunctionBuilder builder(*this);
   return builder.createFunction(
       SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
-      Loc, IsBare, IsNotTransparent, IsNotSerialized, ProfileCounter(),
-      IsNotThunk, SubclassScope::NotApplicable);
+      Loc, IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+      ProfileCounter(), IsNotThunk, SubclassScope::NotApplicable);
 }
 
 SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
@@ -507,7 +594,7 @@ SILGenModule::getOrCreateProfilerForConstructors(DeclContext *ctx,
   // distinct files. For extensions, just pass in the constructor, because
   // there are no stored property initializers to visit.
   Decl *decl = nullptr;
-  if (ctx->isExtensionContext())
+  if (isa<ExtensionDecl>(ctx))
     decl = cd;
   else
     decl = ctx->getSelfNominalTypeDecl();
@@ -588,10 +675,10 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 /// Emit a function now, if it's externally usable or has been referenced in
 /// the current TU, or remember how to emit it later if not.
 template<typename /*void (SILFunction*)*/ Fn>
-void emitOrDelayFunction(SILGenModule &SGM,
-                         SILDeclRef constant,
-                         Fn &&emitter,
-                         bool forceEmission = false) {
+static void emitOrDelayFunction(SILGenModule &SGM,
+                                SILDeclRef constant,
+                                Fn &&emitter,
+                                bool forceEmission = false) {
   auto emitAfter = SGM.lastEmittedFunction;
 
   SILFunction *f = nullptr;
@@ -657,10 +744,12 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
              F->getLoweredType().print(llvm::dbgs());
              llvm::dbgs() << '\n';
              if (astNode) {
-               if (auto *decl = astNode.dyn_cast<ValueDecl *>())
+               if (auto *decl = astNode.dyn_cast<ValueDecl *>()) {
                  decl->dump(llvm::dbgs());
-               else
+               } else {
                  astNode.get<Expr *>()->dump(llvm::dbgs());
+                 llvm::dbgs() << "\n";
+               }
                llvm::dbgs() << '\n';
              });
 }
@@ -1056,9 +1145,9 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   SILGenFunctionBuilder builder(*this);
-  auto *f = builder.createFunction(SILLinkage::Private, funcName, initSILType,
-                                   nullptr, SILLocation(binding), IsNotBare,
-                                   IsNotTransparent, IsNotSerialized);
+  auto *f = builder.createFunction(
+      SILLinkage::Private, funcName, initSILType, nullptr, SILLocation(binding),
+      IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   auto dc = binding->getDeclContext();
   SILGenFunction(*this, *f, dc).emitLazyGlobalInitializer(binding, pbdEntry);
@@ -1203,15 +1292,41 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
-  if (vd->getImplInfo().isSimpleStored()) {
-    // If the global variable has storage, it might also have synthesized
-    // accessors. Emit them here, since they won't appear anywhere else.
-    vd->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-      auto accessor = vd->getAccessor(kind);
-      if (accessor)
-        emitFunction(accessor);
-    });
-  }
+  // Emit the variable's opaque accessors.
+  vd->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
+    auto accessor = vd->getAccessor(kind);
+    if (!accessor) return;
+
+    // Only emit the accessor if it wasn't added to the surrounding decl
+    // list by the parser.  We can test that easily by looking at the impl
+    // info, since all of these accessors have a corresponding access kind
+    // whose impl should definitely point at the accessor if it was parsed.
+    //
+    // This is an unfortunate formation rule, but it's easier than messing
+    // with the invariants for now.
+    bool shouldEmit = [&] {
+      auto impl = vd->getImplInfo();
+      switch (kind) {
+      case AccessorKind::Get:
+        return impl.getReadImpl() != ReadImplKind::Get;
+      case AccessorKind::Read:
+        return impl.getReadImpl() != ReadImplKind::Read;
+      case AccessorKind::Set:
+        return impl.getWriteImpl() != WriteImplKind::Set &&
+               impl.getWriteImpl() != WriteImplKind::StoredWithObservers;
+      case AccessorKind::Modify:
+        return impl.getReadWriteImpl() != ReadWriteImplKind::Modify;
+#define ACCESSOR(ID) \
+      case AccessorKind::ID:
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#include "swift/AST/AccessorKinds.def"
+        llvm_unreachable("not an opaque accessor");
+      }
+    }();
+    if (!shouldEmit) return;
+
+    emitFunction(accessor);
+  });
 
   tryEmitPropertyDescriptor(vd);
 }
@@ -1532,6 +1647,14 @@ public:
         SGF.B.createBuiltin(moduleLoc,
                             sgm.getASTContext().getIdentifier("errorInMain"),
                             sgm.Types.getEmptyTupleType(), {}, {error});
+
+        // Then end the lifetime of the error.
+        //
+        // We do this to appease the ownership verifier. We do not care about
+        // actually destroying the value since we are going to immediately exit,
+        // so this saves us a slight bit of code-size since end_lifetime is
+        // stripped out after ownership is removed.
+        SGF.B.createEndLifetime(moduleLoc, error);
 
         // Signal an abnormal exit by returning 1.
         SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(moduleLoc),

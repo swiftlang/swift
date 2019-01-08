@@ -723,7 +723,7 @@ extension Sequence {
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
   public func reduce<Result>(
-    into initialResult: Result,
+    into initialResult: __owned Result,
     _ updateAccumulatingResult:
       (_ partialResult: inout Result, Element) throws -> ()
   ) rethrows -> Result {
@@ -810,7 +810,7 @@ extension Sequence {
   /// Returns an array containing the non-`nil` results of calling the given
   /// transformation with each element of this sequence.
   ///
-  /// Use this method to receive an array of nonoptional values when your
+  /// Use this method to receive an array of non-optional values when your
   /// transformation produces an optional value.
   ///
   /// In this example, note the difference in the result of using `map` and

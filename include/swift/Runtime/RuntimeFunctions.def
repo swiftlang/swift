@@ -585,16 +585,6 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, SwiftCC,
          ARGS(SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// WitnessTable *swift_getForeignWitnessTable(
-//                                  const WitnessTable *candidate,
-//                                  const TypeContextDescriptor *forType,
-//                                  const ProtocolDescriptor *forProtocol);
-FUNCTION(GetForeignWitnessTable, swift_getForeignWitnessTable, C_CC,
-         RETURNS(WitnessTablePtrTy),
-         ARGS(WitnessTablePtrTy, TypeContextDescriptorPtrTy,
-              ProtocolDescriptorPtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
 // MetadataResponse swift_getSingletonMetadata(MetadataRequest request,
 //                                             TypeContextDescriptor *type);
 FUNCTION(GetSingletonMetadata, swift_getSingletonMetadata, SwiftCC,
@@ -635,10 +625,10 @@ FUNCTION(CheckMetadataState, swift_checkMetadataState, SwiftCC,
          ATTRS(NoUnwind, ReadOnly))
 
 // const ProtocolWitnessTable *
-// swift_instantiateWitnessTable(const ProtocolConformanceDescriptor *conf,
-//                               const Metadata *type,
-//                               void ** const *instantiationArgs);
-FUNCTION(InstantiateWitnessTable, swift_instantiateWitnessTable, C_CC,
+// swift_getWitnessTable(const ProtocolConformanceDescriptor *conf,
+//                       const Metadata *type,
+//                       const void * const *instantiationArgs);
+FUNCTION(GetWitnessTable, swift_getWitnessTable, C_CC,
          RETURNS(WitnessTablePtrTy),
          ARGS(ProtocolConformanceDescriptorPtrTy,
               TypeMetadataPtrTy,
@@ -655,6 +645,23 @@ FUNCTION(GetAssociatedTypeWitness, swift_getAssociatedTypeWitness, SwiftCC,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy,
               WitnessTablePtrTy,
+              TypeMetadataPtrTy,
+              ProtocolRequirementStructTy->getPointerTo(),
+              ProtocolRequirementStructTy->getPointerTo()),
+         ATTRS(NoUnwind, ReadNone))
+
+// SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+// const WitnessTable *swift_getAssociatedConformanceWitness(
+//                                 WitnessTable *wtable,
+//                                 const Metadata *conformingType,
+//                                 const Metadata *assocType,
+//                                 const ProtocolRequirement *reqBase,
+//                                 const ProtocolRequirement *assocConformance);
+FUNCTION(GetAssociatedConformanceWitness,
+         swift_getAssociatedConformanceWitness, SwiftCC,
+         RETURNS(WitnessTablePtrTy),
+         ARGS(WitnessTablePtrTy,
+              TypeMetadataPtrTy,
               TypeMetadataPtrTy,
               ProtocolRequirementStructTy->getPointerTo(),
               ProtocolRequirementStructTy->getPointerTo()),
@@ -856,15 +863,6 @@ FUNCTION(InitEnumMetadataMultiPayload,
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int8PtrPtrTy->getPointerTo(0)),
          ATTRS(NoUnwind))
 
-// int swift_getEnumCaseSinglePayload(opaque_t *obj, Metadata *payload,
-//                                    unsigned num_empty_cases);
-FUNCTION(GetEnumCaseSinglePayload,
-         swift_getEnumCaseSinglePayload,
-         C_CC,
-         RETURNS(Int32Ty),
-         ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty),
-         ATTRS(NoUnwind, ReadOnly))
-
 // int swift_getEnumCaseMultiPayload(opaque_t *obj, Metadata *enumTy);
 FUNCTION(GetEnumCaseMultiPayload,
          swift_getEnumCaseMultiPayload,
@@ -873,14 +871,39 @@ FUNCTION(GetEnumCaseMultiPayload,
          ARGS(OpaquePtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// void swift_storeEnumTagSinglePayload(opaque_t *obj, Metadata *payload,
-//                                      unsigned case_index,
-//                                      unsigned num_empty_cases);
-FUNCTION(StoreEnumTagSinglePayload,
-         swift_storeEnumTagSinglePayload,
-         C_CC,
+// int swift_getEnumTagSinglePayloadGeneric(opaque_t *obj,
+//                                          unsigned num_empty_cases,
+//                                          Metadata *payloadType,
+//                         int (*getExtraInhabitantIndex)(opaque_t *obj,
+//                                                        unsigned numPayloadXI,
+//                                                        Metadata *payload));
+FUNCTION(GetEnumTagSinglePayloadGeneric,
+         swift_getEnumTagSinglePayloadGeneric,
+         SwiftCC,
+         RETURNS(Int32Ty),
+         ARGS(OpaquePtrTy, Int32Ty, TypeMetadataPtrTy,
+              llvm::FunctionType::get(Int32Ty, {OpaquePtrTy, Int32Ty,
+                                                TypeMetadataPtrTy},
+                                      false)->getPointerTo()),
+         ATTRS(NoUnwind, ReadOnly))
+
+
+// void swift_storeEnumTagSinglePayloadGeneric(opaque_t *obj,
+//                                             unsigned case_index,
+//                                             unsigned num_empty_cases,
+//                                             Metadata *payloadType,
+//                           void (*storeExtraInhabitant)(opaque_t *obj,
+//                                                        unsigned case_index,
+//                                                        unsigned numPayloadXI,
+//                                                        Metadata *payload));
+FUNCTION(StoreEnumTagSinglePayloadGeneric,
+         swift_storeEnumTagSinglePayloadGeneric,
+         SwiftCC,
          RETURNS(VoidTy),
-         ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty, Int32Ty),
+         ARGS(OpaquePtrTy, Int32Ty, Int32Ty, TypeMetadataPtrTy,
+              llvm::FunctionType::get(VoidTy, {OpaquePtrTy, Int32Ty, Int32Ty,
+                                               TypeMetadataPtrTy},
+                                      false)->getPointerTo()),
          ATTRS(NoUnwind))
 
 // void swift_storeEnumTagMultiPayload(opaque_t *obj, Metadata *enumTy,
@@ -935,7 +958,7 @@ FUNCTION(DynamicCastClass, swift_dynamicCastClass, C_CC,
 FUNCTION(DynamicCastClassUnconditional, swift_dynamicCastClassUnconditional,
          C_CC,
          RETURNS(Int8PtrTy),
-         ARGS(Int8PtrTy, Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // void *swift_dynamicCastObjCClass(void*, void*);
@@ -948,7 +971,7 @@ FUNCTION(DynamicCastObjCClass, swift_dynamicCastObjCClass, C_CC,
 FUNCTION(DynamicCastObjCClassUnconditional,
          swift_dynamicCastObjCClassUnconditional, C_CC,
          RETURNS(Int8PtrTy),
-         ARGS(Int8PtrTy, Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // void *swift_dynamicCastUnknownClass(void*, void*);
@@ -961,7 +984,7 @@ FUNCTION(DynamicCastUnknownClass, swift_dynamicCastUnknownClass, C_CC,
 FUNCTION(DynamicCastUnknownClassUnconditional,
          swift_dynamicCastUnknownClassUnconditional, C_CC,
          RETURNS(Int8PtrTy),
-         ARGS(Int8PtrTy, Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // type *swift_dynamicCastMetatype(type*, type*);
@@ -974,7 +997,7 @@ FUNCTION(DynamicCastMetatype, swift_dynamicCastMetatype, C_CC,
 FUNCTION(DynamicCastMetatypeUnconditional,
          swift_dynamicCastMetatypeUnconditional, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // objc_class *swift_dynamicCastObjCClassMetatype(objc_class*, objc_class*);
@@ -988,7 +1011,7 @@ FUNCTION(DynamicCastObjCClassMetatype, swift_dynamicCastObjCClassMetatype,
 FUNCTION(DynamicCastObjCClassMetatypeUnconditional,
          swift_dynamicCastObjCClassMetatypeUnconditional, C_CC,
          RETURNS(ObjCClassPtrTy),
-         ARGS(ObjCClassPtrTy, ObjCClassPtrTy),
+         ARGS(ObjCClassPtrTy, ObjCClassPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // bool swift_dynamicCast(opaque*, opaque*, type*, type*, size_t);
@@ -1004,7 +1027,7 @@ FUNCTION(DynamicCast, swift_dynamicCast, C_CC,
 FUNCTION(DynamicCastTypeToObjCProtocolUnconditional,
          swift_dynamicCastTypeToObjCProtocolUnconditional, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind))
 
 // type* swift_dynamicCastTypeToObjCProtocolConditional(type* object,
@@ -1022,7 +1045,7 @@ FUNCTION(DynamicCastTypeToObjCProtocolConditional,
 FUNCTION(DynamicCastObjCProtocolUnconditional,
          swift_dynamicCastObjCProtocolUnconditional, C_CC,
          RETURNS(ObjCPtrTy),
-         ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy),
+         ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind))
 
 // id swift_dynamicCastObjCProtocolConditional(id object,
@@ -1038,7 +1061,7 @@ FUNCTION(DynamicCastObjCProtocolConditional,
 FUNCTION(DynamicCastMetatypeToObjectUnconditional,
          swift_dynamicCastMetatypeToObjectUnconditional, C_CC,
          RETURNS(ObjCPtrTy),
-         ARGS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadNone))
 
 // id swift_dynamicCastMetatypeToObjectConditional(type *type);
@@ -1256,6 +1279,16 @@ FUNCTION(VerifyTypeLayoutAttribute, _swift_debug_verifyTypeLayoutAttribute,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, Int8PtrTy, Int8PtrTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
+
+// float swift_intToFloat32(const size_t *data, IntegerLiteralFlags flags);
+FUNCTION(IntToFloat32, swift_intToFloat32, SwiftCC,
+         RETURNS(FloatTy),
+         ARGS(SizeTy->getPointerTo(), SizeTy),
+         ATTRS(NoUnwind, ReadOnly))
+FUNCTION(IntToFloat64, swift_intToFloat64, SwiftCC,
+         RETURNS(DoubleTy),
+         ARGS(SizeTy->getPointerTo(), SizeTy),
+         ATTRS(NoUnwind, ReadOnly))
 
 #undef RETURNS
 #undef ARGS

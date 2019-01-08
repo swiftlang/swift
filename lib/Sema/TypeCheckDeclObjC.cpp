@@ -760,7 +760,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
     VD->getASTContext().getLazyResolver()->resolveDeclSignature(
                                               const_cast<VarDecl *>(VD));
     if (!VD->hasInterfaceType()) {
-      VD->diagnose(diag::recursive_type_reference, VD->getDescriptiveKind(),
+      VD->diagnose(diag::recursive_decl_reference, VD->getDescriptiveKind(),
                    VD->getName());
       return false;
     }
@@ -988,7 +988,7 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
   auto classDecl = VD->getDeclContext()->getSelfClassDecl();
   if (!classDecl) return false;
 
-  return classDecl->getAttrs().hasAttribute<ObjCMembersAttr>();
+  return classDecl->hasObjCMembers();
 }
 
 // A class is @objc if it does not have generic ancestry, and it either has
@@ -1066,6 +1066,21 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     if (VD->getFormalAccess() <= AccessLevel::FilePrivate)
       return false;
 
+    if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::DidSet:
+      case AccessorKind::Modify:
+      case AccessorKind::Read:
+      case AccessorKind::WillSet:
+        return false;
+
+      case AccessorKind::MutableAddress:
+      case AccessorKind::Address:
+      case AccessorKind::Get:
+      case AccessorKind::Set:
+        break;
+      }
+    }
     return true;
   };
 
@@ -1106,7 +1121,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
        cast<ExtensionDecl>(VD->getDeclContext())->getAttrs()
         .hasAttribute<NonObjCAttr>()))
     return None;
-  if (isMemberOfObjCClassExtension(VD))
+  if (isMemberOfObjCClassExtension(VD) && canInferImplicitObjC())
     return ObjCReason(ObjCReason::MemberOfObjCExtension);
   if (isMemberOfObjCMembersClass(VD) && canInferImplicitObjC())
     return ObjCReason(ObjCReason::MemberOfObjCMembersClass);
@@ -1142,14 +1157,15 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
 
       return ObjCReason(ObjCReason::ExplicitlyDynamic);
     }
-
-    // Complain that 'dynamic' requires '@objc', but (quietly) infer @objc
-    // anyway for better recovery.
-    VD->diagnose(diag::dynamic_requires_objc,
-                 VD->getDescriptiveKind(), VD->getFullName())
-      .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
-                 "@objc ");
-    return ObjCReason(ObjCReason::ImplicitlyObjC);
+    if (!ctx.isSwiftVersionAtLeast(5)) {
+      // Complain that 'dynamic' requires '@objc', but (quietly) infer @objc
+      // anyway for better recovery.
+      VD->diagnose(diag::dynamic_requires_objc, VD->getDescriptiveKind(),
+                   VD->getFullName())
+          .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
+                       "@objc ");
+      return ObjCReason(ObjCReason::ImplicitlyObjC);
+    }
   }
 
   // If we aren't provided Swift 3's @objc inference rules, we're done.

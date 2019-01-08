@@ -5,5 +5,4 @@ struct Bar<A1, A2> {
   var b: Foo<A1>
 }
 
-enum Foo<A>{
-}
+enum Foo<A> {}

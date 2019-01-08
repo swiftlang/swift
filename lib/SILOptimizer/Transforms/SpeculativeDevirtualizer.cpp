@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "sil-speculative-devirtualizer"
 
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -29,7 +30,6 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/ASTContext.h"

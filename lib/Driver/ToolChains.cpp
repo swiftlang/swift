@@ -186,6 +186,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
   inputArgs.AddLastArg(arguments, options::OPT_debug_info_format);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
@@ -218,6 +219,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
   inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_enable_experimental_dependencies);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -394,6 +397,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-c";
   case file_types::TY_PCH:
     return "-emit-pch";
+  case file_types::TY_ASTDump:
+    return "-dump-ast";
   case file_types::TY_RawSIL:
     return "-emit-silgen";
   case file_types::TY_SIL:
@@ -649,6 +654,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ImportedModules:
     case file_types::TY_TBD:
     case file_types::TY_SwiftModuleFile:
+    case file_types::TY_ASTDump:
     case file_types::TY_RawSIL:
     case file_types::TY_RawSIB:
     case file_types::TY_SIL:

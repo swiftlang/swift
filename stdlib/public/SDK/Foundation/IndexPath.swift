@@ -265,7 +265,6 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     default:
                         fatalError("Range \(range) is out of bounds of count 1")
                     }
-                    return self
                 case .pair(let first, let second):
                     
                     switch (range.lowerBound, range.upperBound) {

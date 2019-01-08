@@ -406,7 +406,9 @@ extension _BridgedNSError where Self.RawValue: FixedWidthInteger {
     self.init(rawValue: RawValue(_bridgedNSError.code))
   }
 
-  public var hashValue: Int { return _code }
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_code)
+  }
 }
 
 /// Describes a bridged error that stores the underlying NSError, so
@@ -428,16 +430,6 @@ public protocol _BridgedStoredNSError :
   init(_nsError error: NSError)
 }
 
-/// TODO: Better way to do this?
-internal func _stringDictToAnyHashableDict(_ input: [String : Any])
-    -> [AnyHashable : Any] {
-  var result = [AnyHashable : Any](minimumCapacity: input.count)
-  for (k, v) in input {
-    result[k] = v
-  }
-  return result
-}
-
 /// Various helper implementations for _BridgedStoredNSError
 extension _BridgedStoredNSError {
   public var code: Code {
@@ -449,7 +441,7 @@ extension _BridgedStoredNSError {
   public init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: Self.errorDomain,
                                 code: unsafeBinaryIntegerToInt(code.rawValue),
-                                userInfo: _stringDictToAnyHashableDict(userInfo)))
+                                userInfo: userInfo))
   }
 
   /// The user-info dictionary for an error that was bridged from
@@ -483,17 +475,16 @@ public extension _BridgedStoredNSError {
   var errorUserInfo: [String : Any] {
     var result: [String : Any] = [:]
     for (key, value) in _nsError.userInfo {
-      guard let stringKey = key.base as? String else { continue }
-      result[stringKey] = value
+      result[key] = value
     }
     return result
   }
 }
 
 /// Implementation of Hashable for all _BridgedStoredNSErrors.
-public extension _BridgedStoredNSError {
-  var hashValue: Int {
-    return _nsError.hashValue
+extension _BridgedStoredNSError {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_nsError)
   }
 }
 
@@ -579,10 +570,6 @@ public struct CocoaError : _BridgedStoredNSError {
     public init(rawValue: Int) {
       self.rawValue = rawValue
     }
-    
-    public var hashValue: Int {
-      return self.rawValue
-    }
   }
 }
 
@@ -615,7 +602,7 @@ public extension CocoaError {
 
 extension CocoaError {
     public static func error(_ code: CocoaError.Code, userInfo: [AnyHashable : Any]? = nil, url: URL? = nil) -> Error {
-        var info: [AnyHashable : Any] = userInfo ?? [:]
+        var info: [String : Any] = userInfo as? [String : Any] ?? [:]
         if let url = url {
             info[NSURLErrorKey] = url
         }
@@ -1809,10 +1796,6 @@ public struct URLError : _BridgedStoredNSError {
 
     public init(rawValue: Int) {
       self.rawValue = rawValue
-    }
-
-    public var hashValue: Int {
-      return self.rawValue
     }
   }
 }

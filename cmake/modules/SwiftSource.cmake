@@ -241,8 +241,9 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 
-  if(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP AND SWIFTFILE_IS_STDLIB)
+  if(SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
+    list(APPEND swift_flags "-Xfrontend" "-enable-mandatory-semantic-arc-opts")
   endif()
 
   if(NOT SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING AND SWIFTFILE_IS_STDLIB)
@@ -302,6 +303,7 @@ function(_compile_swift_files
 
   set(module_file)
   set(module_doc_file)
+  set(interface_file)
 
   if(NOT SWIFTFILE_IS_MAIN)
     # Determine the directory where the module file should be placed.
@@ -321,7 +323,11 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
     set(module_doc_file "${module_base}.swiftdoc")
-    set(interface_file "${module_base}.swiftinterface")
+
+    if(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES)
+      set(interface_file "${module_base}.swiftinterface")
+      list(APPEND swift_flags "-emit-parseable-module-interface")
+    endif()
 
     list(APPEND command_create_dirs
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
@@ -337,8 +343,13 @@ function(_compile_swift_files
     endif()
   endif()
 
+  set(module_outputs "${module_file}" "${module_doc_file}")
+  if(interface_file)
+    list(APPEND module_outputs "${interface_file}")
+  endif()
+
   swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-    FILES "${module_file}" "${module_doc_file}" "${interface_file}"
+    FILES ${module_outputs}
     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
@@ -395,7 +406,6 @@ function(_compile_swift_files
 
   set(standard_outputs ${SWIFTFILE_OUTPUT})
   set(apinotes_outputs ${apinote_files})
-  set(module_outputs "${module_file}" "${module_doc_file}" "${interface_file}")
   set(sib_outputs "${sib_file}")
   set(sibopt_outputs "${sibopt_file}")
   set(sibgen_outputs "${sibgen_file}")
@@ -454,13 +464,14 @@ function(_compile_swift_files
   # Then we can compile both the object files and the swiftmodule files
   # in parallel in this target for the object file, and ...
 
-  # Windows doesn't support long command line paths, of 8191 chars or over.
-  # We need to work around this by avoiding long command line arguments. This can be
-  # achieved by writing the list of file paths to a file, then reading that list
-  # in the Python script.
+  # Windows doesn't support long command line paths, of 8191 chars or over. We
+  # need to work around this by avoiding long command line arguments. This can
+  # be achieved by writing the list of file paths to a file, then reading that
+  # list in the Python script.
   string(RANDOM file_name)
   set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
-  file(WRITE "${file_path}" "${source_files}")
+  string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
+  file(WRITE "${file_path}" "'${source_files_quoted}'")
   
   add_custom_command_target(
       dependency_target
@@ -497,15 +508,11 @@ function(_compile_swift_files
     add_custom_command_target(
         module_dependency_target
         COMMAND
-          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_file}"
-        COMMAND
-          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_doc_file}"
-        COMMAND
-          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${interface_file}"
+          "${CMAKE_COMMAND}" "-E" "remove" "-f" ${module_outputs}
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
-          "-emit-parseable-module-interface" ${swift_flags} "@${file_path}"
+          ${swift_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS

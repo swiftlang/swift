@@ -123,6 +123,8 @@ NO_OPERAND_INST(AllocGlobal)
 NO_OPERAND_INST(AllocStack)
 NO_OPERAND_INST(FloatLiteral)
 NO_OPERAND_INST(FunctionRef)
+NO_OPERAND_INST(DynamicFunctionRef)
+NO_OPERAND_INST(PreviousDynamicFunctionRef)
 NO_OPERAND_INST(GlobalAddr)
 NO_OPERAND_INST(GlobalValue)
 NO_OPERAND_INST(IntegerLiteral)
@@ -1149,6 +1151,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ZExt)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ZExtOrBitCast)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ZeroInitializer)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Swift3ImplicitObjCEntrypoint)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, PoundAssert)
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see

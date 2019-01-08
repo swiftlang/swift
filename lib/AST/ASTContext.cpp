@@ -324,6 +324,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     /// The set of normal protocol conformances.
     llvm::FoldingSet<NormalProtocolConformance> NormalConformances;
 
+    // The set of self protocol conformances.
+    llvm::DenseMap<ProtocolDecl*, SelfProtocolConformance*> SelfConformances;
+
     /// The set of specialized protocol conformances.
     llvm::FoldingSet<SpecializedProtocolConformance> SpecializedConformances;
 
@@ -426,7 +429,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 };
 
 ASTContext::Implementation::Implementation()
-    : IdentifierTable(Allocator), TheSyntaxArena(new SyntaxArena()) {}
+    : IdentifierTable(Allocator),
+      TheSyntaxArena(new syntax::SyntaxArena()) {}
 ASTContext::Implementation::~Implementation() {
   delete Resolver;
 
@@ -511,6 +515,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
                                BuiltinUnsafeValueBufferType(*this)),
     TheSILTokenType(new (*this, AllocationArena::Permanent)
                       SILTokenType(*this)),
+    TheIntegerLiteralType(new (*this, AllocationArena::Permanent)
+                               BuiltinIntegerLiteralType(*this)),
     TheIEEE32Type(new (*this, AllocationArena::Permanent)
                     BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
     TheIEEE64Type(new (*this, AllocationArena::Permanent)
@@ -1882,6 +1888,19 @@ ASTContext::getConformance(Type conformingType,
   return result;
 }
 
+/// Produce a self-conformance for the given protocol.
+SelfProtocolConformance *
+ASTContext::getSelfConformance(ProtocolDecl *protocol) {
+  auto &selfConformances =
+    getImpl().getArena(AllocationArena::Permanent).SelfConformances;
+  auto &entry = selfConformances[protocol];
+  if (!entry) {
+    entry = new (*this, AllocationArena::Permanent)
+      SelfProtocolConformance(protocol->getDeclaredInterfaceType());
+  }
+  return entry;
+}
+
 /// If one of the ancestor conformances already has a matching type, use
 /// that instead.
 static ProtocolConformance *collapseSpecializedConformance(
@@ -1897,6 +1916,7 @@ static ProtocolConformance *collapseSpecializedConformance(
 
     case ProtocolConformanceKind::Normal:
     case ProtocolConformanceKind::Inherited:
+    case ProtocolConformanceKind::Self:
       // If the conformance matches, return it.
       if (conformance->getType()->isEqual(type)) {
         for (auto subConformance : substitutions.getConformances())
@@ -3032,6 +3052,7 @@ Type ErrorType::get(Type originalType) {
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
                                             const ASTContext &C) {
+  assert(!BitWidth.isArbitraryWidth());
   BuiltinIntegerType *&Result = C.getImpl().IntegerTypes[BitWidth];
   if (Result == nullptr)
     Result = new (C, AllocationArena::Permanent) BuiltinIntegerType(BitWidth,C);
@@ -3718,7 +3739,7 @@ void AnyFunctionType::decomposeInput(
   default:
     result.emplace_back(type->getInOutObjectType(), Identifier(),
                         ParameterTypeFlags::fromParameterType(
-                          type, false, ValueOwnership::Default));
+                          type, false, false, ValueOwnership::Default));
     return;
   }
 }
@@ -4027,6 +4048,10 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
 
   // Make sure the interface types are sane.
   if (genericSig) {
+    assert(!genericSig->areAllParamsConcrete() &&
+           "If all generic parameters are concrete, SILFunctionType should "
+           "not have a generic signature at all");
+
     for (auto gparam : genericSig->getGenericParams()) {
       (void)gparam;
       assert(gparam->isCanonical() && "generic signature is not canonicalized");

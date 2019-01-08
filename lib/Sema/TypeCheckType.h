@@ -118,8 +118,11 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this is the payload subpattern of an enum pattern.
   EnumPatternPayload,
 
-  /// Whether we are checking the underlying type of a typealias.
+  /// Whether we are checking the underlying type of a non-generic typealias.
   TypeAliasDecl,
+
+  /// Whether we are checking the underlying type of a generic typealias.
+  GenericTypeAliasDecl,
 
   /// Whether we are in a requirement of a generic declaration
   GenericRequirement,
@@ -207,6 +210,7 @@ public:
     case Context::EnumElementDecl:
     case Context::EnumPatternPayload:
     case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
@@ -350,6 +354,11 @@ public:
   Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                   SourceRange baseRange,
                                   ComponentIdentTypeRepr *ref) const;
+
+  /// Resolve an unqualified reference to an associated type or type alias
+  /// in a protocol.
+  Type resolveSelfAssociatedType(Type baseTy, DeclContext *DC,
+                                 Identifier name) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.

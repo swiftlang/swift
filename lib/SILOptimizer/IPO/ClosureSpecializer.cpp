@@ -659,7 +659,7 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
       getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()), ClonedName,
       ClonedTy, ClosureUser->getGenericEnvironment(),
       ClosureUser->getLocation(), IsBare, ClosureUser->isTransparent(),
-      CallSiteDesc.isSerialized(), ClosureUser->getEntryCount(),
+      CallSiteDesc.isSerialized(), IsNotDynamic, ClosureUser->getEntryCount(),
       ClosureUser->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
@@ -1035,7 +1035,8 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         // so continue...
         auto AI = FullApplySite::isa(Use->getUser());
         if (!AI || AI.hasSubstitutions() ||
-            !canSpecializeFullApplySite(AI.getKind()))
+            !canSpecializeFullApplySite(AI.getKind()) ||
+            !AI.canOptimize())
           continue;
 
         // Check if we have already associated this apply inst with a closure to

@@ -446,9 +446,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
 
-    for (auto &Segment : E->getSegments()) {
-      if (Expr *Seg = doIt(Segment))
-        Segment = Seg;
+    if (auto oldAppendingExpr = E->getAppendingExpr()) {
+      if (auto appendingExpr = doIt(oldAppendingExpr))
+        E->setAppendingExpr(dyn_cast<TapExpr>(appendingExpr));
       else
         return nullptr;
     }
@@ -972,7 +972,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       Expr *sub = doIt(objcStringLiteral);
       if (!sub) return nullptr;
       E->setObjCStringLiteralExpr(sub);
-      return E;
     }
 
     auto components = E->getComponents();
@@ -1050,6 +1049,28 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
+
+  Expr *visitTapExpr(TapExpr *E) {
+    if (auto oldSubExpr = E->getSubExpr()) {
+      if (auto subExpr = doIt(oldSubExpr)) {
+        E->setSubExpr(subExpr);
+      }
+      else {
+        return nullptr;
+      }
+    }
+
+    if (auto oldBody = E->getBody()) {
+      if (auto body = doIt(oldBody)) {
+        E->setBody(dyn_cast<BraceStmt>(body));
+      }
+      else {
+        return nullptr;
+      }
+    }
+
+    return E;
+  }
 
   //===--------------------------------------------------------------------===//
   //                           Everything Else
@@ -1278,6 +1299,14 @@ Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
   return nullptr;
 }
 
+Stmt *Traversal::visitPoundAssertStmt(PoundAssertStmt *S) {
+  if (auto *condition = doIt(S->getCondition())) {
+    S->setCondition(condition);
+  } else {
+    return nullptr;
+  }
+  return S;
+}
 
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {
@@ -1593,6 +1622,10 @@ Pattern *Traversal::visitIsPattern(IsPattern *P) {
 }
 
 Pattern *Traversal::visitEnumElementPattern(EnumElementPattern *P) {
+  if (!P->isParentTypeImplicit())
+    if (doIt(P->getParentType()))
+      return nullptr;
+
   if (!P->hasSubPattern())
     return P;
 

@@ -654,7 +654,9 @@ void LoopTreeOptimization::analyzeCurrentLoop(
       case SILInstructionKind::BeginAccessInst: {
         auto *BI = dyn_cast<BeginAccessInst>(&Inst);
         assert(BI && "Expected a Begin Access");
-        BeginAccesses.push_back(BI);
+        if (BI->getEnforcement() == SILAccessEnforcement::Dynamic) {
+          BeginAccesses.push_back(BI);
+        }
         checkSideEffects(Inst, MayWrites);
         break;
       }

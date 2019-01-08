@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference
 // RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference | %FileCheck %s
-// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference 2> %t.dump
-// RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.dump
+// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference > %t.ast
+// RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.ast
 // REQUIRES: objc_interop
 
 import Foundation
@@ -839,19 +839,19 @@ class infer_instanceVar1 {
   }
 
   var observingAccessorsVar1: Int {
-  // CHECK: @objc var observingAccessorsVar1: Int {
+  // CHECK: @_hasStorage @objc var observingAccessorsVar1: Int {
     willSet {}
-    // CHECK-NEXT: {{^}} willSet {}
+    // CHECK-NEXT: {{^}} @objc get
     didSet {}
-    // CHECK-NEXT: {{^}} didSet {}
+    // CHECK-NEXT: {{^}} @objc set
   }
 
   @objc var observingAccessorsVar1_: Int {
-  // CHECK: {{^}} @objc var observingAccessorsVar1_: Int {
+  // CHECK: {{^}} @objc @_hasStorage var observingAccessorsVar1_: Int {
     willSet {}
-    // CHECK-NEXT: {{^}} willSet {}
+    // CHECK-NEXT: {{^}} @objc get
     didSet {}
-    // CHECK-NEXT: {{^}} didSet {}
+    // CHECK-NEXT: {{^}} @objc set
   }
 
 
@@ -941,7 +941,7 @@ class infer_instanceVar1 {
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_PlainEnum: PlainEnum
-// CHECK-LABEL: {{^}}  var var_PlainEnum: PlainEnum
+// CHECK-LABEL: {{^}} var var_PlainEnum: PlainEnum
 
   @objc var var_PlainEnum_: PlainEnum
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
@@ -1709,14 +1709,20 @@ class HasNSManaged {
 
   @NSManaged
   var goodManaged: Class_ObjC1
-  // CHECK-LABEL: {{^}}  @objc @NSManaged dynamic var goodManaged: Class_ObjC1
+  // CHECK-LABEL: {{^}}  @objc @NSManaged @_hasStorage dynamic var goodManaged: Class_ObjC1 {
+  // CHECK-NEXT: {{^}} @objc get
+  // CHECK-NEXT: {{^}} @objc set
+  // CHECK-NEXT: {{^}} }
 
   @NSManaged
   var badManaged: PlainStruct
   // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-error@-3{{'dynamic' property 'badManaged' must also be '@objc'}}
-  // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct
+  // CHECK-LABEL: {{^}}  @NSManaged @_hasStorage var badManaged: PlainStruct {
+  // CHECK-NEXT: {{^}} get
+  // CHECK-NEXT: {{^}} set
+  // CHECK-NEXT: {{^}} }
 }
 
 //===---
@@ -2180,8 +2186,8 @@ class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
   @nonobjc final func objc_ext_objc_explicit_nonobjc(_: PlainStruct) { }
 }
 
-@objc class ObjC_Class1 : Hashable { 
-  var hashValue: Int { return 0 }
+@objc class ObjC_Class1 : Hashable {
+  func hash(into hasher: inout Hasher) {}
 }
 
 func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
@@ -2305,4 +2311,19 @@ protocol ObjCProtocolWithWeakProperty {
 @objc
 protocol ObjCProtocolWithUnownedProperty {
    unowned var unownedProp: AnyObject { get set } // okay
+}
+
+// rdar://problem/46699152: errors about read/modify accessors being implicitly
+// marked @objc.
+@objc class MyObjCClass: NSObject {}
+
+@objc
+extension MyObjCClass {
+    @objc
+    static var objCVarInObjCExtension: Bool {
+        get {
+            return true
+        }
+        set {}
+    }
 }

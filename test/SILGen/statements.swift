@@ -34,9 +34,9 @@ func assignment(_ x: Int, y: Int) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}assignment
-// CHECK: integer_literal $Builtin.Int2048, 42
+// CHECK: integer_literal $Builtin.IntLiteral, 42
 // CHECK: assign
-// CHECK: integer_literal $Builtin.Int2048, 57
+// CHECK: integer_literal $Builtin.IntLiteral, 57
 // CHECK: assign
 
 func if_test(_ x: Int, y: Bool) {
@@ -270,18 +270,15 @@ label2:
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
 
-  // CHECK: [[FALSE]]:
-  // CHECK:   br [[AFTER_FALSE:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : @owned $C):
     use(x)
-    // CHECK:   br [[CONT:bb[0-9]+]]
-    // CHECK: [[CONT]]:
+    // CHECK: apply
     // CHECK:   br [[EPILOG:bb[0-9]+]]
   } else {
-    // CHECK: [[AFTER_FALSE]]:
+    // CHECK: [[FALSE]]:
     // CHECK: apply
-    // CHECK: br [[EPILOG]]
+    // CHECK:   br [[EPILOG:bb[0-9]+]]
     foo()
     break label2
     foo() // expected-warning {{will never be executed}}
@@ -297,17 +294,12 @@ label3:
   // CHECK: [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
   // CHECK: switch_enum [[ARG2_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
 
-  // CHECK: [[FALSE]]:
-  // CHECK:   br [[COND2:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : @owned $C):
     use(x)
-    // CHECK:   br [[TRUE_TRAMPOLINE:bb[0-9]+]]
-    //
-    // CHECK: [[TRUE_TRAMPOLINE]]:
     // CHECK:   br [[EPILOG_BB:bb[0-9]+]]
   } else if a {
-    // CHECK: [[COND2]]:
+    // CHECK: [[FALSE]]:
     // CHECK:   cond_br {{.*}}, [[TRUE2:bb[0-9]+]], [[FALSE2:bb[0-9]+]]
     //
     // CHECK: [[TRUE2]]:
@@ -331,9 +323,8 @@ label3:
 func test_if_break(_ a : Bool) {
   // CHECK: br [[LOOP:bb[0-9]+]]
   // CHECK: [[LOOP]]:
-  // CHECK: function_ref @$sSb21_getBuiltinLogicValue{{[_0-9a-zA-Z]*}}F
-  // CHECK-NEXT: apply
-  // CHECK-NEXT: cond_br {{.*}}, [[LOOPTRUE:bb[0-9]+]], [[OUT:bb[0-9]+]]
+  // CHECK-NEXT: struct_extract {{.*}}
+  // CHECK-NEXT: cond_br {{.*}}, [[LOOPTRUE:bb[0-9]+]], [[EXIT:bb[0-9]+]]
   while a {
     if a {
       foo()
@@ -343,17 +334,19 @@ func test_if_break(_ a : Bool) {
   }
 
   // CHECK: [[LOOPTRUE]]:
-  // CHECK: function_ref @$sSb21_getBuiltinLogicValue{{[_0-9a-zA-Z]*}}F
-  // CHECK-NEXT: apply
+  // CHECK-NEXT: struct_extract {{.*}}
   // CHECK-NEXT: cond_br {{.*}}, [[IFTRUE:bb[0-9]+]], [[IFFALSE:bb[0-9]+]]
 
   // [[IFTRUE]]:
   // CHECK: function_ref statements.foo
-  // CHECK: br [[OUT]]
+  // CHECK: br [[OUT:bb[0-9]+]]
 
   // CHECK: [[IFFALSE]]:
   // CHECK: function_ref statements.foo
   // CHECK: br [[LOOP]]
+
+  // CHECK: [[EXIT]]:
+  // CHECK: br [[OUT]]
 
   // CHECK: [[OUT]]:
   // CHECK:   return
@@ -361,7 +354,7 @@ func test_if_break(_ a : Bool) {
 
 // CHECK-LABEL: sil hidden @$s10statements7test_doyyF
 func test_do() {
-  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: integer_literal $Builtin.IntLiteral, 0
   // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(0)
@@ -372,7 +365,7 @@ func test_do() {
     let obj = MyClass()
     _ = obj
     
-    // CHECK: integer_literal $Builtin.Int2048, 1
+    // CHECK: integer_literal $Builtin.IntLiteral, 1
     // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(1)
@@ -382,7 +375,7 @@ func test_do() {
     // CHECK-NOT: br bb
   }
 
-  // CHECK: integer_literal $Builtin.Int2048, 2
+  // CHECK: integer_literal $Builtin.IntLiteral, 2
   // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(2)
@@ -390,7 +383,7 @@ func test_do() {
 
 // CHECK-LABEL: sil hidden @$s10statements15test_do_labeledyyF
 func test_do_labeled() {
-  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: integer_literal $Builtin.IntLiteral, 0
   // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(0)
@@ -402,7 +395,7 @@ func test_do_labeled() {
     let obj = MyClass()
     _ = obj
 
-    // CHECK: integer_literal $Builtin.Int2048, 1
+    // CHECK: integer_literal $Builtin.IntLiteral, 1
     // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(1)
@@ -417,7 +410,7 @@ func test_do_labeled() {
     }
 
     // CHECK: bb3:
-    // CHECK: integer_literal $Builtin.Int2048, 2
+    // CHECK: integer_literal $Builtin.IntLiteral, 2
     // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(2)
@@ -432,7 +425,7 @@ func test_do_labeled() {
     }
 
     // CHECK: bb5:
-    // CHECK: integer_literal $Builtin.Int2048, 3
+    // CHECK: integer_literal $Builtin.IntLiteral, 3
     // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(3)
@@ -441,7 +434,7 @@ func test_do_labeled() {
     // CHECK: br bb6
   }
 
-  // CHECK: integer_literal $Builtin.Int2048, 4
+  // CHECK: integer_literal $Builtin.IntLiteral, 4
   // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(4)
@@ -475,12 +468,10 @@ func defer_test1() {
 func defer_test2(_ cond : Bool) {
   // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3yyF
   // CHECK: apply [[C3]]
-  // CHECK: br [[LOOP:bb[0-9]+]]
   callee3()
   
-// CHECK: [[LOOP]]:
 // test the condition.
-// CHECK:  [[CONDTRUE:%.*]] = apply {{.*}}(%0)
+// CHECK:  [[CONDTRUE:%.*]] = struct_extract {{.*}}
 // CHECK: cond_br [[CONDTRUE]], [[BODY:bb[0-9]+]], [[EXIT:bb[0-9]+]]
   while cond {
 // CHECK: [[BODY]]:
@@ -489,13 +480,16 @@ func defer_test2(_ cond : Bool) {
 
   // CHECK: [[C1:%.*]] = function_ref @$s10statements11defer_test2yySbF6
   // CHECK: apply [[C1]]
-  // CHECK: br [[EXIT]]
+  // CHECK: br [[RETURN:bb[0-9]+]]
     defer { callee1() }
     callee2()
     break
   }
   
 // CHECK: [[EXIT]]:
+// CHECK: br [[RETURN]]
+
+// CHECK: [[RETURN]]:
 // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3yyF
 // CHECK: apply [[C3]]
 
@@ -587,18 +581,12 @@ func testRequireExprPattern(_ a : Int) {
 // CHECK-NEXT:   switch_enum [[ARG]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
 func testRequireOptional1(_ a : Int?) -> Int {
 
-  // CHECK: [[NONE]]:
-  // CHECK:   br [[ABORT:bb[0-9]+]]
-
   // CHECK: [[SOME]]([[PAYLOAD:%.*]] : @trivial $Int):
   // CHECK-NEXT:   debug_value [[PAYLOAD]] : $Int, let, name "t"
-  // CHECK-NEXT:   br [[EPILOG:bb[0-9]+]]
-  //
-  // CHECK: [[EPILOG]]:
   // CHECK-NEXT:   return [[PAYLOAD]] : $Int
   guard let t = a else { abort() }
 
-  // CHECK:  [[ABORT]]:
+  // CHECK: [[NONE]]:
   // CHECK-NEXT:    // function_ref statements.abort() -> Swift.Never
   // CHECK-NEXT:    [[FUNC_REF:%.*]] = function_ref @$s10statements5aborts5NeverOyF
   // CHECK-NEXT:    apply [[FUNC_REF]]() : $@convention(thin) () -> Never
@@ -614,20 +602,15 @@ func testRequireOptional1(_ a : Int?) -> Int {
 func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
-  // CHECK: [[NONE_BB]]:
-  // CHECK-NEXT: br [[ABORT_BB:bb[0-9]+]]
-  
   // CHECK:  [[SOME_BB]]([[STR:%.*]] : @owned $String):
   // CHECK-NEXT:   debug_value [[STR]] : $String, let, name "t"
-  // CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
-  // CHECK:  [[CONT_BB]]:
   // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
   // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[BORROWED_STR]]
   // CHECK-NEXT:   end_borrow [[BORROWED_STR]]
   // CHECK-NEXT:   destroy_value [[STR]] : $String
   // CHECK-NEXT:   return [[RETURN]] : $String
 
-  // CHECK:        [[ABORT_BB]]:
+  // CHECK: [[NONE_BB]]:
   // CHECK-NEXT:   // function_ref statements.abort() -> Swift.Never
   // CHECK-NEXT:   [[ABORT_FUNC:%.*]] = function_ref @$s10statements5aborts5NeverOyF
   // CHECK-NEXT:   [[NEVER:%.*]] = apply [[ABORT_FUNC]]()
@@ -665,8 +648,6 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
 
   // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : @owned $DerivedClass):
   // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass, let, name "result"
-  // CHECK-NEXT: br [[CONT_BB:bb[0-9]+]]
-  // CHECK: [[CONT_BB]]:
   // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [[PTR]]
   // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[BORROWED_PTR]]
   // CHECK-NEXT: end_borrow [[BORROWED_PTR]]
@@ -689,8 +670,6 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   ([[PAYLOAD_1:%.*]], [[PAYLOAD_2:%.*]]) = destructure_tuple [[PAYLOAD]]
   // CHECK-NEXT:   debug_value [[PAYLOAD_1]] : $Int, let, name "x"
   // CHECK-NEXT:   debug_value [[PAYLOAD_2]] : $Int, let, name "y"
-  // CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
-  // CHECK: [[CONT_BB]]:
   // CHECK-NEXT:   return [[PAYLOAD_1]] : $Int
 }
 

@@ -1121,7 +1121,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   auto result =
     tc.checkGenericArguments(dc, SourceLoc(), SourceLoc(),
                              typeInContext,
-                             { Type(proto->getProtocolSelfType()) },
+                             { proto->getSelfInterfaceType() },
                              sanitizedRequirements,
                              QuerySubstitutionMap{substitutions},
                              TypeChecker::LookUpConformance(dc),
@@ -1557,7 +1557,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
     if (!t2)
       return true;
 
-    return TC.isSubclassOf(t1, t2, DC);
+    return t2->isExactSuperclassOf(t1);
   };
 
   bool protos1AreSubsetOf2 = protos1.empty();
@@ -1747,9 +1747,27 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
           if (failed.Result.isError())
             continue;
 
+          if ((!failed.TypeWitness->getAnyNominal() ||
+               failed.TypeWitness->isExistentialType()) &&
+              failed.Result.isConformanceRequirement()) {
+            diags.diagnose(failed.Witness,
+                           diag::associated_type_witness_conform_impossible,
+                           assocType->getName(), failed.TypeWitness,
+                           failed.Result.getRequirement());
+            continue;
+          }
+          if (!failed.TypeWitness->getClassOrBoundGenericClass() &&
+              failed.Result.isSuperclassRequirement()) {
+            diags.diagnose(failed.Witness,
+                           diag::associated_type_witness_inherit_impossible,
+                           assocType->getName(), failed.TypeWitness,
+                           failed.Result.getRequirement());
+            continue;
+          }
+
           diags.diagnose(failed.Witness,
                          diag::associated_type_deduction_witness_failed,
-                         failed.Requirement->getFullName(),
+                         assocType->getName(),
                          failed.TypeWitness,
                          failed.Result.getRequirement(),
                          failed.Result.isConformanceRequirement());
@@ -2065,38 +2083,8 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     }
   }
 
-  // Try to resolve the witness via explicit definitions.
-  switch (resolveWitnessViaLookup(requirement)) {
-  case ResolveWitnessResult::Success:
-    return;
-
-  case ResolveWitnessResult::ExplicitFailed:
-    Conformance->setInvalid();
-    recordInvalidWitness(requirement);
-    return;
-
-  case ResolveWitnessResult::Missing:
-    // Continue trying below.
-    break;
-  }
-
-  // Try to resolve the witness via derivation.
-  switch (resolveWitnessViaDerivation(requirement)) {
-  case ResolveWitnessResult::Success:
-    return;
-
-  case ResolveWitnessResult::ExplicitFailed:
-    Conformance->setInvalid();
-    recordInvalidWitness(requirement);
-    return;
-
-  case ResolveWitnessResult::Missing:
-    // Continue trying below.
-    break;
-  }
-
-  // Try to resolve the witness via defaults.
-  switch (resolveWitnessViaDefault(requirement)) {
+  // Try to resolve the witness.
+  switch (resolveWitnessTryingAllStrategies(requirement)) {
   case ResolveWitnessResult::Success:
     return;
 
@@ -2107,6 +2095,5 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 
   case ResolveWitnessResult::Missing:
     llvm_unreachable("Should have failed");
-    break;
   }
 }

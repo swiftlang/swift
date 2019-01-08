@@ -40,8 +40,8 @@ ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
 /// Emit a copy of this value with independent ownership.
 ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &SGF,
                                             SILLocation loc) {
-  assert(SGF.InFormalEvaluationScope && "Can only perform a formal access copy in a "
-                                 "formal evaluation scope");
+  assert(SGF.isInFormalEvaluationScope() &&
+         "Can only perform a formal access copy in a formal evaluation scope");
   auto &lowering = SGF.getTypeLowering(getType());
   if (lowering.isTrivial())
     return *this;
@@ -85,6 +85,8 @@ ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &SGF, SILLocation loc) {
 /// have cleanups.  It returns a +1 value with one.
 ManagedValue ManagedValue::formalAccessCopyUnmanaged(SILGenFunction &SGF,
                                                      SILLocation loc) {
+  assert(SGF.isInFormalEvaluationScope());
+
   if (getType().isObject()) {
     return SGF.B.createFormalAccessCopyValue(loc, *this);
   }
@@ -141,6 +143,7 @@ ManagedValue ManagedValue::borrow(SILGenFunction &SGF, SILLocation loc) const {
 
 ManagedValue ManagedValue::formalAccessBorrow(SILGenFunction &SGF,
                                               SILLocation loc) const {
+  assert(SGF.isInFormalEvaluationScope());
   assert(getValue() && "cannot borrow an invalid or in-context value");
   if (isLValue())
     return *this;

@@ -172,6 +172,13 @@ static inline bool isReadAccessResultOwned(SGFAccessKind kind) {
   return uint8_t(kind) >= uint8_t(SGFAccessKind::OwnedAddressRead);
 }
 
+/// Given a read access kind, does it require an address result?
+static inline bool isReadAccessResultAddress(SGFAccessKind kind) {
+  assert(isReadAccess(kind));
+  return kind == SGFAccessKind::BorrowedAddressRead ||
+         kind == SGFAccessKind::OwnedAddressRead;
+}
+
 /// Return an address-preferring version of the given access kind.
 static inline SGFAccessKind getAddressAccessKind(SGFAccessKind kind) {
   switch (kind) {
@@ -295,7 +302,9 @@ public:
   bool NeedsReturn = false;
 
   /// \brief Is emission currently within a formal modification?
-  bool InFormalEvaluationScope = false;
+  bool isInFormalEvaluationScope() const {
+    return FormalEvalContext.isInFormalEvaluationScope();
+  }
 
   /// \brief Is emission currently within an inout conversion?
   bool InInOutConversionScope = false;
@@ -642,7 +651,8 @@ public:
                            SubstitutionMap reqtSubs,
                            SILDeclRef witness,
                            SubstitutionMap witnessSubs,
-                           IsFreeFunctionWitness_t isFree);
+                           IsFreeFunctionWitness_t isFree,
+                           bool isSelfConformance);
   
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
@@ -679,12 +689,10 @@ public:
   //===--------------------------------------------------------------------===//
   // Control flow
   //===--------------------------------------------------------------------===//
-  
+
   /// emitCondition - Emit a boolean expression as a control-flow condition.
   ///
   /// \param E - The expression to be evaluated as a condition.
-  /// \param hasFalseCode - true if the false branch doesn't just lead
-  ///        to the fallthrough.
   /// \param invertValue - true if this routine should invert the value before
   ///        testing true/false.
   /// \param contArgs - the types of the arguments to the continuation BB.
@@ -693,14 +701,15 @@ public:
   /// \param NumTrueTaken - The number of times the condition evaluates to true.
   /// \param NumFalseTaken - The number of times the condition evaluates to
   /// false.
-  Condition emitCondition(Expr *E, bool hasFalseCode = true,
-                          bool invertValue = false,
+  ///
+  /// If `contArgs` is nonempty, then both Condition::exitTrue() and
+  /// Condition::exitFalse() must be called.
+  Condition emitCondition(Expr *E, bool invertValue = false,
                           ArrayRef<SILType> contArgs = {},
                           ProfileCounter NumTrueTaken = ProfileCounter(),
                           ProfileCounter NumFalseTaken = ProfileCounter());
 
-  Condition emitCondition(SILValue V, SILLocation Loc, bool hasFalseCode = true,
-                          bool invertValue = false,
+  Condition emitCondition(SILValue V, SILLocation Loc, bool invertValue = false,
                           ArrayRef<SILType> contArgs = {},
                           ProfileCounter NumTrueTaken = ProfileCounter(),
                           ProfileCounter NumFalseTaken = ProfileCounter());
@@ -727,6 +736,9 @@ public:
   /// section.
   SILBasicBlock *createBasicBlock(FunctionSection section);
 
+  SILBasicBlock *createBasicBlockAndBranch(SILLocation loc,
+                                           SILBasicBlock *destBB);
+
   /// Erase a basic block that was speculatively created and turned
   /// out to be unneeded.
   ///
@@ -735,6 +747,8 @@ public:
   ///
   /// The block should be empty and have no predecessors.
   void eraseBasicBlock(SILBasicBlock *block);
+
+  void mergeCleanupBlocks();
 
   //===--------------------------------------------------------------------===//
   // Memory management
@@ -1041,7 +1055,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range);
-  void emitStmtCondition(StmtCondition Cond, JumpDest FailDest, SILLocation loc,
+  void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
                          ProfileCounter NumFalseTaken = ProfileCounter());
 
@@ -1146,9 +1160,11 @@ public:
   SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant) {
     return emitGlobalFunctionRef(loc, constant, getConstantInfo(constant));
   }
-  SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
-                                 SILConstantInfo constantInfo);
-  
+  SILValue
+  emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
+                        SILConstantInfo constantInfo,
+                        bool callPreviousDynamicReplaceableImpl = false);
+
   /// Returns a reference to a function value that dynamically dispatches
   /// the function in a runtime-modifiable way.
   ManagedValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
@@ -1216,16 +1232,18 @@ public:
 
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                          SubstitutionMap substitutions,
-                         ArgumentSource &&optionalSelfValue,
-                         bool isSuper, bool isDirectAccessorUse,
-                         PreparedArguments &&optionalSubscripts, SGFContext C);
+                         ArgumentSource &&optionalSelfValue, bool isSuper,
+                         bool isDirectAccessorUse,
+                         PreparedArguments &&optionalSubscripts, SGFContext C,
+                         bool isOnSelfParameter);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
                        ArgumentSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
                        PreparedArguments &&optionalSubscripts,
-                       ArgumentSource &&value);
+                       ArgumentSource &&value,
+                       bool isOnSelfParameter);
 
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
@@ -1235,21 +1253,19 @@ public:
                                        AccessorDecl *witness,
                                        SubstitutionMap witnessSubs);
 
-  std::pair<ManagedValue,ManagedValue>
-  emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
-                        SubstitutionMap substitutions,
-                        ArgumentSource &&optionalSelfValue,
-                        bool isSuper, bool isDirectAccessorUse,
-                        PreparedArguments &&optionalSubscripts,
-                        SILType addressType);
+  ManagedValue emitAddressorAccessor(
+      SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
+      ArgumentSource &&optionalSelfValue, bool isSuper,
+      bool isDirectAccessorUse, PreparedArguments &&optionalSubscripts,
+      SILType addressType, bool isOnSelfParameter);
 
-  CleanupHandle
-  emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
-                        SubstitutionMap substitutions,
-                        ArgumentSource &&optionalSelfValue,
-                        bool isSuper, bool isDirectAccessorUse,
-                        PreparedArguments &&optionalSubscripts,
-                        SmallVectorImpl<ManagedValue> &yields);
+  CleanupHandle emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
+                                      SubstitutionMap substitutions,
+                                      ArgumentSource &&optionalSelfValue,
+                                      bool isSuper, bool isDirectAccessorUse,
+                                      PreparedArguments &&optionalSubscripts,
+                                      SmallVectorImpl<ManagedValue> &yields,
+                                      bool isOnSelfParameter);
 
   RValue emitApplyConversionFunction(SILLocation loc,
                                      Expr *funcExpr,
@@ -1327,6 +1343,8 @@ public:
                                            SILValue semanticValue,
                                            SILType storageType);
 
+  SILValue emitUnwrapIntegerResult(SILLocation loc, SILValue value);
+  
   /// Load an r-value out of the given address. This does not handle
   /// reabstraction or bridging. If that is needed, use the other emit load
   /// entry point.
@@ -1456,16 +1474,21 @@ public:
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
+  CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
+                               SubstitutionMap subs, ArrayRef<ManagedValue> args,
+                               CanSILFunctionType substFnType,
+                               ApplyOptions options,
+                               SmallVectorImpl<ManagedValue> &yields);
+
   SILValue emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                 SILType substFnType,
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
 
-  SILValue emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
-                                     SILType substFnType,
-                                     SubstitutionMap subs,
-                                     ArrayRef<SILValue> args,
-                                     SmallVectorImpl<SILValue> &yields);
+  std::pair<SILValue, CleanupHandle>
+  emitBeginApplyWithRethrow(SILLocation loc, SILValue fn, SILType substFnType,
+                            SubstitutionMap subs, ArrayRef<SILValue> args,
+                            SmallVectorImpl<SILValue> &yields);
   void emitEndApplyWithRethrow(SILLocation loc, SILValue token);
 
   /// Emit a literal that applies the various initializers.

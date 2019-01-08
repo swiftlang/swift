@@ -35,6 +35,9 @@
 // CHECK: # define OBJC_DESIGNATED_INITIALIZER
 
 // CHECK-LABEL: #if __has_feature(modules)
+// CHECK-NEXT: #if __has_warning
+// CHECK-NEXT: #pragma clang diagnostic
+// CHECK-NEXT: #endif
 // CHECK-NEXT: #endif
 
 

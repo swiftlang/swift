@@ -5,8 +5,8 @@
 // tests here that must fail don't currently. Such tests have comments
 // describing the desirable behavior. They are false negatives now but have
 // to be addressed in the future.
-// References: <rdar://problem/29937936>, <rdar://problem/29939484>,
-// <https://bugs.swift.org/browse/SR-5964>, <rdar://problem/39120081>
+// References: <rdar://problem/29937936>,
+// <https://bugs.swift.org/browse/SR-5964>
 
 import StdlibUnittest
 

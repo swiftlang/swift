@@ -101,10 +101,10 @@ bb0(%0 : $*T, %1 : $*XXX<T>):
   return %9 : $Int32                              // id: %11
 }
 
-// Swift.Int32._convertFromBuiltinIntegerLiteral (Swift.Int32.Type)(Builtin.Int2048) -> Swift.Int32
-sil public_external [transparent] @$sSi33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32 {
-bb0(%0 : $Builtin.Int2048, %1 : $@thin Int32.Type):
-  %3 = builtin "s_to_s_checked_trunc_Int2048_Int32"(%0 : $Builtin.Int2048) : $(Builtin.Int32, Builtin.Int1)
+// Swift.Int32._convertFromBuiltinIntegerLiteral (Swift.Int32.Type)(Builtin.IntLiteral) -> Swift.Int32
+sil public_external [transparent] @$sSi33_convertFromBuiltinIntegerLiteralySiBI_cSimF : $@convention(thin) (Builtin.IntLiteral, @thin Int32.Type) -> Int32 {
+bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int32.Type):
+  %3 = builtin "s_to_s_checked_trunc_IntLiteral_Int32"(%0 : $Builtin.IntLiteral) : $(Builtin.Int32, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int32, Builtin.Int1), 0 // user: %5
   %5 = struct $Int32 (%4 : $Builtin.Int32)           // user: %6
   return %5 : $Int32                                // id: %6

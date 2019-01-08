@@ -58,9 +58,9 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[READ]] : $*T
   // CHECK:   [[INT64:%[0-9]+]] = metatype $@thin Int.Type
-  // CHECK:   [[FIVELIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
+  // CHECK:   [[FIVELIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 5
   // CHECK:   [[INTCONV:%[0-9]+]] = function_ref @$sSi2{{[_0-9a-zA-Z]*}}fC
-  // CHECK:   [[FIVE:%[0-9]+]] = apply [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+  // CHECK:   [[FIVE:%[0-9]+]] = apply [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
   // CHECK:   alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[T]] : $T, #P1.subscript!getter.1.foreign
   var subscriptRef = t[5]

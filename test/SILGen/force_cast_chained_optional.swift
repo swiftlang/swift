@@ -18,9 +18,6 @@ class D: C {}
 // CHECK:   select_enum_addr {{%.*}}
 // CHECK:   cond_br {{%.*}}, [[SOME_BAR:bb[0-9]+]], [[NO_BAR:bb[0-9]+]]
 //
-// CHECK: [[NO_BAR]]:
-// CHECK:   br [[TRAP:bb[0-9]+]]
-//
 // CHECK: [[SOME_BAR]]:
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<Bar>
 // CHECK:   [[BAR:%.*]] = load [copy] [[PAYLOAD_ADDR]]
@@ -30,7 +27,7 @@ class D: C {}
 // CHECK:   end_borrow [[BORROWED_BAR]]
 // CHECK:   unconditional_checked_cast {{%.*}} : $C to $D
 //
-// CHECK: [[TRAP]]:
+// CHECK: [[NO_BAR]]:
 // CHECK:   unreachable
 func test(_ x: Foo) -> D {
   return x.bar?.bas as! D

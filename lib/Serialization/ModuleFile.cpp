@@ -12,7 +12,9 @@
 
 #include "swift/Serialization/ModuleFile.h"
 #include "DeserializationErrors.h"
+#include "DocFormat.h"
 #include "swift/Serialization/ModuleFormat.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -27,6 +29,7 @@
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -36,15 +39,9 @@ using namespace swift::serialization;
 using namespace llvm::support;
 using llvm::Expected;
 
-static bool checkModuleSignature(llvm::BitstreamCursor &cursor) {
-  for (unsigned char byte : MODULE_SIGNATURE)
-    if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
-      return false;
-  return true;
-}
-
-static bool checkModuleDocSignature(llvm::BitstreamCursor &cursor) {
-  for (unsigned char byte : MODULE_DOC_SIGNATURE)
+static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
+                                 ArrayRef<unsigned char> signature) {
+  for (unsigned char byte : signature)
     if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
       return false;
   return true;
@@ -116,6 +113,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::IS_TESTABLE:
       extendedInfo.setIsTestable(true);
       break;
+    case options_block::ARE_PRIVATE_IMPORTS_ENABLED:
+      extendedInfo.setPrivateImportsEnabled(true);
+      break;
     case options_block::RESILIENCE_STRATEGY:
       unsigned Strategy;
       options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
@@ -134,6 +134,7 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
 static ValidationInfo
 validateControlBlock(llvm::BitstreamCursor &cursor,
                      SmallVectorImpl<uint64_t> &scratch,
+                     std::pair<uint16_t, uint16_t> expectedVersion,
                      ExtendedValidationInfo *extendedInfo) {
   // The control block is malformed until we've at least read a major version
   // number.
@@ -179,9 +180,9 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       }
 
       uint16_t versionMajor = scratch[0];
-      if (versionMajor > VERSION_MAJOR)
+      if (versionMajor > expectedVersion.first)
         result.status = Status::FormatTooNew;
-      else if (versionMajor < VERSION_MAJOR)
+      else if (versionMajor < expectedVersion.first)
         result.status = Status::FormatTooOld;
       else
         result.status = Status::Valid;
@@ -189,8 +190,8 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       // Major version 0 does not have stable minor versions.
       if (versionMajor == 0) {
         uint16_t versionMinor = scratch[1];
-        if (versionMinor != VERSION_MINOR) {
-          if (versionMinor < VERSION_MINOR)
+        if (versionMinor != expectedVersion.second) {
+          if (versionMinor < expectedVersion.second)
             result.status = Status::FormatTooOld;
           else
             result.status = Status::FormatTooNew;
@@ -202,9 +203,11 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       default:
         // Add new cases here, in descending order.
       case 4:
-        result.compatibilityVersion =
-          version::Version(blobData.substr(scratch[2]+1, scratch[3]),
-                           SourceLoc(), nullptr);
+        if (scratch[3] != 0) {
+          result.compatibilityVersion =
+            version::Version(blobData.substr(scratch[2]+1, scratch[3]),
+                             SourceLoc(), nullptr);
+        }
         LLVM_FALLTHROUGH;
       case 3:
         result.shortVersion = blobData.slice(0, scratch[2]);
@@ -234,15 +237,45 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
+static bool validateInputBlock(
+    llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
+    SmallVectorImpl<SerializationOptions::FileDependency> &dependencies) {
+  while (!cursor.AtEndOfStream()) {
+    auto entry = cursor.advance();
+    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+      break;
+
+    if (entry.Kind == llvm::BitstreamEntry::Error)
+      return true;
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+    switch (kind) {
+    case input_block::FILE_DEPENDENCY:
+      dependencies.push_back(SerializationOptions::FileDependency{
+          scratch[0], scratch[1], blobData});
+      break;
+    default:
+      // Unknown metadata record, possibly for use by a future version of the
+      // module format.
+      break;
+    }
+  }
+  return false;
+}
+
+
 bool serialization::isSerializedAST(StringRef data) {
-  StringRef signatureStr(reinterpret_cast<const char *>(MODULE_SIGNATURE),
-                         llvm::array_lengthof(MODULE_SIGNATURE));
+  StringRef signatureStr(reinterpret_cast<const char *>(SWIFTMODULE_SIGNATURE),
+                         llvm::array_lengthof(SWIFTMODULE_SIGNATURE));
   return data.startswith(signatureStr);
 }
 
 ValidationInfo serialization::validateSerializedAST(
     StringRef data,
-    ExtendedValidationInfo *extendedInfo) {
+    ExtendedValidationInfo *extendedInfo,
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -253,7 +286,7 @@ ValidationInfo serialization::validateSerializedAST(
   llvm::BitstreamCursor cursor(data);
   SmallVector<uint64_t, 32> scratch;
 
-  if (!checkModuleSignature(cursor) ||
+  if (!checkModuleSignature(cursor, SWIFTMODULE_SIGNATURE) ||
       !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID, false))
     return result;
 
@@ -266,9 +299,20 @@ ValidationInfo serialization::validateSerializedAST(
 
     if (topLevelEntry.ID == CONTROL_BLOCK_ID) {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
-      result = validateControlBlock(cursor, scratch, extendedInfo);
+      result = validateControlBlock(cursor, scratch,
+                                    {SWIFTMODULE_VERSION_MAJOR,
+                                     SWIFTMODULE_VERSION_MINOR},
+                                    extendedInfo);
       if (result.status == Status::Malformed)
         return result;
+    } else if (dependencies &&
+               result.status == Status::Valid &&
+               topLevelEntry.ID == INPUT_BLOCK_ID) {
+      cursor.EnterSubBlock(INPUT_BLOCK_ID);
+      if (validateInputBlock(cursor, scratch, *dependencies)) {
+        result.status = Status::Malformed;
+        return result;
+      }
     } else {
       if (cursor.SkipBlock()) {
         result.status = Status::Malformed;
@@ -954,8 +998,9 @@ public:
 std::unique_ptr<ModuleFile::SerializedDeclCommentTable>
 ModuleFile::readDeclCommentTable(ArrayRef<uint64_t> fields,
                                  StringRef blobData) {
-  uint32_t tableOffset;
-  index_block::DeclListLayout::readRecord(fields, tableOffset);
+  if (fields.empty() || blobData.empty())
+    return nullptr;
+  uint32_t tableOffset = static_cast<uint32_t>(fields.front());
   auto base = reinterpret_cast<const uint8_t *>(blobData.data());
 
   return std::unique_ptr<SerializedDeclCommentTable>(
@@ -1084,6 +1129,65 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
   return ctxTarget.isOSVersionLT(major, minor, micro);
 }
 
+bool ModuleFile::readModuleDocIfPresent() {
+  if (!this->ModuleDocInputBuffer)
+    return true;
+
+  llvm::BitstreamCursor docCursor{ModuleDocInputBuffer->getMemBufferRef()};
+  if (!checkModuleSignature(docCursor, SWIFTDOC_SIGNATURE) ||
+      !enterTopLevelModuleBlock(docCursor, MODULE_DOC_BLOCK_ID)) {
+    return false;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  llvm::BitstreamEntry topLevelEntry;
+
+  bool hasValidControlBlock = false;
+  ValidationInfo info;
+
+  while (!docCursor.AtEndOfStream()) {
+    topLevelEntry = docCursor.advance(AF_DontPopBlockAtEnd);
+    if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
+      break;
+
+    switch (topLevelEntry.ID) {
+    case CONTROL_BLOCK_ID: {
+      docCursor.EnterSubBlock(CONTROL_BLOCK_ID);
+
+      info = validateControlBlock(docCursor, scratch,
+                                  {SWIFTDOC_VERSION_MAJOR,
+                                   SWIFTDOC_VERSION_MINOR},
+                                  /*extendedInfo*/nullptr);
+      if (info.status != Status::Valid)
+        return false;
+      // Check that the swiftdoc is actually for this module.
+      if (info.name != Name)
+        return false;
+      hasValidControlBlock = true;
+      break;
+    }
+
+    case COMMENT_BLOCK_ID: {
+      if (!hasValidControlBlock || !readCommentBlock(docCursor))
+        return false;
+      break;
+    }
+
+    default:
+      // Unknown top-level block, possibly for use by a future version of the
+      // module format.
+      if (docCursor.SkipBlock())
+        return false;
+      break;
+    }
+  }
+
+  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
+    return false;
+
+  return true;
+}
+
 ModuleFile::ModuleFile(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
@@ -1099,7 +1203,7 @@ ModuleFile::ModuleFile(
 
   llvm::BitstreamCursor cursor{ModuleInputBuffer->getMemBufferRef()};
 
-  if (!checkModuleSignature(cursor) ||
+  if (!checkModuleSignature(cursor, SWIFTMODULE_SIGNATURE) ||
       !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID)) {
     error();
     return;
@@ -1121,7 +1225,10 @@ ModuleFile::ModuleFile(
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      info = validateControlBlock(cursor, scratch, extInfo);
+      info = validateControlBlock(cursor, scratch,
+                                  {SWIFTMODULE_VERSION_MAJOR,
+                                   SWIFTMODULE_VERSION_MINOR},
+                                  extInfo);
       if (info.status != Status::Valid) {
         error(info.status);
         return;
@@ -1313,42 +1420,7 @@ ModuleFile::ModuleFile(
     return;
   }
 
-  if (!this->ModuleDocInputBuffer)
-    return;
-
-  llvm::BitstreamCursor docCursor{ModuleDocInputBuffer->getMemBufferRef()};
-  if (!checkModuleDocSignature(docCursor) ||
-      !enterTopLevelModuleBlock(docCursor, MODULE_DOC_BLOCK_ID)) {
-    error(Status::MalformedDocumentation);
-    return;
-  }
-
-  while (!docCursor.AtEndOfStream()) {
-    topLevelEntry = docCursor.advance(AF_DontPopBlockAtEnd);
-    if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
-      break;
-
-    switch (topLevelEntry.ID) {
-    case COMMENT_BLOCK_ID: {
-      if (!hasValidControlBlock || !readCommentBlock(docCursor)) {
-        error(Status::MalformedDocumentation);
-        return;
-      }
-      break;
-    }
-
-    default:
-      // Unknown top-level block, possibly for use by a future version of the
-      // module format.
-      if (docCursor.SkipBlock()) {
-        error(Status::MalformedDocumentation);
-        return;
-      }
-      break;
-    }
-  }
-
-  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
+  if (!readModuleDocIfPresent()) {
     error(Status::MalformedDocumentation);
     return;
   }
@@ -1546,25 +1618,29 @@ TypeDecl *ModuleFile::lookupNestedType(Identifier name,
                                        const NominalTypeDecl *parent) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
-  if (!NestedTypeDecls)
-    return nullptr;
+  if (NestedTypeDecls) {
+    auto iter = NestedTypeDecls->find(name);
+    if (iter != NestedTypeDecls->end()) {
+      for (std::pair<DeclID, DeclID> entry : *iter) {
+        assert(entry.first);
+        auto declOrOffset = Decls[entry.first - 1];
+        if (!declOrOffset.isComplete())
+          continue;
 
-  auto iter = NestedTypeDecls->find(name);
-  if (iter == NestedTypeDecls->end())
-    return nullptr;
-
-  auto data = *iter;
-  for (std::pair<DeclID, DeclID> entry : data) {
-    assert(entry.first);
-    auto declOrOffset = Decls[entry.first - 1];
-    if (!declOrOffset.isComplete())
-      continue;
-
-    Decl *decl = declOrOffset;
-    if (decl != parent)
-      continue;
-    return cast<TypeDecl>(getDecl(entry.second));
+        Decl *decl = declOrOffset;
+        if (decl != parent)
+          continue;
+        return cast<TypeDecl>(getDecl(entry.second));
+      }
+    }
   }
+
+  if (!ShadowedModule)
+    return nullptr;
+
+  for (FileUnit *file : ShadowedModule->getFiles())
+    if (auto *nestedType = file->lookupNestedType(name, parent))
+      return nestedType;
 
   return nullptr;
 }

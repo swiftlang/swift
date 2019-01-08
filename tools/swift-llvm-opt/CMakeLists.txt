@@ -11,8 +11,5 @@ add_swift_host_tool(swift-llvm-opt
   clangBasic
   clangCodeGen
 
-  LLVM_COMPONENT_DEPENDS
-    DebugInfoCodeView
-
   SWIFT_COMPONENT tools
 )

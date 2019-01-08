@@ -70,6 +70,11 @@ namespace irgen {
     ForMetaClass = true
   };
 
+  enum HasUpdateCallback_t : bool {
+    DoesNotHaveUpdateCallback = false,
+    HasUpdateCallback = true
+  };
+
   std::pair<Size,Size>
   emitClassPrivateDataFields(IRGenModule &IGM,
                              ConstantStructBuilder &builder,

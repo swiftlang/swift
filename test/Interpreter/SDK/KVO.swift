@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3 | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -8,12 +8,12 @@ import Foundation
 var kvoContext = 0
 
 class Model : NSObject {
-  dynamic var name = ""
-  dynamic var number = 0
+  @objc dynamic var name = ""
+  @objc dynamic var number = 0
 }
 
 class Observer : NSObject {
-  let model = Model()
+  @objc let model = Model()
 
   override init() {
     super.init()

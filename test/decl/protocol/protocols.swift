@@ -77,7 +77,7 @@ class NotPrintableC : CustomStringConvertible, Any {} // expected-error{{type 'N
 enum NotPrintableO : Any, CustomStringConvertible {} // expected-error{{type 'NotPrintableO' does not conform to protocol 'CustomStringConvertible'}}
 
 struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'NotFormattedPrintable' does not conform to protocol 'CustomStringConvertible'}}
-  func print(format: TestFormat) {} // expected-note{{candidate has non-matching type '(TestFormat) -> ()'}}
+  func print(format: TestFormat) {} 
 }
 
 // Protocol compositions in inheritance clauses

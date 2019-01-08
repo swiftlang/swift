@@ -923,10 +923,8 @@ class MyThing: Hashable {
     deinit {
         Swift.print("Deinit \(name)")
     }
-    
-    var hashValue: Int {
-        return 0
-    }
+
+    func hash(into hasher: inout Hasher) {}
     
     static func ==(lhs: MyThing, rhs: MyThing) -> Bool {
         return false

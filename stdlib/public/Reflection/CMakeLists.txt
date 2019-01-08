@@ -1,13 +1,4 @@
-set(swift_extra_sources)
-
-# When we're building with assertions, include the demangle node dumper to aid
-# in debugging.
-if (LLVM_ENABLE_ASSERTIONS)
-  list(APPEND swift_extra_sources "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
-endif(LLVM_ENABLE_ASSERTIONS)
-
-
-add_swift_library(swiftReflection STATIC TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
+set(swiftReflection_SOURCES
   MetadataSource.cpp
   TypeLowering.cpp
   TypeRef.cpp
@@ -19,9 +10,40 @@ add_swift_library(swiftReflection STATIC TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
   "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
-  ${swift_extra_sources}
-  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
-  LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
-  INSTALL_IN_COMPONENT dev)
+  "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp")
+
+# When we're building with assertions, include the demangle node dumper to aid
+# in debugging.
+if (LLVM_ENABLE_ASSERTIONS)
+  list(APPEND swiftReflection_SOURCES
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
+endif(LLVM_ENABLE_ASSERTIONS)
+
+if(SWIFT_BUILD_STDLIB)
+  add_swift_target_library(swiftReflection STATIC TARGET_LIBRARY
+    ${swiftReflection_SOURCES}
+    C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
+    LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
+    INSTALL_IN_COMPONENT dev)
+endif()
+
+# Build a specific version for the host with the host toolchain.  This is going
+# to be used by tools (e.g. lldb)
+if(SWIFT_INCLUDE_TOOLS)
+  if(NOT SWIFT_BUILD_STDLIB)
+    add_custom_target(swiftReflection-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
+  endif()
+
+  if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    set(CMAKE_C_COMPILER ${HOST_CMAKE_C_COMPILER})
+    set(CMAKE_CXX_COMPILER ${HOST_CMAKE_CXX_COMPILER})
+  endif()
+
+  add_swift_host_library(swiftReflection STATIC
+    ${swiftReflection_SOURCES})
+  target_compile_options(swiftReflection PRIVATE
+    ${SWIFT_RUNTIME_CXX_FLAGS})
+  set_property(TARGET swiftReflection
+    APPEND_STRING PROPERTY LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS})
+endif()
 

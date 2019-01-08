@@ -42,7 +42,7 @@ var events: [String]
 var currentModel: Model { get }
 
 public class Model : Object {
-  @sil_stored var id: Int { get set }
+  @_hasStorage var id: Int { get set }
   override init()
   init(value: Any)
   deinit

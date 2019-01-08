@@ -9,7 +9,6 @@ import gizmo
 
 // CHECK-DAG: sil shared [serializable] @$sSo16NSRuncingOptionsV{{[_0-9a-zA-Z]*}}fC
 // CHECK-DAG: sil shared [serializable] @$sSo16NSRuncingOptionsV8rawValueSivg
-// CHECK-DAG: sil shared [serializable] @$sSo16NSRuncingOptionsV9hashValueSivg
 
 // Non-payload enum ctors don't need to be instantiated at all.
 // NEGATIVE-NOT: sil shared [transparent] @$sSo16NSRuncingOptionsV5MinceAbBmF
@@ -36,8 +35,8 @@ protocol Bub {}
 
 extension NSRuncingOptions: Bub {}
 
-// CHECK-32-DAG: integer_literal $Builtin.Int2048, -2147483648
-// CHECK-64-DAG: integer_literal $Builtin.Int2048, 2147483648
+// CHECK-32-DAG: integer_literal $Builtin.IntLiteral, -2147483648
+// CHECK-64-DAG: integer_literal $Builtin.IntLiteral, 2147483648
 _ = NSFungingMask.toTheMax
 
 // CHECK-DAG: sil_witness_table shared [serialized] NSRuncingOptions: RawRepresentable module gizmo

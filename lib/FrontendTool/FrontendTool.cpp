@@ -29,6 +29,7 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ASTMangler.h"
@@ -312,30 +313,6 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                   PSPs.OutputFilename, opts.EmitSortedSIL);
 }
 
-/// A wrapper around swift::atomicallyWritingToFile that handles diagnosing any
-/// filesystem errors and ignores empty output paths.
-///
-/// \returns true if there were any errors, either from the filesystem
-/// operations or from \p action returning true.
-static bool atomicallyWritingToTextFile(
-    StringRef outputPath, DiagnosticEngine &diags,
-    llvm::function_ref<bool(llvm::raw_pwrite_stream &)> action) {
-  assert(!outputPath.empty());
-
-  bool actionFailed = false;
-  std::error_code EC =
-      swift::atomicallyWritingToFile(outputPath,
-                                     [&](llvm::raw_pwrite_stream &out) {
-    actionFailed = action(out);
-  });
-  if (EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   outputPath, EC.message());
-    return true;
-  }
-  return actionFailed;
-}
-
 /// Prints the Objective-C "generated header" interface for \p M to \p
 /// outputPath.
 ///
@@ -348,8 +325,8 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
                                 StringRef bridgingHeader, bool moduleIsPublic) {
   if (outputPath.empty())
     return false;
-  return atomicallyWritingToTextFile(outputPath, M->getDiags(),
-                                     [&](raw_ostream &out) -> bool {
+  return withOutputFile(M->getDiags(), outputPath,
+                        [&](raw_ostream &out) -> bool {
     auto requiredAccess = moduleIsPublic ? AccessLevel::Public
                                          : AccessLevel::Internal;
     return printAsObjC(out, M, bridgingHeader, requiredAccess);
@@ -368,8 +345,8 @@ static bool printParseableInterfaceIfNeeded(StringRef outputPath,
                                             ModuleDecl *M) {
   if (outputPath.empty())
     return false;
-  return atomicallyWritingToTextFile(outputPath, M->getDiags(),
-                                     [M, Opts](raw_ostream &out) -> bool {
+  return withOutputFile(M->getDiags(), outputPath,
+                        [M, Opts](raw_ostream &out) -> bool {
     return swift::emitParseableInterface(out, Opts, M);
   });
 }
@@ -708,6 +685,29 @@ static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
   return SF;
 }
 
+/// Dumps the AST of all available primary source files. If corresponding output
+/// files were specified, use them; otherwise, dump the AST to stdout.
+static void dumpAST(CompilerInvocation &Invocation,
+                    CompilerInstance &Instance) {
+  // FIXME: WMO doesn't use the notion of primary files, so this doesn't do the
+  // right thing. Perhaps it'd be best to ignore WMO when dumping the AST, just
+  // like WMO ignores `-incremental`.
+
+  auto primaryFiles = Instance.getPrimarySourceFiles();
+  if (!primaryFiles.empty()) {
+    for (SourceFile *sourceFile: primaryFiles) {
+      auto PSPs = Instance.getPrimarySpecificPathsForSourceFile(*sourceFile);
+      auto OutputFilename = PSPs.OutputFilename;
+      auto OS = getFileOutputStream(OutputFilename, Instance.getASTContext());
+      sourceFile->dump(*OS);
+    }
+  } else {
+    // Some invocations don't have primary files. In that case, we default to
+    // looking for the main file and dumping it to `stdout`.
+    getPrimaryOrMainSourceFile(Invocation, Instance)->dump(llvm::outs());
+  }
+}
+
 /// We may have been told to dump the AST (either after parsing or
 /// type-checking, which is already differentiated in
 /// CompilerInstance::performSema()), so dump or print the main source file and
@@ -751,7 +751,7 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
 
   case FrontendOptions::ActionType::DumpParse:
   case FrontendOptions::ActionType::DumpAST:
-    getPrimaryOrMainSourceFile(Invocation, Instance)->dump();
+    dumpAST(Invocation, Instance);
     break;
 
   case FrontendOptions::ActionType::EmitImportedModules:

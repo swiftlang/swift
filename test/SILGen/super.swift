@@ -1,10 +1,18 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule %S/../Inputs/resilient_class.swift
+
+// Note: we build fixed_layout_class without -enable-resilience, since with
+// -enable-resilience even @_fixed_layout classes have resilient metadata, and
+// we want to test the fragile access pattern here.
+
+// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
+
 // RUN: %target-swift-emit-silgen -module-name super -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
+import fixed_layout_class
 
 public class Parent {
   public final var finalProperty: String {
@@ -35,10 +43,12 @@ public class Child : Parent {
   // CHECK-LABEL: sil @$s5super5ChildC8propertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
   // CHECK:       bb0([[SELF:%.*]] : @guaranteed $Child):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
+  // CHECK:         [[CAST_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
+  // CHECK:         [[CAST_SELF_BORROW:%[0-9]+]] = begin_borrow [[CAST_SELF_COPY]]
   // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @$s5super6ParentC8propertySSvg : $@convention(method) (@guaranteed Parent) -> @owned String
-  // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
-  // CHECK:         destroy_value [[CASTED_SELF_COPY]]
+  // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CAST_SELF_BORROW]])
+  // CHECK:         end_borrow [[CAST_SELF_BORROW]]
+  // CHECK:         destroy_value [[CAST_SELF_COPY]]
   // CHECK:         return [[RESULT]]
   public override var property: String {
     return super.property
@@ -47,10 +57,12 @@ public class Child : Parent {
   // CHECK-LABEL: sil @$s5super5ChildC13otherPropertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
   // CHECK:       bb0([[SELF:%.*]] : @guaranteed $Child):
   // CHECK:         [[COPIED_SELF:%.*]] = copy_value [[SELF]]
-  // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[COPIED_SELF]] : $Child to $Parent
+  // CHECK:         [[CAST_SELF_COPY:%[0-9]+]] = upcast [[COPIED_SELF]] : $Child to $Parent
+  // CHECK:         [[CAST_SELF_BORROW:%[0-9]+]] = begin_borrow [[CAST_SELF_COPY]]
   // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @$s5super6ParentC13finalPropertySSvg
-  // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
-  // CHECK:         destroy_value [[CASTED_SELF_COPY]]
+  // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CAST_SELF_BORROW]])
+  // CHECK:         end_borrow [[CAST_SELF_BORROW]]
+  // CHECK:         destroy_value [[CAST_SELF_COPY]]
   // CHECK:         return [[RESULT]]
   public var otherProperty: String {
     return super.finalProperty

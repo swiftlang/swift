@@ -107,9 +107,6 @@ public:
   /// compiler to act as if it is version 3.1.
   Optional<Version> getEffectiveLanguageVersion() const;
 
-  /// Whether this version is in the Swift 3 family
-  bool isVersion3() const { return !empty() && Components[0] == 3; }
-
   /// Whether this version is greater than or equal to the given major version
   /// number.
   bool isVersionAtLeast(unsigned major, unsigned minor = 0) const {
@@ -155,8 +152,8 @@ public:
 
   // List of backward-compatibility versions that we permit passing as
   // -swift-version <vers>
-  static std::array<StringRef, 4> getValidEffectiveVersions() {
-    return {{"3", "4", "4.2", "5"}};
+  static std::array<StringRef, 3> getValidEffectiveVersions() {
+    return {{"4", "4.2", "5"}};
   };
 };
 

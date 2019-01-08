@@ -55,3 +55,7 @@ public func testDispatchThunkMyOverride(d: MyDerived, o: Object) {
 
   // CHECK: ret void
 }
+
+public func testDispatchThunkCast(d: Derived) {
+  _ = d.returnsSuperclass()
+}

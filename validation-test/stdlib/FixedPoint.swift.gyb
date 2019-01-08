@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swiftgyb-swift3
+// RUN: %target-run-stdlib-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -80,7 +80,7 @@ _UnimplementedError()
 }
 
 //===----------------------------------------------------------------------===//
-// 'Int(truncatingBitPattern:)' initializer
+// 'Int(truncatingIfNeeded:)' initializer
 //===----------------------------------------------------------------------===//
 
 %{
@@ -97,11 +97,11 @@ truncating_bit_pattern_test_template = gyb.parse_template("truncating_bit_patter
 %
 %       for bit_pattern in test_bit_patterns:
 
-FixedPoint.test("${Dst}(truncatingBitPattern:) from ${Src}(${bit_pattern})") {
+FixedPoint.test("${Dst}(truncatingIfNeeded:) from ${Src}(${bit_pattern})") {
 %       input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
   let input = get${Src}(${input})
 %       input = prepare_bit_pattern(input, src_ty.bits, False)
-  let output = get${Dst}(${Dst}(truncatingBitPattern: input))
+  let output = get${Dst}(${Dst}(truncatingIfNeeded: input))
   let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
   expectEqual(expected, output)
 }

@@ -196,6 +196,8 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
                                              SGFContext ctxt) {
   assert(inputType != outputType);
 
+  FormalEvaluationScope scope(SGF);
+
   SILGenFunction::OpaqueValueState state;
   ArchetypeType *openedArchetype = nullptr;
 
@@ -578,6 +580,8 @@ ManagedValue Transform::transform(ManagedValue v,
 
       // Unwrap zero or more metatype levels
       auto openedArchetype = getOpenedArchetype(openedType);
+
+      FormalEvaluationScope scope(SGF);
 
       auto state = SGF.emitOpenExistential(Loc, v, openedArchetype,
                                            loweredOpenedType,
@@ -3163,7 +3167,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   }
 
   // Create it in our current function.
-  auto thunkValue = SGF.B.createFunctionRef(loc, thunk);
+  auto thunkValue = SGF.B.createFunctionRefFor(loc, thunk);
   ManagedValue thunkedFn =
     SGF.B.createPartialApply(loc, thunkValue,
                              SILType::getPrimitiveObjectType(substFnType),
@@ -3271,7 +3275,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   }
 
   // Create it in our current function.
-  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkValue = B.createFunctionRefFor(loc, thunk);
   SILValue noEscapeValue =
       noEscapingFunctionValue.ensurePlusOne(*this, loc).forward(*this);
   SingleValueInstruction *thunkedFn = B.createPartialApply(
@@ -3548,7 +3552,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   forwardFunctionArguments(*this, loc, fTy, substArgs, args);
 
   // Create the call.
-  auto implRef = B.createFunctionRef(loc, implFn);
+  auto implRef = B.createFunctionRefFor(loc, implFn);
   SILValue implResult = emitApplyWithRethrow(loc, implRef,
                                 SILType::getPrimitiveObjectType(fTy),
                                 subs, args);
@@ -3571,18 +3575,26 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 enum class WitnessDispatchKind {
   Static,
   Dynamic,
-  Class
+  Class,
+  Witness
 };
 
-static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness) {
+static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness,
+                                                  bool isSelfConformance) {
   auto *decl = witness.getDecl();
 
+  if (isSelfConformance) {
+    assert(isa<ProtocolDecl>(decl->getDeclContext()));
+    return WitnessDispatchKind::Witness;
+  }
+
   ClassDecl *C = decl->getDeclContext()->getSelfClassDecl();
-  if (!C)
+  if (!C) {
     return WitnessDispatchKind::Static;
+  }
 
   // If the witness is dynamic, go through dynamic dispatch.
-  if (decl->isDynamic()) {
+  if (decl->isObjCDynamic()) {
     // For initializers we still emit a static allocating thunk around
     // the dynamic initializing entry point.
     if (witness.kind == SILDeclRef::Kind::Allocator)
@@ -3626,6 +3638,7 @@ getWitnessFunctionType(SILGenModule &SGM,
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
   case WitnessDispatchKind::Dynamic:
+  case WitnessDispatchKind::Witness:
     return SGM.Types.getConstantInfo(witness).SILFnType;
   case WitnessDispatchKind::Class:
     return SGM.Types.getConstantOverrideType(witness);
@@ -3634,11 +3647,21 @@ getWitnessFunctionType(SILGenModule &SGM,
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
 }
 
+static std::pair<CanType, ProtocolConformanceRef>
+getSelfTypeAndConformanceForWitness(SILDeclRef witness, SubstitutionMap subs) {
+  auto protocol = cast<ProtocolDecl>(witness.getDecl()->getDeclContext());
+  auto selfParam = protocol->getProtocolSelfType()->getCanonicalType();
+  auto type = subs.getReplacementTypes()[0];
+  auto conf = *subs.lookupConformance(selfParam, protocol);
+  return {type->getCanonicalType(), conf};
+}
+
 static SILValue
 getWitnessFunctionRef(SILGenFunction &SGF,
                       SILDeclRef witness,
                       CanSILFunctionType witnessFTy,
                       WitnessDispatchKind witnessKind,
+                      SubstitutionMap witnessSubs,
                       SmallVectorImpl<ManagedValue> &witnessParams,
                       SILLocation loc) {
   switch (witnessKind) {
@@ -3646,6 +3669,14 @@ getWitnessFunctionRef(SILGenFunction &SGF,
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
+  case WitnessDispatchKind::Witness: {
+    auto typeAndConf =
+      getSelfTypeAndConformanceForWitness(witness, witnessSubs);
+    return SGF.B.createWitnessMethod(loc, typeAndConf.first,
+                                     typeAndConf.second,
+                                     witness,
+                            SILType::getPrimitiveObjectType(witnessFTy));
+  }
   case WitnessDispatchKind::Class: {
     SILValue selfPtr = witnessParams.back().getValue();
     return SGF.emitClassMethodRef(loc, selfPtr, witness, witnessFTy);
@@ -3655,23 +3686,22 @@ getWitnessFunctionRef(SILGenFunction &SGF,
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
 }
 
-namespace {
-  class EmitAbortApply : public Cleanup {
-    SILValue Token;
-  public:
-    EmitAbortApply(SILValue token) : Token(token) {}
-    void emit(SILGenFunction &SGF, CleanupLocation loc,
-              ForUnwind_t forUnwind) override {
-      SGF.B.createAbortApply(loc, Token);
-    }
-    void dump(SILGenFunction &SGF) const override {
-#ifndef NDEBUG
-      llvm::errs() << "EmitAbortApply\n"
-                   << "State:" << getState() << "\n"
-                   << "Token:" << Token << "\n";
-#endif
-    }
-  };
+static ManagedValue
+emitOpenExistentialInSelfConformance(SILGenFunction &SGF, SILLocation loc,
+                                     SILDeclRef witness,
+                                     SubstitutionMap subs, ManagedValue value,
+                                     SILParameterInfo destParameter) {
+  auto typeAndConf = getSelfTypeAndConformanceForWitness(witness, subs);
+  auto archetype = typeAndConf.first->castTo<ArchetypeType>();
+  assert(archetype->isOpenedExistential());
+
+  auto openedTy = destParameter.getSILStorageType();
+  auto state = SGF.emitOpenExistential(loc, value, archetype, openedTy,
+                                       destParameter.isIndirectMutating()
+                                         ? AccessKind::ReadWrite
+                                         : AccessKind::Read);
+
+  return state.Value;
 }
 
 void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
@@ -3680,7 +3710,8 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                          SubstitutionMap reqtSubs,
                                          SILDeclRef witness,
                                          SubstitutionMap witnessSubs,
-                                         IsFreeFunctionWitness_t isFree) {
+                                         IsFreeFunctionWitness_t isFree,
+                                         bool isSelfConformance) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
@@ -3694,7 +3725,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   FullExpr scope(Cleanups, cleanupLoc);
   FormalEvaluationScope formalEvalScope(*this);
 
-  auto witnessKind = getWitnessDispatchKind(witness);
+  auto witnessKind = getWitnessDispatchKind(witness, isSelfConformance);
   auto thunkTy = F.getLoweredFunctionType();
 
   SmallVector<ManagedValue, 8> origParams;
@@ -3719,8 +3750,23 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                           ->getCanonicalType());
   }
 
+  // Get the lowered type of the witness.
+  auto origWitnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
+  auto witnessFTy = origWitnessFTy;
+  if (!witnessSubs.empty())
+    witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs);
+
   auto reqtSubstParams = reqtSubstTy.getParams();
   auto witnessSubstParams = witnessSubstTy.getParams();
+
+  // For a self-conformance, open the self parameter.
+  if (isSelfConformance) {
+    assert(!isFree && "shouldn't have a free witness for a self-conformance");
+    origParams.back() =
+      emitOpenExistentialInSelfConformance(*this, loc, witness, witnessSubs,
+                                           origParams.back(),
+                                           witnessFTy->getSelfParameter());
+  }
 
   // For a free function witness, discard the 'self' parameter of the
   // requirement.
@@ -3731,11 +3777,6 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
 
   // Translate the argument values from the requirement abstraction level to
   // the substituted signature of the witness.
-  auto origWitnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
-  auto witnessFTy = origWitnessFTy;
-  if (!witnessSubs.empty())
-    witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs);
-
   SmallVector<ManagedValue, 8> witnessParams;
   AbstractionPattern witnessOrigTy(witnessInfo.LoweredType);
   TranslateArguments(*this, loc,
@@ -3748,7 +3789,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
 
   SILValue witnessFnRef = getWitnessFunctionRef(*this, witness,
                                                 origWitnessFTy,
-                                                witnessKind,
+                                                witnessKind, witnessSubs,
                                                 witnessParams, loc);
 
   auto coroutineKind =
@@ -3789,13 +3830,9 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
 
   case SILCoroutineKind::YieldOnce: {
     SmallVector<SILValue, 4> witnessYields;
-    auto token =
+    auto tokenAndCleanup =
       emitBeginApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs,
                                 args, witnessYields);
-
-    // Push a cleanup to abort the inner coroutine.
-    Cleanups.pushCleanup<EmitAbortApply>(token);
-    auto abortCleanup = Cleanups.getTopCleanup();
 
     YieldInfo witnessYieldInfo(SGM, witness, witnessFTy, witnessSubs);
     YieldInfo reqtYieldInfo(SGM, requirement, thunkTy,
@@ -3804,10 +3841,10 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
     translateYields(*this, loc, witnessYields, witnessYieldInfo, reqtYieldInfo);
 
     // Kill the abort cleanup without emitting it.
-    Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    Cleanups.setCleanupState(tokenAndCleanup.second, CleanupState::Dead);
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, token);
+    emitEndApplyWithRethrow(loc, tokenAndCleanup.first);
 
     reqtResultValue = B.createTuple(loc, {});
     break;
@@ -3954,7 +3991,7 @@ SILGenFunction::emitCanonicalFunctionThunk(SILLocation loc, ManagedValue fn,
   }
 
   // Create it in the current function.
-  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkValue = B.createFunctionRefFor(loc, thunk);
   ManagedValue thunkedFn = B.createPartialApply(
       loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy),
       interfaceSubs, {fn},

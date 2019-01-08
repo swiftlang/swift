@@ -15,17 +15,17 @@ func sum(_ x: UInt64, _ y: UInt64) -> UInt64 {
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb5
-// TESTSIL: [[B2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: [[B2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL-NEXT: load [[B2]]
 // TESTSIL: store {{.*}} to [[B2]]
 // TESTSIL: end_access [[B2]]
 // TESTSIL: bb6
-// TESTSIL: [[B3:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: [[B3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL-NEXT: load [[B3]]
 // TESTSIL: store {{.*}} to [[B3]]
 // TESTSIL: end_access [[B3]]
 // TESTSIL: bb7
-// TESTSIL: [[B4:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: [[B4:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL-NEXT: load [[B4]]
 // TESTSIL: store {{.*}} to [[B4]]
 // TESTSIL: end_access [[B4]]
@@ -54,12 +54,12 @@ public func MergeTest1(_ N: Int) {
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb6
-// TESTSIL: [[B2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: [[B2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL-NEXT: load [[B2]]
 // TESTSIL: store {{.*}} to [[B2]]
 // TESTSIL: end_access [[B2]]
 // TESTSIL: bb7
-// TESTSIL: [[B3:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: [[B3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL-NEXT: load [[B3]]
 // TESTSIL: store {{.*}} to [[B3]]
 // TESTSIL: end_access [[B3]]
@@ -105,12 +105,12 @@ public func MergeTest3(_ N: Int) {
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb7
-// TESTSIL: [[B2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: [[B2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL-NEXT: load [[B2]]
 // TESTSIL: store {{.*}} to [[B2]]
 // TESTSIL: end_access [[B2]]
 // TESTSIL: bb8
-// TESTSIL: [[B3:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: [[B3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL-NEXT: load [[B3]]
 // TESTSIL: store {{.*}} to [[B3]]
 // TESTSIL: end_access [[B3]]
@@ -136,17 +136,17 @@ public func MergeTest4(_ N: Int) {
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb6
-// TESTSIL: [[B2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: [[B2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL-NEXT: load [[B2]]
 // TESTSIL: store {{.*}} to [[B2]]
 // TESTSIL: end_access [[B2]]
 // TESTSIL: bb7
-// TESTSIL: [[B3:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: [[B3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL-NEXT: load [[B3]]
 // TESTSIL: store {{.*}} to [[B3]]
 // TESTSIL: end_access [[B3]]
 // TESTSIL: bb8
-// TESTSIL: [[B4:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: [[B4:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL-NEXT: load [[B4]]
 // TESTSIL: store {{.*}} to [[B4]]
 // TESTSIL: end_access [[B4]]

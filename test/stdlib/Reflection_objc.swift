@@ -286,10 +286,9 @@ testQLO(HasStringQLO.self)
 // CHECK-NEXT: HasStringQLO overboard
 // CHECK-NEXT: CanaryBase overboard
 
-// simd types get no reflection info, so should have no mirror children
 let x = float4(0)
 print("float4 has \(Mirror(reflecting: x).children.count) children")
-// CHECK-NEXT: float4 has 0 children
+// CHECK-NEXT: float4 has 1 children
 
 // CHECK-LABEL: and now our song is done
 print("and now our song is done")

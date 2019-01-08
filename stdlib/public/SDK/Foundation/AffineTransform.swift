@@ -239,7 +239,7 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
     
     public func inverted() -> AffineTransform? {
         let determinant = (m11 * m22) - (m12 * m21)
-        if fabs(determinant) <= ε {
+        if abs(determinant) <= ε {
             return nil
         }
         var inverse = AffineTransform()

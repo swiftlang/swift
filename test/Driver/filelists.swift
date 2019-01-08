@@ -6,16 +6,16 @@
 // CHECK-NOT: Handled
 // CHECK: Handled a.swift
 // CHECK-NEXT: Supplementary "./a.swift":
-// CHECK-NEXT: Supplementary swiftdoc: "./a.swiftdoc"
 // CHECK-NEXT: Supplementary swiftmodule: "./a.swiftmodule"
+// CHECK-NEXT: Supplementary swiftdoc: "./a.swiftdoc"
 // CHECK-NEXT: Handled b.swift
 // CHECK-NEXT: Supplementary "./b.swift":
-// CHECK-NEXT: Supplementary swiftdoc: "./b.swiftdoc"
 // CHECK-NEXT: Supplementary swiftmodule: "./b.swiftmodule"
+// CHECK-NEXT: Supplementary swiftdoc: "./b.swiftdoc"
 // CHECK-NEXT: Handled c.swift
 // CHECK-NEXT: Supplementary "./c.swift":
-// CHECK-NEXT: Supplementary swiftdoc: "./c.swiftdoc"
 // CHECK-NEXT: Supplementary swiftmodule: "./c.swiftmodule"
+// CHECK-NEXT: Supplementary swiftdoc: "./c.swiftdoc"
 // CHECK-NEXT: Handled modules
 // CHECK-NOT: Handled
 

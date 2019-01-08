@@ -121,24 +121,27 @@ public:
   // flags of the field types can be mostly bitwise-or'ed together to derive the
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
   // still require additional fixup.)
-  enum : int_type {
+  enum : uint32_t {
     AlignmentMask =       0x000000FF,
+    // unused             0x0000FF00,
     IsNonPOD =            0x00010000,
     IsNonInline =         0x00020000,
-    HasExtraInhabitants = 0x00040000,
+    // unused             0x00040000,
     HasSpareBits =        0x00080000,
     IsNonBitwiseTakable = 0x00100000,
     HasEnumWitnesses =    0x00200000,
     Incomplete =          0x00400000,
-
-    // Everything else is reserved.
+    // unused             0xFF800000,
   };
 
+  static constexpr const uint32_t MaxNumExtraInhabitants = 0x7FFFFFFF;
+
 private:
-  int_type Data;
+  uint32_t Data;
+
+  explicit constexpr TargetValueWitnessFlags(uint32_t data) : Data(data) {}
 
 public:
-  explicit constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
   constexpr TargetValueWitnessFlags() : Data(0) {}
 
   /// The required alignment of the first byte of an object of this
@@ -192,21 +195,11 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
   }
-  /// True if this type's binary representation has extra inhabitants, that is,
-  /// bit patterns that do not form valid values of the type.
-  ///
-  /// If true, then the extra inhabitant value witness table entries are
-  /// available in this type's value witness table.
-  bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
+
   /// True if this type's binary representation is that of an enum, and the
   /// enum value witness table entries are available in this type's value
   /// witness table.
   bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
-  constexpr TargetValueWitnessFlags
-  withExtraInhabitants(bool hasExtraInhabitants) const {
-    return TargetValueWitnessFlags((Data & ~HasExtraInhabitants) |
-                               (hasExtraInhabitants ? HasExtraInhabitants : 0));
-  }
   constexpr TargetValueWitnessFlags
   withEnumWitnesses(bool hasEnumWitnesses) const {
     return TargetValueWitnessFlags((Data & ~HasEnumWitnesses) |
@@ -223,43 +216,11 @@ public:
                                    (isIncomplete ? Incomplete : 0));
   }
 
-  constexpr int_type getOpaqueValue() const { return Data; }
-  static constexpr TargetValueWitnessFlags getFromOpaqueValue(int_type data) {
-    return TargetValueWitnessFlags(data);
+  constexpr uint32_t getOpaqueValue() const {
+    return Data;
   }
 };
 using ValueWitnessFlags = TargetValueWitnessFlags<size_t>;
-
-/// Flags stored in a value-witness table with extra inhabitants.
-template <typename int_type>
-class TargetExtraInhabitantFlags {
-public:
-  enum : int_type {
-    NumExtraInhabitantsMask = 0x7FFFFFFFU,
-    ExtraInhabitantFlags
-  };
-  int_type Data;
-
-  constexpr TargetExtraInhabitantFlags(int_type data) : Data(data) {}
-
-public:
-  constexpr TargetExtraInhabitantFlags() : Data(0) {}
-  /// The number of extra inhabitants in the type's representation.
-  int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
-
-  constexpr TargetExtraInhabitantFlags
-  withNumExtraInhabitants(unsigned numExtraInhabitants) const {
-    return TargetExtraInhabitantFlags((Data & ~NumExtraInhabitantsMask) |
-                                      numExtraInhabitants);
-  }
-
-  constexpr int_type getOpaqueValue() const { return Data; }
-  static constexpr TargetExtraInhabitantFlags getFromOpaqueValue(int_type data){
-    return TargetExtraInhabitantFlags(data);
-  }
-};
-using ExtraInhabitantFlags =
-  TargetExtraInhabitantFlags<size_t>;
 
 /// Flags for dynamic-cast operations.
 enum class DynamicCastFlags : size_t {
@@ -380,12 +341,12 @@ enum : unsigned {
 /// Kinds of type metadata/protocol conformance records.
 enum class TypeReferenceKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
-  /// getNominalTypeDescriptor() points to the nominal type descriptor.
-  DirectNominalTypeDescriptor = 0x00,
+  /// getTypeDescriptor() points to the type context descriptor.
+  DirectTypeDescriptor = 0x00,
 
   /// The conformance is for a nominal type referenced indirectly;
-  /// getNominalTypeDescriptor() points to the nominal type descriptor.
-  IndirectNominalTypeDescriptor = 0x01,
+  /// getTypeDescriptor() points to the type context descriptor.
+  IndirectTypeDescriptor = 0x01,
 
   /// The conformance is for an Objective-C class that should be looked up
   /// by class name.
@@ -402,7 +363,7 @@ enum class TypeReferenceKind : unsigned {
 
   // We only reserve three bits for this in the various places we store it.
 
-  First_Kind = DirectNominalTypeDescriptor,
+  First_Kind = DirectTypeDescriptor,
   Last_Kind = IndirectObjCClass,
 };
 
@@ -600,24 +561,9 @@ class ConformanceFlags {
 public:
   typedef uint32_t int_type;
 
-  enum class ConformanceKind {
-    /// A direct reference to a protocol witness table.
-    WitnessTable,
-    /// A function pointer that can be called to access the protocol witness
-    /// table.
-    WitnessTableAccessor,
-    /// A function pointer that can be called to access the protocol witness
-    /// table whose conformance is conditional on additional requirements that
-    /// must first be evaluated and then provided to the accessor function.
-    ConditionalWitnessTableAccessor,
-
-    First_Kind = WitnessTable,
-    Last_Kind = ConditionalWitnessTableAccessor,
-  };
-
 private:
   enum : int_type {
-    ConformanceKindMask = 0x07,      // 8 conformance kinds
+    UnusedLowBits = 0x07,      // historical conformance kind
 
     TypeMetadataKindMask = 0x7 << 3, // 8 type reference kinds
     TypeMetadataKindShift = 3,
@@ -636,10 +582,6 @@ private:
 
 public:
   ConformanceFlags(int_type value = 0) : Value(value) {}
-
-  ConformanceFlags withConformanceKind(ConformanceKind kind) const {
-    return ConformanceFlags((Value & ~ConformanceKindMask) | int_type(kind));
-  }
 
   ConformanceFlags withTypeReferenceKind(TypeReferenceKind kind) const {
     return ConformanceFlags((Value & ~TypeMetadataKindMask)
@@ -675,11 +617,6 @@ public:
                             | (hasGenericWitnessTable
                                  ? HasGenericWitnessTableMask
                                  : 0));
-  }
-
-  /// Retrieve the conformance kind.
-  ConformanceKind getConformanceKind() const {
-    return ConformanceKind(Value & ConformanceKindMask);
   }
 
   /// Retrieve the type reference kind kind.
@@ -880,7 +817,11 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 
 template <typename int_type>
 class TargetParameterTypeFlags {
-  enum : int_type { ValueOwnershipMask = 0x7F, VariadicMask = 0x80 };
+  enum : int_type {
+    ValueOwnershipMask = 0x7F,
+    VariadicMask       = 0x80,
+    AutoClosureMask    = 0x100,
+  };
   int_type Data;
 
   constexpr TargetParameterTypeFlags(int_type Data) : Data(Data) {}
@@ -900,8 +841,15 @@ public:
                                               (isVariadic ? VariadicMask : 0));
   }
 
+  constexpr TargetParameterTypeFlags<int_type>
+  withAutoClosure(bool isAutoClosure) const {
+    return TargetParameterTypeFlags<int_type>(
+        (Data & ~AutoClosureMask) | (isAutoClosure ? AutoClosureMask : 0));
+  }
+
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
+  bool isAutoClosure() const { return Data & AutoClosureMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);
@@ -1521,6 +1469,45 @@ enum class GenericRequirementLayoutKind : uint32_t {
   Class = 0,
 };
 
+class GenericEnvironmentFlags {
+  uint32_t Value;
+
+  enum : uint32_t {
+    NumGenericParameterLevelsMask = 0xFFF,
+    NumGenericRequirementsShift = 12,
+    NumGenericRequirementsMask = 0xFFFF << NumGenericRequirementsShift,
+  };
+
+  constexpr explicit GenericEnvironmentFlags(uint32_t value) : Value(value) { }
+
+public:
+  constexpr GenericEnvironmentFlags() : Value(0) { }
+
+  constexpr GenericEnvironmentFlags
+  withNumGenericParameterLevels(uint16_t numGenericParameterLevels) const {
+    return GenericEnvironmentFlags((Value &~ NumGenericParameterLevelsMask)
+                                   | numGenericParameterLevels);
+  }
+
+  constexpr GenericEnvironmentFlags
+  withNumGenericRequirements(uint16_t numGenericRequirements) const {
+    return GenericEnvironmentFlags((Value &~ NumGenericRequirementsMask)
+             | (numGenericRequirements << NumGenericRequirementsShift));
+  }
+
+  constexpr unsigned getNumGenericParameterLevels() const {
+    return Value & NumGenericParameterLevelsMask;
+  }
+
+  constexpr unsigned getNumGenericRequirements() const {
+    return (Value & NumGenericRequirementsMask) >> NumGenericRequirementsShift;
+  }
+
+  constexpr uint32_t getIntValue() const {
+    return Value;
+  }
+};
+
 /// Flags used by generic metadata patterns.
 class GenericMetadataPatternFlags : public FlagSet<uint32_t> {
   enum {
@@ -1684,6 +1671,40 @@ public:
   /// Is this request satisfied by a metadata that's in the given state?
   bool isSatisfiedBy(MetadataState state) const {
     return isAtLeast(state, getState());
+  }
+};
+
+/// Flags for Builtin.IntegerLiteral values.
+class IntegerLiteralFlags {
+public:
+  enum : size_t {
+    IsNegativeFlag = 0x1,
+
+    // Save some space for other flags.
+
+    BitWidthShift = 8,
+  };
+
+private:
+  size_t Data;
+
+  explicit IntegerLiteralFlags(size_t data) : Data(data) {}
+
+public:
+  constexpr IntegerLiteralFlags(size_t bitWidth, bool isNegative)
+    : Data((bitWidth << BitWidthShift)
+           | (isNegative ? IsNegativeFlag : 0)) {}
+
+  /// Return true if the value is negative.
+  bool isNegative() const { return Data & IsNegativeFlag; }
+
+  /// Return the minimum number of bits necessary to store the value in
+  /// two's complement, including a leading sign bit.
+  unsigned getBitWidth() const { return Data >> BitWidthShift; }
+
+  size_t getOpaqueValue() const { return Data; }
+  static IntegerLiteralFlags getFromOpaqueValue(size_t value) {
+    return IntegerLiteralFlags(value);
   }
 };
 

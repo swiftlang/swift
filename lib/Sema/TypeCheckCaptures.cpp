@@ -239,6 +239,14 @@ public:
   std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
 
+    // HACK: $interpolation variables are seen as needing to be captured. 
+    // The good news is, we literally never need to capture them, so we 
+    // can safely ignore them.
+    // FIXME(TapExpr): This is probably caused by the scoping 
+    // algorithm's ignorance of TapExpr. We should fix that.
+    if (D->getBaseName() == D->getASTContext().Id_dollarInterpolation)
+      return { false, DRE };
+
     // Capture the generic parameters of the decl, unless it's a
     // local declaration in which case we will pick up generic
     // parameter references transitively.
@@ -275,15 +283,14 @@ public:
         // recontextualized into it, so treat it as if it's already there.
         if (auto init = dyn_cast<PatternBindingInitializer>(TmpDC)) {
           if (auto lazyVar = init->getInitializedLazyVar()) {
-            // Referring to the 'self' parameter is fine.
-            if (D == init->getImplicitSelfDecl())
-              return { false, DRE };
-
-            // Otherwise, act as if we're in the getter.
-            auto getter = lazyVar->getGetter();
-            assert(getter && "lazy variable without getter");
-            TmpDC = getter;
-            continue;
+            // If we have a getter with a body, we're already re-parented
+            // everything so pretend we're inside the getter.
+            if (auto getter = lazyVar->getGetter()) {
+              if (getter->getBody(/*canSynthesize=*/false)) {
+                TmpDC = getter;
+                continue;
+              }
+            }
           }
         }
 
@@ -394,7 +401,9 @@ public:
     if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
       if (D->getBaseName() == D->getASTContext().Id_self) {
         TC.diagnose(DRE->getLoc(),
-          diag::closure_implicit_capture_mutating_self);
+                    diag::closure_implicit_capture_mutating_self);
+        TC.diagnose(DRE->getLoc(),
+                    diag::create_mutating_copy_or_capture_self);
       } else {
         TC.diagnose(DRE->getLoc(),
           diag::closure_implicit_capture_without_noescape);

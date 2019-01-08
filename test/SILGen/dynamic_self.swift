@@ -304,9 +304,8 @@ class Derived : Base {
   // CHECK-LABEL: sil hidden @$s12dynamic_self7DerivedC9superCallyyF : $@convention(method) (@guaranteed Derived) -> ()
   // CHECK: [[SELF:%.*]] = copy_value %0
   // CHECK: [[SUPER:%.*]] = upcast [[SELF]] : $Derived to $Base
-  // CHECK: [[BORROWED_SUPER:%.*]] = begin_borrow [[SUPER]]
   // CHECK: [[METHOD:%.*]] = function_ref @$s12dynamic_self4BaseC11returnsSelfACXDyF
-  // CHECK: apply [[METHOD]]([[BORROWED_SUPER]])
+  // CHECK: apply [[METHOD]]([[SUPER]])
   // CHECK: return
   func superCall() {
     _ = super.returnsSelf()
@@ -324,9 +323,8 @@ class Derived : Base {
   // CHECK-LABEL: sil hidden @$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyF : $@convention(method) (@guaranteed Derived) -> @owned Derived
   // CHECK: [[SELF:%.*]] = copy_value %0
   // CHECK: [[SUPER:%.*]] = upcast [[SELF]] : $Derived to $Base
-  // CHEcK: [[BORROWED_SUPER:%.*]] = begin_borrow [[SUPER]]
   // CHECK: [[METHOD:%.*]] = function_ref @$s12dynamic_self4BaseC11returnsSelfACXDyF
-  // CHECK: apply [[METHOD]]([[BORROWED_SUPER]])
+  // CHECK: apply [[METHOD]]([[SUPER]])
   // CHECK: return
   func superCallFromMethodReturningSelf() -> Self {
     _ = super.returnsSelf()

@@ -53,30 +53,35 @@
 // CHECK-32: Alignment: 4
 // CHECK-32: Stride: 12
 // CHECK-32: NumExtraInhabitants: 0
+// CHECK-32: BitwiseTakable: 1
 
 // CHECK-32-LABEL: - __C.MyCEnum:
 // CHECK-32: Size: 4
 // CHECK-32: Alignment: 4
 // CHECK-32: Stride: 4
 // CHECK-32: NumExtraInhabitants: 0
+// CHECK-32: BitwiseTakable: 1
 
 // CHECK-32-LABEL: - __C.MyCUnion:
 // CHECK-32: Size: 4
 // CHECK-32: Alignment: 4
 // CHECK-32: Stride: 4
 // CHECK-32: NumExtraInhabitants: 0
+// CHECK-32: BitwiseTakable: 1
 
 // CHECK-i386-LABEL: - __C.MyCStructWithBitfields:
 // CHECK-i386: Size: 4
 // CHECK-i386: Alignment: 4
 // CHECK-i386: Stride: 4
 // CHECK-i386: NumExtraInhabitants: 0
+// CHECK-i386: BitwiseTakable: 1
 
 // CHECK-arm-LABEL: - __C.MyCStructWithBitfields:
 // CHECK-arm: Size: 2
 // CHECK-arm: Alignment: 1
 // CHECK-arm: Stride: 2
 // CHECK-arm: NumExtraInhabitants: 0
+// CHECK-arm: BitwiseTakable: 1
 
 // CHECK-32: CAPTURE DESCRIPTORS:
 // CHECK-32: ====================
@@ -128,24 +133,28 @@
 // CHECK-64: Alignment: 8
 // CHECK-64: Stride: 24
 // CHECK-64: NumExtraInhabitants: 0
+// CHECK-64: BitwiseTakable: 1
 
 // CHECK-64-LABEL: - __C.MyCEnum:
 // CHECK-64: Size: 4
 // CHECK-64: Alignment: 4
 // CHECK-64: Stride: 4
 // CHECK-64: NumExtraInhabitants: 0
+// CHECK-64: BitwiseTakable: 1
 
 // CHECK-64-LABEL: - __C.MyCUnion:
 // CHECK-64: Size: 8
 // CHECK-64: Alignment: 8
 // CHECK-64: Stride: 8
 // CHECK-64: NumExtraInhabitants: 0
+// CHECK-64: BitwiseTakable: 1
 
 // CHECK-64-LABEL: - __C.MyCStructWithBitfields:
 // CHECK-64: Size: 4
 // CHECK-64: Alignment: 4
 // CHECK-64: Stride: 4
 // CHECK-64: NumExtraInhabitants: 0
+// CHECK-64: BitwiseTakable: 1
 
 // CHECK-64: CAPTURE DESCRIPTORS:
 // CHECK-64: ====================

@@ -187,8 +187,8 @@ public struct Set<Element: Hashable> {
   ///   is a reference type).
   @inlinable
   public // SPI(Foundation)
-  init(_immutableCocoaSet: __owned _NSSet) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
+  init(_immutableCocoaSet: __owned AnyObject) {
+    _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
     self.init(_cocoa: _CocoaSet(_immutableCocoaSet))
   }
@@ -390,18 +390,6 @@ extension Set: Collection {
   @inlinable
   public var isEmpty: Bool {
     return count == 0
-  }
-
-  /// The first element of the set.
-  ///
-  /// The first element of the set is not necessarily the first element added
-  /// to the set. Don't expect any particular ordering of set elements.
-  ///
-  /// If the set is empty, the value of this property is `nil`.
-  @inlinable
-  public var first: Element? {
-    var iterator = makeIterator()
-    return iterator.next()
   }
 }
 
@@ -1379,8 +1367,8 @@ extension Set.Index {
       }
       let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
       _variant = .native(dummy)
+      defer { _variant = .cocoa(cocoa) }
       yield &cocoa
-      _variant = .cocoa(cocoa)
     }
   }
 #endif
@@ -1437,7 +1425,7 @@ extension Set.Index: Hashable {
 #if _runtime(_ObjC)
     guard _isNative else {
       hasher.combine(1 as UInt8)
-      hasher.combine(_asCocoa.storage.currentKeyIndex)
+      hasher.combine(_asCocoa._offset)
       return
     }
     hasher.combine(0 as UInt8)
@@ -1530,7 +1518,7 @@ extension Set.Iterator {
         return nativeIterator
 #if _runtime(_ObjC)
       case .cocoa:
-        _sanityCheckFailure("internal error: does not contain a native index")
+        _internalInvariantFailure("internal error: does not contain a native index")
 #endif
       }
     }
@@ -1545,7 +1533,7 @@ extension Set.Iterator {
     get {
       switch _variant {
       case .native:
-        _sanityCheckFailure("internal error: does not contain a Cocoa index")
+        _internalInvariantFailure("internal error: does not contain a Cocoa index")
       case .cocoa(let cocoa):
         return cocoa
       }
@@ -1625,7 +1613,7 @@ extension Set {
   public // FIXME(reserveCapacity): Should be inlinable
   mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variant.reserveCapacity(minimumCapacity)
-    _sanityCheck(self.capacity >= minimumCapacity)
+    _internalInvariant(self.capacity >= minimumCapacity)
   }
 }
 

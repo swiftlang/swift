@@ -362,6 +362,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(ObjCSelector);
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
+  NO_REFERENCE(Tap);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -667,6 +668,9 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::EditorPlaceholder:
   case ExprKind::KeyPathDot:
     return false;
+
+  case ExprKind::Tap:
+    return true;
   }
 
   llvm_unreachable("Unhandled ExprKind in switch.");
@@ -789,7 +793,9 @@ static LiteralExpr *
 shallowCloneImpl(const InterpolatedStringLiteralExpr *E, ASTContext &Ctx,
                  llvm::function_ref<Type(const Expr *)> getType) {
   auto res = new (Ctx) InterpolatedStringLiteralExpr(E->getLoc(),
-                const_cast<InterpolatedStringLiteralExpr*>(E)->getSegments());
+                                                     E->getLiteralCapacity(),
+                                                     E->getInterpolationCount(),
+                                                     E->getAppendingExpr());
   res->setSemanticExpr(E->getSemanticExpr());
   return res;
 }
@@ -849,46 +855,81 @@ IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsig
   return new (C) IntegerLiteralExpr(Text, SourceLoc(), /*implicit*/ true);
 }
 
-/// A wrapper around LLVM::getAsInteger that can be used on Swift interger
-/// literals. It avoids misinterpreting decimal numbers prefixed with 0 as
-/// octal numbers.
-static bool getAsInteger(StringRef Text, llvm::APInt &Value) {
-  // swift encodes octal differently from C
-  bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
-  return Text.getAsInteger(IsCOctal ? 10 : 0, Value);
-}
-
-static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
-                                    unsigned BitWidth) {
-  llvm::APInt Value(BitWidth, 0);
-  bool Error = getAsInteger(Text, Value);
-  assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
-  if (IsNegative)
-    Value = -Value;
-  if (Value.getBitWidth() != BitWidth)
-    Value = Value.sextOrTrunc(BitWidth);
-  return Value;
-}
-
-APInt IntegerLiteralExpr::getValue(StringRef Text, unsigned BitWidth, bool Negative) {
-  return getIntegerLiteralValue(Negative, Text, BitWidth);
-}
-
-/// Returns the raw magnitude of the literal text without any truncation.
-APInt IntegerLiteralExpr::getRawMagnitude() const {
-  llvm::APInt Value(64, 0);
-  bool Error = getAsInteger(getDigitsText(), Value);
-  assert(!Error && "Invalid IntegerLiteral formed");
-  (void)Error;
-  return Value;
+APInt IntegerLiteralExpr::getRawValue() const {
+  return BuiltinIntegerWidth::arbitrary().parse(getDigitsText(), /*radix*/0,
+                                                isNegative());
 }
 
 APInt IntegerLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
   assert(!getType()->hasError() && "Should have a valid type");
-  return getIntegerLiteralValue(
-      isNegative(), getDigitsText(),
-      getType()->castTo<BuiltinIntegerType>()->getGreatestWidth());
+  auto width = getType()->castTo<AnyBuiltinIntegerType>()->getWidth();
+  return width.parse(getDigitsText(), /*radix*/ 0, isNegative());
+}
+
+APInt BuiltinIntegerWidth::parse(StringRef text, unsigned radix, bool negate,
+                                 bool *hadError) const {
+  if (hadError) *hadError = false;
+
+  // Parse an unsigned value from the string.
+  APInt value;
+
+  // Swift doesn't treat a leading zero as signifying octal, but
+  // StringRef::getAsInteger does.  Force decimal parsing in this case.
+  if (radix == 0 && text.size() >= 2 && text[0] == '0' && isdigit(text[1]))
+    radix = 10;
+
+  bool error = text.getAsInteger(radix, value);
+  if (error) {
+    if (hadError) *hadError = true;
+    return value;
+  }
+
+  // If we're producing an arbitrary-precision value, we don't need to do
+  // much additional processing.
+  if (isArbitraryWidth()) {
+    // The parser above always produces a non-negative value, so if the sign
+    // bit is set we need to give it some breathing room.
+    if (value.isNegative())
+      value = value.zext(value.getBitWidth() + 1);
+    assert(!value.isNegative());
+
+    // Now we can safely negate.
+    if (negate) {
+      value = -value;
+      assert(value.isNegative() || value.isNullValue());
+    }
+
+    // Truncate down to the minimum number of bits required to express
+    // this value exactly.
+    auto requiredBits = value.getMinSignedBits();
+    if (value.getBitWidth() > requiredBits)
+      value = value.trunc(requiredBits);
+
+  // If we have a fixed-width type (including abstract ones), we need to do
+  // fixed-width transformations, which can overflow.
+  } else {
+    unsigned width = getGreatestWidth();
+
+    // The overflow diagnostics in this case can't be fully correct because
+    // we don't know whether we're supposed to be producing a signed number
+    // or an unsigned one.
+
+    if (hadError && value.getActiveBits() > width)
+      *hadError = true;
+    value = value.zextOrTrunc(width);
+
+    if (negate) {
+      value = -value;
+
+      if (hadError && !value.isNegative())
+        *hadError = true;
+    }
+
+    assert(value.getBitWidth() == width);
+  }
+
+  return value;
 }
 
 static APFloat getFloatLiteralValue(bool IsNegative, StringRef Text,
@@ -1780,6 +1821,13 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
       candidate = covariantExpr->getSubExpr();
       continue;
     }
+    
+    // Look through inject into optional expressions
+    if (auto injectIntoOptionalExpr
+        = dyn_cast<InjectIntoOptionalExpr>(candidate)) {
+      candidate = injectIntoOptionalExpr->getSubExpr();
+      continue;
+    }
     break;
   }
 
@@ -2181,6 +2229,53 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Identity:
     llvm_unreachable("no hashable conformances for this kind");
   }
+}
+
+void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx, 
+    llvm::function_ref<void(bool, CallExpr *)> callback) {
+  auto appendingExpr = getAppendingExpr();
+  if (SemanticExpr) {
+    SemanticExpr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+      if (auto tap = dyn_cast_or_null<TapExpr>(subExpr)) {
+        appendingExpr = tap;
+        return nullptr;
+      }
+      return subExpr;
+    });
+  }
+
+  for (auto stmt : appendingExpr->getBody()->getElements()) {
+    if (auto expr = stmt.dyn_cast<Expr*>()) {
+      if (auto call = dyn_cast<CallExpr>(expr)) {
+        DeclName name;
+        if (auto fn = call->getCalledValue()) {
+          name = fn->getFullName();
+        } else if (auto unresolvedDot =
+                      dyn_cast<UnresolvedDotExpr>(call->getFn())) {
+          name = unresolvedDot->getName();
+        }
+
+        bool isInterpolation = (name.getBaseName() ==
+                                Ctx.Id_appendInterpolation);
+
+        callback(isInterpolation, call);
+      }
+    }
+  }
+}
+
+TapExpr::TapExpr(Expr * SubExpr, BraceStmt *Body)
+    : Expr(ExprKind::Tap, /*Implicit=*/true),
+      SubExpr(SubExpr), Body(Body) {
+  if (Body) {
+    assert(Body->getNumElements() > 0 &&
+         Body->getElement(0).isDecl(DeclKind::Var) &&
+         "First element of Body should be a variable to init with the subExpr");
+  }
+}
+
+VarDecl * TapExpr::getVar() const {
+  return dyn_cast<VarDecl>(Body->getElement(0).dyn_cast<Decl *>());
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is

@@ -81,7 +81,7 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
 }
 
 SILLinkage
-swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
+swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
                                         ForDefinition_t definition) {
   // Behavior conformances are always private.
   if (C->isBehaviorConformance())

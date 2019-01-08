@@ -43,7 +43,7 @@ extension LazyFilterSequence.Iterator : _ObjectiveCBridgeable { // expected-erro
 
 
 struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 
   func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
@@ -71,14 +71,14 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
 
 func ==(x: BridgedStruct, y: BridgedStruct) -> Bool { return true }
 
-struct NotBridgedStruct : Hashable { 
-  var hashValue: Int { return 0 }
+struct NotBridgedStruct : Hashable {
+  func hash(into hasher: inout Hasher) {}
 }
 
 func ==(x: NotBridgedStruct, y: NotBridgedStruct) -> Bool { return true }
 
 class OtherClass : Hashable { 
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 func ==(x: OtherClass, y: OtherClass) -> Bool { return true }
 
@@ -269,7 +269,7 @@ func rdar19831698() {
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
   var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and '[Any]'}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Self, Other), (Other, Self)}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Array<Element>, Array<Element>), (Self, Other), (Other, Self)}}
   var v75 = true + "str" // expected-error {{binary operator '+' cannot be applied to operands of type 'Bool' and 'String'}} expected-note {{expected an argument list of type '(String, String)'}}
 }
 

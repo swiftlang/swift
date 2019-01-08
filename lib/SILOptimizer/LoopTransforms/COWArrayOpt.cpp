@@ -515,7 +515,6 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kGetCount:
   case ArrayCallKind::kGetCapacity:
   case ArrayCallKind::kGetElement:
-  case ArrayCallKind::kGetArrayOwner:
   case ArrayCallKind::kGetElementAddress:
     return true;
   case ArrayCallKind::kMakeMutable:
@@ -1580,7 +1579,7 @@ protected:
     }
   }
 
-  SILValue remapValue(SILValue V) {
+  SILValue getMappedValue(SILValue V) {
     if (auto *BB = V->getParentBlock()) {
       if (!DomTree.dominates(StartBB, BB)) {
         // Must be a value that dominates the start basic block.
@@ -1589,7 +1588,7 @@ protected:
         return V;
       }
     }
-    return SILCloner<RegionCloner>::remapValue(V);
+    return SILCloner<RegionCloner>::getMappedValue(V);
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
@@ -1611,7 +1610,7 @@ protected:
     // Update SSA form.
     SSAUp.Initialize(V->getType());
     SSAUp.AddAvailableValue(OrigBB, V);
-    SILValue NewVal = remapValue(V);
+    SILValue NewVal = getMappedValue(V);
     SSAUp.AddAvailableValue(getOpBasicBlock(OrigBB), NewVal);
     for (auto U : UseList) {
       Operand *Use = U;

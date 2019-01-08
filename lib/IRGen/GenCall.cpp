@@ -1510,11 +1510,14 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
 
   // For ABI reasons the result type of the call might not actually match the
   // expected result type.
+  //
+  // This can happen when calling C functions, or class method dispatch thunks
+  // for methods that have covariant ABI-compatible overrides.
   auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
   if (result->getType() != expectedNativeResultType) {
-    // This should only be needed when we call C functions.
-    assert(getCallee().getOrigFunctionType()->getLanguage() ==
-           SILFunctionLanguage::C);
+    auto origFnType = getCallee().getOrigFunctionType();
+    assert(origFnType->getLanguage() == SILFunctionLanguage::C ||
+           origFnType->getRepresentation() == SILFunctionTypeRepresentation::Method);
     result =
         IGF.coerceValue(result, expectedNativeResultType, IGF.IGM.DataLayout);
   }
@@ -1738,9 +1741,11 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
     }
 
     // Otherwise, it's direct.  Remap.
-    auto temp = schema.getDirectSchema().mapFromNative(IGF.IGM, IGF,
-                                                       rawYieldComponents,
-                                                       schema.getSILType());
+    const auto &directSchema = schema.getDirectSchema();
+    Explosion eltValues;
+    rawYieldComponents.transferInto(eltValues, directSchema.size());
+    auto temp = directSchema.mapFromNative(IGF.IGM, IGF, eltValues,
+                                           schema.getSILType());
 
     auto &yieldTI = cast<LoadableTypeInfo>(schema.getTypeInfo());
     emitCastToSubstSchema(IGF, temp, yieldTI.getSchema(), out);

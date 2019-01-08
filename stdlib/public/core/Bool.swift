@@ -170,15 +170,6 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   }
 }
 
-extension Bool {
-  // This is a magic entry point known to the compiler.
-  @_transparent
-  public // COMPILER_INTRINSIC
-  func _getBuiltinLogicValue() -> Builtin.Int1 {
-    return _value
-  }
-}
-
 extension Bool : CustomStringConvertible {
   /// A textual representation of the Boolean value.
   @inlinable
@@ -343,10 +334,10 @@ extension Bool {
   /// Use this method to toggle a Boolean value from `true` to `false` or from
   /// `false` to `true`.
   ///
-  ///    var bools = [true, false]
+  ///     var bools = [true, false]
   ///
-  ///    bools[0].toggle()
-  ///    // bools == [false, false]
+  ///     bools[0].toggle()
+  ///     // bools == [false, false]
   @inlinable
   public mutating func toggle() {
     self = !self

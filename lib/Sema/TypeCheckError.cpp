@@ -146,6 +146,9 @@ public:
       // Look through closure capture lists.
       } else if (auto captureList = dyn_cast<CaptureListExpr>(fn)) {
         fn = captureList->getClosureBody();
+        // Look through optional evaluations.
+      } else if (auto optionalEval = dyn_cast<OptionalEvaluationExpr>(fn)) {
+        fn = optionalEval->getSubExpr()->getValueProvidingExpr();
       } else {
         break;
       }
@@ -207,6 +210,8 @@ public:
       recurse = asImpl().checkOptionalTry(optionalTryExpr);
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
       recurse = asImpl().checkApply(apply);
+    } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+      recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
     }
     // Error handling validation (via checkTopLevelErrorHandling) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -591,6 +596,9 @@ private:
       Result = ThrowingKind::Throws;
       return ShouldRecurse;
     }
+    ShouldRecurse_t checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
+      return ShouldRecurse;
+    }
 
     ShouldRecurse_t checkIfConfig(IfConfigDecl *D) {
       return ShouldRecurse;
@@ -705,7 +713,10 @@ private:
 
     // If it doesn't have function type, we must have invalid code.
     Type argType = fn.getType();
-    auto argFnType = (argType ? argType->getAs<AnyFunctionType>() : nullptr);
+    if (!argType) return Classification::forInvalidCode();
+
+    auto argFnType =
+        argType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
     if (!argFnType) return Classification::forInvalidCode();
 
     // If it doesn't throw, this argument does not cause the call to throw.
@@ -891,6 +902,7 @@ private:
   Kind TheKind;
   bool DiagnoseErrorOnTry = false;
   DeclContext *RethrowsDC = nullptr;
+  InterpolatedStringLiteralExpr * InterpolatedString;
 
   explicit Context(Kind kind) : TheKind(kind) {}
 
@@ -965,6 +977,12 @@ public:
     return Context(Kind::CatchGuard);
   }
 
+  Context withInterpolatedString(InterpolatedStringLiteralExpr *E) const {
+    Context copy = *this;
+    copy.InterpolatedString = E;
+    return copy;
+  }
+
   Kind getKind() const { return TheKind; }
 
   bool handlesNothing() const {
@@ -990,6 +1008,9 @@ public:
   }
 
   DeclContext *getRethrowsDC() const { return RethrowsDC; }
+  InterpolatedStringLiteralExpr * getInterpolatedString() const {
+    return InterpolatedString;
+  }
 
   static void diagnoseThrowInIllegalContext(TypeChecker &TC, ASTNode node,
                                             StringRef description) {
@@ -1026,6 +1047,7 @@ public:
                                   const PotentialReason &reason) {
     auto message = diag::throwing_call_without_try;
     auto loc = E.getStartLoc();
+    SourceLoc insertLoc;
     SourceRange highlight;
     
     // Generate more specific messages in some cases.
@@ -1035,7 +1057,14 @@ public:
         loc = e->getFn()->getStartLoc();
         message = diag::throwing_operator_without_try;
       }
+      insertLoc = loc;
       highlight = e->getSourceRange();
+      
+      if (InterpolatedString && e->getCalledValue()->getBaseName() ==
+          TC.Context.Id_appendInterpolation) {
+        message = diag::throwing_interpolation_without_try;
+        insertLoc = InterpolatedString->getLoc();
+      }
     }
     
     TC.diagnose(loc, message).highlight(highlight);
@@ -1051,10 +1080,12 @@ public:
     if (reason.getKind() != PotentialReason::Kind::CallThrows)
       return;
 
-    TC.diagnose(loc, diag::note_forgot_try).fixItInsert(loc, "try ");
-    TC.diagnose(loc, diag::note_error_to_optional).fixItInsert(loc, "try? ");
+    TC.diagnose(loc, diag::note_forgot_try)
+        .fixItInsert(insertLoc, "try ");
+    TC.diagnose(loc, diag::note_error_to_optional)
+        .fixItInsert(insertLoc, "try? ");
     TC.diagnose(loc, diag::note_disable_error_propagation)
-        .fixItInsert(loc, "try! ");
+        .fixItInsert(insertLoc, "try! ");
   }
 
   void diagnoseThrowInLegalContext(TypeChecker &TC, ASTNode node,
@@ -1305,6 +1336,12 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
 
+    void preserveCoverageFromInterpolatedString() {
+      OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasTryThrowSite, Self.Flags);
+      OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
+    }
+    
     bool wasTopLevelDebuggerFunction() const {
       return OldFlags.has(ContextFlags::IsTopLevelDebuggerFunction);
     }
@@ -1451,6 +1488,15 @@ private:
     // incorrect.
     auto type = E->getType();
     return !type || type->hasError() ? ShouldNotRecurse : ShouldRecurse;
+  }
+
+  ShouldRecurse_t
+  checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
+    ContextScope scope(*this, CurContext.withInterpolatedString(E));
+    if (E->getSemanticExpr())
+      E->getSemanticExpr()->walk(*this);
+    scope.preserveCoverageFromInterpolatedString();
+    return ShouldNotRecurse;
   }
 
   ShouldRecurse_t checkIfConfig(IfConfigDecl *ICD) {

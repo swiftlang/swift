@@ -561,10 +561,10 @@ func testNoReturn3(_ b : Bool) -> Any {
 
   switch b {
   default:
-    PerpetualMotion().start()
+    PerpetualMotion().start() // expected-note {{a call to a never-returning function}}
   }
 
-  return a
+  return a // expected-warning {{will never be executed}}
 }
 
 func testNoReturn4(_ b : Bool) -> Any {
@@ -572,10 +572,10 @@ func testNoReturn4(_ b : Bool) -> Any {
 
   switch b {
   default:
-    PerpetualMotion.stop()
+    PerpetualMotion.stop() // expected-note {{a call to a never-returning function}}
   }
 
-  return a
+  return a // expected-warning {{will never be executed}}
 }
 
 
@@ -1550,4 +1550,32 @@ func testOptionalUnwrapNoError() -> Int? {
   let x: Int?
   x = 0
   return x!
+}
+
+// <https://bugs.swift.org/browse/SR-9451>
+class StrongCycle {
+  var c: StrongCycle
+  var d: Int
+  init(first: ()) {
+    self.d = 10
+    self.c = self // expected-error {{variable 'self.c' used before being initialized}}
+  }
+
+  init(second: ()) {
+    self.c = self // expected-error {{variable 'self.c' used before being initialized}}
+    self.d = 10
+  }
+}
+
+class WeakCycle {
+  weak var c: WeakCycle?
+  var d: Int
+  init(first: ()) { // FIXME: This is inconsistent with the strong reference behavior above
+    self.d = 10
+    self.c = self
+  }
+  init(second: ()) {
+    self.c = self // expected-error {{variable 'self.d' used before being initialized}}
+    self.d = 10
+  }
 }

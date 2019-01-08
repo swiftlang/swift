@@ -133,7 +133,7 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
-  void print(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
+  void dump(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
@@ -1222,6 +1222,31 @@ public:
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Throw;
+  }
+};
+
+/// PoundAssertStmt - Asserts that a condition is true, at compile time.
+class PoundAssertStmt : public Stmt {
+  SourceRange Range;
+  Expr *Condition;
+  StringRef Message;
+
+ public:
+  PoundAssertStmt(SourceRange Range, Expr *condition, StringRef message)
+      : Stmt(StmtKind::PoundAssert, /*Implicit=*/false),
+        Range(Range),
+        Condition(condition),
+        Message(message) {}
+
+  SourceRange getSourceRange() const { return Range; }
+
+  Expr *getCondition() const { return Condition; }
+  StringRef getMessage() const { return Message; }
+
+  void setCondition(Expr *condition) { Condition = condition; }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::PoundAssert;
   }
 };
 

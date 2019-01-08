@@ -29,36 +29,7 @@ struct SillyString : _ExpressibleByBuiltinStringLiteral, ExpressibleByStringLite
   init(stringLiteral value: SillyString) { }
 }
 
-struct SillyUTF16String : _ExpressibleByBuiltinUTF16StringLiteral, ExpressibleByStringLiteral {
-  init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
-
-  init(unicodeScalarLiteral value: SillyString) { }
-
-  init(
-    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    utf8CodeUnitCount: Builtin.Word,
-    isASCII: Builtin.Int1
-  ) { 
-  }
-
-  init(extendedGraphemeClusterLiteral value: SillyString) { }
-
-  init(
-    _builtinStringLiteral start: Builtin.RawPointer,
-    utf8CodeUnitCount: Builtin.Word,
-    isASCII: Builtin.Int1
-  ) { }
-
-  init(
-    _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    utf16CodeUnitCount: Builtin.Word
-  ) { 
-  }
-
-  init(stringLiteral value: SillyUTF16String) { }
-}
-
-struct SillyConstUTF16String : ExpressibleByStringLiteral {
+struct SillyConstString : ExpressibleByStringLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
 
   init(unicodeScalarLiteral value: SillyString) { }
@@ -72,7 +43,7 @@ struct SillyConstUTF16String : ExpressibleByStringLiteral {
 
   init(extendedGraphemeClusterLiteral value: SillyString) { }
 
-  init(stringLiteral value: SillyUTF16String) { }
+  init(stringLiteral value: SillyString) { }
 }
 
 func literals() {
@@ -82,9 +53,9 @@ func literals() {
   var e:SillyString = "foo"
 }
 // CHECK-LABEL: sil hidden @$s11expressions8literalsyyF
-// CHECK: integer_literal $Builtin.Int2048, 1
+// CHECK: integer_literal $Builtin.IntLiteral, 1
 // CHECK: float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF4000000000000|0x3FFFA000000000000000}}
-// CHECK: string_literal utf16 "foö"
+// CHECK: string_literal utf8 "foö"
 // CHECK: string_literal utf8 "foo"
 
 func bar(_ x: Int) {}
@@ -473,7 +444,7 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
     : z
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBA]]
   // CHECK:   [[A:%[0-9]+]] = load [trivial] [[READ]]
-  // CHECK:   [[ACOND:%[0-9]+]] = apply {{.*}}([[A]])
+  // CHECK:   [[ACOND:%[0-9]+]] = struct_extract [[A]] : $Bool, #Bool._value
   // CHECK:   cond_br [[ACOND]], [[IF_A:bb[0-9]+]], [[ELSE_A:bb[0-9]+]]
   // CHECK: [[IF_A]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
@@ -482,7 +453,7 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   // CHECK: [[ELSE_A]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBB]]
   // CHECK:   [[B:%[0-9]+]] = load [trivial] [[READ]]
-  // CHECK:   [[BCOND:%[0-9]+]] = apply {{.*}}([[B]])
+  // CHECK:   [[BCOND:%[0-9]+]] = struct_extract [[B]] : $Bool, #Bool._value
   // CHECK:   cond_br [[BCOND]], [[IF_B:bb[0-9]+]], [[ELSE_B:bb[0-9]+]]
   // CHECK: [[IF_B]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBY]]
@@ -506,19 +477,19 @@ func magic_identifier_expansion(_ a: Int = #column) {
   
   // This should expand to the column number of the first _.
   var tmp = #column
-  // CHECK: integer_literal $Builtin.Int2048, 13
+  // CHECK: integer_literal $Builtin.IntLiteral, 13
 
   // This should expand to the column number of the (, not to the column number
   // of #column in the default argument list of this function.
   // rdar://14315674
   magic_identifier_expansion()
-  // CHECK: integer_literal $Builtin.Int2048, 29
+  // CHECK: integer_literal $Builtin.IntLiteral, 29
 }
 
 func print_string() {
   // CHECK-LABEL: print_string
   var str = "\u{08}\u{09}\thello\r\n\0wörld\u{1e}\u{7f}"
-  // CHECK: string_literal utf16 "\u{08}\t\thello\r\n\0wörld\u{1E}\u{7F}"
+  // CHECK: string_literal utf8 "\u{08}\t\thello\r\n\0wörld\u{1E}\u{7F}"
 }
 
 
@@ -660,22 +631,21 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 // CHECK: bb0(%0 : @trivial $*NonTrivialStruct, %1 : @guaranteed $WritableKeyPath<NonTrivialStruct, Int>):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: debug_value %1
+// CHECK-NEXT: [[KP_TEMP:%[0-9]+]] = copy_value %1
 // CHECK-NEXT: [[S_READ:%[0-9]+]] = begin_access [read] [unknown] %0
+// CHECK-NEXT: [[KP:%[0-9]+]] = upcast [[KP_TEMP]]
 // CHECK-NEXT: [[S_TEMP:%[0-9]+]] = alloc_stack $NonTrivialStruct
 // CHECK-NEXT: copy_addr [[S_READ]] to [initialization] [[S_TEMP]]
-// CHECK-NEXT: [[KP_TEMP:%[0-9]+]] = copy_value %1
-// CHECK-NEXT: [[KP:%[0-9]+]] = upcast [[KP_TEMP]]
-// CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @$ss23_projectKeyPathReadOnly{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT: [[KP_BORROW:%.*]] = begin_borrow [[KP]]
-// CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP_BORROW]])
+// CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @swift_getAtKeyPath :
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int
+// CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP]])
+// CHECK-NEXT: load [trivial] [[RESULT]]
 // CHECK-NEXT: end_access [[S_READ]]
-// CHECK-NEXT: end_borrow [[KP_BORROW]]
 // CHECK-NEXT: dealloc_stack [[RESULT]]
-// CHECK-NEXT: destroy_value [[KP]]
 // CHECK-NEXT: destroy_addr [[S_TEMP]]
 // CHECK-NEXT: dealloc_stack [[S_TEMP]]
+// CHECK-NEXT: destroy_value [[KP]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK-NOT: destroy_value %1
 // CHECK-NEXT: return [[METATYPE]]

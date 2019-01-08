@@ -22,11 +22,13 @@ struct SimpleTest {
 // CHECK:         [[T0:%.*]] = begin_access [read] [unknown] %0
 // CHECK-NEXT:    [[SELF:%.*]] = load [copy] [[T0]] : $*SimpleTest
 // CHECK-NEXT:    end_access [[T0]]
+// CHECK-NEXT:    [[SELF_BORROW:%.*]] = begin_borrow [[SELF]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[READFN:%.*]] = function_ref @$s13read_accessor10SimpleTestV8readableSSvr : $@yield_once @convention(method) (@guaranteed SimpleTest) -> @yields @guaranteed String
-// CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READFN]]([[SELF]])
+// CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READFN]]([[SELF_BORROW]])
 // CHECK-NEXT:    [[RET:%.*]] = copy_value [[VALUE]] : $String
 // CHECK-NEXT:    end_apply [[TOKEN]]
+// CHECK-NEXT:    end_borrow [[SELF_BORROW]]
 // CHECK-NEXT:    destroy_value [[SELF]]
 // CHECK-NEXT:    return [[RET]] : $String
   mutating func get() -> String {
@@ -115,4 +117,91 @@ struct TupleReader {
   func useReadable() {
     var v = readable
   }
+
+  var computed: String {
+    return compute()
+  }
+
+// CHECK-LABEL: sil hidden @$s13read_accessor11TupleReaderV0A8ComputedSSvr
+// CHECK:         [[GETTER:%.*]] = function_ref @$s13read_accessor11TupleReaderV8computedSSvg
+// CHECK-NEXT:    [[VALUE:%.]] = apply [[GETTER]](%0)
+// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[VALUE]] : $String
+// CHECK-NEXT:    yield [[BORROW]] : $String, resume bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow [[BORROW]] : $String
+// CHECK-NEXT:    destroy_value [[VALUE]] : $String
+  var readComputed : String {
+    _read {
+      yield computed
+    }
+  }
 }
+
+struct TestKeyPath {
+  var readable: String {
+    _read {
+      yield ""
+    }
+  }
+
+  func useKeyPath() -> String {
+    return self[keyPath: \.readable]
+  }
+}
+//   Key-path getter for TestKeyPath.readable
+// CHECK-LABEL: sil shared [thunk] @$s13read_accessor11TestKeyPathV8readableSSvpACTK
+// CHECK:       bb0(%0 : @trivial $*String, %1 : @trivial $*TestKeyPath):
+// CHECK-NEXT:    [[SELF:%.*]] = load [trivial] %1
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[READ:%.*]] = function_ref @$s13read_accessor11TestKeyPathV8readableSSvr
+// CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READ]]([[SELF]])
+// CHECK-NEXT:    [[COPY:%.*]] = copy_value [[VALUE]]
+// CHECK-NEXT:    end_apply [[TOKEN]]
+// CHECK-NEXT:    store [[COPY]] to [init] %0 : $*String
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    return [[RET]] : $()
+// CHECK-LABEL: } // end sil function '$s13read_accessor11TestKeyPathV8readableSSvpACTK'
+
+//   Check that we emit a read coroutine but not a getter for this.
+//   This test assumes that we emit accessors in a particular order.
+// CHECK-LABEL: sil [transparent] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvpfi
+// CHECK-NOT:   sil [transparent] [serialized] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvg
+// CHECK:       sil [transparent] [serialized] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvr
+// CHECK-NOT:   sil [transparent] [serialized] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvg
+// CHECK-LABEL: sil [transparent] [serialized] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvs
+public struct TestBorrowedProperty {
+  @_borrowed
+  public var borrowedString = ""
+}
+
+protocol ReadableTitle {
+  @_borrowed
+  var title: String { get }
+}
+class OverridableGetter : ReadableTitle {
+  var title: String = ""
+}
+//   The concrete read accessor is generated on-demand and does a class dispatch to the getter.
+// CHECK-LABEL: sil shared @$s13read_accessor17OverridableGetterC5titleSSvr
+// CHECK:       class_method %0 : $OverridableGetter, #OverridableGetter.title!getter.1
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableGetterC5titleSSvr'
+//   The read witness thunk does a direct call to the concrete read accessor.
+// CHECK-LABEL: sil private [transparent] [thunk] @$s13read_accessor17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW
+// CHECK:       function_ref @$s13read_accessor17OverridableGetterC5titleSSvr
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW'
+
+protocol GettableTitle {
+  var title: String { get }
+}
+class OverridableReader : GettableTitle {
+  @_borrowed
+  var title: String = ""
+}
+//   The concrete getter is generated on-demand and does a class dispatch to the read accessor.
+// CHECK-LABEL: sil shared @$s13read_accessor17OverridableReaderC5titleSSvg
+// CHECK:       class_method %0 : $OverridableReader, #OverridableReader.title!read.1
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableReaderC5titleSSvg'
+//   The getter witness thunk does a direct call to the concrete getter.
+// CHECK-LABEL: sil private [transparent] [thunk] @$s13read_accessor17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW
+// CHECK:       function_ref @$s13read_accessor17OverridableReaderC5titleSSvg
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW'

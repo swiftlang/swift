@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk -I %t) -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-RAW
-// RUN: %target-swift-emit-sil(mock-sdk: %clang-importer-sdk -I %t) -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk -I %t) -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-sil-ownership -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-RAW
+// RUN: %target-swift-emit-sil(mock-sdk: %clang-importer-sdk -I %t) -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-sil-ownership -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
 
 // REQUIRES: objc_interop
 
@@ -26,10 +26,10 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK-RAW: [[BORROWED_COPIED_STR:%.*]] = begin_borrow [[COPIED_STR]]
 // CHECK-RAW: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[BORROWED_COPIED_STR]])
+// CHECK-RAW: end_borrow [[BORROWED_COPIED_STR]]
 // CHECK-RAW: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_BOX]]
 // CHECK-RAW: [[RAWVALUE_ADDR:%[0-9]+]] = struct_element_addr [[WRITE]]
 // CHECK-RAW: assign [[BRIDGED]] to [[RAWVALUE_ADDR]]
-// CHECK-RAW: end_borrow [[BORROWED_COPIED_STR]]
 // CHECK-RAW: end_borrow [[BORROWED_STR]]
 
 func getRawValue(ed: ErrorDomain) -> String {
@@ -48,7 +48,7 @@ func getRawValue(ed: ErrorDomain) -> String {
 
 class ObjCTest {
   // CHECK-RAW-LABEL: sil hidden @$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF : $@convention(method) (@guaranteed Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
-  // CHECK-RAW: sil hidden [thunk] @$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> Optional<ErrorDomain> {
+  // CHECK-RAW: sil hidden [thunk] @$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> @autoreleased Optional<ErrorDomain> {
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed
   }  

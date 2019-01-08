@@ -431,12 +431,9 @@ protected:
     SelfAccess : 2
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+3,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4,
     /// The kind of accessor this is.
-    AccessorKind : 4,
-
-    /// The kind of addressor this is.
-    AddressorKind : 3
+    AccessorKind : 4
   );
 
   SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+2+1,
@@ -463,7 +460,8 @@ protected:
     HasStubImplementation : 1
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, ValueDecl);
+  SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
+  SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16,
     : NumPadBits,
@@ -472,7 +470,7 @@ protected:
     Index : 16
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, ValueDecl);
+  SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
     /// Whether the typealias forwards perfectly to its underlying type.
@@ -526,7 +524,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+3+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+3+1+1+1+1,
     /// Whether this class requires all of its instance variables to
     /// have in-class initializers.
     RequiresStoredPropertyInits : 1,
@@ -550,6 +548,10 @@ protected:
     /// Whether the class has @objc ancestry.
     ObjCKind : 3,
 
+    /// Whether this class has @objc members.
+    HasObjCMembersComputed : 1,
+    HasObjCMembers : 1,
+
     HasMissingDesignatedInitializers : 1,
     HasMissingVTableEntries : 1
   );
@@ -570,6 +572,28 @@ protected:
     /// attribute.  A single bit because it's lazily computed along with the
     /// HasAssociatedValues bit.
     HasAnyUnavailableValues : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1,
+    /// If the module was or is being compiled with `-enable-testing`.
+    TestingEnabled : 1,
+
+    /// If the module failed to load
+    FailedToLoad : 1,
+
+    /// Whether the module is resilient.
+    ///
+    /// \sa ResilienceStrategy
+    RawResilienceStrategy : 1,
+
+    /// Whether all imports have been resolved. Used to detect circular imports.
+    HasResolvedImports : 1,
+
+    // If the module was or is being compiled with `-enable-private-imports`.
+    PrivateImportsEnabled : 1,
+
+    // If the module is compiled with `-enable-implicit-dynamic`.
+    ImplicitDynamicEnabled : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1397,13 +1421,10 @@ public:
                        Requirements.back().getSourceRange().End);
   }
 
-  /// Retrieve the depth of this generic parameter list.
-  unsigned getDepth() const {
-    unsigned depth = 0;
-    for (auto gp = getOuterParameters(); gp; gp = gp->getOuterParameters())
-      ++depth;
-    return depth;
-  }
+  unsigned getDepth() const;
+
+  /// Configure the depth of the generic parameters in this list.
+  void configureGenericParamDepth();
 
   /// Create a copy of the generic parameter list and all of its generic
   /// parameter declarations. The copied generic parameters are re-parented
@@ -1738,6 +1759,8 @@ public:
   bool hasValidSignature() const {
     return getValidationState() > ValidationState::CheckingWithValidSignature;
   }
+
+  void createGenericParamsIfMissing(NominalTypeDecl *nominal);
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
@@ -2573,6 +2596,14 @@ public:
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 
+  bool isObjCDynamic() const {
+    return isObjC() && isDynamic();
+  }
+
+  bool isNativeDynamic() const {
+    return !isObjC() && isDynamic();
+  }
+
   /// Set whether this type is 'dynamic' or not.
   void setIsDynamic(bool value);
 
@@ -2998,6 +3029,14 @@ static inline bool isRawPointerKind(PointerTypeKind PTK) {
   llvm_unreachable("Unhandled PointerTypeKind in switch.");
 }
 
+enum KeyPathTypeKind : unsigned char {
+  KPTK_AnyKeyPath,
+  KPTK_PartialKeyPath,
+  KPTK_KeyPath,
+  KPTK_WritableKeyPath,
+  KPTK_ReferenceWritableKeyPath
+};
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.
 class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   SourceRange Braces;
@@ -3034,15 +3073,25 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// The table itself is lazily constructed and updated when
   /// lookupDirect() is called. The bit indicates whether the lookup
   /// table has already added members by walking the declarations in
-  /// scope.
+  /// scope; it should be manipulated through \c isLookupTablePopulated()
+  /// and \c setLookupTablePopulated().
   llvm::PointerIntPair<MemberLookupTable *, 1, bool> LookupTable;
 
   /// Prepare the lookup table to make it ready for lookups.
   void prepareLookupTable(bool ignoreNewExtensions);
 
+  /// True if the entries in \c LookupTable are complete--that is, if a
+  /// name is present, it contains all members with that name.
+  bool isLookupTablePopulated() const;
+  void setLookupTablePopulated(bool value);
+
   /// Note that we have added a member into the iterable declaration context,
   /// so that it can also be added to the lookup table (if needed).
   void addedMember(Decl *member);
+
+  /// Note that we have added an extension into the nominal type,
+  /// so that its members can eventually be added to the lookup table.
+  void addedExtension(ExtensionDecl *ext);
 
   /// \brief A lookup table used to find the protocol conformances of
   /// a given nominal type.
@@ -3208,6 +3257,9 @@ public:
 
   /// Is this the decl for Optional<T>?
   bool isOptionalDecl() const;
+
+  /// Is this a key path type?
+  Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.
@@ -3525,6 +3577,8 @@ class ClassDecl final : public NominalTypeDecl {
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
 
+  bool hasObjCMembersSlow();
+
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
             MutableArrayRef<TypeLoc> Inherited,
@@ -3534,6 +3588,17 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(ClassLoc, getBraces().End);
   }
+
+  /// Determine whether the member area of this class's metadata (which consists
+  /// of field offsets and vtable entries) is to be considered opaque by clients.
+  ///
+  /// Note that even @_fixed_layout classes have resilient metadata if they are
+  /// in a resilient module.
+  bool hasResilientMetadata() const;
+
+  /// Determine whether this class has resilient metadata when accessed from the
+  /// given module and resilience expansion.
+  bool hasResilientMetadata(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// Determine whether this class has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
@@ -3672,10 +3737,19 @@ public:
     Bits.ClassDecl.InheritsSuperclassInits = true;
   }
 
-  /// Figure out if this class has any @objc ancestors, in which case it should
-  /// have implicitly @objc members. Note that a class with generic ancestry
-  /// might have implicitly @objc members, but will never itself be @objc.
+  /// Returns if this class has any @objc ancestors, or if it is directly
+  /// visible to Objective-C. The latter is a stronger condition which is only
+  /// true if the class does not have any generic ancestry.
   ObjCClassKind checkObjCAncestry() const;
+
+  /// Returns if the class has implicitly @objc members. This is true if any
+  /// ancestor class has the @objcMembers attribute.
+  bool hasObjCMembers() const {
+    if (Bits.ClassDecl.HasObjCMembersComputed)
+      return Bits.ClassDecl.HasObjCMembers;
+
+    return const_cast<ClassDecl *>(this)->hasObjCMembersSlow();
+  }
 
   /// The type of metaclass to use for a class.
   enum class MetaclassKind : uint8_t {
@@ -3914,6 +3988,9 @@ public:
     return const_cast<ProtocolDecl *>(this)
              ->existentialConformsToSelfSlow();
   }
+
+  /// Does this protocol require a self-conformance witness table?
+  bool requiresSelfConformanceWitnessTable() const;
 
   /// Find direct Self references within the given requirement.
   ///
@@ -4699,7 +4776,11 @@ public:
   bool isOwned() const { return getSpecifier() == Specifier::Owned; }
 
   ValueOwnership getValueOwnership() const {
-    switch (getSpecifier()) {
+    return getValueOwnershipForSpecifier(getSpecifier());
+  }
+
+  static ValueOwnership getValueOwnershipForSpecifier(Specifier specifier) {
+    switch (specifier) {
     case Specifier::Let:
       return ValueOwnership::Default;
     case Specifier::Var:
@@ -4712,6 +4793,21 @@ public:
       return ValueOwnership::Owned;
     }
     llvm_unreachable("unhandled specifier");
+  }
+
+  static Specifier
+  getParameterSpecifierForValueOwnership(ValueOwnership ownership) {
+    switch (ownership) {
+    case ValueOwnership::Default:
+      return Specifier::Let;
+    case ValueOwnership::Shared:
+      return Specifier::Shared;
+    case ValueOwnership::InOut:
+      return Specifier::InOut;
+    case ValueOwnership::Owned:
+      return Specifier::Owned;
+    }
+    llvm_unreachable("unhandled ownership");
   }
 
   /// Is this an element in a capture list?
@@ -4788,7 +4884,10 @@ class ParamDecl : public VarDecl {
 
   /// The default value, if any, along with whether this is varargs.
   llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
-  
+
+  /// `@autoclosure` flag associated with this parameter.
+  bool IsAutoClosure = false;
+
 public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
@@ -4872,7 +4971,11 @@ public:
   /// Whether or not this parameter is varargs.
   bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
   void setVariadic(bool value = true) {DefaultValueAndIsVariadic.setInt(value);}
-  
+
+  /// Whether or not this parameter is marked with `@autoclosure`.
+  bool isAutoClosure() const { return IsAutoClosure; }
+  void setAutoClosure(bool value = true) { IsAutoClosure = value; }
+
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter
   /// type of "[Int]" and this returns "Int".
@@ -5630,8 +5733,7 @@ class AccessorDecl final : public FuncDecl {
   AbstractStorageDecl *Storage;
 
   AccessorDecl(SourceLoc declLoc, SourceLoc accessorKeywordLoc,
-               AccessorKind accessorKind, AddressorKind addressorKind,
-               AbstractStorageDecl *storage,
+               AccessorKind accessorKind, AbstractStorageDecl *storage,
                SourceLoc staticLoc, StaticSpellingKind staticSpelling,
                bool throws, SourceLoc throwsLoc,
                unsigned numParameterLists, GenericParamList *genericParams,
@@ -5643,14 +5745,12 @@ class AccessorDecl final : public FuncDecl {
       AccessorKeywordLoc(accessorKeywordLoc),
       Storage(storage) {
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
-    Bits.AccessorDecl.AddressorKind = unsigned(addressorKind);
   }
 
   static AccessorDecl *createImpl(ASTContext &ctx,
                                   SourceLoc declLoc,
                                   SourceLoc accessorKeywordLoc,
                                   AccessorKind accessorKind,
-                                  AddressorKind addressorKind,
                                   AbstractStorageDecl *storage,
                                   SourceLoc staticLoc,
                                   StaticSpellingKind staticSpelling,
@@ -5664,7 +5764,6 @@ public:
                               SourceLoc declLoc,
                               SourceLoc accessorKeywordLoc,
                               AccessorKind accessorKind,
-                              AddressorKind addressorKind,
                               AbstractStorageDecl *storage,
                               SourceLoc staticLoc,
                               StaticSpellingKind staticSpelling,
@@ -5675,7 +5774,6 @@ public:
   static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
                               SourceLoc accessorKeywordLoc,
                               AccessorKind accessorKind,
-                              AddressorKind addressorKind,
                               AbstractStorageDecl *storage,
                               SourceLoc staticLoc,
                               StaticSpellingKind staticSpelling,
@@ -5693,10 +5791,6 @@ public:
 
   AccessorKind getAccessorKind() const {
     return AccessorKind(Bits.AccessorDecl.AccessorKind);
-  }
-
-  AddressorKind getAddressorKind() const {
-    return AddressorKind(Bits.AccessorDecl.AddressorKind);
   }
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
@@ -6745,12 +6839,6 @@ inline const GenericContext *Decl::getAsGenericContext() const {
   }
 }
 
-inline bool DeclContext::isExtensionContext() const {
-  if (auto D = getAsDecl())
-    return ExtensionDecl::classof(D);
-  return false;
-}
-
 inline bool DeclContext::classof(const Decl *D) {
   switch (D->getKind()) { //
   default: return false;
@@ -6789,16 +6877,8 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   return result;
 }
 
-/// Determine the default argument kind and type for the given argument index
-/// in this declaration, which must be a function or constructor.
-///
-/// \param Index The index of the argument for which we are querying the
-/// default argument.
-///
-/// \returns the default argument kind and, if there is a default argument,
-/// the type of the corresponding parameter.
-std::pair<DefaultArgumentKind, Type>
-getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
+/// Retrieve parameter declaration from the given source at given index.
+const ParamDecl *getParameterAt(ValueDecl *source, unsigned index);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);

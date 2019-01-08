@@ -592,7 +592,9 @@ struct KeyA: Hashable {
   init(value: String) { self.value = value }
 
   static func ==(a: KeyA, b: KeyA) -> Bool { return a.value == b.value }
-  var hashValue: Int { return value.hashValue }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 }
 struct KeyB: Hashable {
   var canary = LifetimeTracked(2222)
@@ -602,7 +604,9 @@ struct KeyB: Hashable {
   init(value: Int) { self.value = value }
 
   static func ==(a: KeyB, b: KeyB) -> Bool { return a.value == b.value }
-  var hashValue: Int { return value.hashValue }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 }
 
 func fullGenericContext<T: Hashable, U: Hashable>(x: T, y: U) -> KeyPath<Subscripts<T>, SubscriptResult<T, U>> {
@@ -768,6 +772,34 @@ keyPath.test("optional chaining component that needs generic instantiation") {
   Value6096<Int>().doSomething()
 }
 
+// Nested generics.
+protocol HasAssoc {
+  associatedtype A
+}
+
+struct Outer<T, U> {
+  struct Middle<V, W, X> {
+  }
+}
+
+extension Outer.Middle where V: HasAssoc, U == V.A, W == X {
+  struct Inner<Y: Hashable> {
+    func foo() ->  AnyKeyPath {
+      return \[Y?: [U]].values
+    }
+  }
+}
+
+extension Double: HasAssoc {
+  typealias A = Float
+}
+
+keyPath.test("nested generics") {
+  let nested = Outer<Int, Float>.Middle<Double, String, String>.Inner<UInt>()
+  let nestedKeyPath = nested.foo()
+  typealias DictType = [UInt? : [Float]]
+  expectTrue(nestedKeyPath is KeyPath<DictType, DictType.Values>)
+}
 
 runAllTests()
 

@@ -48,20 +48,11 @@ TermInst *changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest, size_t Idx,
 /// \brief Replace a branch target.
 ///
 /// \param T The terminating instruction to modify.
-/// \param EdgeIdx The successor edges index that will be replaced.
-/// \param NewDest The new target block.
-/// \param PreserveArgs If set, preserve arguments on the replaced edge.
-void changeBranchTarget(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewDest,
-                        bool PreserveArgs);
-
-/// \brief Replace a branch target.
-///
-/// \param T The terminating instruction to modify.
 /// \param OldDest The successor block that will be replaced.
 /// \param NewDest The new target block.
 /// \param PreserveArgs If set, preserve arguments on the replaced edge.
-void replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest, SILBasicBlock *NewDest,
-                         bool PreserveArgs);
+void replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
+                         SILBasicBlock *NewDest, bool PreserveArgs);
 
 /// \brief Check if the edge from the terminator is critical.
 bool isCriticalEdge(TermInst *T, unsigned EdgeIdx);
@@ -85,13 +76,9 @@ SILBasicBlock *splitIfCriticalEdge(SILBasicBlock *From, SILBasicBlock *To,
                                    DominanceInfo *DT = nullptr,
                                    SILLoopInfo *LI = nullptr);
 
-/// \brief Splits the edge from terminator.
-///
-/// Updates dominance information and loop information if not null.
-/// Returns the newly created basic block.
-SILBasicBlock *splitEdge(TermInst *T, unsigned EdgeIdx,
-                         DominanceInfo *DT = nullptr,
-                         SILLoopInfo *LI = nullptr);
+/// Splits all critical edges originating from `fromBB`.
+bool splitCriticalEdgesFrom(SILBasicBlock *fromBB, DominanceInfo *DT = nullptr,
+                            SILLoopInfo *LI = nullptr);
 
 /// \brief Splits the edges between two basic blocks.
 ///

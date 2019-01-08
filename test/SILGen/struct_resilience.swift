@@ -120,6 +120,11 @@ public struct MySize {
 // CHECK-LABEL: sil @$s17struct_resilience6MySizeV1hSivg : $@convention(method) (@in_guaranteed MySize) -> Int
   public let h: Int
 
+  // Weak property
+
+// CHECK-LABEL: sil @$s17struct_resilience6MySizeV1iyXlSgvg : $@convention(method) (@in_guaranteed MySize) -> @owned Optional<AnyObject>
+  public weak var i: AnyObject?
+
   // Static stored property
 
 // CHECK-LABEL: sil @$s17struct_resilience6MySizeV9copyrightSivgZ : $@convention(method) (@thin MySize.Type) -> Int
@@ -195,8 +200,8 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   return s.w
 }
 
-// CHECK-LABEL: sil [serialized] [always_inline] @$s17struct_resilience26publicInlineAlwaysFunctionySiAA6MySizeVF : $@convention(thin) (@in_guaranteed MySize) -> Int
-@inline(__always) public func publicInlineAlwaysFunction(_ s: MySize) -> Int {
+// CHECK-LABEL: sil [serialized] @$s17struct_resilience23publicInlinableFunctionySiAA6MySizeVF : $@convention(thin) (@in_guaranteed MySize) -> Int
+@inlinable public func publicInlinableFunction(_ s: MySize) -> Int {
 
   // Since the body of a public transparent function might be inlined into
   // other resilience domains, we have to use accessors

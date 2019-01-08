@@ -105,9 +105,8 @@ struct AddrOnlyStructInitGeneric<T> {
 // CHECK:   [[BORROWED_CANONICAL_THUNK_COPY:%.*]] = copy_value [[BORROWED_CANONICAL_THUNK]]
 // CHECK:   [[ALLOCATING_INIT:%.*]] = function_ref @$ss5KlassCABycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
 // CHECK:   [[SELF:%.*]] = apply [[ALLOCATING_INIT]](
-// CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK:   [[BORROWED_CANONICAL_THUNK:%.*]] = begin_borrow [[BORROWED_CANONICAL_THUNK_COPY]]
-// CHECK:   apply [[BORROWED_CANONICAL_THUNK]]([[BORROWED_SELF]])
+// CHECK:   apply [[BORROWED_CANONICAL_THUNK]]([[SELF]])
 // CHECK: } // end sil function '$ss021testLoadableClassInitB0yyF'
 
 // Curry thunk.
@@ -140,9 +139,8 @@ func testLoadableClassInitLoadable() {
 // CHECK:   [[BORROWED_CANONICAL_THUNK_COPY:%.*]] = copy_value [[BORROWED_CANONICAL_THUNK]]
 // CHECK:   [[ALLOCATING_INIT:%.*]] = function_ref @$ss5KlassCABycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
 // CHECK:   [[SELF:%.*]] = apply [[ALLOCATING_INIT]](
-// CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK:   [[BORROWED_CANONICAL_THUNK:%.*]] = begin_borrow [[BORROWED_CANONICAL_THUNK_COPY]]
-// CHECK:   apply [[BORROWED_CANONICAL_THUNK]]([[BORROWED_SELF]])
+// CHECK:   apply [[BORROWED_CANONICAL_THUNK]]([[SELF]])
 // CHECK: } // end sil function '$ss022testLoadableStructInitB0yyF'
 
 // Curry thunk.
@@ -180,9 +178,8 @@ func testLoadableStructInitLoadable() {
 // CHECK:   [[BORROWED_CANONICAL_THUNK_COPY:%.*]] = copy_value [[BORROWED_CANONICAL_THUNK]]
 // CHECK:   [[ALLOCATING_INIT:%.*]] = function_ref @$ss5KlassCABycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
 // CHECK:   [[SELF:%.*]] = apply [[ALLOCATING_INIT]](
-// CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK:   [[BORROWED_CANONICAL_THUNK:%.*]] = begin_borrow [[BORROWED_CANONICAL_THUNK_COPY]]
-// CHECK:   apply [[BORROWED_CANONICAL_THUNK]]([[BORROWED_SELF]])
+// CHECK:   apply [[BORROWED_CANONICAL_THUNK]]([[SELF]])
 
 // Curry thunk
 //
@@ -242,9 +239,8 @@ func testAddrOnlyStructInitGenericAddrOnly<T : ProtocolInitAddressOnly>(t: T) {
 // CHECK:   [[COPY_BORROWED_CURRY_THUNK:%.*]] = copy_value [[BORROWED_CURRY_THUNK]]
 // CHECK:   [[ALLOCATING_INIT:%.*]] = function_ref @$ss5KlassCABycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
 // CHECK:   [[SELF:%.*]] = apply [[ALLOCATING_INIT]](
-// CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK:   [[BORROWED_CURRY_THUNK:%.*]] = begin_borrow [[COPY_BORROWED_CURRY_THUNK]]
-// CHECK:   apply [[BORROWED_CURRY_THUNK]]([[Y]], [[BORROWED_SELF]])
+// CHECK:   apply [[BORROWED_CURRY_THUNK]]([[Y]], [[SELF]])
 // CHECK: } // end sil function '$ss20testGenericInitClass1tyx_ts08ProtocolC8LoadableRzlF'
 
 // Curry thunk.

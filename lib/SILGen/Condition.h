@@ -32,10 +32,12 @@ namespace Lowering {
 
 /// A condition is the result of evaluating a boolean expression as
 /// control flow.
+///
+/// For each Condition instance, `enterTrue` must be called before `complete`.
+/// If `enterFalse` is skipped, then an empty fall-through block is created.
 class LLVM_LIBRARY_VISIBILITY Condition {
-  /// The blocks responsible for executing the true and false conditions.  A
-  /// block is non-null if that branch is possible, but it's only an independent
-  /// block if both branches are possible.
+  /// The blocks responsible for executing the true and false conditions. These
+  /// are initialized non-null and set to null after being emitted.
   SILBasicBlock *TrueBB;
   SILBasicBlock *FalseBB;
   
@@ -50,30 +52,39 @@ public:
             SILBasicBlock *ContBB,
             SILLocation L)
     : TrueBB(TrueBB), FalseBB(FalseBB), ContBB(ContBB), Loc(L)
-  {}
-  
-  bool hasTrue() const { return TrueBB; }
-  bool hasFalse() const { return FalseBB; }
-  
-  /// enterTrue - Begin the emission of the true block.  This should only be
-  /// called if hasTrue() returns true.
-  void enterTrue(SILGenFunction &SGF);
-  
-  /// exitTrue - End the emission of the true block.  This must be called after
-  /// enterTrue but before anything else on this Condition.
-  void exitTrue(SILGenFunction &SGF, ArrayRef<SILValue> Args = {});
-  
-  /// enterFalse - Begin the emission of the false block.  This should only be
-  /// called if hasFalse() returns true.
-  void enterFalse(SILGenFunction &SGF);
-  
-  /// exitFalse - End the emission of the true block.  This must be called after
-  /// enterFalse but before anything else on this Condition.
-  void exitFalse(SILGenFunction &SGF, ArrayRef<SILValue> Args = {});
-  
+  {
+    assert((TrueBB != nullptr && FalseBB != nullptr) &&
+           "Requires non-null block pointers.");
+  }
+
+  /// enterTrue - Begin the emission of the true block.
+  void enterTrue(SILGenFunction &SGF) { enter(SGF, TrueBB); }
+
+  /// exitTrue - End the emission of the true block.
+  void exitTrue(SILGenFunction &SGF, ArrayRef<SILValue> Args = {}) {
+    exit(SGF, TrueBB, Args);
+    TrueBB = nullptr;
+  }
+
+  /// enterFalse - Begin the emission of the false block.
+  void enterFalse(SILGenFunction &SGF) { enter(SGF, FalseBB); }
+
+  /// exitFalse - End the emission of the true block.
+  void exitFalse(SILGenFunction &SGF, ArrayRef<SILValue> Args = {}) {
+    exit(SGF, FalseBB, Args);
+    FalseBB = nullptr;
+  }
+
   /// complete - Complete this conditional execution.  This should be called
   /// only after all other calls on this Condition have been made.
+  /// This leaves SGF's SILGenBuilder at the continuation block.
   SILBasicBlock *complete(SILGenFunction &SGF);
+
+protected:
+  void enter(SILGenFunction &SGF, SILBasicBlock *destBB);
+
+  void exit(SILGenFunction &SGF, SILBasicBlock *destBB,
+            ArrayRef<SILValue> Args = {});
 };
 
 /// A conditional value is one that depends on conditional execution.

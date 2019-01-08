@@ -17,6 +17,7 @@
 
 from __future__ import print_function
 
+import os
 import subprocess
 import tempfile
 import uuid
@@ -24,6 +25,7 @@ import uuid
 
 # A temporary directory on the Android device.
 DEVICE_TEMP_DIR = '/data/local/tmp'
+ENV_PREFIX = 'ANDROID_CHILD_'
 
 
 def shell(args):
@@ -88,10 +90,33 @@ def execute_on_device(executable_path, executable_arguments):
     uuid_dir = '{}/{}'.format(DEVICE_TEMP_DIR, str(uuid.uuid4())[:10])
     shell(['mkdir', '-p', uuid_dir])
 
-    # `adb` can only handle commands under a certain length. No matter what the
-    # original executable's name, on device we call it `__executable`.
-    executable = '{}/__executable'.format(uuid_dir)
+    # `adb` can only handle commands under a certain length. That's why we
+    # hide the arguments and piping/status in executable files. However, at
+    # least one resilience test relies on checking the executable name, so we
+    # need to use the same name as the one provided.
+    executable_name = os.path.basename(executable_path)
+    executable = '{}/{}'.format(uuid_dir, executable_name)
     push(executable_path, executable)
+
+    child_environment = ['{}="{}"'.format(k.replace(ENV_PREFIX, '', 1), v)
+                         for (k, v) in os.environ.items()
+                         if k.startswith(ENV_PREFIX)]
+
+    # The executables are sometimes passed arguments, and sometimes those
+    # arguments are files that have to be pushed, but also the argument values
+    # have to be changed to the new path in the Android device.
+    translated_executable_arguments = []
+    for executable_argument in executable_arguments:
+        # Currently we only support arguments that are file paths themselves.
+        # Things like `--foo=/path/to/file` or directories are not supported.
+        # Relative paths from the executable to the arguments are not kept.
+        if os.path.isfile(executable_argument):
+            final_path = '{}/{}'.format(uuid_dir,
+                                        os.path.basename(executable_argument))
+            push(executable_argument, final_path)
+            translated_executable_arguments.append(final_path)
+        else:
+            translated_executable_arguments.append(executable_argument)
 
     # When running the executable on the device, we need to pass it the same
     # arguments, as well as specify the correct LD_LIBRARY_PATH. Save these
@@ -100,11 +125,12 @@ def execute_on_device(executable_path, executable_arguments):
     _create_executable_on_device(
         executable_with_args,
         'LD_LIBRARY_PATH={uuid_dir}:{tmp_dir} '
-        '{executable} {executable_arguments}'.format(
+        '{child_environment} {executable} {executable_arguments}'.format(
             uuid_dir=uuid_dir,
             tmp_dir=DEVICE_TEMP_DIR,
+            child_environment=' '.join(child_environment),
             executable=executable,
-            executable_arguments=' '.join(executable_arguments)))
+            executable_arguments=' '.join(translated_executable_arguments)))
 
     # Write the output from the test executable to a file named '__stdout', and
     # if the test executable succeeds, write 'SUCCEEDED' to a file
@@ -146,7 +172,7 @@ def execute_on_device(executable_path, executable_arguments):
         # the executable on the device.
         return 1
 
-    print(stdout)
+    print(stdout, end='')
 
     shell(['rm', '-rf', uuid_dir])
     return 0

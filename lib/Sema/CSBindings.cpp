@@ -132,48 +132,6 @@ findInferableTypeVars(Type type,
   type.walk(Walker(typeVars));
 }
 
-/// \brief Return whether a relational constraint between a type variable and a
-/// trivial wrapper type (autoclosure, unary tuple) should result in the type
-/// variable being potentially bound to the value type, as opposed to the
-/// wrapper type.
-static bool shouldBindToValueType(Constraint *constraint) {
-  switch (constraint->getKind()) {
-  case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::Conversion:
-  case ConstraintKind::BridgingConversion:
-  case ConstraintKind::Subtype:
-    return true;
-  case ConstraintKind::Bind:
-  case ConstraintKind::Equal:
-  case ConstraintKind::BindParam:
-  case ConstraintKind::BindToPointerType:
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::LiteralConformsTo:
-  case ConstraintKind::CheckedCast:
-  case ConstraintKind::SelfObjectOfProtocol:
-  case ConstraintKind::ApplicableFunction:
-  case ConstraintKind::BindOverload:
-  case ConstraintKind::OptionalObject:
-    return false;
-  case ConstraintKind::DynamicTypeOf:
-  case ConstraintKind::EscapableFunctionOf:
-  case ConstraintKind::OpenedExistentialOf:
-  case ConstraintKind::KeyPath:
-  case ConstraintKind::KeyPathApplication:
-  case ConstraintKind::ValueMember:
-  case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::Defaultable:
-  case ConstraintKind::Disjunction:
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
-    llvm_unreachable("shouldBindToValueType() may only be called on "
-                     "relational constraints");
-  }
-
-  llvm_unreachable("Unhandled ConstraintKind in switch.");
-}
-
 void ConstraintSystem::PotentialBindings::addPotentialBinding(
     PotentialBinding binding, bool allowJoinMeet) {
   assert(!binding.BindingType->is<ErrorType>());
@@ -218,6 +176,9 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
 
   if (!isViable(binding))
     return;
+
+  if (binding.isDefaultableBinding())
+    ++NumDefaultableBindings;
 
   Bindings.push_back(std::move(binding));
 }
@@ -295,14 +256,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   // Do not attempt to bind to ErrorType.
   if (type->hasError())
     return None;
-
-  // Don't deduce autoclosure types.
-  if (shouldBindToValueType(constraint)) {
-    if (auto funcTy = type->getAs<FunctionType>()) {
-      if (funcTy->isAutoClosure())
-        type = funcTy->getResult();
-    }
-  }
 
   // If the source of the binding is 'OptionalObject' constraint
   // and type variable is on the left-hand side, that means
@@ -412,6 +365,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   auto &tc = getTypeChecker();
   bool hasNonDependentMemberRelationalConstraints = false;
   bool hasDependentMemberRelationalConstraints = false;
+  bool sawNilLiteral = false;
   for (auto constraint : constraints) {
     switch (constraint->getKind()) {
     case ConstraintKind::Bind:
@@ -429,7 +383,12 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       // this constraint is resolved, because we currently don't
       // look-through constraints expect to `subtype` to try and
       // find related bindings.
-      if (constraint->getKind() == ConstraintKind::BindParam)
+      // This only affects type variable that appears one the
+      // right-hand side of the `bind param` constraint and
+      // represents result type of the closure body, because
+      // left-hand side gets types from overload choices.
+      if (constraint->getKind() == ConstraintKind::BindParam &&
+          constraint->getSecondType()->isEqual(typeVar))
         result.PotentiallyIncomplete = true;
 
       auto binding = getPotentialBindingForRelationalConstraint(
@@ -523,8 +482,10 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       // If there is a 'nil' literal constraint, we might need optional
       // supertype bindings.
       if (constraint->getProtocol()->isSpecificProtocol(
-              KnownProtocolKind::ExpressibleByNilLiteral))
+              KnownProtocolKind::ExpressibleByNilLiteral)) {
+        sawNilLiteral = true;
         addOptionalSupertypeBindings = true;
+      }
 
       // If there is a default literal type for this protocol, it's a
       // potential binding.
@@ -575,6 +536,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     }
 
     case ConstraintKind::ApplicableFunction:
+    case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload: {
       if (result.FullyBound && result.InvolvesTypeVariables)
         continue;
@@ -704,7 +666,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     if (!exactTypes.insert(type->getCanonicalType()).second)
       continue;
 
-    ++result.NumDefaultableBindings;
     result.addPotentialBinding({type, AllowedBindingKind::Exact,
                                 constraint->getKind(), nullptr,
                                 constraint->getLocator()});
@@ -761,6 +722,32 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       result.FullyBound = true;
     else
       result.Bindings.clear();
+  }
+
+  // Revise any optional-of-function-types we may try to nil literals
+  // to be non-throwing so they don't inadvertantly result in rethrows
+  // diagnostics.
+  if (sawNilLiteral) {
+    for (auto &binding : result.Bindings) {
+      auto nested = binding.BindingType->lookThroughAllOptionalTypes();
+      if (!nested)
+        continue;
+
+      if (!nested->is<FunctionType>())
+        continue;
+
+      // Remove throws from the nested function type.
+      binding.BindingType =
+          binding.BindingType.transform([&](Type inner) -> Type {
+            auto *fnTy = dyn_cast<FunctionType>(inner.getPointer());
+            if (!fnTy)
+              return inner;
+
+            auto extInfo = fnTy->getExtInfo().withThrows(false);
+            return FunctionType::get(fnTy->getParams(), fnTy->getResult(),
+                                     extInfo);
+          });
+    }
   }
 
   return result;

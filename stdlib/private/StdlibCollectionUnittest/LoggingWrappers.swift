@@ -77,18 +77,14 @@ public class SequenceLog {
   // Sequence
   public static var makeIterator = TypeIndexed(0)
   public static var underestimatedCount = TypeIndexed(0)
-  public static var map = TypeIndexed(0)
-  public static var filter = TypeIndexed(0)
-  public static var forEach = TypeIndexed(0)
   public static var dropFirst = TypeIndexed(0)
   public static var dropLast = TypeIndexed(0)
   public static var dropWhile = TypeIndexed(0)
   public static var prefixWhile = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
   public static var suffixMaxLength = TypeIndexed(0)
-  public static var split = TypeIndexed(0)
+  public static var withContiguousStorageIfAvailable = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
-  public static var _preprocessingPass = TypeIndexed(0)
   public static var _copyToContiguousArray = TypeIndexed(0)
   public static var _copyContents = TypeIndexed(0)  
   // Collection
@@ -101,26 +97,24 @@ public class SequenceLog {
   public static var successor = TypeIndexed(0)
   public static var formSuccessor = TypeIndexed(0)
   public static var indices = TypeIndexed(0)
-  public static var prefixUpTo = TypeIndexed(0)
-  public static var prefixThrough = TypeIndexed(0)
-  public static var suffixFrom = TypeIndexed(0)
   public static var isEmpty = TypeIndexed(0)
   public static var count = TypeIndexed(0)
   public static var _customIndexOfEquatableElement = TypeIndexed(0)
-  public static var first = TypeIndexed(0)
   public static var advance = TypeIndexed(0)
   public static var advanceLimit = TypeIndexed(0)
   public static var distance = TypeIndexed(0)
   // BidirectionalCollection
   public static var predecessor = TypeIndexed(0)
   public static var formPredecessor = TypeIndexed(0)
-  public static var last = TypeIndexed(0)
   // MutableCollection
   public static var subscriptIndexSet = TypeIndexed(0)
   public static var subscriptRangeSet = TypeIndexed(0)
   public static var partitionBy = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupported = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupportedNonNilReturns =
+    TypeIndexed(0)
+  public static var withContiguousMutableStorageIfAvailable = TypeIndexed(0)
+  public static var withContiguousMutableStorageIfAvailableNonNilReturns =
     TypeIndexed(0)
   // RangeReplaceableCollection
   public static var init_ = TypeIndexed(0)
@@ -210,7 +204,6 @@ extension LoggingSequence: LoggingType {
 extension LoggingSequence: Sequence {
   public typealias Element = Base.Element
   public typealias Iterator = LoggingIterator<Base.Iterator>
-  public typealias SubSequence = Base.SubSequence
 
   public func makeIterator() -> Iterator {
     SequenceLog.makeIterator[selfType] += 1
@@ -221,85 +214,17 @@ extension LoggingSequence: Sequence {
     SequenceLog.underestimatedCount[selfType] += 1
     return base.underestimatedCount
   }
-
-  public func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    SequenceLog.map[selfType] += 1
-    return try base.map(transform)
-  }
-
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    SequenceLog.filter[selfType] += 1
-    return try base.filter(isIncluded)
-  }
-
-  public func forEach(_ body: (Element) throws -> Void) rethrows {
-    SequenceLog.forEach[selfType] += 1
-    try base.forEach(body)
-  }
-
-  public func dropFirst(_ n: Int) -> SubSequence {
-    SequenceLog.dropFirst[selfType] += 1
-    return base.dropFirst(n)
-  }
-
-  public func dropLast(_ n: Int) -> SubSequence {
-    SequenceLog.dropLast[selfType] += 1
-    return base.dropLast(n)
-  }
-
-  public func drop(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    SequenceLog.dropWhile[selfType] += 1
-    return try base.drop(while: predicate)
-  }
-
-  public func prefix(_ maxLength: Int) -> SubSequence {
-    SequenceLog.prefixMaxLength[selfType] += 1
-    return base.prefix(maxLength)
-  }
-
-  public func prefix(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    SequenceLog.prefixWhile[selfType] += 1
-    return try base.prefix(while: predicate)
-  }
-
-  public func suffix(_ maxLength: Int) -> SubSequence {
-    SequenceLog.suffixMaxLength[selfType] += 1
-    return base.suffix(maxLength)
-  }
-
-  public func split(
-    maxSplits: Int = Int.max,
-    omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [SubSequence] {
-    SequenceLog.split[selfType] += 1
-    return try base.split(
-      maxSplits: maxSplits,
-      omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: isSeparator)
+  
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    SequenceLog.withContiguousStorageIfAvailable[selfType] += 1
+    return try base.withContiguousStorageIfAvailable(body)
   }
 
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     SequenceLog._customContainsEquatableElement[selfType] += 1
     return base._customContainsEquatableElement(element)
-  }
-
-  /// If `self` is multi-pass (i.e., a `Collection`), invoke
-  /// `preprocess` on `self` and return its result.  Otherwise, return
-  /// `nil`.
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    SequenceLog._preprocessingPass[selfType] += 1
-    return try base._preprocessingPass(preprocess)
   }
 
   /// Create a native array buffer containing the elements of `self`,
@@ -324,6 +249,7 @@ public typealias LoggingCollection<Base: Collection> = LoggingSequence<Base>
 extension LoggingCollection: Collection {  
   public typealias Index = Base.Index
   public typealias Indices = Base.Indices
+  public typealias SubSequence = Base.SubSequence
 
   public var startIndex: Index {
     CollectionLog.startIndex[selfType] += 1
@@ -336,17 +262,13 @@ extension LoggingCollection: Collection {
   }
 
   public subscript(position: Index) -> Element {
-    get {
-      CollectionLog.subscriptIndex[selfType] += 1
-      return base[position]
-    }
+    CollectionLog.subscriptIndex[selfType] += 1
+    return base[position]
   }
 
   public subscript(bounds: Range<Index>) -> SubSequence {
-    get {
-      CollectionLog.subscriptRange[selfType] += 1
-      return base[bounds]
-    }
+    CollectionLog.subscriptRange[selfType] += 1
+    return base[bounds]
   }
 
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
@@ -374,21 +296,6 @@ extension LoggingCollection: Collection {
     return base.indices
   }
 
-  public func prefix(upTo end: Index) -> SubSequence {
-    CollectionLog.prefixUpTo[selfType] += 1
-    return base.prefix(upTo: end)
-  }
-
-  public func prefix(through position: Index) -> SubSequence {
-    CollectionLog.prefixThrough[selfType] += 1
-    return base.prefix(through: position)
-  }
-
-  public func suffix(from start: Index) -> SubSequence {
-    CollectionLog.suffixFrom[selfType] += 1
-    return base.suffix(from: start)
-  }
-
   public var isEmpty: Bool {
     CollectionLog.isEmpty[selfType] += 1
     return base.isEmpty
@@ -404,11 +311,6 @@ extension LoggingCollection: Collection {
   ) -> Index?? {
     CollectionLog._customIndexOfEquatableElement[selfType] += 1
     return base._customIndexOfEquatableElement(element)
-  }
-
-  public var first: Element? {
-    CollectionLog.first[selfType] += 1
-    return base.first
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
@@ -442,11 +344,6 @@ extension LoggingBidirectionalCollection: BidirectionalCollection {
   public func formIndex(before i: inout Index) {
     BidirectionalCollectionLog.formPredecessor[selfType] += 1
     base.formIndex(before: &i)
-  }
-
-  public var last: Element? {
-    BidirectionalCollectionLog.last[selfType] += 1
-    return base.last
   }
 }
 
@@ -495,6 +392,17 @@ extension LoggingMutableCollection: MutableCollection {
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
     if result != nil {
       Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType] += 1
+    }
+    return result
+  }
+
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    MutableCollectionLog.withContiguousMutableStorageIfAvailable[selfType] += 1
+    let result = try base.withContiguousMutableStorageIfAvailable(body)
+    if result != nil {
+      Log.withContiguousMutableStorageIfAvailable[selfType] += 1
     }
     return result
   }
@@ -615,10 +523,10 @@ public typealias LoggingRangeReplaceableRandomAccessCollection<
 > = LoggingRangeReplaceableCollection<Base>
 
 //===----------------------------------------------------------------------===//
-// Collections that count calls to `_withUnsafeMutableBufferPointerIfSupported`
+// Collections that count calls to `withContiguousMutableStorageIfAvailable`
 //===----------------------------------------------------------------------===//
 
-/// Interposes between `_withUnsafeMutableBufferPointerIfSupported` method calls
+/// Interposes between `withContiguousMutableStorageIfAvailable` method calls
 /// to increment a counter. Calls to this method from within dispatched methods
 /// are uncounted by the standard logging collection wrapper.
 public struct BufferAccessLoggingMutableCollection<
@@ -698,6 +606,17 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
     if result != nil {
       Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType] += 1
+    }
+    return result
+  }
+  
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    Log.withContiguousMutableStorageIfAvailable[selfType] += 1
+    let result = try base.withContiguousMutableStorageIfAvailable(body)
+    if result != nil {
+      Log.withContiguousMutableStorageIfAvailable[selfType] += 1
     }
     return result
   }

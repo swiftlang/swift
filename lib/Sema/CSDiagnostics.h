@@ -39,6 +39,9 @@ class FailureDiagnostic {
   ConstraintSystem &CS;
   ConstraintLocator *Locator;
 
+  /// The original anchor before any simplification.
+  Expr *RawAnchor;
+  /// Simplified anchor associated with the given locator.
   Expr *Anchor;
   /// Indicates whether locator could be simplified
   /// down to anchor expression.
@@ -47,7 +50,7 @@ class FailureDiagnostic {
 public:
   FailureDiagnostic(Expr *expr, ConstraintSystem &cs,
                     ConstraintLocator *locator)
-      : E(expr), CS(cs), Locator(locator) {
+      : E(expr), CS(cs), Locator(locator), RawAnchor(locator->getAnchor()) {
     std::tie(Anchor, HasComplexLocator) = computeAnchor();
   }
 
@@ -77,6 +80,8 @@ public:
   }
 
   Expr *getParentExpr() const { return E; }
+
+  Expr *getRawAnchor() const { return RawAnchor; }
 
   Expr *getAnchor() const { return Anchor; }
 
@@ -160,9 +165,23 @@ protected:
   const ApplyExpr *Apply = nullptr;
 
 public:
-  RequirementFailure(Expr *expr, ConstraintSystem &cs,
+  RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
                      ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator), AffectedDecl(getDeclRef()) {
+    assert(locator);
+    assert(AffectedDecl);
+
+    auto path = locator->getPath();
+    assert(!path.empty());
+
+    auto &last = path.back();
+    assert(last.getKind() == ConstraintLocator::TypeParameterRequirement);
+    assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+
+    // It's possible sometimes not to have no base expression.
+    if (!expr)
+      return;
+
     auto *anchor = getAnchor();
     expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
       auto *AE = dyn_cast<ApplyExpr>(subExpr);
@@ -245,7 +264,7 @@ public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
                             std::pair<Type, ProtocolDecl *> conformance)
-      : RequirementFailure(expr, cs, locator),
+      : RequirementFailure(cs, expr, RequirementKind::Conformance, locator),
         NonConformingType(conformance.first), Protocol(conformance.second) {}
 
   bool diagnoseAsError() override;
@@ -293,7 +312,8 @@ class SameTypeRequirementFailure final : public RequirementFailure {
 public:
   SameTypeRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                              Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(expr, cs, locator), LHS(lhs), RHS(rhs) {}
+      : RequirementFailure(cs, expr, RequirementKind::SameType, locator),
+        LHS(lhs), RHS(rhs) {}
 
   Type getLHS() const override { return LHS; }
   Type getRHS() const override { return RHS; }
@@ -331,7 +351,8 @@ class SuperclassRequirementFailure final : public RequirementFailure {
 public:
   SuperclassRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                                Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(expr, cs, locator), LHS(lhs), RHS(rhs) {}
+      : RequirementFailure(cs, expr, RequirementKind::Superclass, locator),
+        LHS(lhs), RHS(rhs) {}
 
   Type getLHS() const override { return LHS; }
   Type getRHS() const override { return RHS; }
@@ -540,6 +561,73 @@ private:
              isLoadedLValue(ifExpr->getElseExpr());
     return false;
   }
+};
+
+/// Intended to diagnose any possible contextual failure
+/// e.g. argument/parameter, closure result, conversions etc.
+class ContextualFailure final : public FailureDiagnostic {
+  Type FromType, ToType;
+
+public:
+  ContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                    ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
+        ToType(resolve(rhs)) {}
+
+  bool diagnoseAsError() override;
+
+  // If we're trying to convert something of type "() -> T" to T,
+  // then we probably meant to call the value.
+  bool diagnoseMissingFunctionCall() const;
+
+  /// Try to add a fix-it when converting between a collection and its slice
+  /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
+  static bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
+                                           ConstraintSystem &CS, Type fromType,
+                                           Type toType, Expr *expr);
+
+private:
+  Type resolve(Type rawType) {
+    auto type = resolveType(rawType)->getWithoutSpecifierType();
+    if (auto *BGT = type->getAs<BoundGenericType>()) {
+      if (BGT->hasUnresolvedType())
+        return BGT->getDecl()->getDeclaredInterfaceType();
+    }
+    return type;
+  }
+};
+
+/// Diagnose situations when @autoclosure argument is passed to @autoclosure
+/// parameter directly without calling it first.
+class AutoClosureForwardingFailure final : public FailureDiagnostic {
+public:
+  AutoClosureForwardingFailure(ConstraintSystem &cs, ConstraintLocator *locator)
+      : FailureDiagnostic(nullptr, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations when there was an attempt to unwrap entity
+/// of non-optional type e.g.
+///
+/// ```swift
+/// let i: Int = 0
+/// _ = i!
+///
+/// struct A { func foo() {} }
+/// func foo(_ a: A) {
+///   a?.foo()
+/// }
+/// ```
+class NonOptionalUnwrapFailure final : public FailureDiagnostic {
+  Type BaseType;
+
+public:
+  NonOptionalUnwrapFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                           ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseType) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints

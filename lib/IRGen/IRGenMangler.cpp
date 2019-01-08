@@ -13,6 +13,8 @@
 #include "IRGenMangler.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ProtocolAssociations.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/ABI/MetadataValues.h"
@@ -47,16 +49,14 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
     GET_MANGLING(AssignWithTake) \
     GET_MANGLING(GetEnumTagSinglePayload) \
     GET_MANGLING(StoreEnumTagSinglePayload) \
-    GET_MANGLING(StoreExtraInhabitant) \
-    GET_MANGLING(GetExtraInhabitantIndex) \
     GET_MANGLING(GetEnumTag) \
     GET_MANGLING(DestructiveProjectEnumData) \
     GET_MANGLING(DestructiveInjectEnumTag)
 #undef GET_MANGLING
     case ValueWitness::Size:
     case ValueWitness::Flags:
+    case ValueWitness::ExtraInhabitantCount:
     case ValueWitness::Stride:
-    case ValueWitness::ExtraInhabitantFlags:
       llvm_unreachable("not a function witness");
   }
   appendOperator("w", Code);
@@ -131,6 +131,20 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   return withSymbolicReferences(IGM, [&]{
     appendType(Ty);
   });
+}
+
+std::string IRGenMangler::mangleProtocolConformanceDescriptor(
+                                 const RootProtocolConformance *conformance) {
+  beginMangling();
+  if (isa<NormalProtocolConformance>(conformance)) {
+    appendProtocolConformance(conformance);
+    appendOperator("Mc");
+  } else {
+    auto protocol = cast<SelfProtocolConformance>(conformance)->getProtocol();
+    appendProtocolName(protocol);
+    appendOperator("MS");
+  }
+  return finalize();
 }
 
 SymbolicMangling
@@ -235,5 +249,54 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
       llvm_unreachable("unhandled referent");
   }
   
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForAssociatedConformanceWitness(
+                                  const NormalProtocolConformance *conformance,
+                                  CanType associatedType,
+                                  const ProtocolDecl *proto) {
+  beginManglingWithoutPrefix();
+  if (conformance) {
+    Buffer << "associated conformance ";
+    appendProtocolConformance(conformance);
+  } else {
+    Buffer << "default associated conformance";
+  }
+
+  bool isFirstAssociatedTypeIdentifier = true;
+  appendAssociatedTypePath(associatedType, isFirstAssociatedTypeIdentifier);
+  appendProtocolName(proto);
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForKeyPathMetadata(
+                                           const char *kind,
+                                           CanGenericSignature genericSig,
+                                           CanType type,
+                                           ProtocolConformanceRef conformance) {
+  beginManglingWithoutPrefix();
+  Buffer << kind << " ";
+
+  if (genericSig)
+    appendGenericSignature(genericSig);
+
+  if (type)
+    appendType(type);
+
+  if (conformance.isConcrete())
+    appendConcreteProtocolConformance(conformance.getConcrete());
+  else if (conformance.isAbstract())
+    appendProtocolName(conformance.getAbstract());
+  else
+    assert(conformance.isInvalid() && "Unknown protocol conformance");
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
+                                              CanGenericSignature genericSig) {
+  beginManglingWithoutPrefix();
+  Buffer << "generic environment ";
+  appendGenericSignature(genericSig);
   return finalize();
 }

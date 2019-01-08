@@ -319,6 +319,8 @@ private:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
     case Node::Kind::AutoClosureType:
+    case Node::Kind::BaseConformanceDescriptor:
+    case Node::Kind::BaseWitnessTableAccessor:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
@@ -404,6 +406,7 @@ private:
     case Node::Kind::Number:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::ObjCBlock:
+    case Node::Kind::ObjCMetadataUpdateFunction:
     case Node::Kind::Owned:
     case Node::Kind::OwningAddressor:
     case Node::Kind::OwningMutableAddressor:
@@ -417,6 +420,9 @@ private:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
     case Node::Kind::ProtocolRequirementsBaseDescriptor:
+    case Node::Kind::ProtocolSelfConformanceDescriptor:
+    case Node::Kind::ProtocolSelfConformanceWitness:
+    case Node::Kind::ProtocolSelfConformanceWitnessTable:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
     case Node::Kind::ProtocolWitnessTableAccessor:
@@ -485,6 +491,18 @@ private:
     case Node::Kind::AssociatedTypeGenericParamRef:
     case Node::Kind::ExtensionDescriptor:
     case Node::Kind::AnonymousContext:
+    case Node::Kind::AnyProtocolConformanceList:
+    case Node::Kind::ConcreteProtocolConformance:
+    case Node::Kind::DependentAssociatedConformance:
+    case Node::Kind::DependentProtocolConformanceAssociated:
+    case Node::Kind::DependentProtocolConformanceInherited:
+    case Node::Kind::DependentProtocolConformanceRoot:
+    case Node::Kind::ProtocolConformanceRefInTypeModule:
+    case Node::Kind::ProtocolConformanceRefInProtocolModule:
+    case Node::Kind::ProtocolConformanceRefInOtherModule:
+    case Node::Kind::DynamicallyReplaceableFunctionKey:
+    case Node::Kind::DynamicallyReplaceableFunctionImpl:
+    case Node::Kind::DynamicallyReplaceableFunctionVar:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -939,6 +957,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "method lookup function for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::ObjCMetadataUpdateFunction:
+    Printer << "ObjC metadata update function for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::OutlinedBridgedMethod:
     Printer << "outlined bridged method (" << Node->getText() << ") of ";
     return nullptr;
@@ -1360,6 +1382,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << " and conformance ";
     print(Node->getChild(1));
     return nullptr;
+  case Node::Kind::ProtocolSelfConformanceWitnessTable:
+    Printer << "protocol self-conformance witness table for ";
+    print(Node->getFirstChild());
+    return nullptr;
   case Node::Kind::ProtocolWitnessTableAccessor:
     Printer << "protocol witness table accessor for ";
     print(Node->getFirstChild());
@@ -1388,6 +1414,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "vtable thunk for ";
     print(Node->getChild(1));
     Printer << " dispatching to ";
+    print(Node->getChild(0));
+    return nullptr;
+  }
+  case Node::Kind::ProtocolSelfConformanceWitness: {
+    Printer << "protocol self-conformance witness for ";
     print(Node->getChild(0));
     return nullptr;
   }
@@ -1509,6 +1540,21 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "type symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
     return nullptr;
+  case Node::Kind::DynamicallyReplaceableFunctionKey:
+    if (!Options.ShortenThunk) {
+      Printer << "dynamically replaceable key for ";
+    }
+    return nullptr;
+  case Node::Kind::DynamicallyReplaceableFunctionImpl:
+    if (!Options.ShortenThunk) {
+      Printer << "dynamically replaceable thunk for ";
+    }
+    return nullptr;
+  case Node::Kind::DynamicallyReplaceableFunctionVar:
+    if (!Options.ShortenThunk) {
+      Printer << "dynamically replaceable variable for ";
+    }
+    return nullptr;
   case Node::Kind::ProtocolSymbolicReference:
     Printer << "protocol symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
@@ -1520,6 +1566,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Metaclass:
     Printer << "metaclass for ";
     print(Node->getFirstChild());
+    return nullptr;
+  case Node::Kind::ProtocolSelfConformanceDescriptor:
+    Printer << "protocol self-conformance descriptor for ";
+    print(Node->getChild(0));
     return nullptr;
   case Node::Kind::ProtocolConformanceDescriptor:
     Printer << "protocol conformance descriptor for ";
@@ -1591,6 +1641,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << " in ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::BaseConformanceDescriptor:
+    Printer << "base conformance descriptor for ";
+    print(Node->getChild(0));
+    Printer << ": ";
+    print(Node->getChild(1));
+    return nullptr;
   case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
     Printer << "default associated type metadata accessor for ";
     print(Node->getChild(0));
@@ -1600,6 +1656,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(1));
     Printer << " : ";
     print(Node->getChild(2));
+    Printer << " in ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::BaseWitnessTableAccessor:
+    Printer << "base witness table accessor for ";
+    print(Node->getChild(1));
     Printer << " in ";
     print(Node->getChild(0));
     return nullptr;
@@ -2079,6 +2141,48 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::AssociatedTypeGenericParamRef:
     Printer << "generic parameter reference for associated type ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::AnyProtocolConformanceList:
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::ConcreteProtocolConformance:
+    Printer << "concrete protocol conformance ";
+    if (Node->hasIndex())
+      Printer << "#" << Node->getIndex() << " ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::DependentAssociatedConformance:
+    Printer << "dependent associated conformance ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::DependentProtocolConformanceAssociated:
+    Printer << "dependent associated protocol conformance ";
+    if (Node->hasIndex())
+      Printer << "#" << Node->getIndex() << " ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::DependentProtocolConformanceInherited:
+    Printer << "dependent inherited protocol conformance ";
+    if (Node->hasIndex())
+      Printer << "#" << Node->getIndex() << " ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::DependentProtocolConformanceRoot:
+    Printer << "dependent root protocol conformance #" << Node->getIndex()
+      << " ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::ProtocolConformanceRefInTypeModule:
+    Printer << "protocol conformance ref (type's module) ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::ProtocolConformanceRefInProtocolModule:
+    Printer << "protocol conformance ref (protocol's module) ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::ProtocolConformanceRefInOtherModule:
+    Printer << "protocol conformance ref (retroactive) ";
     printChildren(Node);
     return nullptr;
   }

@@ -41,6 +41,7 @@ TYPE("sil",                 SIL,                       "sil",             "")
 TYPE("sib",                 SIB,                       "sib",             "")
 
 // Output types
+TYPE("ast-dump",            ASTDump,                   "ast",             "")
 TYPE("image",               Image,                     "out",             "")
 TYPE("object",              Object,                    "o",               "")
 TYPE("dSYM",                dSYM,                      "dSYM",            "")

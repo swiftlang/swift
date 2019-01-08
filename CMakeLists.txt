@@ -128,7 +128,7 @@ set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "4.2")
+set(SWIFT_VERSION "5.0")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -175,6 +175,10 @@ set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
 option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
   the type checker so that it always compiles with optimization. This eases
   debugging after type checking occurs by speeding up type checking" FALSE)
+
+option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
+       "Generate .swiftinterface files alongside .swiftmodule files"
+       FALSE)
 
 #
 # User-configurable Android specific options.
@@ -448,13 +452,9 @@ include(SwiftList)
 swift_configure_components()
 
 # lipo is used to create universal binaries.
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  include(SwiftDarwin)
-  if(SWIFT_LIPO)
-    set(LIPO ${SWIFT_LIPO})
-  else()
-    find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
-  endif()
+include(SwiftToolchainUtils)
+if(NOT SWIFT_LIPO)
+  find_toolchain_tool(SWIFT_LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
 endif()
 
 if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
@@ -912,8 +912,9 @@ endif()
 # https://bugs.swift.org/browse/SR-5975
 add_subdirectory(stdlib)
 
+add_subdirectory(include)
+
 if(SWIFT_INCLUDE_TOOLS)
-  add_subdirectory(include)
   add_subdirectory(lib)
   
   # Always include this after including stdlib/!

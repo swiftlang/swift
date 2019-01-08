@@ -1,4 +1,4 @@
-add_swift_library(swiftIRGen STATIC
+add_swift_host_library(swiftIRGen STATIC
   AllocStackHoisting.cpp
   ClassLayout.cpp
   DebugTypeInfo.cpp
@@ -21,6 +21,7 @@ add_swift_library(swiftIRGen STATIC
   GenFunc.cpp
   GenHeap.cpp
   GenInit.cpp
+  GenIntegerLiteral.cpp
   GenKeyPath.cpp
   GenMeta.cpp
   GenObjC.cpp

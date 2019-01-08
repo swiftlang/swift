@@ -100,18 +100,10 @@ static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
   diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                  verArg->getAsString(Args), verArg->getValue());
 
-  // Check for an unneeded minor version, otherwise just list valid versions
-  if (vers.hasValue() && !vers.getValue().empty() &&
-      vers.getValue().asMajorVersion().getEffectiveLanguageVersion()) {
-    diags.diagnose(SourceLoc(), diag::note_swift_version_major,
-                   vers.getValue()[0]);
-  } else {
-    // Note valid versions instead
-    auto validVers = version::Version::getValidEffectiveVersions();
-    auto versStr =
-        "'" + llvm::join(validVers.begin(), validVers.end(), "', '") + "'";
-    diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, versStr);
-  }
+  // Note valid versions.
+  auto validVers = version::Version::getValidEffectiveVersions();
+  auto versStr = "'" + llvm::join(validVers, "', '") + "'";
+  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, versStr);
 }
 
 /// \brief Create a new Regex instance out of the string value in \p RpassArg.
@@ -159,9 +151,9 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
 /// Save a copy of any flags marked as ParseableInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
+                                       FrontendOptions &FOpts,
                                        ArgList &Args, DiagnosticEngine &Diags) {
-  if (!Args.hasArg(options::OPT_emit_interface_path) &&
-      !Args.hasArg(options::OPT_emit_parseable_module_interface_path))
+  if (!FOpts.InputsAndOutputs.hasParseableInterfaceOutputPath())
     return;
   ArgStringList RenderedArgs;
   for (auto A : Args) {
@@ -206,11 +198,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode,
                                             OPT_serialize_diagnostics_path);
 
+  Opts.EnableExperimentalStaticAssert |=
+    Args.hasArg(OPT_enable_experimental_static_assert);
+
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
+
+  // Always enable operator designated types for the standard library.
+  Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
 
   Opts.SolverEnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_solver_enable_operator_designated_types);
@@ -273,6 +271,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.BuildSyntaxTree = true;
     Opts.VerifySyntaxTree = true;
   }
+  
+  if (Args.hasArg(OPT_enable_experimental_dependencies))
+    Opts.EnableExperimentalDependencies = true;
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
@@ -361,8 +362,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableSwift3ObjCInference =
     Args.hasFlag(OPT_enable_swift3_objc_inference,
-                 OPT_disable_swift3_objc_inference,
-                 Opts.isSwiftVersion3());
+                 OPT_disable_swift3_objc_inference, false);
 
   if (Opts.EnableSwift3ObjCInference) {
     if (const Arg *A = Args.getLastArg(
@@ -734,7 +734,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.AssumeUnqualifiedOwnershipWhenParsing
     |= Args.hasArg(OPT_assume_parsing_unqualified_ownership_sil);
   Opts.EnableMandatorySemanticARCOpts |=
-      !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
+      Args.hasArg(OPT_enable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
@@ -768,6 +768,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.VerifyExclusivity
       = A->getOption().matches(OPT_enable_verify_exclusivity);
   }
+  // If runtime asserts are disabled in general, also disable runtime
+  // exclusivity checks unless explicitly requested.
+  if (Opts.RemoveRuntimeAsserts)
+    Opts.EnforceExclusivityDynamic = false;
+
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
     parseExclusivityEnforcementOptions(A, Opts, Diags);
   }
@@ -978,6 +983,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
+  Opts.EnableDynamicReplacementChaining |=
+      Args.hasArg(OPT_enable_dynamic_replacement_chaining);
+
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
 
   // This is set to true by default.
@@ -1043,6 +1051,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableResilienceBypass = true;
   }
 
+  // PE/COFF cannot deal with the cross-module reference to the metadata parent
+  // (e.g. NativeObject).  Force the lazy initialization of the VWT always.
+  Opts.LazyInitializeClassMetadata = Triple.isOSBinFormatCOFF();
+
   if (const Arg *A = Args.getLastArg(OPT_read_type_info_path_EQ)) {
     Opts.ReadTypeInfoPath = A->getValue();
   }
@@ -1067,8 +1079,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   return false;
 }
 
-static std::string getScriptFileName(StringRef name) {
-  return (Twine(name) + "4" + ".json").str();
+static std::string getScriptFileName(StringRef name, version::Version &ver) {
+  if (ver.isVersionAtLeast(4, 2))
+    return (Twine(name) + "42" + ".json").str();
+  else
+    return (Twine(name) + "4" + ".json").str();
 }
 
 static bool ParseMigratorArgs(MigratorOptions &Opts,
@@ -1112,20 +1127,20 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
 
     bool Supported = true;
     llvm::SmallString<128> dataPath(basePath);
-
+    auto &langVer = LangOpts.EffectiveLanguageVersion;
     if (Triple.isMacOSX())
-      llvm::sys::path::append(dataPath, getScriptFileName("macos"));
+      llvm::sys::path::append(dataPath, getScriptFileName("macos", langVer));
     else if (Triple.isiOS())
-      llvm::sys::path::append(dataPath, getScriptFileName("ios"));
+      llvm::sys::path::append(dataPath, getScriptFileName("ios", langVer));
     else if (Triple.isTvOS())
-      llvm::sys::path::append(dataPath, getScriptFileName("tvos"));
+      llvm::sys::path::append(dataPath, getScriptFileName("tvos", langVer));
     else if (Triple.isWatchOS())
-      llvm::sys::path::append(dataPath, getScriptFileName("watchos"));
+      llvm::sys::path::append(dataPath, getScriptFileName("watchos", langVer));
     else
       Supported = false;
     if (Supported) {
       llvm::SmallString<128> authoredDataPath(basePath);
-      llvm::sys::path::append(authoredDataPath, getScriptFileName("overlay"));
+      llvm::sys::path::append(authoredDataPath, getScriptFileName("overlay", langVer));
       // Add authored list first to take higher priority.
       Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
       Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
@@ -1184,12 +1199,13 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  SaveParseableInterfaceArgs(ParseableInterfaceOpts, ParsedArgs, Diags);
-
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
                         ConfigurationFileBuffers)) {
     return true;
   }
+
+  SaveParseableInterfaceArgs(ParseableInterfaceOpts, FrontendOpts,
+                             ParsedArgs, Diags);
 
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;

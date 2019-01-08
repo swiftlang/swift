@@ -110,7 +110,7 @@ RUN:                              --check-prefix LOGHEADER \
 RUN:                              --check-prefix LOGBENCH
 LOGHEADER-LABEL: #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
 LOGBENCH: {{[0-9]+}},
-NUMITERS1: AngryPhonebook,1
+NUMITERS1: AngryPhonebook,{{[0-9]+}}
 NUMITERS1-NOT: 0,0,0,0,0
 LOGBENCH-SAME: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
 ````
@@ -153,7 +153,8 @@ CONFIG: NumSamples: 2
 CONFIG: Tests Filter: ["1", "Ackermann", "1", "AngryPhonebook"]
 CONFIG: Tests to run: Ackermann, AngryPhonebook
 LOGFORMAT: #,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX,MAX_RSS(B)
-LOGVERBOSE-LABEL: Running Ackermann for 2 samples.
+LOGVERBOSE-LABEL: Running Ackermann
+LOGVERBOSE: Collecting 2 samples.
 LOGVERBOSE: Measuring with scale {{[0-9]+}}.
 LOGVERBOSE: Sample 0,{{[0-9]+}}
 LOGVERBOSE: Sample 1,{{[0-9]+}}
@@ -163,7 +164,8 @@ MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
 LOGFORMAT: ,{{[0-9]+}},{{[0-9]+}},,{{[0-9]+}},{{[0-9]+}}
-LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
+LOGVERBOSE-LABEL: Running AngryPhonebook
+LOGVERBOSE: Collecting 2 samples.
 ````
 
 Verify the specified delimiter is used when logging to console. The non-verbose

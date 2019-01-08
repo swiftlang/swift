@@ -3,7 +3,7 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   set(EXTRA_TYPECHECKER_FLAGS "FORCE_BUILD_OPTIMIZED")
 endif()
 
-add_swift_library(swiftSema STATIC
+add_swift_host_library(swiftSema STATIC
   CSApply.cpp
   CSBindings.cpp
   CSDiag.cpp

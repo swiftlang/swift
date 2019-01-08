@@ -9,7 +9,5 @@ add_swift_host_tool(sil-passpipeline-dumper
     # FIXME: Circular dependencies require re-listing these libraries.
     swiftSema
     swiftAST
-  LLVM_COMPONENT_DEPENDS
-    DebugInfoCodeView
   SWIFT_COMPONENT tools
 )

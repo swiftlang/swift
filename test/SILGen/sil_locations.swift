@@ -12,8 +12,10 @@ func ifexpr() -> Int {
   // CHECK-LABEL: sil hidden @$s13sil_locations6ifexprSiyF
   // CHECK: apply {{.*}}, loc "{{.*}}":[[@LINE-5]]:6
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-6]]:6
-  // CHECK: br [[FALSE_BB]], loc "{{.*}}":[[@LINE-5]]:3
-  // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE-5]]:3, {{.*}}:return
+  // CHECK: [[TRUE_BB]]:
+  // CHECK: br [[CONT_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-6]]:3
+  // CHECK: [[CONT_BB]]:
+  // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE-7]]:3, {{.*}}:return
 }
 
 func ifelseexpr() -> Int {
@@ -77,7 +79,7 @@ func templateTest<T>(_ value: T) -> T {
 func useTemplateTest() -> Int {
   return templateTest(5);
   // CHECK-LABEL: sil hidden @$s13sil_locations15useTemplateTestSiyF
-  // CHECK: function_ref @$sSi2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":78
+  // CHECK: function_ref @$sSi2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":[[@LINE-2]]
 }
 
 func foo(_ x: Int) -> Int {
@@ -130,13 +132,13 @@ func testSwitch() {
   switch (switchfoo(), switchbar()) {
   // CHECK: store {{.*}}, loc "{{.*}}":[[@LINE-1]]
   case (1,2):
-  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-3]]:10
+  // CHECK: integer_literal $Builtin.IntLiteral, 2, loc "{{.*}}":[[@LINE-3]]:10
   // FIXME: Location info is missing.
   // CHECK: cond_br
   //
     var z: Int = 200
   // CHECK: [[VAR_Z:%[0-9]+]] = alloc_box ${ var Int }, var, name "z"{{.*}}line:[[@LINE-1]]:9
-  // CHECK: integer_literal $Builtin.Int2048, 200, loc "{{.*}}":[[@LINE-2]]:18
+  // CHECK: integer_literal $Builtin.IntLiteral, 200, loc "{{.*}}":[[@LINE-2]]:18
     x = z
   // CHECK:  destroy_value [[VAR_Z]]{{.*}}, loc "{{.*}}":[[@LINE-1]]:9, {{.*}}:cleanup
   case (3, let y):
@@ -176,7 +178,7 @@ func testFor() {
 
   // CHECK-LABEL: sil hidden @$s13sil_locations7testForyyF
   // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box ${ var Int }, var, name "y", loc "{{.*}}":[[@LINE-10]]:9
-  // CHECK: integer_literal $Builtin.Int2048, 300, loc "{{.*}}":[[@LINE-11]]:18
+  // CHECK: integer_literal $Builtin.IntLiteral, 300, loc "{{.*}}":[[@LINE-11]]:18
   // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
   // CHECK: br bb{{.*}}, loc "{{.*}}":[[@LINE-10]]:7
   // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
@@ -191,8 +193,8 @@ func testTuples() {
   var d = "foo"
   // CHECK-LABEL: sil hidden @$s13sil_locations10testTuplesyyF
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-4]]:11
-  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-5]]:12
-  // CHECK: integer_literal $Builtin.Int2048, 3, loc "{{.*}}":[[@LINE-6]]:14
+  // CHECK: integer_literal $Builtin.IntLiteral, 2, loc "{{.*}}":[[@LINE-5]]:12
+  // CHECK: integer_literal $Builtin.IntLiteral, 3, loc "{{.*}}":[[@LINE-6]]:14
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-6]]:12
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:16  
 }
@@ -220,7 +222,27 @@ func captures_tuple<T, U>(x: (T, U)) -> () -> (T, U) {
 func interpolated_string(_ x: Int, y: String) -> String {
   return "The \(x) Million Dollar \(y)"
   // CHECK-LABEL: sil hidden @$s13sil_locations19interpolated_string{{[_0-9a-zA-Z]*}}F
-  // CHECK: copy_value{{.*}}, loc "{{.*}}":[[@LINE-2]]:37
+  // CHECK: function_ref @$ss26DefaultStringInterpolationV15literalCapacity18interpolationCountABSi_SitcfC
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-3]]:10
+  
+  // CHECK: string_literal utf8 "The ", loc "{{.*}}":[[@LINE-5]]:10
+  // CHECK: function_ref @$ss26DefaultStringInterpolationV13appendLiteralyySSF
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-7]]:11
+  
+  // CHECK: store %0 to{{.*}}, loc "{{.*}}":[[@LINE-9]]:17
+  // CHECK: function_ref @$ss26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzlF
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-11]]:16
+  
+  // CHECK: string_literal utf8 " Million Dollar ", loc "{{.*}}":[[@LINE-13]]:19
+  // CHECK: function_ref @$ss26DefaultStringInterpolationV13appendLiteralyySSF
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-15]]:19
+  
+  // CHECK: store_borrow %1 to {{.*}}, loc "{{.*}}":[[@LINE-17]]:37
+  // CHECK: function_ref @$ss26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzs20TextOutputStreamableRzlF
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-19]]:36
+  
+  // CHECK: function_ref @$sSS19stringInterpolationSSs013DefaultStringB0V_tcfC
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-22]]:10
 }
 
 
@@ -243,8 +265,8 @@ func containers() -> ([Int], Dictionary<String, Int>) {
   
   // CHECK: string_literal utf8 "Ankeny", loc "{{.*}}":[[@LINE-4]]:23
 
-  // CHECK: integer_literal $Builtin.Int2048, 1, loc "{{.*}}":[[@LINE-6]]:33
-  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-7]]:48
+  // CHECK: integer_literal $Builtin.IntLiteral, 1, loc "{{.*}}":[[@LINE-6]]:33
+  // CHECK: integer_literal $Builtin.IntLiteral, 2, loc "{{.*}}":[[@LINE-7]]:48
 
   
   
@@ -313,7 +335,7 @@ func testStringForEachStmt() {
   // CHECK-LABEL: sil hidden @$s13sil_locations21testStringForEachStmtyyF
   // CHECK: br {{.*}} line:[[@LINE-8]]:3
   // CHECK: switch_enum {{.*}} line:[[@LINE-9]]:3
-  // CHECK: cond_br {{.*}} line:[[@LINE-8]]:8
+  // CHECK: cond_br {{.*}} line:[[@LINE-8]]:10
   // Break branch:
   // CHECK: br {{.*}} line:[[@LINE-9]]:7
   // Looping back branch:
@@ -366,9 +388,9 @@ func testRepeatWhile() {
   
   // CHECK-LABEL: sil hidden @$s13sil_locations15testRepeatWhileyyF
   // CHECK: br {{.*}} line:[[@LINE-6]]:3
-  // CHECK: cond_br {{.*}} line:[[@LINE-5]]:11
+  // CHECK: cond_br {{.*}} line:[[@LINE-5]]:14
   // Loop back branch:
-  // CHECK: br {{.*}} line:[[@LINE-7]]:11  
+  // CHECK: br {{.*}} line:[[@LINE-7]]:14
 }
 
 
@@ -386,9 +408,9 @@ func testWhile() {
   // CHECK-LABEL: sil hidden @$s13sil_locations9testWhileyyF
   // CHECK: br {{.*}} line:[[@LINE-9]]:3
   // While loop conditional branch:
-  // CHECK: cond_br {{.*}} line:[[@LINE-11]]:9
+  // CHECK: cond_br {{.*}} line:[[@LINE-11]]:11
   // If stmt condition branch:
-  // CHECK: cond_br {{.*}} line:[[@LINE-11]]:8
+  // CHECK: cond_br {{.*}} line:[[@LINE-11]]:10
   // Break branch:
   // CHECK: br {{.*}} line:[[@LINE-12]]:7
   // Looping back branch:

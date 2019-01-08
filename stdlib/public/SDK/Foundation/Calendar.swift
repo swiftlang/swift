@@ -357,7 +357,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter component: A component to calculate a range for.
     /// - returns: The range, or nil if it could not be calculated.
     public func minimumRange(of component: Component) -> Range<Int>? {
-        return _handle.map { $0.minimumRange(of: Calendar._toCalendarUnit([component])).toRange() }
+        return _handle.map { Range($0.minimumRange(of: Calendar._toCalendarUnit([component]))) }
     }
     
     /// The maximum range limits of the values that a given component can take on in the receive
@@ -366,7 +366,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter component: A component to calculate a range for.
     /// - returns: The range, or nil if it could not be calculated.
     public func maximumRange(of component: Component) -> Range<Int>? {
-        return _handle.map { $0.maximumRange(of: Calendar._toCalendarUnit([component])).toRange() }
+        return _handle.map { Range($0.maximumRange(of: Calendar._toCalendarUnit([component]))) }
     }
     
     
@@ -383,7 +383,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter date: The absolute time for which the calculation is performed.
     /// - returns: The range of absolute time values smaller can take on in larger at the time specified by date. Returns `nil` if larger is not logically bigger than smaller in the calendar, or the given combination of components does not make sense (or is a computation which is undefined).
     public func range(of smaller: Component, in larger: Component, for date: Date) -> Range<Int>? {
-        return _handle.map { $0.range(of: Calendar._toCalendarUnit([smaller]), in: Calendar._toCalendarUnit([larger]), for: date).toRange() }
+        return _handle.map { Range($0.range(of: Calendar._toCalendarUnit([smaller]), in: Calendar._toCalendarUnit([larger]), for: date)) }
     }
     
     @available(*, unavailable, message: "use range(of:in:for:) instead")

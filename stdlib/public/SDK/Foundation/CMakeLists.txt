@@ -1,20 +1,25 @@
 cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
-add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   AffineTransform.swift
   Boxing.swift
   BundleLookup.mm
   Calendar.swift
   CharacterSet.swift
   Codable.swift
+  Collections+DataProtocol.swift
+  ContiguousBytes.swift
   Data.swift
+  DataProtocol.swift
+  DispatchData+DataProtocol.swift
+  NSData+DataProtocol.swift
+  Pointers+DataProtocol.swift
   DataThunks.m
   Date.swift
   DateComponents.swift
   DateInterval.swift
   Decimal.swift
-  ExtraStringAPIs.swift
   FileManager.swift
   Foundation.swift
   IndexPath.swift
@@ -59,7 +64,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   UUID.swift
   CheckClass.mm
 
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xllvm" "-sil-inline-generics" "-Xllvm" "-sil-partial-specialization" "-swift-version" "3"
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xllvm" "-sil-inline-generics" "-Xllvm" "-sil-partial-specialization" "-swift-version" "5"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS_OSX Darwin CoreFoundation CoreGraphics Dispatch IOKit ObjectiveC # auto-updated

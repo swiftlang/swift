@@ -423,6 +423,27 @@ public:
                                         const CalleeCandidateInfo &candidates,
                                             TCCOptions options = TCCOptions());
 
+  void getPossibleTypesOfExpressionWithoutApplying(
+      Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
+      FreeTypeVariableBinding allowFreeTypeVariables =
+          FreeTypeVariableBinding::Disallow,
+      ExprTypeCheckListener *listener = nullptr) {
+    CS.TC.getPossibleTypesOfExpressionWithoutApplying(
+        expr, dc, types, allowFreeTypeVariables, listener);
+    CS.cacheExprTypes(expr);
+  }
+
+  Type getTypeOfExpressionWithoutApplying(
+      Expr *&expr, DeclContext *dc, ConcreteDeclRef &referencedDecl,
+      FreeTypeVariableBinding allowFreeTypeVariables =
+          FreeTypeVariableBinding::Disallow,
+      ExprTypeCheckListener *listener = nullptr) {
+    auto type = CS.TC.getTypeOfExpressionWithoutApplying(expr, dc, referencedDecl,
+                                                         allowFreeTypeVariables, listener);
+    CS.cacheExprTypes(expr);
+    return type;
+  }
+
   /// Diagnose common failures due to applications of an argument list to an
   /// ApplyExpr or SubscriptExpr.
   bool diagnoseParameterErrors(CalleeCandidateInfo &CCI,
@@ -451,6 +472,10 @@ public:
   bool diagnoseCallContextualConversionErrors(ApplyExpr *callEpxr,
                                               Type contextualType,
                                               ContextualTypePurpose CTP);
+
+  bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
+                                  CalleeCandidateInfo &CCI,
+                                  ArrayRef<Identifier> argLabels);
 
 private:
   /// Validate potential contextual type for type-checking one of the
@@ -1289,7 +1314,8 @@ diagnoseUnresolvedDotExprTypeRequirementFailure(ConstraintSystem &cs,
   // If we actually resolved the member to use, use it.
   auto loc = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
   auto *member = cs.findResolvedMemberRef(loc);
-  if (!member)
+  // If the problem is contextual it's diagnosed elsewhere.
+  if (!member || !member->getAsGenericContext())
     return false;
 
   auto req = member->getAsGenericContext()
@@ -1851,7 +1877,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
       (isa<OverloadedDeclRefExpr>(subExpr->getValueProvidingExpr()))) {
     return subExpr;
   }
-  
+
   // Save any existing type data of the subexpr tree, and reset it to null in
   // prep for re-type-checking the tree.  If things fail, we can revert the
   // types back to their original state.
@@ -1895,9 +1921,12 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // holding on to an expression containing open existential types but
   // no OpenExistentialExpr, which breaks invariants enforced by the
   // ASTChecker.
-  if (isa<OpenExistentialExpr>(subExpr))
-    eraseOpenedExistentials(CS, subExpr);
-  
+  // Another reason why we need to do this is because diagnostics might pick
+  // constraint anchor for re-typechecking which would only have opaque value
+  // expression and not enclosing open existential, which is going to trip up
+  // sanitizer.
+  eraseOpenedExistentials(CS, subExpr);
+
   // If recursive type checking failed, then an error was emitted.  Return
   // null to indicate this to the caller.
   if (!resultTy)
@@ -2227,48 +2256,6 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
   return false;
 }
 
-/// Try to add a fix-it when converting between a collection and its slice type,
-/// such as String <-> Substring or (eventually) Array <-> ArraySlice
-static bool trySequenceSubsequenceConversionFixIts(InFlightDiagnostic &diag,
-                                                   ConstraintSystem &CS,
-                                                   Type fromType, Type toType,
-                                                   Expr *expr) {
-  if (CS.TC.Context.getStdlibModule() == nullptr)
-    return false;
-
-  auto String = CS.TC.getStringType(CS.DC);
-  auto Substring = CS.TC.getSubstringType(CS.DC);
-
-  if (!String || !Substring)
-    return false;
-
-  /// FIXME: Remove this flag when void subscripts are implemented.
-  /// Make this unconditional and remove the if statement.
-  if (CS.TC.getLangOpts().FixStringToSubstringConversions) {
-    // String -> Substring conversion
-    // Add '[]' void subscript call to turn the whole String into a Substring
-    if (fromType->isEqual(String)) {
-      if (toType->isEqual(Substring)) {
-        diag.fixItInsertAfter(expr->getEndLoc (), "[]");
-        return true;
-      }
-    }
-  }
-
-  // Substring -> String conversion
-  // Wrap in String.init
-  if (fromType->isEqual(Substring)) {
-    if (toType->isEqual(String)) {
-      auto range = expr->getSourceRange();
-      diag.fixItInsert(range.Start, "String(");
-      diag.fixItInsertAfter(range.End, ")");
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /// Attempts to add fix-its for these two mistakes:
 ///
 /// - Passing an integer with the right type but which is getting wrapped with a
@@ -2395,7 +2382,7 @@ bool FailureDiagnosis::diagnoseNonEscapingParameterToEscaping(
   InFlightDiagnostic note = CS.TC.diagnose(
       paramDecl->getLoc(), diag::noescape_parameter, paramDecl->getName());
 
-  if (!srcFT->isAutoClosure()) {
+  if (!paramDecl->isAutoClosure()) {
     note.fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
                      "@escaping ");
   } // TODO: add in a fixit for autoclosure
@@ -2737,10 +2724,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   // Try to convert between a sequence and its subsequence, notably
   // String <-> Substring.
-  if (trySequenceSubsequenceConversionFixIts(diag, CS, exprType, contextualType,
-                                             expr)) {
+  if (ContextualFailure::trySequenceSubsequenceFixIts(diag, CS, exprType,
+                                                      contextualType, expr))
     return true;
-  }
 
   // Attempt to add a fixit for the error.
   switch (CTP) {
@@ -2856,10 +2842,10 @@ static bool candidatesHaveAnyDefaultValues(
     if (!function) continue;
 
     if (function->hasImplicitSelfDecl()) {
-      if (cand.level != 1)
+      if (!cand.skipCurriedSelf)
         return false;
     } else {
-      if (cand.level != 0)
+      if (cand.skipCurriedSelf)
         return false;
     }
 
@@ -2910,10 +2896,10 @@ static Optional<unsigned> getElementForScalarInitOfArg(
   if (!function) return getElementForScalarInitSimple(tupleTy);
 
   if (function->hasImplicitSelfDecl()) {
-    if (cand.level != 1)
+    if (!cand.skipCurriedSelf)
       return getElementForScalarInitSimple(tupleTy);
   } else {
-    if (cand.level != 0)
+    if (cand.skipCurriedSelf)
       return getElementForScalarInitSimple(tupleTy);
   }
 
@@ -2987,7 +2973,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   // diagnostics when we don't force the self type down.
   if (argType && !candidates.empty())
     if (auto decl = candidates[0].getDecl())
-      if (decl->isInstanceMember() && candidates[0].level == 0 &&
+      if (decl->isInstanceMember() && !candidates[0].skipCurriedSelf &&
           !isa<SubscriptDecl>(decl))
         argType = Type();
 
@@ -3013,7 +2999,13 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // punt on passing down the type information, since type checking the
     // subexpression won't be able to find the default argument provider.
     if (argType) {
-      if (auto argTT = argType->getAs<TupleType>()) {
+      if (auto *PT = dyn_cast<ParenType>(argType.getPointer())) {
+        const auto &flags = PT->getParameterFlags();
+        if (flags.isAutoClosure()) {
+          auto resultTy = PT->castTo<FunctionType>()->getResult();
+          argType = ParenType::get(PT->getASTContext(), resultTy);
+        }
+      } else if (auto argTT = argType->getAs<TupleType>()) {
         if (auto scalarElt = getElementForScalarInitOfArg(argTT, candidates)) {
           // If we found the single argument being initialized, use it.
           auto &arg = argTT->getElement(*scalarElt);
@@ -3023,6 +3015,8 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
           // the individual varargs argument, not the overall array type.
           if (arg.isVararg())
             argType = arg.getVarargBaseTy();
+          else if (arg.isAutoClosure())
+            argType = arg.getType()->castTo<FunctionType>()->getResult();
           else
             argType = arg.getType();
         } else if (candidatesHaveAnyDefaultValues(candidates)) {
@@ -3052,7 +3046,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     SmallBitVector defaultMap(params.size());
     if (!candidates.empty()) {
       defaultMap = computeDefaultMap(params, candidates[0].getDecl(),
-                                     candidates[0].level);
+                                     candidates[0].skipCurriedSelf);
     }
 
     // Form a set of call arguments, using a dummy type (Void), because the
@@ -3089,6 +3083,15 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 
         // Look at each of the arguments assigned to this parameter.
         auto currentParamType = param.getOldType();
+
+        // Since this is diagnostics, let's make sure that parameter
+        // marked as @autoclosure indeed has a function type, because
+        // it can also be an error type and possibly unresolved type.
+        if (param.isAutoClosure()) {
+          if (auto *funcType = currentParamType->getAs<FunctionType>())
+            currentParamType = funcType->getResult();
+        }
+
         for (auto inArgNo : paramBindings[paramIdx]) {
           // Determine the argument type.
           auto currentArgType = TE->getElement(inArgNo);
@@ -3219,10 +3222,9 @@ decomposeArgType(Type argType, ArrayRef<Identifier> argLabels) {
   return result;
 }
 
-static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
-                                       CalleeCandidateInfo &CCI,
-                                       ArrayRef<Identifier> argLabels,
-                                       ConstraintSystem &CS) {
+bool FailureDiagnosis::diagnoseImplicitSelfErrors(
+    Expr *fnExpr, Expr *argExpr, CalleeCandidateInfo &CCI,
+    ArrayRef<Identifier> argLabels) {
   // If candidate list is empty it means that problem is somewhere else,
   // since we need to have candidates which might be shadowing other funcs.
   if (CCI.empty() || !CCI[0].getDecl())
@@ -3276,8 +3278,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     for (unsigned i = 0, e = argTuple->getNumElements(); i < e; ++i) {
       ConcreteDeclRef ref = nullptr;
       auto *el = argTuple->getElement(i);
-      auto typeResult =
-        TC.getTypeOfExpressionWithoutApplying(el, CS.DC, ref);
+      auto typeResult = getTypeOfExpressionWithoutApplying(el, CS.DC, ref);
       if (!typeResult)
         return false;
       auto flags = ParameterTypeFlags().withInOut(typeResult->is<InOutType>());
@@ -3461,14 +3462,15 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
     // it might be worth while to check if it's instance method as curried
     // member of type problem.
     if (CCI.closeness == CC_ExactMatch &&
-        (decl->isInstanceMember() && candidate.level == 1))
+        (decl->isInstanceMember() && candidate.skipCurriedSelf))
       continue;
 
     auto params = candidate.getParameters();
     // If one of the candidates is an instance method with a single parameter
     // at the level 0, this might be viable situation for calling instance
     // method as curried member of type problem.
-    if (params.size() != 1 || !decl->isInstanceMember() || candidate.level > 0)
+    if (params.size() != 1 || !decl->isInstanceMember() ||
+        candidate.skipCurriedSelf)
       return false;
   }
 
@@ -3754,9 +3756,8 @@ public:
       Ty = param.getPlainType();
     }
     // @autoclosure; the type should be the result type.
-    if (auto FT = param.getOldType()->getAs<AnyFunctionType>())
-      if (FT->isAutoClosure())
-        Ty = FT->getResult();
+    if (param.isAutoClosure())
+      Ty = param.getPlainType()->castTo<FunctionType>()->getResult();
     insertText << "<#" << Ty << "#>";
     if (argIdx == 0 && insertableEndIdx != 0)
       insertText << ", ";
@@ -4020,7 +4021,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
   auto params = candidate.getParameters();
 
   SmallBitVector defaultMap =
-    computeDefaultMap(params, candidate.getDecl(), candidate.level);
+    computeDefaultMap(params, candidate.getDecl(), candidate.skipCurriedSelf);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
   // Check the case where a raw-representable type is constructed from an
@@ -4034,7 +4035,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
   //    MyEnumType.foo
   //
   if (params.size() == 1 && args.size() == 1 && candidate.getDecl() &&
-      isa<ConstructorDecl>(candidate.getDecl()) && candidate.level == 1) {
+      isa<ConstructorDecl>(candidate.getDecl()) && candidate.skipCurriedSelf) {
     AnyFunctionType::Param &arg = args[0];
     auto resTy =
         candidate.getResultType()->lookThroughAllOptionalTypes();
@@ -4145,7 +4146,7 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
   auto arguments = decomposeArgType(argType, argLabels);
 
   auto bestMatchKind = RawRepresentableMismatch::NotApplicable;
-  const UncurriedCandidate *bestMatchCandidate = nullptr;
+  const OverloadCandidate *bestMatchCandidate = nullptr;
   KnownProtocolKind bestMatchProtocol;
   size_t bestMatchIndex;
 
@@ -4251,7 +4252,7 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
   }
 
   // Try to diagnose errors related to the use of implicit self reference.
-  if (diagnoseImplicitSelfErrors(fnExpr, argExpr, CCI, argLabels, CS))
+  if (diagnoseImplicitSelfErrors(fnExpr, argExpr, CCI, argLabels))
     return true;
 
   if (diagnoseInstanceMethodAsCurriedMemberOnType(CCI, fnExpr, argExpr))
@@ -4320,7 +4321,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
     // We're about to typecheck the index list, which needs to be processed with
     // self already applied.
     for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-      ++calleeInfo.candidates[i].level;
+      calleeInfo.candidates[i].skipCurriedSelf = true;
 
     auto indexExpr =
         typeCheckArgumentChildIndependently(SE->getIndex(), Type(), calleeInfo);
@@ -4329,7 +4330,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
 
     // Back to analyzing the candidate list with self applied.
     for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-      --calleeInfo.candidates[i].level;
+      calleeInfo.candidates[i].skipCurriedSelf = false;
 
     ArrayRef<Identifier> argLabels = SE->getArgumentLabels();
     if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
@@ -4340,7 +4341,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
     auto decomposedBaseType = decomposeArgType(baseType, {Identifier()});
     auto decomposedIndexType = decomposeArgType(indexType, argLabels);
     calleeInfo.filterList(
-        [&](UncurriedCandidate cand) -> CalleeCandidateInfo::ClosenessResultTy {
+        [&](OverloadCandidate cand) -> CalleeCandidateInfo::ClosenessResultTy {
           // Classify how close this match is.  Non-subscript decls don't match.
           auto subscriptDecl = dyn_cast_or_null<SubscriptDecl>(cand.getDecl());
           if (!subscriptDecl ||
@@ -4353,9 +4354,8 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
               CC_ExactMatch)
             selfConstraint = CC_SelfMismatch;
 
-          // Increase the uncurry level to look past the self argument to the
-          // indices.
-          cand.level++;
+          // Set a flag to look past the self argument to the indices.
+          cand.skipCurriedSelf = true;
 
           // Explode out multi-index subscripts to find the best match.
           auto indexResult =
@@ -4378,7 +4378,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
 
     // Any other failures relate to the index list.
     for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-      ++calleeInfo.candidates[i].level;
+      calleeInfo.candidates[i].skipCurriedSelf = true;
 
     // TODO: Is there any reason to check for CC_NonLValueInOut here?
 
@@ -4394,7 +4394,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
         ConcreteDeclRef decl = nullptr;
         message = diag::cannot_subscript_with_index;
 
-        if (CS.TC.getTypeOfExpressionWithoutApplying(expr, CS.DC, decl))
+        if (getTypeOfExpressionWithoutApplying(expr, CS.DC, decl))
           return false;
 
         // If we are down to a single candidate but with an unresolved
@@ -4402,7 +4402,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
         // and more concrete expected type for this subscript decl, in order
         // to diagnose a better error.
         if (baseType && indexType->hasUnresolvedType()) {
-          UncurriedCandidate cand = calleeInfo.candidates[0];
+          auto cand = calleeInfo.candidates[0];
           auto candType = baseType->getTypeOfMember(CS.DC->getParentModule(),
                                                     cand.getDecl(), nullptr);
           if (auto *candFunc = candType->getAs<FunctionType>()) {
@@ -4668,7 +4668,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
 
   auto params = candidate.getParameters();
   SmallBitVector defaultMap =
-    computeDefaultMap(params, candidate.getDecl(), candidate.level);
+    computeDefaultMap(params, candidate.getDecl(), candidate.skipCurriedSelf);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
   SmallVector<ParamBinding, 4> bindings;
@@ -4958,7 +4958,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
   if (currentType->hasTypeVariable() || currentType->hasUnresolvedType()) {
     auto contextualType = CS.getContextualType();
     CallResultListener listener(contextualType);
-    CS.TC.getPossibleTypesOfExpressionWithoutApplying(
+    getPossibleTypesOfExpressionWithoutApplying(
         fnExpr, CS.DC, possibleTypes, FreeTypeVariableBinding::UnresolvedType,
         &listener);
 
@@ -5063,9 +5063,9 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   auto &TC = CS.TC;
   auto *DC = CS.DC;
 
-  auto typeCheckExpr = [](TypeChecker &TC, Expr *expr, DeclContext *DC,
-                          SmallPtrSetImpl<TypeBase *> &types) {
-    TC.getPossibleTypesOfExpressionWithoutApplying(
+  auto typeCheckExpr = [&](TypeChecker &TC, Expr *expr, DeclContext *DC,
+                           SmallPtrSetImpl<TypeBase *> &types) {
+    getPossibleTypesOfExpressionWithoutApplying(
         expr, DC, types, FreeTypeVariableBinding::Disallow);
   };
 
@@ -5125,8 +5125,8 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
   auto params = decomposeArgType(CS.getType(argExpr), argLabels);
   using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
 
-  candidateInfo.filterList([&](UncurriedCandidate cand) -> ClosenessPair {
-    auto candFuncType = cand.getUncurriedFunctionType();
+  candidateInfo.filterList([&](OverloadCandidate cand) -> ClosenessPair {
+    auto candFuncType = cand.getFunctionType();
     if (!candFuncType)
       return {CC_GeneralMismatch, {}};
 
@@ -5191,14 +5191,14 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
 // unresolved result let's not re-typecheck the function expression,
 // because it might produce unrelated diagnostics due to lack of
 // contextual information.
-static bool shouldTypeCheckFunctionExpr(TypeChecker &TC, DeclContext *DC,
+static bool shouldTypeCheckFunctionExpr(FailureDiagnosis &FD, DeclContext *DC,
                                         Expr *fnExpr) {
   if (!isa<UnresolvedDotExpr>(fnExpr))
     return true;
 
   SmallPtrSet<TypeBase *, 4> fnTypes;
-  TC.getPossibleTypesOfExpressionWithoutApplying(fnExpr, DC, fnTypes,
-                                       FreeTypeVariableBinding::UnresolvedType);
+  FD.getPossibleTypesOfExpressionWithoutApplying(
+      fnExpr, DC, fnTypes, FreeTypeVariableBinding::UnresolvedType);
 
   if (fnTypes.size() == 1) {
     // Some member types depend on the arguments to produce a result type,
@@ -5232,7 +5232,7 @@ static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
       return true;
     };
 
-    auto defaultMap = computeDefaultMap(params, funcDecl, cand.level);
+    auto defaultMap = computeDefaultMap(params, funcDecl, cand.skipCurriedSelf);
     InputMatcher IM(params, defaultMap);
     auto result = IM.match(numArgs, pairMatcher);
     if (result == InputMatcher::IM_Succeeded)
@@ -5258,7 +5258,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   auto *fnExpr = callExpr->getFn();
   auto originalFnType = CS.getType(callExpr->getFn());
 
-  if (shouldTypeCheckFunctionExpr(CS.TC, CS.DC, fnExpr)) {
+  if (shouldTypeCheckFunctionExpr(*this, CS.DC, fnExpr)) {
 
     // If we are misusing a subscript, diagnose that and provide a fixit.
     // We diagnose this here to have enough context to offer an appropriate fixit.
@@ -5295,7 +5295,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     fnExpr = callExpr->getFn();
 
     SmallPtrSet<TypeBase *, 4> types;
-    CS.TC.getPossibleTypesOfExpressionWithoutApplying(fnExpr, CS.DC, types);
+    getPossibleTypesOfExpressionWithoutApplying(fnExpr, CS.DC, types);
 
     auto isFunctionType = [getFuncType](Type type) -> bool {
       return type && getFuncType(type)->is<AnyFunctionType>();
@@ -5335,7 +5335,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
              "unexpected declaration reference");
 
       ConcreteDeclRef decl = nullptr;
-      Type type = CS.TC.getTypeOfExpressionWithoutApplying(
+      Type type = getTypeOfExpressionWithoutApplying(
           fnExpr, CS.DC, decl, FreeTypeVariableBinding::UnresolvedType,
           &listener);
 
@@ -5356,8 +5356,27 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // non-function/non-metatype type, then we cannot call it!
   if (!isUnresolvedOrTypeVarType(fnType) &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
-    
+
     auto arg = callExpr->getArg();
+
+    // Diagnose @dynamicCallable errors.
+    if (CS.DynamicCallableCache[fnType->getCanonicalType()].isValid()) {
+      auto dynamicCallableMethods =
+        CS.DynamicCallableCache[fnType->getCanonicalType()];
+
+      // Diagnose dynamic calls with keywords on @dynamicCallable types that
+      // don't define the `withKeywordArguments` method.
+      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+        bool hasArgLabel = llvm::any_of(
+          tuple->getElementNames(), [](Identifier i) { return !i.empty(); });
+        if (hasArgLabel &&
+            dynamicCallableMethods.keywordArgumentsMethods.empty()) {
+          diagnose(callExpr->getFn()->getStartLoc(),
+                   diag::missing_dynamic_callable_kwargs_method, fnType);
+          return true;
+        }
+      }
+    }
 
     if (fnType->is<ExistentialMetatypeType>()) {
       auto diag = diagnose(arg->getStartLoc(),
@@ -5413,7 +5432,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     if (!calleeInfo.empty()) {
       auto &&cand = calleeInfo[0];
       auto decl = cand.getDecl();
-      if (decl && decl->isInstanceMember() && cand.level == 0 &&
+      if (decl && decl->isInstanceMember() && !cand.skipCurriedSelf &&
           cand.getParameters().size() == 1)
         isInstanceMethodAsCurriedMemberOnType = true;
     }
@@ -5443,7 +5462,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (auto fn = fnType->getAs<AnyFunctionType>()) {
     using Closeness = CalleeCandidateInfo::ClosenessResultTy;
 
-    calleeInfo.filterList([&](UncurriedCandidate candidate) -> Closeness {
+    calleeInfo.filterList([&](OverloadCandidate candidate) -> Closeness {
       auto resultType = candidate.getResultType();
       if (!resultType)
         return {CC_GeneralMismatch, {}};
@@ -5679,7 +5698,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
           return false;
 
         auto candidate = calleeInfo[0];
-        auto *fnType = candidate.getUncurriedFunctionType();
+        auto *fnType = candidate.getFunctionType();
         if (!fnType)
           return false;
 
@@ -5900,7 +5919,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
     ExprTypeSaverAndEraser eraser(srcExpr);
 
     ConcreteDeclRef ref = nullptr;
-    auto type = CS.TC.getTypeOfExpressionWithoutApplying(srcExpr, CS.DC, ref);
+    auto type = getTypeOfExpressionWithoutApplying(srcExpr, CS.DC, ref);
 
     if (type && !type->isEqual(contextualType))
       return diagnoseContextualConversionError(
@@ -6398,7 +6417,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       // diagnose situations where contextual type expected one result
       // type but actual closure produces a different one without explicitly
       // declaring it (e.g. by using anonymous parameters).
-      auto type = CS.TC.getTypeOfExpressionWithoutApplying(
+      auto type = getTypeOfExpressionWithoutApplying(
           closure, CS.DC, decl, FreeTypeVariableBinding::Disallow);
 
       if (type && resultTypeProcessor(type, expectedResultType))
@@ -6708,10 +6727,16 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
                                            : defaultUnqualifiedLookupOptions),
                                corrections);
 
-      if (currentType)
-        TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
-                    currentType, componentName);
-      else
+      if (currentType) {
+        if (currentType->is<TupleType>()) {
+          TC.diagnose(KPE->getLoc(), diag::expr_keypath_unimplemented_tuple);
+          isInvalid = true;
+          break;
+        }
+        else
+          TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
+                      currentType, componentName);
+      } else
         TC.diagnose(componentNameLoc, diag::use_unresolved_identifier,
                     componentName, false);
 
@@ -6901,7 +6926,7 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
     KeyPathListener listener(klass, parentType, rootType);
     ConcreteDeclRef concreteDecl;
 
-    auto derivedType = CS.TC.getTypeOfExpressionWithoutApplying(
+    auto derivedType = getTypeOfExpressionWithoutApplying(
         expr, CS.DC, concreteDecl, FreeTypeVariableBinding::Disallow,
         &listener);
 
@@ -7089,7 +7114,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     return false;
   DeclName constrName = TC.getObjectLiteralConstructorName(E);
   assert(constrName);
-  ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
+  auto constrs = protocol->lookupDirect(constrName);
   if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front()))
     return false;
   auto *constr = cast<ConstructorDecl>(constrs.front());
@@ -7228,7 +7253,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
       // expected result type.
       auto resultTy = candidateInfo[0].getResultType();
       if (!resultTy)
-        resultTy = candidateInfo[0].getUncurriedType();
+        resultTy = candidateInfo[0].getType();
 
       if (resultTy && !CS.getContextualType()->is<UnboundGenericType>() &&
           !CS.TC.isConvertibleTo(resultTy, CS.getContextualType(), CS.DC)) {
@@ -7904,12 +7929,6 @@ FailureDiagnosis::validateContextualType(Type contextualType,
   if (!contextualType)
     return {contextualType, CTP};
 
-  // If we're asked to convert to an autoclosure, then we really want to
-  // convert to the result of it.
-  if (auto *FT = contextualType->getAs<AnyFunctionType>())
-    if (FT->isAutoClosure())
-      contextualType = FT->getResult();
-
   // Since some of the contextual types might be tuples e.g. subscript argument
   // is a tuple or paren wrapping a tuple, it's required to recursively check
   // its elements to determine nullability of the contextual type, because it
@@ -8065,7 +8084,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       // successfully type-checked its type cleanup is going to be disabled
       // (we are allowing unresolved types), and as a side-effect it might
       // also be transformed e.g. OverloadedDeclRefExpr -> DeclRefExpr.
-      auto type = CS.TC.getTypeOfExpressionWithoutApplying(
+      auto type = getTypeOfExpressionWithoutApplying(
           resultExpr, CS.DC, decl, FreeTypeVariableBinding::UnresolvedType);
       if (type)
         resultType = type;

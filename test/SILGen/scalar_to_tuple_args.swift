@@ -59,16 +59,14 @@ tupleWithDefaults(x: (x,x))
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
 // CHECK: [[X:%.*]] = load [trivial] [[READ]]
 // CHECK: store [[X]] to [trivial] [[ADDR]]
-// CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
 // CHECK: [[VARIADIC_FIRST:%.*]] = function_ref @$s20scalar_to_tuple_args13variadicFirstyySid_tF
-// CHECK: apply [[VARIADIC_FIRST]]([[BORROWED_ARRAY]])
+// CHECK: apply [[VARIADIC_FIRST]]([[ARRAY]])
 variadicFirst(x)
 
 // CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: ([[ARRAY:%.*]], [[MEMORY:%.*]]) = destructure_tuple [[ALLOC_ARRAY]]
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
 // CHECK: [[X:%.*]] = load [trivial] [[READ]]
-// CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
 // CHECK: [[VARIADIC_SECOND:%.*]] = function_ref @$s20scalar_to_tuple_args14variadicSecondyySi_SidtF
-// CHECK: apply [[VARIADIC_SECOND]]([[X]], [[BORROWED_ARRAY]])
+// CHECK: apply [[VARIADIC_SECOND]]([[X]], [[ARRAY]])
 variadicSecond(x)

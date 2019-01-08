@@ -468,10 +468,8 @@ class LetFieldClass {
   // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*Kraken
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [copy] [[READ]]
   // CHECK-NEXT: end_access [[READ]] : $*Kraken
-  // CHECK-NEXT: [[BORROWED_KRAKEN_COPY:%.*]] = begin_borrow [[KRAKEN_COPY]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN_COPY]])
-  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN_COPY]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: destroy_value [[KRAKEN_COPY]]
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
   // CHECK-NEXT: destroy_value [[KRAKEN]]
@@ -489,10 +487,8 @@ class LetFieldClass {
   // CHECK: bb0([[CLS:%.*]] : @guaranteed $LetFieldClass):
   // CHECK: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken, $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
-  // CHECK-NEXT: [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
-  // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[BORROWED_KRAKEN]]
-  // CHECK-NEXT: apply [[KRAKEN_METH]]([[BORROWED_KRAKEN]])
-  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]]
+  // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
+  // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
   // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken, $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
@@ -508,10 +504,8 @@ class LetFieldClass {
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [read] [unknown] [[PB]] : $*Kraken
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [copy] [[WRITE]]
   // CHECK-NEXT: end_access [[WRITE]] : $*Kraken
-  // CHECK-NEXT: [[BORROWED_KRAKEN_COPY:%.*]] = begin_borrow [[KRAKEN_COPY]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN_COPY]])
-  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN_COPY]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: destroy_value [[KRAKEN_COPY]]
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
   // CHECK-NEXT: destroy_value [[KRAKEN]]

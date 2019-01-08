@@ -72,11 +72,17 @@ public protocol TextOutputStream {
 
   /// Appends the given string to the stream.
   mutating func write(_ string: String)
+
+  mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>)
 }
 
 extension TextOutputStream {
   public mutating func _lock() {}
   public mutating func _unlock() {}
+
+  public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
+    write(String._fromASCII(buffer))
+  }
 }
 
 /// A source of text-streaming operations.
@@ -267,11 +273,9 @@ public protocol CustomDebugStringConvertible {
 // Default (ad-hoc) printing
 //===----------------------------------------------------------------------===//
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_EnumCaseName")
 internal func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_OpaqueSummary")
 internal func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 
@@ -404,31 +408,6 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
   _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: false)
 }
 
-/// Returns the result of `print`'ing `x` into a `String`.
-///
-/// Exactly the same as `String`, but annotated 'readonly' to allow
-/// the optimizer to remove calls where results are unused.
-///
-/// This function is forbidden from being inlined because when building the
-/// standard library inlining makes us drop the special semantics.
-@_effects(readonly)
-@usableFromInline
-internal func _toStringReadOnlyStreamable<
-  T : TextOutputStreamable
->(_ x: T) -> String {
-  var result = ""
-  x.write(to: &result)
-  return result
-}
-
-@inline(never) @_effects(readonly)
-@usableFromInline
-internal func _toStringReadOnlyPrintable<
-  T : CustomStringConvertible
->(_ x: T) -> String {
-  return x.description
-}
-
 //===----------------------------------------------------------------------===//
 // `debugPrint`
 //===----------------------------------------------------------------------===//
@@ -542,26 +521,22 @@ internal struct _Stdout : TextOutputStream {
   internal mutating func write(_ string: String) {
     if string.isEmpty { return }
 
-    if _fastPath(string._guts.isASCII) {
-      defer { _fixLifetime(string) }
-      let ascii = string._guts._unmanagedASCIIView
-      _swift_stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
-      return
-    }
-
-    for c in string.utf8 {
-      _swift_stdlib_putchar_unlocked(Int32(c))
+    _ = string._withUTF8 { utf8 in
+      _swift_stdlib_fwrite_stdout(utf8.baseAddress!, 1, utf8.count)
     }
   }
 }
 
 extension String : TextOutputStream {
   /// Appends the given string to this string.
-  /// 
+  ///
   /// - Parameter other: A string to append.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func write(_ other: String) {
     self += other
+  }
+
+  public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
+    self._guts.append(_StringGuts(buffer, isASCII: true))
   }
 }
 
@@ -571,9 +546,8 @@ extension String : TextOutputStream {
 
 extension String : TextOutputStreamable {
   /// Writes the string into the given output stream.
-  /// 
+  ///
   /// - Parameter target: An output stream.
-  @inlinable // FIXME(sil-serialize-all)
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(self)
   }
@@ -583,7 +557,6 @@ extension Character : TextOutputStreamable {
   /// Writes the character into the given output stream.
   ///
   /// - Parameter target: An output stream.
-  @inlinable // FIXME(sil-serialize-all)
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(String(self))
   }
@@ -594,7 +567,6 @@ extension Unicode.Scalar : TextOutputStreamable {
   /// output stream.
   ///
   /// - Parameter target: An output stream.
-  @inlinable // FIXME(sil-serialize-all)
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(String(Character(self)))
   }
@@ -624,4 +596,3 @@ internal struct _TeeStream<
   internal mutating func _lock() { left._lock(); right._lock() }
   internal mutating func _unlock() { right._unlock(); left._unlock() }
 }
-

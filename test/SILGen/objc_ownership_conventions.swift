@@ -127,8 +127,9 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : @guaranteed $Gizmo):
   // CHECK:      [[G_COPY:%.*]] = copy_value [[G]]
   // CHECK-NEXT: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY]] : $Gizmo to $NSObject
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_COPY]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
+  // CHECK-NEXT: [[NS_G_BORROW:%.*]] = begin_borrow [[NS_G_COPY]]
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_BORROW]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_BORROW]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_BB]]([[OBJC:%.*]] : @trivial $@objc_metatype AnyObject.Type):
@@ -147,8 +148,9 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : @guaranteed $Gizmo):
   // CHECK: [[G_COPY:%.*]] = copy_value [[G]]
   // CHECK: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_COPY]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
+  // CHECK-NEXT: [[NS_G_BORROW:%.*]] = begin_borrow [[NS_G_COPY]]
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_BORROW]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_BORROW]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
   // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_BB]]([[OBJC:%.*]] : @trivial $@objc_metatype NSAnsing.Type):

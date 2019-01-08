@@ -45,8 +45,10 @@ public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
 // ---
 // CHECK-LABEL: sil @$ss13unsafeBitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $T, [[ARG1:%.*]] : @trivial $@thick U.Type):
-// CHECK:   [[RESULT:%.*]] = unchecked_bitwise_cast [[ARG0]] : $T to $U
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG0]] : $T
+// CHECK:   [[RESULT:%.*]] = unchecked_bitwise_cast [[ARG_COPY]] : $T to $U
 // CHECK:   [[RESULT_COPY:%.*]] = copy_value [[RESULT]] : $U
+// CHECK:   destroy_value [[ARG_COPY]] : $T
 // CHECK:   return [[RESULT_COPY]] : $U
 // CHECK-LABEL: } // end sil function '$ss13unsafeBitCast_2toq_x_q_mtr0_lF'
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
@@ -109,7 +111,7 @@ public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
   return lhs.rawValue == rhs.rawValue
 }
 
-public typealias _MaxBuiltinIntegerType = Builtin.Int2048
+public typealias _MaxBuiltinIntegerType = Builtin.IntLiteral
 
 public protocol _ExpressibleByBuiltinIntegerLiteral {
   init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
@@ -137,7 +139,7 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral {}
 public struct Int64 : ExpressibleByIntegerLiteral, _ExpressibleByBuiltinIntegerLiteral, Equatable {
   public var _value: Builtin.Int64
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    _value = Builtin.s_to_s_checked_trunc_Int2048_Int64(x).0
+    _value = Builtin.s_to_s_checked_trunc_IntLiteral_Int64(x).0
   }
   public typealias IntegerLiteralType = Int64
   public init(integerLiteral value: Int64) {
@@ -174,8 +176,8 @@ public enum FloatingPointSign: Int64 {
 // CHECK-OSX:   [[BORROW2:%.*]] = begin_borrow [[COPY]] : $Any
 // CHECK-OSX:   [[VAL:%.*]] = open_existential_value [[BORROW2]] : $Any to $@opened
 // CHECK-OSX:   [[COPY2:%.*]] = copy_value [[VAL]] : $@opened
-// CHECK-OSX:   destroy_value [[COPY2]] : $@opened
 // CHECK-OSX:   end_borrow [[BORROW2]] : $Any
+// CHECK-OSX:   destroy_value [[COPY2]] : $@opened
 // CHECK-OSX:   destroy_value [[COPY]] : $Any
 // CHECK-OSX-NOT:   destroy_value %0 : $Any
 // CHECK-OSX:   return undef : $AnyObject
@@ -237,10 +239,8 @@ public struct EnumIter<Base : IP> : IP, Seq {
 // CHECK:  [[MT:%.*]] = metatype $@thin EnumIter<Base.Iterator>.Type
 // CHECK:  [[FIELD:%.*]] = struct_extract %0 : $EnumSeq<Base>, #EnumSeq._base
 // CHECK:  [[COPY:%.*]] = copy_value [[FIELD]] : $Base
-// CHECK:  [[BORROW:%.*]] = begin_borrow [[COPY]] : $Base
 // CHECK:  [[WT:%.*]] = witness_method $Base, #Seq.makeIterator!1 : <Self where Self : Seq> (Self) -> () -> Self.Iterator : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
-// CHECK:  [[ITER:%.*]] = apply [[WT]]<Base>([[BORROW]]) : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
-// CHECK:  end_borrow [[BORROW]] : $Base
+// CHECK:  [[ITER:%.*]] = apply [[WT]]<Base>([[COPY]]) : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
 // CHECK:  destroy_value [[COPY]] : $Base
 // CHECK: [[FN:%.*]] = function_ref @$ss8EnumIterV5_baseAByxGx_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
 // CHECK:  [[RET:%.*]] = apply [[FN]]<Base.Iterator>([[ITER]], [[MT]]) : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>

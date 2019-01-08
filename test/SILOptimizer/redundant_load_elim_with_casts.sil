@@ -362,7 +362,7 @@ bb0:
 }
 
 class Empty {}
-struct HoldsRef { @sil_stored var c: Empty }
+struct HoldsRef { @_hasStorage var c: Empty }
 
 sil @mutator : $@convention(method) (@inout HoldsRef) -> ()
 

@@ -22,6 +22,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
+#include "swift/Strings.h"
 #include <vector>
 
 namespace swift {
@@ -56,6 +57,7 @@ public:
   void setType(BuiltType type) { Type = type; }
 
   void setVariadic() { Flags = Flags.withVariadic(true); }
+  void setAutoClosure() { Flags = Flags.withAutoClosure(true); }
   void setValueOwnership(ValueOwnership ownership) {
     Flags = Flags.withValueOwnership(ownership);
   }
@@ -73,6 +75,34 @@ public:
     return FunctionParam(Label, Type, flags);
   }
 };
+
+
+#if SWIFT_OBJC_INTEROP
+/// For a mangled node that refers to an Objective-C class or protocol,
+/// return the class or protocol name.
+static inline Optional<StringRef> getObjCClassOrProtocolName(
+    const Demangle::NodePointer &node) {
+  if (node->getKind() != Demangle::Node::Kind::Class &&
+      node->getKind() != Demangle::Node::Kind::Protocol)
+    return None;
+
+  if (node->getNumChildren() != 2)
+    return None;
+
+  // Check whether we have the __ObjC module.
+  auto moduleNode = node->getChild(0);
+  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
+      moduleNode->getText() != MANGLING_MODULE_OBJC)
+    return None;
+
+  // Check whether we have an identifier.
+  auto nameNode = node->getChild(1);
+  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
+    return None;
+
+  return nameNode->getText();
+}
+#endif
 
 /// Decode a mangled type to construct an abstract type, forming such
 /// types by invoking a custom builder.
@@ -111,6 +141,13 @@ class TypeDecoder {
 
       return decodeMangledType(Node->getChild(0));
     case NodeKind::Class:
+    {
+#if SWIFT_OBJC_INTEROP
+      if (auto mangledName = getObjCClassOrProtocolName(Node))
+        return Builder.createObjCClassType(mangledName->str());
+#endif
+      LLVM_FALLTHROUGH;
+    }
     case NodeKind::Enum:
     case NodeKind::Structure:
     case NodeKind::TypeAlias: // This can show up for imported Clang decls.
@@ -124,6 +161,20 @@ class TypeDecoder {
       return Builder.createNominalType(typeDecl, parent);
     }
     case NodeKind::BoundGenericClass:
+    {
+#if SWIFT_OBJC_INTEROP
+      if (Node->getNumChildren() >= 2) {
+        auto ChildNode = Node->getChild(0);
+        if (ChildNode->getKind() == NodeKind::Type &&
+            ChildNode->getNumChildren() > 0)
+          ChildNode = ChildNode->getChild(0);
+
+        if (auto mangledName = getObjCClassOrProtocolName(ChildNode))
+          return Builder.createObjCClassType(mangledName->str());
+      }
+#endif
+      LLVM_FALLTHROUGH;
+    }
     case NodeKind::BoundGenericEnum:
     case NodeKind::BoundGenericStructure:
     case NodeKind::BoundGenericOtherNominalType: {
@@ -253,7 +304,6 @@ class TypeDecoder {
       if (Node->getNumChildren() < 2)
         return BuiltType();
 
-      // FIXME: autoclosure is not represented in function metadata
       FunctionTypeFlags flags;
       if (Node->getKind() == NodeKind::ObjCBlock) {
         flags = flags.withConvention(FunctionMetadataConvention::Block);
@@ -528,6 +578,11 @@ private:
         && node->getKind() != NodeKind::ProtocolSymbolicReference)
       return BuiltProtocolDecl();
 
+#if SWIFT_OBJC_INTEROP
+    if (auto objcProtocolName = getObjCClassOrProtocolName(node))
+      return Builder.createObjCProtocolDecl(objcProtocolName->str());
+#endif
+
     return Builder.createProtocolDecl(node);
   }
 
@@ -564,6 +619,13 @@ private:
       case NodeKind::Owned:
         setOwnership(ValueOwnership::Owned);
         break;
+
+      case NodeKind::AutoClosureType:
+      case NodeKind::EscapingAutoClosureType: {
+        param.setAutoClosure();
+        hasParamFlags = true;
+        break;
+      }
 
       default:
         break;

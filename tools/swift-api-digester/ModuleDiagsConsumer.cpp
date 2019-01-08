@@ -49,6 +49,7 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::decl_type_change:
   case LocalDiagID::func_type_escaping_changed:
   case LocalDiagID::param_ownership_change:
+  case LocalDiagID::type_witness_change:
     return "/* Type Changes */";
   case LocalDiagID::raw_type_change:
     return "/* RawRepresentable Changes */";
@@ -77,8 +78,9 @@ static StringRef getCategoryName(uint32_t ID) {
 }
 
 swift::ide::api::
-ModuleDifferDiagsConsumer::ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff):
-    PrintingDiagnosticConsumer(llvm::errs()),
+ModuleDifferDiagsConsumer::ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff,
+                                                     llvm::raw_ostream &OS):
+    PrintingDiagnosticConsumer(OS), OS(OS),
     DiagnoseModuleDiff(DiagnoseModuleDiff) {
 #define DIAG(KIND, ID, Options, Text, Signature)                              \
   auto ID = getCategoryName(LocalDiagID::ID);                                 \
@@ -111,10 +113,10 @@ ModuleDifferDiagsConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
 
 swift::ide::api::ModuleDifferDiagsConsumer::~ModuleDifferDiagsConsumer() {
   for (auto &Pair: AllDiags) {
-    llvm::outs() << "\n";
-    llvm::outs() << Pair.first << "\n";
+    OS << "\n";
+    OS << Pair.first << "\n";
     for (auto &Item: Pair.second) {
-      llvm::outs() << Item << "\n";
+      OS << Item << "\n";
     }
   }
 }

@@ -7,9 +7,9 @@ func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {
   // CHECK: [[TMETA:%.*]] = metatype $@thick T.Type
   // CHECK: [[LITVAR:%.*]] = alloc_stack $T.IntegerLiteralType
   // CHECK: [[LITMETA:%.*]] = metatype $@thick T.IntegerLiteralType.Type
-  // CHECK: [[INTLIT:%.*]] = integer_literal $Builtin.Int2048, 17
+  // CHECK: [[INTLIT:%.*]] = integer_literal $Builtin.IntLiteral, 17
   // CHECK: [[BUILTINCONV:%.*]] = witness_method $T.IntegerLiteralType, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1
-  // CHECK: [[LIT:%.*]] = apply [[BUILTINCONV]]<T.IntegerLiteralType>([[LITVAR]], [[INTLIT]], [[LITMETA]]) : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
+  // CHECK: [[LIT:%.*]] = apply [[BUILTINCONV]]<T.IntegerLiteralType>([[LITVAR]], [[INTLIT]], [[LITMETA]]) : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.IntLiteral, @thick τ_0_0.Type) -> @out τ_0_0
   // CHECK: [[TCONV:%.*]] = witness_method $T, #ExpressibleByIntegerLiteral.init!allocator.1
   // CHECK: apply [[TCONV]]<T>([[ADDR]], [[LITVAR]], [[TMETA]]) : $@convention(witness_method: ExpressibleByIntegerLiteral) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in τ_0_0.IntegerLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
 

@@ -57,7 +57,7 @@ print("Testing...")
 var nsb = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: Hello, snowy world: 🏂☃❅❆❄︎⛄️❄️
 print("Hello, snowy world: \(nsb)")
-// CHECK-NEXT: String(Unmanaged(count: 11))
+// CHECK-NEXT: String(Unmanaged(count: 31))
 print("  \(repr(nsb))")
 
 var empty = String()
@@ -92,25 +92,28 @@ func nonASCII() {
   let nsRoundTripUTF16 = newNSUTF16 as NSString
   print("  \(repr(nsRoundTripUTF16))")
 
-  // CHECK: --- UTF-16 slicing ---
+  // CHECK-LABEL: --- UTF-16 slicing ---
   print("--- UTF-16 slicing ---")
 
   // Slicing the String allocates a new buffer
   // CHECK-NOT: String(Native(owner: @[[utf16address]],
-  // CHECK-NEXT: String(Native(owner: @[[sliceAddress:[x0-9a-f]+]], count: 6
+  // CHECK-NEXT: String(Native(owner: @[[sliceAddress:[x0-9a-f]+]], count: 18
   let i2 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 2)
   let i8 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 6)
   let slice = String(newNSUTF16[i2..<i8])
   print("  \(repr(slice))")
 
+  // CHECK-LABEL: --- NSString slicing ---
+  print("--- NSString slicing ---")
+
   // The storage of the slice implements NSString directly
   // CHECK-NOT: @[[utf16address]] = "❅❆❄︎⛄️"
-  // CHECK-NEXT: _TtGCs19_SwiftStringStorageVs6UInt16_@[[sliceAddress]] = "❅❆❄︎⛄️"
+  // CHECK-NEXT: {{.*}}StringStorage@[[sliceAddress]] = "❅❆❄︎⛄️"
   let nsSlice = slice as NSString
   print("  \(repr(nsSlice))")
 
   // Check that we can recover the original buffer
-  // CHECK-NEXT: String(Native(owner: @[[sliceAddress]], count: 6
+  // CHECK-NEXT: String(Native(owner: @[[sliceAddress]], count: 18
   print("  \(repr(nsSlice as String))")
 }
 nonASCII()
@@ -172,7 +175,7 @@ let asciiLiteral: String = "foobar"
 print("  \(repr(asciiLiteral))")
 print("  \(asciiLiteral._classify()._isASCII)")
 
-// CHECK-NEXT: String(Unmanaged(count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
+// CHECK-NEXT: String(Unmanaged(count: 31)) = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: false
 let nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
 print("  \(repr(nonASCIILiteral))")

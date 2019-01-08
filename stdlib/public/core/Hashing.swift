@@ -105,8 +105,8 @@ final internal class _SwiftEmptyNSEnumerator
 /// representing hash table storage for AnyObject elements. This is used to
 /// store bridged elements in deferred bridging scenarios.
 ///
-/// Using a dedicated class for this rather than a _HeapBuffer makes it easy to
-/// recognize these in heap dumps etc.
+/// Using a dedicated class for this rather than a _BridgingBuffer makes it easy
+/// to recognize these in heap dumps etc.
 internal final class _BridgingHashBuffer
   : ManagedBuffer<_BridgingHashBuffer.Header, AnyObject> {
   struct Header {
@@ -138,7 +138,7 @@ internal final class _BridgingHashBuffer
 
   internal subscript(bucket: _HashTable.Bucket) -> AnyObject {
     @inline(__always) get {
-      _sanityCheck(header.hashTable.isOccupied(bucket))
+      _internalInvariant(header.hashTable.isOccupied(bucket))
       defer { _fixLifetime(self) }
       return firstElementAddress[bucket.offset]
     }
@@ -146,7 +146,7 @@ internal final class _BridgingHashBuffer
 
   @inline(__always)
   internal func initialize(at bucket: _HashTable.Bucket, to object: AnyObject) {
-    _sanityCheck(header.hashTable.isOccupied(bucket))
+    _internalInvariant(header.hashTable.isOccupied(bucket))
     (firstElementAddress + bucket.offset).initialize(to: object)
     _fixLifetime(self)
   }

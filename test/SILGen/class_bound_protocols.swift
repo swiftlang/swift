@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
 
 enum Optional<T> {
   case some(T)
@@ -169,14 +169,12 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}") InheritsMutatingMethod
   x.mutateMe()
 
-  // CHECK-NEXT: [[RESULT_BOX:%.*]] = alloc_stack $Value
-  // CHECK-NEXT: [[RESULT:%.*]] = mark_uninitialized [var] [[RESULT_BOX]] : $*Value
   // CHECK-NEXT: [[X_ADDR:%.*]] = begin_access [read] [unknown] %0 : $*InheritsMutatingMethod
   // CHECK-NEXT: [[X_VALUE:%.*]] = load [copy] [[X_ADDR]] : $*InheritsMutatingMethod
   // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $InheritsMutatingMethod to $@opened("{{.*}}") InheritsMutatingMethod
   // CHECK-NEXT: [[TEMPORARY:%.*]] = alloc_stack $@opened("{{.*}}") InheritsMutatingMethod
   // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened("{{.*}}") InheritsMutatingMethod
-  // CHECK-NEXT: [[X_PAYLOAD_RELOADED:%.*]] = load [take] [[TEMPORARY]]
+  // CHECK-NEXT: [[X_PAYLOAD_RELOADED:%.*]] = load_borrow [[TEMPORARY]]
   //
   // ** *NOTE* This extra copy is here since RValue invariants enforce that all
   // ** loadable objects are actually loaded. So we form the RValue and
@@ -184,16 +182,15 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // ** pass to an in_guaranteed method. PredictableMemOpts is able to handle this
   // ** type of temporary codegen successfully.
   // CHECK-NEXT: [[TEMPORARY_2:%.*]] = alloc_stack $@opened("{{.*}}") InheritsMutatingMethod
-  // CHECK-NEXT: store [[X_PAYLOAD_RELOADED:%.*]] to [init] [[TEMPORARY_2]]
+  // CHECK-NEXT: store_borrow [[X_PAYLOAD_RELOADED:%.*]] to [[TEMPORARY_2]]
   // 
   // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") InheritsMutatingMethod, #HasMutatingMethod.mutatingCounter!getter.1 : <Self where Self : HasMutatingMethod> (Self) -> () -> Value, [[X_PAYLOAD]] : $@opened("{{.*}}") InheritsMutatingMethod : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
   // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened("{{.*}}") InheritsMutatingMethod>([[TEMPORARY_2]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
-  // CHECK-NEXT: destroy_addr [[TEMPORARY_2]] : $*@opened("{{.*}}") InheritsMutatingMethod
   // CHECK-NEXT: dealloc_stack  [[TEMPORARY_2]]
+  // CHECK-NEXT: end_borrow
+  // CHECK-NEXT: destroy_addr
   // CHECK-NEXT: end_access [[X_ADDR]] : $*InheritsMutatingMethod
-  // CHECK-NEXT: assign [[RESULT_VALUE]] to [[RESULT]] : $*Value
   // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}") InheritsMutatingMethod
-  // CHECK-NEXT: dealloc_stack [[RESULT_BOX]] : $*Value
   _ = x.mutatingCounter
 
   // CHECK-NEXT: [[X_ADDR:%.*]] = begin_access [modify] [unknown] %0 : $*InheritsMutatingMethod

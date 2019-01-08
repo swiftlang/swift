@@ -558,3 +558,7 @@ func foo() {}
 #sourceLocation()
 
 "abc \( } ) def"
+
+#assert(true)
+#assert(false)
+#assert(true, "hello world")

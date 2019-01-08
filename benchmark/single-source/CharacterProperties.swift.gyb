@@ -104,17 +104,22 @@ func setupMemo() {
 }
 
 // Precompute whole scalar set
-% for Property, Set in Properties.items():
-var ${Set}Precomputed: Set<UInt32> = {
+func precompute(_ charSet: CharacterSet) -> Set<UInt32> {
   var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if ${Set}.contains(scalar) {
-      result.insert(scalar.value)
+  for plane in 0...0x10 {
+    guard charSet.hasMember(inPlane: UInt8(plane)) else { continue }
+    let offset = plane &* 0x1_0000
+    for codePoint in 0...0xFFFF {
+      guard let scalar = UnicodeScalar(codePoint &+ offset) else { continue }
+      if charSet.contains(scalar) {
+        result.insert(scalar.value)
+      }
     }
   }
   return result
-}()
+}
+% for Property, Set in Properties.items():
+var ${Set}Precomputed: Set<UInt32> = precompute(${Set})
 func is${Property}Precomputed(_ c: Character) -> Bool {
   return ${Set}Precomputed.contains(c.firstScalar.value)
 }

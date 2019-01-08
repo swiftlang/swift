@@ -34,13 +34,8 @@ extension Dictionary {
   @usableFromInline
   @_fixed_layout
   internal struct _Variant {
-#if _runtime(_ObjC)
     @usableFromInline
-    internal var object: _BridgeStorage<_RawDictionaryStorage, _NSDictionary>
-#else
-    @usableFromInline
-    internal var object: _BridgeStorage<_RawDictionaryStorage, AnyObject>
-#endif
+    internal var object: _BridgeStorage<_RawDictionaryStorage>
 
     @inlinable
     @inline(__always)
@@ -78,31 +73,30 @@ extension Dictionary._Variant {
 
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
-    return object.isUniquelyReferenced_native_noSpareBits()
+    return object.isUniquelyReferencedUnflaggedNative()
   }
 
 #if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var isNative: Bool {
     if guaranteedNative { return true }
-    return object.isNativeWithClearedSpareBits(0)
+    return object.isUnflaggedNative
   }
 #endif
 
   @usableFromInline @_transparent
   internal var asNative: _NativeDictionary<Key, Value> {
     get {
-      return _NativeDictionary<Key, Value>(object.nativeInstance_noSpareBits)
+      return _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
     }
     set {
       self = .init(native: newValue)
     }
     _modify {
-      var native = _NativeDictionary<Key, Value>(
-        object.nativeInstance_noSpareBits)
+      var native = _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
+      defer { object = .init(native: native._storage) }
       yield &native
-      object = .init(native: native._storage)
     }
   }
 
@@ -281,6 +275,31 @@ extension Dictionary._Variant: _DictionaryBuffer {
     }
 #endif
     return asNative.value(at: index)
+  }
+}
+
+extension Dictionary._Variant {
+  @inlinable
+  internal subscript(key: Key) -> Value? {
+    @inline(__always)
+    get {
+      return lookup(key)
+    }
+    @inline(__always)
+    _modify {
+#if _runtime(_ObjC)
+      guard isNative else {
+        let cocoa = asCocoa
+        var native = _NativeDictionary<Key, Value>(
+          cocoa, capacity: cocoa.count + 1)
+        self = .init(native: native)
+        yield &native[key, isUnique: true]
+        return
+      }
+#endif
+      let isUnique = isUniquelyReferenced()
+      yield &asNative[key, isUnique: isUnique]
+    }
   }
 }
 

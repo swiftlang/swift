@@ -500,7 +500,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
 }
 
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
-  if (auto *FRI = dyn_cast<FunctionRefInst>(callee))
+  if (auto *FRI = dyn_cast<FunctionRefBaseInst>(callee))
     if (auto *F = FRI->getReferencedFunction())
       return F->hasSemanticsAttr(semantics);
   return false;
@@ -577,21 +577,40 @@ TryApplyInst *TryApplyInst::create(
                                      normalBB, errorBB, specializationInfo);
 }
 
-FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
-    : InstructionBase(Loc, F->getLoweredType()),
-      Function(F) {
+FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
+                                         SILDebugLocation DebugLoc,
+                                         SILFunction *F)
+    : LiteralInst(Kind, DebugLoc, F->getLoweredType()), f(F) {
   F->incrementRefCount();
 }
 
-FunctionRefInst::~FunctionRefInst() {
-  if (Function)
+void FunctionRefBaseInst::dropReferencedFunction() {
+  if (auto *Function = getReferencedFunction())
     Function->decrementRefCount();
+  f = nullptr;
 }
 
-void FunctionRefInst::dropReferencedFunction() {
-  if (Function)
-    Function->decrementRefCount();
-  Function = nullptr;
+FunctionRefBaseInst::~FunctionRefBaseInst() {
+  if (getReferencedFunction())
+    getReferencedFunction()->decrementRefCount();
+}
+
+FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
+    : FunctionRefBaseInst(SILInstructionKind::FunctionRefInst, Loc, F) {
+  assert(!F->isDynamicallyReplaceable());
+}
+
+DynamicFunctionRefInst::DynamicFunctionRefInst(SILDebugLocation Loc,
+                                               SILFunction *F)
+    : FunctionRefBaseInst(SILInstructionKind::DynamicFunctionRefInst, Loc, F) {
+  assert(F->isDynamicallyReplaceable());
+}
+
+PreviousDynamicFunctionRefInst::PreviousDynamicFunctionRefInst(
+    SILDebugLocation Loc, SILFunction *F)
+    : FunctionRefBaseInst(SILInstructionKind::PreviousDynamicFunctionRefInst,
+                          Loc, F) {
+  assert(!F->isDynamicallyReplaceable());
 }
 
 AllocGlobalInst::AllocGlobalInst(SILDebugLocation Loc,
@@ -646,32 +665,54 @@ IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
                                                SILType Ty, const APInt &Value,
                                                SILModule &M) {
-  auto intTy = Ty.castTo<BuiltinIntegerType>();
-  assert(intTy->getGreatestWidth() == Value.getBitWidth() &&
-         "IntegerLiteralInst APInt value's bit width doesn't match type");
-  (void)intTy;
+#ifndef NDEBUG
+  if (auto intTy = Ty.getAs<BuiltinIntegerType>()) {
+    assert(intTy->getGreatestWidth() == Value.getBitWidth() &&
+           "IntegerLiteralInst APInt value's bit width doesn't match type");
+  } else {
+    assert(Ty.is<BuiltinIntegerLiteralType>());
+    assert(Value.getBitWidth() == Value.getMinSignedBits());
+  }
+#endif
 
   void *buf = allocateLiteralInstWithBitSize<IntegerLiteralInst>(M,
                                                           Value.getBitWidth());
   return ::new (buf) IntegerLiteralInst(Loc, Ty, Value);
 }
 
+static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value) {
+  // If we're forming a fixed-width type, build using the greatest width.
+  if (auto intTy = dyn_cast<BuiltinIntegerType>(anyIntTy))
+    return APInt(intTy->getGreatestWidth(), value);
+
+  // Otherwise, build using the size of the type and then truncate to the
+  // minimum width necessary.
+  APInt result(8 * sizeof(value), value, /*signed*/ true);
+  result = result.trunc(result.getMinSignedBits());
+  return result;
+}
+
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
                                                SILType Ty, intmax_t Value,
                                                SILModule &M) {
-  auto intTy = Ty.castTo<BuiltinIntegerType>();
-  return create(Loc, Ty,
-                APInt(intTy->getGreatestWidth(), Value), M);
+  auto intTy = Ty.castTo<AnyBuiltinIntegerType>();
+  return create(Loc, Ty, getAPInt(intTy, Value), M);
+}
+
+static SILType getGreatestIntegerType(Type type, SILModule &M) {
+  if (auto intTy = type->getAs<BuiltinIntegerType>()) {
+    return SILType::getBuiltinIntegerType(intTy->getGreatestWidth(),
+                                          M.getASTContext());
+  } else {
+    assert(type->is<BuiltinIntegerLiteralType>());
+    return SILType::getBuiltinIntegerLiteralType(M.getASTContext());
+  }
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
                                                SILDebugLocation Loc,
                                                SILModule &M) {
-  return create(
-      Loc, SILType::getBuiltinIntegerType(
-               E->getType()->castTo<BuiltinIntegerType>()->getGreatestWidth(),
-               M.getASTContext()),
-      E->getValue(), M);
+  return create(Loc, getGreatestIntegerType(E->getType(), M), E->getValue(), M);
 }
 
 /// getValue - Return the APInt for the underlying integer literal.
@@ -832,31 +873,38 @@ UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
       Operands(this, src, dest), SourceType(srcType), TargetType(targetType) {}
 
 StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
-                               ArrayRef<SILValue> Elements, SILModule &M) {
+                               ArrayRef<SILValue> Elements, SILModule &M,
+                               bool HasOwnership) {
   auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
   auto Buffer = M.allocateInst(Size, alignof(StructInst));
-  return ::new(Buffer) StructInst(Loc, Ty, Elements);
+  return ::new (Buffer) StructInst(Loc, Ty, Elements, HasOwnership);
 }
 
 StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
-                       ArrayRef<SILValue> Elems)
-    : InstructionBaseWithTrailingOperands(Elems, Loc, Ty) {
+                       ArrayRef<SILValue> Elems, bool HasOwnership)
+    : InstructionBaseWithTrailingOperands(
+          Elems, Loc, Ty,
+          HasOwnership ? *mergeSILValueOwnership(Elems)
+                       : ValueOwnershipKind(ValueOwnershipKind::Any)) {
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 
 ObjectInst *ObjectInst::create(SILDebugLocation Loc, SILType Ty,
                                ArrayRef<SILValue> Elements,
-                               unsigned NumBaseElements, SILModule &M) {
+                               unsigned NumBaseElements, SILModule &M,
+                               bool HasOwnership) {
   auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
   auto Buffer = M.allocateInst(Size, alignof(ObjectInst));
-  return ::new(Buffer) ObjectInst(Loc, Ty, Elements, NumBaseElements);
+  return ::new (Buffer)
+      ObjectInst(Loc, Ty, Elements, NumBaseElements, HasOwnership);
 }
 
 TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
-                             ArrayRef<SILValue> Elements, SILModule &M) {
+                             ArrayRef<SILValue> Elements, SILModule &M,
+                             bool HasOwnership) {
   auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
   auto Buffer = M.allocateInst(Size, alignof(TupleInst));
-  return ::new(Buffer) TupleInst(Loc, Ty, Elements);
+  return ::new (Buffer) TupleInst(Loc, Ty, Elements, HasOwnership);
 }
 
 bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
@@ -1281,11 +1329,20 @@ SwitchValueInst *SwitchValueInst::create(
   return ::new (buf) SwitchValueInst(Loc, Operand, DefaultBB, Cases, BBs);
 }
 
+SelectValueInst::SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand,
+                                 SILType Type, SILValue DefaultResult,
+                                 ArrayRef<SILValue> CaseValuesAndResults,
+                                 bool HasOwnership)
+    : InstructionBaseWithTrailingOperands(
+          Operand, CaseValuesAndResults, DebugLoc, Type,
+          HasOwnership ? *mergeSILValueOwnership(CaseValuesAndResults)
+                       : ValueOwnershipKind(ValueOwnershipKind::Any)) {}
+
 SelectValueInst *
 SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
                         SILValue DefaultResult,
                         ArrayRef<std::pair<SILValue, SILValue>> CaseValues,
-                        SILFunction &F) {
+                        SILModule &M, bool HasOwnership) {
   // Allocate enough room for the instruction with tail-allocated data for all
   // the case values and the SILSuccessor arrays. There are `CaseBBs.size()`
   // SILValues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
@@ -1299,17 +1356,17 @@ SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
     CaseValuesAndResults.push_back(DefaultResult);
 
   auto Size = totalSizeToAlloc<swift::Operand>(CaseValuesAndResults.size() + 1);
-  auto Buf = F.getModule().allocateInst(Size, alignof(SelectValueInst));
+  auto Buf = M.allocateInst(Size, alignof(SelectValueInst));
   return ::new (Buf) SelectValueInst(Loc, Operand, Type, DefaultResult,
-                                     CaseValuesAndResults);
+                                     CaseValuesAndResults, HasOwnership);
 }
 
 template <typename SELECT_ENUM_INST>
 SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
     SILDebugLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
     ArrayRef<std::pair<EnumElementDecl *, SILValue>> DeclsAndValues,
-    SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
-    ProfileCounter DefaultCount) {
+    SILModule &Mod, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    ProfileCounter DefaultCount, bool HasOwnership) {
   // Allocate enough room for the instruction with tail-allocated
   // EnumElementDecl and operand arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` values.
@@ -1326,31 +1383,34 @@ SELECT_ENUM_INST *SelectEnumInstBase::createSelectEnum(
   auto Size = SELECT_ENUM_INST::template
     totalSizeToAlloc<swift::Operand, EnumElementDecl*>(CaseValues.size() + 1,
                                                        CaseDecls.size());
-  auto Buf = F.getModule().allocateInst(Size + sizeof(ProfileCounter),
-                                        alignof(SELECT_ENUM_INST));
-  return ::new (Buf) SELECT_ENUM_INST(Loc, Operand, Ty, bool(DefaultValue),
-                                      CaseValues, CaseDecls, CaseCounts,
-                                      DefaultCount);
+  auto Buf = Mod.allocateInst(Size + sizeof(ProfileCounter),
+                              alignof(SELECT_ENUM_INST));
+  return ::new (Buf)
+      SELECT_ENUM_INST(Loc, Operand, Ty, bool(DefaultValue), CaseValues,
+                       CaseDecls, CaseCounts, DefaultCount, HasOwnership);
 }
 
 SelectEnumInst *SelectEnumInst::create(
     SILDebugLocation Loc, SILValue Operand, SILType Type, SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILFunction &F,
-    Optional<ArrayRef<ProfileCounter>> CaseCounts,
-    ProfileCounter DefaultCount) {
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILModule &M,
+    Optional<ArrayRef<ProfileCounter>> CaseCounts, ProfileCounter DefaultCount,
+    bool HasOwnership) {
   return createSelectEnum<SelectEnumInst>(Loc, Operand, Type, DefaultValue,
-                                          CaseValues, F, CaseCounts,
-                                          DefaultCount);
+                                          CaseValues, M, CaseCounts,
+                                          DefaultCount, HasOwnership);
 }
 
 SelectEnumAddrInst *SelectEnumAddrInst::create(
     SILDebugLocation Loc, SILValue Operand, SILType Type, SILValue DefaultValue,
-    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILFunction &F,
+    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILModule &M,
     Optional<ArrayRef<ProfileCounter>> CaseCounts,
     ProfileCounter DefaultCount) {
-  return createSelectEnum<SelectEnumAddrInst>(Loc, Operand, Type, DefaultValue,
-                                              CaseValues, F, CaseCounts,
-                                              DefaultCount);
+  // We always pass in false since SelectEnumAddrInst doesn't use ownership. We
+  // have to pass something in since SelectEnumInst /does/ need to consider
+  // ownership and both use the same creation function.
+  return createSelectEnum<SelectEnumAddrInst>(
+      Loc, Operand, Type, DefaultValue, CaseValues, M, CaseCounts, DefaultCount,
+      false /*HasOwnership*/);
 }
 
 SwitchEnumInstBase::SwitchEnumInstBase(
@@ -1751,9 +1811,13 @@ OpenExistentialAddrInst::OpenExistentialAddrInst(
     OpenedExistentialAccess AccessKind)
     : UnaryInstructionBase(DebugLoc, Operand, SelfTy), ForAccess(AccessKind) {}
 
-OpenExistentialRefInst::OpenExistentialRefInst(
-    SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(DebugLoc, Operand, Ty) {
+OpenExistentialRefInst::OpenExistentialRefInst(SILDebugLocation DebugLoc,
+                                               SILValue Operand, SILType Ty,
+                                               bool HasOwnership)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty,
+                           HasOwnership
+                               ? Operand.getOwnershipKind()
+                               : ValueOwnershipKind(ValueOwnershipKind::Any)) {
   assert(Operand->getType().isObject() && "Operand must be an object.");
   assert(Ty.isObject() && "Result type must be an object type.");
 }

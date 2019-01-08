@@ -24,7 +24,7 @@ using namespace swift;
 SILBuilder::SILBuilder(SILGlobalVariable *GlobVar,
                        SmallVectorImpl<SILInstruction *> *InsertedInstrs)
     : TempContext(GlobVar->getModule(), InsertedInstrs), C(TempContext),
-      F(nullptr) {
+      F(nullptr), hasOwnership(false) {
   setInsertionPoint(&GlobVar->StaticInitializerBlock);
 }
 
@@ -566,4 +566,17 @@ DebugValueAddrInst *SILBuilder::createDebugValueAddr(SILLocation Loc,
   DebugLocOverrideRAII LocOverride{*this, None};
   return insert(DebugValueAddrInst::create(getSILDebugLocation(Loc), src,
                                            getModule(), Var));
+}
+
+void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
+                                           function_ref<void(SILValue)> &&fun) {
+  if (original->getType().isAddress()) {
+    original = createLoadBorrow(loc, original);
+  } else {
+    original = createBeginBorrow(loc, original);
+  }
+
+  fun(original);
+
+  createEndBorrow(loc, original);
 }

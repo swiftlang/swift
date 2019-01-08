@@ -39,7 +39,7 @@ struct ContainerContainer {
 }
 
 class MyArrayStorage {
-  @sil_stored var header: Int
+  @_hasStorage var header: Int
 
   init()
   deinit
@@ -478,7 +478,7 @@ struct My2dArray<T> {
 
 
 struct MyInt {
-  @sil_stored var _value: Builtin.Int64
+  @_hasStorage var _value: Builtin.Int64
   init(_ value: Int16)
 }
 

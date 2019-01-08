@@ -21,13 +21,11 @@ func test1() {
   // CHECK: [[T0:%.*]] = metatype $@thick D.Type
   // CHECK: [[CTOR:%.*]] = function_ref @$s10assignment1DC{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[D:%.*]] = apply [[CTOR]]([[T0]])
-  // CHECK: [[BORROWED_D:%.*]] = begin_borrow [[D]]
   // CHECK: [[T0:%.*]] = metatype $@thick C.Type
   // CHECK: [[CTOR:%.*]] = function_ref @$s10assignment1CC{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[C:%.*]] = apply [[CTOR]]([[T0]]) : $@convention(method) (@thick C.Type) -> @owned C
-  // CHECK: [[SETTER:%.*]] = class_method [[BORROWED_D]] : $D,  #D.child!setter.1
-  // CHECK: apply [[SETTER]]([[C]], [[BORROWED_D]])
-  // CHECK: end_borrow [[BORROWED_D]]
+  // CHECK: [[SETTER:%.*]] = class_method [[D]] : $D,  #D.child!setter.1
+  // CHECK: apply [[SETTER]]([[C]], [[D]])
   // CHECK: destroy_value [[D]]
   D().child = C()
 }

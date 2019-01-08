@@ -94,9 +94,10 @@ public:
 };
 } // namespace swift
 
+namespace llvm {
 // Use the same DenseMapInfo for StorageAccessInfo as for AccessedStorage. None
 // of the subclass bitfields participate in the Key.
-template <> struct llvm::DenseMapInfo<swift::StorageAccessInfo> {
+template <> struct DenseMapInfo<swift::StorageAccessInfo> {
   static swift::StorageAccessInfo getEmptyKey() {
     auto key = DenseMapInfo<swift::AccessedStorage>::getEmptyKey();
     return static_cast<swift::StorageAccessInfo &>(key);
@@ -114,6 +115,7 @@ template <> struct llvm::DenseMapInfo<swift::StorageAccessInfo> {
     return DenseMapInfo<swift::AccessedStorage>::isEqual(LHS, RHS);
   }
 };
+}
 
 namespace swift {
 /// The per-function result of AccessedStorageAnalysis.

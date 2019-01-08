@@ -725,12 +725,6 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
 // filter()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("filter/Sequence/Dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.filter { _ in false }
-  expectCustomizable(tester, tester.log.filter)
-}
-
 SequenceTypeTests.test("filter/Sequence/Semantics") {
   for test in filterTests {
     for underestimatedCountBehavior in [
@@ -838,9 +832,7 @@ func callGenericSequenceMap<S : Sequence, T>(
   return result
 }
 
-% for Implementation in ['Default', 'Custom']:
-
-%   for dispatch in ['Static', 'Generic']:
+% for dispatch in ['Static', 'Generic']:
 
 SequenceTypeTests.test(
   "map/Sequence/${Implementation}Implementation/${dispatch}"
@@ -857,9 +849,6 @@ SequenceTypeTests.test(
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-%     if Implementation == 'Custom':
-      MinimalSequenceWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled = 0
-%     end
       var result = call${dispatch}SequenceMap(s) {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32> in
         _blackHole(closureLifetimeTracker)
@@ -868,20 +857,13 @@ SequenceTypeTests.test(
       }
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
-%     if Implementation == 'Custom':
-      expectEqual(
-        1, MinimalSequenceWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
-%     end
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
-      expectEqual(
-        test.sequence.count, timesClosureWasCalled,
+      expectEqual(        test.sequence.count, timesClosureWasCalled,
         "map() should be eager and should only call its predicate"
         + "once per element")
     }
   }
 }
-
-%   end
 
 % end
 
@@ -959,91 +941,6 @@ SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
         "flatMap() should not reserve capacity")
     }
   }
-}
-
-//===----------------------------------------------------------------------===//
-// forEach()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("forEach/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.forEach { print($0) }
-  expectCustomizable(tester, tester.log.forEach)
-}
-
-//===----------------------------------------------------------------------===//
-// dropFirst()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("dropFirst/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.dropFirst(1)
-  expectCustomizable(tester, tester.log.dropFirst)
-}
-
-//===----------------------------------------------------------------------===//
-// dropLast()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("dropLast/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.dropLast(1)
-  expectCustomizable(tester, tester.log.dropLast)
-}
-
-//===----------------------------------------------------------------------===//
-// drop(while:)
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("drop(while:)/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.drop { _ in return false }
-  expectCustomizable(tester, tester.log.dropWhile)
-}
-
-//===----------------------------------------------------------------------===//
-// prefix()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("prefix/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.prefix(1)
-  expectCustomizable(tester, tester.log.prefixMaxLength)
-}
-
-SequenceTypeTests.test("prefix/drop/dispatch") {
-  let xs = sequence(first: 1, next: {$0 < 10 ? $0 + 1 : nil})
-  expectEqualSequence([], Array(xs.prefix(3).drop(while: {$0 < 7})))
-}
-
-//===----------------------------------------------------------------------===//
-// prefix(while:)
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("prefix(while:)/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.prefix { _ in return false }
-  expectCustomizable(tester, tester.log.prefixWhile)
-}
-
-//===----------------------------------------------------------------------===//
-// suffix()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("suffix/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.suffix(1)
-  expectCustomizable(tester, tester.log.suffixMaxLength)
-}
-
-//===----------------------------------------------------------------------===//
-// split()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("Sequence/split/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.split { $0.value == 1 }
-  expectCustomizable(tester, tester.log.split)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1150,6 +1047,20 @@ SequenceTypeTests.test("underestimatedCount/Sequence/CustomImplementation") {
     let s = SequenceWithCustomUnderestimatedCount(underestimatedCount: 42)
     expectEqual(42, callGenericUnderestimatedCount(s))
   }
+}
+
+//===----------------------------------------------------------------------===//
+// withContiguousStorageIfAvailable()
+//===----------------------------------------------------------------------===//
+SequenceTypeTests.test("withContiguousMutableStorageIfAvailable")
+.code {
+  let s = [ 1, 2, 3 ].map(OpaqueValue.init)
+  let tester = SequenceLog.dispatchTester(s)
+  let result = tester.withContiguousStorageIfAvailable { buf in
+    buf.reduce(0) { $0 + $1.value }
+  }
+  expectEqual(6, result)
+  expectCustomizable(tester, tester.log.withContiguousStorageIfAvailable)
 }
 
 //===----------------------------------------------------------------------===//

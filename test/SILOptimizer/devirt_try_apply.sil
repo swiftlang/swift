@@ -107,7 +107,7 @@ bb0(%0 : $Base):
 }
 
 
-sil [transparent] [serialized] @_TFVs5Int32CfMS_FT22_builtinIntegerLiteralBi2048__S_ : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32
+sil [transparent] [serialized] @_TFVs5Int32CfMS_FT22_builtinIntegerLiteralBI__S_ : $@convention(thin) (Builtin.IntLiteral, @thin Int32.Type) -> Int32
 
 
 sil hidden [noinline] @_TFC16devirt_try_apply4Base4boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error) {

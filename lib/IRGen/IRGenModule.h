@@ -82,6 +82,7 @@ namespace swift {
   class AssociatedConformance;
   class AssociatedType;
   class ASTContext;
+  class BaseConformance;
   class BraceStmt;
   class CanType;
   class LinkLibrary;
@@ -90,6 +91,7 @@ namespace swift {
   class NormalProtocolConformance;
   class ProtocolConformance;
   class ProtocolCompositionType;
+  class RootProtocolConformance;
   struct SILDeclRef;
   class SILGlobalVariable;
   class SILModule;
@@ -109,7 +111,11 @@ namespace irgen {
   class Address;
   class ClangTypeConverter;
   class ClassMetadataLayout;
+  class ConformanceDescription;
   class ConformanceInfo;
+  class ConstantInitBuilder;
+  struct ConstantIntegerLiteral;
+  class ConstantIntegerLiteralMap;
   class DebugTypeInfo;
   class EnumImplStrategy;
   class EnumMetadataLayout;
@@ -233,13 +239,7 @@ private:
 
   llvm::SmallPtrSet<SILFunction*, 4> LazilyEmittedFunctions;
 
-  struct FieldTypeMetadata {
-    IRGenModule *IGM;
-    std::vector<CanType> fieldTypes;
-  };
-
-  /// Field types we need to verify are present.
-  llvm::SmallVector<FieldTypeMetadata, 4> LazyFieldTypes;
+  llvm::SetVector<SILFunction*> DynamicReplacements;
 
   /// SIL functions that we need to emit lazily.
   llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;
@@ -336,6 +336,9 @@ public:
 
   void emitEagerClassInitialization();
 
+  // Emit the code to replace dynamicReplacement(for:) functions.
+  void emitDynamicReplacements();
+
   /// Checks if the metadata of \p Nominal can be emitted lazily.
   ///
   /// If yes, \p Nominal is added to eligibleLazyMetadata and true is returned.
@@ -346,12 +349,21 @@ public:
 
   void addLazyFunction(SILFunction *f);
 
+  void addDynamicReplacement(SILFunction *f) { DynamicReplacements.insert(f); }
+
   void forceLocalEmitOfLazyFunction(SILFunction *f) {
     DefaultIGMForFunction[f] = CurrentIGM;
   }
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
+  }
+
+  void noteUseOfTypeMetadata(Type type) {
+    type.visit([&](Type t) {
+      if (auto *nominal = t->getAnyNominal())
+        noteUseOfTypeMetadata(nominal);
+    });
   }
 
   void noteUseOfTypeContextDescriptor(NominalTypeDecl *type,
@@ -373,9 +385,6 @@ public:
   /// Adds \p Conf to LazyWitnessTables if it has not been added yet.
   void addLazyWitnessTable(const ProtocolConformance *Conf);
 
-  void addFieldTypes(ArrayRef<CanType> fieldTypes, IRGenModule *IGM) {
-    LazyFieldTypes.push_back({IGM, {fieldTypes.begin(), fieldTypes.end()}});
-  }
 
   void addClassForEagerInitialization(ClassDecl *ClassDecl);
 
@@ -445,48 +454,6 @@ enum class MangledTypeRefRole {
   /// The mangled type reference is used for a default associated type
   /// witness.
   DefaultAssociatedTypeWitness,
-};
-
-/// The description of a protocol conformance, including its witness table
-/// and any additional information needed to produce the protocol conformance
-/// descriptor.
-struct ConformanceDescription {
-  /// The conformance itself.
-  const NormalProtocolConformance *conformance;
-
-  /// The witness table.
-  SILWitnessTable *wtable;
-
-  /// The witness table pattern, which is also a complete witness table
-  /// when \c requiresSpecialization is \c false.
-  llvm::Constant *pattern;
-
-  /// The size of the witness table.
-  const uint16_t witnessTableSize;
-
-  /// The private size of the witness table, allocated
-  const uint16_t witnessTablePrivateSize;
-
-  /// Whether this witness table requires runtime specialization.
-  const unsigned requiresSpecialization : 1;
-
-  /// The instantiation function, to be run at the end of witness table
-  /// instantiation.
-  llvm::Constant *instantiationFn = nullptr;
-
-  /// The resilient witnesses, if any.
-  SmallVector<llvm::Constant *, 4> resilientWitnesses;
-
-  ConformanceDescription(const NormalProtocolConformance *conformance,
-                         SILWitnessTable *wtable,
-                         llvm::Constant *pattern,
-                         uint16_t witnessTableSize,
-                         uint16_t witnessTablePrivateSize,
-                         bool requiresSpecialization)
-    : conformance(conformance), wtable(wtable), pattern(pattern),
-      witnessTableSize(witnessTableSize),
-      witnessTablePrivateSize(witnessTablePrivateSize),
-      requiresSpecialization(requiresSpecialization) { }
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -629,6 +596,15 @@ public:
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
+  llvm::Type *FloatTy;
+  llvm::Type *DoubleTy;
+  llvm::StructType *DynamicReplacementsTy; // { i8**, i8* }
+  llvm::PointerType *DynamicReplacementsPtrTy;
+
+  llvm::StructType *DynamicReplacementLinkEntryTy; // %link_entry = { i8*, %link_entry*}
+  llvm::PointerType
+      *DynamicReplacementLinkEntryPtrTy; // %link_entry*
+  llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -649,7 +625,7 @@ public:
   /// Get the bit width of an integer type for the target platform.
   unsigned getBuiltinIntegerWidth(BuiltinIntegerType *t);
   unsigned getBuiltinIntegerWidth(BuiltinIntegerWidth w);
-  
+
   Size getPointerSize() const { return PtrSize; }
   Alignment getPointerAlignment() const {
     // We always use the pointer's width as its swift ABI alignment.
@@ -721,6 +697,13 @@ public:
   llvm::Type *getValueWitnessTy(ValueWitness index);
   Signature getValueWitnessSignature(ValueWitness index);
 
+  llvm::StructType *getIntegerLiteralTy();
+
+  llvm::StructType *getValueWitnessTableTy();
+  llvm::StructType *getEnumValueWitnessTableTy();
+  llvm::PointerType *getValueWitnessTablePtrTy();
+  llvm::PointerType *getEnumValueWitnessTablePtrTy();
+
   void unimplemented(SourceLoc, StringRef Message);
   LLVM_ATTRIBUTE_NORETURN
   void fatal_unimplemented(SourceLoc, StringRef Message);
@@ -750,7 +733,10 @@ private:
   llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
   llvm::FunctionType *AssociatedTypeWitnessTableAccessFunctionTy = nullptr;
   llvm::StructType *GenericWitnessTableCacheTy = nullptr;
-  
+  llvm::StructType *IntegerLiteralTy = nullptr;
+  llvm::PointerType *ValueWitnessTablePtrTy = nullptr;
+  llvm::PointerType *EnumValueWitnessTablePtrTy = nullptr;
+
   llvm::DenseMap<llvm::Type *, SpareBitVector> SpareBitsForTypes;
   
 //--- Types -----------------------------------------------------------------
@@ -802,6 +788,7 @@ public:
   clang::CodeGen::CodeGenModule &getClangCGM() const;
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
+  bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
@@ -852,15 +839,14 @@ public:
                                            ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                           SILLocation diagLoc);
-  llvm::Constant *getAddrOfAssociatedTypeGenericParamRef(GenericSignature *sig,
-                                                    CanDependentMemberType dmt);
   ConstantReference getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto);
+
+  ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
 
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
-  void addFieldTypes(ArrayRef<CanType> fieldTypes);
-  void addProtocolConformance(ConformanceDescription conformance);
+  void addProtocolConformance(ConformanceDescription &&conformance);
 
   llvm::Constant *emitSwiftProtocols();
   llvm::Constant *emitProtocolConformances();
@@ -913,6 +899,9 @@ private:
                               StringRef funcName,
                               CopyAddrHelperGenerator generator);
 
+  llvm::Constant *getOrCreateGOTEquivalent(llvm::Constant *global,
+                                           LinkEntity entity);
+                                           
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
@@ -926,6 +915,8 @@ private:
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>> FieldNames;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
   llvm::StringMap<llvm::Constant*> ObjCMethodNames;
+
+  std::unique_ptr<ConstantIntegerLiteralMap> ConstantIntegerLiterals;
 
   /// Maps to constant swift 'String's.
   llvm::StringMap<llvm::Constant*> GlobalConstantStrings;
@@ -958,7 +949,7 @@ private:
   /// List of non-ObjC protocols described by this module.
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate descriptors for.
-  SmallVector<ConformanceDescription, 4> ProtocolConformances;
+  std::vector<ConformanceDescription> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
   SmallVector<NominalTypeDecl *, 4> RuntimeResolvableTypes;
   /// List of ExtensionDecls corresponding to the generated
@@ -1027,21 +1018,38 @@ public:
   /// without knowledge of their contents. This includes imported structs
   /// and fixed-size multi-payload enums.
   llvm::SetVector<const NominalTypeDecl *> OpaqueTypes;
-  /// Imported classes referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<const ClassDecl *> ImportedClasses;
-  /// Imported protocols referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<const ProtocolDecl *> ImportedProtocols;
   /// Imported structs referenced by types in this module when emitting
   /// reflection metadata.
   llvm::SetVector<const StructDecl *> ImportedStructs;
 
   llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  llvm::Constant *getMangledAssociatedConformance(
+                                  const NormalProtocolConformance *conformance,
+                                  const AssociatedConformance &requirement);
   llvm::Constant *getAddrOfStringForTypeRef(StringRef mangling,
                                             MangledTypeRefRole role);
   llvm::Constant *getAddrOfStringForTypeRef(const SymbolicMangling &mangling,
                                             MangledTypeRefRole role);
+
+  /// Retrieve the address of a mangled string used for some kind of metadata
+  /// reference.
+  ///
+  /// \param symbolName The name of the symbol that describes the metadata
+  /// being referenced.
+  /// \param alignment If non-zero, the alignment of the requested variable.
+  /// \param shouldSetLowBit Whether to set the low bit of the result
+  /// constant, which is used by some clients to indicate that the result is
+  /// a mangled name.
+  /// \param body The body of a function that will create the metadata value
+  /// itself, given a constant building and producing a future for the
+  /// initializer.
+  /// \returns the address of the global variable describing this metadata.
+  llvm::Constant *getAddrOfStringForMetadataRef(
+      StringRef symbolName,
+      unsigned alignment,
+      bool shouldSetLowBit,
+      llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> body);
+
   llvm::Constant *getAddrOfFieldName(StringRef Name);
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
@@ -1054,7 +1062,7 @@ public:
   llvm::Constant *getAssociatedTypeWitness(CanType type,
                                            bool inProtocolContext);
 
-  void emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance);
+  void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
   void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
 
   /// Emit a reflection metadata record for a builtin type referenced
@@ -1183,6 +1191,7 @@ public:
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
+  llvm::Constant *getInt32(uint32_t value);
   llvm::Constant *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);
   llvm::Constant *getBool(bool condition);
@@ -1273,7 +1282,9 @@ public:
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfObjCModuleContextDescriptor();
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
-  ConstantReference getAddrOfParentContextDescriptor(DeclContext *from);
+  ConstantReference getAddrOfParentContextDescriptor(DeclContext *from,
+                                                     bool fromAnonymousContext);
+  llvm::Constant *getAddrOfGenericEnvironment(CanGenericSignature signature);
   llvm::Constant *getAddrOfProtocolRequirementsBaseDescriptor(
                                                   ProtocolDecl *proto);
   llvm::GlobalValue *defineProtocolRequirementsBaseDescriptor(
@@ -1289,11 +1300,16 @@ public:
   llvm::GlobalValue *defineAssociatedConformanceDescriptor(
                                               AssociatedConformance conformance,
                                               llvm::Constant *definition);
+  llvm::Constant *getAddrOfBaseConformanceDescriptor(
+                                                 BaseConformance conformance);
+  llvm::GlobalValue *defineBaseConformanceDescriptor(
+                                              BaseConformance conformance,
+                                              llvm::Constant *definition);
 
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfProtocolConformanceDescriptor(
-                                  const NormalProtocolConformance *conformance,
+                                  const RootProtocolConformance *conformance,
                                   ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfPropertyDescriptor(AbstractStorageDecl *D,
                                       ConstantInit definition = ConstantInit());
@@ -1302,24 +1318,30 @@ public:
   Address getAddrOfObjCClassRef(ClassDecl *D);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
                                            ForDefinition_t forDefinition);
-  llvm::Function *getAddrOfSILFunction(SILFunction *f,
-                                       ForDefinition_t forDefinition);
+
+  llvm::Function *getAddrOfObjCMetadataUpdateFunction(ClassDecl *D,
+                                                      ForDefinition_t forDefinition);
+
+  llvm::Function *
+  getAddrOfSILFunction(SILFunction *f, ForDefinition_t forDefinition,
+                       bool isDynamicallyReplaceableImplementation = false,
+                       bool shouldCallPreviousImplementation = false);
+
+  void emitDynamicReplacementOriginalFunctionThunk(SILFunction *f);
+
   llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      const TypeInfo &ti,
                                      ForDefinition_t forDefinition);
-  llvm::Function *getAddrOfWitnessTableAccessFunction(
-                                           const NormalProtocolConformance *C,
-                                               ForDefinition_t forDefinition);
   llvm::Function *getAddrOfWitnessTableLazyAccessFunction(
-                                           const NormalProtocolConformance *C,
+                                               const NormalProtocolConformance *C,
                                                CanType conformingType,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTableLazyCacheVariable(
-                                           const NormalProtocolConformance *C,
+                                               const NormalProtocolConformance *C,
                                                CanType conformingType,
                                                ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
+  llvm::Constant *getAddrOfWitnessTable(const RootProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfWitnessTablePattern(
                                       const NormalProtocolConformance *C,
@@ -1368,6 +1390,10 @@ public:
   void emitSharedContextDescriptor(DeclContext *dc);
 
   void ensureRelativeSymbolCollocation(SILWitnessTable &wt);
+
+  llvm::GlobalVariable *
+  getGlobalForDynamicallyReplaceableThunk(LinkEntity &entity, llvm::Type *type,
+                                          ForDefinition_t forDefinition);
 
 private:
   llvm::Constant *

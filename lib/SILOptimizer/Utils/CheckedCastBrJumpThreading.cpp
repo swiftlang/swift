@@ -249,8 +249,8 @@ modifyCFGForFailurePreds(Optional<BasicBlockCloner> &Cloner) {
 
   assert(!Cloner.hasValue());
   Cloner.emplace(CCBBlock);
-  Cloner->clone();
-  SILBasicBlock *TargetFailureBB = Cloner->getDestBB();
+  Cloner->cloneBlock();
+  SILBasicBlock *TargetFailureBB = Cloner->getNewBB();
   auto *TI = TargetFailureBB->getTerminator();
   SILBuilderWithScope Builder(TI);
   // This BB copy branches to a FailureBB.
@@ -286,8 +286,8 @@ modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
       // for all SuccessPreds.
       assert(!Cloner.hasValue());
       Cloner.emplace(CCBBlock);
-      Cloner->clone();
-      SILBasicBlock *TargetSuccessBB = Cloner->getDestBB();
+      Cloner->cloneBlock();
+      SILBasicBlock *TargetSuccessBB = Cloner->getNewBB();
       auto *TI = TargetSuccessBB->getTerminator();
       SILBuilderWithScope Builder(TI);
       // This BB copy branches to SuccessBB.
@@ -684,11 +684,11 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     edit->modifyCFGForUnknownPreds();
 
     if (Cloner.hasValue()) {
-      updateSSAAfterCloning(*Cloner.getPointer(), Cloner->getDestBB(),
+      updateSSAAfterCloning(*Cloner.getPointer(), Cloner->getNewBB(),
                             edit->CCBBlock);
 
-      if (!Cloner->getDestBB()->pred_empty())
-        BlocksForWorklist.push_back(Cloner->getDestBB());
+      if (!Cloner->getNewBB()->pred_empty())
+        BlocksForWorklist.push_back(Cloner->getNewBB());
     }
     if (!edit->CCBBlock->pred_empty())
       BlocksForWorklist.push_back(edit->CCBBlock);

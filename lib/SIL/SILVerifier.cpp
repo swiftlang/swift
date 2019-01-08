@@ -1391,7 +1391,7 @@ public:
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
   }
   
-  void checkFunctionRefInst(FunctionRefInst *FRI) {
+  void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
     require(!fnType->getExtInfo().hasContext(),
@@ -1401,6 +1401,22 @@ public:
     // we may not have linked everything yet.
 
     SILFunction *RefF = FRI->getReferencedFunction();
+
+    if (isa<FunctionRefInst>(FRI))
+      require(
+          !RefF->isDynamicallyReplaceable(),
+          "function_ref cannot reference a [dynamically_replaceable] function");
+    else if (isa<PreviousDynamicFunctionRefInst>(FRI)) {
+      require(!RefF->isDynamicallyReplaceable(),
+              "previous_function_ref cannot reference a "
+              "[dynamically_replaceable] function");
+      require(RefF->getDynamicallyReplacedFunction(),
+              "previous_function_ref must reference a "
+              "[dynamic_replacement_for:...] function");
+    } else if (isa<DynamicFunctionRefInst>(FRI))
+      require(RefF->isDynamicallyReplaceable(),
+              "dynamic_function_ref cannot reference a "
+              "[dynamically_replaceable] function");
 
     // In canonical SIL, direct reference to a shared_external declaration
     // is an error; we should have deserialized a body. In raw SIL, we may
@@ -1425,6 +1441,18 @@ public:
     }
 
     verifySILFunctionType(fnType);
+  }
+
+  void checkFunctionRefInst(FunctionRefInst *FRI) {
+    checkFunctionRefBaseInst(FRI);
+  }
+
+  void checkDynamicFunctionRefInst(DynamicFunctionRefInst *FRI) {
+    checkFunctionRefBaseInst(FRI);
+  }
+
+  void checkPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI) {
+    checkFunctionRefBaseInst(FRI);
   }
 
   void checkAllocGlobalInst(AllocGlobalInst *AGI) {
@@ -1468,7 +1496,7 @@ public:
   }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {
-    require(ILI->getType().is<BuiltinIntegerType>(),
+    require(ILI->getType().is<AnyBuiltinIntegerType>(),
             "invalid integer literal type");
   }
 
@@ -4018,6 +4046,13 @@ public:
     require(!(isa<MethodInst>(branchArg) &&
               cast<MethodInst>(branchArg)->getMember().isForeign),
         "branch argument cannot be a witness_method or an objc method_inst");
+    require(!(branchArg->getType().is<SILFunctionType>() &&
+              branchArg->getType()
+                      .castTo<SILFunctionType>()
+                      ->getExtInfo()
+                      .getRepresentation() ==
+                  SILFunctionTypeRepresentation::ObjCMethod),
+            "branch argument cannot be a objective-c method");
     return branchArg->getType() == bbArg->getType();
   }
 
@@ -4425,12 +4460,7 @@ public:
             "have at least one argument for self.");
   }
 
-  /// Verify the various control-flow-sensitive rules of SIL:
-  ///
-  /// - stack allocations and deallocations must obey a stack discipline
-  /// - accesses must be uniquely ended
-  /// - flow-sensitive states must be equivalent on all paths into a block
-  void verifyFlowSensitiveRules(SILFunction *F) {
+  struct VerifyFlowSensitiveRulesDetails {
     enum CFGState {
       /// No special rules are in play.
       Normal,
@@ -4439,6 +4469,7 @@ public:
       /// We've followed the unwind edge of a yield.
       YieldUnwind
     };
+
     struct BBState {
       std::vector<SingleValueInstruction*> Stack;
 
@@ -4447,17 +4478,24 @@ public:
 
       CFGState CFG = Normal;
     };
+  };
 
+  /// Verify the various control-flow-sensitive rules of SIL:
+  ///
+  /// - stack allocations and deallocations must obey a stack discipline
+  /// - accesses must be uniquely ended
+  /// - flow-sensitive states must be equivalent on all paths into a block
+  void verifyFlowSensitiveRules(SILFunction *F) {
     // Do a breath-first search through the basic blocks.
     // Note that we intentionally don't verify these properties in blocks
     // that can't be reached from the entry block.
-    llvm::DenseMap<SILBasicBlock*, BBState> visitedBBs;
+    llvm::DenseMap<SILBasicBlock*, VerifyFlowSensitiveRulesDetails::BBState> visitedBBs;
     SmallVector<SILBasicBlock*, 16> Worklist;
     visitedBBs.try_emplace(&*F->begin());
     Worklist.push_back(&*F->begin());
     while (!Worklist.empty()) {
       SILBasicBlock *BB = Worklist.pop_back_val();
-      BBState state = visitedBBs[BB];
+      VerifyFlowSensitiveRulesDetails::BBState state = visitedBBs[BB];
       for (SILInstruction &i : *BB) {
         CurInstruction = &i;
 
@@ -4492,16 +4530,16 @@ public:
                     "return with operations still active");
 
             if (isa<UnwindInst>(term)) {
-              require(state.CFG == YieldUnwind,
+              require(state.CFG == VerifyFlowSensitiveRulesDetails::YieldUnwind,
                       "encountered 'unwind' when not on unwind path");
             } else {
-              require(state.CFG != YieldUnwind,
+              require(state.CFG != VerifyFlowSensitiveRulesDetails::YieldUnwind,
                       "encountered 'return' or 'throw' when on unwind path");
               if (isa<ReturnInst>(term) &&
                   F->getLoweredFunctionType()->getCoroutineKind() ==
                     SILCoroutineKind::YieldOnce &&
                   F->getModule().getStage() != SILStage::Raw) {
-                require(state.CFG == YieldOnceResume,
+                require(state.CFG == VerifyFlowSensitiveRulesDetails::YieldOnceResume,
                         "encountered 'return' before yielding a value in "
                         "yield_once coroutine");
               }
@@ -4509,9 +4547,9 @@ public:
           }
 
           if (isa<YieldInst>(term)) {
-            require(state.CFG != YieldOnceResume,
+            require(state.CFG != VerifyFlowSensitiveRulesDetails::YieldOnceResume,
                     "encountered multiple 'yield's along single path");
-            require(state.CFG == Normal,
+            require(state.CFG == VerifyFlowSensitiveRulesDetails::Normal,
                     "encountered 'yield' on abnormal CFG path");
           }
 
@@ -4538,14 +4576,14 @@ public:
               if (isa<YieldInst>(term)) {
                 // Enforce that the unwind logic is segregated in all stages.
                 if (i == 1) {
-                  insertResult.first->second.CFG = YieldUnwind;
+                  insertResult.first->second.CFG = VerifyFlowSensitiveRulesDetails::YieldUnwind;
 
                 // We check the yield_once rule in the mandatory analyses,
                 // so we can't assert it yet in the raw stage.
                 } else if (F->getLoweredFunctionType()->getCoroutineKind()
                              == SILCoroutineKind::YieldOnce && 
                            F->getModule().getStage() != SILStage::Raw) {
-                  insertResult.first->second.CFG = YieldOnceResume;
+                  insertResult.first->second.CFG = VerifyFlowSensitiveRulesDetails::YieldOnceResume;
                 }
               }
 
@@ -5118,7 +5156,7 @@ void SILModule::verify() const {
 
   // Check all witness tables.
   LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
-  llvm::DenseSet<NormalProtocolConformance*> wtableConformances;
+  llvm::DenseSet<RootProtocolConformance*> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();

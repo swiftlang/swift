@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/References.h"

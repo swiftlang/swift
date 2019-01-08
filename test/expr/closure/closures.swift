@@ -15,7 +15,7 @@ var closure3b : (Int,Int) -> (Int) -> (Int,Int) = {{ (4, 2) }} // expected-error
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int = {
        $0 + 1.0
-       // expected-error@+1 {{cannot convert value of type 'Double' to closure result type 'Int'}}
+       // expected-error@-1 {{cannot convert value of type 'Double' to closure result type 'Int'}}
 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}

@@ -81,3 +81,11 @@ func testStringCollectionTypes(s: String) {
   acceptsBidirectionalCollection(s)
   acceptsRandomAccessCollection(s) // expected-error{{argument type 'String' does not conform to expected type 'RandomAccessCollection'}}
 }
+
+// In previous versions of Swift, code would accidentally select
+// init(stringInterpolationSegment:) when String.init was used in the context
+// of a CustomStringConvertible type. This checks that we still have an
+// unambiguous overload for them to select.
+func testStringInitWithCustomStringConvertible() {
+  _ = [(1..<10)].map(String.init)
+}

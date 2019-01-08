@@ -106,7 +106,6 @@ class Parser {
   void operator=(const Parser&) = delete;
 
   bool IsInputIncomplete = false;
-  SourceLoc DelayedDeclEnd;
   std::vector<Token> SplitTokens;
 
 public:
@@ -556,7 +555,16 @@ public:
 
   /// Parse an #endif.
   bool parseEndIfDirective(SourceLoc &Loc);
-  
+
+  /// Given that the current token is a string literal,
+  /// - if it is not interpolated, returns the contents;
+  /// - otherwise, diagnoses and returns None.
+  ///
+  /// \param Loc where to diagnose.
+  /// \param DiagText name for the string literal in the diagnostic.
+  Optional<StringRef>
+  getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
+
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -895,30 +903,23 @@ public:
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
 
   struct ParsedAccessors;
-  bool parseGetSetImpl(ParseDeclOptions Flags,
-                       GenericParamList *GenericParams,
-                       ParameterList *Indices,
-                       TypeLoc ElementTy,
-                       ParsedAccessors &accessors,
-                       AbstractStorageDecl *storage,
-                       SourceLoc &LastValidLoc,
-                       SourceLoc StaticLoc, SourceLoc VarLBLoc);
-  bool parseGetSet(ParseDeclOptions Flags,
-                   GenericParamList *GenericParams,
-                   ParameterList *Indices,
-                   TypeLoc ElementTy,
-                   ParsedAccessors &accessors,
-                   AbstractStorageDecl *storage,
-                   SourceLoc StaticLoc);
+  ParserStatus parseGetSet(ParseDeclOptions Flags,
+                           GenericParamList *GenericParams,
+                           ParameterList *Indices,
+                           TypeLoc ElementTy,
+                           ParsedAccessors &accessors,
+                           AbstractStorageDecl *storage,
+                           SourceLoc StaticLoc);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
                        TypeLoc elementTy, const DeclAttributes &attrs,
                        SourceLoc staticLoc, ParsedAccessors &accessors);
-  void parseAccessorBodyDelayed(AbstractFunctionDecl *AFD);
-  VarDecl *parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
-                              SourceLoc StaticLoc, SourceLoc VarLoc,
-                              bool hasInitializer,
-                              const DeclAttributes &Attributes,
-                              SmallVectorImpl<Decl *> &Decls);
+  ParserResult<VarDecl> parseDeclVarGetSet(Pattern *pattern,
+                                           ParseDeclOptions Flags,
+                                           SourceLoc StaticLoc,
+                                           SourceLoc VarLoc,
+                                           bool hasInitializer,
+                                           const DeclAttributes &Attributes,
+                                           SmallVectorImpl<Decl *> &Decls);
   
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                    const DeclAttributes &Attrs);
@@ -971,9 +972,9 @@ public:
   /// \brief Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
 
-  bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
-                             SourceLoc &LAngleLoc,
-                             SourceLoc &RAngleLoc);
+  ParserStatus parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
+                                     SourceLoc &LAngleLoc,
+                                     SourceLoc &RAngleLoc);
 
   ParserResult<TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
@@ -1224,9 +1225,14 @@ public:
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
 
+  StringRef copyAndStripUnderscores(StringRef text);
+
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
-                                   SmallVectorImpl<Expr*> &Exprs,
-                                   Token EntireTok);
+                                   Token EntireTok,
+                                   VarDecl *InterpolationVar,
+                                   SmallVectorImpl<ASTNode> &Stmts,
+                                   unsigned &LiteralCapacity,
+                                   unsigned &InterpolationCount);
 
   /// Parse an argument label `identifier ':'`, if it exists.
   ///
@@ -1250,7 +1256,8 @@ public:
   DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
                                     const Diagnostic &diag,
                                     bool allowOperators=false,
-                                    bool allowZeroArgCompoundNames=false);
+                                    bool allowZeroArgCompoundNames=false,
+                                    bool allowDeinitAndSubscript=false);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
@@ -1326,8 +1333,8 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
-  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
-  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
+  ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
+  ParserResult<Expr> parseExprPoundAssert();
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
@@ -1366,6 +1373,7 @@ public:
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
   ParserResult<CaseStmt> parseStmtCase(bool IsActive);
+  ParserResult<Stmt> parseStmtPoundAssert();
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

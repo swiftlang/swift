@@ -267,9 +267,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
           HashbangMode::Allowed, CommentRetentionMode::None,
           TriviaRetentionMode::WithoutTrivia);
   L.restoreState(State(Loc));
-  Token Result;
-  L.lex(Result);
-  return Result;
+  return L.peekNextToken();
 }
 
 void Lexer::formToken(tok Kind, const char *TokStart) {
@@ -2388,6 +2386,8 @@ void Lexer::lexImpl() {
   case 0:
     switch (getNulCharacterKind(CurPtr - 1)) {
     case NulCharacterKind::CodeCompletion:
+      while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+        ;
       return formToken(tok::code_complete, TokStart);
 
     case NulCharacterKind::BufferEnd:

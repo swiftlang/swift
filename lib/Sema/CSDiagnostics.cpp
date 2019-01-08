@@ -103,14 +103,26 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     locator = cs.getConstraintLocator(
         ctor.withPathElement(PathEltKind::ApplyFunction)
             .withPathElement(PathEltKind::ConstructorMember));
-  } else if (isa<UnresolvedDotExpr>(anchor)) {
+  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
     ConstraintLocatorBuilder member(locator);
-    locator =
-        cs.getConstraintLocator(member.withPathElement(PathEltKind::Member));
+
+    if (UDE->getName().isSimpleName(DeclBaseName::createConstructor())) {
+      member = member.withPathElement(PathEltKind::ConstructorMember);
+    } else {
+      member = member.withPathElement(PathEltKind::Member);
+    }
+
+    locator = cs.getConstraintLocator(member);
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    locator = cs.getConstraintLocator(locator, PathEltKind::UnresolvedMember);
   } else if (isa<SubscriptExpr>(anchor)) {
     ConstraintLocatorBuilder subscript(locator);
     locator = cs.getConstraintLocator(
         subscript.withPathElement(PathEltKind::SubscriptMember));
+  } else if (isa<MemberRefExpr>(anchor)) {
+    ConstraintLocatorBuilder memberRef(locator);
+    locator =
+        cs.getConstraintLocator(memberRef.withPathElement(PathEltKind::Member));
   }
 
   auto overload = getOverloadChoiceIfAvailable(locator);
@@ -568,10 +580,22 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
   if (!tryExpr)
     return diagnoseUnwrap(getConstraintSystem(), unwrapped, type);
-
-  emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
-      .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
-  return true;
+  
+  bool isSwift5OrGreater = getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5);
+  auto subExprType = getType(tryExpr->getSubExpr());
+  bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
+  
+  
+  if (isSwift5OrGreater && subExpressionIsOptional) {
+    // Using 'try!' won't change the type for a 'try?' with an optional sub-expr
+    // under Swift 5+, so just report that a missing unwrap can't be handled here.
+    return false;
+  }
+  else {
+    emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
+    .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
+    return true;
+  }
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
@@ -656,7 +680,8 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     }
 
     if (auto resolvedOverload = getResolvedOverload(getLocator()))
-      if (resolvedOverload->Choice.getKind() == OverloadChoiceKind::DynamicMemberLookup)
+      if (resolvedOverload->Choice.getKind() ==
+          OverloadChoiceKind::DynamicMemberLookup)
         subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
   } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
@@ -1097,4 +1122,121 @@ Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
   }
 
   return diag::assignment_lhs_is_immutable_variable;
+}
+
+bool ContextualFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto path = getLocator()->getPath();
+
+  assert(!path.empty());
+
+  if (diagnoseMissingFunctionCall())
+    return true;
+
+  Diag<Type, Type> diagnostic;
+  switch (path.back().getKind()) {
+  case ConstraintLocator::ClosureResult: {
+    diagnostic = diag::cannot_convert_closure_result;
+    break;
+  }
+
+  default:
+    return false;
+  }
+
+  auto diag = emitDiagnostic(anchor->getLoc(), diagnostic, FromType, ToType);
+  diag.highlight(anchor->getSourceRange());
+
+  (void)trySequenceSubsequenceFixIts(diag, getConstraintSystem(), FromType,
+                                     ToType, anchor);
+  return true;
+}
+
+bool ContextualFailure::diagnoseMissingFunctionCall() const {
+  auto &TC = getTypeChecker();
+
+  auto *srcFT = FromType->getAs<FunctionType>();
+  if (!srcFT || !srcFT->getParams().empty())
+    return false;
+
+  if (ToType->is<AnyFunctionType>() ||
+      !TC.isConvertibleTo(srcFT->getResult(), ToType, getDC()))
+    return false;
+
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::missing_nullary_call,
+                 srcFT->getResult())
+      .highlight(anchor->getSourceRange())
+      .fixItInsertAfter(anchor->getEndLoc(), "()");
+  return true;
+}
+
+bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
+                                                     ConstraintSystem &CS,
+                                                     Type fromType, Type toType,
+                                                     Expr *expr) {
+  if (!CS.TC.Context.getStdlibModule())
+    return false;
+
+  auto String = CS.TC.getStringType(CS.DC);
+  auto Substring = CS.TC.getSubstringType(CS.DC);
+
+  if (!String || !Substring)
+    return false;
+
+  /// FIXME: Remove this flag when void subscripts are implemented.
+  /// Make this unconditional and remove the if statement.
+  if (CS.TC.getLangOpts().FixStringToSubstringConversions) {
+    // String -> Substring conversion
+    // Add '[]' void subscript call to turn the whole String into a Substring
+    if (fromType->isEqual(String)) {
+      if (toType->isEqual(Substring)) {
+        diag.fixItInsertAfter(expr->getEndLoc(), "[]");
+        return true;
+      }
+    }
+  }
+
+  // Substring -> String conversion
+  // Wrap in String.init
+  if (fromType->isEqual(Substring)) {
+    if (toType->isEqual(String)) {
+      auto range = expr->getSourceRange();
+      diag.fixItInsert(range.Start, "String(");
+      diag.fixItInsertAfter(range.End, ")");
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool AutoClosureForwardingFailure::diagnoseAsError() {
+  auto path = getLocator()->getPath();
+  assert(!path.empty());
+
+  auto &last = path.back();
+  assert(last.getKind() == ConstraintLocator::ApplyArgToParam);
+
+  // We need a raw anchor here because `getAnchor()` is simplified
+  // to the argument expression.
+  auto *argExpr = getArgumentExpr(getRawAnchor(), last.getValue());
+  emitDiagnostic(argExpr->getLoc(), diag::invalid_autoclosure_forwarding)
+      .highlight(argExpr->getSourceRange())
+      .fixItInsertAfter(argExpr->getEndLoc(), "()");
+  return true;
+}
+
+bool NonOptionalUnwrapFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+
+  auto diagnostic = diag::invalid_optional_chain;
+  if (isa<ForceValueExpr>(anchor))
+    diagnostic = diag::invalid_force_unwrap;
+
+  emitDiagnostic(anchor->getLoc(), diagnostic, BaseType)
+      .highlight(anchor->getSourceRange())
+      .fixItRemove(anchor->getEndLoc());
+
+  return true;
 }

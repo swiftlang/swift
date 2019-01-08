@@ -603,7 +603,7 @@ namespace {
       Result = Cloned;
       SILCloner<InstructionCloner>::postProcess(Orig, Cloned);
     }
-    SILValue remapValue(SILValue Value) {
+    SILValue getMappedValue(SILValue Value) {
       return Value;
     }
     SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }

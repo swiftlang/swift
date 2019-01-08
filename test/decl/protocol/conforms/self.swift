@@ -61,12 +61,7 @@ class SeriousClass {}
 
 extension HasDefault where Self : SeriousClass {
   func foo() {}
-  // expected-note@-1 {{candidate has non-matching type '<Self> () -> ()'}}
-
-  // FIXME: the above diangostic is from trying to check conformance for
-  // 'SillyClass' and not 'SeriousClass'. Evidently name lookup finds members
-  // from all constrained extensions, and then if any don't have a matching
-  // generic signature, diagnostics doesn't really know what to do about it.
+  // expected-note@-1 {{candidate would match if 'SillyClass' subclassed 'SeriousClass'}}
 }
 
 extension SeriousClass : HasDefault {}

@@ -920,7 +920,9 @@ Driver::buildCompilation(const ToolChain &TC,
         ArgList->hasArg(options::OPT_driver_time_compilation);
     std::unique_ptr<UnifiedStatsReporter> StatsReporter =
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
-    
+    const bool EnableExperimentalDependencies =
+        ArgList->hasArg(options::OPT_enable_experimental_dependencies);
+
     C = llvm::make_unique<Compilation>(
         Diags, TC, OI, Level,
         std::move(ArgList),
@@ -939,12 +941,13 @@ Driver::buildCompilation(const ToolChain &TC,
         DriverBatchSizeLimit,
         SaveTemps,
         ShowDriverTimeCompilation,
-        std::move(StatsReporter));
+        std::move(StatsReporter),
+        EnableExperimentalDependencies);
   }
 
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
-  buildActions(TopLevelActions, TC, OI, OFM ? OFM.getPointer() : nullptr,
+  buildActions(TopLevelActions, TC, OI,
                rebuildEverything ? nullptr : &outOfDateMap, *C);
 
   if (Diags.hadAnyError())
@@ -1386,6 +1389,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_LLVM_BC;
       break;
 
+    case options::OPT_dump_ast:
+      OI.CompilerOutputType = file_types::TY_ASTDump;
+      break;
+
     case options::OPT_emit_pch:
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       OI.CompilerOutputType = file_types::TY_PCH;
@@ -1408,11 +1415,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_Remapping;
       OI.LinkAction = LinkKind::None;
       break;
+
     case options::OPT_parse:
     case options::OPT_resolve_imports:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
-    case options::OPT_dump_ast:
     case options::OPT_emit_syntax:
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
@@ -1659,7 +1666,6 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
 
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                           const ToolChain &TC, const OutputInfo &OI,
-                          const OutputFileMap *OFM,
                           const InputInfoMap *OutOfDateMap,
                           Compilation &C) const {
   const DerivedArgList &Args = C.getArgs();
@@ -1762,6 +1768,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
           break;
         }
         LLVM_FALLTHROUGH;
+      case file_types::TY_ASTDump:
       case file_types::TY_Image:
       case file_types::TY_dSYM:
       case file_types::TY_Dependencies:
@@ -2469,8 +2476,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                     Output.get());
 
   if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA))
-    chooseSwiftModuleOutputPath(C, OFM, OutputMap, workingDirectory,
-                                Output.get());
+    chooseSwiftModuleOutputPath(C, OutputMap, workingDirectory, Output.get());
 
   if (OI.ShouldGenerateModule &&
       (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA)))
@@ -2656,7 +2662,6 @@ void Driver::computeMainOutput(
 }
 
 void Driver::chooseSwiftModuleOutputPath(Compilation &C,
-                                         const OutputFileMap *OFM,
                                          const TypeToPathMap *OutputMap,
                                          StringRef workingDirectory,
                                          CommandOutput *Output) const {

@@ -206,6 +206,10 @@ private:
   /// limit filelists will be used.
   size_t FilelistThreshold;
 
+  /// Scaffolding to permit experimentation with finer-grained dependencies and
+  /// faster rebuilds.
+  const bool EnableExperimentalDependencies;
+
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -234,7 +238,8 @@ public:
               Optional<unsigned> BatchSizeLimit = None,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
-              std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
+              std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
+              bool EnableExperimentalDependencies = false);
   ~Compilation();
 
   ToolChain const &getToolChain() const {
@@ -287,6 +292,10 @@ public:
   }
   void disableIncrementalBuild() {
     EnableIncrementalBuild = false;
+  }
+
+  bool getEnableExperimentalDependencies() const {
+    return EnableExperimentalDependencies;
   }
 
   bool getBatchModeEnabled() const {

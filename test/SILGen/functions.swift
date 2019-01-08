@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-emit-silgen -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 import Swift // just for Optional
@@ -152,12 +151,10 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[BORROWED_C]] : {{.*}}, #SomeClass.method!1
-  // CHECK: apply [[METHOD]]([[I]], [[BORROWED_C]])
-  // CHECK: end_borrow [[BORROWED_C]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
+  // CHECK: apply [[METHOD]]([[I]], [[C]])
   // CHECK: destroy_value [[C]]
   c.method(i)
 
@@ -169,12 +166,10 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[BORROWED_C]] : {{.*}}, #SomeClass.method!1
-  // CHECK: apply [[METHOD]]([[I]], [[BORROWED_C]])
-  // CHECK: end_borrow [[BORROWED_C]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
+  // CHECK: apply [[METHOD]]([[I]], [[C]])
   // CHECK: destroy_value [[C]]
   SomeClass.method(c)(i)
 
@@ -205,10 +200,8 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
-  // CHECK: [[SETTER:%[0-9]+]] = class_method [[BORROWED_C]] : $SomeClass, #SomeClass.someProperty!setter.1 : (SomeClass) -> (Builtin.Int64) -> ()
-  // CHECK: apply [[SETTER]]([[I]], [[BORROWED_C]])
-  // CHECK: end_borrow [[BORROWED_C]]
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.someProperty!setter.1 : (SomeClass) -> (Builtin.Int64) -> ()
+  // CHECK: apply [[SETTER]]([[I]], [[C]])
   // CHECK: destroy_value [[C]]
   c.someProperty = i
 
@@ -233,10 +226,8 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
   // CHECK: [[READK:%.*]] = begin_access [read] [unknown] [[KADDR]]
   // CHECK: [[K:%[0-9]+]] = load [trivial] [[READK]]
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
-  // CHECK: [[SETTER:%[0-9]+]] = class_method [[BORROWED_C]] : $SomeClass, #SomeClass.subscript!setter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> (), $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
-  // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[BORROWED_C]])
-  // CHECK: end_borrow [[BORROWED_C]]
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> (), $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
+  // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
   // CHECK: destroy_value [[C]]
   c[i, j] = k
 
@@ -285,33 +276,27 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[READG:%.*]] = begin_access [read] [unknown] [[GADDR]]
   // CHECK: [[G:%[0-9]+]] = load [copy] [[READG]]
-  // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK: [[TMPI:%.*]] = alloc_stack $Builtin.Int64
-  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_G]] : {{.*}}, #SomeGeneric.method!1
-  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPI]], [[BORROWED_G]])
-  // CHECK: end_borrow [[BORROWED_G]]
+  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.method!1
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPI]], [[G]])
   // CHECK: destroy_value [[G]]
   g.method(i)
 
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[READG:%.*]] = begin_access [read] [unknown] [[GADDR]]
   // CHECK: [[G:%[0-9]+]] = load [copy] [[READG]]
-  // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK: [[TMPJ:%.*]] = alloc_stack $Builtin.Int64
-  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_G]] : {{.*}}, #SomeGeneric.generic!1
-  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPJ]], [[BORROWED_G]])
-  // CHECK: end_borrow [[BORROWED_G]]
+  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.generic!1
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPJ]], [[G]])
   // CHECK: destroy_value [[G]]
   g.generic(j)
 
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[TMPK:%.*]] = alloc_stack $Builtin.Int64
-  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_C]] : {{.*}}, #SomeClass.generic!1
-  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPK]], [[BORROWED_C]])
-  // CHECK: end_borrow [[BORROWED_C]]
+  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.generic!1
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPK]], [[C]])
   // CHECK: destroy_value [[C]]
   c.generic(k)
 
@@ -436,27 +421,6 @@ func applyTransparent(_ x: Bool) -> Bool {
 @inline(never)
 func noinline_callee() {}
 
-// CHECK-LABEL: sil hidden [always_inline] @$s9functions20always_inline_calleeyyF : $@convention(thin) () -> ()
-@inline(__always)
-func always_inline_callee() {}
-
-// CHECK-LABEL: sil [serialized] [always_inline] @$s9functions27public_always_inline_calleeyyF : $@convention(thin) () -> ()
-@inline(__always)
-public func public_always_inline_callee() {}
-
-protocol AlwaysInline {
-  func alwaysInlined()
-}
-
-// CHECK-LABEL: sil hidden [always_inline] @$s9functions19AlwaysInlinedMemberV06alwaysC0{{[_0-9a-zA-Z]*}}F : $@convention(method) (AlwaysInlinedMember) -> () {
-
-// protocol witness for functions.AlwaysInline.alwaysInlined <A : functions.AlwaysInline>(functions.AlwaysInline.Self)() -> () in conformance functions.AlwaysInlinedMember : functions.AlwaysInline in functions
-// CHECK-LABEL: sil private [transparent] [thunk] [always_inline] @$s9functions19AlwaysInlinedMemberVAA0B6InlineA2aDP06alwaysC0{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: AlwaysInline) (@in_guaranteed AlwaysInlinedMember) -> () {
-struct AlwaysInlinedMember : AlwaysInline {
-  @inline(__always)
-  func alwaysInlined() {}
-}
-
 // CHECK-LABEL: sil hidden [Onone] @$s9functions10onone_funcyyF : $@convention(thin) () -> ()
 @_optimize(none)
 func onone_func() {}
@@ -558,35 +522,3 @@ func testNoescape2() {
 
 // CHECK: // closure #1 () -> () in closure #1 () -> () in functions.testNoescape2() -> ()
 // CHECK-NEXT: sil private @$s9functions13testNoescape2yyFyyXEfU_yycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
-
-enum PartialApplyEnumPayload<T, U> {
-  case Left(T)
-  case Right(U)
-}
-
-struct S {}
-struct C {}
-
-func partialApplyEnumCases(_ x: S, y: C) {
-  let left = PartialApplyEnumPayload<S, C>.Left
-  let left2 = left(S())
-
-  let right = PartialApplyEnumPayload<S, C>.Right
-  let right2 = right(C())
-}
-
-// CHECK-LABEL: sil shared [transparent] [thunk] @$s9functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[UNCURRIED:%.*]] = function_ref @$s9functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[UNCURRIED]]<T, U>(%0)
-// CHECK:         [[CANONICAL_THUNK:%.*]] = function_ref @$sx9functions23PartialApplyEnumPayloadOyxq_GIegir_xADIegnr_r0_lTR : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in τ_0_0) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>
-// CHECK:         [[THUNKED_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CANONICAL_THUNK]]<T, U>([[CLOSURE]])
-// CHECK:         return [[THUNKED_CLOSURE]]
-// CHECK: } // end sil function '$s9functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F'
-
-// CHECK-LABEL: sil shared [transparent] [thunk] @$s9functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[UNCURRIED:%.*]] = function_ref @$s9functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[UNCURRIED]]<T, U>(%0)
-// CHECK:         [[CANONICAL_THUNK:%.*]] = function_ref @$sq_9functions23PartialApplyEnumPayloadOyxq_GIegir_q_ADIegnr_r0_lTR : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_1, @guaranteed @callee_guaranteed (@in τ_0_1) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>
-// CHECK:         [[THUNKED_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CANONICAL_THUNK]]<T, U>([[CLOSURE]])
-// CHECK:         return [[THUNKED_CLOSURE]]
-// CHECK: } // end sil function '$s9functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F'

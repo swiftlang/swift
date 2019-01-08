@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -157,6 +157,15 @@ FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 /// solving expression type constraints. A rough proxy for "how much work the
 /// expression typechecker did".
 FRONTEND_STATISTIC(Sema, NumConstraintScopes)
+
+/// Number of constraint-solving scopes that were created but which
+/// did not themselves lead to the creation of further scopes, either
+/// because we successfully found a solution, or some constraint failed.
+///
+/// Note: This can vary based on the number of connected components we
+/// generate, since each connected component will itself have at least
+/// one leaf scope.
+FRONTEND_STATISTIC(Sema, NumLeafScopes)
 
 /// Number of constraints considered per attempt to
 /// contract constraint graph edges.

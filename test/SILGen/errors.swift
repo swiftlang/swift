@@ -1,16 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership -Xllvm -sil-print-debuginfo -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
-
-// TODO: Turn back on ownership verification. I turned off the verification on
-// this file since it shows an ownership error that does not affect
-// codegen. Specifically when we destroy the temporary array we use for the
-// variadic tuple, we try to borrow the temporary array when we pass it to the
-// destroy function. This makes the ownership verifier think that the owned
-// value we are trying to destroy is not cleaned up. But once ownership is
-// stripped out, the destroy array function still does what it needs to do. The
-// actual fix for this would require a bunch of surgery in SILGenApply around
-// how function types are computed and preserving non-canonical function types
-// through SILGenApply. This is something that can be done after +0 is turned
-// on.
+// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership -Xllvm -sil-print-debuginfo -verify -swift-version 5 -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
 
 import Swift
 
@@ -114,8 +102,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 //   Catch HomeworkError.
 // CHECK:    [[IS_HWE]]:
 // CHECK-NEXT: [[T0_ORIG:%.*]] = load [take] [[DEST_TEMP]] : $*HomeworkError
-// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0_ORIG]]
-// CHECK-NEXT: switch_enum [[T0_COPY]] : $HomeworkError, case #HomeworkError.CatAteIt!enumelt.1: [[MATCH:bb[0-9]+]], default [[NO_MATCH:bb[0-9]+]]
+// CHECK-NEXT: switch_enum [[T0_ORIG]] : $HomeworkError, case #HomeworkError.CatAteIt!enumelt.1: [[MATCH:bb[0-9]+]], default [[NO_MATCH:bb[0-9]+]]
 
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH]]([[T0:%.*]] : @owned $Cat):
@@ -124,7 +111,6 @@ func dont_return<T>(_ argument: T) throws -> T {
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK-NEXT: end_borrow [[BORROWED_T0]]
 // CHECK-NEXT: destroy_value [[T0]]
-// CHECK-NEXT: destroy_value [[T0_ORIG]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
@@ -135,7 +121,6 @@ func dont_return<T>(_ argument: T) throws -> T {
 //   Catch other HomeworkErrors.
 // CHECK:    [[NO_MATCH]]([[CATCHALL_ERROR:%.*]] : @owned $HomeworkError):
 // CHECK-NEXT: destroy_value [[CATCHALL_ERROR]]
-// CHECK-NEXT: destroy_value [[T0_ORIG]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
@@ -176,6 +161,83 @@ func all_together_now(_ flag: Bool) -> Cat {
     return cat
   } catch _ {
     return Cat()
+  }
+}
+
+// Make sure that if we catch an error in a throwing function we borrow the
+// error and only consume the error in the rethrow block.
+//
+// CHECK-LABEL: sil hidden @$s6errors20all_together_now_twoyAA3CatCSgSbKF : $@convention(thin) (Bool) -> (@owned Optional<Cat>, @error Error) {
+// CHECK: bb0(
+// CHECK-NOT: bb1
+// CHECK:   try_apply {{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+//
+// CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+// CHECK:   [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
+// CHECK:   [[COPIED_ERROR:%.*]] = copy_value [[BORROWED_ERROR]]
+// CHECK:   store [[COPIED_ERROR]] to [init] [[CAST_INPUT_MEM:%.*]] : $*Error
+// CHECK:   checked_cast_addr_br copy_on_success Error in [[CAST_INPUT_MEM]] : $*Error to HomeworkError in [[CAST_OUTPUT_MEM:%.*]] : $*HomeworkError, [[CAST_YES_BB:bb[0-9]+]], [[CAST_NO_BB:bb[0-9]+]],
+//
+// CHECK: [[CAST_YES_BB]]:
+// CHECK:   [[SUBERROR:%.*]] = load [take] [[CAST_OUTPUT_MEM]]
+// CHECK:   switch_enum [[SUBERROR]] : $HomeworkError, case #HomeworkError.TooHard!enumelt: {{bb[0-9]+}}, default [[SWITCH_MATCH_FAIL_BB:bb[0-9]+]],
+//
+// CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
+// CHECK:   destroy_value [[SUBERROR]]
+// CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $Error)
+//
+// CHECK: [[CAST_NO_BB]]:
+// CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $Error)
+//
+// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $Error):
+// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: } // end sil function '$s6errors20all_together_now_twoyAA3CatCSgSbKF'
+func all_together_now_two(_ flag: Bool) throws -> Cat? {
+  do {
+    return try dont_return(Cat())
+  } catch HomeworkError.TooHard {
+    return nil
+  }
+}
+
+// Same as the previous test, but with multiple cases instead of just one.
+//
+// CHECK-LABEL: sil hidden @$s6errors22all_together_now_threeyAA3CatCSgSbKF : $@convention(thin) (Bool) -> (@owned Optional<Cat>, @error Error) {
+// CHECK: bb0(
+// CHECK-NOT: bb1
+// CHECK:   try_apply {{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+//
+// CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+// CHECK:   [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
+// CHECK:   [[COPIED_ERROR:%.*]] = copy_value [[BORROWED_ERROR]]
+// CHECK:   store [[COPIED_ERROR]] to [init] [[CAST_INPUT_MEM:%.*]] : $*Error
+// CHECK:   checked_cast_addr_br copy_on_success Error in [[CAST_INPUT_MEM]] : $*Error to HomeworkError in [[CAST_OUTPUT_MEM:%.*]] : $*HomeworkError, [[CAST_YES_BB:bb[0-9]+]], [[CAST_NO_BB:bb[0-9]+]],
+//
+// CHECK: [[CAST_YES_BB]]:
+// CHECK:   [[SUBERROR:%.*]] = load [take] [[CAST_OUTPUT_MEM]]
+// CHECK:   switch_enum [[SUBERROR]] : $HomeworkError, case #HomeworkError.TooHard!enumelt: {{bb[0-9]+}}, case #HomeworkError.TooMuch!enumelt: {{bb[0-9]+}}, default [[SWITCH_MATCH_FAIL_BB:bb[0-9]+]],
+//
+// CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
+// CHECK:   destroy_value [[SUBERROR]]
+// CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $Error)
+//
+// CHECK: [[CAST_NO_BB]]:
+// CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $Error)
+//
+// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $Error):
+// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: } // end sil function '$s6errors22all_together_now_threeyAA3CatCSgSbKF'
+func all_together_now_three(_ flag: Bool) throws -> Cat? {
+  do {
+    return try dont_return(Cat())
+  } catch HomeworkError.TooHard {
+    return nil
+  } catch HomeworkError.TooMuch {
+    return nil
   }
 }
 
@@ -452,11 +514,9 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:       [[NORM_3]]([[CAT3:%.*]] : @owned $Cat):
 // CHECK-NEXT:    store [[CAT3]] to [init] [[ELT3]]
 //   Complete the call and return.
-// CHECK:         [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
 // CHECK:         [[TAKE_FN:%.*]] = function_ref @$s6errors14take_many_catsyyAA3CatCd_tKF : $@convention(thin) (@guaranteed Array<Cat>) -> @error Error
-// CHECK-NEXT:    try_apply [[TAKE_FN]]([[BORROWED_ARRAY]]) : $@convention(thin) (@guaranteed Array<Cat>) -> @error Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
+// CHECK-NEXT:    try_apply [[TAKE_FN]]([[ARRAY]]) : $@convention(thin) (@guaranteed Array<Cat>) -> @error Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
 // CHECK:       [[NORM_CALL]]([[T0:%.*]] : @trivial $()):
-// CHECK-NEXT:    end_borrow [[BORROWED_ARRAY]]
 // CHECK-NEXT:    destroy_value [[ARRAY]]
 // CHECK-NEXT:    [[T0:%.*]] = tuple ()
 // CHECK-NEXT:    return
@@ -486,7 +546,6 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:    br [[RETHROW]]([[ERROR]] : $Error)
 //   Failure from call.
 // CHECK:       [[ERR_CALL]]([[ERROR:%.*]] : @owned $Error):
-// CHECK-NEXT:    end_borrow
 // CHECK-NEXT:    destroy_value [[ARRAY]]
 // CHECK-NEXT:    br [[RETHROW]]([[ERROR]] : $Error)
 //   Rethrow.
@@ -599,11 +658,9 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: [[INDEX_COPY_2:%.*]] = copy_value [[INDEX_COPY_1]] : $String
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Pylon
 // CHECK-NEXT: [[BASE:%.*]] = load_borrow [[WRITE]] : $*Bridge
-// CHECK-NEXT: [[BORROWED_INDEX_COPY_1:%.*]] = begin_borrow [[INDEX_COPY_1]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[GETTER:%.*]] = function_ref @$s6errors6BridgeVyAA5PylonVSScig :
-// CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[BORROWED_INDEX_COPY_1]], [[BASE]])
-// CHECK-NEXT: end_borrow [[BORROWED_INDEX_COPY_1]]
+// CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[INDEX_COPY_1]], [[BASE]])
 // CHECK-NEXT: store [[T0]] to [init] [[TEMP]]
 // CHECK-NEXT: end_borrow [[BASE]]
 // CHECK:      [[SUPPORT:%.*]] = function_ref @$s6errors5PylonV7supportyyKF
@@ -637,47 +694,6 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: throw [[ERROR]]
 // CHECK: } // end sil function '$s6errors16supportStructure_4nameyAA6BridgeVz_SStKF'
 
-struct OwnedBridge {
-  var owner : AnyObject
-  subscript(name: String) -> Pylon {
-    addressWithOwner { return (someValidPointer(), owner) }
-    mutableAddressWithOwner { return (someValidPointer(), owner) }
-  }
-}
-func supportStructure(_ b: inout OwnedBridge, name: String) throws {
-  try b[name].support()
-}
-// CHECK:    sil hidden @$s6errors16supportStructure_4nameyAA11OwnedBridgeVz_SStKF :
-// CHECK:    bb0([[ARG1:%.*]] : @trivial $*OwnedBridge, [[ARG2:%.*]] : @guaranteed $String):
-// CHECK:      [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $String
-// CHECK:      [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*OwnedBridge
-// CHECK:      [[BORROWED_ARG2_COPY:%.*]] = begin_borrow [[ARG2_COPY]]
-// CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @$s6errors11OwnedBridgeVyAA5PylonVSSciaO :
-// CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[BORROWED_ARG2_COPY]], [[WRITE]])
-// CHECK-NEXT: end_borrow [[BORROWED_ARG2_COPY]]
-// CHECK-NEXT: ([[T1:%.*]], [[OWNER:%.*]]) = destructure_tuple [[T0]]
-// CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
-// CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
-// CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
-// CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T5]] : $*Pylon
-// CHECK:      [[SUPPORT:%.*]] = function_ref @$s6errors5PylonV7supportyyKF
-// CHECK-NEXT: try_apply [[SUPPORT]]([[ACCESS]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
-// CHECK:    [[BB_NORMAL]]
-// CHECK-NEXT: end_access [[ACCESS]] : $*Pylon
-// CHECK-NEXT: end_access [[WRITE]]
-// CHECK-NEXT: destroy_value [[OWNER]] : $AnyObject
-// CHECK-NEXT: destroy_value [[ARG2_COPY]] : $String
-// CHECK-NEXT: tuple ()
-// CHECK-NEXT: return
-// CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
-// CHECK-NEXT: end_access [[ACCESS]] : $*Pylon
-// CHECK-NEXT: destroy_value [[OWNER]] : $AnyObject
-// CHECK-NEXT: end_access [[WRITE]]
-// CHECK-NEXT: destroy_value [[ARG2_COPY]] : $String
-// CHECK-NEXT: throw [[ERROR]]
-// CHECK: } // end sil function '$s6errors16supportStructure_4nameyAA11OwnedBridgeVz_SStKF'
-
 // ! peepholes its argument with getSemanticsProvidingExpr().
 // Test that that doesn't look through try!.
 // rdar://21515402
@@ -697,12 +713,10 @@ func testForcePeephole(_ f: () throws -> Int?) -> Int {
 // CHECK-NEXT: destroy_value [[RESULT]] : $Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : @owned $Error):
+// CHECK: [[CLEANUPS:.+]]([[ERROR:%.*]] : @owned $Error):
 // CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: [[NONE:%.+]] = enum $Optional<Cat>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<Cat>)
-// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: } // end sil function '$s6errors15testOptionalTryyyF'
 func testOptionalTry() {
   _ = try? make_a_cat()
@@ -721,23 +735,20 @@ func testOptionalTryThatNeverThrows() {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT: [[BOX:%.+]] = alloc_box ${ var Optional<Cat> }
 // CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @$s6errors10make_a_catAA3CatCyKF
 // CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
 // CHECK: [[SUCCESS]]([[VALUE:%.+]] : @owned $Cat)
-// CHECK-NEXT: store [[VALUE]] to [init] [[BOX_DATA]] : $*Cat
-// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
+// CHECK-NEXT: [[CAT_ENUM:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt.1
+// CHECK-NEXT: store [[CAT_ENUM]] to [init] [[PB]] : $*Optional<Cat>
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
 // CHECK-NEXT: destroy_value [[BOX]] : ${ var Optional<Cat> }
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : @owned $Error):
+// CHECK: [[CLEANUPS:.+]]([[ERROR:%.*]] : @owned $Error):
 // CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
-// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: } // end sil function '$s6errors18testOptionalTryVaryyF'
 func testOptionalTryVar() {
   var cat = try? make_a_cat() // expected-warning {{initialization of variable 'cat' was never used; consider replacing with assignment to '_' or removing it}}
@@ -758,12 +769,10 @@ func testOptionalTryVar() {
 // CHECK-NOT: destroy_addr %0 : $*T
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : @owned $Error):
+// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
 // CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
-// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: } // end sil function '$s6errors26testOptionalTryAddressOnlyyyxlF'
 func testOptionalTryAddressOnly<T>(_ obj: T) {
   _ = try? dont_return(obj)
@@ -784,12 +793,10 @@ func testOptionalTryAddressOnly<T>(_ obj: T) {
 // CHECK-NOT: destroy_addr %0 : $*T
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : @owned $Error):
+// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
 // CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
-// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: } // end sil function '$s6errors29testOptionalTryAddressOnlyVaryyxlF'
 func testOptionalTryAddressOnlyVar<T>(_ obj: T) {
   var copy = try? dont_return(obj) // expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
@@ -839,8 +846,9 @@ func testOptionalTryNeverFails() {
 // CHECK: bb0:
 // CHECK-NEXT:   [[BOX:%.+]] = alloc_box ${ var Optional<()> }
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[BOX]]
-// CHECK-NEXT:   = init_enum_data_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
-// CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
+// CHECK-NEXT:   [[VALUE:%.+]] = tuple ()
+// CHECK-NEXT:   [[ENUM:%.+]] = enum $Optional<()>, #Optional.some!enumelt.1, [[VALUE]]
+// CHECK-NEXT:   store [[ENUM]] to [trivial] [[PB]] :
 // CHECK-NEXT:   destroy_value [[BOX]] : ${ var Optional<()> }
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()

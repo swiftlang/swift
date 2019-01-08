@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-unknown-linux-gnu -parse-stdlib -enable-objc-interop -disable-objc-attr-requires-foundation-module -I %S/Inputs/usr/include -Xcc --sysroot=/var/empty -emit-ir %s -o - | %FileCheck %s -check-prefix CHECK-ELF
+// RUN: %target-swift-frontend -parse-stdlib -enable-objc-interop -disable-objc-attr-requires-foundation-module -I %S/Inputs/usr/include -Xcc --sysroot=/var/empty -emit-ir %s -o - | %FileCheck %s -check-prefix CHECK-ELF
 
 // REQUIRES: OS=linux-gnu
 

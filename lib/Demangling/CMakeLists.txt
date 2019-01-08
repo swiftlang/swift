@@ -1,4 +1,4 @@
-add_swift_library(swiftDemangling
+add_swift_host_library(swiftDemangling
                   STATIC
                     Demangler.cpp
                     Context.cpp

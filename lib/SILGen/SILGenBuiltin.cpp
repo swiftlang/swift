@@ -30,6 +30,16 @@
 using namespace swift;
 using namespace Lowering;
 
+static bool isTrivialShuffle(TupleShuffleExpr *shuffle) {
+  // Each element must be mapped to the corresponding element of the input.
+  auto mapping = shuffle->getElementMapping();
+  for (auto index : indices(mapping)) {
+    if (mapping[index] < 0 || unsigned(mapping[index]) != index)
+      return false;
+  }
+  return true;
+}
+
 /// Break down an expression that's the formal argument expression to
 /// a builtin function, returning its individualized arguments.
 ///
@@ -43,7 +53,15 @@ static ArrayRef<Expr*> decomposeArguments(SILGenFunction &SGF,
   assert(arg->getType()->castTo<TupleType>()->getNumElements()
            == expectedCount);
 
-  auto tuple = dyn_cast<TupleExpr>(arg->getSemanticsProvidingExpr());
+  // The use of owned parameters can trip up CSApply enough to introduce
+  // a trivial tuple shuffle here.
+  arg = arg->getSemanticsProvidingExpr();
+  if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg)) {
+    if (isTrivialShuffle(shuffle))
+      arg = shuffle->getSubExpr();
+  }
+
+  auto tuple = dyn_cast<TupleExpr>(arg);
   if (tuple && tuple->getElements().size() == expectedCount) {
     return tuple->getElements();
   }
@@ -849,9 +867,15 @@ static ManagedValue emitBuiltinValueToBridgeObject(SILGenFunction &SGF,
   assert(args.size() == 1 && "ValueToBridgeObject should have one argument");
   assert(subs.getReplacementTypes().size() == 1 &&
          "ValueToBridgeObject should have one sub");
-  auto &fromTL = SGF.getTypeLowering(subs.getReplacementTypes()[0]);
-  assert(fromTL.isTrivial() && "Expected a trivial type");
-  (void)fromTL;
+
+  Type argTy = subs.getReplacementTypes()[0];
+  if (!argTy->is<BuiltinIntegerType>()) {
+    SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                     "argument to builtin should be a builtin integer");
+    SILType objPointerType = SILType::getBridgeObjectType(SGF.F.getASTContext());
+    SILValue undef = SILUndef::get(objPointerType, SGF.SGM.M);
+    return ManagedValue::forUnmanaged(undef);
+  }
 
   SILValue result = SGF.B.createValueToBridgeObject(loc, args[0].getValue());
   return SGF.emitManagedRetain(loc, result);

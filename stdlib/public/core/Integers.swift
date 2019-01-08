@@ -24,81 +24,16 @@ extension ExpressibleByIntegerLiteral
 }
 
 //===----------------------------------------------------------------------===//
-//===--- Numeric ----------------------------------------------------------===//
+//===--- AdditiveArithmetic -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// Declares methods backing binary arithmetic operators--such as `+`, `-` and
-/// `*`--and their mutating counterparts.
-///
-/// The `Numeric` protocol provides a suitable basis for arithmetic on
-/// scalar values, such as integers and floating-point numbers. You can write
-/// generic methods that operate on any numeric type in the standard library
-/// by using the `Numeric` protocol as a generic constraint.
-///
-/// The following example declares a method that calculates the total of any
-/// sequence with `Numeric` elements.
-///
-///     extension Sequence where Element: Numeric {
-///         func sum() -> Element {
-///             return reduce(0, +)
-///         }
-///     }
-///
-/// The `sum()` method is now available on any sequence or collection with
-/// numeric values, whether it is an array of `Double` or a countable range of
-/// `Int`.
-///
-///     let arraySum = [1.1, 2.2, 3.3, 4.4, 5.5].sum()
-///     // arraySum == 16.5
-///
-///     let rangeSum = (1..<10).sum()
-///     // rangeSum == 45
-///
-/// Conforming to the Numeric Protocol
-/// =====================================
-///
-/// To add `Numeric` protocol conformance to your own custom type, implement
-/// the required mutating methods. Extensions to `Numeric` provide default
-/// implementations for the protocol's nonmutating methods based on the
-/// mutating variants.
-public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
-  /// Creates a new instance from the given integer, if it can be represented
-  /// exactly.
+// FIXME: Add doc comment.
+public protocol AdditiveArithmetic : Equatable {
+  /// The zero value.
   ///
-  /// If the value passed as `source` is not representable exactly, the result
-  /// is `nil`. In the following example, the constant `x` is successfully
-  /// created from a value of `100`, while the attempt to initialize the
-  /// constant `y` from `1_000` fails because the `Int8` type can represent
-  /// `127` at maximum:
-  ///
-  ///     let x = Int8(exactly: 100)
-  ///     // x == Optional(100)
-  ///     let y = Int8(exactly: 1_000)
-  ///     // y == nil
-  ///
-  /// - Parameter source: A value to convert to this type.
-  init?<T : BinaryInteger>(exactly source: T)
-
-  /// A type that can represent the absolute value of any possible value of the
-  /// conforming type.
-  associatedtype Magnitude : Comparable, Numeric
-
-  /// The magnitude of this value.
-  ///
-  /// For any numeric value `x`, `x.magnitude` is the absolute value of `x`.
-  /// You can use the `magnitude` property in operations that are simpler to
-  /// implement in terms of unsigned values, such as printing the value of an
-  /// integer, which is just printing a '-' character in front of an absolute
-  /// value.
-  ///
-  ///     let x = -200
-  ///     // x.magnitude == 200
-  ///
-  /// The global `abs(_:)` function provides more familiar syntax when you need
-  /// to find an absolute value. In addition, because `abs(_:)` always returns
-  /// a value of the same type, even in a generic context, using the function
-  /// instead of the `magnitude` property is encouraged.
-  var magnitude: Magnitude { get }
+  /// - Note: Zero is the identity element for addition; for any value,
+  ///   `x + .zero == x` and `.zero + x == x`.
+  static var zero: Self { get }
 
   /// Adds two values and produces their sum.
   ///
@@ -158,6 +93,91 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
   static func -=(lhs: inout Self, rhs: Self)
+}
+
+public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
+  static var zero: Self {
+    return 0
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//===--- Numeric ----------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+// FIXME: Update comment based on the `AdditiveArithmetic` change.
+/// Declares methods backing binary arithmetic operators--such as `+`, `-` and
+/// `*`--and their mutating counterparts.
+///
+/// The `Numeric` protocol provides a suitable basis for arithmetic on
+/// scalar values, such as integers and floating-point numbers. You can write
+/// generic methods that operate on any numeric type in the standard library
+/// by using the `Numeric` protocol as a generic constraint.
+///
+/// The following example declares a method that calculates the total of any
+/// sequence with `Numeric` elements.
+///
+///     extension Sequence where Element: Numeric {
+///         func sum() -> Element {
+///             return reduce(0, +)
+///         }
+///     }
+///
+/// The `sum()` method is now available on any sequence or collection with
+/// numeric values, whether it is an array of `Double` or a countable range of
+/// `Int`.
+///
+///     let arraySum = [1.1, 2.2, 3.3, 4.4, 5.5].sum()
+///     // arraySum == 16.5
+///
+///     let rangeSum = (1..<10).sum()
+///     // rangeSum == 45
+///
+/// Conforming to the Numeric Protocol
+/// =====================================
+///
+/// To add `Numeric` protocol conformance to your own custom type, implement
+/// the required mutating methods. Extensions to `Numeric` provide default
+/// implementations for the protocol's nonmutating methods based on the
+/// mutating variants.
+public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
+  /// Creates a new instance from the given integer, if it can be represented
+  /// exactly.
+  ///
+  /// If the value passed as `source` is not representable exactly, the result
+  /// is `nil`. In the following example, the constant `x` is successfully
+  /// created from a value of `100`, while the attempt to initialize the
+  /// constant `y` from `1_000` fails because the `Int8` type can represent
+  /// `127` at maximum:
+  ///
+  ///     let x = Int8(exactly: 100)
+  ///     // x == Optional(100)
+  ///     let y = Int8(exactly: 1_000)
+  ///     // y == nil
+  ///
+  /// - Parameter source: A value to convert to this type.
+  init?<T : BinaryInteger>(exactly source: T)
+
+  /// A type that can represent the absolute value of any possible value of the
+  /// conforming type.
+  associatedtype Magnitude : Comparable, Numeric
+
+  /// The magnitude of this value.
+  ///
+  /// For any numeric value `x`, `x.magnitude` is the absolute value of `x`.
+  /// You can use the `magnitude` property in operations that are simpler to
+  /// implement in terms of unsigned values, such as printing the value of an
+  /// integer, which is just printing a '-' character in front of an absolute
+  /// value.
+  ///
+  ///     let x = -200
+  ///     // x.magnitude == 200
+  ///
+  /// The global `abs(_:)` function provides more familiar syntax when you need
+  /// to find an absolute value. In addition, because `abs(_:)` always returns
+  /// a value of the same type, even in a generic context, using the function
+  /// instead of the `magnitude` property is encouraged.
+  var magnitude: Magnitude { get }
 
   /// Multiplies two values and produces their product.
   ///
@@ -298,17 +318,6 @@ extension SignedNumeric {
   }
 }
 
-
-/// Returns the absolute value of the given number.
-///
-/// - Parameter x: A signed number.
-/// - Returns: The absolute value of `x`.
-@inlinable
-public func abs<T : SignedNumeric>(_ x: T) -> T
-  where T.Magnitude == T {
-  return x.magnitude
-}
-
 /// Returns the absolute value of the given number.
 ///
 /// The absolute value of `x` must be representable in the same type. In
@@ -324,10 +333,14 @@ public func abs<T : SignedNumeric>(_ x: T) -> T
 /// - Returns: The absolute value of `x`.
 @inlinable
 public func abs<T : SignedNumeric & Comparable>(_ x: T) -> T {
+  if T.self == T.Magnitude.self {
+    return unsafeBitCast(x.magnitude, to: T.self)
+  }
+
   return x < (0 as T) ? -x : x
 }
 
-extension Numeric {
+extension AdditiveArithmetic {
   /// Returns the given number unchanged.
   ///
   /// You can use the unary plus operator (`+`) to provide symmetry in your
@@ -1430,8 +1443,6 @@ extension BinaryInteger {
 //===----------------------------------------------------------------------===//
 
 extension BinaryInteger {
-  @usableFromInline
-  @_transparent
   internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
 
@@ -2875,7 +2886,7 @@ extension FixedWidthInteger {
 }
 
 extension FixedWidthInteger {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
   public // @testable
   static func _convert<Source : BinaryFloatingPoint>(
@@ -2926,7 +2937,7 @@ extension FixedWidthInteger {
   /// - Parameter source: A floating-point value to convert to an integer.
   ///   `source` must be representable in this type after rounding toward
   ///   zero.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T : BinaryFloatingPoint>(_ source: T) {
@@ -3031,6 +3042,7 @@ extension FixedWidthInteger {
   ///     // 'y' has a binary representation of 11111111_11101011
   ///
   /// - Parameter source: An integer to convert to this type.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= Int.bitWidth {
@@ -3272,6 +3284,7 @@ extension UnsignedInteger {
   /// to find an absolute value. In addition, because `abs(_:)` always returns
   /// a value of the same type, even in a generic context, using the function
   /// instead of the `magnitude` property is encouraged.
+  @inlinable // FIXME(inline-always)
   public var magnitude: Self {
     @inline(__always)
     get { return self }
@@ -3280,6 +3293,7 @@ extension UnsignedInteger {
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// This property is always `false` for unsigned integer types.
+  @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
     @inline(__always)
     get { return false }
@@ -3307,6 +3321,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
@@ -3337,6 +3352,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   ///
   /// - Parameter source: A value to convert to this type of integer.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
@@ -3381,6 +3397,7 @@ extension SignedInteger {
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// This property is always `true` for signed integer types.
+  @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
     @inline(__always)
     get { return true }
@@ -3408,6 +3425,7 @@ extension SignedInteger where Self : FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
@@ -3440,6 +3458,7 @@ extension SignedInteger where Self : FixedWidthInteger {
   ///
   /// - Parameter source: A value to convert to this type of integer.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer

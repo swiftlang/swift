@@ -109,14 +109,6 @@ public typealias StringLiteralType = String
 //===----------------------------------------------------------------------===//
 // Default types for unconstrained number literals
 //===----------------------------------------------------------------------===//
-// Integer literals are limited to 2048 bits.
-// The intent is to have arbitrary-precision literals, but implementing that
-// requires more work.
-//
-// Rationale: 1024 bits are enough to represent the absolute value of min/max
-// IEEE Binary64, and we need 1 bit to represent the sign.  Instead of using
-// 1025, we use the next round number -- 2048.
-public typealias _MaxBuiltinIntegerType = Builtin.Int2048
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE80
 #else
@@ -404,7 +396,7 @@ prefix operator ++
 prefix operator --
 prefix operator !
 prefix operator ~ : BinaryInteger
-prefix operator + : Numeric
+prefix operator + : AdditiveArithmetic
 prefix operator - : SignedNumeric
 prefix operator ...
 prefix operator ..<
@@ -422,15 +414,15 @@ infix operator &>> : BitwiseShiftPrecedence, FixedWidthInteger
 
 infix operator   * : MultiplicationPrecedence, Numeric
 infix operator  &* : MultiplicationPrecedence, FixedWidthInteger
-infix operator   / : MultiplicationPrecedence, BinaryInteger
+infix operator   / : MultiplicationPrecedence, BinaryInteger, FloatingPoint
 infix operator   % : MultiplicationPrecedence, BinaryInteger
 infix operator   & : MultiplicationPrecedence, BinaryInteger
 
 // "Additive"
 
-infix operator   + : AdditionPrecedence, Numeric
+infix operator   + : AdditionPrecedence, AdditiveArithmetic, String, Array, Strideable
 infix operator  &+ : AdditionPrecedence, FixedWidthInteger
-infix operator   - : AdditionPrecedence, Numeric
+infix operator   - : AdditionPrecedence, AdditiveArithmetic, Strideable
 infix operator  &- : AdditionPrecedence, FixedWidthInteger
 infix operator   | : AdditionPrecedence, BinaryInteger
 infix operator   ^ : AdditionPrecedence, BinaryInteger
@@ -482,9 +474,9 @@ infix operator   *= : AssignmentPrecedence, Numeric
 infix operator  &*= : AssignmentPrecedence, FixedWidthInteger
 infix operator   /= : AssignmentPrecedence, BinaryInteger
 infix operator   %= : AssignmentPrecedence, BinaryInteger
-infix operator   += : AssignmentPrecedence, Numeric
+infix operator   += : AssignmentPrecedence, AdditiveArithmetic, String, Array, Strideable
 infix operator  &+= : AssignmentPrecedence, FixedWidthInteger
-infix operator   -= : AssignmentPrecedence, Numeric
+infix operator   -= : AssignmentPrecedence, AdditiveArithmetic, Strideable
 infix operator  &-= : AssignmentPrecedence, FixedWidthInteger
 infix operator  <<= : AssignmentPrecedence, BinaryInteger
 infix operator &<<= : AssignmentPrecedence, FixedWidthInteger

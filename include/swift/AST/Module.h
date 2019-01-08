@@ -28,7 +28,6 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Parse/SyntaxParsingCache.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
@@ -79,6 +78,7 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
+  class SyntaxParsingCache;
   
 namespace syntax {
   class SourceFileSyntax;
@@ -241,13 +241,6 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
-  struct {
-    unsigned TestingEnabled : 1;
-    unsigned FailedToLoad : 1;
-    unsigned ResilienceStrategy : 1;
-    unsigned HasResolvedImports : 1;
-  } Flags;
-
   ModuleDecl(Identifier name, ASTContext &ctx);
 
 public:
@@ -284,32 +277,49 @@ public:
 
   /// Returns true if this module was or is being compiled for testing.
   bool isTestingEnabled() const {
-    return Flags.TestingEnabled;
+    return Bits.ModuleDecl.TestingEnabled;
   }
   void setTestingEnabled(bool enabled = true) {
-    Flags.TestingEnabled = enabled;
+    Bits.ModuleDecl.TestingEnabled = enabled;
+  }
+
+  // Returns true if this module is compiled with implicit dynamic.
+  bool isImplicitDynamicEnabled() const {
+    return Bits.ModuleDecl.ImplicitDynamicEnabled;
+  }
+  void setImplicitDynamicEnabled(bool enabled = true) {
+    Bits.ModuleDecl.ImplicitDynamicEnabled = enabled;
+  }
+
+  /// Returns true if this module was or is begin compile with
+  /// `-enable-private-imports`.
+  bool arePrivateImportsEnabled() const {
+    return Bits.ModuleDecl.PrivateImportsEnabled;
+  }
+  void setPrivateImportsEnabled(bool enabled = true) {
+    Bits.ModuleDecl.PrivateImportsEnabled = true;
   }
 
   /// Returns true if there was an error trying to load this module.
   bool failedToLoad() const {
-    return Flags.FailedToLoad;
+    return Bits.ModuleDecl.FailedToLoad;
   }
   void setFailedToLoad(bool failed = true) {
-    Flags.FailedToLoad = failed;
+    Bits.ModuleDecl.FailedToLoad = failed;
   }
 
   bool hasResolvedImports() const {
-    return Flags.HasResolvedImports;
+    return Bits.ModuleDecl.HasResolvedImports;
   }
   void setHasResolvedImports() {
-    Flags.HasResolvedImports = true;
+    Bits.ModuleDecl.HasResolvedImports = true;
   }
 
   ResilienceStrategy getResilienceStrategy() const {
-    return ResilienceStrategy(Flags.ResilienceStrategy);
+    return ResilienceStrategy(Bits.ModuleDecl.RawResilienceStrategy);
   }
   void setResilienceStrategy(ResilienceStrategy strategy) {
-    Flags.ResilienceStrategy = unsigned(strategy);
+    Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope
@@ -374,6 +384,17 @@ public:
   /// ProtocolConformanceRef if it does conform.
   Optional<ProtocolConformanceRef>
   lookupConformance(Type type, ProtocolDecl *protocol);
+
+  /// Look for the conformance of the given existential type to the given
+  /// protocol.
+  Optional<ProtocolConformanceRef>
+  lookupExistentialConformance(Type type, ProtocolDecl *protocol);
+
+  /// Exposes TypeChecker functionality for querying protocol conformance.
+  /// Returns a valid ProtocolConformanceRef only if all conditional
+  /// requirements are successfully resolved.
+  Optional<ProtocolConformanceRef>
+  conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol);
 
   /// Find a member named \p name in \p container that was declared in this
   /// module.
@@ -851,11 +872,29 @@ public:
 
     /// This source file has access to testable declarations in the imported
     /// module.
-    Testable = 0x2
+    Testable = 0x2,
+
+    /// This source file has access to private declarations in the imported
+    /// module.
+    PrivateImport = 0x4,
   };
 
   /// \see ImportFlags
   using ImportOptions = OptionSet<ImportFlags>;
+
+  typedef std::pair<ImportOptions, StringRef> ImportOptionsAndFilename;
+
+  struct ImportedModuleDesc {
+    ModuleDecl::ImportedModule module;
+    ImportOptions importOptions;
+    StringRef filename;
+
+    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options)
+        : module(module), importOptions(options) {}
+    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
+                       StringRef filename)
+        : module(module), importOptions(options), filename(filename) {}
+  };
 
 private:
   std::unique_ptr<LookupCache> Cache;
@@ -864,7 +903,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
+  ArrayRef<ImportedModuleDesc> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -968,10 +1007,20 @@ public:
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false);
 
-  void
-  addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
+  void addImports(ArrayRef<ImportedModuleDesc> IM);
 
-  bool hasTestableImport(const ModuleDecl *module) const;
+  enum ImportQueryKind {
+    /// Return the results for testable or private imports.
+    TestableAndPrivate,
+    /// Return the results only for testable imports.
+    TestableOnly,
+    /// Return the results only for private imports.
+    PrivateOnly
+  };
+
+  bool
+  hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
+                             ImportQueryKind kind = TestableAndPrivate) const;
 
   void clearLookupCache();
 
@@ -1231,11 +1280,28 @@ protected:
     assert(classof(this) && "invalid kind");
   }
 
+  /// A map from private/fileprivate decls to the file they were defined in.
+  llvm::DenseMap<const ValueDecl *, Identifier> FilenameForPrivateDecls;
+
 public:
+
   /// Returns an arbitrary string representing the storage backing this file.
   ///
   /// This is usually a filesystem path.
   virtual StringRef getFilename() const;
+
+  void addFilenameForPrivateDecl(const ValueDecl *decl, Identifier id) {
+    assert(!FilenameForPrivateDecls.count(decl) ||
+           FilenameForPrivateDecls[decl] == id);
+    FilenameForPrivateDecls[decl] = id;
+  }
+
+  StringRef getFilenameForPrivateDecl(const ValueDecl *decl) {
+    auto it = FilenameForPrivateDecls.find(decl);
+    if (it == FilenameForPrivateDecls.end())
+      return StringRef();
+    return it->second.str();
+  }
 
   /// Look up an operator declaration.
   ///
