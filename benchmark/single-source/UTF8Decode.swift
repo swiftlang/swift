@@ -27,6 +27,38 @@ public let UTF8Decode = [
       runFunction: run_UTF8Decode_InitDecoding,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
+      name: "String.init.decodingUTF8.UMRBP",
+      runFunction: run_UTF8Decode_InitDecodingUMRBP,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "String.init.decodingUTF8.UMRBPSlice",
+      runFunction: run_UTF8Decode_InitDecodingUMRBPSlice,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "String.init.decodingUTF8.URBP",
+      runFunction: run_UTF8Decode_InitDecodingURBP,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "String.init.decodingUTF8.URBPSlice",
+      runFunction: run_UTF8Decode_InitDecodingURBPSlice,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "String.init.decodingUTF8.UMBP",
+      runFunction: run_UTF8Decode_InitDecodingUMBP,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "String.init.decodingUTF8.UMBPSlice",
+      runFunction: run_UTF8Decode_InitDecodingUMBPSlice,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "String.init.decodingUTF8.UBP",
+      runFunction: run_UTF8Decode_InitDecodingUBP,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "String.init.decodingUTF8.UBPSlice",
+      runFunction: run_UTF8Decode_InitDecodingUBPSlice,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
       name: "UTF8Decode_InitFromBytes",
       runFunction: run_UTF8Decode_InitFromBytes,
       tags: [.validation, .api, .String]),
@@ -62,6 +94,20 @@ let allStrings = [ascii, russian, japanese, emoji].map { Array($0.utf8) }
 let allStringsBytes: [UInt8] = Array(allStrings.joined())
 let allStringsData: Data = Data(allStringsBytes)
 
+func withAllStringsUMRBP(_ body: (UnsafeMutableRawBufferPointer) -> Void) -> Void {
+  var all = allStringsBytes
+  all.withUnsafeMutableBytes(body)
+}
+func withAllStringsURBP(_ body: (UnsafeRawBufferPointer) -> Void) -> Void {
+  allStringsBytes.withUnsafeBytes(body)
+}
+func withAllStringsUMBP(_ body: (inout UnsafeMutableBufferPointer<UInt8>) -> Void) -> Void {
+  var all = allStringsBytes
+  all.withUnsafeMutableBufferPointer(body)
+}
+func withAllStringsUBP(_ body: (UnsafeBufferPointer<UInt8>) -> Void) -> Void {
+  allStringsBytes.withUnsafeBufferPointer(body)
+}
 
 @inline(never)
 public func run_UTF8Decode(_ N: Int) {
@@ -104,6 +150,72 @@ public func run_UTF8Decode_InitFromBytes(_ N: Int) {
   let input = allStringsBytes
   for _ in 0..<200*N {
     blackHole(String(bytes: input, encoding: .utf8))
+  }
+}
+
+@inline(never)
+public func run_UTF8Decode_InitDecodingUMRBP(_ N: Int) {
+  withAllStringsUMRBP { (input: UnsafeMutableRawBufferPointer) in
+    for _ in 0..<500*N {
+      blackHole(String(decoding: input, as: UTF8.self))
+    }
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitDecodingUMRBPSlice(_ N: Int) {
+  withAllStringsUMRBP { (input: UnsafeMutableRawBufferPointer) in
+    for _ in 0..<N {
+      blackHole(String(decoding: input[...], as: UTF8.self))
+    }
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitDecodingURBP(_ N: Int) {
+  withAllStringsURBP { (input: UnsafeRawBufferPointer) in
+    for _ in 0..<500*N {
+      blackHole(String(decoding: input, as: UTF8.self))
+    }
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitDecodingURBPSlice(_ N: Int) {
+  withAllStringsURBP { (input: UnsafeRawBufferPointer) in
+    for _ in 0..<N {
+      blackHole(String(decoding: input[...], as: UTF8.self))
+    }
+  }
+}
+
+@inline(never)
+public func run_UTF8Decode_InitDecodingUMBP(_ N: Int) {
+  withAllStringsUMBP { (input: inout UnsafeMutableBufferPointer<UInt8>) in
+    for _ in 0..<500*N {
+      blackHole(String(decoding: input, as: UTF8.self))
+    }
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitDecodingUMBPSlice(_ N: Int) {
+  withAllStringsUMBP { (input: inout UnsafeMutableBufferPointer<UInt8>) in
+    for _ in 0..<N {
+      blackHole(String(decoding: input[...], as: UTF8.self))
+    }
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitDecodingUBP(_ N: Int) {
+  withAllStringsUBP { (input: UnsafeBufferPointer<UInt8>) in
+    for _ in 0..<500*N {
+      blackHole(String(decoding: input, as: UTF8.self))
+    }
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitDecodingUBPSlice(_ N: Int) {
+  withAllStringsUBP { (input: UnsafeBufferPointer<UInt8>) in
+    for _ in 0..<N {
+      blackHole(String(decoding: input[...], as: UTF8.self))
+    }
   }
 }
 
