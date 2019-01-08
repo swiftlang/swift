@@ -228,7 +228,7 @@ struct TestFindFuncParam5_6<T> {
   func testFindFuncParam5(a: Int, b: T) {
     #^FIND_FUNC_PARAM_5^#
 // FIND_FUNC_PARAM_5: Begin completions
-// FIND_FUNC_PARAM_5-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
+// FIND_FUNC_PARAM_5-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
 // FIND_FUNC_PARAM_5-DAG: Decl[LocalVar]/Local: self[#TestFindFuncParam5_6<T>#]{{; name=.+$}}
 // FIND_FUNC_PARAM_5-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // FIND_FUNC_PARAM_5-DAG: Decl[LocalVar]/Local: b[#T#]{{; name=.+$}}
@@ -238,7 +238,7 @@ struct TestFindFuncParam5_6<T> {
   func testFindFuncParam6<U>(a: Int, b: T, c: U) {
     #^FIND_FUNC_PARAM_6^#
 // FIND_FUNC_PARAM_6: Begin completions
-// FIND_FUNC_PARAM_6-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
+// FIND_FUNC_PARAM_6-DAG: Decl[GenericTypeParam]/Local:       T[#T#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[GenericTypeParam]/Local:       U[#U#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[LocalVar]/Local:               self[#TestFindFuncParam5_6<T>#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[LocalVar]/Local:               a[#Int#]{{; name=.+$}}
@@ -309,10 +309,10 @@ class TestFindConstructorParam4<T> {
   init(a: Int, b: T) {
     #^FIND_CONSTRUCTOR_PARAM_4^#
 // FIND_CONSTRUCTOR_PARAM_4: Begin completions
-// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:               self[#TestFindConstructorParam4<T>#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:               a[#Int#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:               b[#T#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:         self[#TestFindConstructorParam4<T>#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:         a[#Int#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:         b[#T#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_4: End completions
   }
 }
@@ -321,12 +321,12 @@ class TestFindConstructorParam5<T> {
   init<U>(a: Int, b: T, c: U) {
     #^FIND_CONSTRUCTOR_PARAM_5^#
 // FIND_CONSTRUCTOR_PARAM_5: Begin completions
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[GenericTypeParam]/Local:       U[#U#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:               self[#TestFindConstructorParam5<T>#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:               a[#Int#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:               b[#T#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:               c[#U#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[GenericTypeParam]/Local: U[#U#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         self[#TestFindConstructorParam5<T>#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         a[#Int#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         b[#T#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         c[#U#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_5: End completions
   }
 }
@@ -357,7 +357,7 @@ class TestFindDestructorParam2<T> {
   deinit {
     #^FIND_DESTRUCTOR_PARAM_2^#
 // FIND_DESTRUCTOR_PARAM_2: Begin completions
-// FIND_DESTRUCTOR_PARAM_2-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
+// FIND_DESTRUCTOR_PARAM_2-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
 // FIND_DESTRUCTOR_PARAM_2-DAG: Decl[LocalVar]/Local: self[#TestFindDestructorParam2<T>#]{{; name=.+$}}
 // FIND_DESTRUCTOR_PARAM_2: End completions
   }
