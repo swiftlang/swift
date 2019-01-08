@@ -1576,3 +1576,40 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
 
   return nullptr;
 }
+
+/// Simplify conversions between thick and objc metatypes.
+SILInstruction *CastOptimizer::optimizeMetatypeConversion(
+    ConversionInst *MCI, MetatypeRepresentation Representation) {
+  SILValue Op = MCI->getOperand(0);
+  // Instruction has a proper target type already.
+  SILType Ty = MCI->getType();
+  auto MetatypeTy = Op->getType().getAs<AnyMetatypeType>();
+
+  if (MetatypeTy->getRepresentation() != Representation)
+    return nullptr;
+
+  // Rematerialize the incoming metatype instruction with the outgoing type.
+  auto replaceCast = [&](SingleValueInstruction *NewCast) {
+    assert(Ty.getAs<AnyMetatypeType>()->getRepresentation()
+           == NewCast->getType().getAs<AnyMetatypeType>()->getRepresentation());
+    MCI->replaceAllUsesWith(NewCast);
+    EraseInstAction(MCI);
+    return NewCast;
+  };
+  if (auto *MI = dyn_cast<MetatypeInst>(Op)) {
+    return replaceCast(
+        SILBuilderWithScope(MCI).createMetatype(MCI->getLoc(), Ty));
+  }
+  // For metatype instructions that require an operand, generate the new
+  // metatype at the same position as the original to avoid extending the
+  // lifetime of `Op` past its destroy.
+  if (auto *VMI = dyn_cast<ValueMetatypeInst>(Op)) {
+    return replaceCast(SILBuilderWithScope(VMI).createValueMetatype(
+        MCI->getLoc(), Ty, VMI->getOperand()));
+  }
+  if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op)) {
+    return replaceCast(SILBuilderWithScope(EMI).createExistentialMetatype(
+        MCI->getLoc(), Ty, EMI->getOperand()));
+  }
+  return nullptr;
+}

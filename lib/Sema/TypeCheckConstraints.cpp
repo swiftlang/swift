@@ -2729,10 +2729,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
-  // If this expression is already typechecked and has an i1 type, then it has
-  // already got its conversion from Boolean back to i1.  Just re-typecheck
-  // it.
-  if (expr->getType() && expr->getType()->isBuiltinIntegerType(1)) {
+  // If this expression is already typechecked and has type Bool, then just
+  // re-typecheck it.
+  if (expr->getType() && expr->getType()->isBool()) {
     auto resultTy = typeCheckExpression(expr, dc);
     return !resultTy;
   }
@@ -2758,19 +2757,6 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
                        cs.getConstraintLocator(expr));
       return false;
     }
-
-    // Convert the result to a Builtin.i1.
-    Expr *appliedSolution(constraints::Solution &solution,
-                          Expr *expr) override {
-      auto &cs = solution.getConstraintSystem();
-
-      auto converted =
-        solution.convertBooleanTypeToBuiltinI1(expr,
-                                             cs.getConstraintLocator(OrigExpr));
-      cs.setExprTypes(converted);
-      return converted;
-    }
-    
   };
 
   ConditionListener listener;

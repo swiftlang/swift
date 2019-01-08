@@ -231,13 +231,13 @@ _findNominalTypeDescriptor(Demangle::NodePointer node,
 /// Find the context descriptor for the type extended by the given extension.
 static const ContextDescriptor *
 _findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
+                                   Demangler &demangler,
                                    Demangle::NodePointer *demangledNode
                                      = nullptr) {
   Demangle::NodePointer localNode;
   Demangle::NodePointer &node = demangledNode ? *demangledNode : localNode;
 
   auto mangledName = extension->getMangledExtendedContext();
-  auto demangler = getDemanglerForRuntimeTypeResolution();
   node = demangler.demangleType(mangledName);
   if (!node)
     return nullptr;
@@ -423,7 +423,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
       Demangle::NodePointer extendedContextDemangled;
       auto extendedDescriptorFromDemangled =
-        _findExtendedTypeContextDescriptor(extension,
+        _findExtendedTypeContextDescriptor(extension, demangler,
                                            &extendedContextDemangled);
 
       // Determine whether the contexts match.
@@ -822,8 +822,10 @@ bool swift::_gatherGenericParameterCounts(
                                  std::vector<unsigned> &genericParamCounts) {
   // If we have an extension descriptor, extract the extended type and use
   // that.
+  auto demangler = getDemanglerForRuntimeTypeResolution();
   if (auto extension = dyn_cast<ExtensionContextDescriptor>(descriptor)) {
-    if (auto extendedType = _findExtendedTypeContextDescriptor(extension))
+    if (auto extendedType =
+            _findExtendedTypeContextDescriptor(extension, demangler))
       descriptor = extendedType;
   }
 

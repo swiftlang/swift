@@ -1,0 +1,8 @@
+// This file is processed by CMake.
+// See https://cmake.org/cmake/help/v3.0/command/configure_file.html.
+
+#ifndef SWIFT_RUNTIME_CMAKECONFIG_H
+
+#cmakedefine01 SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+
+#endif

@@ -129,6 +129,10 @@ public:
                                        SILValue Dest, CanType Source,
                                        CanType Target, SILBasicBlock *SuccessBB,
                                        SILBasicBlock *FailureBB);
+
+  SILInstruction *
+  optimizeMetatypeConversion(ConversionInst *MCI,
+                             MetatypeRepresentation Representation);
 };
 
 } // namespace swift

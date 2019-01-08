@@ -136,9 +136,10 @@
 /// Darwin reserves the low 4GB of address space.
 #define SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER 0x100000000ULL
 
-// TBI guarantees the top byte of pointers is unused.
+// TBI guarantees the top byte of pointers is unused, but ARMv8.5-A
+// claims the bottom four bits of that for memory tagging.
 // Heap objects are eight-byte aligned.
-#define SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK 0xFF00000000000007ULL
+#define SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK 0xF000000000000007ULL
 
 // Objective-C reserves just the high bit for tagged pointers.
 #define SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK 0x8000000000000000ULL

@@ -110,7 +110,7 @@ class CallbackSubC : CallbackBase {
 
 //
 class MyHashableNSObject: NSObject {
-  override var hashValue: Int { // expected-warning{{override of 'NSObject.hashValue' is deprecated}}
+  override var hashValue: Int { // expected-error{{overriding non-open property outside of its defining module}} expected-error{{overriding non-@objc declarations from extensions is not supported}}
     return 0
   }
 }

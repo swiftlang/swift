@@ -1700,11 +1700,11 @@ ERROR(type_witness_not_accessible_type,none,
       "matches a requirement in protocol %3",
       (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
 ERROR(witness_not_usable_from_inline,none,
-      "%0 %1 must be declared '@usableFromInline' because "
+      "%0 %1 must be declared '@usableFromInline' "
       "because it matches a requirement in protocol %2",
       (DescriptiveDeclKind, DeclName, DeclName))
 WARNING(witness_not_usable_from_inline_warn,none,
-        "%0 %1 should be declared '@usableFromInline' because "
+        "%0 %1 should be declared '@usableFromInline' "
         "because it matches a requirement in protocol %2",
         (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(type_witness_objc_generic_parameter,none,
@@ -3942,6 +3942,10 @@ ERROR(dynamic_replacement_function_not_found, none,
      "replaced function %0 could not be found", (DeclName))
 ERROR(dynamic_replacement_accessor_not_found, none,
       "replaced accessor for %0 could not be found", (DeclName))
+ERROR(dynamic_replacement_accessor_ambiguous, none,
+      "replaced accessor for %0 occurs in multiple places", (DeclName))
+NOTE(dynamic_replacement_accessor_ambiguous_candidate, none,
+      "candidate accessor found in module %0", (DeclName))
 ERROR(dynamic_replacement_function_of_type_not_found, none,
       "replaced function %0 of type %1 could not be found", (DeclName, Type))
 NOTE(dynamic_replacement_found_function_of_type, none,
@@ -4276,6 +4280,10 @@ WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
 WARNING(override_nsobject_hashvalue,none,
         "override of 'NSObject.hashValue' is deprecated; "
         "override 'NSObject.hash' to get consistent hashing behavior", ())
+WARNING(hashvalue_implementation,none,
+        "'Hashable.hashValue' is deprecated as a protocol requirement; "
+        "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
+        (Type))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

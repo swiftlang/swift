@@ -42,7 +42,12 @@ struct SomeStructure: Hashable {
     }
 
     // FIXME: we don't care about this, but Any only finds == on Hashables
-    var hashValue: Int { return i }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(i)
+        hasher.combine(str)
+        hasher.combine(sub.i)
+        hasher.combine(sub.str)
+    }
 }
 
 /*

@@ -996,7 +996,7 @@ public:
       case StmtConditionElement::CK_Boolean: {
         auto *E = elt.getBoolean();
         if (shouldVerifyChecked(E))
-          checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
+          checkSameType(E->getType(), Ctx.getBoolDecl()->getDeclaredType(),
                         "condition type");
         break;
       }
@@ -2070,8 +2070,8 @@ public:
       PrettyStackTraceExpr debugStack(Ctx, "verifying IfExpr", E);
 
       auto condTy = E->getCondExpr()->getType();
-      if (!condTy->isBuiltinIntegerType(1)) {
-        Out << "IfExpr condition is not an i1\n";
+      if (!condTy->isBool()) {
+        Out << "IfExpr condition is not Bool\n";
         abort();
       }
 

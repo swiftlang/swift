@@ -46,6 +46,9 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
     [&](const ContextDescriptor *context) -> NodePointer {
       if (demangledGenerics.empty())
         return nullptr;
+
+      if (context->getKind() == ContextDescriptorKind::Anonymous)
+        return nullptr;
       
       auto generics = context->getGenericContext();
       if (!generics)

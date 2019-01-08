@@ -4801,8 +4801,12 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   auto T1 = OrigT1->getRepresentative();
   auto T2 = OrigT2->getRepresentative();
 
-  // Pick representative based on the canonical ordering of the type parameters.
-  if (compareDependentTypes(depType2, depType1) < 0) {
+  // Decide which potential archetype is to be considered the representative.
+  // We prefer potential archetypes with lower nesting depths, because it
+  // prevents us from unnecessarily building deeply nested potential archetypes.
+  unsigned nestingDepth1 = T1->getNestingDepth();
+  unsigned nestingDepth2 = T2->getNestingDepth();
+  if (nestingDepth2 < nestingDepth1) {
     std::swap(T1, T2);
     std::swap(OrigT1, OrigT2);
     std::swap(equivClass, equivClass2);
@@ -6832,6 +6836,14 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 
           auto locA = (*a)->constraint.source->getLoc();
           auto locB = (*b)->constraint.source->getLoc();
+
+          // Put invalid locations after valid ones.
+          if (locA.isInvalid() || locB.isInvalid()) {
+            if (locA.isInvalid() != locB.isInvalid())
+              return locA.isValid() ? 1 : -1;
+
+            return 0;
+          }
 
           auto bufferA = sourceMgr.findBufferContainingLoc(locA);
           auto bufferB = sourceMgr.findBufferContainingLoc(locB);
