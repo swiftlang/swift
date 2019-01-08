@@ -2688,8 +2688,6 @@ ERROR(differentiable_attr_specified_not_function,none,
 ERROR(differentiable_attr_ambiguous_function_identifier,none,
       "ambiguous or overloaded identifier %0 cannot be used in @differentiable "
       "attribute", (DeclName))
-ERROR(differentiable_attr_forward_mode_unsupported,none,
-      "forward-mode automatic differentiation is not supported yet", ())
 ERROR(differentiable_attr_invalid_access,none,
       "associated differentiation function %0 is required to either be public "
       "or @usableFromInline because the original function %1 is public or "
@@ -2700,6 +2698,16 @@ ERROR(differentiable_attr_wrt_not_differentiable,none,
 ERROR(differentiable_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
+ERROR(differentiable_attr_empty_where_clause,none,
+      "empty 'where' clause in @differentiable attribute", ())
+ERROR(differentiable_attr_nongeneric_trailing_where,none,
+      "trailing 'where' clause in @differentiable attribute of non-generic function %0", (DeclName))
+ERROR(differentiable_attr_only_generic_param_req,none,
+      "only requirements on generic parameters are supported by @differentiable attribute", ())
+ERROR(differentiable_attr_non_protocol_type_constraint_req,none,
+      "only conformances to protocol types are supported by @differentiable attribute", ())
+ERROR(differentiable_attr_unsupported_req_kind,none,
+      "layout requirement are not supported by @differentiable attribute", ())
 
 ERROR(compiler_evaluable_bad_context,none,
       "@compilerEvaluable functions not allowed here", ())
