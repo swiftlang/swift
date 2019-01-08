@@ -1333,8 +1333,7 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
-  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
-  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
+  ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
   ParserResult<Expr> parseExprPoundAssert();
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParserResult<Expr>
