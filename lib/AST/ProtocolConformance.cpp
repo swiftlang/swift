@@ -103,6 +103,14 @@ ProtocolConformanceRef::subst(Type origType,
   if (isConcrete())
     return ProtocolConformanceRef(getConcrete()->subst(subs, conformances,
                                                        options));
+  // If the type is an opaque archetype, the conformance will remain abstract,
+  // unless we're specifically substituting opaque types.
+  if (auto origArchetype = origType->getAs<ArchetypeType>()) {
+    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+        && isa<OpaqueTypeArchetypeType>(origArchetype->getRoot())) {
+      return *this;
+    }
+  }
 
   // Otherwise, compute the substituted type.
   auto substType = origType.subst(subs, conformances,
