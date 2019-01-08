@@ -4358,9 +4358,14 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   
   auto newOpaque = ::new (mem) OpaqueTypeArchetypeType(Decl, Substitutions,
                                                     properties,
-                                                    signature,
                                                     opaqueInterfaceTy,
                                                     protos, superclass, layout);
+  
+  // Create a generic environment and bind the opaque archetype to the
+  // opaque interface type from the decl's signature.
+  auto env = signature->createGenericEnvironment();
+  env->addMapping(GenericParamKey(opaqueInterfaceTy), newOpaque);
+  newOpaque->Environment = env;
   
   // Look up the insertion point in the folding set again in case something
   // invalidated it above.
