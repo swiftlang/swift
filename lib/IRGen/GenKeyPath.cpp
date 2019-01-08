@@ -1269,14 +1269,18 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
       var->setConstant(true);
       var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
       var->setAlignment(4);
-      
+
       TheTrivialPropertyDescriptor = var;
     } else {
       auto entity = LinkEntity::forPropertyDescriptor(prop->getDecl());
       auto linkInfo = LinkInfo::get(*this, entity, ForDefinition);
-      llvm::GlobalAlias::create(linkInfo.getLinkage(),
-                                linkInfo.getName(),
-                                TheTrivialPropertyDescriptor);
+      auto *GA = llvm::GlobalAlias::create(linkInfo.getLinkage(),
+                                           linkInfo.getName(),
+                                           TheTrivialPropertyDescriptor);
+      ApplyIRLinkage({linkInfo.getLinkage(),
+                      linkInfo.getVisibility(),
+                      llvm::GlobalValue::DLLExportStorageClass})
+          .to(GA);
     }
     return;
   }
