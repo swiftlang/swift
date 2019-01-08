@@ -35,7 +35,7 @@ AllWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal",
                 "longSharedPrefix"]
 ComparisonWorkloads = AllWorkloads
 HashingWorkloads = AllWorkloads[:-1]
-NormalizedIteratorWorkloads = AllWorkloads[:-1]
+NormalizationWorkloads = AllWorkloads[:-1]
 
 LegacyFactor = dict(abnormal=20, emoji=4, latin1=2, fastPrenormal=10,
                     slowerPrenormal=10, nonBMPSlowestPrenormal=10, zalgo=25)
@@ -68,15 +68,15 @@ public let StringHashing: [BenchmarkInfo] = [
 % end # HashingWorkloads
 ]
 
-public let NormalizedIterator: [BenchmarkInfo] = [
-% for Name in NormalizedIteratorWorkloads:
+public let StringNormalization: [BenchmarkInfo] = [
+% for Name in NormalizationWorkloads:
   BenchmarkInfo(
     name: "NormalizedIterator_${Name}",
-    runFunction: run_NormalizedIterator_${Name},
+    runFunction: run_StringNormalization_${Name},
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_${Name}) }${legacyFactor(Name)}
   ),
-% end # NormalizedIteratorWorkloads
+% end # NormalizationWorkloads
 ]
 
 % for Name in AllWorkloads:
@@ -116,9 +116,9 @@ public func run_StringHashing_${Name}(_ N: Int) {
 
 % end # HashingWorkloads
 
-%for Name in NormalizedIteratorWorkloads:
+%for Name in NormalizationWorkloads:
 @inline(never)
-public func run_NormalizedIterator_${Name}(_ N: Int) {
+public func run_StringNormalization_${Name}(_ N: Int) {
   let workload: Workload = Workload.${Name}
   let tripCount = workload.tripCount
   let payload = workload.payload
@@ -131,7 +131,8 @@ public func run_NormalizedIterator_${Name}(_ N: Int) {
   }
 }
 
-% end # NormalizedIteratorWorkloads
+% end # NormalizationWorkloads
+
 
 struct Workload {
   static let N = 100
