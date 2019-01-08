@@ -34,19 +34,19 @@
 #define BRIDGING_KNOWN_TYPE(module, type)
 #endif
 
-#ifndef BRIDGING_KNOWN_TYPE_WITH_MODULES_4
-#define BRIDGING_KNOWN_TYPE_WITH_MODULES_4(module1, module2, module3, module4, type)
+#ifndef BRIDGING_KNOWN_TYPE_WITH_MODULES_2
+#define BRIDGING_KNOWN_TYPE_WITH_MODULES_2(module1, module2, type)
 #endif
 
 #ifndef BRIDGE_TYPE
 #define BRIDGE_TYPE(bmodule, btype, nmodule, ntype, opt)
 #endif
 
-BRIDGING_KNOWN_TYPE_WITH_MODULES_4(SwiftFoundationBase, SwiftFoundation, FoundationBase, Foundation, NSString)
-BRIDGING_KNOWN_TYPE_WITH_MODULES_4(SwiftFoundationBase, SwiftFoundation, FoundationBase, Foundation, NSArray)
-BRIDGING_KNOWN_TYPE_WITH_MODULES_4(SwiftFoundationBase, SwiftFoundation, FoundationBase, Foundation, NSDictionary)
-BRIDGING_KNOWN_TYPE_WITH_MODULES_4(SwiftFoundationBase, SwiftFoundation, FoundationBase, Foundation, NSSet)
-BRIDGING_KNOWN_TYPE_WITH_MODULES_4(SwiftFoundationBase, SwiftFoundation, FoundationBase, Foundation, NSError)
+BRIDGING_KNOWN_TYPE_WITH_MODULES_2(FoundationBase, Foundation, NSString)
+BRIDGING_KNOWN_TYPE_WITH_MODULES_2(FoundationBase, Foundation, NSArray)
+BRIDGING_KNOWN_TYPE_WITH_MODULES_2(FoundationBase, Foundation, NSDictionary)
+BRIDGING_KNOWN_TYPE_WITH_MODULES_2(FoundationBase, Foundation, NSSet)
+BRIDGING_KNOWN_TYPE_WITH_MODULES_2(FoundationBase, Foundation, NSError)
 BRIDGING_KNOWN_TYPE(Swift, String)
 BRIDGING_KNOWN_TYPE(ObjectiveC, ObjCBool)
 BRIDGING_KNOWN_TYPE(ObjectiveC, Selector)
@@ -59,4 +59,4 @@ BRIDGE_TYPE(Darwin, DarwinBoolean, Swift, Bool, false)
 
 #undef BRIDGING_KNOWN_TYPE
 #undef BRIDGE_TYPE
-#undef BRIDGING_KNOWN_TYPE_WITH_MODULES_4
+#undef BRIDGING_KNOWN_TYPE_WITH_MODULES_2

@@ -697,7 +697,7 @@ class TypeConverter {
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   Optional<CanType> BridgedType##Ty;
-#define BRIDGING_KNOWN_TYPE_WITH_MODULES_4(_1, _2, _3, _4, BridgedType) \
+#define BRIDGING_KNOWN_TYPE_WITH_MODULES_2(_1, _2, BridgedType) \
   Optional<CanType> BridgedType##Ty;
 #include "swift/SIL/BridgedTypes.def"
 
@@ -952,7 +952,7 @@ public:
   /// Known types for bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType get##BridgedType##Type();
-#define BRIDGING_KNOWN_TYPE_WITH_MODULES_4(_1, _2, _3, _4, BridgedType) \
+#define BRIDGING_KNOWN_TYPE_WITH_MODULES_2(_1, _2, BridgedType) \
   CanType get##BridgedType##Type();
 #include "swift/SIL/BridgedTypes.def"
 

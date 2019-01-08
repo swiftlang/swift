@@ -848,13 +848,7 @@ StructDecl *ASTContext::getObjCBoolDecl() const {
 #define GET_FOUNDATION_DECL(NAME) \
 ClassDecl *ASTContext::get##NAME##Decl() const { \
   if (!getImpl().NAME##Decl) { \
-    ModuleDecl *M = getLoadedModule(Id_SwiftFoundationBase); \
-    if (!M) { \
-      M = getLoadedModule(Id_SwiftFoundation); \
-    } \
-    if (!M) { \
-      M = getLoadedModule(Id_FoundationBase); \
-    } \
+    ModuleDecl *M = getLoadedModule(Id_FoundationBase); \
     if (!M) { \
       M = getLoadedModule(Id_Foundation); \
     } \
