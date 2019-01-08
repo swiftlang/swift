@@ -754,7 +754,39 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 }
 
 void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
+  if (auto *proto = dyn_cast<ProtocolDecl>(typeDecl)) {
+    // Compute the requirement signature first.
+    if (!proto->isRequirementSignatureComputed())
+      proto->computeRequirementSignature();
+
+    // The generic signature and environment is created lazily by
+    // GenericContext::getGenericSignature(), so there is nothing we
+    // need to do.
+
+    // Debugging of the generic signature builder and generic signature
+    // generation.
+    if (Context.LangOpts.DebugGenericSignatures) {
+      auto *sig = proto->getGenericSignature();
+
+      proto->printContext(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "Generic signature: ";
+      sig->print(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "Canonical generic signature: ";
+      sig->getCanonicalSignature()->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+
+    return;
+  }
+
   assert(!typeDecl->getGenericEnvironment());
+
+  // We don't go down this path for protocols; instead, the generic signature
+  // is simple enough that GenericContext::getGenericSignature() can build it
+  // directly.
+  assert(!isa<ProtocolDecl>(typeDecl));
 
   auto *gp = typeDecl->getGenericParams();
   auto *dc = typeDecl->getDeclContext();
@@ -766,13 +798,6 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   }
 
   gp->setDepth(typeDecl->getGenericContextDepth());
-
-  // For a protocol, compute the requirement signature first. It will be used
-  // by clients of the protocol.
-  if (auto proto = dyn_cast<ProtocolDecl>(typeDecl)) {
-    if (!proto->isRequirementSignatureComputed())
-      proto->computeRequirementSignature();
-  }
 
   auto *env = checkGenericEnvironment(gp, dc,
                                       dc->getGenericSignatureOfContext(),
