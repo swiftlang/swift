@@ -1029,70 +1029,78 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
 
+    // A reference wrapper around a Range<Int> for when the range of a data buffer is too large to whole in a single word.
+    // Inlinability strategy: everything should be inlinable as trivial.
     @usableFromInline
     @_fixed_layout
     internal final class RangeReference {
-        @usableFromInline
-        var range: Range<Int>
+        @usableFromInline var range: Range<Int>
 
-        @inlinable
-        var lowerBound: Int { return range.lowerBound }
+        @inlinable @inline(__always) // This is @inlinable as trivially forwarding.
+        var lowerBound: Int {
+            return range.lowerBound
+        }
 
-        @inlinable
-        var upperBound: Int { return range.upperBound }
+        @inlinable @inline(__always) // This is @inlinable as trivially forwarding.
+        var upperBound: Int {
+            return range.upperBound
+        }
 
-        @inlinable
-        var count: Int { return range.upperBound - range.lowerBound }
+        @inlinable @inline(__always) // This is @inlinable as trivially computable.
+        var count: Int {
+            return range.upperBound - range.lowerBound
+        }
 
-        @inlinable
+        @inlinable @inline(__always) // This is @inlinable as a trivial initializer.
         init(_ range: Range<Int>) {
             self.range = range
         }
     }
 
+    // A buffer of bytes whose range is too large to fit in a signle word. Used alongside a RangeReference to make it fit into _Representation's two-word size.
+    // Inlinability strategy: everything here should be easily inlinable as large _DataStorage methods should not inline into here.
     @usableFromInline
     @_fixed_layout
     internal struct LargeSlice {
         // ***WARNING***
         // These ivars are specifically laid out so that they cause the enum _Representation to be 16 bytes on 64 bit platforms. This means we _MUST_ have the class type thing last
-        @usableFromInline
-        var slice: RangeReference
-        @usableFromInline
-        var storage: _DataStorage
+        @usableFromInline var slice: RangeReference
+        @usableFromInline var storage: _DataStorage
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(_ buffer: UnsafeRawBufferPointer) {
             self.init(_DataStorage(bytes: buffer.baseAddress, length: buffer.count), count: buffer.count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(capacity: Int) {
             self.init(_DataStorage(capacity: capacity), count: 0)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(count: Int) {
             self.init(_DataStorage(length: count), count: count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(_ inline: InlineData) {
-            self.init(inline.withUnsafeBytes { return _DataStorage(bytes: $0.baseAddress, length: $0.count) }, count: inline.count)
+            let storage = inline.withUnsafeBytes { return _DataStorage(bytes: $0.baseAddress, length: $0.count) }
+            self.init(storage, count: inline.count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a trivial initializer.
         init(_ slice: InlineSlice) {
             self.storage = slice.storage
             self.slice = RangeReference(slice.range)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a trivial initializer.
         init(_ storage: _DataStorage, count: Int) {
             self.storage = storage
-            slice = RangeReference(0..<count)
+            self.slice = RangeReference(0..<count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable (and inlining may help avoid retain-release traffic).
         mutating func ensureUniqueReference() {
             if !isKnownUniquelyReferenced(&storage) {
                 storage = storage.mutableCopy(range)
@@ -1102,25 +1110,29 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
-        var startIndex: Int { return slice.range.lowerBound }
+        @inlinable // This is @inlinable as trivially forwarding.
+        var startIndex: Int {
+            return slice.range.lowerBound
+        }
 
-        @inlinable
-        var endIndex: Int { return slice.range.upperBound }
+        @inlinable // This is @inlinable as trivially forwarding.
+        var endIndex: Int {
+          return slice.range.upperBound
+        }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially forwarding.
         var capacity: Int {
             return storage.capacity
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         mutating func reserveCapacity(_ minimumCapacity: Int) {
             ensureUniqueReference()
             // the current capacity can be zero (representing externally owned buffer), and count can be greater than the capacity
             storage.ensureUniqueBufferReference(growingTo: Swift.max(minimumCapacity, count))
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         var count: Int {
             get {
                 return slice.count
@@ -1132,28 +1144,30 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
-        var range: Range<Int> { return slice.range }
+        @inlinable // This is @inlinable as it is trivially forwarding.
+        var range: Range<Int> {
+            return slice.range
+        }
 
-        @inlinable
+        @inlinable // This is @inlinable as a generic, trivially forwarding function.
         func withUnsafeBytes<Result>(_ apply: (UnsafeRawBufferPointer) throws -> Result) rethrows -> Result {
             return try storage.withUnsafeBytes(in: range, apply: apply)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a generic, trivially forwarding function.
         mutating func withUnsafeMutableBytes<Result>(_ apply: (UnsafeMutableRawBufferPointer) throws -> Result) rethrows -> Result {
             ensureUniqueReference()
             return try storage.withUnsafeMutableBytes(in: range, apply: apply)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         mutating func append(contentsOf buffer: UnsafeRawBufferPointer) {
             ensureUniqueReference()
             storage.replaceBytes(in: NSRange(location: range.upperBound, length: storage.length - (range.upperBound - storage._offset)), with: buffer.baseAddress, length: buffer.count)
             slice.range = slice.range.lowerBound..<slice.range.upperBound + buffer.count
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         subscript(index: Index) -> UInt8 {
             get {
                 precondition(startIndex <= index, "index \(index) is out of bounds of \(startIndex)..<\(endIndex)")
@@ -1168,12 +1182,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially forwarding.
         func bridgedReference() -> NSData {
             return storage.bridgedReference(self.range)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         mutating func resetBytes(in range: Range<Int>) {
             precondition(range.lowerBound <= endIndex, "index \(range.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
             ensureUniqueReference()
@@ -1183,7 +1197,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         mutating func replaceSubrange(_ subrange: Range<Index>, with bytes: UnsafeRawPointer?, count cnt: Int) {
             precondition(startIndex <= subrange.lowerBound, "index \(subrange.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
             precondition(subrange.lowerBound <= endIndex, "index \(subrange.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
@@ -1198,7 +1212,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             slice.range = slice.range.lowerBound..<resultingUpper
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         func copyBytes(to pointer: UnsafeMutableRawPointer, from range: Range<Int>) {
             precondition(startIndex <= range.lowerBound, "index \(range.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
             precondition(range.lowerBound <= endIndex, "index \(range.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
