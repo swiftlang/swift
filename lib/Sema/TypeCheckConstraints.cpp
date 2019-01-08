@@ -2965,9 +2965,13 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
 
       if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
         auto root = archetypeType->getRoot();
+        // We leave opaque types and their nested associated types alone here.
+        // They're globally available.
+        if (isa<OpaqueTypeArchetypeType>(root))
+          return origType;
         // For other nested types, fail here so the default logic in subst()
         // for nested types applies.
-        if (root != archetypeType)
+        else if (root != archetypeType)
           return Type();
         
         auto locator = cs.getConstraintLocator(nullptr);

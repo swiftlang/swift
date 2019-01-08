@@ -4758,18 +4758,17 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
   /// The substitutions into the interface signature of the opaque type.
   SubstitutionMap Substitutions;
   
-  /// The generic signature used to build out this archetype, and its
-  /// nested archetypes.
-  GenericSignature *BoundSignature;
+  /// A GenericEnvironment with this opaque archetype bound to the interface
+  /// type of the output type from the OpaqueDecl.
+  GenericEnvironment *Environment;
   
 public:
   /// Get 
   
   /// Get an opaque archetype representing the underlying type of the given
   /// opaque type decl.
-  static OpaqueTypeArchetypeType *
-  get(OpaqueTypeDecl *Decl,
-      SubstitutionMap Substitutions);
+  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl,
+                                      SubstitutionMap Substitutions);
   
   OpaqueTypeDecl *getOpaqueDecl() const {
     return OpaqueDecl;
@@ -4782,8 +4781,11 @@ public:
   /// equivalent to the OpaqueTypeDecl's interface generic signature, with
   /// all of the generic parameters aside from the opaque type's interface
   /// type same-type-constrained to their substitutions for this type.
-  GenericSignature *getBoundSignature() const {
-    return BoundSignature;
+  GenericSignature *getBoundSignature() const;
+  
+  /// Get a generic environment that has this opaque archetype bound within it.
+  GenericEnvironment *getGenericEnvironment() const {
+    return Environment;
   }
   
   static bool classof(const TypeBase *T) {
@@ -4802,7 +4804,6 @@ private:
   OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
                           SubstitutionMap Substitutions,
                           RecursiveTypeProperties Props,
-                          GenericSignature *BoundSignature,
                           Type InterfaceType,
                           ArrayRef<ProtocolDecl*> ConformsTo,
                           Type Superclass, LayoutConstraint Layout);

@@ -1595,8 +1595,15 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   TypeMatchOptions subflags = TMF_GenerateConstraints;
 
   // Handle opaque archetypes.
-  if (auto opaque1 = type1->getAs<OpaqueTypeArchetypeType>()) {
-    auto opaque2 = type2->castTo<OpaqueTypeArchetypeType>();
+  if (auto arch1 = type1->getAs<ArchetypeType>()) {
+    auto arch2 = type2->castTo<ArchetypeType>();
+    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1->getRoot());
+    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2->getRoot());
+    assert(arch1->getInterfaceType()->getCanonicalType(
+                      opaque1->getGenericEnvironment()->getGenericSignature())
+        == arch2->getInterfaceType()->getCanonicalType(
+                      opaque2->getGenericEnvironment()->getGenericSignature()));
+    assert(opaque1->getOpaqueDecl() == opaque2->getOpaqueDecl());
     
     auto args1 = opaque1->getSubstitutions().getReplacementTypes();
     auto args2 = opaque2->getSubstitutions().getReplacementTypes();
@@ -2275,7 +2282,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::NestedArchetype:
       // If two module types or archetypes were not already equal, there's
       // nothing more we can do.
       return getTypeMatchFailure(locator);
@@ -2406,6 +2412,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       break;
     }
 
+    // Opaque archetypes are globally bound, so we can match them for deep
+    // equality.
     case TypeKind::OpaqueTypeArchetype: {
       auto opaque1 = cast<OpaqueTypeArchetypeType>(desugar1);
       auto opaque2 = cast<OpaqueTypeArchetypeType>(desugar2);
@@ -2417,7 +2425,34 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
       break;
     }
-        
+    
+    // Same for nested archetypes rooted in opaque types.
+    case TypeKind::NestedArchetype: {
+      auto nested1 = cast<NestedArchetypeType>(desugar1);
+      auto nested2 = cast<NestedArchetypeType>(desugar2);
+      
+      auto rootOpaque1 = dyn_cast<OpaqueTypeArchetypeType>(nested1->getRoot());
+      auto rootOpaque2 = dyn_cast<OpaqueTypeArchetypeType>(nested2->getRoot());
+      if (rootOpaque1 && rootOpaque2) {
+        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
+        auto interfaceTy1 = nested1->getInterfaceType()
+          ->getCanonicalType(rootOpaque1->getGenericEnvironment()
+                                        ->getGenericSignature());
+        auto interfaceTy2 = nested2->getInterfaceType()
+          ->getCanonicalType(rootOpaque2->getGenericEnvironment()
+                                        ->getGenericSignature());
+        if (!type1->is<LValueType>()
+            && interfaceTy1 == interfaceTy2
+            && rootOpaque1->getOpaqueDecl() == rootOpaque2->getOpaqueDecl()) {
+          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+          break;
+        }
+      }
+
+      // If the archetypes aren't rooted in an opaque type, or are rooted in
+      // completely different decls, then there's nothing else we can do.
+      return getTypeMatchFailure(locator);
+    }
     }
   }
 
