@@ -202,46 +202,6 @@ extension Strideable where Self : FloatingPoint, Self == Stride {
   }
 }
 
-/// An iterator for a `StrideTo` instance.
-@_fixed_layout
-public struct StrideToIterator<Element : Strideable> {
-  @usableFromInline
-  internal let _start: Element
-
-  @usableFromInline
-  internal let _end: Element
-
-  @usableFromInline
-  internal let _stride: Element.Stride
-
-  @usableFromInline
-  internal var _current: (index: Int?, value: Element)
-
-  @inlinable
-  internal init(_start: Element, end: Element, stride: Element.Stride) {
-    self._start = _start
-    _end = end
-    _stride = stride
-    _current = (0, _start)
-  }
-}
-
-extension StrideToIterator: IteratorProtocol {
-  /// Advances to the next element and returns it, or `nil` if no next element
-  /// exists.
-  ///
-  /// Once `nil` has been returned, all subsequent calls return `nil`.
-  @inlinable
-  public mutating func next() -> Element? {
-    let result = _current.value
-    if _stride > 0 ? result >= _end : result <= _end {
-      return nil
-    }
-    _current = Element._step(after: _current, from: _start, by: _stride)
-    return result
-  }
-}
-
 // FIXME: should really be a Collection, as it is multipass
 /// A sequence of values formed by striding over a half-open interval.
 ///
@@ -268,13 +228,58 @@ public struct StrideTo<Element : Strideable> {
   }
 }
 
+extension StrideTo {
+  /// An iterator for a `StrideTo` instance.
+  @_fixed_layout
+  public struct Iterator {
+    @usableFromInline
+    internal let _start: Element
+
+    @usableFromInline
+    internal let _end: Element
+
+    @usableFromInline
+    internal let _stride: Element.Stride
+
+    @usableFromInline
+    internal var _current: (index: Int?, value: Element)
+
+    @inlinable
+    internal init(_start: Element, end: Element, stride: Element.Stride) {
+      self._start = _start
+      _end = end
+      _stride = stride
+      _current = (0, _start)
+    }
+  }
+}
+
+extension StrideTo.Iterator: IteratorProtocol {
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
+  @inlinable
+  public mutating func next() -> Element? {
+    let result = _current.value
+    if _stride > 0 ? result >= _end : result <= _end {
+      return nil
+    }
+    _current = Element._step(after: _current, from: _start, by: _stride)
+    return result
+  }
+}
+
+@available(swift, deprecated: 5.1, renamed: "StrideTo.Iterator")
+public typealias StrideToIterator<T> = StrideTo<T>.Iterator where T: Strideable
+
 extension StrideTo: Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @inlinable
-  public __consuming func makeIterator() -> StrideToIterator<Element> {
-    return StrideToIterator(_start: _start, end: _end, stride: _stride)
+  public __consuming func makeIterator() -> Iterator {
+    return Iterator(_start: _start, end: _end, stride: _stride)
   }
 
   // FIXME(conditional-conformances): this is O(N) instead of O(1), leaving it
@@ -403,34 +408,59 @@ public func stride<T>(
   return StrideTo(_start: start, end: end, stride: stride)
 }
 
-/// An iterator for a `StrideThrough` instance.
+// FIXME: should really be a Collection, as it is multipass
+/// A sequence of values formed by striding over a closed interval.
+///
+/// Use the `stride(from:through:by:)` function to create `StrideThrough`
+/// instances.
 @_fixed_layout
-public struct StrideThroughIterator<Element : Strideable> {
+public struct StrideThrough<Element: Strideable> {
   @usableFromInline
   internal let _start: Element
-
   @usableFromInline
   internal let _end: Element
-
   @usableFromInline
   internal let _stride: Element.Stride
 
-  @usableFromInline
-  internal var _current: (index: Int?, value: Element)
-
-  @usableFromInline
-  internal var _didReturnEnd: Bool = false
-
   @inlinable
   internal init(_start: Element, end: Element, stride: Element.Stride) {
+    _precondition(stride != 0, "Stride size must not be zero")
     self._start = _start
-    _end = end
-    _stride = stride
-    _current = (0, _start)
+    self._end = end
+    self._stride = stride
   }
 }
 
-extension StrideThroughIterator: IteratorProtocol {
+extension StrideThrough {
+  /// An iterator for a `StrideThrough` instance.
+  @_fixed_layout
+  public struct Iterator {
+    @usableFromInline
+    internal let _start: Element
+
+    @usableFromInline
+    internal let _end: Element
+
+    @usableFromInline
+    internal let _stride: Element.Stride
+
+    @usableFromInline
+    internal var _current: (index: Int?, value: Element)
+
+    @usableFromInline
+    internal var _didReturnEnd: Bool = false
+
+    @inlinable
+    internal init(_start: Element, end: Element, stride: Element.Stride) {
+      self._start = _start
+      _end = end
+      _stride = stride
+      _current = (0, _start)
+    }
+  }
+}
+
+extension StrideThrough.Iterator: IteratorProtocol {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -453,36 +483,16 @@ extension StrideThroughIterator: IteratorProtocol {
   }
 }
 
-// FIXME: should really be a Collection, as it is multipass
-/// A sequence of values formed by striding over a closed interval.
-///
-/// Use the `stride(from:through:by:)` function to create `StrideThrough` 
-/// instances.
-@_fixed_layout
-public struct StrideThrough<Element: Strideable> {
-  @usableFromInline
-  internal let _start: Element
-  @usableFromInline
-  internal let _end: Element
-  @usableFromInline
-  internal let _stride: Element.Stride
-  
-  @inlinable
-  internal init(_start: Element, end: Element, stride: Element.Stride) {
-    _precondition(stride != 0, "Stride size must not be zero")
-    self._start = _start
-    self._end = end
-    self._stride = stride
-  }
-}
+@available(swift, deprecated: 5.1, renamed: "StrideThrough.Iterator")
+public typealias StrideThroughIterator<T> = StrideThrough<T>.Iterator where T: Strideable
 
 extension StrideThrough: Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @inlinable
-  public __consuming func makeIterator() -> StrideThroughIterator<Element> {
-    return StrideThroughIterator(_start: _start, end: _end, stride: _stride)
+  public __consuming func makeIterator() -> Iterator {
+    return Iterator(_start: _start, end: _end, stride: _stride)
   }
 
   // FIXME(conditional-conformances): this is O(N) instead of O(1), leaving it
