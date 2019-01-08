@@ -448,6 +448,13 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     return Invocation.parseArgs(FrontendArgs, Diags);
   });
 
+  // Remove the StreamDiagConsumer as it's no longer needed.
+  std::vector<DiagnosticConsumer *> OldC = Diags.takeConsumers();
+  OldC.erase(std::remove(OldC.begin(), OldC.end(), &DiagConsumer));
+  for (DiagnosticConsumer *Consumer : OldC) {
+    Diags.addConsumer(*Consumer);
+  }
+
   if (HadError) {
     Error = ErrOS.str();
     return true;
