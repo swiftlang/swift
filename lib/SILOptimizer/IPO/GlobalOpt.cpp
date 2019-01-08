@@ -701,7 +701,6 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
           SILBuilder B(CA);
           B.createStore(CA->getLoc(), NewAI, CA->getDest(),
                         StoreOwnershipQualifier::Unqualified);
-          CA->eraseFromParent();
         } else {
           // The result of the initializer is used as a value.
           replaceLoadSequence(Load, NewAI, B);
