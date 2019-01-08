@@ -3704,6 +3704,7 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
     return true;
 
   TypeChecker *TC = &createTypeChecker(DC.getASTContext());
+  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
 
   ConstraintSystemOptions Options;
   ConstraintSystem CS(*TC, &DC, Options);
