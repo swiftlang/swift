@@ -539,5 +539,16 @@
     "RightUsr": "",
     "RightComment": "FontWeighting",
     "ModuleName": "Cities"
-  }
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6CitiesAAC6yogurtSivp",
+    "LeftComment": "yogurt",
+    "RightUsr": "",
+    "RightComment": "cheese",
+    "ModuleName": "Cities"
+  },
 ]
