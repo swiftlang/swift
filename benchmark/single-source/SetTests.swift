@@ -63,6 +63,11 @@ public let SetTests = [
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setE, setAB]) }),
   BenchmarkInfo(
+    name: "Set.isSubset.Int0.Empty",
+    runFunction: { n in run_SetIsSubsetInt(setAB, setE, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setE]) }),
+  BenchmarkInfo(
     name: "SetIsSubsetInt0",
     runFunction: { n in run_SetIsSubsetInt(setAB, setCD, false, 5000 * n) },
     tags: [.validation, .api, .Set],
@@ -99,10 +104,20 @@ public let SetTests = [
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setE, setAB]) }),
   BenchmarkInfo(
+    name: "Set.isDisjoint.Int0.Empty",
+    runFunction: { n in run_SetIsDisjointInt(setAB, setE, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setE]) }),
+  BenchmarkInfo(
     name: "Set.isDisjoint.Empty.Box0",
     runFunction: { n in run_SetIsDisjointBox(setOE, setOAB, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOE, setOAB]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Box0.Empty",
+    runFunction: { n in run_SetIsDisjointBox(setOAB, setOE, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOE]) }),
   BenchmarkInfo(
     name: "Set.isDisjoint.Int0",
     runFunction: { n in run_SetIsDisjointInt(setAB, setCD, true, 50 * n) },
@@ -233,10 +248,20 @@ public let SetTests = [
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setE, setAB]) }),
   BenchmarkInfo(
+    name: "Set.subtracting.Int0.Empty",
+    runFunction: { n in run_SetSubtractingInt(setAB, setE, countAB, 10 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setE]) }),
+  BenchmarkInfo(
     name: "Set.subtracting.Empty.Box0",
     runFunction: { n in run_SetSubtractingBox(setOE, setOAB, 0, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOE, setOAB]) }),
+  BenchmarkInfo(
+    name: "Set.subtracting.Box0.Empty",
+    runFunction: { n in run_SetSubtractingBox(setOAB, setOE, countAB, 10 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOE]) }),
   BenchmarkInfo(
     name: "SetSubtractingInt0",
     runFunction: { n in run_SetSubtractingInt(setAB, setCD, countAB, 10 * n) },
