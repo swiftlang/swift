@@ -333,3 +333,106 @@ enum Lens<T> {
 enum HasVariadic {
   case variadic(x: Int...) // expected-error {{variadic enum cases are not supported}}
 }
+
+// SR-2176
+enum Foo {
+  case bar
+  case none
+}
+
+let _: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{15-15=Optional}}
+// expected-note@-2 {{use 'Foo.none' instead}} {{15-15=Foo}}
+let _: Foo?? = .none // expected-warning {{assuming you mean 'Optional<Optional<Foo>>.none'; did you mean 'Foo.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{16-16=Optional}}
+// expected-note@-2 {{use 'Foo.none' instead}} {{16-16=Foo}}
+
+let _: Foo = .none // ok
+let _: Foo = .bar // ok
+let _: Foo? = .bar // ok
+let _: Foo?? = .bar // ok
+let _: Foo = Foo.bar // ok
+let _: Foo = Foo.none // ok
+let _: Foo? = Foo.none // ok
+let _: Foo?? = Foo.none // ok
+
+func baz(_: Foo?) {}
+baz(.none) // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{5-5=Optional}}
+// expected-note@-2 {{use 'Foo.none' instead}} {{5-5=Foo}}
+
+let test: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{18-18=Optional}}
+// expected-note@-2 {{use 'Foo.none' instead}} {{18-18=Foo}}
+let answer = test == .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{22-22=Optional}}
+// expected-note@-2 {{use 'Foo.none' instead}} {{22-22=Foo}}
+
+enum Bar {
+  case baz
+}
+
+let _: Bar? = .none // ok
+let _: Bar?? = .none // ok
+let _: Bar? = .baz // ok
+let _: Bar?? = .baz // ok
+let _: Bar = .baz // ok
+
+enum AnotherFoo {
+  case none(Any)
+}
+
+let _: AnotherFoo? = .none // ok
+let _: AnotherFoo? = .none(0) // ok
+
+struct FooStruct {
+  static let none = FooStruct()
+  static let one = FooStruct()
+}
+
+let _: FooStruct? = .none // expected-warning {{assuming you mean 'Optional<FooStruct>.none'; did you mean 'FooStruct.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{21-21=Optional}}
+// expected-note@-2 {{use 'FooStruct.none' instead}} {{21-21=FooStruct}}
+let _: FooStruct?? = .none // expected-warning {{assuming you mean 'Optional<Optional<FooStruct>>.none'; did you mean 'FooStruct.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{22-22=Optional}}
+// expected-note@-2 {{use 'FooStruct.none' instead}} {{22-22=FooStruct}}
+let _: FooStruct = .none // ok
+let _: FooStruct = .one // ok
+let _: FooStruct? = .one // ok
+let _: FooStruct?? = .one // ok
+
+struct NestedBazEnum {
+  enum Baz {
+    case one
+    case none
+  }
+}
+
+let _: NestedBazEnum.Baz? = .none // expected-warning {{assuming you mean 'Optional<NestedBazEnum.Baz>.none'; did you mean 'NestedBazEnum.Baz.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{29-29=Optional}}
+// expected-note@-2 {{use 'NestedBazEnum.Baz.none' instead}} {{29-29=NestedBazEnum.Baz}}
+let _: NestedBazEnum.Baz?? = .none // expected-warning {{assuming you mean 'Optional<Optional<NestedBazEnum.Baz>>.none'; did you mean 'NestedBazEnum.Baz.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{30-30=Optional}}
+// expected-note@-2 {{use 'NestedBazEnum.Baz.none' instead}} {{30-30=NestedBazEnum.Baz}}
+let _: NestedBazEnum.Baz = .none // ok
+let _: NestedBazEnum.Baz = .one // ok
+let _: NestedBazEnum.Baz? = .one // ok
+let _: NestedBazEnum.Baz?? = .one // ok
+
+struct NestedBazEnumGeneric {
+  enum Baz<T> {
+    case one
+    case none
+  }
+}
+
+let _: NestedBazEnumGeneric.Baz<Int>? = .none // expected-warning {{assuming you mean 'Optional<NestedBazEnumGeneric.Baz<Int>>.none'; did you mean 'NestedBazEnumGeneric.Baz<Int>.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{41-41=Optional}}
+// expected-note@-2 {{use 'NestedBazEnumGeneric.Baz<Int>.none' instead}} {{41-41=NestedBazEnumGeneric.Baz<Int>}}
+let _: NestedBazEnumGeneric.Baz<Int>?? = .none // expected-warning {{assuming you mean 'Optional<Optional<NestedBazEnumGeneric.Baz<Int>>>.none'; did you mean 'NestedBazEnumGeneric.Baz<Int>.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{42-42=Optional}}
+// expected-note@-2 {{use 'NestedBazEnumGeneric.Baz<Int>.none' instead}} {{42-42=NestedBazEnumGeneric.Baz<Int>}}
+let _: NestedBazEnumGeneric.Baz<Int> = .none // ok
+let _: NestedBazEnumGeneric.Baz<Int> = .one // ok
+let _: NestedBazEnumGeneric.Baz<Int>? = .one // ok
+let _: NestedBazEnumGeneric.Baz<Int>?? = .one // ok
