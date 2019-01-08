@@ -3765,10 +3765,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // function takes no arguments, otherwise it
       // would make sense to report this a missing member.
       if (funcType->getNumParams() == 0) {
-        auto *fix = InsertExplicitCall::create(*this, locator);
-        if (recordFix(fix))
-          return SolutionKind::Error;
-
         auto result = simplifyMemberConstraint(
             kind, funcType->getResult(), member, memberTy, useDC,
             functionRefKind, outerAlternatives, flags, locatorB);
@@ -3777,8 +3773,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         // let's return, otherwise let's fall-through and report
         // this problem as a missing member.
         if (result == SolutionKind::Solved)
-          return result;
+          return recordFix(InsertExplicitCall::create(*this, locator))
+                     ? SolutionKind::Error
+                     : SolutionKind::Solved;
       }
+    }
+
+    // Instead of using subscript operator spelled out `subscript` directly.
+    if (member.getBaseName() == getTokenText(tok::kw_subscript)) {
+      auto result = simplifyMemberConstraint(
+          kind, baseTy, DeclBaseName::createSubscript(), memberTy, useDC,
+          functionRefKind, {}, flags, locatorB);
+
+      // Looks like it was indeed meant to be a subscript operator.
+      if (result == SolutionKind::Solved)
+        return recordFix(UseSubscriptOperator::create(*this, locator))
+                   ? SolutionKind::Error
+                   : SolutionKind::Solved;
     }
   }
   return SolutionKind::Error;
@@ -5442,6 +5453,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
+  case FixKind::UseSubscriptOperator:
   case FixKind::InsertCall:
   case FixKind::ExplicitlyEscaping:
   case FixKind::CoerceToCheckedCast:

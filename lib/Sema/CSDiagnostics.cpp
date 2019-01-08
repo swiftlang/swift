@@ -78,6 +78,10 @@ FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
   return cs.TC.diagnose(std::forward<ArgTypes>(Args)...);
 }
 
+Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
+  return E ? E->getParentMap()[subExpr] : nullptr;
+}
+
 Type RequirementFailure::getOwnerType() const {
   return getType(getAnchor())->getInOutObjectType()->getMetatypeInstanceType();
 }
@@ -1274,4 +1278,57 @@ bool MissingCallFailure::diagnoseAsError() {
   emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function_value)
       .fixItInsertAfter(insertLoc, "()");
   return true;
+}
+
+bool SubscriptMisuseFailure::diagnoseAsError() {
+  auto &sourceMgr = getASTContext().SourceMgr;
+
+  auto *memberExpr = cast<UnresolvedDotExpr>(getRawAnchor());
+  auto *baseExpr = getAnchor();
+
+  auto memberRange = baseExpr->getSourceRange();
+  (void)simplifyLocator(getConstraintSystem(), getLocator(), memberRange);
+
+  auto nameLoc = DeclNameLoc(memberRange.Start);
+
+  auto diag = emitDiagnostic(baseExpr->getLoc(),
+                             diag::could_not_find_subscript_member_did_you_mean,
+                             getType(baseExpr));
+
+  diag.highlight(memberRange).highlight(nameLoc.getSourceRange());
+
+  auto *parentExpr = findParentExpr(memberExpr);
+  assert(parentExpr && "Couldn't find a parent expression for a member call?!");
+
+  auto *argExpr = cast<ApplyExpr>(parentExpr)->getArg();
+
+  auto toCharSourceRange = Lexer::getCharSourceRangeFromSourceRange;
+  auto lastArgSymbol = toCharSourceRange(sourceMgr, argExpr->getEndLoc());
+
+  diag.fixItReplace(SourceRange(argExpr->getStartLoc()),
+                    getTokenText(tok::l_square));
+  diag.fixItRemove(nameLoc.getSourceRange());
+  diag.fixItRemove(SourceRange(memberExpr->getDotLoc()));
+
+  if (sourceMgr.extractText(lastArgSymbol) == getTokenText(tok::r_paren))
+    diag.fixItReplace(SourceRange(argExpr->getEndLoc()),
+                      getTokenText(tok::r_square));
+  else
+    diag.fixItInsertAfter(argExpr->getEndLoc(), getTokenText(tok::r_square));
+
+  diag.flush();
+  if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
+    emitDiagnostic(overload->choice.getDecl(), diag::kind_declared_here,
+                   DescriptiveDeclKind::Subscript);
+  }
+
+  return true;
+}
+
+bool SubscriptMisuseFailure::diagnoseAsNote() {
+  if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
+    emitDiagnostic(overload->choice.getDecl(), diag::found_candidate);
+    return true;
+  }
+  return false;
 }

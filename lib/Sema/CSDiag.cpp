@@ -572,10 +572,6 @@ private:
 
   bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
 
-  /// Diagnose the usage of 'subscript' instead of the operator when calling
-  /// a subscript and offer a fixit if the inputs are compatible.
-  bool diagnoseSubscriptMisuse(ApplyExpr *callExpr);
-
   /// Try to diagnose common errors involving implicitly non-escaping parameters
   /// of function type, giving more specific and simpler diagnostics, attaching
   /// notes on the parameter, and offering fixits to insert @escaping. Returns
@@ -5089,105 +5085,6 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
                                            exprType);
 }
 
-bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
-  auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
-  if (!UDE)
-    return false;
-
-  auto baseExpr = UDE->getBase();
-  if (!baseExpr || UDE->getName().getBaseName() != getTokenText(tok::kw_subscript))
-    return false;
-
-  auto baseType = CS.getType(baseExpr);
-  // Look up subscript declarations.
-  auto lookup = CS.lookupMember(baseType->getRValueType(),
-                                DeclName(DeclBaseName::createSubscript()));
-  auto nonSubscrLookup = CS.lookupMember(baseType->getRValueType(),
-                                         UDE->getName());
-  // Make sure we only found subscript declarations. If not, the problem
-  // is different - return.
-  if (lookup.empty() || !nonSubscrLookup.empty())
-    return false;
-  // Try to resolve a type of the argument expression.
-  auto argExpr = typeCheckChildIndependently(callExpr->getArg(),
-                                             Type(), CTP_CallArgument);
-  if (!argExpr)
-    return CS.TC.Diags.hadAnyError();
-
-  SmallVector<Identifier, 2> scratch;
-  ArrayRef<Identifier> argLabels = callExpr->getArgumentLabels(scratch);
-  SmallVector<OverloadChoice, 2> choices;
-
-  for (auto candidate : lookup)
-    choices.push_back(OverloadChoice(baseType, candidate.getValueDecl(),
-                                     UDE->getFunctionRefKind()));
-  CalleeCandidateInfo candidateInfo(baseType, choices,
-                                    callArgHasTrailingClosure(argExpr),
-                                    CS, true);
-
-  auto params = decomposeArgType(CS.getType(argExpr), argLabels);
-  using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
-
-  candidateInfo.filterList([&](OverloadCandidate cand) -> ClosenessPair {
-    auto candFuncType = cand.getFunctionType();
-    if (!candFuncType)
-      return {CC_GeneralMismatch, {}};
-
-    auto candParams = candFuncType->getParams();
-    if (params.size() != candParams.size())
-      return {CC_GeneralMismatch, {}};
-
-    for (unsigned i = 0, e = params.size(); i < e; i ++) {
-      if (CS.TC.isConvertibleTo(params[i].getOldType(),
-                                candParams[i].getOldType(), CS.DC) ||
-          candParams[i].getOldType()->is<GenericTypeParamType>())
-        continue;
-      return {CC_GeneralMismatch, {}};
-    }
-    return {CC_ExactMatch, {}};
-  });
-
-  auto *locator = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
-  auto memberRange = baseExpr->getSourceRange();
-  if (locator)
-    locator = simplifyLocator(CS, locator, memberRange);
-  auto nameLoc = DeclNameLoc(memberRange.Start);
-
-  auto diag = diagnose(baseExpr->getLoc(),
-                       diag::could_not_find_subscript_member_did_you_mean,
-                       baseType);
-  diag.highlight(memberRange).highlight(nameLoc.getSourceRange());
-
-  auto showNote = [&]() {
-    diag.flush();
-    if (candidateInfo.size() == 1)
-      diagnose(candidateInfo.candidates.front().getDecl(),
-               diag::kind_declared_here, DescriptiveDeclKind::Subscript);
-  };
-  if (candidateInfo.closeness != CC_ExactMatch) {
-    showNote();
-    return true;
-  }
-  auto toCharSourceRange = Lexer::getCharSourceRangeFromSourceRange;
-  auto lastArgSymbol = toCharSourceRange(CS.TC.Context.SourceMgr,
-                                         argExpr->getEndLoc());
-
-  diag.fixItReplace(SourceRange(argExpr->getStartLoc()),
-                    getTokenText(tok::l_square));
-  diag.fixItRemove(nameLoc.getSourceRange());
-  diag.fixItRemove(SourceRange(UDE->getDotLoc()));
-  if (CS.TC.Context.SourceMgr.extractText(lastArgSymbol) ==
-      getTokenText(tok::r_paren))
-    diag.fixItReplace(SourceRange(argExpr->getEndLoc()),
-                      getTokenText(tok::r_square));
-  else
-    diag.fixItInsertAfter(argExpr->getEndLoc(),
-                          getTokenText(tok::r_square));
-  showNote();
-
-  return true;
-}
-
 // Check if there is a structural problem in the function expression
 // by performing type checking with the option to allow unresolved
 // type variables. If that is going to produce a function type with
@@ -5262,12 +5159,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   auto originalFnType = CS.getType(callExpr->getFn());
 
   if (shouldTypeCheckFunctionExpr(*this, CS.DC, fnExpr)) {
-
-    // If we are misusing a subscript, diagnose that and provide a fixit.
-    // We diagnose this here to have enough context to offer an appropriate fixit.
-    if (diagnoseSubscriptMisuse(callExpr)) {
-      return CS.TC.Diags.hadAnyError();
-    }
     // Type check the function subexpression to resolve a type for it if
     // possible.
     fnExpr = typeCheckChildIndependently(callExpr->getFn());
