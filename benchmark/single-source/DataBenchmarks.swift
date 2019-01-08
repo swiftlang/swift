@@ -15,30 +15,25 @@ import Foundation
 
 let d: [BenchmarkCategory] =  [.validation, .api, .Data]
 
-/// Workload scaling: Inner loop multipliers
-let M = 10_000  /// default
-let I = 100_000 /// Data initialization
-let S = 200     /// String conversions
-
 public let DataBenchmarks = [
   BenchmarkInfo(name: "DataCreateEmpty",
-    runFunction: { for _ in 0..<$0*I/10 { blackHole(Data()) } },
+    runFunction: { for _ in 0..<$0*10_000 { blackHole(Data()) } },
     tags: d, legacyFactor: 10),
   BenchmarkInfo(name: "DataCreateSmall",
-    runFunction: { for _ in 0..<$0*I/1000 { blackHole(sampleData(.small)) } },
+    runFunction: { for _ in 0..<$0*100 { blackHole(sampleData(.small)) } },
     tags: d, legacyFactor: 1000),
   BenchmarkInfo(name: "DataCreateMedium",
-    runFunction: { for _ in 0..<$0*M/100 { blackHole(sampleData(.medium)) } },
+    runFunction: { for _ in 0..<$0*100 { blackHole(sampleData(.medium)) } },
     tags: d, legacyFactor: 100),
 
   BenchmarkInfo(name: "DataCreateEmptyArray",
-    runFunction: { for _ in 0..<$0*I/50 { blackHole(Data([])) } }, tags: d,
+    runFunction: { for _ in 0..<$0*2_000 { blackHole(Data([])) } }, tags: d,
     legacyFactor: 50),
   BenchmarkInfo(name: "DataCreateSmallArray",
-    runFunction: { for _ in 0..<$0*I/50 { blackHole(Data(
+    runFunction: { for _ in 0..<$0*2_000 { blackHole(Data(
       [0, 1, 2, 3, 4, 5, 6])) } }, tags: d, legacyFactor: 50),
   BenchmarkInfo(name: "DataCreateMediumArray",
-    runFunction: { for _ in 0..<$0*M/20 { blackHole(Data([
+    runFunction: { for _ in 0..<$0*500 { blackHole(Data([
       0, 1, 2, 3, 4, 5, 6,
       0, 1, 2, 3, 4, 5, 6,
       0, 1, 2, 3, 4, 5, 6,
@@ -47,117 +42,125 @@ public let DataBenchmarks = [
 
   BenchmarkInfo(name: "DataSubscriptSmall",
     runFunction: { let data = small
-      for _ in 0..<$0*M { blackHole(data[1]) } }, tags: d),
+      for _ in 0..<$0*10_000 { blackHole(data[1]) } }, tags: d),
   BenchmarkInfo(name: "DataSubscriptMedium",
     runFunction: { let data = medium
-      for _ in 0..<$0*M { blackHole(data[521]) } }, tags: d),
+      for _ in 0..<$0*10_000 { blackHole(data[521]) } }, tags: d),
 
   BenchmarkInfo(name: "DataCountSmall",
-    runFunction: { count($0*M, data: small) }, tags: d),
+    runFunction: { count($0*10_000, data: small) }, tags: d),
   BenchmarkInfo(name: "DataCountMedium",
-    runFunction: { count($0*M, data: medium) }, tags: d),
+    runFunction: { count($0*10_000, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataSetCountSmall",
-    runFunction: { setCount($0*M, data: small, extra: 3) }, tags: d),
+    runFunction: { setCount($0*10_000, data: small, extra: 3) }, tags: d),
   BenchmarkInfo(name: "DataSetCountMedium",
-    runFunction: { setCount($0*M/10, data: medium, extra: 100) }, tags: d,
+    runFunction: { setCount($0*1_000, data: medium, extra: 100) }, tags: d,
     legacyFactor: 10),
 
   BenchmarkInfo(name: "DataAccessBytesSmall",
-    runFunction: { withUnsafeBytes($0*M, data: small) }, tags: d),
+    runFunction: { withUnsafeBytes($0*10_000, data: small) }, tags: d),
   BenchmarkInfo(name: "DataAccessBytesMedium",
-    runFunction: { withUnsafeBytes($0*M, data: medium) }, tags: d),
+    runFunction: { withUnsafeBytes($0*10_000, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataMutateBytesSmall",
-    runFunction: { withUnsafeMutableBytes($0*M/20, data: small) }, tags: d,
+    runFunction: { withUnsafeMutableBytes($0*500, data: small) }, tags: d,
     legacyFactor: 20),
   BenchmarkInfo(name: "DataMutateBytesMedium",
-    runFunction: { withUnsafeMutableBytes($0*M/20, data: medium) }, tags: d,
+    runFunction: { withUnsafeMutableBytes($0*500, data: medium) }, tags: d,
     legacyFactor: 20),
 
   BenchmarkInfo(name: "DataCopyBytesSmall",
-    runFunction: { copyBytes($0*M, data: small) }, tags: d),
+    runFunction: { copyBytes($0*10_000, data: small) }, tags: d),
   BenchmarkInfo(name: "DataCopyBytesMedium",
-    runFunction: { copyBytes($0*M/2, data: medium) }, tags: d,
+    runFunction: { copyBytes($0*5_000, data: medium) }, tags: d,
     legacyFactor: 2),
 
   BenchmarkInfo(name: "DataAppendBytesSmall",
-    runFunction: { append($0*M, bytes: 3, to: small) }, tags: d),
+    runFunction: { append($0*10_000, bytes: 3, to: small) }, tags: d),
   BenchmarkInfo(name: "DataAppendBytesMedium",
-    runFunction: { append($0*M/20, bytes: 809, to: medium) }, tags: d,
+    runFunction: { append($0*500, bytes: 809, to: medium) }, tags: d,
     legacyFactor: 20),
 
   BenchmarkInfo(name: "DataAppendArray",
-    runFunction: { append($0*M/100, arraySize: 809, to: medium) }, tags: d,
+    runFunction: { append($0*100, arraySize: 809, to: medium) }, tags: d,
     legacyFactor: 100),
 
   BenchmarkInfo(name: "DataReset",
-    runFunction: { resetBytes($0*M/100, in: 431..<809, data: medium) },
+    runFunction: { resetBytes($0*100, in: 431..<809, data: medium) },
     tags: d, legacyFactor: 100),
 
   BenchmarkInfo(name: "DataReplaceSmall", runFunction: {
-    replace($0*M/100, data: medium, subrange:431..<809, with: small) },
+    replace($0*100, data: medium, subrange:431..<809, with: small) },
     tags: d, legacyFactor: 100),
   BenchmarkInfo(name: "DataReplaceMedium", runFunction: {
-    replace($0*M/100, data: medium, subrange:431..<809, with: medium) },
+    replace($0*100, data: medium, subrange:431..<809, with: medium) },
     tags: d, legacyFactor: 100),
   BenchmarkInfo(name: "DataReplaceLarge", runFunction: {
-    replace($0*M/100, data: medium, subrange:431..<809, with: large) },
+    replace($0*100, data: medium, subrange:431..<809, with: large) },
     tags: d, legacyFactor: 100),
 
   BenchmarkInfo(name: "DataReplaceSmallBuffer", runFunction: {
-    replaceBuffer($0*M/100, data: medium, subrange:431..<809, with: small) },
+    replaceBuffer($0*100, data: medium, subrange:431..<809, with: small) },
     tags: d, legacyFactor: 100),
   BenchmarkInfo(name: "DataReplaceMediumBuffer", runFunction: {
-    replaceBuffer($0*M/100, data: medium, subrange:431..<809, with: medium) },
+    replaceBuffer($0*100, data: medium, subrange:431..<809, with: medium) },
     tags: d, legacyFactor: 100),
   BenchmarkInfo(name: "DataReplaceLargeBuffer", runFunction: {
     replaceBuffer($0*10, data: medium, subrange:431..<809, with: large) },
     tags: d),
 
   BenchmarkInfo(name: "DataAppendSequence",
-    runFunction: { append($0*M/100, sequenceLength: 809, to: medium) },
+    runFunction: { append($0*100, sequenceLength: 809, to: medium) },
   tags: d, legacyFactor: 100),
 
   BenchmarkInfo(name: "DataAppendDataSmallToSmall",
-    runFunction: { append($0*M/20, data: small, to: small) }, tags: d,
+    runFunction: { append($0*500, data: small, to: small) }, tags: d,
     legacyFactor: 20),
   BenchmarkInfo(name: "DataAppendDataSmallToMedium",
-    runFunction: { append($0*M/20, data: small, to: medium) }, tags: d,
+    runFunction: { append($0*500, data: small, to: medium) }, tags: d,
     legacyFactor: 20),
   BenchmarkInfo(name: "DataAppendDataSmallToLarge",
-    runFunction: { append($0*M/200, data: small, to: large) }, tags: d,
+    runFunction: { append($0*50, data: small, to: large) }, tags: d,
     legacyFactor: 200),
   BenchmarkInfo(name: "DataAppendDataMediumToSmall",
-    runFunction: { append($0*M/20, data: medium, to: small) }, tags: d,
+    runFunction: { append($0*500, data: medium, to: small) }, tags: d,
     legacyFactor: 20),
   BenchmarkInfo(name: "DataAppendDataMediumToMedium",
-    runFunction: { append($0*M/20, data: medium, to: medium) }, tags: d,
+    runFunction: { append($0*500, data: medium, to: medium) }, tags: d,
     legacyFactor: 20),
   BenchmarkInfo(name: "DataAppendDataMediumToLarge",
-    runFunction: { append($0*50, data: medium, to: large) }, tags: d),
+    runFunction: { append($0*50, data: medium, to: large) }, tags: d,
+    legacyFactor: 200),
   BenchmarkInfo(name: "DataAppendDataLargeToSmall",
-    runFunction: { append($0*M/200, data: large, to: small) }, tags: d,
+    runFunction: { append($0*50, data: large, to: small) }, tags: d,
     legacyFactor: 200),
   BenchmarkInfo(name: "DataAppendDataLargeToMedium",
-    runFunction: { append($0*M/200, data: large, to: medium) }, tags: d,
+    runFunction: { append($0*50, data: large, to: medium) }, tags: d,
     legacyFactor: 200),
   BenchmarkInfo(name: "DataAppendDataLargeToLarge",
-    runFunction: { append($0*50, data: large, to: large) }, tags: d),
+    runFunction: { append($0*50, data: large, to: large) }, tags: d,
+    legacyFactor: 200),
 
   BenchmarkInfo(name: "DataToStringEmpty",
-    runFunction: { string($0*S, from: emptyData) }, tags: d, legacyFactor: 50),
+    runFunction: { string($0*200, from: emptyData) }, tags: d,
+    legacyFactor: 50),
   BenchmarkInfo(name: "DataToStringSmall",
-    runFunction: { string($0*S, from: smallData) }, tags: d, legacyFactor: 50),
+    runFunction: { string($0*200, from: smallData) }, tags: d,
+    legacyFactor: 50),
   BenchmarkInfo(name: "DataToStringMedium",
-    runFunction: { string($0*S, from: mediumData) }, tags: d, legacyFactor: 50),
+    runFunction: { string($0*200, from: mediumData) }, tags: d,
+    legacyFactor: 50),
 
   BenchmarkInfo(name: "StringToDataEmpty",
-    runFunction: { data($0*S, from: emptyString) }, tags: d, legacyFactor: 50),
+    runFunction: { data($0*200, from: emptyString) }, tags: d,
+    legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataSmall",
-    runFunction: { data($0*S, from: smallString) }, tags: d, legacyFactor: 50),
+    runFunction: { data($0*200, from: smallString) }, tags: d,
+    legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataMedium",
-    runFunction: { data($0*S, from: mediumString) }, tags: d, legacyFactor: 50),
+    runFunction: { data($0*200, from: mediumString) }, tags: d,
+    legacyFactor: 50),
 ]
 
 let emptyString = ""
