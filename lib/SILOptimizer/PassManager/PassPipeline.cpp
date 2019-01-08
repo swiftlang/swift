@@ -536,7 +536,8 @@ static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
 SILPassPipelinePlan
 SILPassPipelinePlan::getLoweringPassPipeline() {
   SILPassPipelinePlan P;
-  P.startPipeline("Address Lowering");
+  P.startPipeline("Lowering Pass Pipeline");
+  P.addOwnershipModelEliminator();
   P.addIRGenPrepare();
   P.addAddressLowering();
 
