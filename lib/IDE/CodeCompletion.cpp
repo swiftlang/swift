@@ -3184,6 +3184,21 @@ public:
 
     this->ExprType = ExprType;
 
+    // Open existential types, so that lookupVisibleMemberDecls() can properly
+    // substitute them.
+    bool WasOptional = false;
+    if (auto OptionalType = ExprType->getOptionalObjectType()) {
+      ExprType = OptionalType;
+      WasOptional = true;
+    }
+
+    if (!ExprType->getMetatypeInstanceType()->isAnyObject())
+      if (ExprType->isAnyExistentialType())
+        ExprType = ArchetypeType::getAnyOpened(ExprType);
+
+    if (WasOptional)
+      ExprType = OptionalType::get(ExprType);
+
     // Handle special cases
     bool isIUO = VD && VD->getAttrs()
         .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
