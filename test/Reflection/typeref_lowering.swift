@@ -1044,7 +1044,7 @@
 // CHECK-64-NEXT:       (field name=Indirect offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
 // CHECK-64-NEXT:   (field name=multiPayloadConcrete offset=24
-// CHECK-64-NEXT:     (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2045 bitwise_takable=1
+// CHECK-64-NEXT:     (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants={{(2045|125)}} bitwise_takable=1
 // CHECK-64-NEXT:       (field name=Left offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))
 // CHECK-64-NEXT:       (field name=Right offset=0
