@@ -5184,25 +5184,27 @@ class ExprContextAnalyzer {
   }
 
   /// Collect context information at call argument position.
-  bool collectArgumentExpectation(DeclContext &DC, Expr *E, Expr *CCExpr) {
+  bool analyzeApplyExpr(Expr *E) {
     // Collect parameter lists for possible func decls.
     SmallVector<FunctionTypeAndDecl, 2> Candidates;
     Expr *Arg = nullptr;
     if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
-      if (!collectPossibleCalleesForApply(DC, applyExpr, Candidates))
+      if (!collectPossibleCalleesForApply(*DC, applyExpr, Candidates))
         return false;
       Arg = applyExpr->getArg();
     } else if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
-      if (!collectPossibleCalleesForSubscript(DC, subscriptExpr, Candidates))
+      if (!collectPossibleCalleesForSubscript(*DC, subscriptExpr, Candidates))
         return false;
       Arg = subscriptExpr->getIndex();
+    } else {
+      llvm_unreachable("unexpected expression kind");
     }
     PossibleCallees.assign(Candidates.begin(), Candidates.end());
 
     // Determine the position of code completion token in call argument.
     unsigned Position;
     bool HasName;
-    if (!getPositionInArgs(DC, Arg, CCExpr, Position, HasName))
+    if (!getPositionInArgs(*DC, Arg, ParsedExpr, Position, HasName))
       return false;
     if (!translateArgIndexToParamIndex(Arg, Position, HasName))
       return false;
@@ -5243,11 +5245,10 @@ class ExprContextAnalyzer {
       case ExprKind::Subscript:
       case ExprKind::Binary:
       case ExprKind::PrefixUnary: {
-        collectArgumentExpectation(*DC, Parent, ParsedExpr);
+        analyzeApplyExpr(Parent);
         break;
       }
       case ExprKind::Assign: {
-        auto &SM = DC->getASTContext().SourceMgr;
         auto *AE = cast<AssignExpr>(Parent);
 
         // Make sure code completion is on the right hand side.
