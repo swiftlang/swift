@@ -783,7 +783,6 @@ public:
   void diagnoseUsesFromHost(SILValue value, SILLocation loc);
   void diagnoseCopyToHost(SILValue value, SILInstruction *user,
                           SILLocation loc);
-  void diagnoseOpaqueHandleCopy(SILValue value, SILInstruction *user);
 
 private:
   // Marking.
