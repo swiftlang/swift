@@ -945,6 +945,7 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
+  friend class MissingMemberFailure;
 
   class SolverScope;
 
@@ -1783,6 +1784,8 @@ public:
 
     return !solverState || solverState->recordFixes;
   }
+
+  ArrayRef<ConstraintFix *> getFixes() const { return Fixes; }
 
   bool shouldSuppressDiagnostics() const {
     return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);

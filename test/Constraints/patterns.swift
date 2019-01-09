@@ -122,8 +122,7 @@ case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is a
   ()
 case Watch.Edition: // TODO: should warn that cast can't succeed with currently known conformances
   ()
-// TODO: Bad error message
-case .HairForceOne: // expected-error{{cannot convert}}
+case .HairForceOne: // expected-error{{type 'HairType' has no member 'HairForceOne'}}
   ()
 default:
   break

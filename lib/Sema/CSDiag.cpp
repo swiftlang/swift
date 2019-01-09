@@ -523,10 +523,10 @@ private:
   /// Given a result of name lookup that had no viable results, diagnose the
   /// unviable ones.
   void diagnoseUnviableLookupResults(MemberLookupResult &lookupResults,
-                                     Type baseObjTy, Expr *baseExpr,
+                                     Expr *expr, Type baseObjTy, Expr *baseExpr,
                                      DeclName memberName, DeclNameLoc nameLoc,
                                      SourceLoc loc);
-  
+
   /// Produce a diagnostic for a general overload resolution failure
   /// (irrespective of the exact expression kind).
   bool diagnoseGeneralOverloadFailure(Constraint *constraint);
@@ -913,125 +913,23 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
   return;
 }
 
-/// When a user refers a enum case with a wrong member name, we try to find a enum
-/// element whose name differs from the wrong name only in convention; meaning their
-/// lower case counterparts are identical.
-///   - DeclName is valid when such a correct case is found; invalid otherwise.
-static DeclName
-findCorrectEnumCaseName(Type Ty, TypoCorrectionResults &corrections,
-                        DeclName memberName) {
-  if (memberName.isSpecial() || !memberName.isSimpleName())
-    return DeclName();
-  if (!Ty->is<EnumType>() &&
-      !Ty->is<BoundGenericEnumType>())
-    return DeclName();
-  auto candidate =
-    corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
-      return (isa<EnumElementDecl>(candidate) &&
-              candidate->getFullName().getBaseIdentifier().str()
-                .equals_lower(memberName.getBaseIdentifier().str()));
-    });
-  return (candidate ? candidate->getFullName() : DeclName());
-}
-
 /// Given a result of name lookup that had no viable results, diagnose the
 /// unviable ones.
-void FailureDiagnosis::
-diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
-                              Expr *baseExpr,
-                              DeclName memberName, DeclNameLoc nameLoc,
-                              SourceLoc loc) {
+void FailureDiagnosis::diagnoseUnviableLookupResults(
+    MemberLookupResult &result, Expr *E, Type baseObjTy, Expr *baseExpr,
+    DeclName memberName, DeclNameLoc nameLoc, SourceLoc loc) {
   SourceRange baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
-  
+
   // If we found no results at all, mention that fact.
   if (result.UnviableCandidates.empty()) {
-    TypoCorrectionResults corrections(CS.TC, memberName, nameLoc);
-    auto tryTypoCorrection = [&] {
-      CS.TC.performTypoCorrection(CS.DC, DeclRefKind::Ordinary, baseObjTy,
-                                  defaultMemberLookupOptions, corrections);
-    };
-
-    // TODO: This should handle tuple member lookups, like x.1231 as well.
-    if (memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
-      diagnose(loc, diag::could_not_find_value_subscript, baseObjTy)
-        .highlight(baseRange);
-    } else if (memberName.getBaseName() == "deinit") {
-      // Specialised diagnostic if trying to access deinitialisers
-      diagnose(loc, diag::destructor_not_accessible).highlight(baseRange);
-    } else if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
-      auto instanceTy = metatypeTy->getInstanceType();
-      tryTypoCorrection();
-
-      if (DeclName rightName = findCorrectEnumCaseName(instanceTy,
-                                                       corrections,
-                                                       memberName)) {
-        diagnose(loc, diag::could_not_find_enum_case, instanceTy,
-                 memberName, rightName)
-          .fixItReplace(nameLoc.getBaseNameLoc(),
-                        rightName.getBaseIdentifier().str());
-        return;
-      }
-
-      if (auto correction = corrections.claimUniqueCorrection()) {
-        auto diagnostic =
-          diagnose(loc, diag::could_not_find_type_member_corrected,
-                   instanceTy, memberName, correction->CorrectedName);
-        diagnostic.highlight(baseRange).highlight(nameLoc.getSourceRange());
-        correction->addFixits(diagnostic);
-      } else {
-        diagnose(loc, diag::could_not_find_type_member, instanceTy, memberName)
-          .highlight(baseRange).highlight(nameLoc.getSourceRange());
-      }
-    } else if (auto moduleTy = baseObjTy->getAs<ModuleType>()) {
-      diagnose(baseExpr->getLoc(), diag::no_member_of_module,
-               moduleTy->getModule()->getName(), memberName)
-          .highlight(baseRange)
-          .highlight(nameLoc.getSourceRange());
-      return;
-    } else {
-      auto emitBasicError = [&] {
-        diagnose(loc, diag::could_not_find_value_member,
-                 baseObjTy, memberName)
-          .highlight(baseRange).highlight(nameLoc.getSourceRange());
-      };
-      
-      // Check for a few common cases that can cause missing members.
-      if (baseObjTy->is<EnumType>() && memberName.isSimpleName("rawValue")) {
-        auto loc = baseObjTy->castTo<EnumType>()->getDecl()->getNameLoc();
-        if (loc.isValid()) {
-          emitBasicError();
-          diagnose(loc, diag::did_you_mean_raw_type);
-          return;
-        }
-      } else if (baseObjTy->isAny()) {
-        emitBasicError();
-        diagnose(loc, diag::any_as_anyobject_fixit)
-          .fixItInsert(baseExpr->getStartLoc(), "(")
-          .fixItInsertAfter(baseExpr->getEndLoc(), " as AnyObject)");
-        return;
-      }
-
-      tryTypoCorrection();
-
-      if (auto correction = corrections.claimUniqueCorrection()) {
-        auto diagnostic =
-          diagnose(loc, diag::could_not_find_value_member_corrected,
-                   baseObjTy, memberName, correction->CorrectedName);
-        diagnostic.highlight(baseRange).highlight(nameLoc.getSourceRange());
-        correction->addFixits(diagnostic);
-      } else {
-        emitBasicError();
-      }
-    }
-
-    // Note all the correction candidates.
-    corrections.noteAllCandidates();
-
-    // TODO: recover?
+    MissingMemberFailure failure(nullptr, CS, baseObjTy, memberName,
+                                 CS.getConstraintLocator(E));
+    auto diagnosed = failure.diagnoseAsError();
+    assert(diagnosed && "Failed to produce missing member diagnostic");
+    (void)diagnosed;
     return;
   }
 
-  
   // Otherwise, we have at least one (and potentially many) viable candidates
   // sort them out.  If all of the candidates have the same problem (commonly
   // because there is exactly one candidate!) diagnose this.
@@ -4632,7 +4530,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
   // If one of the unviable candidates matches arguments exactly,
   // that means that actual problem is related to function attributes.
   if (unviableCandidates.closeness == CC_ExactMatch) {
-    diagnoseUnviableLookupResults(results, baseType, base, UDE->getName(),
+    diagnoseUnviableLookupResults(results, UDE, baseType, base, UDE->getName(),
                                   UDE->getNameLoc(), UDE->getLoc());
     return true;
   }
@@ -7458,7 +7356,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
     }
 
     // FIXME: Dig out the property DeclNameLoc.
-    diagnoseUnviableLookupResults(result, baseObjTy, baseExpr, memberName,
+    diagnoseUnviableLookupResults(result, E, baseObjTy, baseExpr, memberName,
                                   NameLoc, BaseLoc);
     return true;
   }
@@ -8224,6 +8122,20 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
         .highlight(E->getSourceRange());
       return;
     }
+  }
+
+  // Before giving up completely let's try to see if there are any
+  // fixes recorded by constraint generator, which point to structural
+  // problems that might not result in solution even if fixed e.g.
+  // missing members involved in protocol composition in expression
+  // context which are interpreted as binary operator expressions instead.
+  {
+    bool diagnosed = false;
+    for (auto *fix : CS.getFixes())
+      diagnosed |= fix->diagnose(expr);
+
+    if (diagnosed)
+      return;
   }
 
   // If there are no posted constraints or failures, then there was

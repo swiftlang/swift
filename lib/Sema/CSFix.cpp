@@ -247,7 +247,9 @@ UseSubscriptOperator *UseSubscriptOperator::create(ConstraintSystem &cs,
 }
 
 bool DefineMemberBasedOnUse::diagnose(Expr *root, bool asNote) const {
-  return false;
+  auto failure = MissingMemberFailure(root, getConstraintSystem(), BaseType,
+                                      Name, getLocator());
+  return failure.diagnose(asNote);
 }
 
 DefineMemberBasedOnUse *
