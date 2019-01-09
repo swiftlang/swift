@@ -1044,7 +1044,8 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+DifferentiableAttr::DifferentiableAttr(ASTContext &context, SourceLoc atLoc,
+                                       SourceRange baseRange,
                                        ArrayRef<AutoDiffParameter> parameters,
                                        Optional<DeclNameWithLoc> primal,
                                        Optional<DeclNameWithLoc> adjoint,
@@ -1054,13 +1055,13 @@ DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
     NumParameters(parameters.size()),
     Primal(std::move(primal)), Adjoint(std::move(adjoint)),
-    JVP(std::move(jvp)), VJP(std::move(vjp)), WhereClause(clause),
-    NumRequirements(clause ? clause->getRequirements().size() : 0) {
+    JVP(std::move(jvp)), VJP(std::move(vjp)), WhereClause(clause) {
   std::copy(parameters.begin(), parameters.end(),
             getTrailingObjects<AutoDiffParameter>());
 }
 
-DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+DifferentiableAttr::DifferentiableAttr(ASTContext &context, SourceLoc atLoc,
+                                       SourceRange baseRange,
                                        ArrayRef<AutoDiffParameter> parameters,
                                        Optional<DeclNameWithLoc> primal,
                                        Optional<DeclNameWithLoc> adjoint,
@@ -1070,12 +1071,10 @@ DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
     NumParameters(parameters.size()),
     Primal(std::move(primal)), Adjoint(std::move(adjoint)),
-    JVP(std::move(jvp)), VJP(std::move(vjp)),
-    NumRequirements(requirements.size()) {
+    JVP(std::move(jvp)), VJP(std::move(vjp)) {
   std::copy(parameters.begin(), parameters.end(),
             getTrailingObjects<AutoDiffParameter>());
-  std::copy(requirements.begin(), requirements.end(),
-            getTrailingObjects<Requirement>());
+  setRequirements(context, requirements);
 }
 
 DifferentiableAttr *
@@ -1087,10 +1086,9 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            TrailingWhereClause *clause) {
-  unsigned size = totalSizeToAlloc<AutoDiffParameter, Requirement>(
-      parameters.size(), clause ? clause->getRequirements().size() : 0);
+  unsigned size = totalSizeToAlloc<AutoDiffParameter>(parameters.size());
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(atLoc, baseRange, parameters,
+  return new (mem) DifferentiableAttr(context, atLoc, baseRange, parameters,
                                       std::move(primal), std::move(adjoint),
                                       std::move(jvp), std::move(vjp), clause);
 }
@@ -1104,22 +1102,19 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            ArrayRef<Requirement> requirements) {
-  unsigned size = totalSizeToAlloc<AutoDiffParameter, Requirement>(
-      parameters.size(), requirements.size());
+  unsigned size = totalSizeToAlloc<AutoDiffParameter>(parameters.size());
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(atLoc, baseRange, parameters,
+  return new (mem) DifferentiableAttr(context, atLoc, baseRange, parameters,
                                       std::move(primal), std::move(adjoint),
                                       std::move(jvp), std::move(vjp),
                                       requirements);
 }
 
-void DifferentiableAttr::setRequirements(ASTContext &ctx,
+void DifferentiableAttr::setRequirements(ASTContext &context,
                                          ArrayRef<Requirement> requirements) {
-  assert(requirements.size() <= NumRequirements &&
-         "Requirements size must not exceed number of allocated requirements");
-  NumRequirements = requirements.size();
-  std::copy(requirements.begin(), requirements.end(),
-            getTrailingObjects<Requirement>());
+  Requirements =
+      context.AllocateUninitialized<Requirement>(requirements.size());
+  std::copy(requirements.begin(), requirements.end(), Requirements.data());
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

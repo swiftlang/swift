@@ -1316,8 +1316,7 @@ public:
 ///   @differentiable(reverse, wrt: (self, .0, .1), adjoint: bar(_:_:_:seed:))
 class DifferentiableAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<DifferentiableAttr, AutoDiffParameter,
-                                    Requirement> {
+      private llvm::TrailingObjects<DifferentiableAttr, AutoDiffParameter> {
 public:
   struct DeclNameWithLoc {
     DeclName Name;
@@ -1350,13 +1349,16 @@ private:
   FuncDecl *VJPFunction = nullptr;
   /// Checked parameter indices, to be resolved by the type checker.
   AutoDiffParameterIndices *CheckedParameterIndices = nullptr;
-  /// The constraint clauses for generic types.
+  /// The trailing where clause, if it exists.
   TrailingWhereClause *WhereClause = nullptr;
-  /// The number of requirements in the trailing where clause, to be resolved
-  /// by the type checker.
-  unsigned NumRequirements = 0;
+  /// The requirements for autodiff associated functions. Resolved by the type
+  /// checker based on the original function's generic signature and the
+  /// attribute's where clause requirements. This is set only if the attribute's
+  /// where clause exists.
+  MutableArrayRef<Requirement> Requirements;
 
-  explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+  explicit DifferentiableAttr(ASTContext &context, SourceLoc atLoc,
+                              SourceRange baseRange,
                               ArrayRef<AutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> primal,
                               Optional<DeclNameWithLoc> adjoint,
@@ -1364,7 +1366,8 @@ private:
                               Optional<DeclNameWithLoc> vjp,
                               TrailingWhereClause *clause);
 
-  explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+  explicit DifferentiableAttr(ASTContext &context, SourceLoc atLoc,
+                              SourceRange baseRange,
                               ArrayRef<AutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> primal,
                               Optional<DeclNameWithLoc> adjoint,
@@ -1417,16 +1420,9 @@ public:
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
-  ArrayRef<Requirement> getRequirements() const {
-    return { getTrailingObjects<Requirement>(), NumRequirements };
-  }
-  MutableArrayRef<Requirement> getRequirements() {
-    return { getTrailingObjects<Requirement>(), NumRequirements };
-  }
-  void setRequirements(ASTContext &ctx, ArrayRef<Requirement> requirements);
-  size_t numTrailingObjects(OverloadToken<Requirement>) const {
-    return NumRequirements;
-  }
+  ArrayRef<Requirement> getRequirements() const { return Requirements; }
+  MutableArrayRef<Requirement> getRequirements() { return Requirements; }
+  void setRequirements(ASTContext &context, ArrayRef<Requirement> requirements);
 
   FuncDecl *getPrimalFunction() const { return PrimalFunction; }
   void setPrimalFunction(FuncDecl *decl) { PrimalFunction = decl; }
