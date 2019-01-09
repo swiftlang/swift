@@ -521,6 +521,9 @@ def create_argument_parser():
     option(['--skstresstester'], store_true('build_skstresstester'),
            help='build the SourceKit stress tester')
 
+    option(['--swiftevolve'], store_true('build_swiftevolve'),
+           help='build the swift-evolve tool')
+
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
 
