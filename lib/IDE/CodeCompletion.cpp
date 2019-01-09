@@ -5166,7 +5166,6 @@ class ExprContextAnalyzer {
   Expr *ParsedExpr;
   SourceManager &SM;
   ASTContext &Context;
-  ExprParentFinder Finder;
 
   // Results populated by Analyze()
   SmallVector<Type, 2> PossibleTypes;
@@ -5237,59 +5236,6 @@ class ExprContextAnalyzer {
     }
     return !PossibleTypes.empty() || !PossibleNames.empty();
   }
-
-public:
-  ExprContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
-    ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
-    Context(DC->getASTContext()),
-    Finder(ParsedExpr,  [](ASTWalker::ParentTy Node, ASTWalker::ParentTy Parent) {
-      if (auto E = Node.getAsExpr()) {
-        switch(E->getKind()) {
-        case ExprKind::Call:
-        case ExprKind::Binary:
-        case ExprKind::PrefixUnary:
-        case ExprKind::Assign:
-        case ExprKind::Subscript:
-          return true;
-        case ExprKind::Tuple: {
-          auto ParentE = Parent.getAsExpr();
-          return !ParentE || (!isa<CallExpr>(ParentE) &&
-                              !isa<SubscriptExpr>(ParentE) &&
-                              !isa<BinaryExpr>(ParentE) &&
-                              !isa<TupleShuffleExpr>(ParentE));
-        }
-        default:
-          return false;
-        }
-      } else if (auto S = Node.getAsStmt()) {
-        switch (S->getKind()) {
-        case StmtKind::Return:
-        case StmtKind::ForEach:
-        case StmtKind::RepeatWhile:
-        case StmtKind::If:
-        case StmtKind::While:
-        case StmtKind::Guard:
-          return true;
-        default:
-          return false;
-        }
-      } else if (auto D = Node.getAsDecl()) {
-        switch (D->getKind()) {
-        case DeclKind::PatternBinding:
-          return true;
-        default:
-          return false;
-        }
-      } else if (auto P = Node.getAsPattern()) {
-        switch (P->getKind()) {
-        case PatternKind::Expr:
-          return true;
-        default:
-          return false;
-        }
-      } else
-        return false;
-    }) {}
 
   void analyzeExpr(Expr *Parent) {
     switch (Parent->getKind()) {
@@ -5421,10 +5367,64 @@ public:
     }
   }
 
+public:
+  ExprContextAnalyzer(DeclContext *DC, Expr *ParsedExpr)
+      : DC(DC), ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
+        Context(DC->getASTContext()) {}
+
   bool Analyze() {
     // We cannot analyze without target.
     if (!ParsedExpr)
       return false;
+
+    ExprParentFinder Finder(ParsedExpr, [](ASTWalker::ParentTy Node,
+                                           ASTWalker::ParentTy Parent) {
+      if (auto E = Node.getAsExpr()) {
+        switch (E->getKind()) {
+        case ExprKind::Call:
+        case ExprKind::Binary:
+        case ExprKind::PrefixUnary:
+        case ExprKind::Assign:
+        case ExprKind::Subscript:
+          return true;
+        case ExprKind::Tuple: {
+          auto ParentE = Parent.getAsExpr();
+          return !ParentE ||
+                 (!isa<CallExpr>(ParentE) && !isa<SubscriptExpr>(ParentE) &&
+                  !isa<BinaryExpr>(ParentE) && !isa<TupleShuffleExpr>(ParentE));
+        }
+        default:
+          return false;
+        }
+      } else if (auto S = Node.getAsStmt()) {
+        switch (S->getKind()) {
+        case StmtKind::Return:
+        case StmtKind::ForEach:
+        case StmtKind::RepeatWhile:
+        case StmtKind::If:
+        case StmtKind::While:
+        case StmtKind::Guard:
+          return true;
+        default:
+          return false;
+        }
+      } else if (auto D = Node.getAsDecl()) {
+        switch (D->getKind()) {
+        case DeclKind::PatternBinding:
+          return true;
+        default:
+          return false;
+        }
+      } else if (auto P = Node.getAsPattern()) {
+        switch (P->getKind()) {
+        case PatternKind::Expr:
+          return true;
+        default:
+          return false;
+        }
+      } else
+        return false;
+    });
     DC->walkContext(Finder);
 
     if (Finder.Ancestors.empty())
