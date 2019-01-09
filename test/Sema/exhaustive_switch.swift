@@ -883,7 +883,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   }
 
-  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{3-3=@unknown default:\n<#fatalError#>()\n}}
+  switch value { // expected-warning {{switch covers known cases, but 'NonExhaustive' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{3-3=@unknown default:\n<#fatalError#>()\n}}
   case .a: break
   case .b: break
   }
@@ -915,7 +915,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   }
 
   // Test being part of other spaces.
-  switch value as Optional { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.some(_)'}}
+  switch value as Optional { // expected-warning {{switch covers known cases, but 'Optional<NonExhaustive>' may have additional unknown values}} {{none}} expected-note {{add missing case: '.some(_)'}}
   case .a?: break
   case .b?: break
   case nil: break
@@ -933,7 +933,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case nil: break
   } // no-warning
 
-  switch (value, flag) { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(_, false)'}}
+  switch (value, flag) { // expected-warning {{switch covers known cases, but '(NonExhaustive, Bool)' may have additional unknown values}} {{none}} expected-note {{add missing case: '(_, false)'}}
   case (.a, _): break
   case (.b, false): break
   case (_, true): break
@@ -946,7 +946,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break
   } // no-warning
 
-  switch (flag, value) { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(false, _)'}}
+  switch (flag, value) { // expected-warning {{switch covers known cases, but '(Bool, NonExhaustive)' may have additional unknown values}} {{none}} expected-note {{add missing case: '(false, _)'}}
   case (_, .a): break
   case (false, .b): break
   case (true, _): break
@@ -959,7 +959,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break
   } // no-warning
 
-  switch (value, value) { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(_, _)'}}
+  switch (value, value) { // expected-warning {{switch covers known cases, but '(NonExhaustive, NonExhaustive)' may have additional unknown values}} {{none}} expected-note {{add missing case: '(_, _)'}}
   case (.a, _), (_, .a): break
   case (.b, _), (_, .b): break
   }
@@ -975,7 +975,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   }
 
-  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{3-3=@unknown default:\n<#fatalError#>()\n}}
+  switch payload { // expected-warning {{switch covers known cases, but 'NonExhaustivePayload' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{3-3=@unknown default:\n<#fatalError#>()\n}}
   case .a: break
   case .b: break
   }
