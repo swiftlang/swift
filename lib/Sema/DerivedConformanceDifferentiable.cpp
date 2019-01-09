@@ -577,7 +577,21 @@ deriveDifferentiable_VectorSpace(DerivedConformance &derived,
                             parentDC, ConformanceCheckFlags::Used);
   // Return `Self` if conditions are met.
   if (allMembersVectorSpaceEqualsSelf && nominalConformsToAddArith) {
-    return parentDC->mapTypeIntoContext(nominal->getDeclaredInterfaceType());
+    auto selfType =
+        parentDC->mapTypeIntoContext(nominal->getDeclaredInterfaceType());
+    auto *aliasDecl = new (C) TypeAliasDecl(
+        SourceLoc(), SourceLoc(), getVectorSpaceIdentifier(kind, C),
+        SourceLoc(), {}, nominal);
+    aliasDecl->setUnderlyingType(selfType);
+    aliasDecl->setImplicit();
+    aliasDecl->getAttrs().add(
+        new (C) FieldwiseProductSpaceAttr(/*implicit*/ true));
+    nominal->addMember(aliasDecl);
+    aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
+    aliasDecl->setValidationToChecked();
+    TC.validateDecl(aliasDecl);
+    C.addSynthesizedDecl(aliasDecl);
+    return selfType;
   }
 
   // Get or synthesize both `TangentVector` and `CotangentVector` structs at
