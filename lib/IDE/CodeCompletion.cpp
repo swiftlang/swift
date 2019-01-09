@@ -1345,52 +1345,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// to the \c Consumer.
   bool DeliveredResults = false;
 
-  void typeCheckContext(DeclContext *DC) {
-    // Nothing to type check in module context.
-    if (DC->isModuleScopeContext())
-      return;
-
-    typeCheckContext(DC->getParent());
-
-    // Type-check this context.
-    switch (DC->getContextKind()) {
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::Initializer:
-    case DeclContextKind::Module:
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::TopLevelCodeDecl:
-      // Nothing to do for these.
-      break;
-
-    case DeclContextKind::AbstractFunctionDecl: {
-      auto *AFD = cast<AbstractFunctionDecl>(DC);
-
-      // FIXME: This shouldn't be necessary, but we crash otherwise.
-      if (auto *AD = dyn_cast<AccessorDecl>(AFD))
-        typeCheckCompletionDecl(AD->getStorage());
-
-      typeCheckAbstractFunctionBodyUntil(
-                                  AFD,
-                                  P.Context.SourceMgr.getCodeCompletionLoc());
-      break;
-    }
-
-    case DeclContextKind::ExtensionDecl:
-      typeCheckCompletionDecl(cast<ExtensionDecl>(DC));
-      break;
-
-    case DeclContextKind::GenericTypeDecl:
-      typeCheckCompletionDecl(cast<GenericTypeDecl>(DC));
-      break;
-
-    case DeclContextKind::FileUnit:
-      llvm_unreachable("module scope context handled above");
-
-    case DeclContextKind::SubscriptDecl:
-      typeCheckCompletionDecl(cast<SubscriptDecl>(DC));
-      break;
-    }
-  }
 
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
@@ -4905,16 +4859,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       CurDeclContext = DC;
   }
 
-  // The only time we have to explicitly check a TopLevelCodeDecl
-  // is when we're directly inside of one. In this case,
-  // performTypeChecking() did not type check it for us.
-  auto *DC = CurDeclContext;
-  while (isa<AbstractClosureExpr>(DC))
-    DC = DC->getParent();
-  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC))
-    typeCheckTopLevelCodeDecl(TLCD);
-  else
-    typeCheckContext(CurDeclContext);
+  typeCheckContextUntil(
+      CurDeclContext,
+      CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc());
 
   Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;

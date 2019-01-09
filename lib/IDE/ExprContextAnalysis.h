@@ -25,6 +25,10 @@ class AnyFunctionType;
 
 namespace ide {
 
+/// Type check parent contexts of the given decl context, and the body of the
+/// given context until \c Loc if the context is a function body.
+void typeCheckContextUntil(DeclContext *DC, SourceLoc Loc);
+
 /// Returns expected return type of the given decl context.
 /// \p DC should be an \c AbstractFunctionDecl or an \c AbstractClosureExpr.
 Type getReturnTypeFromContext(const DeclContext *DC);
