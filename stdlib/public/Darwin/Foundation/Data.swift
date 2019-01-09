@@ -17,7 +17,7 @@ import Darwin
 #elseif os(Linux)
 import Glibc
 
-@inlinable // This is inlinable as it is trivially computable.
+@inlinable // This is @inlinable as trivially computable.
 fileprivate func malloc_good_size(_ size: Int) -> Int {
     return size
 }
@@ -1841,8 +1841,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         /// A custom deallocator.
         case custom((UnsafeMutableRawPointer, Int) -> Void)
         
-        @usableFromInline
-        internal var _deallocator : ((UnsafeMutableRawPointer, Int) -> Void) {
+        @usableFromInline internal var _deallocator : ((UnsafeMutableRawPointer, Int) -> Void) {
 #if DEPLOYMENT_RUNTIME_SWIFT
             switch self {
             case .unmap:
@@ -1878,7 +1877,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// - parameter bytes: A pointer to the memory. It will be copied.
     /// - parameter count: The number of bytes to copy.
-    @inlinable
+    @inlinable // This is @inlinable as a trivial initializer.
     public init(bytes: UnsafeRawPointer, count: Int) {
         _representation = _Representation(UnsafeRawBufferPointer(start: bytes, count: count))
     }
@@ -1886,7 +1885,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Initialize a `Data` with copied memory content.
     ///
     /// - parameter buffer: A buffer pointer to copy. The size is calculated from `SourceType` and `buffer.count`.
-    @inlinable
+    @inlinable // This is @inlinable as a trivial, generic initializer.
     public init<SourceType>(buffer: UnsafeBufferPointer<SourceType>) {
         _representation = _Representation(UnsafeRawBufferPointer(buffer))
     }
@@ -1894,7 +1893,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Initialize a `Data` with copied memory content.
     ///
     /// - parameter buffer: A buffer pointer to copy. The size is calculated from `SourceType` and `buffer.count`.
-    @inlinable
+    @inlinable // This is @inlinable as a trivial, generic initializer.
     public init<SourceType>(buffer: UnsafeMutableBufferPointer<SourceType>) {
         _representation = _Representation(UnsafeRawBufferPointer(buffer))
     }
@@ -1903,7 +1902,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// - parameter repeatedValue: A byte to initialize the pattern
     /// - parameter count: The number of bytes the data initially contains initialized to the repeatedValue
-    @inlinable
+    @inlinable // This is @inlinable as a convenience initializer.
     public init(repeating repeatedValue: UInt8, count: Int) {
         self.init(count: count)
         withUnsafeMutableBytes { (buffer: UnsafeMutableRawBufferPointer) -> Void in
@@ -1920,7 +1919,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// If the capacity specified in `capacity` is greater than four memory pages in size, this may round the amount of requested memory up to the nearest full page.
     ///
     /// - parameter capacity: The size of the data.
-    @inlinable
+    @inlinable // This is @inlinable as a trivial initializer.
     public init(capacity: Int) {
         _representation = _Representation(capacity: capacity)
     }
@@ -1928,13 +1927,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Initialize a `Data` with the specified count of zeroed bytes.
     ///
     /// - parameter count: The number of bytes the data initially contains.
-    @inlinable
+    @inlinable // This is @inlinable as a trivial initializer.
     public init(count: Int) {
         _representation = _Representation(count: count)
     }
     
     /// Initialize an empty `Data`.
-    @inlinable
+    @inlinable // This is @inlinable as a trivial initializer.
     public init() {
         _representation = .empty
     }
@@ -1946,7 +1945,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter bytes: A pointer to the bytes.
     /// - parameter count: The size of the bytes.
     /// - parameter deallocator: Specifies the mechanism to free the indicated buffer, or `.none`.
-    @inlinable
+    @inlinable // This is @inlinable as a trivial initializer.
     public init(bytesNoCopy bytes: UnsafeMutableRawPointer, count: Int, deallocator: Deallocator) {
         let whichDeallocator = deallocator._deallocator
         if count == 0 {
@@ -1962,7 +1961,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter url: The `URL` to read.
     /// - parameter options: Options for the read operation. Default value is `[]`.
     /// - throws: An error in the Cocoa domain, if `url` cannot be read.
-    @inlinable
+    @inlinable // This is @inlinable as a convenience initializer.
     public init(contentsOf url: __shared URL, options: Data.ReadingOptions = []) throws {
         let d = try NSData(contentsOf: url, options: ReadingOptions(rawValue: options.rawValue))
         self.init(bytes: d.bytes, count: d.length)
@@ -1973,7 +1972,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Returns nil when the input is not recognized as valid Base-64.
     /// - parameter base64String: The string to parse.
     /// - parameter options: Encoding options. Default value is `[]`.
-    @inlinable
+    @inlinable // This is @inlinable as a convenience initializer.
     public init?(base64Encoded base64String: __shared String, options: Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64String, options: Base64DecodingOptions(rawValue: options.rawValue)) {
             self.init(bytes: d.bytes, count: d.length)
@@ -1988,7 +1987,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// - parameter base64Data: Base-64, UTF-8 encoded input data.
     /// - parameter options: Decoding options. Default value is `[]`.
-    @inlinable
+    @inlinable // This is @inlinable as a convenience initializer.
     public init?(base64Encoded base64Data: __shared Data, options: Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64Data, options: Base64DecodingOptions(rawValue: options.rawValue)) {
             self.init(bytes: d.bytes, count: d.length)
@@ -2025,8 +2024,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     // slightly faster paths for common sequences
-    @inlinable
-    @inline(__always)
+    @inlinable // This is @inlinable as an important generic funnel point, despite being a non-trivial initializer.
     public init<S: Sequence>(_ elements: S) where S.Element == UInt8 {
         // If the sequence is already contiguous, access the underlying raw memory directly.
         if let contiguous = elements as? ContiguousBytes {
@@ -2084,7 +2082,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
        self.init(bytes)
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as a trivial initializer.
     internal init(representation: _Representation) {
         _representation = representation
     }
@@ -2092,13 +2090,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // -----------------------------------
     // MARK: - Properties and Functions
 
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public mutating func reserveCapacity(_ minimumCapacity: Int) {
         _representation.reserveCapacity(minimumCapacity)
     }
     
     /// The number of bytes in the data.
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public var count: Int {
         get {
             return _representation.count
@@ -2109,7 +2107,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
 
-    @inlinable
+    @inlinable // This is @inlinable as trivially computable.
     public var regions: CollectionOfOne<Data> {
         return CollectionOfOne(self)
     }
@@ -2124,7 +2122,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as a generic, trivially forwarding function.
     public func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
         return try _representation.withUnsafeBytes(body)
     }
@@ -2140,7 +2138,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
 
-    @inlinable
+    @inlinable // This is @inlinable as a generic, trivially forwarding function.
     public mutating func withUnsafeMutableBytes<ResultType>(_ body: (UnsafeMutableRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
         return try _representation.withUnsafeMutableBytes(body)
     }
@@ -2153,14 +2151,14 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter pointer: A pointer to the buffer you wish to copy the bytes into.
     /// - parameter count: The number of bytes to copy.
     /// - warning: This method does not verify that the contents at pointer have enough space to hold `count` bytes.
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, count: Int) {
         precondition(count >= 0, "count of bytes to copy must not be negative")
         if count == 0 { return }
         _copyBytesHelper(to: UnsafeMutableRawPointer(pointer), from: startIndex..<(startIndex + count))
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     internal func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: Range<Int>) {
         if range.upperBound - range.lowerBound == 0 { return }
         _representation.copyBytes(to: pointer, from: range)
@@ -2171,7 +2169,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter pointer: A pointer to the buffer you wish to copy the bytes into.
     /// - parameter range: The range in the `Data` to copy.
     /// - warning: This method does not verify that the contents at pointer have enough space to hold the required number of bytes.
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, from range: Range<Index>) {
         _copyBytesHelper(to: pointer, from: range)
     }
@@ -2183,7 +2181,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter buffer: A buffer to copy the data into.
     /// - parameter range: A range in the data to copy into the buffer. If the range is empty, this function will return 0 without copying anything. If the range is nil, as much data as will fit into `buffer` is copied.
     /// - returns: Number of bytes copied into the destination buffer.
-    @inlinable
+    @inlinable // This is @inlinable as generic and reasonably small.
     public func copyBytes<DestinationType>(to buffer: UnsafeMutableBufferPointer<DestinationType>, from range: Range<Index>? = nil) -> Int {
         let cnt = count
         guard cnt > 0 else { return 0 }
@@ -2249,7 +2247,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter range: The range of this data in which to perform the search. Default value is `nil`, which means the entire content of this data.
     /// - returns: A `Range` specifying the location of the found data, or nil if a match could not be found.
     /// - precondition: `range` must be in the bounds of the Data.
-    @inlinable
     public func range(of dataToFind: Data, options: Data.SearchOptions = [], in range: Range<Index>? = nil) -> Range<Index>? {
         let nsRange : NSRange
         if let r = range {
@@ -2275,19 +2272,18 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         _representation.enumerateBytes(block)
     }
 
-    @inlinable
+    @inlinable // This is @inlinable as a generic, trivially forwarding function.
     internal mutating func _append<SourceType>(_ buffer : UnsafeBufferPointer<SourceType>) {
         if buffer.isEmpty { return }
         _representation.append(contentsOf: UnsafeRawBufferPointer(buffer))
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as a generic, trivially forwarding function.
     public mutating func append(_ bytes: UnsafePointer<UInt8>, count: Int) {
         if count == 0 { return }
         _append(UnsafeBufferPointer(start: bytes, count: count))
     }
     
-    @inlinable
     public mutating func append(_ other: Data) {
         guard other.count > 0 else { return }
         other.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
@@ -2298,19 +2294,19 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Append a buffer of bytes to the data.
     ///
     /// - parameter buffer: The buffer of bytes to append. The size is calculated from `SourceType` and `buffer.count`.
-    @inlinable
+    @inlinable // This is @inlinable as a generic, trivially forwarding function.
     public mutating func append<SourceType>(_ buffer : UnsafeBufferPointer<SourceType>) {
         _append(buffer)
     }
 
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public mutating func append(contentsOf bytes: [UInt8]) {
         bytes.withUnsafeBufferPointer { (buffer: UnsafeBufferPointer<UInt8>) -> Void in
             _append(buffer)
         }
     }
 
-    @inlinable
+    @inlinable // This is @inlinable as an important generic funnel point, despite being non-trivial.
     public mutating func append<S: Sequence>(contentsOf elements: S) where S.Element == Element {
         // If the sequence is already contiguous, access the underlying raw memory directly.
         if let contiguous = elements as? ContiguousBytes {
@@ -2359,7 +2355,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// If `range` exceeds the bounds of the data, then the data is resized to fit.
     /// - parameter range: The range in the data to set to `0`.
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public mutating func resetBytes(in range: Range<Index>) {
         // it is worth noting that the range here may be out of bounds of the Data itself (which triggers a growth)
         precondition(range.lowerBound >= 0, "Ranges must not be negative bounds")
@@ -2374,7 +2370,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - precondition: The bounds of `subrange` must be valid indices of the collection.
     /// - parameter subrange: The range in the data to replace. If `subrange.lowerBound == data.count && subrange.count == 0` then this operation is an append.
     /// - parameter data: The replacement data.
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public mutating func replaceSubrange(_ subrange: Range<Index>, with data: Data) {
         data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
             _representation.replaceSubrange(subrange, with: buffer.baseAddress, count: buffer.count)
@@ -2388,7 +2384,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - precondition: The bounds of `subrange` must be valid indices of the collection.
     /// - parameter subrange: The range in the data to replace.
     /// - parameter buffer: The replacement bytes.
-    @inlinable
+    @inlinable // This is @inlinable as a generic, trivially forwarding function.
     public mutating func replaceSubrange<SourceType>(_ subrange: Range<Index>, with buffer: UnsafeBufferPointer<SourceType>) {
         guard !buffer.isEmpty  else { return }
         replaceSubrange(subrange, with: buffer.baseAddress!, count: buffer.count * MemoryLayout<SourceType>.stride)
@@ -2401,9 +2397,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - precondition: The bounds of `subrange` must be valid indices of the collection.
     /// - parameter subrange: The range in the data to replace.
     /// - parameter newElements: The replacement bytes.
-    @inlinable
+    @inlinable // This is @inlinable as generic and reasonably small.
     public mutating func replaceSubrange<ByteCollection : Collection>(_ subrange: Range<Index>, with newElements: ByteCollection) where ByteCollection.Iterator.Element == Data.Iterator.Element {
-        let totalCount: Int = numericCast(newElements.count)
+        let totalCount = Int(newElements.count)
         _withStackOrHeapBuffer(totalCount) { conditionalBuffer in
             let buffer = UnsafeMutableBufferPointer(start: conditionalBuffer.pointee.memory.assumingMemoryBound(to: UInt8.self), count: totalCount)
             var (iterator, index) = newElements._copyContents(initializing: buffer)
@@ -2415,7 +2411,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public mutating func replaceSubrange(_ subrange: Range<Index>, with bytes: UnsafeRawPointer, count cnt: Int) {
         _representation.replaceSubrange(subrange, with: bytes, count: cnt)
     }
@@ -2423,7 +2419,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Return a new copy of the data in a specified range.
     ///
     /// - parameter range: The range to copy.
-    @inlinable
     public func subdata(in range: Range<Index>) -> Data {
         if isEmpty || range.upperBound - range.lowerBound == 0 {
             return Data()
@@ -2442,7 +2437,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// - parameter options: The options to use for the encoding. Default value is `[]`.
     /// - returns: The Base-64 encoded string.
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public func base64EncodedString(options: Data.Base64EncodingOptions = []) -> String {
         return _representation.withInteriorPointerReference {
             return $0.base64EncodedString(options: options)
@@ -2453,7 +2448,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// - parameter options: The options to use for the encoding. Default value is `[]`.
     /// - returns: The Base-64 encoded data.
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public func base64EncodedData(options: Data.Base64EncodingOptions = []) -> Data {
         return _representation.withInteriorPointerReference {
             return $0.base64EncodedData(options: options)
@@ -2469,7 +2464,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         _representation.hash(into: &hasher)
     }
     
-    @inlinable
     public func advanced(by amount: Int) -> Data {
         let length = count - amount
         precondition(length > 0)
@@ -2484,7 +2478,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // MARK: Index and Subscript
     
     /// Sets or returns the byte at the specified index.
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public subscript(index: Index) -> UInt8 {
         get {
             return _representation[index]
@@ -2494,7 +2488,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public subscript(bounds: Range<Index>) -> Data {
         get {
             return _representation[bounds]
@@ -2504,15 +2498,15 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as a generic, trivially forwarding function.
     public subscript<R: RangeExpression>(_ rangeExpression: R) -> Data
         where R.Bound: FixedWidthInteger {
         get {
             let lower = R.Bound(startIndex)
             let upper = R.Bound(endIndex)
             let range = rangeExpression.relative(to: lower..<upper)
-            let start: Int = numericCast(range.lowerBound)
-            let end: Int = numericCast(range.upperBound)
+            let start = Int(range.lowerBound)
+            let end = Int(range.upperBound)
             let r: Range<Int> = start..<end
             return _representation[r]
         }
@@ -2520,8 +2514,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             let lower = R.Bound(startIndex)
             let upper = R.Bound(endIndex)
             let range = rangeExpression.relative(to: lower..<upper)
-            let start: Int = numericCast(range.lowerBound)
-            let end: Int = numericCast(range.upperBound)
+            let start = Int(range.lowerBound)
+            let end = Int(range.upperBound)
             let r: Range<Int> = start..<end
             replaceSubrange(r, with: newValue)
         }
@@ -2529,7 +2523,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     /// The start `Index` in the data.
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public var startIndex: Index {
         get {
             return _representation.startIndex
@@ -2539,31 +2533,31 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// The end `Index` into the data.
     ///
     /// This is the "one-past-the-end" position, and will always be equal to the `count`.
-    @inlinable
+    @inlinable // This is @inlinable as trivially forwarding.
     public var endIndex: Index {
         get {
             return _representation.endIndex
         }
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as trivially computable.
     public func index(before i: Index) -> Index {
         return i - 1
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as trivially computable.
     public func index(after i: Index) -> Index {
         return i + 1
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as trivially computable.
     public var indices: Range<Int> {
         get {
             return startIndex..<endIndex
         }
     }
     
-    @inlinable
+    @inlinable // This is @inlinable as a fast-path for emitting into generic Sequence usages.
     public func _copyContents(initializing buffer: UnsafeMutableBufferPointer<UInt8>) -> (Iterator, UnsafeMutableBufferPointer<UInt8>.Index) {
         guard !isEmpty else { return (makeIterator(), buffer.startIndex) }
         let cnt = Swift.min(count, buffer.count)
@@ -2578,7 +2572,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// An iterator over the contents of the data.
     ///
     /// The iterator will increment byte-by-byte.
-    @inlinable
+    @inlinable // This is @inlinable as trivially computable.
     public func makeIterator() -> Data.Iterator {
         return Iterator(self, at: startIndex)
     }
@@ -2596,7 +2590,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         @usableFromInline internal var _idx: Data.Index
         @usableFromInline internal let _endIdx: Data.Index
         
-        @usableFromInline
+        @usableFromInline // This is @usableFromInline as a non-trivial initializer.
         internal init(_ data: Data, at loc: Data.Index) {
             // The let vars prevent this from being marked as @inlinable
             _data = data
@@ -2612,7 +2606,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
         
-        @inlinable
         public mutating func next() -> UInt8? {
             let idx = _idx
             let bufferSize = MemoryLayout<Buffer>.size
@@ -2656,7 +2649,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public var mutableBytes: UnsafeMutableRawPointer { fatalError() }
     
     /// Returns `true` if the two `Data` arguments are equal.
-    @inlinable
+    @inlinable // This is @inlinable as emission into clients is safe -- the concept of equality on Data will not change.
     public static func ==(d1 : Data, d2 : Data) -> Bool {
         let length1 = d1.count
         if length1 != d2.count {
