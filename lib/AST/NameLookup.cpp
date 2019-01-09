@@ -171,6 +171,19 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
   return ConstructorComparison::Same;
 }
 
+bool ModuleDecl::transitivelyImports(const ModuleDecl *other) const {
+  ASTContext &ctx = getASTContext();
+  auto result = ctx.evaluator(IsTransitiveModuleImportRequest{this, other});
+  if (result)
+    return result.get();
+
+  llvm::handleAllErrors(result.takeError(),
+      [](const CyclicalRequestError<IsTransitiveModuleImportRequest> &E) {
+        // cycle detected
+      });
+  return false;
+}
+
 /// Given a set of declarations whose names and signatures have matched,
 /// figure out which of these declarations have been shadowed by others.
 static void recordShadowedDeclsAfterSignatureMatch(
@@ -236,60 +249,15 @@ static void recordShadowedDeclsAfterSignatureMatch(
           isa<ProtocolDecl>(secondDecl->getDeclContext()))
         continue;
 
-      // Prefer declarations in the current module over those in another
-      // module.
-      // FIXME: This is a hack. We should query a (lazily-built, cached)
-      // module graph to determine shadowing.
-      if ((firstModule == curModule) != (secondModule == curModule)) {
-        // If the first module is the current module, the second declaration
-        // is shadowed by the first.
-        if (firstModule == curModule) {
-          shadowed.insert(secondDecl);
-          continue;
-        }
-
-        // Otherwise, the first declaration is shadowed by the second. There is
-        // no point in continuing to compare the first declaration to others.
-        shadowed.insert(firstDecl);
-        break;
-      }
-
-      // Prefer declarations in the any module over those in the standard
-      // library module.
-      if (auto swiftModule = ctx.getStdlibModule()) {
-        if ((firstModule == swiftModule) != (secondModule == swiftModule)) {
-          // If the second module is the standard library module, the second
-          // declaration is shadowed by the first.
-          if (secondModule == swiftModule) {
-            shadowed.insert(secondDecl);
-            continue;
-          }
-
-          // Otherwise, the first declaration is shadowed by the second. There is
-          // no point in continuing to compare the first declaration to others.
+      if (firstModule != secondModule) {
+        if (secondModule->transitivelyImports(firstModule)) {
           shadowed.insert(firstDecl);
           break;
         }
-      }
 
-      // Prefer declarations in an overlay to similar declarations in
-      // the Clang module it customizes.
-      if (firstDecl->hasClangNode() != secondDecl->hasClangNode()) {
-        auto clangLoader = ctx.getClangModuleLoader();
-        if (!clangLoader) continue;
-
-        if (clangLoader->isInOverlayModuleForImportedModule(
-                                              firstDecl->getDeclContext(),
-                                              secondDecl->getDeclContext())) {
+        if (firstModule->transitivelyImports(secondModule)) {
           shadowed.insert(secondDecl);
           continue;
-        }
-
-        if (clangLoader->isInOverlayModuleForImportedModule(
-                                               secondDecl->getDeclContext(),
-                                               firstDecl->getDeclContext())) {
-          shadowed.insert(firstDecl);
-          break;
         }
       }
     }

@@ -442,6 +442,10 @@ public:
   /// The order of items in \p imports is \e not preserved.
   static void removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports);
 
+  /// Determine whether this module imports the given \c other module, either
+  /// directly or transitively.
+  bool transitivelyImports(const ModuleDecl *other) const;
+
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

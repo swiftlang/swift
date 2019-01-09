@@ -12,6 +12,7 @@
 
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -150,6 +151,66 @@ void TypeDeclsFromWhereClauseRequest::noteCycleStep(
   auto ext = std::get<0>(getStorage());
   // FIXME: Customize this further.
   diags.diagnose(ext, diag::circular_reference_through);
+}
+
+static bool isSourceModule(const ModuleDecl *module){
+  for (const auto *file : module->getFiles()) {
+    if (isa<SourceFile>(file))
+      return true;
+  }
+
+  return false;
+}
+
+bool IsTransitiveModuleImportRequest::evaluate(Evaluator &evaluator,
+                                               const ModuleDecl *from,
+                                               const ModuleDecl *to) const {
+  if (from == to)
+    return false;
+
+  // By definition, everything shadows the Swift module because it is
+  // implicitly imported.
+  if (to == to->getASTContext().getStdlibModule())
+    return true;
+
+  llvm::SmallSetVector<const ModuleDecl *, 16> visited;
+  visited.insert(from);
+  for (unsigned currentIdx = 0; currentIdx != visited.size(); ++currentIdx) {
+    auto current = visited[currentIdx];
+    assert(current != to);
+
+    // If we're searching from a source module, consider all of the imports.
+    // Otherwise, only consider the public imports of imported modules.
+    auto importFilter =
+      currentIdx == 0 && isSourceModule(current)
+        ? ModuleDecl::ImportFilter::All
+        : ModuleDecl::ImportFilter::Public;
+
+    SmallVector<ModuleDecl::ImportedModule, 8> importedModules;
+    current->getImportedModules(importedModules, importFilter);
+    for (const auto &imported : importedModules) {
+      if (imported.second == to)
+        return true;
+
+      visited.insert(imported.second);
+    }
+  }
+
+  return false;
+}
+
+void IsTransitiveModuleImportRequest::diagnoseCycle(
+                                              DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
+  auto module = std::get<0>(getStorage());
+  diags.diagnose(module, diag::circular_reference);
+}
+
+void IsTransitiveModuleImportRequest::noteCycleStep(
+                                              DiagnosticEngine &diags) const {
+  auto module = std::get<0>(getStorage());
+  // FIXME: Customize this further.
+  diags.diagnose(module, diag::circular_reference_through);
 }
 
 // Define request evaluation functions for each of the name lookup requests.

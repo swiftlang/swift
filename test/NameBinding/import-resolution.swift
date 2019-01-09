@@ -1,8 +1,5 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck %s -enable-source-import -I %S/Inputs -sdk "" -verify -show-diagnostics-after-fatal
-// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs -sdk "" -show-diagnostics-after-fatal 2>&1 | %FileCheck %s -check-prefix=CHECK-NO-SOURCE-IMPORT
-
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/abcde.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/aeiou.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/asdf.swift
@@ -11,9 +8,6 @@
 
 // RUN: %target-swift-ide-test -source-filename %s -print-module-imports -module-to-print=letters -I %t | %FileCheck %s -check-prefix=CHECK-IMPORTS
 
-// CHECK-NO-SOURCE-IMPORT: no such module 'letters'
-// CHECK-NO-SOURCE-IMPORT: no such module 'abcde'
-// CHECK-NO-SOURCE-IMPORT: no such module 'asdf'
 import letters
 import abcde
 import struct asdf.S
@@ -31,7 +25,7 @@ letters.asdf.A // expected-error{{module 'letters' has no member named 'asdf'}}
 
 var uA : A // expected-error {{'A' is ambiguous for type lookup in this context}}
 var uB : B = abcde.B()
-var uC : C // expected-error {{'C' is ambiguous for type lookup in this context}}
+var uC : C
 var uD : D // expected-error {{'D' is ambiguous for type lookup in this context}}
 var uE : E // expected-error {{'E' is ambiguous for type lookup in this context}}
 var uF : F = letters.F()

@@ -236,6 +236,32 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Request to determine whether one module (transitively) imports another
+/// module.
+class IsTransitiveModuleImportRequest :
+    public SimpleRequest<IsTransitiveModuleImportRequest,
+                         CacheKind::Cached,
+                         bool,
+                         const ModuleDecl *, const ModuleDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, const ModuleDecl *from,
+                const ModuleDecl *to) const;
+
+public:
+  // Cycle handling
+  bool breakCycle() const { return false; }
+
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// The zone number for name-lookup requests.
 #define SWIFT_NAME_LOOKUP_REQUESTS_TYPEID_ZONE 9
 
