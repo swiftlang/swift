@@ -515,6 +515,13 @@ def build_module_from_parseable_interface :
   HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
   ModeOpt;
 
+def prebuilt_module_cache_path :
+  Separate<["-"], "prebuilt-module-cache-path">,
+  HelpText<"Directory of prebuilt modules for loading parseable interfaces">;
+def prebuilt_module_cache_path_EQ :
+  Joined<["-"], "prebuilt-module-cache-path=">,
+  Alias<prebuilt_module_cache_path>;
+
 def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
    HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
 
