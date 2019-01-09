@@ -697,6 +697,10 @@ public:
 
   void addDifferentiableAttr(SILDifferentiableAttr *attr);
 
+  void removeDifferentiableAttr(SILDifferentiableAttr *attr) {
+    std::remove(DifferentiableAttrs.begin(), DifferentiableAttrs.end(), attr);
+  }
+
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is
   /// not set for this specific function.
   OptimizationMode getOptimizationMode() const { return OptMode; }

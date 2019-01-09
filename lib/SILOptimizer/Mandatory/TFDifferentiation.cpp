@@ -1032,6 +1032,20 @@ public:
     return cachedPlusFn;
   }
 
+  void clearTask(DifferentiationTask *task) {
+    LLVM_DEBUG(getADDebugStream() << "Clearing differentiation task for "
+               << task->original->getName() << '\n');
+    transform.notifyWillDeleteFunction(task->primal);
+    module.eraseFunction(task->primal);
+    transform.notifyWillDeleteFunction(task->adjoint);
+    module.eraseFunction(task->adjoint);
+    transform.notifyWillDeleteFunction(task->jvp);
+    module.eraseFunction(task->jvp);
+    transform.notifyWillDeleteFunction(task->vjp);
+    module.eraseFunction(task->vjp);
+    task->original->removeDifferentiableAttr(task->attr);
+  }
+
   /// Retrieves the file unit that contains implicit declarations in the
   /// current Swift module. If it does not exist, create one.
   ///
@@ -1220,10 +1234,13 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
   // Location of the instruction.
   auto opLoc = inst->getLoc().getSourceLoc();
   auto invoker = task->getInvoker();
-  LLVM_DEBUG(getADDebugStream()
-             << "Diagnosing non-differentiability for value \n\t" << *inst
-             << "\n"
-             << "while performing differentiation task\n\t" << task << '\n');
+  LLVM_DEBUG({
+    auto &s = getADDebugStream()
+        << "Diagnosing non-differentiability for value \n\t" << *inst
+        << "\nwhile performing differentiation task\n\t";
+    task->print(s);
+    s << '\n';
+  });
   switch (invoker.getKind()) {
   // For a `autodiff_function` instruction or a `[differentiable]` attribute
   // that is not associated with any source location, we emit a diagnostic at
@@ -1407,6 +1424,11 @@ private:
   /// Perform analysis and populate sets.
   void analyze(DominanceInfo *di, PostDominanceInfo *pdi);
 
+  void setVariedIfDifferentiable(SILValue value,
+                                 unsigned independentVariableIndex);
+  void setUsefulIfDifferentiable(SILValue value,
+                                 unsigned dependentVariableIndex);
+
 public:
   explicit DifferentiableActivityInfo(SILFunction &f,
                                       DominanceInfo *di,
@@ -1459,9 +1481,8 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
              << "Running activity analysis on @" << function.getName() << '\n');
   // Inputs are just function's arguments, count `n`.
   auto paramArgs = function.getArgumentsWithoutIndirectResults();
-  for (auto valueAndIndex : enumerate(paramArgs)) {
-    inputValues.push_back(valueAndIndex.first);
-  }
+  for (auto value : paramArgs)
+    inputValues.push_back(value);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Inputs in @" << function.getName() << ":\n";
@@ -1477,37 +1498,109 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
       s << val << '\n';
   });
 
+  auto &module = function.getModule();
   // Mark inputs as varied.
   assert(variedValueSets.empty());
-  for (auto input : inputValues)
-    variedValueSets.push_back({input});
+  for (auto input : inputValues) {
+    variedValueSets.push_back({});
+    if (input->getType().isDifferentiable(module))
+      variedValueSets.back().insert(input);
+  }
   // Propagate varied-ness through the function in dominance order.
   DominanceOrder domOrder(function.getEntryBlock(), di);
   while (auto *block = domOrder.getNext()) {
-    for (auto &inst : *block)
-      for (auto &op : inst.getAllOperands())
-        for (auto i : indices(inputValues))
-          if (isVaried(op.get(), i))
-            for (auto result : inst.getResults())
-              variedValueSets[i].insert(result);
+    for (auto &inst : *block) {
+      for (auto i : indices(inputValues)) {
+        // Handle `apply`.
+        if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
+          for (auto arg : ai->getArgumentsWithoutIndirectResults()) {
+            if (isVaried(arg, i)) {
+              for (auto indRes : ai->getIndirectSILResults())
+                setVariedIfDifferentiable(indRes, i);
+              for (auto dirRes : ai->getResults())
+                setVariedIfDifferentiable(dirRes, i);
+            }
+          }
+        }
+        // Handle `store`.
+        else if (auto *si = dyn_cast<StoreInst>(&inst)) {
+          if (isVaried(si->getSrc(), i))
+            setVariedIfDifferentiable(si->getDest(), i);
+        }
+        // Handle everything else.
+        else {
+          for (auto &op : inst.getAllOperands())
+            if (isVaried(op.get(), i))
+              for (auto result : inst.getResults())
+                setVariedIfDifferentiable(result, i);
+        }
+      }
+    }
     domOrder.pushChildren(block);
   }
 
-  // Mark outputs as useful.
+  // Mark differentiable outputs as useful.
   assert(usefulValueSets.empty());
-  for (auto output : outputValues)
-    usefulValueSets.push_back({output});
+  for (auto output : outputValues) {
+    usefulValueSets.push_back({});
+    if (output->getType().isDifferentiable(module))
+      usefulValueSets.back().insert(output);
+  }
   // Propagate usefulness through the function in post-dominance order.
   PostDominanceOrder postDomOrder(&*function.findReturnBB(), pdi);
   while (auto *block = postDomOrder.getNext()) {
-    for (auto &inst : reversed(*block))
-      for (auto result : inst.getResults())
-        for (auto i : indices(outputValues))
-          if (isUseful(result, i))
-            for (auto &op : inst.getAllOperands())
-              usefulValueSets[i].insert(op.get());
+    for (auto &inst : reversed(*block)) {
+      for (auto i : indices(outputValues)) {
+        // Handle indirect results in `apply`.
+        if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
+          auto checkAndSetUseful = [&](SILValue res) {
+            if (isUseful(res, i))
+              for (auto arg : ai->getArgumentsWithoutIndirectResults())
+                setUsefulIfDifferentiable(arg, i);
+          };
+          for (auto dirRes : ai->getResults())
+            checkAndSetUseful(dirRes);
+          for (auto indRes : ai->getIndirectSILResults())
+            checkAndSetUseful(indRes);
+        }
+        // Handle `store`.
+        else if (auto *si = dyn_cast<StoreInst>(&inst)) {
+          if (isUseful(si->getDest(), i))
+            setUsefulIfDifferentiable(si->getSrc(), i);
+        }
+        // Handle side-effecting operations.
+        else if (inst.mayHaveSideEffects()) {
+          for (auto &op : inst.getAllOperands())
+            if (op.get()->getType().isAddress())
+              setUsefulIfDifferentiable(op.get(), i);
+          for (auto result : inst.getResults())
+            setUsefulIfDifferentiable(result, i);
+        }
+        // Handle everything else.
+        else {
+          for (auto result : inst.getResults())
+            if (isUseful(result, i))
+              for (auto &op : inst.getAllOperands())
+                setUsefulIfDifferentiable(op.get(), i);
+        }
+      }
+    }
     postDomOrder.pushChildren(block);
   }
+}
+
+void DifferentiableActivityInfo::setVariedIfDifferentiable(
+    SILValue value, unsigned independentVariableIndex) {
+  if (!value->getType().isDifferentiable(function.getModule()))
+    return;
+  variedValueSets[independentVariableIndex].insert(value);
+}
+
+void DifferentiableActivityInfo::setUsefulIfDifferentiable(
+    SILValue value, unsigned dependentVariableIndex) {
+  if (!value->getType().isDifferentiable(function.getModule()))
+    return;
+  usefulValueSets[dependentVariableIndex].insert(value);
 }
 
 bool DifferentiableActivityInfo::isIndependent(
@@ -2181,11 +2274,8 @@ public:
     // Clone.
     cloneFunctionBody(original, entry, entryArgs);
     // If errors occurred, back out.
-    if (errorOccurred) {
-      // Delete the body so that later passes don't get confused by invalid SIL.
-      getPrimal()->getBlocks().clear();
+    if (errorOccurred)
       return true;
-    }
     auto *origExit = &*original->findReturnBB();
     auto *exit = BBMap.lookup(origExit);
     assert(exit->getParent() == getPrimal());
@@ -2249,7 +2339,15 @@ public:
       return;
     SILClonerWithScopes::visit(inst);
   }
-  
+
+  void visitSILInstruction(SILInstruction *inst) {
+    // TODO: Change this to a note when we emit an error at the @autodiff
+    // function conversion location.
+    getContext().emitNondifferentiabilityError(inst, getDifferentiationTask(),
+        diag::autodiff_expression_is_not_differentiable_error);
+    errorOccurred = true;
+  }
+
   void visitReturnInst(ReturnInst *ri) {
     // The original return is not to be cloned.
     return;
@@ -2702,6 +2800,7 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // Synthesize primal.
   PrimalGenCloner cloner(item, activityInfo, domInfo, pdomInfo, loopInfo, *this,
                          context);
+  // Run the cloner.
   return cloner.run();
 }
 
@@ -2724,7 +2823,10 @@ bool PrimalGen::run() {
   while (!worklist.empty()) {
     auto synthesis = worklist.back();
     worklist.pop_back();
-    errorOccurred |= performSynthesis(synthesis);
+    if (performSynthesis(synthesis)) {
+      context.clearTask(synthesis.task);
+      errorOccurred = true;
+    }
     synthesis.task->getPrimalInfo()->computePrimalValueStructType();
     synthesis.task->setPrimalSynthesisState(FunctionSynthesisState::Done);
   }
@@ -2780,7 +2882,10 @@ bool AdjointGen::run() {
   while (!worklist.empty()) {
     auto synthesis = worklist.back();
     worklist.pop_back();
-    errorOccurred |= performSynthesis(synthesis);
+    if (performSynthesis(synthesis)) {
+      context.clearTask(synthesis.task);
+      errorOccurred = true;
+    }
     synthesis.task->setAdjointSynthesisState(FunctionSynthesisState::Done);
   }
   return errorOccurred;
@@ -3243,6 +3348,8 @@ public:
           continue;
         // Differentiate instruction.
         visit(&inst);
+        if (errorOccurred)
+          return true;
       }
     }
     
@@ -3322,7 +3429,11 @@ public:
   }
 
   void visitSILInstruction(SILInstruction *inst) {
-    llvm_unreachable("Unsupport instruction visited");
+    // TODO: Change this to a note when we emit an error at the @autodiff
+    // function conversion location.
+    getContext().emitNondifferentiabilityError(inst, getDifferentiationTask(),
+        diag::autodiff_expression_is_not_differentiable_error);
+    errorOccurred = true;
   }
 
   SILLocation remapLocation(SILLocation loc) { return loc; }
@@ -4326,6 +4437,7 @@ bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
                          *domAnalysis->get(item.original),
                          *pdomAnalysis->get(item.original),
                          *loopAnalysis->get(item.original), *this);
+  // Run the adjoint emitter.
   return emitter.run();
 }
 

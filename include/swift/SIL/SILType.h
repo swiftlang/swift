@@ -497,6 +497,10 @@ public:
   /// formal type. Meant for verification purposes/assertions.
   bool isLoweringOf(SILModule &M, CanType formalType);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Returns true if this SILType is a differentiable type.
+  bool isDifferentiable(SILModule &M) const;
+
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(*this);
