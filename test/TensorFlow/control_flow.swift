@@ -341,7 +341,6 @@ public func testCriticalEdges() {
 public func SR8443(n: Int32) {
   var i: Int32 = 0
   while i < n {
-    // expected-warning @+1 {{implicitly copied to the host}}
     let images = Tensor<Float>(0.0)
     _hostOp(images)
     i += 1
