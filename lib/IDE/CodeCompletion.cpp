@@ -5168,9 +5168,9 @@ class ExprContextAnalyzer {
   ASTContext &Context;
 
   // Results populated by Analyze()
-  SmallVector<Type, 2> PossibleTypes;
-  SmallVector<StringRef, 2> PossibleNames;
-  SmallVector<FunctionTypeAndDecl, 2> PossibleCallees;
+  SmallVectorImpl<Type> &PossibleTypes;
+  SmallVectorImpl<StringRef> &PossibleNames;
+  SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees;
 
   void recordPossibleType(Type ty) {
     if (!ty || ty->is<ErrorType>())
@@ -5368,9 +5368,13 @@ class ExprContextAnalyzer {
   }
 
 public:
-  ExprContextAnalyzer(DeclContext *DC, Expr *ParsedExpr)
+  ExprContextAnalyzer(DeclContext *DC, Expr *ParsedExpr,
+                      SmallVectorImpl<Type> &PossibleTypes,
+                      SmallVectorImpl<StringRef> &PossibleNames,
+                      SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees)
       : DC(DC), ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
-        Context(DC->getASTContext()) {}
+        Context(DC->getASTContext()), PossibleTypes(PossibleTypes),
+        PossibleNames(PossibleNames), PossibleCallees(PossibleCallees) {}
 
   bool Analyze() {
     // We cannot analyze without target.
@@ -5442,9 +5446,29 @@ public:
     }
     return (!PossibleTypes.empty() || !PossibleNames.empty());
   }
+};
 
+class ExprContextInfo {
+  SmallVector<Type, 2> PossibleTypes;
+  SmallVector<StringRef, 2> PossibleNames;
+  SmallVector<FunctionTypeAndDecl, 2> PossibleCallees;
+
+public:
+  ExprContextInfo(DeclContext *DC, Expr *TargetExpr) {
+    ExprContextAnalyzer Analyzer(DC, TargetExpr, PossibleTypes, PossibleNames,
+                                 PossibleCallees);
+    Analyzer.Analyze();
+  }
+
+  // Returns a list of possible context types.
   ArrayRef<Type> getPossibleTypes() const { return PossibleTypes; }
+
+  // Returns a list of possible argument label names.
+  // Valid only if \c getKind() is \c CallArgument.
   ArrayRef<StringRef> getPossibleNames() const { return PossibleNames; }
+
+  // Returns a list of possible callee
+  // Valid only if \c getKind() is \c CallArgument.
   ArrayRef<FunctionTypeAndDecl> getPossibleCallees() const {
     return PossibleCallees;
   }
@@ -5542,10 +5566,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isa<BindOptionalExpr>(ParsedExpr) || isa<ForceValueExpr>(ParsedExpr))
       Lookup.setIsUnwrappedOptional(true);
 
-    ::ExprContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
-    if (TypeAnalyzer.Analyze()) {
-      Lookup.setExpectedTypes(TypeAnalyzer.getPossibleTypes());
-    }
+    ExprContextInfo ContextInfo(CurDeclContext, ParsedExpr);
+    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes());
     Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     break;
   }
@@ -5585,10 +5607,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::ForEachSequence:
   case CompletionKind::PostfixExprBeginning: {
-    ::ExprContextAnalyzer Analyzer(CurDeclContext, CodeCompleteTokenExpr);
-    if (Analyzer.Analyze()) {
-      Lookup.setExpectedTypes(Analyzer.getPossibleTypes());
-    }
+    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
+    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes());
     DoPostfixExprBeginning();
     break;
   }
@@ -5611,21 +5631,18 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::PostfixExprParen: {
     Lookup.setHaveLParen(true);
 
-    ::ExprContextAnalyzer TypeAnalyzer(CurDeclContext, CodeCompleteTokenExpr);
-    if (TypeAnalyzer.Analyze()) {
-      Lookup.setExpectedTypes(TypeAnalyzer.getPossibleTypes());
-    }
-
+    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
+    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes());
     if (ShouldCompleteCallPatternAfterParen) {
       if (ExprType) {
         Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
       } else {
-        for (auto &typeAndDecl : TypeAnalyzer.getPossibleCallees())
+        for (auto &typeAndDecl : ContextInfo.getPossibleCallees())
           Lookup.getValueExprCompletions(typeAndDecl.first, typeAndDecl.second);
       }
     } else {
       // Add argument labels, then fallthrough to get values.
-      Lookup.addArgNameCompletionResults(TypeAnalyzer.getPossibleNames());
+      Lookup.addArgNameCompletionResults(ContextInfo.getPossibleNames());
     }
 
     if (!Lookup.FoundFunctionCalls ||
@@ -5735,10 +5752,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::UnresolvedMember: {
     Lookup.setHaveDot(DotLoc);
-    ::ExprContextAnalyzer TypeAnalyzer(CurDeclContext, CodeCompleteTokenExpr);
-    if (TypeAnalyzer.Analyze())
-      Lookup.setExpectedTypes(TypeAnalyzer.getPossibleTypes());
-    Lookup.getUnresolvedMemberCompletions(TypeAnalyzer.getPossibleTypes());
+    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
+    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes());
+    Lookup.getUnresolvedMemberCompletions(ContextInfo.getPossibleTypes());
     break;
   }
   case CompletionKind::AssignmentRHS : {
@@ -5749,13 +5765,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::CallArg : {
-    ::ExprContextAnalyzer Analyzer(CurDeclContext, CodeCompleteTokenExpr);
-    Analyzer.Analyze();
-    if (!Analyzer.getPossibleNames().empty()) {
-      Lookup.addArgNameCompletionResults(Analyzer.getPossibleNames());
+    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
+    if (!ContextInfo.getPossibleNames().empty()) {
+      Lookup.addArgNameCompletionResults(ContextInfo.getPossibleNames());
       break;
     }
-    Lookup.setExpectedTypes(Analyzer.getPossibleTypes());
+    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes());
     DoPostfixExprBeginning();
     break;
   }
