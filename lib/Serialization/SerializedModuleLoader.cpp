@@ -43,11 +43,9 @@ SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
 std::error_code SerializedModuleLoaderBase::openModuleFiles(
-    AccessPathElem ModuleID, StringRef DirName, StringRef ModuleFilename,
-    StringRef ModuleDocFilename,
+    AccessPathElem ModuleID, StringRef ModulePath, StringRef ModuleDocPath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    llvm::SmallVectorImpl<char> &Scratch) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
   assert(((ModuleBuffer && ModuleDocBuffer) ||
           (!ModuleBuffer && !ModuleDocBuffer)) &&
          "Module and Module Doc buffer must both be initialized or NULL");
@@ -56,12 +54,11 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
 
   // Try to open the module file first.  If we fail, don't even look for the
   // module documentation file.
-  Scratch.clear();
-  llvm::sys::path::append(Scratch, DirName, ModuleFilename);
+
   // If there are no buffers to load into, simply check for the existence of
   // the module file.
   if (!(ModuleBuffer || ModuleDocBuffer)) {
-    llvm::ErrorOr<llvm::vfs::Status> statResult = FS.status(Scratch);
+    llvm::ErrorOr<llvm::vfs::Status> statResult = FS.status(ModulePath);
     if (!statResult)
       return statResult.getError();
     if (!statResult->exists())
@@ -72,16 +69,14 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   }
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
-      FS.getBufferForFile(StringRef(Scratch.data(), Scratch.size()));
+      FS.getBufferForFile(ModulePath);
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
   // Try to open the module documentation file.  If it does not exist, ignore
   // the error.  However, pass though all other errors.
-  Scratch.clear();
-  llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
-      FS.getBufferForFile(StringRef(Scratch.data(), Scratch.size()));
+      FS.getBufferForFile(ModuleDocPath);
   if (!ModuleDocOrErr &&
       ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
     return ModuleDocOrErr.getError();
@@ -94,20 +89,23 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   return std::error_code();
 }
 
-std::error_code SerializedModuleLoader::openModuleFiles(
-    AccessPathElem ModuleID, StringRef DirName, StringRef ModuleFilename,
+std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
+    AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
     StringRef ModuleDocFilename,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    llvm::SmallVectorImpl<char> &Scratch) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
   if (LoadMode == ModuleLoadingMode::OnlyParseable)
     return std::make_error_code(std::errc::not_supported);
 
-  return SerializedModuleLoaderBase::openModuleFiles(ModuleID, DirName,
-                                                     ModuleFilename,
-                                                     ModuleDocFilename,
+  llvm::SmallString<256> ModulePath{DirPath};
+  llvm::sys::path::append(ModulePath, ModuleFilename);
+  llvm::SmallString<256> ModuleDocPath{DirPath};
+  llvm::sys::path::append(ModuleDocPath, ModuleDocFilename);
+  return SerializedModuleLoaderBase::openModuleFiles(ModuleID,
+                                                     ModulePath,
+                                                     ModuleDocPath,
                                                      ModuleBuffer,
-                                                     ModuleDocBuffer, Scratch);
+                                                     ModuleDocBuffer);
 }
 
 bool SerializedModuleLoader::maybeDiagnoseArchitectureMismatch(
@@ -194,10 +192,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   auto &fs = *Ctx.SourceMgr.getFileSystem();
   isFramework = false;
 
-  // Declare some reusable buffers up front; if we end up spilling onto the
-  // heap once, we're likely to do so again.
-  llvm::SmallString<128> scratch;
-  llvm::SmallString<128> currPath;
+  llvm::SmallString<256> currPath;
   for (auto path : Ctx.SearchPathOpts.ImportSearchPaths) {
     std::error_code result;
 
@@ -207,18 +202,17 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
     if (statResult && statResult->isDirectory()) {
       // A .swiftmodule directory contains architecture-specific files.
-      result = openModuleFiles(moduleID, currPath,
-                               archFileNames.first, archFileNames.second,
-                               moduleBuffer, moduleDocBuffer,
-                               scratch);
+      result = findModuleFilesInDirectory(moduleID, currPath,
+                                          archFileNames.first,
+                                          archFileNames.second,
+                                          moduleBuffer, moduleDocBuffer);
 
       if (result == std::errc::no_such_file_or_directory &&
           !alternateArchName.empty()) {
-        result = openModuleFiles(moduleID, currPath,
-                                 alternateArchFileNames.first,
-                                 alternateArchFileNames.second,
-                                 moduleBuffer, moduleDocBuffer,
-                                 scratch);
+        result = findModuleFilesInDirectory(moduleID, currPath,
+                                            alternateArchFileNames.first,
+                                            alternateArchFileNames.second,
+                                            moduleBuffer, moduleDocBuffer);
       }
 
       if (result == std::errc::no_such_file_or_directory) {
@@ -231,10 +225,10 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     } else {
       // We can't just return the error; the path we're looking for might not
       // be "Foo.swiftmodule".
-      result = openModuleFiles(moduleID, path,
-                               moduleFilename.str(), moduleDocFilename.str(),
-                               moduleBuffer, moduleDocBuffer,
-                               scratch);
+      result = findModuleFilesInDirectory(moduleID, path,
+                                          moduleFilename.str(),
+                                          moduleDocFilename.str(),
+                                          moduleBuffer, moduleDocBuffer);
     }
     if (!result)
       return true;
@@ -257,16 +251,17 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
       // Frameworks always use architecture-specific files within a .swiftmodule
       // directory.
       llvm::sys::path::append(currPath, "Modules", moduleFilename.str());
-      auto err = openModuleFiles(moduleID, currPath,
-                                 archFileNames.first, archFileNames.second,
-                                 moduleBuffer, moduleDocBuffer, scratch);
+      auto err = findModuleFilesInDirectory(moduleID, currPath,
+                                            archFileNames.first,
+                                            archFileNames.second,
+                                            moduleBuffer, moduleDocBuffer);
 
       if (err == std::errc::no_such_file_or_directory &&
           !alternateArchName.empty()) {
-        err = openModuleFiles(moduleID, currPath,
-                              alternateArchFileNames.first,
-                              alternateArchFileNames.second,
-                              moduleBuffer, moduleDocBuffer, scratch);
+        err = findModuleFilesInDirectory(moduleID, currPath,
+                                         alternateArchFileNames.first,
+                                         alternateArchFileNames.second,
+                                         moduleBuffer, moduleDocBuffer);
       }
 
       if (err == std::errc::no_such_file_or_directory) {
@@ -287,6 +282,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     if (Ctx.LangOpts.Target.isOSDarwin()) {
       // Apple platforms have extra implicit framework search paths:
       // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/
+      SmallString<256> scratch;
       scratch = Ctx.SearchPathOpts.SDKPath;
       llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
       if (tryFrameworkImport(scratch))
@@ -305,9 +301,10 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
   // Search the runtime import path.
   isFramework = false;
-  return !openModuleFiles(moduleID, Ctx.SearchPathOpts.RuntimeLibraryImportPath,
-                          moduleFilename.str(), moduleDocFilename.str(),
-                          moduleBuffer, moduleDocBuffer, scratch);
+  return !findModuleFilesInDirectory(
+      moduleID, Ctx.SearchPathOpts.RuntimeLibraryImportPath,
+      moduleFilename.str(), moduleDocFilename.str(), moduleBuffer,
+      moduleDocBuffer);
 }
 
 static std::pair<StringRef, clang::VersionTuple>

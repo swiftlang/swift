@@ -61,13 +61,15 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 /// directory, and loading the serialized .swiftmodules from there.
 class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   explicit ParseableInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
+                                          StringRef prebuiltCacheDir,
                                           DependencyTracker *tracker,
                                           ModuleLoadingMode loadMode)
     : SerializedModuleLoaderBase(ctx, tracker, loadMode),
-      CacheDir(cacheDir)
+      CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir)
   {}
 
   std::string CacheDir;
+  std::string PrebuiltCacheDir;
 
   /// Wire up the SubInvocation's InputsAndOutputs to contain both input and
   /// output filenames.
@@ -77,20 +79,25 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   static void configureSubInvocationInputsAndOutputs(
     CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath);
 
-  std::error_code
-  openModuleFiles(AccessPathElem ModuleID, StringRef DirName,
-                  StringRef ModuleFilename, StringRef ModuleDocFilename,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-                  llvm::SmallVectorImpl<char> &Scratch) override;
+  static bool buildSwiftModuleFromSwiftInterface(
+    llvm::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
+    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
+    StringRef ModuleCachePath, DependencyTracker *OuterTracker,
+    bool ShouldSerializeDeps);
+
+  std::error_code findModuleFilesInDirectory(
+      AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
+      StringRef ModuleDocFilename,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
 
 public:
   static std::unique_ptr<ParseableInterfaceModuleLoader>
-  create(ASTContext &ctx, StringRef cacheDir,
-         DependencyTracker *tracker,
-         ModuleLoadingMode loadMode) {
+  create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
+         DependencyTracker *tracker, ModuleLoadingMode loadMode) {
     return std::unique_ptr<ParseableInterfaceModuleLoader>(
-        new ParseableInterfaceModuleLoader(ctx, cacheDir, tracker, loadMode));
+        new ParseableInterfaceModuleLoader(ctx, cacheDir, prebuiltCacheDir,
+                                           tracker, loadMode));
   }
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
@@ -100,6 +107,7 @@ public:
   /// testing purposes.
   static bool buildSwiftModuleFromSwiftInterface(ASTContext &Ctx,
                                                  StringRef CacheDir,
+                                                 StringRef PrebuiltCacheDir,
                                                  StringRef ModuleName,
                                                  StringRef InPath,
                                                  StringRef OutPath);
