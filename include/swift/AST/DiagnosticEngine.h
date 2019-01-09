@@ -596,6 +596,12 @@ namespace swift {
       Consumers.push_back(&Consumer);
     }
 
+    /// Remove a specific DiagnosticConsumer.
+    void removeConsumer(DiagnosticConsumer &Consumer) {
+      Consumers.erase(
+          std::remove(Consumers.begin(), Consumers.end(), &Consumer));
+    }
+
     /// Remove and return all \c DiagnosticConsumers.
     std::vector<DiagnosticConsumer *> takeConsumers() {
       auto Result = std::vector<DiagnosticConsumer*>(Consumers.begin(),
