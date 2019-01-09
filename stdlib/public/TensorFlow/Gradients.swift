@@ -43,6 +43,169 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// Method-style differential operators
+//===----------------------------------------------------------------------===//
+
+public extension Differentiable {
+  @inlinable
+  func gradient<R : Differentiable>(
+    in f: @autodiff (Self) -> Tensor<R>
+  ) -> CotangentVector
+    where R : Differentiable & FloatingPoint {
+    return self.pullback(in: f)(Tensor<R>(1))
+  }
+
+  @inlinable
+  func valueWithGradient<R : Differentiable>(
+    in f: @autodiff (Self) -> Tensor<R>
+  ) -> (value: Tensor<R>, gradient: CotangentVector)
+    where R : Differentiable & FloatingPoint {
+    let (y, pb) = self.valueWithPullback(in: f)
+    return (y, pb(Tensor<R>(1)))
+  }
+
+  @inlinable
+  func gradient<T : Differentiable, R : Differentiable>(
+    at x: T, in f: @autodiff (Self, T) -> Tensor<R>
+  ) -> (CotangentVector, T.CotangentVector)
+    where R : Differentiable & FloatingPoint {
+    return self.pullback(at: x, in: f)(Tensor<R>(1))
+  }
+
+  @inlinable
+  func valueWithGradient<T : Differentiable, R : Differentiable>(
+    at x: T, in f: @autodiff (Self, T) -> Tensor<R>
+  ) -> (value: Tensor<R>, gradient: (CotangentVector, T.CotangentVector))
+    where R : Differentiable & FloatingPoint {
+    let (y, pb) = self.valueWithPullback(at: x, in: f)
+    return (y, pb(Tensor<R>(1)))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Free-function-style differential operators
+//===----------------------------------------------------------------------===//
+
+// Value with gradient
+
+@inlinable
+public func valueWithGradient<T, R>(
+  at x: T, in f: @autodiff (T) -> Tensor<R>
+) -> (value: Tensor<R>, gradient: T.CotangentVector)
+where T : Differentiable, R : Differentiable & FloatingPoint {
+  let (y, pullback) = valueWithPullback(at: x, in: f)
+  return (y, pullback(Tensor<R>(1)))
+}
+
+@inlinable
+public func valueWithGradient<T, U, R>(
+  at x: T, _ y: U, in f: @autodiff (T, U) -> Tensor<R>
+) -> (value: Tensor<R>, gradient: (T.CotangentVector, U.CotangentVector))
+  where T : Differentiable, U : Differentiable,
+        R : Differentiable & FloatingPoint {
+  let (y, pullback) = valueWithPullback(at: x, y, in: f)
+  return (y, pullback(Tensor<R>(1)))
+}
+
+@inlinable
+public func valueWithGradient<T, U, V, R>(
+  at x: T, _ y: U, _ z: V, in f: @autodiff (T, U, V) -> Tensor<R>
+) -> (value: Tensor<R>,
+      gradient: (T.CotangentVector, U.CotangentVector, V.CotangentVector))
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : Differentiable & FloatingPoint {
+  let (y, pullback) = valueWithPullback(at: x, y, z, in: f)
+  return (y, pullback(Tensor<R>(1)))
+}
+
+// Value with gradient (curried)
+
+@inlinable
+public func valueWithGradient<T, R>(
+  of f: @escaping @autodiff (T) -> Tensor<R>
+) -> (T) -> (value: Tensor<R>, gradient: T.CotangentVector)
+  where T : Differentiable, R : Differentiable & FloatingPoint {
+  return { x in valueWithGradient(at: x, in: f) }
+}
+
+@inlinable
+public func valueWithGradient<T, U, R>(
+  of f: @escaping @autodiff (T, U) -> Tensor<R>
+) -> (T, U)
+    -> (value: Tensor<R>, gradient: (T.CotangentVector, U.CotangentVector))
+  where T : Differentiable, U : Differentiable,
+        R : Differentiable & FloatingPoint {
+  return { x, y in valueWithGradient(at: x, y, in: f) }
+}
+
+@inlinable
+public func valueWithGradient<T, U, V, R>(
+  of f: @escaping @autodiff (T, U, V) -> Tensor<R>
+) -> (T, U, V)
+    -> (value: Tensor<R>,
+        gradient: (T.CotangentVector, U.CotangentVector, V.CotangentVector))
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : Differentiable & FloatingPoint {
+  return { x, y, z in valueWithGradient(at: x, y, z, in: f) }
+}
+
+// Gradient
+
+@inlinable
+public func gradient<T, R>(
+  at x: T, in f: @autodiff (T) -> Tensor<R>
+) -> T.CotangentVector
+  where T : Differentiable, R : Differentiable & FloatingPoint {
+  return pullback(at: x, in: f)(Tensor<R>(1))
+}
+
+@inlinable
+public func gradient<T, U, R>(
+  at x: T, _ y: U, in f: @autodiff (T, U) -> Tensor<R>
+) -> (T.CotangentVector, U.CotangentVector)
+  where T : Differentiable, U : Differentiable,
+        R : Differentiable & FloatingPoint {
+  return pullback(at: x, y, in: f)(Tensor<R>(1))
+}
+
+@inlinable
+public func gradient<T, U, V, R>(
+  at x: T, _ y: U, _ z: V, in f: @autodiff (T, U, V) -> Tensor<R>
+) -> (T.CotangentVector, U.CotangentVector, V.CotangentVector)
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : Differentiable & FloatingPoint {
+  return pullback(at: x, y, z, in: f)(Tensor<R>(1))
+}
+
+// Gradient (curried)
+
+@inlinable
+public func gradient<T, R>(
+  of f: @escaping @autodiff (T) -> Tensor<R>
+) -> (T) -> T.CotangentVector
+  where T : Differentiable, R : Differentiable & FloatingPoint {
+  return { x in gradient(at: x, in: f) }
+}
+
+@inlinable
+public func gradient<T, U, R>(
+  of f: @escaping @autodiff (T, U) -> Tensor<R>
+) -> (T, U) -> (T.CotangentVector, U.CotangentVector)
+  where T : Differentiable, U : Differentiable,
+        R : Differentiable & FloatingPoint {
+  return { x, y in gradient(at: x, y, in: f) }
+}
+
+@inlinable
+public func gradient<T, U, V, R>(
+  of f: @escaping @autodiff (T, U, V) -> Tensor<R>
+) -> (T, U, V) -> (T.CotangentVector, U.CotangentVector, V.CotangentVector)
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : Differentiable & FloatingPoint {
+  return { x, y, z in gradient(at: x, y, z, in: f) }
+}
+
+//===----------------------------------------------------------------------===//
 // Elementwise binary
 //===----------------------------------------------------------------------===//
 
