@@ -585,7 +585,7 @@ deriveDifferentiable_VectorSpace(DerivedConformance &derived,
     aliasDecl->setImplicit();
     aliasDecl->getAttrs().add(
         new (C) FieldwiseProductSpaceAttr(/*implicit*/ true));
-    aliasDecl->setUnderlyingType(selfType->mapTypeOutOfContext());
+    aliasDecl->setUnderlyingType(selfType);
     nominal->addMember(aliasDecl);
     return selfType;
   }
