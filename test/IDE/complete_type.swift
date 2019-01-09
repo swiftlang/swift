@@ -456,7 +456,7 @@ typealias FooTypealias = Int
 //===---
 
 // TYPE_IN_PROTOCOL: Begin completions
-// TYPE_IN_PROTOCOL-DAG: Decl[GenericTypeParam]/Super: Self[#Self#]{{; name=.+$}}
+// TYPE_IN_PROTOCOL-DAG: Decl[GenericTypeParam]/Local: Self[#Self#]{{; name=.+$}}
 // TYPE_IN_PROTOCOL: End completions
 
 protocol TestSelf1 {
@@ -488,9 +488,9 @@ struct TestTypeInParamGeneric2<
 }
 
 // TYPE_IN_FUNC_PARAM_GENERIC_2: Begin completions
-// TYPE_IN_FUNC_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
+// TYPE_IN_FUNC_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
+// TYPE_IN_FUNC_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
+// TYPE_IN_FUNC_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_2: End completions
 
 struct TestTypeInParamGeneric3 {
@@ -518,9 +518,9 @@ struct TestTypeInParamGeneric4<
 
 // TYPE_IN_FUNC_PARAM_GENERIC_4: Begin completions
 // Generic parameters of the struct.
-// TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
+// TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
+// TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
+// TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/Local: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
 // Generic parameters of the function.
 // TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
@@ -537,9 +537,9 @@ struct TestTypeInParamGeneric5<StructGenericFoo> {
 
 // TYPE_IN_FUNC_PARAM_GENERIC_5: Begin completions
 // Generic parameters of the containing structs.
-// TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/OutNominal: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/OutNominal: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
+// TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
+// TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
+// TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/Local: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
 // Generic parameters of the function.
 // TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_5: End completions
@@ -552,9 +552,9 @@ struct TestTypeInConstructorParamGeneric1<
 }
 
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1: Begin completions
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
+// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
+// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
+// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1: End completions
 
 struct TestTypeInConstructorParamGeneric2 {
@@ -580,9 +580,9 @@ struct TestTypeInConstructorParamGeneric3<
 
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3: Begin completions
 // Generic parameters of the struct.
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
+// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
+// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
+// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
 // Generic parameters of the constructor.
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
@@ -605,18 +605,18 @@ class A<T> {
 }
 
 // TYPE_IN_RETURN_GEN_PARAM_NO_DUP: Begin completions
-// TYPE_IN_RETURN_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]; name=T
-// TYPE_IN_RETURN_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
+// TYPE_IN_RETURN_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/Local: T[#T#]; name=T
+// TYPE_IN_RETURN_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local: T[#T#]; name=T
 // TYPE_IN_RETURN_GEN_PARAM_NO_DUP: End completions
 
 // TYPE_IVAR_GEN_PARAM_NO_DUP: Begin completions
-// TYPE_IVAR_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]; name=T
-// TYPE_IVAR_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
+// TYPE_IVAR_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/Local: T[#T#]; name=T
+// TYPE_IVAR_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local: T[#T#]; name=T
 // TYPE_IVAR_GEN_PARAM_NO_DUP: End completions
 
 // TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP: Begin completions
-// TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]; name=T
-// TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
+// TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/Local: T[#T#]; name=T
+// TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local: T[#T#]; name=T
 // TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP: End completions
 
 //===---
@@ -1013,7 +1013,7 @@ func testTypeIdentifierGeneric1<
     >(a: GenericFoo.#^TYPE_IDENTIFIER_GENERIC_1^#
 
 // TYPE_IDENTIFIER_GENERIC_1: Begin completions
-// TYPE_IDENTIFIER_GENERIC_1-NEXT: Decl[AssociatedType]/Super: FooTypeAlias1{{; name=.+$}}
+// TYPE_IDENTIFIER_GENERIC_1-NEXT: Decl[AssociatedType]/CurrNominal: FooTypeAlias1{{; name=.+$}}
 // TYPE_IDENTIFIER_GENERIC_1-NEXT: Keyword/None:          Type[#GenericFoo.Type#]
 // TYPE_IDENTIFIER_GENERIC_1-NEXT: End completions
 
@@ -1022,8 +1022,8 @@ func testTypeIdentifierGeneric2<
     >(a: GenericFoo.#^TYPE_IDENTIFIER_GENERIC_2^#
 
 // TYPE_IDENTIFIER_GENERIC_2: Begin completions
-// TYPE_IDENTIFIER_GENERIC_2-NEXT: Decl[AssociatedType]/Super: BarTypeAlias1{{; name=.+$}}
-// TYPE_IDENTIFIER_GENERIC_2-NEXT: Decl[AssociatedType]/Super: FooTypeAlias1{{; name=.+$}}
+// TYPE_IDENTIFIER_GENERIC_2-NEXT: Decl[AssociatedType]/CurrNominal: BarTypeAlias1{{; name=.+$}}
+// TYPE_IDENTIFIER_GENERIC_2-NEXT: Decl[AssociatedType]/CurrNominal: FooTypeAlias1{{; name=.+$}}
 // TYPE_IDENTIFIER_GENERIC_2-NEXT: Keyword/None:          Type[#GenericFoo.Type#]
 // TYPE_IDENTIFIER_GENERIC_2-NEXT: End completions
 
