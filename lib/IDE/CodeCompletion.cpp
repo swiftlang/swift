@@ -5376,10 +5376,10 @@ public:
         Context(DC->getASTContext()), PossibleTypes(PossibleTypes),
         PossibleNames(PossibleNames), PossibleCallees(PossibleCallees) {}
 
-  bool Analyze() {
+  void Analyze() {
     // We cannot analyze without target.
     if (!ParsedExpr)
-      return false;
+      return;
 
     ExprParentFinder Finder(ParsedExpr, [](ASTWalker::ParentTy Node,
                                            ASTWalker::ParentTy Parent) {
@@ -5432,7 +5432,7 @@ public:
     DC->walkContext(Finder);
 
     if (Finder.Ancestors.empty())
-      return false;
+      return;
 
     auto &P = Finder.Ancestors.back();
     if (auto Parent = P.getAsExpr()) {
@@ -5444,7 +5444,6 @@ public:
     } else if (auto Parent = P.getAsPattern()) {
       analyzePattern(Parent);
     }
-    return (!PossibleTypes.empty() || !PossibleNames.empty());
   }
 };
 
