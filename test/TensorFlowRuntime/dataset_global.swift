@@ -1,5 +1,4 @@
-// TODO: Revert to %target-run-simple-swift once we complete send/recv support for resource/variant tensors.
-// RUN: %target-run-send-recv-handle-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // RUN: %target-run-dynamic-compilation-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize

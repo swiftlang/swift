@@ -67,12 +67,6 @@ static llvm::cl::opt<bool> TFWarnScalarTransfer(
         "Emit warnings for sends/receives that transfer values that are "
         "known to be scalar."));
 
-// TODO: Remove this short-term flag once we migrate over all unit tests.
-static llvm::cl::opt<bool> TFSendRecvOpaqueHandle(
-    "tf-send-recv-opaque-handle", llvm::cl::init(true),
-    llvm::cl::desc("When true, variant and resource handles can be sent via "
-                   "eager API as tensor handles."));
-
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
                                    Diag<T...> diag, U &&... args) {
@@ -789,7 +783,6 @@ public:
   void diagnoseUsesFromHost(SILValue value, SILLocation loc);
   void diagnoseCopyToHost(SILValue value, SILInstruction *user,
                           SILLocation loc);
-  void diagnoseOpaqueHandleCopy(SILValue value, SILInstruction *user);
 
 private:
   // Marking.
@@ -932,13 +925,6 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value);
 
-  // Opaque handles can never be sent or passed as tensor program arguments.
-  // Type checking must have rejected host functions that are either a)
-  // public with private ABI or b) marked @inline(never).
-  assert(TFSendRecvOpaqueHandle ||
-         (!isOpaqueHandle(value->getType()) &&
-          "Opaque handles should never have been on the host"));
-
   // Try to make a useful description of the value being copied to help
   // disambiguate.
   std::string description = "value";
@@ -1040,12 +1026,6 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
     if (isUserIgnoredByPartitioning(user))
       continue;
 
-    // If the value is a non-copyable opaque handle, emit an error.
-    if (!TFSendRecvOpaqueHandle && isOpaqueHandle(value->getType())) {
-      diagnoseOpaqueHandleCopy(value, user);
-      continue;
-    }
-
     // If we are running this in the context of an expression run in the REPL or
     // playgrounds, or script mode, then we should never emit a warning: we know
     // we're going to be implicitly copying things in as warnings all the time.
@@ -1103,20 +1083,6 @@ void TFFunctionPartition::diagnoseCopyToHost(SILValue value,
              diag::tf_value_used_here)
         .highlight(userLoc.getSourceRange());
   }
-}
-
-/// Emit an error for invalid send/receive of opaque handles.
-void TFFunctionPartition::diagnoseOpaqueHandleCopy(SILValue value,
-                                                   SILInstruction *user) {
-  assert(!TFSendRecvOpaqueHandle);
-  assert(isOpaqueHandle(value->getType()) &&
-         "Shouldn't emit an error for opaque handle copy when the value is not "
-         "an opaque handle");
-  auto &ctx = value->getFunction()->getASTContext();
-  diagnose(ctx, getUserSourceLocation(value).getSourceLoc(),
-           diag::tfop_value_no_send_receive);
-  diagnose(ctx, getUserSourceLocation(user).getSourceLoc(),
-           diag::tf_value_used_here);
 }
 
 /// Some instruction in the specified block needs to be split out to the
@@ -3718,19 +3684,6 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
 
 void TFFunctionPartition::insertReplacementGraphOp(
     ArrayRef<SILValue> resultValues) {
-  // Sanity check that all result values are tensor handles. Note SIL
-  // accelerator functions under the "tensorflow" convention can also return
-  // variant and resource tensors (in addition to tensor handles), but such
-  // functions will not generate all host-side code, and thus this method will
-  // not be called.
-  assert(TFSendRecvOpaqueHandle ||
-         llvm::all_of(resultValues,
-                      [](SILValue resultValue) {
-                        return isTensorHandle(resultValue->getType());
-                      }) &&
-             "Cannot return a non-TensorHandle value to host in the TF program "
-             "-- should this function use tensorflow convention?");
-
   auto &ctx = hostFn.getASTContext();
   auto loc = hostFn.getLocation();
 
@@ -3775,17 +3728,6 @@ void TFFunctionPartition::insertReplacementGraphOp(
 
 void TFFunctionPartition::insertTensorComputationStartEndTerminate(
     ArrayRef<SILValue> resultValues) {
-  // Sanity check that all result values are tensor handles. Note SIL
-  // accelerator functions under the "tensorflow" convention can also return
-  // variant and resource tensors (in addition to tensor handles), but such
-  // functions will not generate all host-side code, and thus this method will
-  // not be called.
-  for (auto resultValue : resultValues) {
-    assert(TFSendRecvOpaqueHandle || isTensorHandle(resultValue->getType()) &&
-           "Cannot return a non-TensorHandle value to host in the TF program "
-           "-- should this function use tensorflow convention?");
-  }
-
   auto &ctx = hostFn.getASTContext();
   auto loc = hostFn.getLocation();
 
@@ -3925,8 +3867,7 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
     // closed over.  If it is a TensorHandle<T>, load the CTensorHandle out of
     // it.  If it is a scalar, then we need to box the scalar in a
     // CTensorHandle.
-    if ((TFSendRecvOpaqueHandle &&
-         isTensorFlowValue(tensorValue->getType().getASTType())) ||
+    if (isTensorFlowValue(tensorValue->getType().getASTType()) ||
         isTensorHandle(tensorValue->getType().getASTType())) {
       // Upcast to _AnyTensorHandle.
       tensorValue = B.createUpcast(loc, tensorValue, anyTensorHandleSILTy);
@@ -4207,15 +4148,6 @@ bool TFFunctionPartition::partition(bool isTest) {
                 (argInfo->second.first == Marking::Move ||
                  argInfo->second.first == Marking::Delete))
               continue;
-          }
-
-          // If it's an opaque handle such as VariantHandle or ResourceHandle,
-          // it cannot be a result except when it's being returned in an
-          // accelerator-only function.
-          if (!TFSendRecvOpaqueHandle && isOpaqueHandle(result->getType()) &&
-              !(isAcceleratorOnly(hostFn) && isReturning(user))) {
-            diagnoseOpaqueHandleCopy(result, user);
-            return true;
           }
 
           // Remember if the instruction has any use.  If not, then it never
