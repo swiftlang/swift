@@ -1667,9 +1667,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
 
-  auto *typeVar1 = desugar1->getAs<TypeVariableType>();
-  auto *typeVar2 = desugar2->getAs<TypeVariableType>();
-
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2))
     return getTypeMatchSuccess();
@@ -1698,6 +1695,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     return getTypeMatchAmbiguous();
   };
+
+  auto *typeVar1 = dyn_cast<TypeVariableType>(desugar1);
+  auto *typeVar2 = dyn_cast<TypeVariableType>(desugar2);
 
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
@@ -1800,11 +1800,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion:
-      // We couldn't solve this constraint. If only one of the types is a type
-      // variable, perhaps we can do something with it below.
-      if (typeVar1 && typeVar2)
-        return formUnsolvedResult();
-      break;
+      return formUnsolvedResult();
 
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::DynamicCallableApplicableFunction:
@@ -1830,11 +1826,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  bool isTypeVarOrMember1 = desugar1->isTypeVariableOrMember();
-  bool isTypeVarOrMember2 = desugar2->isTypeVariableOrMember();
+  // If one of the types is a member type of a type variable type,
+  // there's nothing we can do.
+  if (desugar1->isTypeVariableOrMember() ||
+      desugar2->isTypeVariableOrMember()) {
+    return formUnsolvedResult();
+  }
 
   llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
-  bool concrete = !isTypeVarOrMember1 && !isTypeVarOrMember2;
 
   // Decompose parallel structure.
   TypeMatchOptions subflags =
@@ -1854,29 +1853,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-    case TypeKind::Module:
-      if (desugar1 == desugar2) {
-        return getTypeMatchSuccess();
-      }
-      return getTypeMatchFailure(locator);
 
     case TypeKind::Error:
     case TypeKind::Unresolved:
-        return getTypeMatchFailure(locator);
+      return getTypeMatchFailure(locator);
 
     case TypeKind::GenericTypeParam:
       llvm_unreachable("unmapped dependent type in type checker");
+
+    case TypeKind::TypeVariable:
+      llvm_unreachable("type variables should have already been handled by now");
 
     case TypeKind::DependentMember:
       // Nothing we can solve.
       return formUnsolvedResult();
 
-    case TypeKind::TypeVariable:
+    case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
     case TypeKind::NestedArchetype:
-      // Nothing to do here; handle type variables and archetypes below.
-      break;
+      // If two module types or archetypes were not already equal, there's
+      // nothing more we can do.
+      return getTypeMatchFailure(locator);
 
     case TypeKind::Tuple: {
       assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
@@ -2010,7 +2008,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  if (concrete && kind >= ConstraintKind::Subtype) {
+  if (kind >= ConstraintKind::Subtype) {
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
         type2->getClassOrBoundGenericClass() &&
@@ -2166,7 +2164,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return getTypeMatchSuccess();
   }
 
-  if (concrete && kind >= ConstraintKind::Conversion) {
+  if (kind >= ConstraintKind::Conversion) {
     // An lvalue of type T1 can be converted to a value of type T2 so long as
     // T1 is convertible to T2 (by loading the value).  Note that we cannot get
     // a value of inout type as an lvalue though.
@@ -2301,7 +2299,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  if (concrete && kind >= ConstraintKind::OperatorArgumentConversion) {
+  if (kind >= ConstraintKind::OperatorArgumentConversion) {
     // If the RHS is an inout type, the LHS must be an @lvalue type.
     if (auto *lvt = type1->getAs<LValueType>()) {
       if (auto *iot = type2->getAs<InOutType>()) {
@@ -2317,7 +2315,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // to U by force-unwrapping the source value.
   // A value of type T, T?, or T! can be converted to type U? or U! if
   // T is convertible to U.
-  if (concrete && !type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
+  if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
     enumerateOptionalConversionRestrictions(
         type1, type2, kind, locator,
         [&](ConversionRestrictionKind restriction) {
@@ -2329,7 +2327,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // literals.
   if (auto elt = locator.last()) {
     if (elt->getKind() == ConstraintLocator::ClosureResult) {
-      if (concrete && kind >= ConstraintKind::Subtype &&
+      if (kind >= ConstraintKind::Subtype &&
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);
         return getTypeMatchSuccess();
@@ -2337,7 +2335,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  if (concrete && kind == ConstraintKind::BindParam) {
+  if (kind == ConstraintKind::BindParam) {
     if (auto *iot = dyn_cast<InOutType>(desugar1)) {
       if (auto *lvt = dyn_cast<LValueType>(desugar2)) {
         return matchTypes(iot->getObjectType(), lvt->getObjectType(),
@@ -2351,7 +2349,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Attempt fixes iff it's allowed, both types are concrete and
   // we are not in the middle of attempting one already.
   bool attemptFixes =
-      shouldAttemptFixes() && concrete && !flags.contains(TMF_ApplyingFix);
+      shouldAttemptFixes() && !flags.contains(TMF_ApplyingFix);
 
   // When we hit this point, we're committed to the set of potential
   // conversions recorded thus far.
@@ -2446,14 +2444,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (attemptFixes)
     repairFailures(*this, type1, type2, conversionsOrFixes, locator);
 
-  if (conversionsOrFixes.empty()) {
-    // If one of the types is a type variable or member thereof, we leave this
-    // unsolved.
-    if (isTypeVarOrMember1 || isTypeVarOrMember2)
-      return formUnsolvedResult();
-
+  if (conversionsOrFixes.empty())
     return getTypeMatchFailure(locator);
-  }
 
   // Where there is more than one potential conversion, create a disjunction
   // so that we'll explore all of the options.
