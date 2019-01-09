@@ -1124,7 +1124,7 @@ public struct ${Self}
 %   end
 
 %   for (FloatType, FloatBits) in [
-%     ('Float', 32), ('Double', 64), ('Float80', 80)]:
+%     ('Float16', 16), ('Float', 32), ('Double', 64), ('Float80', 80)]:
 %     (lower, upper) = getFtoIBounds(floatBits=FloatBits, intBits=int(bits), signed=signed)
 
 %     if FloatType == 'Float80':
