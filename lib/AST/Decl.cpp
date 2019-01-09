@@ -2550,6 +2550,34 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
+/// Returns \c true if this declaration is *not* intended to be used directly
+/// by application developers despite of the visibility.
+bool ValueDecl::shouldHideFromEditor() const {
+  // Hide private stdlib declarations.
+  if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
+      // ShowInInterfaceAttr is for decls to show in interface as exception but
+      // they are not intended to be used directly.
+      getAttrs().hasAttribute<ShowInInterfaceAttr>())
+    return true;
+
+  if (AvailableAttr::isUnavailable(this))
+    return true;
+
+  if (auto *ClangD = getClangDecl()) {
+    if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
+      return true;
+  }
+
+  if (!isUserAccessible())
+    return true;
+
+  // Hide editor placeholders.
+  if (getBaseName().isEditorPlaceholder())
+    return true;
+
+  return false;
+}
+
 /// Return the access level of an internal or public declaration
 /// that's been testably imported.
 static AccessLevel getTestableOrPrivateImportsAccess(const ValueDecl *decl) {

@@ -2116,7 +2116,7 @@ public:
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
     if (!VD->hasName() ||
         !VD->isAccessibleFrom(CurrDeclContext) ||
-        shouldHideDeclFromCompletionResults(VD))
+        VD->shouldHideFromEditor())
       return;
 
     StringRef Name = VD->getName().get();
@@ -2637,7 +2637,7 @@ public:
                                          NL_QualifiedDefault,
                                          TypeResolver, initializers)) {
       for (auto *init : initializers) {
-        if (shouldHideDeclFromCompletionResults(init))
+        if (init->shouldHideFromEditor())
           continue;
         if (IsUnresolvedMember &&
             cast<ConstructorDecl>(init)->getFailability() == OTK_Optional) {
@@ -2782,7 +2782,7 @@ public:
                          bool HasTypeContext) {
     if (!EED->hasName() ||
         !EED->isAccessibleFrom(CurrDeclContext) ||
-        shouldHideDeclFromCompletionResults(EED))
+        EED->shouldHideFromEditor())
       return;
 
     CommandWordsPairs Pairs;
@@ -2895,7 +2895,7 @@ public:
 
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
-    if (shouldHideDeclFromCompletionResults(D))
+    if (D->shouldHideFromEditor())
       return;
 
     if (IsKeyPathExpr && !KeyPathFilter(D, Reason))
@@ -4152,7 +4152,7 @@ public:
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       return;
 
-    if (shouldHideDeclFromCompletionResults(D))
+    if (D->shouldHideFromEditor())
       return;
 
     if (D->getAttrs().hasAttribute<FinalAttr>())
@@ -4993,7 +4993,7 @@ void collectPossibleCalleesByQualifiedLookup(
 
   for (auto *VD : decls) {
     if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
-        shouldHideDeclFromCompletionResults(VD))
+        VD->shouldHideFromEditor())
       continue;
     resolver->resolveDeclSignature(VD);
     if (!VD->hasInterfaceType())
