@@ -192,18 +192,10 @@ static void doGlobalExtensionLookup(Type BaseType,
                             extension))
       continue;
 
-    bool validatedExtension = false;
     for (auto Member : extension->getMembers()) {
       if (auto VD = dyn_cast<ValueDecl>(Member))
-        if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver)) {
-          // Resolve the extension, if we haven't done so already.
-          if (!validatedExtension && TypeResolver) {
-            TypeResolver->resolveExtension(extension);
-            validatedExtension = true;
-          }
-
+        if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
           FoundDecls.push_back(VD);
-        }
     }
   }
 

@@ -583,7 +583,11 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
         auto known = replacements.find(
           cast<GenericTypeParamType>(genericParam->getCanonicalType()));
-        assert(known != replacements.end());
+        // FIXME: This should be an assert, however protocol generic signatures
+        // drop outer generic parameters.
+        // assert(known != replacements.end());
+        if (known == replacements.end())
+          return ErrorType::get(TC.Context);
         return known->second;
       }
 

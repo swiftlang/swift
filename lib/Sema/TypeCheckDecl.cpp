@@ -4193,13 +4193,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       return;
     proto->computeType();
 
-    auto *gp = proto->getGenericParams();
-    gp->setDepth(proto->getGenericContextDepth());
-
-    for (auto ATD : proto->getAssociatedTypeMembers()) {
-      validateDeclForNameLookup(ATD);
-    }
-
     // Compute the requirement signature later to avoid circularity.
     DelayedRequirementSignatures.insert(proto);
 
