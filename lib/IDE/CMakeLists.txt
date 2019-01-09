@@ -14,6 +14,7 @@ add_swift_host_library(swiftIDE STATIC
   IDETypeChecking.cpp
   APIDigesterData.cpp
   SourceEntityWalker.cpp
+  TypeContextInfo.cpp
   LINK_LIBRARIES
     swiftAST
     swiftFrontend

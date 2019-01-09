@@ -36,6 +36,7 @@
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
+#include "swift/IDE/TypeContextInfo.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Index/Index.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -98,6 +99,7 @@ enum class ActionType {
   DiffModuleAPI,
   ReconstructType,
   Range,
+  TypeContextInfo,
 };
 
 class NullDebuggerClient : public DebuggerClient {
@@ -219,7 +221,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "Print information about a given range"),
            clEnumValN(ActionType::PrintIndexedSymbols,
                       "print-indexed-symbols",
-                      "Print indexed symbol information")));
+                      "Print indexed symbol information"),
+           clEnumValN(ActionType::TypeContextInfo,
+	                    "type-context-info",
+                      "Perform expression context info analysis")));
 
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"),
@@ -675,6 +680,65 @@ removeCodeCompletionTokens(llvm::MemoryBuffer *Input,
   return std::unique_ptr<llvm::MemoryBuffer>(
       llvm::MemoryBuffer::getMemBufferCopy(CleanFile,
                                            Input->getBufferIdentifier()));
+}
+
+static int doTypeContextInfo(const CompilerInvocation &InitInvok,
+                             StringRef SourceFilename,
+                             StringRef SecondSourceFileName,
+                             StringRef CodeCompletionToken,
+                             bool CodeCompletionDiagnostics) {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+      llvm::MemoryBuffer::getFile(SourceFilename);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening input file: "
+                 << FileBufOrErr.getError().message() << '\n';
+    return 1;
+  }
+
+  unsigned Offset;
+
+  std::unique_ptr<llvm::MemoryBuffer> CleanFile(removeCodeCompletionTokens(
+      FileBufOrErr.get().get(), CodeCompletionToken, &Offset));
+
+  if (Offset == ~0U) {
+    llvm::errs() << "could not find code completion token \""
+                 << CodeCompletionToken << "\"\n";
+    return 1;
+  }
+  llvm::outs() << "found code completion token " << CodeCompletionToken
+               << " at offset " << Offset << "\n";
+  llvm::errs() << "found code completion token " << CodeCompletionToken
+               << " at offset " << Offset << "\n";
+
+  CompilerInvocation Invocation(InitInvok);
+
+  Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
+
+  // Create a CodeCompletionConsumer.
+  std::unique_ptr<ide::TypeContextInfoConsumer> Consumer(
+      new ide::PrintingTypeContextInfoConsumer(llvm::outs()));
+
+  // Create a factory for code completion callbacks that will feed the
+  // Consumer.
+  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+      ide::makeTypeContextInfoCallbacksFactory(*Consumer));
+
+  Invocation.setCodeCompletionFactory(callbacksFactory.get());
+  if (!SecondSourceFileName.empty()) {
+    Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
+        SecondSourceFileName);
+  }
+  CompilerInstance CI;
+
+  PrintingDiagnosticConsumer PrintDiags;
+  if (CodeCompletionDiagnostics) {
+    // Display diagnostics to stderr.
+    CI.addDiagnosticConsumer(&PrintDiags);
+  }
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  return 0;
 }
 
 static int doCodeCompletion(const CompilerInvocation &InitInvok,
@@ -3194,6 +3258,18 @@ int main(int argc, char *argv[]) {
     ExitCode = doREPLCodeCompletion(InitInvok, options::SourceFilename);
     break;
 
+  case ActionType::TypeContextInfo:
+    if (options::CodeCompletionToken.empty()) {
+      llvm::errs() << "token name required\n";
+      return 1;
+    }
+    ExitCode = doTypeContextInfo(InitInvok,
+                                  options::SourceFilename,
+                                  options::SecondSourceFilename,
+                                  options::CodeCompletionToken,
+                                  options::CodeCompletionDiagnostics);
+    break;
+
   case ActionType::SyntaxColoring:
     ExitCode = doSyntaxColoring(InitInvok,
                                 options::SourceFilename,
@@ -3342,4 +3418,3 @@ int main(int argc, char *argv[]) {
 
   return ExitCode;
 }
-
