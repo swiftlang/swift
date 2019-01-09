@@ -4906,7 +4906,7 @@ static void addConditionalCompilationFlags(ASTContext &Ctx,
 
 namespace  {
   class ExprParentFinder : public ASTWalker {
-    friend class CodeCompletionTypeContextAnalyzer;
+    friend class ExprContextAnalyzer;
     Expr *ChildExpr;
     llvm::function_ref<bool(ParentTy, ParentTy)> Predicate;
 
@@ -5161,7 +5161,7 @@ bool translateArgIndexToParamIndex(Expr *Args, unsigned &Position,
 
 /// Given an expression and its context, the analyzer tries to figure out the
 /// expected type of the expression by analyzing its context.
-class CodeCompletionTypeContextAnalyzer {
+class ExprContextAnalyzer {
   DeclContext *DC;
   Expr *ParsedExpr;
   SourceManager &SM;
@@ -5239,7 +5239,7 @@ class CodeCompletionTypeContextAnalyzer {
   }
 
 public:
-  CodeCompletionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
+  ExprContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
     ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
     Context(DC->getASTContext()),
     Finder(ParsedExpr,  [](ASTWalker::ParentTy Node, ASTWalker::ParentTy Parent) {
@@ -5542,8 +5542,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isa<BindOptionalExpr>(ParsedExpr) || isa<ForceValueExpr>(ParsedExpr))
       Lookup.setIsUnwrappedOptional(true);
 
-    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
-                                                     ParsedExpr);
+    ::ExprContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
     if (TypeAnalyzer.Analyze()) {
       Lookup.setExpectedTypes(TypeAnalyzer.getPossibleTypes());
     }
@@ -5586,8 +5585,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::ForEachSequence:
   case CompletionKind::PostfixExprBeginning: {
-    ::CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
-                                                 CodeCompleteTokenExpr);
+    ::ExprContextAnalyzer Analyzer(CurDeclContext, CodeCompleteTokenExpr);
     if (Analyzer.Analyze()) {
       Lookup.setExpectedTypes(Analyzer.getPossibleTypes());
     }
@@ -5613,8 +5611,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::PostfixExprParen: {
     Lookup.setHaveLParen(true);
 
-    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
-                                                     CodeCompleteTokenExpr);
+    ::ExprContextAnalyzer TypeAnalyzer(CurDeclContext, CodeCompleteTokenExpr);
     if (TypeAnalyzer.Analyze()) {
       Lookup.setExpectedTypes(TypeAnalyzer.getPossibleTypes());
     }
@@ -5738,8 +5735,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::UnresolvedMember: {
     Lookup.setHaveDot(DotLoc);
-    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
-                                                     CodeCompleteTokenExpr);
+    ::ExprContextAnalyzer TypeAnalyzer(CurDeclContext, CodeCompleteTokenExpr);
     if (TypeAnalyzer.Analyze())
       Lookup.setExpectedTypes(TypeAnalyzer.getPossibleTypes());
     Lookup.getUnresolvedMemberCompletions(TypeAnalyzer.getPossibleTypes());
@@ -5753,8 +5749,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::CallArg : {
-    ::CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
-                                                 CodeCompleteTokenExpr);
+    ::ExprContextAnalyzer Analyzer(CurDeclContext, CodeCompleteTokenExpr);
     Analyzer.Analyze();
     if (!Analyzer.getPossibleNames().empty()) {
       Lookup.addArgNameCompletionResults(Analyzer.getPossibleNames());
