@@ -2345,14 +2345,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
         // Conformance requirements are valid if:
         // - The first type is a generic type parameter type.
-        // - The second type is a protocol type.
+        // - The second type is a protocol type or protocol composition type.
         case RequirementKind::Conformance:
           if (diagnoseDifferentiableAttrIndirectGenericType(
                   attr->getLocation(), req.getFirstType(),
                   reqRepr->getSubjectRepr()))
             return false;
 
-          if (!req.getSecondType()->is<ProtocolType>()) {
+          if (!req.getSecondType()->is<ProtocolType>() &&
+              !req.getSecondType()->is<ProtocolCompositionType>()) {
             TC.diagnose(attr->getLocation(),
                      diag::differentiable_attr_non_protocol_type_constraint_req)
               .highlight(reqRepr->getSourceRange());
