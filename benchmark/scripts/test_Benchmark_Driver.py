@@ -743,17 +743,17 @@ class TestBenchmarkDoctor(unittest.TestCase):
             doctor.analyze({'name': 'Zero', 'Zero O i1a': _PTR(min=0),
                             'Zero O i2a': _PTR(min=0)})
             doctor.analyze({
-                'name': 'OOO',  # Out Of Order
-                # Impossible to detect overhead -- limits of precision:
+                'name': 'LOA',  # Limit of Accuracy
+                # Impossible to detect overhead:
                 # Even 1μs change in 20μs runtime is 5%.
-                'OOO O i1a': _PTR(min=21),
-                'OOO O i2a': _PTR(min=20)})
+                'LOA O i1a': _PTR(min=21),
+                'LOA O i2a': _PTR(min=20)})
         output = out.getvalue()
 
         self.assertIn('runtime: ', output)
         self.assertNotIn('NoOverhead', output)
         self.assertNotIn('ZeroRuntime', output)
-        self.assertNotIn('OOO', output)
+        self.assertNotIn('LOA', output)
         self.assert_contains(
             ["'SO' has setup overhead of 4 μs (5.8%)."],
             self.logs['error'])
