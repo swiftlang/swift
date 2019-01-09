@@ -206,6 +206,9 @@ public:
   /// Always empty if !SF.shouldBuildSyntaxTree().
   syntax::Trivia TrailingTrivia;
 
+  /// Whether we should disable delayed parsing.
+  bool DisableDelayedParsing;
+
   /// The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
 
@@ -352,14 +355,17 @@ public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
+         bool DisableDelayedParsing = false);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
+         bool DisableDelayedParsing = false);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserTUStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
+         bool DisableDelayedParsing = false);
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }

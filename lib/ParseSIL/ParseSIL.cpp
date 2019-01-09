@@ -115,7 +115,8 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB,
-                                bool FullParse) {
+                                bool FullParse,
+                                bool DisableDelayedParsing) {
   assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
          "cannot parse in full with the given parameters!");
 
@@ -127,7 +128,7 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
 
   SharedTimer timer("Parsing");
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
-           PersistentState, STreeCreator);
+           PersistentState, STreeCreator, DisableDelayedParsing);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
@@ -155,19 +156,22 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
                                 bool *Done,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
-                                DelayedParsingCallbacks *DelayedParseCB) {
+                                DelayedParsingCallbacks *DelayedParseCB,
+                                bool DisableDelayedParsing) {
   return parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
                                  PersistentState, DelayedParseCB,
-                                 /*FullParse=*/SF.shouldBuildSyntaxTree());
+                                 /*FullParse=*/SF.shouldBuildSyntaxTree(),
+                                 DisableDelayedParsing);
 }
 
 bool swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                                     PersistentParserState *PersistentState,
-                                    DelayedParsingCallbacks *DelayedParseCB) {
+                                    DelayedParsingCallbacks *DelayedParseCB,
+                                    bool DisableDelayedParsing) {
   bool Done = false;
   return parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
                                  PersistentState, DelayedParseCB,
-                                 /*FullParse=*/true);
+                                 /*FullParse=*/true, DisableDelayedParsing);
 }
 
 
