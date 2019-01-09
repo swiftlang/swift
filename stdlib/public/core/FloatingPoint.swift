@@ -1822,21 +1822,12 @@ extension FloatingPoint {
   /// - Returns: The square root of the value.
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
-  // FIXME: This causes AD to register a differentiation task for this function
-  // twice.
-  // @differentiable(wrt: (self), adjoint: _adjointSquareRoot)
+  @differentiable(wrt: (self), adjoint: _adjointSquareRoot
+                  where Self : Differentiable, Self == Self.CotangentVector)
   public func squareRoot( ) -> Self {
     var lhs = self
     lhs.formSquareRoot( )
     return lhs
-  }
-
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// The adjoint of `squareRoot`. Returns the gradient of `squareRoot` with
-  /// respect to `self`.
-  @inlinable // FIXME(sil-serialize-all)
-  func _adjointSquareRoot(_ adjoint: Self, _ originalValue: Self) -> Self {
-    return 2 * self * adjoint
   }
 
   /// Returns the result of adding the product of the two given values to this
@@ -1854,25 +1845,12 @@ extension FloatingPoint {
   /// - Returns: The product of `lhs` and `rhs`, added to this value.
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  // FIXME: Need to make FloatingPoint refine Differentiable to make this
-  // method differentiable, but that causes stdlib compilation to crash.
-  // @differentiable(wrt: (self, .0, .1), adjoint: _adjointAddingProduct)
+  @differentiable(wrt: (self, .0, .1), adjoint: _adjointAddingProduct
+                  where Self : Differentiable, Self == Self.CotangentVector)
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
     addend.addProduct(lhs, rhs)
     return addend
-  }
-
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// The adjoint of `addingProduct`. Returns the gradient of `addingProduct`
-  /// with respect to `self`, `lhs` and `rhs`.
-  @inlinable
-  func _adjointAddingProduct(
-    _ adjoint: Self,
-    _ originalValue: Self,
-    _ lhs: Self, _ rhs: Self
-  ) -> (Self, Self, Self) {
-    return (1, rhs, lhs)
   }
 
   /// Returns the lesser of the two given values.
@@ -2041,6 +2019,28 @@ extension FloatingPoint {
     if isNormal { return sign == .minus ? .negativeNormal : .positiveNormal }
     if isSubnormal { return sign == .minus ? .negativeSubnormal : .positiveSubnormal }
     return sign == .minus ? .negativeZero : .positiveZero
+  }
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+extension FloatingPoint where Self : Differentiable,
+                              Self == Self.CotangentVector {
+  /// The adjoint of `addingProduct`. Returns the gradient of `addingProduct`
+  /// with respect to `self`, `lhs` and `rhs`.
+  @inlinable
+  func _adjointAddingProduct(
+    _ adjoint: Self,
+    _ originalValue: Self,
+    _ lhs: Self, _ rhs: Self
+  ) -> (Self, Self, Self) {
+    return (1, rhs, lhs)
+  }
+
+  /// The adjoint of `squareRoot`. Returns the gradient of `squareRoot` with
+  /// respect to `self`.
+  @inlinable // FIXME(sil-serialize-all)
+  func _adjointSquareRoot(_ adjoint: Self, _ originalValue: Self) -> Self {
+    return 2 * self * adjoint
   }
 }
 

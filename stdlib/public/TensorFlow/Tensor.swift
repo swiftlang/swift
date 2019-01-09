@@ -795,8 +795,8 @@ public extension Tensor {
   /// - Precondition: The number of scalars matches the new shape.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self),
-    adjoint: _adjointReshaped(seed:originalValue:toShape:)
+    wrt: (self), adjoint: _adjointReshaped(seed:originalValue:toShape:)
+    where Scalar : Differentiable & FloatingPoint
   )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
     return Raw.reshape(self, shape: newShape)
@@ -819,8 +819,8 @@ public extension Tensor {
   /// specified shape index.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self),
-    adjoint: _adjointExpandingShape(seed:originalValue:at:)
+    wrt: (self), adjoint: _adjointExpandingShape(seed:originalValue:at:)
+    where Scalar : Differentiable & FloatingPoint
   )
   func expandingShape(at shapeIndex: Int32) -> Tensor {
     return Raw.expandDims(self, dim: Tensor<Int32>(shapeIndex))
