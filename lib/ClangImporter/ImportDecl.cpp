@@ -4407,9 +4407,6 @@ namespace {
       if (!result->isRequirementSignatureComputed())
         result->computeRequirementSignature();
 
-      auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
-      result->setGenericEnvironment(env);
-
       result->setMemberLoader(&Impl, 0);
 
       // Add the protocol decl to ExternalDefinitions so that IRGen can emit
