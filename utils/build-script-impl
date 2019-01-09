@@ -1846,7 +1846,7 @@ function set_stresstester_build_script_helper_command() {
     local package_build_type="$2"
 
     if [ "${SKIP_BUILD_SWIFTSYNTAX}" ]; then
-        echo "Error: Cannot build the SourceKit stress tester without SwiftSyntax."
+        echo "Error: Cannot build $package_name without SwiftSyntax."
         exit 1
     fi
 
@@ -2577,7 +2577,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
             swiftevolve)
                 if [[ "$(uname -s)" != "Darwin" ]]; then
-                    echo "error: unable to build swift-stress-tester on this platform"
+                    echo "error: unable to build swift-evolve on this platform"
                     continue
                 fi
                 set_swiftevolve_build_command
@@ -3573,7 +3573,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     exit 1
                 fi
                 if [[ -z "${INSTALL_SWIFTSYNTAX}" ]] ; then
-                    echo "--install-swiftsyntax is required to install the SourceKit stress tester"
+                    echo "--install-swiftsyntax is required to install swift-evolve"
                     exit 1
                 fi
 
