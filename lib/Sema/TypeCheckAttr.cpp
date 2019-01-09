@@ -2289,21 +2289,27 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // Type-check 'where' clause.
+  // Handle 'where' clause, if it exists.
+  // - Resolve attribute where clause requirements and store in the attribute
+  //   for serialization.
+  // - Compute generic signature for autodiff associated functions based on
+  //   the original function's generate signature and the attribute's where
+  //   clause requirements.
   GenericSignature *whereClauseGenSig = nullptr;
   GenericEnvironment *whereClauseGenEnv = nullptr;
   if (auto whereClause = attr->getWhereClause()) {
     if (whereClause->getRequirements().empty()) {
-      // Report an empty where clause.
+      // Where clause must not be empty.
       TC.diagnose(attr->getLocation(),
                   diag::differentiable_attr_empty_where_clause);
       attr->setInvalid();
       return;
     }
 
-    auto *genericSig = original->getGenericSignature();
-    if (!genericSig) {
-      // Only generic functions can have trailing where clauses.
+    auto *originalGenSig = original->getGenericSignature();
+    if (!originalGenSig) {
+      // Attributes with where clauses can only be declared on
+      // generic functions.
       TC.diagnose(attr->getLocation(),
                   diag::differentiable_attr_nongeneric_trailing_where,
                   original->getFullName())
@@ -2312,34 +2318,16 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return;
     }
 
-    // Form a new generic signature.
+    // Build a new generic signature for autodiff associated functions.
     GenericSignatureBuilder builder(ctx);
-    // First, add the old generic signature.
-    builder.addGenericSignature(genericSig);
-    // Go over the set of requirements, adding them to the builder.
-    SmallVector<Requirement, 4> convertedRequirements;
-
-    // Set where clause owner.
-    // Default to using @differentiable attribute as owner.
-    // If original function is declared on a protocol, use protocol's generic
-    // parameters instead.
-    WhereClauseOwner owner(original, attr);
-    if (auto nominal = original->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-        auto DC = original->getDeclContext();
-        auto genericParams = proto->createGenericParams(DC);
-        TC.prepareGenericParamList(genericParams, DC);
-        genericParams->addTrailingWhereClause(ctx, whereClause->getWhereLoc(),
-                                              whereClause->getRequirements());
-        owner = WhereClauseOwner(original, genericParams);
-      }
-    }
+    // Add the original function's generic signature.
+    builder.addGenericSignature(originalGenSig);
 
     using FloatingRequirementSource =
-    GenericSignatureBuilder::FloatingRequirementSource;
+        GenericSignatureBuilder::FloatingRequirementSource;
 
     RequirementRequest::visitRequirements(
-      owner, TypeResolutionStage::Structural,
+      WhereClauseOwner(original, attr), TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         // Check additional constraints.
         // TODO: refine constraints.
@@ -2355,7 +2343,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
             .highlight(reqRepr->getSourceRange());
           return false;
 
-        // Conformance requirements are supported if:
+        // Conformance requirements are valid if:
         // - The first type is a generic type parameter type.
         // - The second type is a protocol type.
         case RequirementKind::Conformance:
@@ -2373,20 +2361,20 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           break;
         }
 
-        // Add the requirement to the generic signature builder.
+        // Add requirement to generic signature builder.
         builder.addRequirement(req, reqRepr,
                                FloatingRequirementSource::forExplicit(reqRepr),
                                nullptr, original->getModuleContext());
-        convertedRequirements.push_back(getCanonicalRequirement(req));
         return false;
       });
 
-    // Store the converted requirements in the attribute.
-    attr->setRequirements(ctx, convertedRequirements);
+    // Compute generic signature and environment for autodiff associated
+    // functions.
     whereClauseGenSig = std::move(builder).computeGenericSignature(
         attr->getLocation(), /*allowConcreteGenericParams=*/true);
     whereClauseGenEnv = whereClauseGenSig->createGenericEnvironment();
-    whereClauseGenEnv->setOwningDeclContext(original->getDeclContext());
+    // Store the resolved requirements in the attribute.
+    attr->setRequirements(ctx, whereClauseGenSig->getRequirements());
   }
 
   // Resolve the primal declaration, if it exists.
