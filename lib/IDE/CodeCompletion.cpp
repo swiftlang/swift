@@ -5427,21 +5427,20 @@ public:
       return false;
     DC->walkContext(Finder);
 
-    for (auto It = Finder.Ancestors.rbegin(); It != Finder.Ancestors.rend();
-         ++ It) {
-      if (auto Parent = It->getAsExpr()) {
-        analyzeExpr(Parent);
-      } else if (auto Parent = It->getAsStmt()) {
-        analyzeStmt(Parent);
-      } else if (auto Parent = It->getAsDecl()) {
-        analyzeDecl(Parent);
-      } else if (auto Parent = It->getAsPattern()) {
-        analyzePattern(Parent);
-      }
-      if (!PossibleTypes.empty() || !PossibleNames.empty())
-        return true;
+    if (Finder.Ancestors.empty())
+      return false;
+
+    auto &P = Finder.Ancestors.back();
+    if (auto Parent = P.getAsExpr()) {
+      analyzeExpr(Parent);
+    } else if (auto Parent = P.getAsStmt()) {
+      analyzeStmt(Parent);
+    } else if (auto Parent = P.getAsDecl()) {
+      analyzeDecl(Parent);
+    } else if (auto Parent = P.getAsPattern()) {
+      analyzePattern(Parent);
     }
-    return false;
+    return (!PossibleTypes.empty() || !PossibleNames.empty());
   }
 
   ArrayRef<Type> getPossibleTypes() const { return PossibleTypes; }
