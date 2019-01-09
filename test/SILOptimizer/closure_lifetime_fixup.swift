@@ -17,14 +17,13 @@ public class C {
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK: [[F:%.*]]  = function_ref @$s22closure_lifetime_fixup10testSimple1cyAA1CC_tFyyXEfU_
 // CHECK-NEXT:  strong_retain [[ARG]] : $C
-// CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> ()
-// CHECK-NEXT: strong_retain [[PA]] : $@callee_guaranteed () -> ()
-// CHECK-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:  [[CL:%.*]] = mark_dependence [[PA]] : $@noescape @callee_guaranteed () -> () on [[ARG]] : $C
 // CHECK-NEXT:  // function_ref use_closure(_:)
 // CHECK-NEXT:  [[F2:%.*]] = function_ref @$s22closure_lifetime_fixup04use_A0yyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-// CHECK-NEXT:  apply [[F2]]([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-// CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> ()
-// CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> ()
+// CHECK-NEXT:  apply [[F2]]([[CL]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK-NEXT:  dealloc_stack [[PA]] : $@noescape @callee_guaranteed () -> ()
+// CHECK-NEXT:  strong_release [[ARG]] : $C
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return {{.*}} : $()
 public func testSimple(c: C) {
@@ -35,19 +34,17 @@ public func testSimple(c: C) {
 // CHECK:bb0([[ARG:%.*]] : $C):
 // CHECK:  [[F:%.*]] = function_ref @$s22closure_lifetime_fixup11testGeneric1cyAA1CC_tFSiyXEfU_ : $@convention(thin) (@guaranteed C) -> Int
 // CHECK-NEXT:  strong_retain [[ARG]] : $C
-// CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> Int
-// CHECK-NEXT:  strong_retain [[PA]] : $@callee_guaranteed () -> Int
-// CHECK-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> Int
+// CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> Int
+// CHECK-NEXT:  [[MD:%.*]] = mark_dependence [[PA]] : $@noescape @callee_guaranteed () -> Int on [[ARG]] : $C
 // CHECK-NEXT:  // function_ref thunk for @callee_guaranteed () -> (@unowned Int)
 // CHECK-NEXT:  [[F:%.*]] = function_ref @$sSiIgd_SiIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
-// CHECK-NEXT:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [[F]]([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
-// CHECK-NEXT:  [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> @out Int to $@noescape @callee_guaranteed () -> @out Int
-// CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> Int
+// CHECK-NEXT:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[F]]([[MD]]) : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
 // CHECK-NEXT:  // function_ref use_closureGeneric<A>(_:)
 // CHECK-NEXT:  [[F2:%.*]] = function_ref @$s22closure_lifetime_fixup04use_A7GenericyyxyXElF : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed () -> @out τ_0_0) -> ()
-// CHECK-NEXT:  %12 = apply [[F2]]<Int>([[CVT2]]) : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed () -> @out τ_0_0) -> ()
-// CHECK-NEXT:  strong_release [[PA2]] : $@callee_guaranteed () -> @out Int
-// CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> Int
+// CHECK-NEXT:  apply [[F2]]<Int>([[PA2]]) : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed () -> @out τ_0_0) -> ()
+// CHECK-NEXT:  dealloc_stack [[PA2]]
+// CHECK-NEXT:  dealloc_stack [[PA]]
+// CHECK-NEXT:  strong_release [[ARG]]
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return {{.*}} : $()
 
@@ -89,4 +86,16 @@ public func dontCrash<In, Out>(test: Bool, body: @escaping ((In) -> Out, In) -> 
     return r
   }
   return result
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup28to_stack_of_convert_function1pySvSg_tF
+// CHECK:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  [[MD:%.*]] = mark_dependence [[PA]]
+// CHECK:  [[CVT:%.*]] = convert_function [[MD]]
+// CHECK:  [[REABSTRACT:%.*]] = function_ref @$sSvSSs5Error_pIgyozo_SvSSsAA_pIegnrzo_TR
+// CHECK:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[REABSTRACT]]([[CVT]])
+// CHECK:  [[MAP:%.*]] = function_ref @$sSq3mapyqd__Sgqd__xKXEKlF
+// CHECK:  try_apply [[MAP]]<UnsafeMutableRawPointer, String>({{.*}}, [[PA2]], {{.*}})
+public func to_stack_of_convert_function(p: UnsafeMutableRawPointer?) {
+  _ = p.map(String.init(describing:))
 }
