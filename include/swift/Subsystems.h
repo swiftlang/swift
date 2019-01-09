@@ -119,7 +119,8 @@ namespace swift {
   bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
                            SILParserState *SIL = nullptr,
                            PersistentParserState *PersistentState = nullptr,
-                           DelayedParsingCallbacks *DelayedParseCB = nullptr);
+                           DelayedParsingCallbacks *DelayedParseCB = nullptr,
+                           bool DisableDelayedParsing = false);
 
   /// \brief Finish the parsing by going over the nodes that were delayed
   /// during the first parsing pass.
