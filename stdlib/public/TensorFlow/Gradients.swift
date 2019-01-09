@@ -36,9 +36,6 @@
 // TODO:
 // - Add gradients for more ops ('sum', 'mean', etc).
 // - Fix gradients for broadcasting ops (need to perform reduction).
-// - When the trailing 'where' clause in @differentiable is properly
-//   type-checked, define constraints on BinaryFloatingPoint in original
-//   declarations and define adjoints on BinaryFloatingPoint.
 //
 // FIXME:
 // - Handle scalar broadcasting.
@@ -49,7 +46,7 @@
 // Elementwise binary
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : Numeric {
+extension Tensor where Scalar : FloatingPoint {
   @inlinable
   static func _adjointAdd(
     _ seed: Tensor, _ originalValue: Tensor, _ x: Tensor, _ y: Tensor
@@ -84,7 +81,7 @@ extension Tensor where Scalar : Numeric {
 }
 
 @inlinable
-func _adjointMinMax<T : Numeric & Comparable>(
+func _adjointMinMax<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>, _ y: Tensor<T>
 ) -> (Tensor<T>, Tensor<T>) {
   let denom = 1 + Tensor<T>(x .== y)
@@ -94,7 +91,7 @@ func _adjointMinMax<T : Numeric & Comparable>(
 }
 
 @inlinable
-func _adjointPow<T : BinaryFloatingPoint>(
+func _adjointPow<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>, _ y: Tensor<T>
 ) -> (Tensor<T>, Tensor<T>) {
   return ((seed * y * pow(x, y-1)).unbroadcast(like: x),
@@ -105,7 +102,7 @@ func _adjointPow<T : BinaryFloatingPoint>(
 // Elementwise unary
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : SignedNumeric {
+extension Tensor where Scalar : FloatingPoint {
   @inlinable
   static func _adjointNegate(
     _ seed: Tensor, _ originalValue: Tensor, _ x: Tensor
@@ -115,90 +112,90 @@ extension Tensor where Scalar : SignedNumeric {
 }
 
 @inlinable
-func _adjointLog<T : BinaryFloatingPoint>(
+func _adjointLog<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return seed / x
 }
 
 @inlinable
-func _adjointSin<T : BinaryFloatingPoint>(
+func _adjointSin<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return seed * cos(x)
 }
 
 @inlinable
-func _adjointCos<T : BinaryFloatingPoint>(
+func _adjointCos<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return -seed * sin(x)
 }
 
 @inlinable
-func _adjointTan<T : BinaryFloatingPoint>(
+func _adjointTan<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return seed * (1 + originalValue.squared())
 }
 
 @inlinable
-func _adjointSinh<T : BinaryFloatingPoint>(
+func _adjointSinh<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return seed * cosh(x)
 }
 
 @inlinable
-func _adjointCosh<T : BinaryFloatingPoint>(
+func _adjointCosh<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return seed * sinh(x)
 }
 
 @inlinable
-func _adjointTanh<T : BinaryFloatingPoint>(
+func _adjointTanh<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return seed * (1 - originalValue.squared())
 }
 
 @inlinable
-func _adjointExp<T : BinaryFloatingPoint>(
+func _adjointExp<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return originalValue * seed
 }
 
 @inlinable
-func _adjointCeil<T : BinaryFloatingPoint>(
+func _adjointCeil<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return Tensor(0).broadcast(like: x)
 }
 
 @inlinable
-func _adjointFloor<T : BinaryFloatingPoint>(
+func _adjointFloor<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return Tensor(0).broadcast(like: x)
 }
 
 @inlinable
-func _adjointSqrt<T : BinaryFloatingPoint>(
+func _adjointSqrt<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return seed / (2 * originalValue)
 }
 
 @inlinable
-func _adjointRsqrt<T : BinaryFloatingPoint>(
+func _adjointRsqrt<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return -seed / 2 * pow(originalValue, 3)
 }
 
-func _adjointSquared<T : BinaryFloatingPoint>(
+func _adjointSquared<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return 2 * x * seed
@@ -209,7 +206,7 @@ func _adjointSquared<T : BinaryFloatingPoint>(
 //===----------------------------------------------------------------------===//
 
 @inlinable
-func _adjointMatmul<Scalar : Numeric>(
+func _adjointMatmul<Scalar : FloatingPoint>(
   _ seed: Tensor<Scalar>, _ originalValue: Tensor<Scalar>,
   _ left: Tensor<Scalar>, _ right: Tensor<Scalar>
 ) -> (Tensor<Scalar>, Tensor<Scalar>) {
@@ -220,16 +217,14 @@ func _adjointMatmul<Scalar : Numeric>(
 // TODO: We have to define a custom adjoint on • because AD can't yet
 // differentiate generic methods. After AD can differentiate generic methods,
 // remove the custom adjoint.
-extension Tensor where Scalar : Numeric {
+extension Tensor where Scalar : FloatingPoint {
   @inlinable
   static func _adjointMatmulOperator(seed: Tensor, originalValue: Tensor,
                                      lhs: Tensor, rhs: Tensor)
       -> (Tensor, Tensor) {
     return _adjointMatmul(seed, originalValue, lhs, rhs)
   }
-}
 
-extension Tensor {
   @inlinable
   func _adjointTransposed(
     _ seed: Tensor, _ originalValue: Tensor, _ permutations: Tensor<Int32>
@@ -243,7 +238,7 @@ extension Tensor {
 // Shape transformations
 //===----------------------------------------------------------------------===//
 
-extension Tensor {
+extension Tensor where Scalar : FloatingPoint {
   @inlinable
   func _adjointReshaped(
     seed: Tensor, originalValue: Tensor, toShape newShape: Tensor<Int32>
@@ -265,9 +260,8 @@ extension Tensor {
 // Normalization
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : BinaryFloatingPoint,
-                       Scalar : Differentiable,
-                       Scalar.CotangentVector == Scalar {
+extension Tensor where Scalar : BinaryFloatingPoint & Differentiable,
+                       Scalar == Scalar.CotangentVector {
   // TODO: Verify that these calculations are correct.
   @inlinable
   func _adjointBatchNormalized(
@@ -304,7 +298,7 @@ extension Tensor where Scalar : BinaryFloatingPoint,
 // Convolution and pooling
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : BinaryFloatingPoint {
+extension Tensor where Scalar : FloatingPoint {
   /// TensorFlow builtin conv2d gradient helper for the input.
   @inlinable
   @differentiable(
@@ -448,7 +442,7 @@ extension Tensor where Scalar : BinaryFloatingPoint {
 //===----------------------------------------------------------------------===//
 
 @inlinable
-func _adjointRelu<T : BinaryFloatingPoint>(
+func _adjointRelu<T : FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return Tensor(x .> 0) * seed

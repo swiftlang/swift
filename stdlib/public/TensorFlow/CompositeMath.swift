@@ -19,7 +19,7 @@
 /// Computes `sigmoid` of the specified tensor element-wise.
 /// Specifically, computes `1 / (1 + exp(-x))`.
 @inlinable @inline(__always)
-public func sigmoid<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+public func sigmoid<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return 1 / (1 + exp(-x))
 }
 
@@ -27,14 +27,14 @@ public func sigmoid<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
 /// Specifically, computes `max(0, x)`.
 @inlinable @inline(__always)
 @differentiable(adjoint: _adjointRelu(_:_:_:))
-public func relu<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+public func relu<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return max(0, x)
 }
 
 /// Computes the softmax of the specified tensor element-wise.
 /// Specifically, computes `exp(x) / exp(x).sum()`.
 @inlinable @inline(__always)
-public func softmax<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+public func softmax<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   let expx = exp(x)
   let sum = expx.sum()
   return expx / sum
@@ -43,7 +43,7 @@ public func softmax<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
 /// Computes the softmax of the specified tensor along the specified axis.
 /// Specifically, computes `exp(x) / exp(x).sum(alongAxes: axis)`.
 @inlinable @inline(__always)
-public func softmax<T : BinaryFloatingPoint>(
+public func softmax<T : FloatingPoint>(
   _ x: Tensor<T>, alongAxis axis: Int32
 ) -> Tensor<T> {
   let expx = exp(x)
