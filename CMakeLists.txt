@@ -991,15 +991,6 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
                         ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
 endif()
 
-#
-# Set up global CMake variables for API notes.
-#
-set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
-include("${SWIFT_API_NOTES_PATH}/CMakeLists.txt")
-if(NOT DEFINED SWIFT_API_NOTES_INPUTS)
-  message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
-endif()
-
 # Add all of the subdirectories, where we actually do work.
 
 ###############
@@ -1007,7 +998,7 @@ endif()
 ###############
 #
 # We have to include stdlib/ before tools/.
-# Do not move add_subdirectory(stdlib) after add_subdirectory(tools)!                                             
+# Do not move add_subdirectory(stdlib) after add_subdirectory(tools)!
 #
 # We must include stdlib/ before tools/ because stdlib/CMakeLists.txt
 # declares the swift-stdlib-* set of targets. These targets will then
@@ -1022,6 +1013,14 @@ endif()
 #
 # https://bugs.swift.org/browse/SR-5975
 add_subdirectory(stdlib)
+
+if(SWIFT_BUILD_SDK_OVERLAY)
+  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}"
+                 building_darwin_sdks)
+  if(building_darwin_sdks)
+    add_subdirectory(apinotes)
+  endif()
+endif()
 
 add_subdirectory(include)
 

@@ -606,7 +606,6 @@ endfunction()
 #     [C_COMPILE_FLAGS flag1...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
-#     [API_NOTES_NON_OVERLAY]
 #     [FILE_DEPENDS target1 ...]
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
@@ -661,9 +660,6 @@ endfunction()
 # LINK_FLAGS
 #   Extra linker flags.
 #
-# API_NOTES_NON_OVERLAY
-#   Generate API notes for non-overlayed modules with this target.
-#
 # FILE_DEPENDS
 #   Additional files this library depends on.
 #
@@ -686,7 +682,6 @@ endfunction()
 #   Sources to add into this library
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
-        API_NOTES_NON_OVERLAY
         DONT_EMBED_BITCODE
         FORCE_BUILD_OPTIMIZED
         IS_SDK_OVERLAY
@@ -805,22 +800,6 @@ function(_add_swift_library_single target name)
       SWIFTLIB_SINGLE_SOURCES
       "${SWIFTLIB_SINGLE_ARCHITECTURE}")
 
-  # Figure out whether and which API notes to create.
-  set(SWIFTLIB_SINGLE_API_NOTES)
-  if(SWIFTLIB_SINGLE_API_NOTES_NON_OVERLAY)
-    # Adopt all of the non-overlay API notes.
-    foreach(framework_name ${SWIFT_API_NOTES_INPUTS})
-      if (${framework_name} STREQUAL "WatchKit" AND
-          ${SWIFTLIB_SINGLE_SDK} STREQUAL "OSX")
-        # HACK: don't build WatchKit API notes for OS X.
-      else()
-        # Always build the "non-overlay" apinotes to keep them in sync
-        # rdar://40496966
-        list(APPEND SWIFTLIB_SINGLE_API_NOTES "${framework_name}")
-      endif()
-    endforeach()
-  endif()
-
   # Remove the "swift" prefix from the name to determine the module name.
   if(SWIFTLIB_IS_STDLIB_CORE)
     set(module_name "Swift")
@@ -870,7 +849,6 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
-      API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
       MODULE_NAME ${module_name}
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
       ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
@@ -1471,7 +1449,6 @@ endfunction()
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
 #     [DONT_EMBED_BITCODE]
-#     [API_NOTES_NON_OVERLAY]
 #     [INSTALL]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
@@ -1550,9 +1527,6 @@ endfunction()
 # LINK_FLAGS
 #   Extra linker flags.
 #
-# API_NOTES_NON_OVERLAY
-#   Generate API notes for non-overlayed modules with this target.
-#
 # DONT_EMBED_BITCODE
 #   Don't embed LLVM bitcode in this target, even if it is enabled globally.
 #
@@ -1589,7 +1563,6 @@ endfunction()
 #   Sources to add into this library.
 function(add_swift_target_library name)
   set(SWIFTLIB_options
-        API_NOTES_NON_OVERLAY
         DONT_EMBED_BITCODE
         FORCE_BUILD_OPTIMIZED
         HAS_SWIFT_CONTENT
@@ -1904,7 +1877,6 @@ function(add_swift_target_library name)
         INCORPORATE_OBJECT_LIBRARIES ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES}
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY}
         ${SWIFTLIB_DONT_EMBED_BITCODE_keyword}
-        ${SWIFTLIB_API_NOTES_NON_OVERLAY_keyword}
         ${SWIFTLIB_IS_STDLIB_keyword}
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
