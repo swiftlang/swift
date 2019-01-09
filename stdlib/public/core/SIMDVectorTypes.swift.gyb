@@ -251,8 +251,8 @@ extension ${Self}: SIMDScalar {
 
 %end
 
-%for (Self, bits) in [('Float',32), ('Double',64)]:
-extension ${Self}: SIMDScalar {
+%for (Self, bits) in [('Float16',16), ('Float',32), ('Double',64)]:
+extension ${Self} : SIMDScalar {
 
   public typealias SIMDMaskScalar = Int${bits}
 
