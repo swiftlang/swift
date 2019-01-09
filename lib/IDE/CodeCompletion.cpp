@@ -1523,10 +1523,10 @@ static Type getReturnTypeFromContext(const DeclContext *DC) {
       if (FD->getDeclContext()->isTypeContext())
         Ty = FD->getMethodInterfaceType();
       if (auto FT = Ty->getAs<AnyFunctionType>())
-        return FT->getResult();
+        return DC->mapTypeIntoContext(FT->getResult());
     }
   } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
-    if (ACE->getType())
+    if (ACE->getType() && !ACE->getType()->hasError())
       return ACE->getResultType();
     if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
       if (CE->hasExplicitResultType())
@@ -3670,8 +3670,10 @@ public:
   }
 
   void getUnresolvedMemberCompletions(Type T) {
-    if (!T->getNominalOrBoundGenericNominal())
+    if (!T->mayHaveMembers())
       return;
+
+    ModuleDecl *CurrModule = CurrDeclContext->getParentModule();
 
     // We can only say .foo where foo is a static member of the contextual
     // type and has the same type (or if the member is a function, then the
@@ -3704,8 +3706,8 @@ public:
       }
 
       // Otherwise, check the result type matches the contextual type.
-      auto declTy = getTypeOfMember(VD, T);
-      if (declTy->hasError())
+      auto declTy = T->getTypeOfMember(CurrModule, VD);
+      if (declTy->is<ErrorType>())
         return false;
 
       DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
@@ -5174,6 +5176,7 @@ class CodeCompletionTypeContextAnalyzer {
   void recordPossibleType(Type ty) {
     if (!ty || ty->is<ErrorType>())
       return;
+
     PossibleTypes.push_back(ty->getRValueType());
   }
 
@@ -5212,6 +5215,10 @@ class CodeCompletionTypeContextAnalyzer {
       SmallPtrSet<TypeBase *, 4> seenTypes;
       SmallPtrSet<Identifier, 4> seenNames;
       for (auto &typeAndDecl : Candidates) {
+        DeclContext *memberDC = nullptr;
+        if (typeAndDecl.second)
+          memberDC = typeAndDecl.second->getInnermostDeclContext();
+
         auto Params = typeAndDecl.first->getParams();
         if (Position >= Params.size())
           continue;
@@ -5220,8 +5227,11 @@ class CodeCompletionTypeContextAnalyzer {
           if (seenNames.insert(Param.getLabel()).second)
             recordPossibleName(Param.getLabel().str());
         } else {
-          if (seenTypes.insert(Param.getOldType().getPointer()).second)
-            recordPossibleType(Param.getOldType());
+          Type ty = Param.getOldType();
+          if (memberDC && ty->hasTypeParameter())
+            ty = memberDC->mapTypeIntoContext(ty);
+          if (seenTypes.insert(ty.getPointer()).second)
+            recordPossibleType(ty);
         }
       }
     }
@@ -5302,8 +5312,11 @@ public:
           if (auto type = destExpr->getType()) {
             recordPossibleType(type);
           } else if (auto *DRE = dyn_cast<DeclRefExpr>(destExpr)) {
-            if (auto *decl = DRE->getDecl())
-              recordPossibleType(decl->getInterfaceType());
+            if (auto *decl = DRE->getDecl()) {
+              if (decl->hasInterfaceType())
+                recordPossibleType(decl->getDeclContext()->mapTypeIntoContext(
+                    decl->getInterfaceType()));
+            }
           }
         }
         break;
@@ -5398,7 +5411,8 @@ public:
       auto ExprPat = cast<ExprPattern>(P);
       if (auto D = ExprPat->getMatchVar()) {
         if (D->hasInterfaceType())
-          recordPossibleType(D->getInterfaceType());
+          recordPossibleType(
+              D->getDeclContext()->mapTypeIntoContext(D->getInterfaceType()));
       }
       break;
     }

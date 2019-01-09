@@ -78,6 +78,28 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_INIT_1 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_INIT_2 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_1 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_2 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_3 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_4 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_5 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_6 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_7 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_8 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_9 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_10 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_11 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_12 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_13 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_14 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_15 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_16 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_17 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_18 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_19 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_20 | %FileCheck %s -check-prefix=GENERICPARAM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_21 | %FileCheck %s -check-prefix=GENERICPARAM_1
+
 enum SomeEnum1 {
   case South
   case North
@@ -534,4 +556,92 @@ func testOverload(val: HasOverloaded) {
 
   let _ = HasOverloaded(e: .#^OVERLOADED_INIT_2^#)
 // Same as OVERLOADED_METHOD_1.
+}
+
+protocol HasStatic {
+  static var instance: Self { get }
+}
+func receiveHasStatic<T: HasStatic>(x: T)  {}
+func testingGenericParam1<T: HasStatic>(x: inout T, fn: (T) -> Void) -> T {
+  x = .#^GENERICPARAM_1^#
+// GENERICPARAM_1: Begin completions, 1 items
+// GENERICPARAM_1: Decl[StaticVar]/CurrNominal: instance[#HasStatic#]; name=instance
+// GENERICPARAM_1: End completions
+
+  /* Parser sync. */;
+
+  let _: (Int, T) = (1, .#^GENERICPARAM_2^#)
+  // Same as GENERICPARAM_1.
+
+  (_, x) = (1, .#^GENERICPARAM_3^#)
+  // Same as GENERICPARAM_1.
+
+  let _ = fn(.#^GENERICPARAM_4^#)
+  // Same as GENERICPARAM_1.
+
+  let _ = receiveHasStatic(x: .#^GENERICPARAM_5^#)
+  // Same as GENERICPARAM_1.
+
+  let _ = { () -> T in
+    return .#^GENERICPARAM_6^#
+    // Same as GENERICPARAM_1.
+  }
+  let _: () -> T = {
+    return .#^GENERICPARAM_7^#
+    // Same as GENERICPARAM_1.
+  }
+  let _ = { (_: InvalidTy) -> T in
+    return .#^GENERICPARAM_8^#
+    // Same as GENERICPARAM_1.
+  }
+
+  if case .#^GENERICPARAM_9^# = x {}
+  // Same as GENERICPARAM_1.
+
+  return .#^GENERICPARAM_10^#
+  // Same as GENERICPARAM_1.
+}
+
+class C<T: HasStatic> {
+
+  var t: T = .instance
+
+  func foo(x: T) -> T {
+    return .#^GENERICPARAM_11^#
+    // Same as GENERICPARAM_1.
+  }
+  func bar<U: HasStatic>(x: U) -> U {
+    return .#^GENERICPARAM_12^#
+    // Same as GENERICPARAM_1.
+  }
+
+  func testing() {
+    let _ = foo(x: .#^GENERICPARAM_13^#)
+    // Same as GENERICPARAM_1.
+    let _ = bar(x: .#^GENERICPARAM_14^#)
+    // Same as GENERICPARAM_1.
+
+    t = .#^GENERICPARAM_15^#
+    // Same as GENERICPARAM_1.
+
+    /* Parser sync. */; func sync1() {}
+    self.t = .#^GENERICPARAM_16^#
+    // Same as GENERICPARAM_1.
+
+    /* Parser sync. */; func sync2() {}
+    (_, t) = (1, .#^GENERICPARAM_17^#)
+    // Same as GENERICPARAM_1.
+
+    (_, self.t) = (1, .#^GENERICPARAM_18^#)
+    // Same as GENERICPARAM_1.
+  }
+}
+
+func testingGenericParam2<X>(obj: C<X>) {
+  let _ = obj.foo(x: .#^GENERICPARAM_19^#)
+  // Same as GENERICPARAM_1.
+  let _ = obj.bar(x: .#^GENERICPARAM_20^#)
+  // Same as GENERICPARAM_1.
+  obj.t = .#^GENERICPARAM_21^#
+  // Same as GENERICPARAM_1.
 }
