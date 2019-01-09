@@ -582,11 +582,15 @@ deriveDifferentiable_VectorSpace(DerivedConformance &derived,
     auto *aliasDecl = new (C) TypeAliasDecl(
         SourceLoc(), SourceLoc(), getVectorSpaceIdentifier(kind, C),
         SourceLoc(), {}, nominal);
+    aliasDecl->setUnderlyingType(selfType);
     aliasDecl->setImplicit();
     aliasDecl->getAttrs().add(
         new (C) FieldwiseProductSpaceAttr(/*implicit*/ true));
-    aliasDecl->setUnderlyingType(selfType);
     nominal->addMember(aliasDecl);
+    aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
+    aliasDecl->setValidationToChecked();
+    TC.validateDecl(aliasDecl);
+    C.addSynthesizedDecl(aliasDecl);
     return selfType;
   }
 
