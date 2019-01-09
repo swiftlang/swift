@@ -454,6 +454,14 @@ const char *swift::_swift_stdlib_strtof_clocale(
     const char * nptr, float *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
 }
+
+const char *swift::_swift_stdlib_strtof16_clocale(
+    const char * nptr, __fp16 *outResult) {
+  float tmp;
+  const char *result = _swift_stdlib_strtoX_clocale_impl(nptr, &tmp);
+  *outResult = tmp;
+  return result;
+}
 #else
 
 // We can't return Float80, but we can receive a pointer to one, so
