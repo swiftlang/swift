@@ -2585,66 +2585,85 @@ void TFDeabstraction::doIt() {
 
 namespace {
   struct TFDeabstractionPass : public SILModuleTransform {
+    TFDeabstractionPass(bool isMandatoryPipeline)
+        : isMandatoryPipeline(isMandatoryPipeline) {}
+
     /// The entry point to the transformation, runs deabstraction on an entire
     /// module.
     void run() override;
+
+  private:
+    // Runs deabstraction of tensorflow convention functions during the
+    // mandatory pipeline.
+    void runMandatoryPipeline(SILModule *module);
+
+    // Runs deabstraction of non-tensorflow convention functions during the
+    // optimization pipeline.
+    void runOptimizationPipeline(SILModule *module);
+
+    /// Deabstract the given function and return true if this function was
+    /// deabstracted. If the flag forceTFFunctions is true, forces partitioning
+    /// of functions that operate on Tensors even if it would have been rejected
+    /// otherwise.
+    bool deabstract(SILFunction &fn, TensorFunctionClassifier &tfc,
+                    ConstExprEvaluator &constantEvaluator,
+                    bool forceTFFunctions);
+
+    /// Determines if the pass is being run as a part of mandatory pipeline or
+    /// optimization pipeline.
+    bool isMandatoryPipeline;
   };
 }  // end anonymous namespace
 
-void TFDeabstractionPass::run() {
-  SILModule *module = getModule();
-  auto &ctx = module->getASTContext();
+bool TFDeabstractionPass::deabstract(SILFunction &fn,
+                                     TensorFunctionClassifier &tfc,
+                                     ConstExprEvaluator &constantEvaluator,
+                                     bool forceTFFunctions) {
+  if (!tfc.shouldBePartitioned(&fn, forceTFFunctions))
+    return false;
 
-  // If the TensorFlow module hasn't been imported by the program, don't do
-  // anything.  This avoids impacting compile time for non-TensorFlow using
-  // Swift programs by doing extraneous analysis.
-  auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
-  if (!tfModule)
-    return;
+  // If something crashes, make sure the pretty stack trace says what we
+  // were doing.
+  llvm::PrettyStackTraceFormat X("TFDeabstraction on function %s",
+                                 fn.getName().str().c_str());
 
-  // If we are running on the TensorFlow module itself, do not perform
-  // deabstraction.  It contains a lot of code that processes TensorHandle and
-  // other types as host values, and we do not want to force inline all of these
-  // things together.
-  //
-  // TODO: Rework the heuristics in inlineCalls() to be smarter.  In an ideal
-  // world, we would be lazy about inlining, and only inline calls due to actual
-  // inter-op value uses.
-  if (module->getSwiftModule() == tfModule)
+  TFDeabstraction(*this, fn, tfc, constantEvaluator, this->getPassManager())
+      .doIt();
+  return true;
+}
+
+void TFDeabstractionPass::runMandatoryPipeline(SILModule *module) {
+  TensorFunctionClassifier tfc;
+  ConstExprEvaluator constantEvaluator(*module);
+
+  for (auto &fn : *module) {
+    if (!isAcceleratorOnly(fn))
+      continue;
+    deabstract(fn, tfc, constantEvaluator, /*forceTFFunctions*/ false);
+  }
+}
+
+void TFDeabstractionPass::runOptimizationPipeline(SILModule *module) {
+  // Only tensorflow convention functions should be deabstracted in dynamic
+  // compilation mode, which already happens in the mandatory pipeline during
+  // deabsraction pass.
+  if (llvm::TFDynamicCompilation)
     return;
 
   TensorFunctionClassifier tfc;
   ConstExprEvaluator constantEvaluator(*module);
-
-  SmallPtrSet<SILFunction*, 16> partitionedFunctions;
+  SmallPtrSet<SILFunction *, 16> partitionedFunctions;
 
   // Loop over all of the functions in the current module processing them -
   // iff they look like they could be the top level of a deabstraction
   // context.
   for (auto &fn : *module) {
-    // In dynamic compilation mode, only deabstract accelerator-only functions.
-    if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn))
+    // Accelerator-only functions are already deabstracted.
+    if (isAcceleratorOnly(fn))
       continue;
 
-    // If this function is a building block of larger tensor programs (e.g.
-    // the ops defined in the TensorFlow module), then don't transform it in
-    // isolation.
-    if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false))
-      continue;
-
-    // If something crashes, make sure the pretty stack trace says what we
-    // were doing.
-    llvm::PrettyStackTraceFormat X("TFDeabstraction on function %s",
-                                   fn.getName().str().c_str());
-
-    TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
-    partitionedFunctions.insert(&fn);
-
-    // TODO(clattner): This should eventually be the driver that kicks off
-    // the partitioning pass as part of it, and the partitioning and later
-    // passes are just function passes that are invoked by this one.  Until
-    // we are ready for that, let them run later in the pipeline after the
-    // other optimization and cleanup passes.
+    if (deabstract(fn, tfc, constantEvaluator, /*forceTFFunctions*/ false))
+      partitionedFunctions.insert(&fn);
   }
 
   // Deabstract stragglers that were left out in the previous iteration. These
@@ -2672,19 +2691,50 @@ void TFDeabstractionPass::run() {
   // of the functions would be dead after the first round, but some stragglers
   // remain as in the example above.
   for (auto &fn : *module) {
-    // In dynamic compilation mode, only deabstract accelerator-only functions.
-    if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn))
+    // Skip functions that are already deabstracted.
+    if (isAcceleratorOnly(fn) || partitionedFunctions.count(&fn) > 0)
       continue;
 
-    // Skip if it is already partitioned, or if it was ignored only because it
-    // operated on tensor values.
-    if (partitionedFunctions.count(&fn) > 0 ||
-        !tfc.shouldBePartitioned(&fn, /*forceTFFunctions=*/true))
-      continue;
-    TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
+    // Deabstract the function and force deabstraction of functions that were
+    // ignored in the earlier pass only because it operated on tensor values.
+    deabstract(fn, tfc, constantEvaluator, /*forceTFFunctions*/ true);
+  }
+  return;
+}
+
+void TFDeabstractionPass::run() {
+  SILModule *module = getModule();
+  auto &ctx = module->getASTContext();
+
+  // If the TensorFlow module hasn't been imported by the program, don't do
+  // anything.  This avoids impacting compile time for non-TensorFlow using
+  // Swift programs by doing extraneous analysis.
+  auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
+  if (!tfModule)
+    return;
+
+  // If we are running on the TensorFlow module itself, do not perform
+  // deabstraction.  It contains a lot of code that processes TensorHandle and
+  // other types as host values, and we do not want to force inline all of these
+  // things together.
+  //
+  // TODO: Rework the heuristics in inlineCalls() to be smarter.  In an ideal
+  // world, we would be lazy about inlining, and only inline calls due to actual
+  // inter-op value uses.
+  if (module->getSwiftModule() == tfModule)
+    return;
+
+  if (isMandatoryPipeline) {
+    runMandatoryPipeline(module);
+  } else {
+    runOptimizationPipeline(module);
   }
 }
 
-SILTransform *swift::createTFDeabstraction() {
-  return new TFDeabstractionPass();
+SILTransform *swift::createTFDeabstractionMandatory() {
+  return new TFDeabstractionPass(/*isMandatoryPipeline*/true);
+}
+
+SILTransform *swift::createTFDeabstractionOpt() {
+  return new TFDeabstractionPass(/*isMandatoryPipeline*/false);
 }

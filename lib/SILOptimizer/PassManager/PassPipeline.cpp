@@ -118,7 +118,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addSplitNonCondBrCriticalEdges();
 
   // SWIFT_ENABLE_TENSORFLOW
-  P.addTFDeabstraction();
+  P.addTFDeabstractionMandatory();
 }
 
 SILPassPipelinePlan
@@ -573,6 +573,10 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
     return P;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  P.startPipeline("TensorFlow Deabstraction (Opt)");
+  P.addTFDeabstractionOpt();
+
   // Eliminate immediately dead functions and then clone functions from the
   // stdlib.
   addPerfEarlyModulePassPipeline(P);
@@ -599,6 +603,10 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // Has only an effect if the -gsil option is specified.
   addSILDebugInfoGeneratorPipeline(P);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  P.startPipeline("TensorFlow Partitioninig");
+  P.addTFPartition();
+
   // Call the CFG viewer.
   if (SILViewCFG) {
     addCFGPrinterPipeline(P, "SIL Before IRGen View CFG");
@@ -619,6 +627,9 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
   P.addUsePrespecialized();
 
   P.startPipeline("Rest of Onone");
+
+  // SWIFT_ENABLE_TENSORFLOW
+  P.addTFPartitionOnone();
 
   // Has only an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();

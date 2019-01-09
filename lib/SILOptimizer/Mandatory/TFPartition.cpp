@@ -4378,6 +4378,7 @@ class TFPartition : public SILModuleTransform {
   ModuleDecl *tfModule = nullptr;
 
   bool isTest = false;
+  bool isOnonePass = false;
   TensorFunctionClassifier tfc;
   /// For partitionable functions, map the SIL host function names to the
   /// lowered TF graph artifacts.
@@ -4396,14 +4397,22 @@ class TFPartition : public SILModuleTransform {
       std::pair<SILFunction *, std::unique_ptr<TFFunctionPartition>>;
 
 public:
-  TFPartition(bool isTest)
-      : isTest(isTest),
-        moduleGraphLowering(TFGraphLowering(*this, graphFunctions)) {}
+  static TFPartition *createTest() {
+    return new TFPartition(/*isTest*/ true, /*isOnonePass*/ false);
+  }
+
+  static TFPartition *create(bool isOnonePass) {
+    return new TFPartition(/*isTest*/ false, isOnonePass);
+  }
 
   /// The entry point to the transformation.
   void run() override;
 
 private:
+  TFPartition(bool isTest, bool isOnonePass)
+      : isTest(isTest), isOnonePass(isOnonePass),
+        moduleGraphLowering(TFGraphLowering(*this, graphFunctions)) {}
+
   /// Partition and lower `hostFn` if it's eligible. Add an entry to
   /// `hostPartitionContexts`, if it references some other function F as a
   /// function-typed attribute, but the graph function definition of F is not
@@ -4612,9 +4621,13 @@ bool TFPartition::partitionFunction(
 
   if (!tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true))
     return false;
-  
-  if (llvm::TFDynamicCompilation && !isAcceleratorOnly(*hostFn))
+
+  // If this is a non-accelerator function, skip if we are running the onone
+  // pass or using dynamic compilation.
+  if (!isAcceleratorOnly(*hostFn) &&
+      (isOnonePass || llvm::TFDynamicCompilation)) {
     return false;
+  }
 
   LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
                           << " should be partitioned.\n");
@@ -4655,13 +4668,17 @@ bool TFPartition::partitionFunction(
   return partitioner->partitionAndLowerGraph(isTest);
 }
 
+SILTransform *swift::createTFPartitionOnone() {
+  return TFPartition::create(/*isOnonePass*/ true);
+}
+
 SILTransform *swift::createTFPartition() {
-  return new TFPartition(/*isTest*/ false);
+  return TFPartition::create(/*isOnonePass*/ false);
 }
 
 /// Create a version of the tf-partition pass that is used by sil-opt for
 /// testcases.  TF-Partition is not a normal pass, so we need an unconventional
 /// approach here.
 SILTransform *swift::createTFPartitionTest() {
-  return new TFPartition(/*isTest*/ true);
+  return TFPartition::createTest();
 }

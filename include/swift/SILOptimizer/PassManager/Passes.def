@@ -283,8 +283,12 @@ PASS(SwiftArrayOpts, "array-specialize",
 // SWIFT_ENABLE_TENSORFLOW
 PASS(Differentiation, "differentiation",
      "Automatic Differentiation")
-PASS(TFDeabstraction, "tf-deabstraction",
-     "Deabstract tensor operations")
+PASS(TFDeabstractionMandatory, "tf-deabstraction-mandatory",
+     "Deabstract tensor operations during mandatory pipeline")
+PASS(TFDeabstractionOpt, "tf-deabstraction-opt",
+     "Deabstract tensor operations during optimization pipeline")
+PASS(TFPartitionOnone, "tf-partition-onone",
+     "Partition accelerator operations out of mainline control flow")
 PASS(TFPartition, "tf-partition-impl",
      "Partition accelerator operations out of mainline control flow")
 PASS(TFPartitionTest, "tf-partition",
