@@ -37,7 +37,11 @@ SignificandBitCount = self_type.significand_bits
 ExponentBitCount = self_type.exponent_bits
 RawSignificand = 'UInt' + str(SignificandSize)
 
-if Self == 'Float':
+if Self == 'Float16':
+    SelfDocComment = '''\
+/// A half-precision (16b), floating-point value type.'''
+
+elif Self == 'Float':
     SelfDocComment = '''\
 /// A single-precision, floating-point value type.'''
 
@@ -82,7 +86,12 @@ extension ${Self}: CustomStringConvertible {
     if isNaN {
       return "nan"
     } else {
+% if bits == 16:
+      // TODO: replace with real _float16ToString implementation
+      var (buffer, length) = _float32ToString(Float(self), debug: false)
+% else:
       var (buffer, length) = _float${bits}ToString(self, debug: false)
+% end
       return buffer.withBytes { (bufferPtr) in
         String._fromASCII(
           UnsafeBufferPointer(start: bufferPtr, count: length))
@@ -94,7 +103,12 @@ extension ${Self}: CustomStringConvertible {
 extension ${Self}: CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
   public var debugDescription: String {
+% if bits == 16:
+    // TODO: replace with real _float16ToString implementation
+    var (buffer, length) = _float32ToString(Float(self), debug: false)
+% else:
     var (buffer, length) = _float${bits}ToString(self, debug: true)
+% end
     return buffer.withBytes { (bufferPtr) in
       String._fromASCII(
         UnsafeBufferPointer(start: bufferPtr, count: length))
@@ -104,7 +118,12 @@ extension ${Self}: CustomDebugStringConvertible {
 
 extension ${Self}: TextOutputStreamable {
   public func write<Target>(to target: inout Target) where Target: TextOutputStream {
+% if bits == 16:
+    // TODO: replace with real _float16ToString implementation
+    var (buffer, length) = _float32ToString(Float(self), debug: true)
+% else:
     var (buffer, length) = _float${bits}ToString(self, debug: true)
+% end
     buffer.withBytes { (bufferPtr) in
       let bufPtr = UnsafeBufferPointer(start: bufferPtr, count: length)
       target._writeASCII(bufPtr)
@@ -431,7 +450,9 @@ extension ${Self}: BinaryFloatingPoint {
 
   @inlinable
   public static var pi: ${Self} {
-%if bits == 32:
+%if bits == 16:
+    return 0x1.92p1
+%elif bits == 32:
     // Note: this is not the correctly rounded (to nearest) value of pi,
     // because pi would round *up* in Float precision, which can result
     // in angles in the wrong quadrant if users aren't careful.  This is
@@ -487,18 +508,7 @@ extension ${Self}: BinaryFloatingPoint {
 
   @inlinable
   public static var leastNormalMagnitude: ${Self} {
-%if bits == 32:
-    return 0x1p-126
-%elif bits == 64:
-    return 0x1p-1022
-%elif bits == 80:
-    return 0x1p-16382
-%else:
-    return ${Self}(
-      sign: .plus,
-      exponentBitPattern: 1,
-      significandBitPattern: 0)
-%end
+    return 0x1.0p-${2**(ExponentBitCount-1)-2}
   }
 
   @inlinable
@@ -507,19 +517,7 @@ extension ${Self}: BinaryFloatingPoint {
     // On 32b arm, the default FPCR has subnormals flushed to zero.
     return leastNormalMagnitude
 #else
-%if bits == 32:
-    return 0x1p-149
-%elif bits == 64:
-    return 0x1p-1074
-%elif bits == 80:
-    return 0x1p-16445
-%else:
-    return ${Self}(
-      sign: .plus,
-      exponentBitPattern: 0,
-      significandBitPattern: 1
-    )
-%end
+    return leastNormalMagnitude * ulpOfOne
 #endif
   }
 
@@ -530,13 +528,7 @@ extension ${Self}: BinaryFloatingPoint {
   /// `FLT_EPSILON`, `DBL_EPSILON`, and others with a similar purpose.
   @inlinable
   public static var ulpOfOne: ${Self} {
-%if bits == 32:
-    return 0x1p-23
-%elif bits == 64:
-    return 0x1p-52
-%elif bits == 80:
-    return 0x1p-63
-%end
+    return 0x1.0p-${SignificandBitCount}
   }
 
   @inlinable
@@ -755,7 +747,12 @@ extension ${Self}: BinaryFloatingPoint {
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public mutating func formRemainder(dividingBy other: ${Self}) {
+% if bits == 16:
+    // TODO: teach importer to map _Float16 <-> Float16, implement new shim
+    self = Float16(_stdlib_remainderf(Float(self), Float(other)))
+% else:
     self = _stdlib_remainder${cFuncSuffix}(self, other)
+% end
   }
 
   @inlinable // FIXME(inline-always)
@@ -766,7 +763,12 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func formSquareRoot( ) {
+% if bits == 16:
+    // TODO: teach importer to map _Float16 <-> Float16, implement new shim
+    self = Float16(_stdlib_squareRootf(Float(self)))
+% else:
     self = _stdlib_squareRoot${cFuncSuffix}(self)
+% end
   }
 
   @_transparent
@@ -917,6 +919,9 @@ extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
     self = ${Self}(value)
+%   elif bits == 16:
+    // workaround missing __truncxfhf
+    self = ${Self}(Float80(value))
 %   elif bits < builtinFloatLiteralBits:
     self = ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   else:
@@ -978,8 +983,10 @@ extension ${Self}: Hashable {
     return hasher._finalize()
   %elif bits == 64:
     return Hasher._hash(seed: seed, v.bitPattern)
-  %elif bits == 32:
-    return Hasher._hash(seed: seed, bytes: UInt64(v.bitPattern), count: 4)
+  %elif bits < 64:
+    return Hasher._hash(seed: seed, bytes: UInt64(v.bitPattern), count: ${bits/8})
+  %else:
+    #error("Unimplemented")
   %end
   }
 }
@@ -1075,7 +1082,22 @@ extension ${Self} {
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public init(_ other: ${That}) {
-%   if srcBits > bits:
+%   if srcBits == 80 and bits == 16:
+    // If we use the Builtin for this operation, LLVM emits a call to
+    // __truncxfhf, which would be a compiler-rt intrinsic but doesn't exist.
+    // Workaround this by doing conversion in two stages, with the first stage
+    // rounding to odd to avoid double-rounding.
+    var flt = Float(other)
+    if flt.isFinite {
+      if Float80(flt).magnitude > other.magnitude {
+        flt = Float(bitPattern: flt.bitPattern &- (~flt.bitPattern & 1))
+      }
+      if Float80(flt).magnitude < other.magnitude {
+        flt = Float(bitPattern: flt.bitPattern | 1)
+      }
+    }
+    self = Float16(flt)
+%   elif srcBits > bits:
     _value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
 %   elif srcBits < bits:
     _value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
