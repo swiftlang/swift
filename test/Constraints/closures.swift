@@ -858,3 +858,19 @@ func rdar45771997() {
   let _: Int = { (s: inout S) in s.foo() }
   // expected-error@-1 {{cannot convert value of type '(inout S) -> ()' to specified type 'Int'}}
 }
+
+struct rdar30347997 {
+  func withUnsafeMutableBufferPointer(body : (inout Int) -> ()) {}
+  func foo() {
+    withUnsafeMutableBufferPointer {
+      (b : Int) in // expected-error {{'Int' is not convertible to 'inout Int'}}
+    }
+  }
+}
+
+struct rdar43866352<Options> {
+  func foo() {
+    let callback: (inout Options) -> Void
+    callback = { (options: Options) in } // expected-error {{cannot assign value of type '(inout Options) -> ()' to type '(inout _) -> Void'}}
+  }
+}
