@@ -1583,21 +1583,18 @@ extension ${Self} {
 extension ${Self} {
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
-  @differentiable(adjoint: _adjointNegate)
+  @differentiable(vjp: _vjpNegate(x:))
   public static prefix func - (x: ${Self}) -> ${Self} {
     return ${Self}(Builtin.fneg_FPIEEE${bits}(x._value))
   }
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 extension ${Self} {
   @usableFromInline
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
-  static func _adjointNegate(
-    seed: ${Self}, originalValue: ${Self}, x: ${Self}
-  ) -> ${Self} {
-    return -seed
+  static func _vjpNegate(x: ${Self}) -> (${Self}, (${Self}) -> ${Self}) {
+    return (-x, { v in -v })
   }
 }
 
@@ -1719,7 +1716,7 @@ extension ${Self} {
 extension ${Self} {
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(adjoint: _adjointAdd)
+  @differentiable(vjp: _vjpAdd(lhs:rhs:))
   public static func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs += rhs
@@ -1728,7 +1725,7 @@ extension ${Self} {
 
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(adjoint: _adjointSubtract)
+  @differentiable(vjp: _vjpSubtract(lhs:rhs:))
   public static func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs -= rhs
@@ -1737,7 +1734,7 @@ extension ${Self} {
 
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(adjoint: _adjointMultiply)
+  @differentiable(vjp: _vjpMultiply(lhs:rhs:))
   public static func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs *= rhs
@@ -1746,7 +1743,7 @@ extension ${Self} {
 
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(adjoint: _adjointDivide)
+  @differentiable(vjp: _vjpDivide(lhs:rhs:))
   public static func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs /= rhs
@@ -1755,42 +1752,38 @@ extension ${Self} {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Adjoints of standard binary operators.
+/// Vector-Jacobian products of standard binary operators.
 extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  static func _adjointAdd(
-    _ adjoint: ${Self}, _ originalValue: ${Self},
-    _ lhs: ${Self}, _ rhs: ${Self}
-  ) -> (${Self}, ${Self}) {
-    return (adjoint, adjoint)
+  static func _vjpAdd(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (${Self}, (${Self}) -> (${Self}, ${Self})) {
+    return (lhs + rhs, { v in (v, v) })
   }
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  static func _adjointSubtract(
-    _ adjoint: ${Self}, _ originalValue: ${Self},
-    _ lhs: ${Self}, _ rhs: ${Self}
-  ) -> (${Self}, ${Self}) {
-    return (adjoint, -adjoint)
+  static func _vjpSubtract(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (${Self}, (${Self}) -> (${Self}, ${Self})) {
+    return (lhs - rhs, { v in (v, -v) })
   }
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  static func _adjointMultiply(
-    _ adjoint: ${Self}, _ originalValue: ${Self},
-    _ lhs: ${Self}, _ rhs: ${Self}
-  ) -> (${Self}, ${Self}) {
-    return (rhs * adjoint, lhs * adjoint)
+  static func _vjpMultiply(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (${Self}, (${Self}) -> (${Self}, ${Self})) {
+    return (lhs * rhs, { v in (rhs * v, lhs * v) })
   }
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  static func _adjointDivide(
-    _ adjoint: ${Self}, _ originalValue: ${Self},
-    _ lhs: ${Self}, _ rhs: ${Self}
-  ) -> (${Self}, ${Self}) {
-    return (adjoint / rhs, -lhs / (rhs * rhs) * adjoint)
+  static func _vjpDivide(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (${Self}, (${Self}) -> (${Self}, ${Self})) {
+    return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
   }
 }
 
