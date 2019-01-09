@@ -2441,9 +2441,16 @@ public:
       newArgs.push_back(getOpValue(origArg));
     assert(newArgs.size() == numVJPParams);
     // Apply the VJP.
-    auto *vjpCall = getBuilder().createApply(ai->getLoc(), vjp,
-                                             ai->getSubstitutionMap(), newArgs,
-                                             ai->isNonThrowing());
+    auto substMap = ai->getSubstitutionMap();
+    if (auto vjpGenSig = vjpFnTy->getGenericSignature()) {
+      auto vjpSubstMap =
+          vjpGenSig->createGenericEnvironment()->getForwardingSubstitutionMap();
+      substMap = vjpSubstMap.subst(
+          [&](SubstitutableType *ty) { return Type(ty).subst(substMap); },
+          LookUpConformanceInModule(context.getModule().getSwiftModule()));
+    }
+    auto *vjpCall = getBuilder().createApply(ai->getLoc(), vjp, substMap,
+                                             newArgs, ai->isNonThrowing());
     LLVM_DEBUG(getADDebugStream() << "Applied vjp function\n" << *vjpCall);
 
     // Get the VJP results (original results and pullback).
