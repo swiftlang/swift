@@ -61,6 +61,11 @@ static llvm::cl::opt<bool> TFModuleLevelGraph(
         "verifying test outputs. Only set to false in unit tests,"
         "and when the unit tests do not involve function-typed attributes."));
 
+static llvm::cl::opt<bool> TFWarnSendRecv(
+    "tf-warn-send-recv", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Emit warnings for sends/receives."));
+
 static llvm::cl::opt<bool> TFWarnScalarTransfer(
     "tf-warn-scalar-transfer", llvm::cl::init(false),
     llvm::cl::desc(
@@ -886,6 +891,7 @@ static inline bool shouldMarkSend(TermInst *predTerm) {
 /// something that induces an implicit data transfer into their code.
 void TFFunctionPartition::diagnoseCopyToAccelerator(
     SILValue value, SILInstruction *user, bool isTensorProgramArgument) {
+
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>(value))
@@ -893,6 +899,12 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
       explicitCopyMarkers.insert(apply);
       return;
     }
+
+  // Skip only after remembering any explict copy markers that triggered this
+  // diagnosis. This is necessary so that we can remove them. (See use of
+  // explictCopymarkers in this file.)
+  if (!TFWarnSendRecv)
+    return;
 
   auto &ctx = hostFn.getModule().getASTContext();
 
@@ -1025,6 +1037,7 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
 /// something that induces an implicit data transfer into their code.
 void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
                                                SILLocation loc) {
+
   for (auto *use : value->getUses()) {
     auto *user = use->getUser();
 
@@ -1034,6 +1047,12 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
       explicitCopyMarkers.insert(user);
       continue;
     }
+
+    // If warnings are disabled, Skip only after remembering any explict copy
+    // markers that triggered this diagnosis. This is necessary so that we can
+    // remove them. (See use of explictCopymarkers in this file.)
+    if (!TFWarnSendRecv)
+      continue;
 
     // If this is a retain/release or debug instruction, don't emit the warning
     // here.  It won't be very useful.
@@ -1061,6 +1080,9 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
 void TFFunctionPartition::diagnoseCopyToHost(SILValue value,
                                              SILInstruction *user,
                                              SILLocation loc) {
+  if (!TFWarnSendRecv)
+    return;
+
   // If scalar transfer warnings are turned off, then don't warn about transfers
   // that are definitely scalars.
   if (!TFWarnScalarTransfer &&
