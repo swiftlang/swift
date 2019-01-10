@@ -534,6 +534,11 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(SILDeclRef method) {
   return getAddrOfObjCSelectorRef(Selector(method).str());
 }
 
+std::string IRGenModule::getObjCSelectorName(SILDeclRef method) {
+  assert(method.isForeign);
+  return Selector(method).str();
+}
+
 static llvm::Value *emitSuperArgument(IRGenFunction &IGF,
                                       bool isInstanceMethod,
                                       llvm::Value *selfValue,
