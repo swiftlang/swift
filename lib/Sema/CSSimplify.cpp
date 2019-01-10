@@ -1667,9 +1667,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
 
-  auto *typeVar1 = desugar1->getAs<TypeVariableType>();
-  auto *typeVar2 = desugar2->getAs<TypeVariableType>();
-
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2))
     return getTypeMatchSuccess();
@@ -1698,6 +1695,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     return getTypeMatchAmbiguous();
   };
+
+  auto *typeVar1 = dyn_cast<TypeVariableType>(desugar1);
+  auto *typeVar2 = dyn_cast<TypeVariableType>(desugar2);
 
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
@@ -1800,11 +1800,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion:
-      // We couldn't solve this constraint. If only one of the types is a type
-      // variable, perhaps we can do something with it below.
-      if (typeVar1 && typeVar2)
-        return formUnsolvedResult();
-      break;
+      return formUnsolvedResult();
 
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::DynamicCallableApplicableFunction:
@@ -1830,11 +1826,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  bool isTypeVarOrMember1 = desugar1->isTypeVariableOrMember();
-  bool isTypeVarOrMember2 = desugar2->isTypeVariableOrMember();
+  // If one of the types is a member type of a type variable type,
+  // there's nothing we can do.
+  if (desugar1->isTypeVariableOrMember() ||
+      desugar2->isTypeVariableOrMember()) {
+    return formUnsolvedResult();
+  }
 
   llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
-  bool concrete = !isTypeVarOrMember1 && !isTypeVarOrMember2;
 
   // Decompose parallel structure.
   TypeMatchOptions subflags =
@@ -1854,35 +1853,39 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-    case TypeKind::Module:
-      if (desugar1 == desugar2) {
-        return getTypeMatchSuccess();
-      }
-      return getTypeMatchFailure(locator);
 
     case TypeKind::Error:
     case TypeKind::Unresolved:
-        return getTypeMatchFailure(locator);
+      return getTypeMatchFailure(locator);
 
     case TypeKind::GenericTypeParam:
       llvm_unreachable("unmapped dependent type in type checker");
+
+    case TypeKind::TypeVariable:
+      llvm_unreachable("type variables should have already been handled by now");
 
     case TypeKind::DependentMember:
       // Nothing we can solve.
       return formUnsolvedResult();
 
-    case TypeKind::TypeVariable:
+    case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
     case TypeKind::NestedArchetype:
-      // Nothing to do here; handle type variables and archetypes below.
-      break;
+      // If two module types or archetypes were not already equal, there's
+      // nothing more we can do.
+      return getTypeMatchFailure(locator);
 
     case TypeKind::Tuple: {
-      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-      // Try the tuple-to-tuple conversion.
-      if (!type1->is<LValueType>())
-        conversionsOrFixes.push_back(ConversionRestrictionKind::TupleToTuple);
+      auto result = matchTupleTypes(cast<TupleType>(desugar1),
+                                    cast<TupleType>(desugar2),
+                                    kind, subflags, locator);
+      if (result != SolutionKind::Error)
+        return result;
+
+      // FIXME: All cases in this switch should go down to the fix logic
+      // to give repairFailures() a chance to run, but this breaks stuff
+      // right now.
       break;
     }
 
@@ -1891,11 +1894,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Class: {
       auto nominal1 = cast<NominalType>(desugar1);
       auto nominal2 = cast<NominalType>(desugar2);
-      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-      if (!type1->is<LValueType>() &&
-          nominal1->getDecl() == nominal2->getDecl()) {
+      if (nominal1->getDecl() == nominal2->getDecl())
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
-      }
 
       // Check for CF <-> ObjectiveC bridging.
       if (isa<ClassType>(desugar1) &&
@@ -1904,9 +1904,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         auto class2 = cast<ClassDecl>(nominal2->getDecl());
 
         // CF -> Objective-C via toll-free bridging.
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-        if (!type1->is<LValueType>() &&
-            class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+        if (class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
             class2->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
             class1->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
           conversionsOrFixes.push_back(
@@ -1914,9 +1912,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
 
         // Objective-C -> CF via toll-free bridging.
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-        if (!type1->is<LValueType>() &&
-            class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+        if (class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
             class1->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
             class2->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
           conversionsOrFixes.push_back(
@@ -2001,16 +1997,24 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto bound1 = cast<BoundGenericType>(desugar1);
       auto bound2 = cast<BoundGenericType>(desugar2);
       
-      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-      if (!type1->is<LValueType>() && bound1->getDecl() == bound2->getDecl()) {
+      if (bound1->getDecl() == bound2->getDecl())
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
-      }
       break;
     }
     }
   }
 
-  if (concrete && kind >= ConstraintKind::Subtype) {
+  if (kind >= ConstraintKind::Conversion) {
+    // An lvalue of type T1 can be converted to a value of type T2 so long as
+    // T1 is convertible to T2 (by loading the value).  Note that we cannot get
+    // a value of inout type as an lvalue though.
+    if (type1->is<LValueType>() && !type2->is<InOutType>()) {
+      return matchTypes(type1->getRValueType(), type2,
+                        kind, subflags, locator);
+    }
+  }
+
+  if (kind >= ConstraintKind::Subtype) {
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
         type2->getClassOrBoundGenericClass() &&
@@ -2166,14 +2170,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return getTypeMatchSuccess();
   }
 
-  if (concrete && kind >= ConstraintKind::Conversion) {
-    // An lvalue of type T1 can be converted to a value of type T2 so long as
-    // T1 is convertible to T2 (by loading the value).  Note that we cannot get
-    // a value of inout type as an lvalue though.
-    if (type1->is<LValueType>() && !type2->is<InOutType>())
-      conversionsOrFixes.push_back(
-        ConversionRestrictionKind::LValueToRValue);
-
+  if (kind >= ConstraintKind::Conversion) {
     // It is never legal to form an autoclosure that results in these
     // implicit conversions to pointer types.
     bool isAutoClosureArgument = false;
@@ -2301,7 +2298,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  if (concrete && kind >= ConstraintKind::OperatorArgumentConversion) {
+  if (kind >= ConstraintKind::OperatorArgumentConversion) {
     // If the RHS is an inout type, the LHS must be an @lvalue type.
     if (auto *lvt = type1->getAs<LValueType>()) {
       if (auto *iot = type2->getAs<InOutType>()) {
@@ -2317,7 +2314,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // to U by force-unwrapping the source value.
   // A value of type T, T?, or T! can be converted to type U? or U! if
   // T is convertible to U.
-  if (concrete && !type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
+  if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
     enumerateOptionalConversionRestrictions(
         type1, type2, kind, locator,
         [&](ConversionRestrictionKind restriction) {
@@ -2329,7 +2326,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // literals.
   if (auto elt = locator.last()) {
     if (elt->getKind() == ConstraintLocator::ClosureResult) {
-      if (concrete && kind >= ConstraintKind::Subtype &&
+      if (kind >= ConstraintKind::Subtype &&
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);
         return getTypeMatchSuccess();
@@ -2337,7 +2334,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  if (concrete && kind == ConstraintKind::BindParam) {
+  if (kind == ConstraintKind::BindParam) {
     if (auto *iot = dyn_cast<InOutType>(desugar1)) {
       if (auto *lvt = dyn_cast<LValueType>(desugar2)) {
         return matchTypes(iot->getObjectType(), lvt->getObjectType(),
@@ -2351,7 +2348,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Attempt fixes iff it's allowed, both types are concrete and
   // we are not in the middle of attempting one already.
   bool attemptFixes =
-      shouldAttemptFixes() && concrete && !flags.contains(TMF_ApplyingFix);
+      shouldAttemptFixes() && !flags.contains(TMF_ApplyingFix);
 
   // When we hit this point, we're committed to the set of potential
   // conversions recorded thus far.
@@ -2421,7 +2418,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             ForceDowncast::create(*this, type2, getConstraintLocator(locator)));
     }
 
-    if (type2->getRValueType()->is<InOutType>()) {
+    if (type2->is<InOutType>()) {
       if (type1->is<LValueType>()) {
         // If we're converting an lvalue to an inout type, add the missing '&'.
         conversionsOrFixes.push_back(
@@ -2446,14 +2443,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (attemptFixes)
     repairFailures(*this, type1, type2, conversionsOrFixes, locator);
 
-  if (conversionsOrFixes.empty()) {
-    // If one of the types is a type variable or member thereof, we leave this
-    // unsolved.
-    if (isTypeVarOrMember1 || isTypeVarOrMember2)
-      return formUnsolvedResult();
-
+  if (conversionsOrFixes.empty())
     return getTypeMatchFailure(locator);
-  }
 
   // Where there is more than one potential conversion, create a disjunction
   // so that we'll explore all of the options.
@@ -4930,6 +4921,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                                          ConstraintKind matchKind,
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator) {
+  assert(!type1->isTypeVariableOrMember() && !type2->isTypeVariableOrMember());
+
   // Add to the score based on context.
   auto addContextualScore = [&] {
     // Okay, we need to perform one or more conversions.  If this
@@ -4941,40 +4934,17 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     }
   };
 
-  // Local function to form an unsolved result.
-  auto formUnsolved = [&] {
-    if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(
-        Constraint::createRestricted(
-          *this, matchKind, restriction, type1, type2,
-          getConstraintLocator(locator)));
-
-      return SolutionKind::Solved;
-    }
-    
-    return SolutionKind::Unsolved;
-  };
-
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   switch (restriction) {
   // for $< in { <, <c, <oc }:
   //   T_i $< U_i ===> (T_i...) $< (U_i...)
-  case ConversionRestrictionKind::TupleToTuple:
-    return matchTupleTypes(type1->castTo<TupleType>(),
-                           type2->castTo<TupleType>(),
-                           matchKind, subflags, locator);
-
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
 
   case ConversionRestrictionKind::Superclass:
     addContextualScore();
     return matchSuperclassTypes(type1, type2, subflags, locator);
-
-  case ConversionRestrictionKind::LValueToRValue:
-    return matchTypes(type1->getRValueType(), type2,
-                      matchKind, subflags, locator);
 
   // for $< in { <, <c, <oc }:
   //   T $< U, U : P_i ===> T $< protocol<P_i...>
@@ -5027,9 +4997,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     increaseScore(SK_ValueToOptional);
 
     assert(matchKind >= ConstraintKind::Subtype);
-    if (type2->isTypeVariableOrMember())
-      return formUnsolved();
-
     if (auto generic2 = type2->getAs<BoundGenericType>()) {
       if (generic2->getDecl()->isOptionalDecl()) {
         return matchTypes(type1, generic2->getGenericArgs()[0],
@@ -5050,9 +5017,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //   T <c U ===> T? <c U!
   case ConversionRestrictionKind::OptionalToOptional: {
     addContextualScore();
-
-    if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
-      return formUnsolved();
 
     assert(matchKind >= ConstraintKind::Subtype);
     if (auto generic1 = type1->getAs<BoundGenericType>()) {
@@ -5296,18 +5260,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   llvm_unreachable("bad conversion restriction");
 }
 
-// Restrictions where CSApply can figure out the correct action from the shape of
-// the types, rather than needing a record of the choice made.
-static bool recordRestriction(ConversionRestrictionKind restriction) {
-  switch(restriction) {
-    case ConversionRestrictionKind::TupleToTuple:
-    case ConversionRestrictionKind::LValueToRValue:
-      return false;
-    default:
-      return true;
-  }
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyRestrictedConstraint(
                                        ConversionRestrictionKind restriction,
@@ -5318,8 +5270,7 @@ ConstraintSystem::simplifyRestrictedConstraint(
   switch (simplifyRestrictedConstraintImpl(restriction, type1, type2,
                                            matchKind, flags, locator)) {
   case SolutionKind::Solved:
-    if (recordRestriction(restriction))
-      ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
+    ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
     return SolutionKind::Solved;
 
   case SolutionKind::Unsolved:

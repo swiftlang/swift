@@ -174,8 +174,6 @@ enum class ConstraintClassification : char {
 /// a superclass conversion from A to B or there might be a user-defined
 /// conversion from A to B. The solver may need to explore both paths.
 enum class ConversionRestrictionKind {
-  /// Tuple-to-tuple conversion.
-  TupleToTuple,
   /// Deep equality comparison.
   DeepEquality,
   /// Subclass-to-superclass conversion.
@@ -194,8 +192,6 @@ enum class ConversionRestrictionKind {
   StringToPointer,
   /// Pointer-to-pointer conversion.
   PointerToPointer,
-  /// Lvalue-to-rvalue conversion.
-  LValueToRValue,
   /// Value to existential value conversion, or existential erasure.
   Existential,
   /// Metatype to existential metatype conversion.
