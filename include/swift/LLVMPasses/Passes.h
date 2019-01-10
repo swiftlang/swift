@@ -30,7 +30,7 @@ namespace swift {
                     const llvm::PreservedAnalyses &) { return false; }
 
     using AAResultBase::getModRefInfo;
-    llvm::ModRefInfo getModRefInfo(llvm::ImmutableCallSite CS,
+    llvm::ModRefInfo getModRefInfo(const llvm::CallBase *Call,
                                    const llvm::MemoryLocation &Loc);
   };
 
