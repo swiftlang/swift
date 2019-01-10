@@ -19,8 +19,6 @@ import StdlibUnittest
 
 var ModelTests = TestSuite("Model")
 
-// FIXME: Debug and fix this test in eager mode.
-#if false
 ModelTests.testAllBackends("StraightLineXORTraining") {
   // FIXME: TPU execution on TAP is timing out. (b/74155319)
   guard !_RuntimeConfig.executionMode.isTPU else { return }
@@ -79,10 +77,7 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
   // Check results
   expectLT(loss, 0.01)
 }
-#endif
 
-// FIXME: Debug and fix this test in eager mode.
-#if false
 ModelTests.testAllBackends("XORClassifierTraining") {
   // FIXME: XORClassifierTraining_TPU crashes with SIGSEGV. (b/74155319)
   guard !_RuntimeConfig.executionMode.isTPU else { return }
@@ -161,6 +156,5 @@ ModelTests.testAllBackends("XORClassifierTraining") {
   // TODO: Add other expectations once code motion helps avoid send/receive.
   expectEqual(classifier.prediction(for: true, false), true)
 }
-#endif
 
 runAllTests()
