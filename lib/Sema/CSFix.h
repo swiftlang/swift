@@ -99,6 +99,11 @@ enum class FixKind : uint8_t {
 
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
+
+  /// Requested name is not associated with a give base type,
+  /// fix this issue by pretending that member exists and matches
+  /// given arguments/result types exactly.
+  DefineMemberBasedOnUse,
 };
 
 class ConstraintFix {
@@ -463,6 +468,30 @@ public:
 
   static UseSubscriptOperator *create(ConstraintSystem &cs,
                                       ConstraintLocator *locator);
+};
+
+class DefineMemberBasedOnUse final : public ConstraintFix {
+  Type BaseType;
+  DeclName Name;
+
+public:
+  DefineMemberBasedOnUse(ConstraintSystem &cs, Type baseType, DeclName member,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::DefineMemberBasedOnUse, locator),
+        BaseType(baseType), Name(member) {}
+
+  std::string getName() const override {
+    llvm::SmallVector<char, 16> scratch;
+    auto memberName = Name.getString(scratch);
+    return "define missing member named '" + memberName.str() +
+           "' based on its use";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
+                                        DeclName member,
+                                        ConstraintLocator *locator);
 };
 
 } // end namespace constraints

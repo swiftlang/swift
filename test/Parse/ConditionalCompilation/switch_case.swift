@@ -180,7 +180,7 @@ func foo(x: E, intVal: Int) {
   switch x {
     print() // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
 #if ENABLE_C
-    case .NOT_EXIST: // expected-error {{pattern cannot match values of type 'E'}}
+    case .NOT_EXIST: // expected-error {{type 'E' has no member 'NOT_EXIST'}}
       break
     case .C:
       break

@@ -17,6 +17,7 @@
 #include "CSDiagnostics.h"
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
+#include "TypoCorrection.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -1331,4 +1332,148 @@ bool SubscriptMisuseFailure::diagnoseAsNote() {
     return true;
   }
   return false;
+}
+
+/// When a user refers a enum case with a wrong member name, we try to find a
+/// enum element whose name differs from the wrong name only in convention;
+/// meaning their lower case counterparts are identical.
+///   - DeclName is valid when such a correct case is found; invalid otherwise.
+DeclName MissingMemberFailure::findCorrectEnumCaseName(
+    Type Ty, TypoCorrectionResults &corrections, DeclName memberName) {
+  if (memberName.isSpecial() || !memberName.isSimpleName())
+    return DeclName();
+  if (!Ty->getEnumOrBoundGenericEnum())
+    return DeclName();
+  auto candidate =
+      corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
+        return (isa<EnumElementDecl>(candidate) &&
+                candidate->getFullName().getBaseIdentifier().str().equals_lower(
+                    memberName.getBaseIdentifier().str()));
+      });
+  return (candidate ? candidate->getFullName() : DeclName());
+}
+
+bool MissingMemberFailure::diagnoseAsError() {
+  auto &TC = getTypeChecker();
+  auto *anchor = getRawAnchor();
+  auto *baseExpr = getAnchor();
+
+  if (!anchor || !baseExpr)
+    return false;
+
+  if (auto *typeVar = BaseType->getAs<TypeVariableType>()) {
+    auto &CS = getConstraintSystem();
+    auto *memberLoc = typeVar->getImpl().getLocator();
+    // Don't try to diagnose anything besides first missing
+    // member in the chain. e.g. `x.foo().bar()` let's make
+    // sure to diagnose only `foo()` as missing because we
+    // don't really know much about what `bar()` is supposed
+    // to be.
+    if (CS.MissingMembers.count(memberLoc))
+      return false;
+  }
+
+  auto baseType = resolveType(BaseType)->getWithoutSpecifierType();
+
+  DeclNameLoc nameLoc(anchor->getStartLoc());
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    nameLoc = UDE->getNameLoc();
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    nameLoc = UME->getNameLoc();
+  }
+
+  auto emitBasicError = [&](Type baseType) {
+    auto diagnostic = diag::could_not_find_value_member;
+
+    if (auto *metatype = baseType->getAs<MetatypeType>()) {
+      baseType = metatype->getInstanceType();
+      diagnostic = diag::could_not_find_type_member;
+    }
+
+    if (baseType->is<TupleType>())
+      diagnostic = diag::could_not_find_tuple_member;
+
+    emitDiagnostic(anchor->getLoc(), diagnostic, baseType, Name)
+        .highlight(baseExpr->getSourceRange())
+        .highlight(nameLoc.getSourceRange());
+  };
+
+  TypoCorrectionResults corrections(TC, Name, nameLoc);
+  auto tryTypoCorrection = [&] {
+    TC.performTypoCorrection(getDC(), DeclRefKind::Ordinary, baseType,
+                             defaultMemberLookupOptions, corrections);
+  };
+
+  if (Name.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
+    emitDiagnostic(anchor->getLoc(), diag::could_not_find_value_subscript,
+                   baseType)
+        .highlight(baseExpr->getSourceRange());
+  } else if (Name.getBaseName() == "deinit") {
+    // Specialised diagnostic if trying to access deinitialisers
+    emitDiagnostic(anchor->getLoc(), diag::destructor_not_accessible)
+        .highlight(baseExpr->getSourceRange());
+  } else if (auto metatypeTy = baseType->getAs<MetatypeType>()) {
+    auto instanceTy = metatypeTy->getInstanceType();
+    tryTypoCorrection();
+
+    if (DeclName rightName =
+            findCorrectEnumCaseName(instanceTy, corrections, Name)) {
+      emitDiagnostic(anchor->getLoc(), diag::could_not_find_enum_case,
+                     instanceTy, Name, rightName)
+          .fixItReplace(nameLoc.getBaseNameLoc(),
+                        rightName.getBaseIdentifier().str());
+      return true;
+    }
+
+    if (auto correction = corrections.claimUniqueCorrection()) {
+      auto diagnostic = emitDiagnostic(
+          anchor->getLoc(), diag::could_not_find_type_member_corrected,
+          instanceTy, Name, correction->CorrectedName);
+      diagnostic.highlight(baseExpr->getSourceRange())
+          .highlight(nameLoc.getSourceRange());
+      correction->addFixits(diagnostic);
+    } else {
+      emitBasicError(baseType);
+    }
+  } else if (auto moduleTy = baseType->getAs<ModuleType>()) {
+    emitDiagnostic(baseExpr->getLoc(), diag::no_member_of_module,
+                   moduleTy->getModule()->getName(), Name)
+        .highlight(baseExpr->getSourceRange())
+        .highlight(nameLoc.getSourceRange());
+    return true;
+  } else {
+    // Check for a few common cases that can cause missing members.
+    auto *ED = baseType->getEnumOrBoundGenericEnum();
+    if (ED && Name.isSimpleName("rawValue")) {
+      auto loc = ED->getNameLoc();
+      if (loc.isValid()) {
+        emitBasicError(baseType);
+        emitDiagnostic(loc, diag::did_you_mean_raw_type);
+        return true;
+      }
+    } else if (baseType->isAny()) {
+      emitBasicError(baseType);
+      emitDiagnostic(anchor->getLoc(), diag::any_as_anyobject_fixit)
+          .fixItInsert(baseExpr->getStartLoc(), "(")
+          .fixItInsertAfter(baseExpr->getEndLoc(), " as AnyObject)");
+      return true;
+    }
+
+    tryTypoCorrection();
+
+    if (auto correction = corrections.claimUniqueCorrection()) {
+      auto diagnostic = emitDiagnostic(
+          anchor->getLoc(), diag::could_not_find_value_member_corrected,
+          baseType, Name, correction->CorrectedName);
+      diagnostic.highlight(baseExpr->getSourceRange())
+          .highlight(nameLoc.getSourceRange());
+      correction->addFixits(diagnostic);
+    } else {
+      emitBasicError(baseType);
+    }
+  }
+
+  // Note all the correction candidates.
+  corrections.noteAllCandidates();
+  return true;
 }

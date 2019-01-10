@@ -14,5 +14,5 @@ struct S2 {
   }
 }
 
-let s1: S1.Type = .A // expected-error{{type of expression is ambiguous without more context}}
+let s1: S1.Type = .A // expected-error {{type 'S1.Type' has no member 'A'}}
 let s2: S2.`Type` = .A // no-error

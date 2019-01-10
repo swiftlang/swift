@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -644,6 +645,33 @@ public:
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
+};
+
+/// Diagnose situations when member referenced by name is missing
+/// from the associated base type, e.g.
+///
+/// ```swift
+/// struct S {}
+/// func foo(_ s: S) {
+///   let _: Int = s.foo(1, 2) // expected type is `(Int, Int) -> Int`
+/// }
+/// ```
+class MissingMemberFailure final : public FailureDiagnostic {
+  Type BaseType;
+  DeclName Name;
+
+public:
+  MissingMemberFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                       DeclName memberName, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseType),
+        Name(memberName) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  static DeclName findCorrectEnumCaseName(Type Ty,
+                                          TypoCorrectionResults &corrections,
+                                          DeclName memberName);
 };
 
 } // end namespace constraints
