@@ -1894,11 +1894,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Class: {
       auto nominal1 = cast<NominalType>(desugar1);
       auto nominal2 = cast<NominalType>(desugar2);
-      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-      if (!type1->is<LValueType>() &&
-          nominal1->getDecl() == nominal2->getDecl()) {
+      if (nominal1->getDecl() == nominal2->getDecl())
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
-      }
 
       // Check for CF <-> ObjectiveC bridging.
       if (isa<ClassType>(desugar1) &&
@@ -1907,9 +1904,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         auto class2 = cast<ClassDecl>(nominal2->getDecl());
 
         // CF -> Objective-C via toll-free bridging.
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-        if (!type1->is<LValueType>() &&
-            class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+        if (class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
             class2->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
             class1->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
           conversionsOrFixes.push_back(
@@ -1917,9 +1912,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
 
         // Objective-C -> CF via toll-free bridging.
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-        if (!type1->is<LValueType>() &&
-            class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+        if (class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
             class1->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
             class2->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
           conversionsOrFixes.push_back(
@@ -2004,10 +1997,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto bound1 = cast<BoundGenericType>(desugar1);
       auto bound2 = cast<BoundGenericType>(desugar2);
       
-      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-      if (!type1->is<LValueType>() && bound1->getDecl() == bound2->getDecl()) {
+      if (bound1->getDecl() == bound2->getDecl())
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
-      }
       break;
     }
     }
@@ -2427,7 +2418,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             ForceDowncast::create(*this, type2, getConstraintLocator(locator)));
     }
 
-    if (type2->getRValueType()->is<InOutType>()) {
+    if (type2->is<InOutType>()) {
       if (type1->is<LValueType>()) {
         // If we're converting an lvalue to an inout type, add the missing '&'.
         conversionsOrFixes.push_back(
