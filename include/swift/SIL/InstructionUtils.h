@@ -126,10 +126,6 @@ bool mayCheckRefCount(SILInstruction *User);
 /// run-time sanitizers.
 bool isSanitizerInstrumentation(SILInstruction *Instruction);
 
-/// If V is a convert_function or convert_escape_to_noescape return its operand
-/// recursively.
-SILValue stripConvertFunctions(SILValue V);
-
 /// Check that this is a partial apply of a reabstraction thunk and return the
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
