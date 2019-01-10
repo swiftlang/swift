@@ -128,6 +128,11 @@ extension IndexingIterator: IteratorProtocol, Sequence {
     _elements.formIndex(after: &_position)
     return element
   }
+
+  @inlinable
+  public var underestimatedCount: Int {
+    return _elements.underestimatedCount
+  }
 }
 
 /// A sequence whose elements can be traversed multiple times,
