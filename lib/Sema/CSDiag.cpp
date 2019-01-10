@@ -7293,13 +7293,6 @@ bool FailureDiagnosis::diagnoseMemberFailures(
     baseObjTy = baseTy->getWithoutSpecifierType();
   }
 
-  if (baseTy->is<InOutType>()) {
-    auto diag = diagnose(baseExpr->getLoc(), diag::extraneous_address_of);
-    if (auto *IOE = dyn_cast<InOutExpr>(baseExpr->getSemanticsProvidingExpr()))
-      diag.fixItRemove(IOE->getStartLoc());
-    return true;
-  }
-
   // If the base type is an IUO, look through it.  Odds are, the code is not
   // trying to find a member of it.
   // FIXME: We need to rework this with IUOs out of the type system.
