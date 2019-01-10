@@ -4298,7 +4298,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID underlyingTypeID;
     TypeID substitutedTypeID;
     SubstitutionMapID substitutionsID;
-    decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
+    decls_block::TypeAliasTypeLayout::readRecord(scratch, typealiasID,
                                                  parentTypeID,
                                                  underlyingTypeID,
                                                  substitutedTypeID,
@@ -4360,7 +4360,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     }
 
     auto parentType = parentTypeOrError.get();
-    typeOrOffset = NameAliasType::get(alias, parentType, subMap,
+    typeOrOffset = TypeAliasType::get(alias, parentType, subMap,
                                       substitutedType);
     break;
   }
@@ -4388,7 +4388,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
         // If the underlying type is itself a typealias, it might be another
         // compatibility alias, meaning we need to go around the loop again.
-        auto aliasTy = dyn_cast<NameAliasType>(underlyingTy);
+        auto aliasTy = dyn_cast<TypeAliasType>(underlyingTy);
         if (!aliasTy)
           break;
         alias = aliasTy->getDecl();

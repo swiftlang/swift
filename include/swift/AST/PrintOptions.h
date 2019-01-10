@@ -335,9 +335,9 @@ struct PrintOptions {
   /// formatting.
   bool PrintOriginalSourceText = false;
 
-  /// When printing a name alias type, whether print the underlying type instead
+  /// When printing a type alias type, whether print the underlying type instead
   /// of the alias.
-  bool PrintNameAliasUnderlyingType = false;
+  bool PrintTypeAliasUnderlyingType = false;
 
   /// When printing an Optional<T>, rather than printing 'T?', print
   /// 'T!'. Used as a modifier only when we know we're printing

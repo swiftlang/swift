@@ -2515,7 +2515,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
 
 static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
   // If it's a typealias, return that.
-  if (auto aliasType = dyn_cast<NameAliasType>(type.getPointer()))
+  if (auto aliasType = dyn_cast<TypeAliasType>(type.getPointer()))
     return { 1, aliasType->getDecl() };
 
   // If there is a generic declaration, return it.

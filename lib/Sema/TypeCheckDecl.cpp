@@ -4581,7 +4581,7 @@ static Type formExtensionInterfaceType(
       mustInferRequirements = true;
     }
 
-    resultType = NameAliasType::get(typealias, parentType, subMap,
+    resultType = TypeAliasType::get(typealias, parentType, subMap,
                                     resultType);
   }
 
@@ -4633,7 +4633,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
 
 static bool isNonGenericTypeAliasType(Type type) {
   // A non-generic typealias can extend a specialized type.
-  if (auto *aliasType = dyn_cast<NameAliasType>(type.getPointer()))
+  if (auto *aliasType = dyn_cast<TypeAliasType>(type.getPointer()))
     return aliasType->getDecl()->getGenericContextDepth() == (unsigned)-1;
 
   return false;

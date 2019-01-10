@@ -492,7 +492,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   Type parentTy;
   SubstitutionMap subMap;
 
-  if (auto *NAT = dyn_cast<NameAliasType>(type.getPointer())) {
+  if (auto *NAT = dyn_cast<TypeAliasType>(type.getPointer())) {
     decl = NAT->getDecl();
     parentTy = NAT->getParent();
     subMap = NAT->getSubstitutionMap();

@@ -450,7 +450,7 @@ static bool initDocEntityInfo(const TextEntity &Entity,
 }
 
 static const TypeDecl *getTypeDeclFromType(Type Ty) {
-  if (auto alias = dyn_cast<NameAliasType>(Ty.getPointer()))
+  if (auto alias = dyn_cast<TypeAliasType>(Ty.getPointer()))
     return alias->getDecl();
   return Ty->getAnyNominal();
 }

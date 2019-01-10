@@ -804,7 +804,7 @@ static void VisitNodeGenericTypealias(ASTContext *ast,
                          ->getSelfNominalTypeDecl()) {
     parentType = nominal->getDeclaredInterfaceType().subst(subMap);
   }
-  NameAliasType *NAT = NameAliasType::get(
+  TypeAliasType *NAT = TypeAliasType::get(
       genericTypeAlias, parentType, subMap,
       genericTypeAlias->getDeclaredInterfaceType().subst(subMap));
   result._types.push_back(NAT);

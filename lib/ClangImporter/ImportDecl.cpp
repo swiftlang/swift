@@ -2406,7 +2406,7 @@ namespace {
             // the name in the imported module and the same name in the
             // standard library.
             if (auto *NAT =
-                  dyn_cast<NameAliasType>(SwiftType.getPointer()))
+                  dyn_cast<TypeAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
             auto *NTD = SwiftType->getAnyNominal();
