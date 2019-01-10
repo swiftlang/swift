@@ -3495,6 +3495,9 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 }
 
 bool Parser::canDelayMemberDeclParsing() {
+  // If explicitly disabled, respect the flag.
+  if (DisableDelayedParsing)
+    return false;
   // There's no fundamental reasons that SIL cannnot be lasily parsed. We need
   // to keep SILParserTUStateBase persistent to make it happen.
   if (isInSILMode())

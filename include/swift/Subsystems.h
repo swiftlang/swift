@@ -121,7 +121,8 @@ namespace swift {
   bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
                            SILParserState *SIL = nullptr,
                            PersistentParserState *PersistentState = nullptr,
-                           DelayedParsingCallbacks *DelayedParseCB = nullptr);
+                           DelayedParsingCallbacks *DelayedParseCB = nullptr,
+                           bool DisableDelayedParsing = false);
 
   /// Parse a single buffer into the given source file, until the full source
   /// contents are parsed.
@@ -129,7 +130,8 @@ namespace swift {
   /// \return true if the parser found code with side effects.
   bool parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                              PersistentParserState *PersistentState = nullptr,
-                             DelayedParsingCallbacks *DelayedParseCB = nullptr);
+                             DelayedParsingCallbacks *DelayedParseCB = nullptr,
+                               bool DisableDelayedParsing = false);
 
   /// Finish the parsing by going over the nodes that were delayed
   /// during the first parsing pass.
