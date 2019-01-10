@@ -1492,6 +1492,8 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
 
   TopLevelSGF->emitProfilerIncrement(td->getBody());
  
+  DebugScope DS(*TopLevelSGF, CleanupLocation(td));
+
   for (auto &ESD : td->getBody()->getElements()) {
     if (!TopLevelSGF->B.hasValidInsertionPoint()) {
       if (auto *S = ESD.dyn_cast<Stmt*>()) {
