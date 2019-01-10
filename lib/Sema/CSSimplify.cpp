@@ -2008,6 +2008,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
+  if (kind >= ConstraintKind::Conversion) {
+    // An lvalue of type T1 can be converted to a value of type T2 so long as
+    // T1 is convertible to T2 (by loading the value).  Note that we cannot get
+    // a value of inout type as an lvalue though.
+    if (type1->is<LValueType>() && !type2->is<InOutType>()) {
+      return matchTypes(type1->getRValueType(), type2,
+                        kind, subflags, locator);
+    }
+  }
+
   if (kind >= ConstraintKind::Subtype) {
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
@@ -2165,13 +2175,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   if (kind >= ConstraintKind::Conversion) {
-    // An lvalue of type T1 can be converted to a value of type T2 so long as
-    // T1 is convertible to T2 (by loading the value).  Note that we cannot get
-    // a value of inout type as an lvalue though.
-    if (type1->is<LValueType>() && !type2->is<InOutType>())
-      conversionsOrFixes.push_back(
-        ConversionRestrictionKind::LValueToRValue);
-
     // It is never legal to form an autoclosure that results in these
     // implicit conversions to pointer types.
     bool isAutoClosureArgument = false;
@@ -4952,10 +4955,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     addContextualScore();
     return matchSuperclassTypes(type1, type2, subflags, locator);
 
-  case ConversionRestrictionKind::LValueToRValue:
-    return matchTypes(type1->getRValueType(), type2,
-                      matchKind, subflags, locator);
-
   // for $< in { <, <c, <oc }:
   //   T $< U, U : P_i ===> T $< protocol<P_i...>
   case ConversionRestrictionKind::Existential:
@@ -5275,7 +5274,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 static bool recordRestriction(ConversionRestrictionKind restriction) {
   switch(restriction) {
     case ConversionRestrictionKind::TupleToTuple:
-    case ConversionRestrictionKind::LValueToRValue:
       return false;
     default:
       return true;

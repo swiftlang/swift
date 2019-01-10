@@ -6369,7 +6369,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     switch (knownRestriction->second) {
 
     case ConversionRestrictionKind::TupleToTuple:
-    case ConversionRestrictionKind::LValueToRValue:
         // Restrictions that don't need to be recorded.
         // Should match recordRestriction() in CSSimplify
         break;
