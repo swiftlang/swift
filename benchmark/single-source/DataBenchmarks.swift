@@ -40,11 +40,11 @@ public let DataBenchmarks = [
       0, 1, 2, 3, 4, 5, 6,
     ])) } }, tags: d, legacyFactor: 20),
 
-  BenchmarkInfo(name: "DataCreateSequenceExactCount", runFunction: {
+  BenchmarkInfo(name: "Data.init.Sequence.ExactCount", runFunction: {
     for _ in 0..<$0*500 {
       blackHole(Data(repeatElement(UInt8(0xA0), count: 809)))
     } }, tags: d),
-  BenchmarkInfo(name: "DataCreateSequenceUnderestimatedCount", runFunction: {
+  BenchmarkInfo(name: "Data.init.Sequence.UnderestimatedCount", runFunction: {
     for _ in 0..<$0*500 { blackHole(Data(repeatElementSeq(809))) } }, tags: d),
 
   BenchmarkInfo(name: "DataSubscriptSmall",
@@ -117,10 +117,10 @@ public let DataBenchmarks = [
     replaceBuffer($0*10, data: medium, subrange:431..<809, with: large) },
     tags: d),
 
-  BenchmarkInfo(name: "DataAppendSequenceExactCount",
+  BenchmarkInfo(name: "DataAppendSequence",
     runFunction: { append($0*100, sequenceLength: 809, to: medium) },
     tags: d, legacyFactor: 100),
-  BenchmarkInfo(name: "DataAppendSequenceUnderestimatedCount", runFunction: {
+  BenchmarkInfo(name: "Data.append.Sequence.UnderestimatedCount", runFunction: {
     append($0*100, sequence: repeatElementSeq(809), to: medium) },
     tags: d, legacyFactor: 100),
 
@@ -172,11 +172,11 @@ public let DataBenchmarks = [
     runFunction: { data($0*200, from: mediumString) }, tags: d,
     legacyFactor: 50),
 
-  BenchmarkInfo(name: "DataHashEmpty",
+  BenchmarkInfo(name: "Data.hash.Empty",
     runFunction: { hash($0*10_000, data: Data()) }, tags: d),
-  BenchmarkInfo(name: "DataHashSmall",
+  BenchmarkInfo(name: "Data.hash.Small",
     runFunction: { hash($0*10_000, data: small) }, tags: d),
-  BenchmarkInfo(name: "DataHashMedium",
+  BenchmarkInfo(name: "Data.hash.Medium",
     runFunction: { hash($0*10_000, data: medium) }, tags: d),
 ]
 
