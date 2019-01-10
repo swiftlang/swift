@@ -4922,6 +4922,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                                          ConstraintKind matchKind,
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator) {
+  assert(!type1->isTypeVariableOrMember() && !type2->isTypeVariableOrMember());
+
   // Add to the score based on context.
   auto addContextualScore = [&] {
     // Okay, we need to perform one or more conversions.  If this
@@ -4931,20 +4933,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (locator.isFunctionConversion()) {
       increaseScore(SK_FunctionConversion);
     }
-  };
-
-  // Local function to form an unsolved result.
-  auto formUnsolved = [&] {
-    if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(
-        Constraint::createRestricted(
-          *this, matchKind, restriction, type1, type2,
-          getConstraintLocator(locator)));
-
-      return SolutionKind::Solved;
-    }
-    
-    return SolutionKind::Unsolved;
   };
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
@@ -5019,9 +5007,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     increaseScore(SK_ValueToOptional);
 
     assert(matchKind >= ConstraintKind::Subtype);
-    if (type2->isTypeVariableOrMember())
-      return formUnsolved();
-
     if (auto generic2 = type2->getAs<BoundGenericType>()) {
       if (generic2->getDecl()->isOptionalDecl()) {
         return matchTypes(type1, generic2->getGenericArgs()[0],
@@ -5042,9 +5027,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //   T <c U ===> T? <c U!
   case ConversionRestrictionKind::OptionalToOptional: {
     addContextualScore();
-
-    if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
-      return formUnsolved();
 
     assert(matchKind >= ConstraintKind::Subtype);
     if (auto generic1 = type1->getAs<BoundGenericType>()) {
