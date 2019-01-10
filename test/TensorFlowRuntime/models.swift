@@ -22,10 +22,6 @@ var ModelTests = TestSuite("Model")
 ModelTests.testAllBackends("StraightLineXORTraining") {
   // FIXME: TPU execution on TAP is timing out. (b/74155319)
   guard !_RuntimeConfig.executionMode.isTPU else { return }
-  // FIXME: GPU training won't converge.
-#if CUDA
-  return
-#endif
 
   // Hyper-parameters
   let iterationCount = 2000
@@ -81,10 +77,6 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
 ModelTests.testAllBackends("XORClassifierTraining") {
   // FIXME: XORClassifierTraining_TPU crashes with SIGSEGV. (b/74155319)
   guard !_RuntimeConfig.executionMode.isTPU else { return }
-  // FIXME: GPU training won't converge.
-#if CUDA
-  return
-#endif
 
   // The classifier struct.
   struct MLPClassifier {
