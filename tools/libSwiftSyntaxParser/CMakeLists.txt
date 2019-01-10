@@ -1,4 +1,5 @@
-set(LLVM_EXPORTED_SYMBOL_FILE ${CMAKE_CURRENT_SOURCE_DIR}/libSwiftSyntaxParser.exports)
+set(LLVM_EXPORTED_SYMBOL_FILE
+    ${CMAKE_CURRENT_SOURCE_DIR}/libSwiftSyntaxParser.exports)
 
 add_swift_host_library(libSwiftSyntaxParser SHARED
 	c-include-check.c
