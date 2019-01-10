@@ -40,6 +40,13 @@ public let DataBenchmarks = [
       0, 1, 2, 3, 4, 5, 6,
     ])) } }, tags: d, legacyFactor: 20),
 
+  BenchmarkInfo(name: "DataCreateSequenceExactCount", runFunction: {
+    for _ in 0..<$0*500 {
+      blackHole(Data(repeatElement(UInt8(0xA0), count: 809)))
+    } }, tags: d),
+  BenchmarkInfo(name: "DataCreateSequenceUnderestimatedCount", runFunction: {
+    for _ in 0..<$0*500 { blackHole(Data(repeatElementSeq(809))) } }, tags: d),
+
   BenchmarkInfo(name: "DataSubscriptSmall",
     runFunction: { let data = small
       for _ in 0..<$0*10_000 { blackHole(data[1]) } }, tags: d),
@@ -110,9 +117,12 @@ public let DataBenchmarks = [
     replaceBuffer($0*10, data: medium, subrange:431..<809, with: large) },
     tags: d),
 
-  BenchmarkInfo(name: "DataAppendSequence",
+  BenchmarkInfo(name: "DataAppendSequenceExactCount",
     runFunction: { append($0*100, sequenceLength: 809, to: medium) },
-  tags: d, legacyFactor: 100),
+    tags: d, legacyFactor: 100),
+  BenchmarkInfo(name: "DataAppendSequenceUnderestimatedCount", runFunction: {
+    append($0*100, sequence: repeatElementSeq(809), to: medium) },
+    tags: d, legacyFactor: 100),
 
   BenchmarkInfo(name: "DataAppendDataSmallToSmall",
     runFunction: { append($0*500, data: small, to: small) }, tags: d,
@@ -173,6 +183,12 @@ let mediumData = Data(mediumString.utf8)
 let small = sampleData(.small)
 let medium = sampleData(.medium)
 let large = sampleData(.large)
+
+let repeatElementSeq = { count in
+  return sequence(state: count) { (i: inout Int) -> UInt8? in
+    defer { i = i &- 1 }; return i > 0 ? UInt8(0xA0) : nil
+  }
+}
 
 enum SampleKind {
   case small
@@ -277,6 +293,15 @@ func append(_ N: Int, sequenceLength: Int, to data: Data) {
   for _ in 1...N {
     var copy = data
     copy.append(contentsOf: bytes)
+  }
+}
+
+@inline(never)
+func append<S: Sequence>(_ N: Int, sequence: S, to data: Data)
+where S.Element == UInt8 {
+  for _ in 1...N {
+    var copy = data
+    copy.append(contentsOf: sequence)
   }
 }
 
