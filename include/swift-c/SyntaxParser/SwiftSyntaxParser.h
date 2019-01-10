@@ -55,7 +55,7 @@
 
 #ifndef SWIFTPARSE_PUBLIC
 # ifdef _WIN32
-#  ifdef SwiftSyntaxParser_EXPORTS
+#  ifdef libSwiftSyntaxParser_EXPORTS
 #    define SWIFTPARSE_PUBLIC __declspec(dllexport)
 #  else
 #    define SWIFTPARSE_PUBLIC __declspec(dllimport)
@@ -126,7 +126,6 @@ typedef struct {
 //=== Parser Functions ----------------------------------------------------===//
 
 typedef void *swiftparse_parser_t;
-typedef void *swiftparse_alloc_t;
 
 SWIFTPARSE_PUBLIC swiftparse_parser_t
 swiftparse_parser_create(void);
@@ -168,13 +167,13 @@ typedef swiftparse_lookup_result_t
 /// It is not required to set a \c swiftparse_node_lookup_t block before calling
 /// \c swiftparse_parse_string. Not setting a \c swiftparse_node_lookup_t block
 /// has same semantics as never skipping any source regions.
-/// \c swiftparse_node_lookup_t can be called multiple times to change the block
-/// before subsequent parses.
+/// \c swiftparse_parser_set_node_lookup can be called multiple times to change
+/// the block before subsequent parses.
 SWIFTPARSE_PUBLIC void
 swiftparse_parser_set_node_lookup(swiftparse_parser_t,
                                   swiftparse_node_lookup_t);
 
-/// Parse the provided \c source and invoke the callback that was set via
+/// Parse the provided \p source and invoke the callback that was set via
 /// \c swiftparse_parser_set_node_handler as each syntax node is parsed.
 ///
 /// Syntax nodes are provided in a top-bottom, depth-first order. For example,
