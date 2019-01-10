@@ -3987,6 +3987,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     checkDeclAttributes(FD);
+    
+    // FIXME: For now, functions with opaque result types have to have their
+    // bodies type checked to get the underlying type.
+    if (FD->getOpaqueResultTypeDecl())
+      typeCheckDecl(FD);
+    
     break;
   }
 
