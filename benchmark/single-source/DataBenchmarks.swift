@@ -171,6 +171,13 @@ public let DataBenchmarks = [
   BenchmarkInfo(name: "StringToDataMedium",
     runFunction: { data($0*200, from: mediumString) }, tags: d,
     legacyFactor: 50),
+
+  BenchmarkInfo(name: "DataHashEmpty",
+    runFunction: { hash($0*10_000, data: Data()) }, tags: d),
+  BenchmarkInfo(name: "DataHashSmall",
+    runFunction: { hash($0*10_000, data: small) }, tags: d),
+  BenchmarkInfo(name: "DataHashMedium",
+    runFunction: { hash($0*10_000, data: medium) }, tags: d),
 ]
 
 let emptyString = ""
@@ -382,4 +389,14 @@ public func data(_ N: Int, from string: String) {
   for _ in 1...N {
     blackHole(Data(string.utf8))
   }
+}
+
+@inline(never)
+public func hash(_ N: Int, data: Data) {
+  var hasher = Hasher()
+  for _ in 0 ..< N {
+    hasher.combine(data)
+  }
+
+  let _ = hasher.finalize()
 }
