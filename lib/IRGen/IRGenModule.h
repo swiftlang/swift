@@ -832,6 +832,7 @@ public:
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCSelectorRef(SILDeclRef method);
+  std::string getObjCSelectorName(SILDeclRef method);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);
   llvm::Constant *getAddrOfObjCProtocolRecord(ProtocolDecl *proto,
                                               ForDefinition_t forDefinition);
