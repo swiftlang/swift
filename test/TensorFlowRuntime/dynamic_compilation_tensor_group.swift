@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
 // RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 
