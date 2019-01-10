@@ -1,4 +1,4 @@
-//===--- Reduce.swift - tests for the two reduce variants -----------------===//
+//===--- Reduce.swift - tests for the four reduce variants -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,14 +15,47 @@
 // CHECK: testing...
 print("testing...")
 
-// Test the examples from the documentation of reduce(_:_:) and reduce(into:_:)
+// Test the examples from the documentation of reduce(_:), reduce(_:_:) and reduce(into:_:)
 
 let numbers = [1, 2, 3, 4]
+
+// reduce(_:)
+let numberSumFold = numbers.reduce({ x, y in
+  x + y
+})!
+// CHECK-NEXT: 10
+print(numberSumFold)
+
+// reduce(_:) inout
+let numberSumFoldInout = numbers.reduce({ x, y in
+  x += y
+})!
+// CHECK-NEXT: 10
+print(numberSumFoldInout)
+
+// reduce(_:_:)
 let numberSum = numbers.reduce(0, { x, y in
   x + y
 })
 // CHECK-NEXT: 10
 print(numberSum)
+
+// reduce(_:)
+let numberSumFold2 = numbers.reduce(+)!
+// CHECK-NEXT: 10
+print(numberSumFold2)
+
+let numberProductFold = numbers.reduce(*)!
+// CHECK-NEXT: 24
+print(numberProductFold)
+
+let numberSumFold3 = numbers.reduce(+=)!
+// CHECK-NEXT: 10
+print(numberSumFold3)
+
+let numberProductFold3 = numbers.reduce(*=)!
+// CHECK-NEXT: 24
+print(numberProductFold3)
 
 let letters = "abracadabra"
 let letterCount = letters.reduce(into: [:]) { counts, letter in
@@ -36,9 +69,29 @@ print(letterCount["c"]!) // CHECK: 1
 print(letterCount["d"]!) // CHECK: 1
 print(letterCount["r"]!) // CHECK: 2
 
-
 // Test the two reduce methods with different levels of inference
 let numbers2 = Array(2..<7)
+
+// Test reduce(_:)
+// CHECK-NEXT: 20
+let sum1fold = numbers2.reduce { (x: Int, y: Int) -> Int in x + y }!
+print(sum1fold)
+
+// CHECK-NEXT: 20
+let sum2fold = numbers2.reduce { (x, y) in x + y }!
+print(sum2fold)
+
+// CHECK-NEXT: 20
+let sum3fold = numbers2.reduce { $0 + $1 }!
+print(sum3fold)
+
+// CHECK-NEXT: 20
+let sum4fold = numbers2.reduce { (x: inout Int, y: Int) -> Void in x += y }!
+print(sum4fold)
+
+// CHECK-NEXT: 20
+let sum5fold = numbers2.reduce { (x: inout Int, y) in x += y }!
+print(sum5fold)
 
 // Test reduce(_:_:)
 // CHECK-NEXT: 20
@@ -88,3 +141,4 @@ print(result)
 
 // CHECK: all done.
 print("all done.")
+

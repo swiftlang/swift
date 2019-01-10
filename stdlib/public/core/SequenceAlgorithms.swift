@@ -677,6 +677,161 @@ extension Sequence {
     return accumulator
   }
   
+  /// Combines the elements of the sequence using a closure, returning the
+  /// result (or nil, for a no-element sequence).
+  ///
+  /// This method uses an (Element, Element) -> Element closure.
+  /// Prefer the (inout Element, Element) -> Element version of reduce(_:)
+  /// instead for efficiency when the result is a copy-on-write type,
+  /// for example an Array or a Dictionary.
+  ///
+  /// Use the `reduce(_:)` method to produce a combined value from a
+  /// sequence. For example, you can return the sum or product of a
+  /// sequence's elements or its minimum or maximum value.
+  /// Each `nextPartialResult` closure is called sequentially, accumulating
+  /// the value initialized to the first element of the sequence.
+  /// This example shows how to find the sum of an array of numbers.
+  ///
+  ///     let numbers = [1, 2, 3, 4]
+  ///     let numberSum = numbers.reduce({ x, y in
+  ///         x + y
+  ///     })
+  ///     // numberSum == 10
+  ///
+  /// Alternatively:
+  ///
+  ///     let numberSum = numbers.reduce(+) // 10
+  ///     let numberProduct = numbers.reduce(*) // 24
+  ///
+  /// When `numbers.reduce(_:)` is called, the following steps occur:
+  ///
+  /// 1. The partial result is initialized from the first sequence member,
+  ///    returning nil for an empty sequence. The first number is 1.
+  /// 2. The closure is called repeatedly with the current partial result and
+  ///    each successive member of the sequence
+  /// 3. When the sequence is exhausted, the method returns the last value
+  ///    returned from the closure.
+  ///
+  /// If the sequence has no elements, `reduce` returns `nil`.
+  ///
+  /// If the sequence has one element, `reduce` returns that element.
+  ///
+  /// For example, `reduce` can combine elements to calculate the minimum
+  /// bounds fitting a set of rectangles defined by an array of `CGRect`
+  ///
+  ///     let frames = [
+  ///       CGRect(x: 10, y: 10, width: 50, height: 50),
+  ///       CGRect(x: 40, y: 80, width: 20, height: 30),
+  ///       CGRect(x: -5, y: 10, width: 10, height: 10),
+  ///     ]
+  ///
+  ///     frames.reduce({ $0.union($1) })
+  ///     // (x: -5.0, y: 10.0, width: 65.0, height: 100.0)
+  ///
+  /// - Parameters:
+  ///   - nextPartialResult: A closure that combines an accumulating value and
+  ///     an element of the sequence into a new accumulating value, to be used
+  ///     in the next call of the `nextPartialResult` closure or returned to
+  ///     the caller.
+  ///   - partialResult: The accumulated value of the sequence, initialized as the
+  ///     first sequence member
+  ///   - current: The next element of the sequence to combine into the partial result
+  /// - Returns: The final accumulated value or if the sequence has
+  ///   no elements, returns `nil`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  ///
+  /// - Note: Prefer the `inout` variation of `reduce(:_)` when processing
+  ///   complex fields. The `inout` version avoids repeated copies and construction
+  ///   for better performance.
+  public func reduce(
+    _ nextPartialResult:
+    (_ partialResult: Element, _ current: Element) throws -> Element) rethrows
+    -> Element? {
+    var iterator = makeIterator()
+    guard var accumulator = iterator.next() else {
+      return nil
+    }
+    while let element = iterator.next() {
+      accumulator = try nextPartialResult(accumulator, element)
+    }
+    return accumulator
+  }
+  
+  /// Combines the elements of the sequence using a closure with
+  /// an initial `inout` argument, returning the result (or nil,
+  /// for a no-element sequence).
+  ///
+  /// Use the `reduce(_:)` method to produce a combined value from a
+  /// sequence. For example, you can return the sum or product of a
+  /// sequence's elements or its minimum or maximum value.
+  /// Each `nextPartialResult` closure is called sequentially, accumulating
+  /// the value initialized to the first element of the sequence.
+  /// This example shows how to find the sum of an array of numbers.
+  ///
+  ///     let numbers = [1, 2, 3, 4]
+  ///     let numberSum = numbers.reduce({ x, y in
+  ///         x += y
+  ///     })
+  ///     // numberSum == 10
+  ///
+  /// Alternatively:
+  ///
+  ///     let numberSum = numbers.reduce(+=) // 10
+  ///     let numberProduct = numbers.reduce(*=) // 24
+  ///
+  /// When `numbers.reduce(_:)` is called, the following steps occur:
+  ///
+  /// 1. The partial result is initialized from the first sequence member,
+  ///    returning nil for an empty sequence. The first number is 1.
+  /// 2. The closure is called repeatedly with the current partial result
+  ///    and each successive member of the sequence
+  /// 3. When the sequence is exhausted, the method returns the last value
+  ///    established by the closure.
+  ///
+  /// If the sequence has no elements, `reduce` returns `nil`.
+  ///
+  /// If the sequence has one element, `reduce` returns that element.
+  ///
+  /// This method uses an (inout Element, Element) -> Element closure.
+  /// Prefer it over the (Element, Element) -> Element version
+  /// of reduce(_:) for efficiency when otherwise repeatedly
+  /// constructing a value. For example, prefer this form of reduce
+  /// to combine the data from a sequence of the following `Event` type
+  /// into a single instance. Copying or constructing a new instance
+  /// to perform the field updates underperforms in the non `inout`
+  /// version:
+  ///
+  /// ```
+  /// public struct Event { var count: Int, logs: [String] }
+  /// ```
+  ///
+  /// - Parameters:
+  ///   - nextPartialResult: A closure that combines an accumulating value and
+  ///     an element of the sequence into a new accumulating value, to be used
+  ///     in the next call of the `nextPartialResult` closure or returned to
+  ///     the caller.
+  ///   - partialResult: The accumulated value of the sequence, initialized as the
+  ///     first sequence member
+  ///   - current: The next element of the sequence to combine into the partial result
+  /// - Returns: The final accumulated value or if the sequence has
+  ///   no elements, returns `nil`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  public func reduce(
+    _ nextPartialResult:
+    (_ partialResult: inout Element, _ current: Element) throws -> Void) rethrows
+    -> Element? {
+    var iterator = makeIterator()
+    guard var accumulator = iterator.next() else {
+      return nil
+    }
+    while let element = iterator.next() {
+      try nextPartialResult(&accumulator, element)
+    }
+    return accumulator
+  }
+
   /// Returns the result of combining the elements of the sequence using the
   /// given closure.
   ///
