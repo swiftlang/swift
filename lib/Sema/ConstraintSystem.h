@@ -593,6 +593,9 @@ public:
   /// The list of fixes that need to be applied to the initial expression
   /// to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
+  /// The list of member references which couldn't be resolved,
+  /// and had to be assumed based on their use.
+  llvm::SmallVector<ConstraintLocator *, 4> MissingMembers;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -942,6 +945,7 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
+  friend class MissingMemberFailure;
 
   class SolverScope;
 
@@ -1038,6 +1042,8 @@ private:
 
   /// The set of fixes applied to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
+  /// The set of type variables representing types of missing members.
+  llvm::SmallSetVector<ConstraintLocator *, 4> MissingMembers;
 
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -1486,6 +1492,8 @@ public:
 
     unsigned numCheckedConformances;
 
+    unsigned numMissingMembers;
+
     /// The previous score.
     Score PreviousScore;
 
@@ -1776,6 +1784,8 @@ public:
 
     return !solverState || solverState->recordFixes;
   }
+
+  ArrayRef<ConstraintFix *> getFixes() const { return Fixes; }
 
   bool shouldSuppressDiagnostics() const {
     return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);

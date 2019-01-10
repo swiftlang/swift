@@ -466,3 +466,54 @@ struct Outer {
 
 // rdar://problem/39514009 - don't crash when trying to diagnose members with special names
 print("hello")[0] // expected-error {{value of tuple type '()' has no member 'subscript'}}
+
+
+func rdar40537782() {
+  class A {}
+  class B : A {
+    override init() {}
+    func foo() -> A { return A() }
+  }
+
+  struct S<T> {
+    init(_ a: T...) {}
+  }
+
+  func bar<T>(_ t: T) {
+    _ = S(B(), .foo(), A()) // expected-error {{type 'A' has no member 'foo'}}
+  }
+}
+
+func rdar36989788() {
+  struct A<T> {
+    func foo() -> A<T> {
+      return self
+    }
+  }
+
+  func bar<T>(_ x: A<T>) -> (A<T>, A<T>) {
+    return (x.foo(), x.undefined()) // expected-error {{value of type 'A<T>' has no member 'undefined'}}
+  }
+}
+
+func rdar46211109() {
+  struct MyIntSequenceStruct: Sequence {
+    struct Iterator: IteratorProtocol {
+      var current = 0
+      mutating func next() -> Int? {
+        return current + 1
+      }
+    }
+
+    func makeIterator() -> Iterator {
+      return Iterator()
+    }
+  }
+
+  func foo<E, S: Sequence>(_ type: E.Type) -> S? where S.Element == E {
+    return nil
+  }
+
+  let _: MyIntSequenceStruct? = foo(Int.Self)
+  // expected-error@-1 {{type 'Int' has no member 'Self'}}
+}

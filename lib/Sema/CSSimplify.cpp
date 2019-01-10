@@ -3659,6 +3659,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     DeclContext *useDC, FunctionRefKind functionRefKind,
     ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
     ConstraintLocatorBuilder locatorB) {
+  // We'd need to record original base type because it might be a type
+  // variable representing another missing member.
+  auto origBaseTy = baseTy;
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
   baseTy = simplifyType(baseTy, flags);
@@ -3706,6 +3709,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
   if (shouldAttemptFixes()) {
+    // Let's record missing member in constraint system, this helps to prevent
+    // stacking up fixes for the same member, because e.g. if its base was of
+    // optional type, we'd re-introduce member constraint with optional stripped
+    // off to see if the problem is related to base not being explicitly unwrapped.
+    if (!MissingMembers.insert(locator))
+      return SolutionKind::Error;
+
     if (baseObjTy->getOptionalObjectType()) {
       // If the base type was an optional, look through it.
 
@@ -3751,15 +3761,22 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       return SolutionKind::Solved;
     }
 
+    auto solveWithNewBaseOrName = [&](Type baseType,
+                                      DeclName memberName) -> SolutionKind {
+      // Let's re-enable fixes for this member, because
+      // the base or member name has been changed.
+      MissingMembers.remove(locator);
+      return simplifyMemberConstraint(kind, baseType, memberName, memberTy,
+                                      useDC, functionRefKind, outerAlternatives,
+                                      flags, locatorB);
+    };
+
     if (auto *funcType = baseTy->getAs<FunctionType>()) {
       // We can't really suggest anything useful unless
       // function takes no arguments, otherwise it
       // would make sense to report this a missing member.
       if (funcType->getNumParams() == 0) {
-        auto result = simplifyMemberConstraint(
-            kind, funcType->getResult(), member, memberTy, useDC,
-            functionRefKind, outerAlternatives, flags, locatorB);
-
+        auto result = solveWithNewBaseOrName(funcType->getResult(), member);
         // If there is indeed a member with given name in result type
         // let's return, otherwise let's fall-through and report
         // this problem as a missing member.
@@ -3772,16 +3789,59 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     // Instead of using subscript operator spelled out `subscript` directly.
     if (member.getBaseName() == getTokenText(tok::kw_subscript)) {
-      auto result = simplifyMemberConstraint(
-          kind, baseTy, DeclBaseName::createSubscript(), memberTy, useDC,
-          functionRefKind, {}, flags, locatorB);
-
+      auto result =
+          solveWithNewBaseOrName(baseTy, DeclBaseName::createSubscript());
       // Looks like it was indeed meant to be a subscript operator.
       if (result == SolutionKind::Solved)
         return recordFix(UseSubscriptOperator::create(*this, locator))
                    ? SolutionKind::Error
                    : SolutionKind::Solved;
     }
+
+    // FIXME(diagnostics): This is more of a hack than anything.
+    // Let's not try to suggest that there is no member related to an
+    // obscure underscored type, the real problem would be somewhere
+    // else. This helps to diagnose pattern matching cases.
+    {
+      if (auto *metatype = baseTy->getAs<MetatypeType>()) {
+        auto instanceTy = metatype->getInstanceType();
+        if (auto *NTD = instanceTy->getAnyNominal()) {
+          if (NTD->getName() == getASTContext().Id_OptionalNilComparisonType)
+            return SolutionKind::Error;
+        }
+      }
+    }
+
+    // FIXME(diagnostics): Errors related to `AnyObject` could be diagnosed
+    // better in the future, relevant failure information has to be extracted
+    // from `performMemberLookup` result, in order to figure out if it was a
+    // simple labeling or # of arguments mismatch, or member with requested name
+    // really doesn't exist.
+    if (baseTy->isAnyObject())
+      return SolutionKind::Error;
+
+    result = performMemberLookup(kind, member, baseTy, functionRefKind, locator,
+                                 /*includeInaccessibleMembers*/ true);
+
+    // FIXME(diagnostics): If there were no viable results, but there are
+    // unviable ones, we'd have to introduce fix for each specific problem.
+    if (!result.UnviableCandidates.empty())
+      return SolutionKind::Error;
+
+    // Since member with given base and name doesn't exist, let's try to
+    // fake its presence based on use, that makes it possible to diagnose
+    // problems related to member lookup more precisely.
+    auto *fix =
+        DefineMemberBasedOnUse::create(*this, origBaseTy, member, locator);
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    // Allow member type to default to `Any` to make it possible to form
+    // solutions when contextual type of the result cannot be deduced e.g.
+    // `let _ = x.foo`.
+    addConstraint(ConstraintKind::Defaultable, memberTy,
+                  getASTContext().TheAnyType, locator);
+    return SolutionKind::Solved;
   }
   return SolutionKind::Error;
 }
@@ -4498,6 +4558,25 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // By construction, the left hand side is a type that looks like the
   // following: $T1 -> $T2.
   assert(type1->is<FunctionType>());
+
+  // Let's check if this member couldn't be found and is fixed
+  // to exist based on its usage.
+  if (auto *memberTy = type2->getAs<TypeVariableType>()) {
+    auto *locator = memberTy->getImpl().getLocator();
+    if (MissingMembers.count(locator)) {
+      auto *funcTy = type1->castTo<FunctionType>();
+      // Bind type variable associated with member to a type of argument
+      // application, which makes it seem like member exists with the
+      // types of the parameters matching argument types exactly.
+      addConstraint(ConstraintKind::Bind, memberTy, funcTy, locator);
+      // There might be no contextual type for result of the application,
+      // in cases like `let _ = x.foo()`, so let's default result to `Any`
+      // to make expressions like that type-check.
+      addConstraint(ConstraintKind::Defaultable, funcTy->getResult(),
+                    getASTContext().TheAnyType, locator);
+      return SolutionKind::Solved;
+    }
+  }
 
   // Drill down to the concrete type on the right hand side.
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
@@ -5412,6 +5491,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddConformance:
   case FixKind::AutoClosureForwarding:
   case FixKind::RemoveUnwrap:
+  case FixKind::DefineMemberBasedOnUse:
     llvm_unreachable("handled elsewhere");
   }
 
