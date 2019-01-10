@@ -808,8 +808,22 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable @inline(__always) // This should always be inlined into _Representation.hash(into:).
         func hash(into hasher: inout Hasher) {
-            hasher.combine(length)
-            Swift.withUnsafeBytes(of: bytes) { hasher.combine(bytes: $0) }
+            // **NOTE**: this uses `count` (an Int) and NOT `length` (a UInt8)
+            //           Despite having the same value, they hash differently. InlineSlice and LargeSlice both use `count` (an Int); if you combine the same bytes but with `length` over `count`, you can get a different hash.
+            //
+            // This affects slices, which are InlineSlice and not InlineData:
+            //
+            //   let d = Data([0xFF, 0xFF])                // InlineData
+            //   let s = Data([0, 0xFF, 0xFF]).dropFirst() // InlineSlice
+            //   assert(s == d)
+            //   assert(s.hashValue == d.hashValue)
+            hasher.combine(count)
+
+            Swift.withUnsafeBytes(of: bytes) {
+                // We have access to the full byte buffer here, but not all of it is meaningfully used (bytes past self.length may be garbage).
+                let bytes = UnsafeRawBufferPointer(start: $0.baseAddress, count: self.count)
+                hasher.combine(bytes: bytes)
+            }
         }
     }
 
@@ -1815,7 +1829,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         func hash(into hasher: inout Hasher) {
             switch self {
             case .empty:
-                hasher.combine(Int(bitPattern: CFHashBytes(nil, 0)))
+                hasher.combine(0)
             case .inline(let inline):
                 inline.hash(into: &hasher)
             case .slice(let slice):
