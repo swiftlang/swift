@@ -40,6 +40,13 @@ public let DataBenchmarks = [
       0, 1, 2, 3, 4, 5, 6,
     ])) } }, tags: d, legacyFactor: 20),
 
+  BenchmarkInfo(name: "Data.init.Sequence.ExactCount", runFunction: {
+    for _ in 0..<$0*100 {
+      blackHole(Data(repeatElement(UInt8(0xA0), count: 809)))
+    } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.UnderestimatedCount", runFunction: {
+    for _ in 0..<$0*100 { blackHole(Data(repeatElementSeq(809))) } }, tags: d),
+
   BenchmarkInfo(name: "DataSubscriptSmall",
     runFunction: { let data = small
       for _ in 0..<$0*10_000 { blackHole(data[1]) } }, tags: d),
@@ -112,7 +119,13 @@ public let DataBenchmarks = [
 
   BenchmarkInfo(name: "DataAppendSequence",
     runFunction: { append($0*100, sequenceLength: 809, to: medium) },
-  tags: d, legacyFactor: 100),
+    tags: d, legacyFactor: 100),
+  BenchmarkInfo(name: "Data.append.Sequence.ExactCount", runFunction: {
+    append($0*100, sequence: repeatElement(UInt8(0xA0), count: 809),
+           to: medium) }, tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.UnderestimatedCount", runFunction: {
+    append($0*100, sequence: repeatElementSeq(809), to: medium) },
+    tags: d),
 
   BenchmarkInfo(name: "DataAppendDataSmallToSmall",
     runFunction: { append($0*500, data: small, to: small) }, tags: d,
@@ -161,6 +174,13 @@ public let DataBenchmarks = [
   BenchmarkInfo(name: "StringToDataMedium",
     runFunction: { data($0*200, from: mediumString) }, tags: d,
     legacyFactor: 50),
+
+  BenchmarkInfo(name: "Data.hash.Empty",
+    runFunction: { hash($0*10_000, data: Data()) }, tags: d),
+  BenchmarkInfo(name: "Data.hash.Small",
+    runFunction: { hash($0*10_000, data: small) }, tags: d),
+  BenchmarkInfo(name: "Data.hash.Medium",
+    runFunction: { hash($0*1_000, data: medium) }, tags: d),
 ]
 
 let emptyString = ""
@@ -173,6 +193,12 @@ let mediumData = Data(mediumString.utf8)
 let small = sampleData(.small)
 let medium = sampleData(.medium)
 let large = sampleData(.large)
+
+let repeatElementSeq = { count in
+  return sequence(state: count) { (i: inout Int) -> UInt8? in
+    defer { i = i &- 1 }; return i > 0 ? UInt8(0xA0) : nil
+  }
+}
 
 enum SampleKind {
   case small
@@ -281,6 +307,15 @@ func append(_ N: Int, sequenceLength: Int, to data: Data) {
 }
 
 @inline(never)
+func append<S: Sequence>(_ N: Int, sequence: S, to data: Data)
+where S.Element == UInt8 {
+  for _ in 1...N {
+    var copy = data
+    copy.append(contentsOf: sequence)
+  }
+}
+
+@inline(never)
 func resetBytes(_ N: Int, in range: Range<Data.Index>, data: Data) {
   for _ in 1...N {
     var copy = data
@@ -357,4 +392,14 @@ public func data(_ N: Int, from string: String) {
   for _ in 1...N {
     blackHole(Data(string.utf8))
   }
+}
+
+@inline(never)
+public func hash(_ N: Int, data: Data) {
+  var hasher = Hasher()
+  for _ in 0 ..< N {
+    hasher.combine(data)
+  }
+
+  let _ = hasher.finalize()
 }
