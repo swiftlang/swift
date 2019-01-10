@@ -1877,10 +1877,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return getTypeMatchFailure(locator);
 
     case TypeKind::Tuple: {
-      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-      // Try the tuple-to-tuple conversion.
-      if (!type1->is<LValueType>())
-        conversionsOrFixes.push_back(ConversionRestrictionKind::TupleToTuple);
+      auto result = matchTupleTypes(cast<TupleType>(desugar1),
+                                    cast<TupleType>(desugar2),
+                                    kind, subflags, locator);
+      if (result != SolutionKind::Error)
+        return result;
+
+      // FIXME: All cases in this switch should go down to the fix logic
+      // to give repairFailures() a chance to run, but this breaks stuff
+      // right now.
       break;
     }
 
@@ -4943,11 +4948,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   switch (restriction) {
   // for $< in { <, <c, <oc }:
   //   T_i $< U_i ===> (T_i...) $< (U_i...)
-  case ConversionRestrictionKind::TupleToTuple:
-    return matchTupleTypes(type1->castTo<TupleType>(),
-                           type2->castTo<TupleType>(),
-                           matchKind, subflags, locator);
-
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
 
@@ -5269,17 +5269,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   llvm_unreachable("bad conversion restriction");
 }
 
-// Restrictions where CSApply can figure out the correct action from the shape of
-// the types, rather than needing a record of the choice made.
-static bool recordRestriction(ConversionRestrictionKind restriction) {
-  switch(restriction) {
-    case ConversionRestrictionKind::TupleToTuple:
-      return false;
-    default:
-      return true;
-  }
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyRestrictedConstraint(
                                        ConversionRestrictionKind restriction,
@@ -5290,8 +5279,7 @@ ConstraintSystem::simplifyRestrictedConstraint(
   switch (simplifyRestrictedConstraintImpl(restriction, type1, type2,
                                            matchKind, flags, locator)) {
   case SolutionKind::Solved:
-    if (recordRestriction(restriction))
-      ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
+    ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
     return SolutionKind::Solved;
 
   case SolutionKind::Unsolved:

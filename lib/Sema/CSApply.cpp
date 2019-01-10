@@ -6367,12 +6367,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                               toType->getCanonicalType() });
   if (knownRestriction != solution.ConstraintRestrictions.end()) {
     switch (knownRestriction->second) {
-
-    case ConversionRestrictionKind::TupleToTuple:
-        // Restrictions that don't need to be recorded.
-        // Should match recordRestriction() in CSSimplify
-        break;
-
     case ConversionRestrictionKind::DeepEquality: {
       if (toType->hasUnresolvedType())
         break;

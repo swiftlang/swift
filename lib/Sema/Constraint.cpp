@@ -428,8 +428,6 @@ void Constraint::dump(ConstraintSystem *CS) const {
 
 StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
   switch (kind) {
-  case ConversionRestrictionKind::TupleToTuple:
-    return "[tuple-to-tuple]";
   case ConversionRestrictionKind::DeepEquality:
     return "[deep equality]";
   case ConversionRestrictionKind::Superclass:
