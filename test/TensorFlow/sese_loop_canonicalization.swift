@@ -1,6 +1,6 @@
 // This test file has various test cases to check that unrollng the loop body
 // preserves the loop nesting.  Note that we use -Onone to preserve the
-// structuren of control flow for tests.
+// structure of control flow for tests.
 // RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Onone -emit-sil %s -verify | %FileCheck %s
 
 import TensorFlow
