@@ -134,7 +134,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return overload->choice.getDecl();
 
   auto ownerType = getOwnerType();
-  if (auto *NA = dyn_cast<NameAliasType>(ownerType.getPointer()))
+  if (auto *NA = dyn_cast<TypeAliasType>(ownerType.getPointer()))
     return NA->getDecl();
 
   return ownerType->getAnyGeneric();

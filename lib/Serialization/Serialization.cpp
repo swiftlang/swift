@@ -655,7 +655,7 @@ DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
 
   assert((allowTypeAliasXRef || !isa<TypeAliasDecl>(D) ||
           D->getModuleContext() == M) &&
-         "cannot cross-reference typealiases directly (use the NameAliasType)");
+         "cannot cross-reference typealiases directly (use the TypeAliasType)");
 
   id = ++LastDeclID;
   DeclsAndTypesToWrite.push(D);
@@ -3704,13 +3704,13 @@ void Serializer::writeType(Type ty) {
                                        TypeID());
     break;
   }
-  case TypeKind::NameAlias: {
-    auto alias = cast<NameAliasType>(ty.getPointer());
+  case TypeKind::TypeAlias: {
+    auto alias = cast<TypeAliasType>(ty.getPointer());
     const TypeAliasDecl *typeAlias = alias->getDecl();
     auto underlyingType = typeAlias->getUnderlyingTypeLoc().getType();
 
-    unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
-    NameAliasTypeLayout::emitRecord(
+    unsigned abbrCode = DeclTypeAbbrCodes[TypeAliasTypeLayout::Code];
+    TypeAliasTypeLayout::emitRecord(
                            Out, ScratchRecord, abbrCode,
                            addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
                            addTypeRef(alias->getParent()),
@@ -4065,7 +4065,7 @@ void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 8);
   using namespace decls_block;
   registerDeclTypeAbbr<BuiltinAliasTypeLayout>();
-  registerDeclTypeAbbr<NameAliasTypeLayout>();
+  registerDeclTypeAbbr<TypeAliasTypeLayout>();
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
   registerDeclTypeAbbr<NominalTypeLayout>();

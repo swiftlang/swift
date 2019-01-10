@@ -659,7 +659,7 @@ static bool shouldMangleAsGeneric(Type type) {
   if (!type)
     return false;
 
-  if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer()))
+  if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
     return !typeAlias->getSubstitutionMap().empty();
 
   return type->isSpecialized();
@@ -723,9 +723,9 @@ void ASTMangler::appendType(Type type) {
       appendType(cast<BuiltinVectorType>(tybase)->getElementType());
       return appendOperator("Bv",
                             cast<BuiltinVectorType>(tybase)->getNumElements());
-    case TypeKind::NameAlias: {
+    case TypeKind::TypeAlias: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
-      auto aliasTy = cast<NameAliasType>(tybase);
+      auto aliasTy = cast<TypeAliasType>(tybase);
 
       // It's not possible to mangle the context of the builtin module.
       // For the DWARF output we want to mangle the type alias + context,
@@ -834,7 +834,7 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct: {
       GenericTypeDecl *Decl;
-      if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer()))
+      if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
         Decl = typeAlias->getDecl();
       else
         Decl = type->getAnyGeneric();
@@ -1075,7 +1075,7 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
 void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
   TypeBase *typePtr = type.getPointer();
   ArrayRef<Type> genericArgs;
-  if (auto *typeAlias = dyn_cast<NameAliasType>(typePtr)) {
+  if (auto *typeAlias = dyn_cast<TypeAliasType>(typePtr)) {
     appendBoundGenericArgs(typeAlias->getDecl(),
                            typeAlias->getSubstitutionMap(),
                            isFirstArgList);
@@ -1177,7 +1177,7 @@ void ASTMangler::appendRetroactiveConformances(Type type) {
   // Dig out the substitution map to use.
   SubstitutionMap subMap;
   ModuleDecl *module;
-  if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer())) {
+  if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer())) {
     module = Mod ? Mod : typeAlias->getDecl()->getModuleContext();
     subMap = typeAlias->getSubstitutionMap();
   } else {

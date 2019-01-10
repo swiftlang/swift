@@ -639,7 +639,7 @@ static bool isPublicOrUsableFromInline(Type ty) {
   return !ty.findIf([](Type typePart) -> bool {
     // FIXME: If we have an internal typealias for a non-internal type, we ought
     // to be able to print it by desugaring.
-    if (auto *aliasTy = dyn_cast<NameAliasType>(typePart.getPointer()))
+    if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
       return !isPublicOrUsableFromInline(aliasTy->getDecl());
     if (auto *nominal = typePart->getAnyNominal())
       return !isPublicOrUsableFromInline(nominal);

@@ -77,7 +77,7 @@ static bool isPublicOrUsableFromInline(Type ty) {
   return !ty.findIf([](Type typePart) -> bool {
     // FIXME: If we have an internal typealias for a non-internal type, we ought
     // to be able to print it by desugaring.
-    if (auto *aliasTy = dyn_cast<NameAliasType>(typePart.getPointer()))
+    if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
       return !isPublicOrUsableFromInline(aliasTy->getDecl());
     if (auto *nominal = typePart->getAnyNominal())
       return !isPublicOrUsableFromInline(nominal);
@@ -3452,8 +3452,8 @@ public:
     Printer << BUILTIN_TYPE_NAME_SILTOKEN;
   }
 
-  void visitNameAliasType(NameAliasType *T) {
-    if (Options.PrintForSIL || Options.PrintNameAliasUnderlyingType) {
+  void visitTypeAliasType(TypeAliasType *T) {
+    if (Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType) {
       visit(T->getSinglyDesugaredType());
       return;
     }
@@ -4472,7 +4472,7 @@ swift::getInheritedForPrinting(const Decl *decl,
   for (auto TL: inherited) {
     if (auto ty = TL.getType()) {
       bool foundUnprintable = ty.findIf([shouldPrint](Type subTy) {
-        if (auto aliasTy = dyn_cast<NameAliasType>(subTy.getPointer()))
+        if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
           return !shouldPrint(aliasTy->getDecl());
         if (auto NTD = subTy->getAnyNominal())
           return !shouldPrint(NTD);
