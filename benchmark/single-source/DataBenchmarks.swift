@@ -177,7 +177,7 @@ public let DataBenchmarks = [
   BenchmarkInfo(name: "Data.hash.Small",
     runFunction: { hash($0*10_000, data: small) }, tags: d),
   BenchmarkInfo(name: "Data.hash.Medium",
-    runFunction: { hash($0*10_000, data: medium) }, tags: d),
+    runFunction: { hash($0*1_000, data: medium) }, tags: d),
 ]
 
 let emptyString = ""
