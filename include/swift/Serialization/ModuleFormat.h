@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 485; // remove @escaping parameter flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 486; // Last change: Opaque result types
 
 using DeclIDField = BCFixed<31>;
 
@@ -799,6 +799,12 @@ namespace decls_block {
     TypeIDField         // the existential type
   >;
   
+  using OpaqueArchetypeTypeLayout = BCRecordLayout<
+    OPAQUE_ARCHETYPE_TYPE,
+    DeclIDField,           // the opaque type decl
+    SubstitutionMapIDField // the arguments
+  >;
+  
   using NestedArchetypeTypeLayout = BCRecordLayout<
     NESTED_ARCHETYPE_TYPE,
     TypeIDField, // root archetype
@@ -1077,6 +1083,7 @@ namespace decls_block {
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // default argument resilience expansion
+    DeclIDField,  // opaque result type decl
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1087,6 +1094,16 @@ namespace decls_block {
     // - inlinable body text, if any
   >;
   
+  using OpaqueTypeLayout = BCRecordLayout<
+    OPAQUE_TYPE_DECL,
+    DeclContextIDField, // decl context
+    DeclIDField, // naming decl
+    GenericSignatureIDField, // interface generic signature
+    TypeIDField, // interface type for opaque type
+    GenericEnvironmentIDField, // generic environment
+    SubstitutionMapIDField // optional substitution map for underlying type
+  >;
+
   // TODO: remove the unnecessary FuncDecl components here
   using AccessorLayout = BCRecordLayout<
     ACCESSOR_DECL,
