@@ -66,12 +66,6 @@ static llvm::cl::opt<bool> TFWarnSendRecv(
     llvm::cl::desc(
         "Emit warnings for sends/receives."));
 
-static llvm::cl::opt<bool> TFWarnScalarTransfer(
-    "tf-warn-scalar-transfer", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Emit warnings for sends/receives that transfer values that are "
-        "known to be scalar."));
-
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
                                    Diag<T...> diag, U &&... args) {
@@ -901,12 +895,6 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
 
   auto &ctx = hostFn.getModule().getASTContext();
 
-  // If scalar transfer warnings are turned off, then don't warn about transfers
-  // that are definitely scalars.
-  if (!TFWarnScalarTransfer &&
-      isValidTensorFlowElementType(value->getType().getASTType()))
-    return;
-
   // If we are running this in the context of an expression run in the REPL or
   // playgrounds, or script mode, then we should never emit a warning: we know
   // we're going to be implicitly copying things in as warnings all the time.
@@ -1062,13 +1050,6 @@ void TFFunctionPartition::diagnoseCopyToHost(SILValue value,
                                              SILLocation loc) {
   if (!TFWarnSendRecv)
     return;
-
-  // If scalar transfer warnings are turned off, then don't warn about transfers
-  // that are definitely scalars.
-  if (!TFWarnScalarTransfer &&
-      classifyInst(user) == PartitioningClass::GetScalarOrDie) {
-    return;
-  }
 
   // Since we're in early development and don't support copies, we always show
   // the using instruction that caused the copy.

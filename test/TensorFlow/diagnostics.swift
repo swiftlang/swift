@@ -82,8 +82,9 @@ public func copyNonScalarTensorToAccel() -> Tensor<Float> {
 // Test that we do not diagnose a scalar transfer to the accelerator. There is a parallel test in
 // diagnostics_scalar_transfers.swift that tests that we do diagnose when
 // tf-warn-scalar-transfer=true.
+// expected-warning @+1 {{'x' implicitly copied to the accelerator}}
 public func scalarToAccelerator(x: Float) -> Tensor<Float> {
-  return Tensor(x) + 1
+  return Tensor(x) + 1 // expected-note {{value used here}}
 }
 
 // Test that we do not diagnose a scalar transfer to the host. There is a parallel test in
@@ -91,6 +92,7 @@ public func scalarToAccelerator(x: Float) -> Tensor<Float> {
 // tf-warn-scalar-transfer=true.
 public func scalarToHost() {
   var i = Tensor(0)
+  // expected-warning @+1 {{value implicitly copied to the host}}
   while i < 10 {
     print("Running loop body")
     i += 1

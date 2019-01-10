@@ -92,9 +92,10 @@ public func test2Sends() {
 
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation
 
+// expected-warning @+1 {{'c' implicitly copied to the accelerator}}
 public func testSendsInABranch(_ c: Bool) {
   var a = Tensor<Float>(1.0)
-  if c {
+  if c { // expected-note {{value used here}}
     a += a
     // One send.
     _hostOp(a.toHost())
@@ -210,6 +211,7 @@ public func testSendsInALoopWithNoResultTensor() {
 // On the other hand, this likely will not happen in a real use case.
 public func test1RecvScalarCPU() {
   let x = Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
+  // expected-warning @+1 {{value implicitly copied to the accelerator}}
   let y = x.scalar! + 2.0 // expected-note {{value used here}}
 
   let z = Tensor<Float>(y)
@@ -250,6 +252,7 @@ public func test1RecvScalarCPU() {
 public func test1RecvScalarGPU() {
   TensorFlow.enableGPU()
   let x = Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
+  // expected-warning @+1 {{value implicitly copied to the accelerator}}
   let y = x.scalar! + 2.0 // expected-note {{value used here}}
   let z = Tensor<Float>(y)
   let result = z+z
@@ -271,6 +274,7 @@ public func test1RecvScalarGPU() {
 public func test1RecvScalarTPU() {
   TensorFlow.enableTPU()
   let x = Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
+  // expected-warning @+1 {{value implicitly copied to the accelerator}}
   let y = x.scalar! + 2 // expected-note {{value used here}}
   let z = Tensor<Float>(y)
   let result = z + z
