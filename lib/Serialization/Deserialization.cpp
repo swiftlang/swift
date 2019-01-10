@@ -3147,6 +3147,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     DeclID accessorStorageDeclID;
     bool needsNewVTableEntry;
     uint8_t rawDefaultArgumentResilienceExpansion;
+    DeclID opaqueResultTypeDeclID;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -3161,6 +3162,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           rawDefaultArgumentResilienceExpansion,
+                                          opaqueResultTypeDeclID,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -3345,10 +3347,49 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
     
+    if (opaqueResultTypeDeclID)
+      fn->setOpaqueResultTypeDecl(
+                     cast<OpaqueTypeDecl>(getDecl(opaqueResultTypeDeclID)));
+
     // Set the interface type.
     fn->computeType();
 
     break;
+  }
+
+  case decls_block::OPAQUE_TYPE_DECL: {
+    DeclID namingDeclID;
+    DeclContextID contextID;
+    GenericSignatureID interfaceSigID;
+    TypeID interfaceTypeID;
+    GenericEnvironmentID genericEnvID;
+    SubstitutionMapID underlyingTypeID;
+    
+    decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
+                                              namingDeclID, interfaceSigID,
+                                              interfaceTypeID, genericEnvID,
+                                              underlyingTypeID);
+    
+    auto opaqueDecl =
+      new (ctx) OpaqueTypeDecl(cast<ValueDecl>(getDecl(namingDeclID)),
+                   nullptr,
+                   getDeclContext(contextID),
+                   getGenericSignature(interfaceSigID),
+                   getType(interfaceTypeID)->castTo<GenericTypeParamType>());
+    auto genericEnv = getGenericEnvironment(genericEnvID);
+    opaqueDecl->setGenericEnvironment(genericEnv);
+    if (underlyingTypeID)
+      opaqueDecl->setUnderlyingTypeSubstitutions(
+                                       getSubstitutionMap(underlyingTypeID));
+    SubstitutionMap subs;
+    if (genericEnv) {
+      subs = genericEnv->getGenericSignature()->getIdentitySubstitutionMap();
+    }
+    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+    auto metatype = MetatypeType::get(opaqueTy);
+    opaqueDecl->setInterfaceType(metatype);
+    
+    return opaqueDecl;
   }
 
   case decls_block::PATTERN_BINDING_DECL: {
@@ -4694,6 +4735,18 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       }, LookUpConformanceInModule(getAssociatedModule()));
     
     typeOrOffset = Type(interfaceTy).subst(subs);
+    break;
+  }
+
+  case decls_block::OPAQUE_ARCHETYPE_TYPE: {
+    DeclID opaqueDeclID;
+    SubstitutionMapID subsID;
+    decls_block::OpaqueArchetypeTypeLayout::readRecord(scratch,
+                                                       opaqueDeclID, subsID);
+    auto opaqueDecl = cast<OpaqueTypeDecl>(getDecl(opaqueDeclID));
+    auto subs = getSubstitutionMap(subsID);
+    
+    typeOrOffset = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
     break;
   }
 
