@@ -1463,40 +1463,6 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
   return false;
 }
 
-/// Determine whether the first type with the given number of optionals
-/// is potentially more optional than the second type with its number of
-/// optionals.
-static bool isPotentiallyMoreOptionalThan(Type type1, Type type2) {
-
-  SmallVector<Type, 2> optionals1;
-  Type objType1 = type1->lookThroughAllOptionalTypes(optionals1);
-  auto numOptionals1 = optionals1.size();
-
-  SmallVector<Type, 2> optionals2;
-  type2->lookThroughAllOptionalTypes(optionals2);
-  auto numOptionals2 = optionals2.size();
-
-  if (numOptionals1 <= numOptionals2 && !objType1->isTypeVariableOrMember())
-    return false;
-
-  return true;
-}
-
-/// Enumerate all of the applicable optional conversion restrictions
-static void enumerateOptionalConversionRestrictions(
-                    Type type1, Type type2,
-                    ConstraintKind kind, ConstraintLocatorBuilder locator,
-                    llvm::function_ref<void(ConversionRestrictionKind)> fn) {
-  // Optional-to-optional.
-  if (type1->getOptionalObjectType() && type2->getOptionalObjectType())
-    fn(ConversionRestrictionKind::OptionalToOptional);
-
-  // Inject a value into an optional.
-  if (isPotentiallyMoreOptionalThan(type2, type1)) {
-    fn(ConversionRestrictionKind::ValueToOptional);
-  }
-}
-
 /// Determine whether we can bind the given type variable to the given
 /// fixed type.
 static bool isBindable(TypeVariableType *typeVar, Type type) {
@@ -2315,11 +2281,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // A value of type T, T?, or T! can be converted to type U? or U! if
   // T is convertible to U.
   if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
-    enumerateOptionalConversionRestrictions(
-        type1, type2, kind, locator,
-        [&](ConversionRestrictionKind restriction) {
-      conversionsOrFixes.push_back(restriction);
-    });
+    if (type1->getOptionalObjectType() && type2->getOptionalObjectType()) {
+      // Optional-to-optional.
+      conversionsOrFixes.push_back(ConversionRestrictionKind::OptionalToOptional);
+    } else if (type2->getOptionalObjectType()) {
+      // Inject a value into an optional.
+      conversionsOrFixes.push_back(ConversionRestrictionKind::ValueToOptional);
+    }
   }
 
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
