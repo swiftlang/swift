@@ -93,6 +93,11 @@ extension ReversedCollection.Iterator: IteratorProtocol, Sequence {
     _base.formIndex(before: &_position)
     return _base[_position]
   }
+
+  @inlinable
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
+  }
 }
 
 extension ReversedCollection: Sequence {
