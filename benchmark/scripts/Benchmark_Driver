@@ -435,6 +435,19 @@ class BenchmarkDoctor(object):
                 "Decrease the workload of '%s' by a factor of %d (%d), to be "
                 "less than %d μs.", name, factor(2), factor(10), threshold)
 
+        threshold = 20
+        if runtime < threshold:
+            log = (BenchmarkDoctor.log_runtime.error if runtime == 0 else
+                   BenchmarkDoctor.log_runtime.warning)
+            log("'%s' execution took %d μs.", name, runtime)
+
+            BenchmarkDoctor.log_runtime.info(
+                "Ensure the workload of '%s' has a properly measurable size"
+                " (runtime > %d μs) and is not eliminated by the compiler (use"
+                " `blackHole` function if necessary)." if runtime == 0 else
+                "Increase the workload of '%s' to be more than %d μs.",
+                name, threshold)
+
     @staticmethod
     def _setup_overhead(measurements):
         select = BenchmarkDoctor._select
@@ -442,7 +455,8 @@ class BenchmarkDoctor(object):
                     [[result.samples.min for result in i_series]
                      for i_series in
                      [select(measurements, num_iters=i) for i in [1, 2]]]]
-        setup = int(round(2.0 * (ti1 - ti2)))
+        setup = (int(round(2.0 * (ti1 - ti2))) if ti2 > 20  # limit of accuracy
+                 else 0)
         ratio = (setup / ti1) if ti1 > 0 else 0
         return (setup, ratio)
 
