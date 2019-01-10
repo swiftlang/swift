@@ -22,10 +22,8 @@ public let SuperChars = BenchmarkInfo(
 // Permute some characters.
 let alphabetInput: [Character] = [
   "A", "B", "C", "D", "E", "F", "«",
-  "H", "I", "J", "K", "L", "M", "N",
   "á", "お", "S", "T", "U", "🇯🇵",
-  "🧟‍♀️", "👩‍👦‍👦", "g", "g", "I",
-  "🕴🏿", "2", "a", "t", "n", "?",
+  "🧟‍♀️", "👩‍👦‍👦", "🕴🏿", "2", "?",
   ]
 
 @inline(never)
