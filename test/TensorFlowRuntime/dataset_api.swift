@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-dynamic-compilation-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
@@ -73,7 +73,7 @@ DatasetAPITests.testAllBackends("SingleValueBatched") {
 }
 
 // TODO(SR-9156): Make this test work in graph mode.
-#if TF_DYNAMIC_COMPILATION
+#if !TF_NODYNAMIC_COMPILATION
 DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
   let scalars1 = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
   let scalars2 = Tensor<Int32>(rangeFrom: 5, to: 10, stride: 1)
@@ -86,7 +86,7 @@ DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
     i += 1
   }
 }
-#endif // TF_DYNAMIC_COMPILATION
+#endif // !TF_NODYNAMIC_COMPILATION
 
 #endif //!CUDA
 

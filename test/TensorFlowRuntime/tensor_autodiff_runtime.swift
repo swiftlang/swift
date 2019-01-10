@@ -1,4 +1,4 @@
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-eager-swift
 //
 // Note: GPE testing is disabled because GPE does not interact well with
 // VJP-based AD. See SR-9638.
