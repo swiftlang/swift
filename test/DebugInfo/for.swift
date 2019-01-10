@@ -7,7 +7,7 @@ for i in 0 ..< 3 {
 }
 
 for i in 0 ..< 3 {
-// CHECK-DAG: ![[SCOPE2:[0-9]+]] = {{.*}}Block(scope: ![[MAIN]],{{.*}}line: [[@LINE-1]]
+// CHECK-DAG: ![[SCOPE2:[0-9]+]] = {{.*}}Block(scope: ![[MAIN2:[0-9]+]],{{.*}}line: [[@LINE-1]]
 // CHECK-DAG: !DILocalVariable(name: "i", scope: ![[SCOPE1]]
 // CHECK-DAG: !DILocalVariable(name: "i", scope: ![[SCOPE2]]
 }
