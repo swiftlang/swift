@@ -30,8 +30,6 @@ extension String {
 }
 
 
-
-
 public let StringComparison: [BenchmarkInfo] = [
   BenchmarkInfo(
     name: "StringComparison_ascii",

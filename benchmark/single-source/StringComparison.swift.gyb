@@ -37,6 +37,7 @@ AllWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal",
 ComparisonWorkloads = AllWorkloads
 HashingWorkloads = AllWorkloads[:-1]
 NormalizationWorkloads = AllWorkloads[:-1]
+}%
 
 public let StringComparison: [BenchmarkInfo] = [
 % for Name in ComparisonWorkloads:
