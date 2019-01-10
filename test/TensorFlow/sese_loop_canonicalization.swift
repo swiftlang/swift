@@ -1,7 +1,14 @@
 // This test file has various test cases to check that unrollng the loop body
-// preserves the loop nesting.  Note that we use -Onone to preserve the
-// structure of control flow for tests.
-// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Onone -emit-sil %s -verify | %FileCheck %s
+// preserves the loop nesting.
+//
+// Note that we need to use -Onone to preserve the structure of control flow for
+// tests. However, deabstraction and partitioning is not invoked on
+// non-tensorflow conventions in Onone mode. Therefore, we need to generate .sil
+// from the source with optimziations turned off and run the relevant passes
+// directly on the resuling .sil file.
+//
+// RUN: %target-swift-frontend -Onone -emit-sil %s -o %t1
+// RUN: %target-sil-opt -tf-dynamic-compilation=false -assume-parsing-unqualified-ownership-sil -tf-dump-intermediates -tf-deabstraction-opt -tf-partition -verify %t1 -o /dev/null | %FileCheck %s 
 
 import TensorFlow
 

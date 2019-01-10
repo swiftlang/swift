@@ -1,4 +1,10 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Onone -emit-sil -Xllvm -tf-module-level-graph=false -verify %s | %FileCheck %s
+// Generate .sil from the source with optimziations turned off and run the
+// relevant passes on the resuling .sil file. This additional step is necessary
+// because deabstraction and partitioning is not invoked on non-tensorflow
+// conventions in Onone mode.
+//
+// RUN: %target-swift-frontend -Onone -emit-sil %s -o %t1
+// RUN: %target-sil-opt -tf-dynamic-compilation=false -assume-parsing-unqualified-ownership-sil -tf-dump-intermediates -tf-deabstraction-opt -tf-partition -verify %t1 -o /dev/null | %FileCheck %s 
 import TensorFlow
 
 public func testArrayValues() -> Tensor<Float> {
