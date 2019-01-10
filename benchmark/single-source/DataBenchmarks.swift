@@ -41,11 +41,11 @@ public let DataBenchmarks = [
     ])) } }, tags: d, legacyFactor: 20),
 
   BenchmarkInfo(name: "Data.init.Sequence.ExactCount", runFunction: {
-    for _ in 0..<$0*500 {
+    for _ in 0..<$0*100 {
       blackHole(Data(repeatElement(UInt8(0xA0), count: 809)))
     } }, tags: d),
   BenchmarkInfo(name: "Data.init.Sequence.UnderestimatedCount", runFunction: {
-    for _ in 0..<$0*500 { blackHole(Data(repeatElementSeq(809))) } }, tags: d),
+    for _ in 0..<$0*100 { blackHole(Data(repeatElementSeq(809))) } }, tags: d),
 
   BenchmarkInfo(name: "DataSubscriptSmall",
     runFunction: { let data = small
