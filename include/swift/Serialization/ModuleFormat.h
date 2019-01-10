@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 469; // @_hasStorage
+const uint16_t SWIFTMODULE_VERSION_MINOR = 472; // Last change: Opaque archetypes
 
 using DeclIDField = BCFixed<31>;
 
@@ -766,17 +766,30 @@ namespace decls_block {
     MetatypeRepresentationField        // representation
   >;
 
-  using ArchetypeTypeLayout = BCRecordLayout<
-    ARCHETYPE_TYPE,
+  using PrimaryArchetypeTypeLayout = BCRecordLayout<
+    PRIMARY_ARCHETYPE_TYPE,
     GenericEnvironmentIDField, // generic environment
-    TypeIDField                // interface type
+    BCVBR<4>, // generic type parameter depth
+    BCVBR<4>  // index + 1, or zero if we have a generic type parameter decl
   >;
 
-  using OpenedExistentialTypeLayout = BCRecordLayout<
-    OPENED_EXISTENTIAL_TYPE,
+  using OpenedArchetypeTypeLayout = BCRecordLayout<
+    OPENED_ARCHETYPE_TYPE,
     TypeIDField         // the existential type
   >;
-
+  
+  using OpaqueArchetypeTypeLayout = BCRecordLayout<
+    OPAQUE_ARCHETYPE_TYPE,
+    DeclIDField,           // the opaque type decl
+    SubstitutionMapIDField // the arguments
+  >;
+  
+  using NestedArchetypeTypeLayout = BCRecordLayout<
+    NESTED_ARCHETYPE_TYPE,
+    TypeIDField, // root archetype
+    TypeIDField // interface type relative to root
+  >;
+  
   using DynamicSelfTypeLayout = BCRecordLayout<
     DYNAMIC_SELF_TYPE,
     TypeIDField          // self type
@@ -1049,6 +1062,7 @@ namespace decls_block {
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // default argument resilience expansion
+    DeclIDField,  // opaque result type decl
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1057,6 +1071,16 @@ namespace decls_block {
     // - body parameter patterns
     // - the foreign error convention, if any
     // - inlinable body text, if any
+  >;
+  
+  using OpaqueTypeLayout = BCRecordLayout<
+    OPAQUE_TYPE_DECL,
+    DeclContextIDField, // decl context
+    DeclIDField, // naming decl
+    GenericSignatureIDField, // interface generic signature
+    TypeIDField, // interface type for opaque type
+    GenericEnvironmentIDField, // generic environment
+    SubstitutionMapIDField // optional substitution map for underlying type
   >;
 
   // TODO: remove the unnecessary FuncDecl components here

@@ -3131,6 +3131,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     DeclID accessorStorageDeclID;
     bool needsNewVTableEntry;
     uint8_t rawDefaultArgumentResilienceExpansion;
+    DeclID opaqueResultTypeDeclID;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -3145,6 +3146,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           rawDefaultArgumentResilienceExpansion,
+                                          opaqueResultTypeDeclID,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -3328,10 +3330,41 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       error();
       return nullptr;
     }
+    
+    if (opaqueResultTypeDeclID)
+      fn->setOpaqueResultTypeDecl(
+                         cast<OpaqueTypeDecl>(getDecl(opaqueResultTypeDeclID)));
 
     // Set the interface type.
     fn->computeType();
 
+    break;
+  }
+      
+  case decls_block::OPAQUE_TYPE_DECL: {
+    DeclID namingDeclID;
+    DeclContextID contextID;
+    GenericSignatureID interfaceSigID;
+    TypeID interfaceTypeID;
+    GenericEnvironmentID genericEnvID;
+    SubstitutionMapID underlyingTypeID;
+    
+    decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
+                                              namingDeclID, interfaceSigID,
+                                              interfaceTypeID, genericEnvID,
+                                              underlyingTypeID);
+    
+    auto opaqueDecl =
+      new (ctx) OpaqueTypeDecl(cast<ValueDecl>(getDecl(namingDeclID)), nullptr,
+                     getDeclContext(contextID),
+                     getGenericSignature(interfaceSigID),
+                     getType(interfaceTypeID)->castTo<GenericTypeParamType>());
+    auto genericEnv = getGenericEnvironment(genericEnvID);
+    opaqueDecl->setGenericEnvironment(genericEnv);
+    if (underlyingTypeID)
+      opaqueDecl->setUnderlyingTypeSubstitutions(
+                                          getSubstitutionMap(underlyingTypeID));
+    declOrOffset = opaqueDecl;
     break;
   }
 
@@ -4621,12 +4654,12 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
-  case decls_block::ARCHETYPE_TYPE: {
+  case decls_block::PRIMARY_ARCHETYPE_TYPE: {
     GenericEnvironmentID envID;
-    TypeID interfaceTypeID;
+    unsigned depth, index;
 
-    decls_block::ArchetypeTypeLayout::readRecord(scratch, envID,
-                                                 interfaceTypeID);
+    decls_block::PrimaryArchetypeTypeLayout::readRecord(scratch, envID,
+                                                        depth, index);
 
     auto env = getGenericEnvironment(envID);
     if (!env) {
@@ -4634,7 +4667,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       break;
     }
 
-    Type interfaceType = getType(interfaceTypeID);
+    Type interfaceType = GenericTypeParamType::get(depth, index, ctx);
     Type contextType = env->mapTypeIntoContext(interfaceType);
     typeOrOffset = contextType;
 
@@ -4646,13 +4679,48 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
-  case decls_block::OPENED_EXISTENTIAL_TYPE: {
+  case decls_block::OPENED_ARCHETYPE_TYPE: {
     TypeID existentialID;
 
-    decls_block::OpenedExistentialTypeLayout::readRecord(scratch,
-                                                         existentialID);
+    decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
+                                                       existentialID);
 
     typeOrOffset = OpenedArchetypeType::get(getType(existentialID));
+    break;
+  }
+      
+  case decls_block::OPAQUE_ARCHETYPE_TYPE: {
+    DeclID opaqueDeclID;
+    SubstitutionMapID subsID;
+    decls_block::OpaqueArchetypeTypeLayout::readRecord(scratch,
+                                                       opaqueDeclID, subsID);
+    
+    auto opaqueDecl = cast<OpaqueTypeDecl>(getDecl(opaqueDeclID));
+    auto subs = getSubstitutionMap(subsID);
+    
+    typeOrOffset = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+    break;
+  }
+      
+  case decls_block::NESTED_ARCHETYPE_TYPE: {
+    TypeID rootID, interfaceTyID;
+    decls_block::NestedArchetypeTypeLayout::readRecord(scratch,
+                                                       rootID, interfaceTyID);
+    
+    auto rootTy = getType(rootID)->castTo<ArchetypeType>();
+    auto interfaceTy = getType(interfaceTyID)->castTo<DependentMemberType>();
+    auto rootInterfaceTy = interfaceTy->getRootGenericParam();
+    
+    auto sig = rootTy->getGenericEnvironment()->getGenericSignature();
+    
+    auto subs = SubstitutionMap::get(sig,
+      [&](SubstitutableType *t) -> Type {
+        if (t->isEqual(rootInterfaceTy))
+          return rootTy;
+        return t;
+      }, LookUpConformanceInModule(getAssociatedModule()));
+    
+    typeOrOffset = Type(interfaceTy).subst(subs);
     break;
   }
 
