@@ -107,6 +107,6 @@ public func runAllTestsWithRemoteSession(taskCount: Int = 2) {
   _RuntimeConfig.tensorFlowRuntimeInitialized = true
 
   let testCluster = TestCluster(taskCount: taskCount)
-  _RuntimeConfig.session = .remote(grpcAddress: testCluster.serverDef)
+  _RuntimeConfig.session = .remote(serverDef: testCluster.serverDef)
   runAllTests()
 }
