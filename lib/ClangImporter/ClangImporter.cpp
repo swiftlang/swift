@@ -2538,7 +2538,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
 
       // Note: We can't use getAnyGeneric() here because `aliasedTy`
       // might be typealias.
-      if (auto Ty = dyn_cast<NameAliasType>(aliasedTy.getPointer()))
+      if (auto Ty = dyn_cast<TypeAliasType>(aliasedTy.getPointer()))
         importedDecl = Ty->getDecl();
       else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
         importedDecl = Ty->getDecl();

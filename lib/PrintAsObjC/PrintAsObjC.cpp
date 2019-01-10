@@ -1071,7 +1071,7 @@ private:
   /// thereof.
   bool isCFTypeRef(Type ty) {
     const TypeAliasDecl *TAD = nullptr;
-    while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
+    while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
       TAD = aliasTy->getDecl();
       ty = aliasTy->getSinglyDesugaredType();
     }
@@ -1612,7 +1612,7 @@ private:
     return true;
   }
 
-  void visitNameAliasType(NameAliasType *aliasTy,
+  void visitTypeAliasType(TypeAliasType *aliasTy,
                                Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
     if (printIfKnownSimpleType(alias, optionalKind))
@@ -2053,7 +2053,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
     llvm_unreachable("unhandled type");
   }
 
-  void visitNameAliasType(NameAliasType *aliasTy) {
+  void visitTypeAliasType(TypeAliasType *aliasTy) {
     if (aliasTy->getDecl()->hasClangNode() &&
         !aliasTy->getDecl()->isCompatibilityAlias()) {
       Callback(*this, aliasTy->getDecl());

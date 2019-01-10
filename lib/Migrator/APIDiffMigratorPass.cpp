@@ -366,11 +366,11 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   llvm::StringSet<> OverridingRemoveNames;
 
   /// For a given expression, check whether the type of this expression is
-  /// name alias type, and the name alias type is known to change to raw
+  /// type alias type, and the type alias type is known to change to raw
   /// representable type.
   bool isRecognizedTypeAliasChange(Expr *E) {
     if (auto Ty = E->getType()) {
-      if (auto *NT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+      if (auto *NT = dyn_cast<TypeAliasType>(Ty.getPointer())) {
         for (auto Item: getRelatedDiffItems(NT->getDecl())) {
           if (auto CI = dyn_cast<CommonDiffItem>(Item)) {
             if (CI->DiffKind == NodeAnnotation::TypeAliasDeclToRawRepresentable) {

@@ -1329,13 +1329,13 @@ private:
 
     // Sugared types.
 
-    case TypeKind::NameAlias: {
-      auto *NameAliasTy = cast<NameAliasType>(BaseTy);
-      auto *Decl = NameAliasTy->getDecl();
+    case TypeKind::TypeAlias: {
+      auto *TypeAliasTy = cast<TypeAliasType>(BaseTy);
+      auto *Decl = TypeAliasTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
-      auto AliasedTy = NameAliasTy->getSinglyDesugaredType();
+      auto AliasedTy = TypeAliasTy->getSinglyDesugaredType();
       auto File = getOrCreateFile(L.Filename);
-      // For NameAlias types, the DeclContext for the aliasED type is
+      // For TypeAlias types, the DeclContext for the aliasED type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
          DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), AliasedTy,

@@ -134,7 +134,7 @@ bool DebugTypeInfo::operator!=(DebugTypeInfo T) const { return !operator==(T); }
 TypeDecl *DebugTypeInfo::getDecl() const {
   if (auto *N = dyn_cast<NominalType>(Type))
     return N->getDecl();
-  if (auto *BTA = dyn_cast<NameAliasType>(Type))
+  if (auto *BTA = dyn_cast<TypeAliasType>(Type))
     return BTA->getDecl();
   if (auto *UBG = dyn_cast<UnboundGenericType>(Type))
     return UBG->getDecl();

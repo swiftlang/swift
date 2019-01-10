@@ -198,7 +198,7 @@ namespace {
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.def"
     
-    // Given a loaded type like CInt, look through the name alias sugar that the
+    // Given a loaded type like CInt, look through the type alias sugar that the
     // stdlib uses to show the underlying type.  We want to import the signature
     // of the exit(3) libc function as "func exit(Int32)", not as
     // "func exit(CInt)".
@@ -206,7 +206,7 @@ namespace {
       // Handle missing or invalid stdlib declarations
       if (!T || T->hasError())
         return Type();
-      if (auto *NAT = dyn_cast<NameAliasType>(T.getPointer()))
+      if (auto *NAT = dyn_cast<TypeAliasType>(T.getPointer()))
         return NAT->getSinglyDesugaredType();
       return T;
     }
@@ -2515,7 +2515,7 @@ Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
         parentType = nominal->getDeclaredInterfaceType();
     }
 
-    return NameAliasType::get(typealias, parentType, SubstitutionMap(),
+    return TypeAliasType::get(typealias, parentType, SubstitutionMap(),
                               typealias->getUnderlyingTypeLoc().getType());
   }
 

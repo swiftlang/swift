@@ -3856,7 +3856,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   // If we had a typealias, form a sugared type.
   if (typealias) {
-    type = NameAliasType::get(typealias, parentType, subMap, type);
+    type = TypeAliasType::get(typealias, parentType, subMap, type);
   }
 
   return type;
@@ -5315,13 +5315,13 @@ public:
 
   Action walkToTypePost(Type ty) override {
     // Infer from generic typealiases.
-    if (auto NameAlias = dyn_cast<NameAliasType>(ty.getPointer())) {
-      auto decl = NameAlias->getDecl();
+    if (auto TypeAlias = dyn_cast<TypeAliasType>(ty.getPointer())) {
+      auto decl = TypeAlias->getDecl();
       auto genericSig = decl->getGenericSignature();
       if (!genericSig)
         return Action::Continue;
 
-      auto subMap = NameAlias->getSubstitutionMap();
+      auto subMap = TypeAlias->getSubstitutionMap();
       for (const auto &rawReq : genericSig->getRequirements()) {
         if (auto req = rawReq.subst(subMap))
           Builder.addRequirement(*req, source, nullptr);

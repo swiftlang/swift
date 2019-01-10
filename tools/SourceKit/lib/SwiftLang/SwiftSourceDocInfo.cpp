@@ -747,7 +747,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   if (VD->hasInterfaceType()) {
     llvm::raw_svector_ostream OS(SS);
     PrintOptions Options;
-    Options.PrintNameAliasUnderlyingType = true;
+    Options.PrintTypeAliasUnderlyingType = true;
     VD->getInterfaceType().print(OS, Options);
   }
   unsigned TypenameEnd = SS.size();

@@ -885,7 +885,7 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty,
   if (Ty->isVoid()) {
     return Ctx.buffer("Void");
   }
-  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+  if (auto *NAT = dyn_cast<TypeAliasType>(Ty.getPointer())) {
     return NAT->getDecl()->getNameStr();
   }
   if (Ty->getAnyNominal()) {
@@ -1199,7 +1199,7 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
     T = T->getCanonicalType();
   }
 
-  if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
+  if (auto NAT = dyn_cast<TypeAliasType>(T.getPointer())) {
     SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeAlias);
     Root->addChild(constructTypeNode(NAT->getSinglyDesugaredType()));
     return Root;

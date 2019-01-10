@@ -2727,7 +2727,7 @@ public:
         }
         addTypeAnnotation(
                       Builder,
-                      NameAliasType::get(const_cast<TypeAliasDecl *>(TAD),
+                      TypeAliasType::get(const_cast<TypeAliasDecl *>(TAD),
                                          parentType, SubstitutionMap(),
                                          underlyingType));
 
@@ -2928,7 +2928,7 @@ public:
           // type is the typealias instead of the underlying type of the alias.
           Optional<Type> Result = None;
           if (!CD->getInterfaceType()->is<ErrorType>() &&
-              isa<NameAliasType>(Ty.getPointer()) &&
+              isa<TypeAliasType>(Ty.getPointer()) &&
               Ty->getDesugaredType() ==
                 CD->getResultInterfaceType().getPointer()) {
             Result = Ty;
