@@ -969,9 +969,6 @@ static void checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
   }
 
   // Look through copies, borrows, and conversions.
-  //
-  // Note: This handles ConversionInst, which already includes everything in
-  // swift::stripConvertFunctions.
   if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
     // Only follow the copied operand. Other operands are incidental,
     // as in the second operand of mark_dependence.

@@ -312,22 +312,6 @@ bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
   return false;
 }
 
-SILValue swift::stripConvertFunctions(SILValue V) {
-  while (true) {
-    if (auto CFI = dyn_cast<ConvertFunctionInst>(V)) {
-      V = CFI->getOperand();
-      continue;
-    }
-    else if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(V)) {
-      V = Cvt->getOperand();
-      continue;
-    }
-    break;
-  }
-  return V;
-}
-
-
 SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   if (PAI->getNumArguments() != 1)
     return SILValue();
