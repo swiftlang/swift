@@ -1138,13 +1138,49 @@ static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
   return true;
 }
 
+static bool
+deadMarkDependenceUser(SILInstruction *Inst,
+                       SmallVectorImpl<SILInstruction *> &DeleteInsts) {
+  if (!isa<MarkDependenceInst>(Inst))
+    return false;
+  DeleteInsts.push_back(Inst);
+  for (auto *Use : cast<SingleValueInstruction>(Inst)->getUses()) {
+    if (!deadMarkDependenceUser(Use->getUser(), DeleteInsts))
+      return false;
+  }
+  return true;
+}
+
 /// TODO: Generalize this to general objects.
 bool swift::tryDeleteDeadClosure(SingleValueInstruction *Closure,
                                  InstModCallbacks Callbacks) {
+  auto *PA = dyn_cast<PartialApplyInst>(Closure);
+
   // We currently only handle locally identified values that do not escape. We
   // also assume that the partial apply does not capture any addresses.
-  if (!isa<PartialApplyInst>(Closure) && !isa<ThinToThickFunctionInst>(Closure))
+  if (!PA && !isa<ThinToThickFunctionInst>(Closure))
     return false;
+
+  // A stack allocated partial apply does not have any release users. Delete it
+  // if the only users are the dealloc_stack and mark_dependence instructions.
+  if (PA && PA->isOnStack()) {
+    SmallVector<SILInstruction*, 8> DeleteInsts;
+    for (auto *Use : PA->getUses()) {
+      if (isa<DeallocStackInst>(Use->getUser()) ||
+          isa<DebugValueInst>(Use->getUser()))
+        DeleteInsts.push_back(Use->getUser());
+      else if (!deadMarkDependenceUser(Use->getUser(), DeleteInsts))
+        return false;
+    }
+    for (auto *Inst : reverse(DeleteInsts))
+      Callbacks.DeleteInst(Inst);
+    Callbacks.DeleteInst(PA);
+
+    // Note: the lifetime of the captured arguments is managed outside of the
+    // trivial closure value i.e: there will already be releases for the
+    // captured arguments. Releasing captured arguments is not necessary.
+    return true;
+  }
 
   // We only accept a user if it is an ARC object that can be removed if the
   // object is dead. This should be expanded in the future. This also ensures
@@ -1768,6 +1804,13 @@ swift::findLocalApplySites(FunctionRefBaseInst *FRI) {
            std::back_inserter(worklist));
       continue;
 
+    // A partial_apply [stack] marks its captured arguments with
+    // mark_dependence.
+    case SILInstructionKind::MarkDependenceInst:
+      copy(cast<SingleValueInstruction>(user)->getUses(),
+           std::back_inserter(worklist));
+      continue;
+
     // Look through any reference count instructions since these are not
     // escapes:
     case SILInstructionKind::CopyValueInst:
@@ -1778,6 +1821,8 @@ swift::findLocalApplySites(FunctionRefBaseInst *FRI) {
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::ReleaseValueInst:
     case SILInstructionKind::DestroyValueInst:
+    // A partial_apply [stack] is deallocated with a dealloc_stack.
+    case SILInstructionKind::DeallocStackInst:
       continue;
     default:
       break;
