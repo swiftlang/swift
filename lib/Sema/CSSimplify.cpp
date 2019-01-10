@@ -2146,15 +2146,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     // Pointer arguments can be converted from pointer-compatible types.
     if (kind >= ConstraintKind::ArgumentConversion) {
-      Type unwrappedType2 = type2;
-      bool type2IsOptional = false;
-      if (Type unwrapped = type2->getOptionalObjectType()) {
-        type2IsOptional = true;
-        unwrappedType2 = unwrapped;
-      }
       PointerTypeKind pointerKind;
-      if (Type pointeeTy =
-              unwrappedType2->getAnyPointerElementType(pointerKind)) {
+      if (Type pointeeTy = type2->getAnyPointerElementType(pointerKind)) {
         switch (pointerKind) {
         case PTK_UnsafeRawPointer:
         case PTK_UnsafeMutableRawPointer:
@@ -2183,24 +2176,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
           // Operators cannot use these implicit conversions.
           if (kind == ConstraintKind::ArgumentConversion) {
-            // We can potentially convert from an UnsafeMutablePointer
-            // of a different type, if we're a void pointer.
-            Type unwrappedType1 = type1;
-            bool type1IsOptional = false;
-            if (Type unwrapped = type1->getOptionalObjectType()) {
-              type1IsOptional = true;
-              unwrappedType1 = unwrapped;
-            }
-
-            // Don't handle normal optional-related conversions here.
-            if (unwrappedType1->isEqual(unwrappedType2))
-              break;
-
             PointerTypeKind type1PointerKind;
             bool type1IsPointer{
-                unwrappedType1->getAnyPointerElementType(type1PointerKind)};
-            bool optionalityMatches = !type1IsOptional || type2IsOptional;
-            if (type1IsPointer && optionalityMatches) {
+                type1->getAnyPointerElementType(type1PointerKind)};
+            if (type1IsPointer) {
               if (type1PointerKind == PTK_UnsafeMutablePointer) {
                 // Favor an UnsafeMutablePointer-to-UnsafeMutablePointer
                 // conversion.
@@ -2241,7 +2220,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 }
               }
               
-              if (type1IsPointer && optionalityMatches &&
+              if (type1IsPointer &&
                   (type1PointerKind == PTK_UnsafePointer ||
                    type1PointerKind == PTK_AutoreleasingUnsafeMutablePointer)) {
                 conversionsOrFixes.push_back(
