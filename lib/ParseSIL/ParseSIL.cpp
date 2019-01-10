@@ -112,9 +112,11 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
                                 bool *Done,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
-                                DelayedParsingCallbacks *DelayedParseCB) {
+                                DelayedParsingCallbacks *DelayedParseCB,
+                                bool DisableDelayedParsing) {
   SharedTimer timer("Parsing");
-  Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState);
+  Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState,
+    DisableDelayedParsing);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,

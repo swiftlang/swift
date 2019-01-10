@@ -333,12 +333,15 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
 
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
-               PersistentParserState *PersistentState)
-    : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState) {}
+               PersistentParserState *PersistentState,
+               bool DisableDelayedParsing)
+    : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState,
+             DisableDelayedParsing) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
                SILParserTUStateBase *SIL,
-               PersistentParserState *PersistentState)
+               PersistentParserState *PersistentState,
+               bool DisableDelayedParsing)
     : Parser(
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
@@ -353,7 +356,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
               SF.shouldBuildSyntaxTree()
                   ? TriviaRetentionMode::WithTrivia
                   : TriviaRetentionMode::WithoutTrivia)),
-          SF, SIL, PersistentState) {}
+          SF, SIL, PersistentState, DisableDelayedParsing) {}
 
 namespace {
 
@@ -472,7 +475,8 @@ public:
 
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserTUStateBase *SIL,
-               PersistentParserState *PersistentState)
+               PersistentParserState *PersistentState,
+               bool DisableDelayedParsing)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
     SF(SF),
@@ -480,6 +484,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     SIL(SIL),
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
+    DisableDelayedParsing(DisableDelayedParsing),
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
