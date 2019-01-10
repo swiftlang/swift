@@ -716,6 +716,14 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
+        @inlinable // This is @inlinable as tribially computable.
+        mutating func append(byte: UInt8) {
+            let count = self.count
+            assert(count + 1 <= MemoryLayout<Buffer>.size)
+            Swift.withUnsafeMutableBytes(of: &bytes) { $0[count] = byte }
+            self.length += 1
+        }
+
         @inlinable // This is @inlinable as trivially computable.
         mutating func append(contentsOf buffer: UnsafeRawBufferPointer) {
             guard buffer.count > 0 else { return }
@@ -2056,10 +2064,14 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 // Copy the contents of buffer...
                 _representation = _Representation(UnsafeRawBufferPointer(start: base, count: endIndex))
 
-                // ... and append the rest byte-wise.
+                // ... and append the rest byte-wise, buffering through an InlineData.
+                var buffer = InlineData()
                 while let element = iter.next() {
-                    Swift.withUnsafeBytes(of: element) {
-                        _representation.append(contentsOf: $0)
+                    if buffer.count < buffer.capacity {
+                        buffer.append(byte: element)
+                    } else {
+                        buffer.withUnsafeBytes {_representation.append(contentsOf: $0)}
+                        buffer.count = 0
                     }
                 }
             }
@@ -2340,10 +2352,14 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             // Copy the contents of the buffer...
             _representation.append(contentsOf: UnsafeRawBufferPointer(start: base, count: endIndex))
 
-            /// ... and append the rest byte-wise.
+            // ... and append the rest byte-wise, buffering through an InlineData.
+            var buffer = InlineData()
             while let element = iter.next() {
-                Swift.withUnsafeBytes(of: element) {
-                    _representation.append(contentsOf: $0)
+                if buffer.count < buffer.capacity {
+                    buffer.append(byte: element)
+                } else {
+                    buffer.withUnsafeBytes {_representation.append(contentsOf: $0)}
+                    buffer.count = 0
                 }
             }
         }
