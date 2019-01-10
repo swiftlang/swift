@@ -1741,8 +1741,7 @@ static bool shouldSerializeMember(Decl *D) {
     return false;
 
   case DeclKind::OpaqueType:
-    // TODO: Will eventually need to serialize.
-    return false;
+    return true;
       
   case DeclKind::EnumElement:
   case DeclKind::Protocol:
@@ -2724,8 +2723,6 @@ void Serializer::writeDecl(const Decl *D) {
   }
 
   switch (D->getKind()) {
-  case DeclKind::OpaqueType:
-    llvm_unreachable("serialization not implemented yet");
   case DeclKind::Import:
     llvm_unreachable("import decls should not be serialized");
 
@@ -3284,7 +3281,7 @@ void Serializer::writeDecl(const Decl *D) {
     Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
-
+    
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            contextID,
                            fn->isImplicit(),
@@ -3307,6 +3304,7 @@ void Serializer::writeDecl(const Decl *D) {
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
                            rawDefaultArgumentResilienceExpansion,
+                           addDeclRef(fn->getOpaqueResultTypeDecl()),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -3319,6 +3317,31 @@ void Serializer::writeDecl(const Decl *D) {
 
     writeInlinableBodyTextIfNeeded(fn);
 
+    break;
+  }
+      
+  case DeclKind::OpaqueType: {
+    auto opaqueDecl = cast<OpaqueTypeDecl>(D);
+    verifyAttrSerializable(opaqueDecl);
+    
+    auto namingDeclID = addDeclRef(opaqueDecl->getNamingDecl());
+    auto contextID = addDeclContextRef(opaqueDecl->getDeclContext());
+    auto interfaceSigID =
+      addGenericSignatureRef(opaqueDecl->getOpaqueInterfaceGenericSignature());
+    auto interfaceTypeID =
+      addTypeRef(opaqueDecl->getUnderlyingInterfaceType());
+    
+    auto genericEnvID = addGenericEnvironmentRef(opaqueDecl->getGenericEnvironment());
+    
+    SubstitutionMapID underlyingTypeID = 0;
+    if (auto underlying = opaqueDecl->getUnderlyingTypeSubstitutions())
+      underlyingTypeID = addSubstitutionMapRef(*underlying);
+    
+    unsigned abbrCode = DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
+    OpaqueTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 contextID, namingDeclID, interfaceSigID,
+                                 interfaceTypeID, genericEnvID,
+                                 underlyingTypeID);
     break;
   }
 
@@ -3803,31 +3826,46 @@ void Serializer::writeType(Type ty) {
     break;
   }
       
-  case TypeKind::OpaqueTypeArchetype:
-    llvm_unreachable("todo");
-
-  case TypeKind::PrimaryArchetype:
-  case TypeKind::NestedArchetype: {
-    auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
-    assert(isa<PrimaryArchetypeType>(archetypeTy->getRoot())
-           && "need to implement for nested archetypes of opened/opaque types");
-
+  case TypeKind::PrimaryArchetype: {
+    auto archetypeTy = cast<PrimaryArchetypeType>(ty.getPointer());
     auto env = archetypeTy->getGenericEnvironment();
 
     GenericEnvironmentID envID = addGenericEnvironmentRef(env);
-    Type interfaceType = archetypeTy->getInterfaceType();
+    auto interfaceType = archetypeTy->getInterfaceType()
+      ->castTo<GenericTypeParamType>();
 
-    unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
-    ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    envID, addTypeRef(interfaceType));
+    unsigned abbrCode = DeclTypeAbbrCodes[PrimaryArchetypeTypeLayout::Code];
+    PrimaryArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           envID,
+                                           interfaceType->getDepth(),
+                                           interfaceType->getIndex());
     break;
   }
 
   case TypeKind::OpenedArchetype: {
     auto archetypeTy = cast<OpenedArchetypeType>(ty.getPointer());
-    unsigned abbrCode = DeclTypeAbbrCodes[OpenedExistentialTypeLayout::Code];
-    OpenedExistentialTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    unsigned abbrCode = DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
+    OpenedArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            addTypeRef(archetypeTy->getOpenedExistentialType()));
+    break;
+  }
+
+  case TypeKind::OpaqueTypeArchetype: {
+    auto archetypeTy = cast<OpaqueTypeArchetypeType>(ty.getPointer());
+    auto declID = addDeclRef(archetypeTy->getOpaqueDecl());
+    auto substMapID = addSubstitutionMapRef(archetypeTy->getSubstitutions());
+    unsigned abbrCode = DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
+    OpaqueArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                          declID, substMapID);
+    break;
+  }
+  case TypeKind::NestedArchetype: {
+    auto archetypeTy = cast<NestedArchetypeType>(ty.getPointer());
+    auto rootTypeID = addTypeRef(archetypeTy->getRoot());
+    auto interfaceTypeID = addTypeRef(archetypeTy->getInterfaceType());
+    unsigned abbrCode = DeclTypeAbbrCodes[NestedArchetypeTypeLayout::Code];
+    NestedArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                          rootTypeID, interfaceTypeID);
     break;
   }
 
@@ -4085,7 +4123,10 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<FunctionParamLayout>();
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
-  registerDeclTypeAbbr<ArchetypeTypeLayout>();
+  registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
+  registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
+  registerDeclTypeAbbr<OpaqueArchetypeTypeLayout>();
+  registerDeclTypeAbbr<NestedArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
@@ -4098,7 +4139,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
-  registerDeclTypeAbbr<OpenedExistentialTypeLayout>();
 
   registerDeclTypeAbbr<TypeAliasLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
@@ -4109,6 +4149,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ParamLayout>();
   registerDeclTypeAbbr<FuncLayout>();
   registerDeclTypeAbbr<AccessorLayout>();
+  registerDeclTypeAbbr<OpaqueTypeLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
