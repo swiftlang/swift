@@ -120,9 +120,12 @@ public let DataBenchmarks = [
   BenchmarkInfo(name: "DataAppendSequence",
     runFunction: { append($0*100, sequenceLength: 809, to: medium) },
     tags: d, legacyFactor: 100),
+  BenchmarkInfo(name: "Data.append.Sequence.ExactCount", runFunction: {
+    append($0*100, sequence: repeatElement(UInt8(0xA0), count: 809),
+           to: medium) }, tags: d),
   BenchmarkInfo(name: "Data.append.Sequence.UnderestimatedCount", runFunction: {
     append($0*100, sequence: repeatElementSeq(809), to: medium) },
-    tags: d, legacyFactor: 100),
+    tags: d),
 
   BenchmarkInfo(name: "DataAppendDataSmallToSmall",
     runFunction: { append($0*500, data: small, to: small) }, tags: d,
