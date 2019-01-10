@@ -7,8 +7,8 @@ import os
 import subprocess
 import sys
 
-from test_util import TestFailedError, run_command, \
-    serializeIncrParseMarkupFile, prepareForIncrParse
+from test_util import TestFailedError, prepareForIncrParse, run_command, \
+    serializeIncrParseMarkupFile
 
 
 def testWithParserLib(test_file, test_case, pre_edit_file, post_edit_file,
@@ -133,13 +133,13 @@ def main():
             '.post.swift'
         after_roundtrip_file = temp_dir + '/' + test_file_name + '.' \
             + test_case + '.post_after_roundtrip.swift'
-        return testWithParserLib(test_file=test_file,
-                                 test_case=test_case,
-                                 pre_edit_file=pre_edit_file,
-                                 post_edit_file=post_edit_file,
-                                 after_roundtrip_file=after_roundtrip_file,
-                    swiftsyntax_lit_test_helper=swiftsyntax_lit_test_helper)
-
+        return testWithParserLib(
+            test_file=test_file,
+            test_case=test_case,
+            pre_edit_file=pre_edit_file,
+            post_edit_file=post_edit_file,
+            after_roundtrip_file=after_roundtrip_file,
+            swiftsyntax_lit_test_helper=swiftsyntax_lit_test_helper)
 
     treeFileExtension = serialization_format
 
