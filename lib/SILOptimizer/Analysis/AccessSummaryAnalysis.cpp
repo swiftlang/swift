@@ -137,6 +137,9 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
     return true;
+  // partial_apply [stack] is terminated by a dealloc_stack.
+  case SILInstructionKind::DeallocStackInst:
+    return true;
 
   case SILInstructionKind::ConvertFunctionInst:
     return llvm::all_of(cast<ConvertFunctionInst>(user)->getUses(),
