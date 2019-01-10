@@ -121,10 +121,8 @@ public func unpackAggregate_generic() {
 // Checks that unpacking reuses extraction instructions instead of making new
 // ones for each element of the input list.
 // TODO(SR-8680): After fixing tuples, make x a tuple, so that we also test tuple extract reuse.
-// expected-warning @+1 {{copied to the accelerator}}
 public func unpackAggregate_reuse(x: Tensor<Float>) {
-  // expected-error @+2 {{op named 'SomeOp7' is not registered in TensorFlow}}
-  // expected-note @+1 {{value used here}}
+  // expected-error @+1 {{op named 'SomeOp7' is not registered in TensorFlow}}
   let _: Tensor<Float> = #tfop("SomeOp7", [x, x])
 }
 
