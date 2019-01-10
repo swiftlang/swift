@@ -2830,6 +2830,7 @@ public:
     DeclID accessorStorageDeclID;
     bool needsNewVTableEntry;
     uint8_t rawDefaultArgumentResilienceExpansion;
+    DeclID opaqueResultTypeDeclID;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -2844,6 +2845,7 @@ public:
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           rawDefaultArgumentResilienceExpansion,
+                                          opaqueResultTypeDeclID,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -3028,6 +3030,10 @@ public:
       return nullptr;
     }
     
+    if (opaqueResultTypeDeclID)
+      fn->setOpaqueResultTypeDecl(
+                     cast<OpaqueTypeDecl>(MF.getDecl(opaqueResultTypeDeclID)));
+
     // Set the interface type.
     fn->computeType();
 
@@ -3041,6 +3047,42 @@ public:
   Expected<Decl *> deserializeAccessor(ArrayRef<uint64_t> scratch,
                                        StringRef blobData) {
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
+  }
+      
+  Expected<Decl *> deserializeOpaqueType(ArrayRef<uint64_t> scratch,
+                                         StringRef blobData) {
+    DeclID namingDeclID;
+    DeclContextID contextID;
+    GenericSignatureID interfaceSigID;
+    TypeID interfaceTypeID;
+    GenericEnvironmentID genericEnvID;
+    SubstitutionMapID underlyingTypeID;
+    
+    decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
+                                              namingDeclID, interfaceSigID,
+                                              interfaceTypeID, genericEnvID,
+                                              underlyingTypeID);
+    
+    auto opaqueDecl =
+      new (ctx) OpaqueTypeDecl(cast<ValueDecl>(MF.getDecl(namingDeclID)),
+                   nullptr,
+                   MF.getDeclContext(contextID),
+                   MF.getGenericSignature(interfaceSigID),
+                   MF.getType(interfaceTypeID)->castTo<GenericTypeParamType>());
+    auto genericEnv = MF.getGenericEnvironment(genericEnvID);
+    opaqueDecl->setGenericEnvironment(genericEnv);
+    if (underlyingTypeID)
+      opaqueDecl->setUnderlyingTypeSubstitutions(
+                                       MF.getSubstitutionMap(underlyingTypeID));
+    SubstitutionMap subs;
+    if (genericEnv) {
+      subs = genericEnv->getGenericSignature()->getIdentitySubstitutionMap();
+    }
+    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+    auto metatype = MetatypeType::get(opaqueTy);
+    opaqueDecl->setInterfaceType(metatype);
+    
+    return opaqueDecl;
   }
 
   Expected<Decl *> deserializePatternBinding(ArrayRef<uint64_t> scratch,
@@ -4097,6 +4139,7 @@ DeclDeserializer::getDeclCheckedImpl() {
   CASE(Var)
   CASE(Param)
   CASE(Func)
+  CASE(OpaqueType)
   CASE(Accessor)
   CASE(PatternBinding)
   CASE(Protocol)
@@ -4683,6 +4726,18 @@ public:
     return OpenedArchetypeType::get(MF.getType(existentialID));
   }
       
+  Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,
+                                                StringRef blobData) {
+    DeclID opaqueDeclID;
+    SubstitutionMapID subsID;
+    decls_block::OpaqueArchetypeTypeLayout::readRecord(scratch,
+                                                       opaqueDeclID, subsID);
+    auto opaqueDecl = cast<OpaqueTypeDecl>(MF.getDecl(opaqueDeclID));
+    auto subs = MF.getSubstitutionMap(subsID);
+    
+    return Type(OpaqueTypeArchetypeType::get(opaqueDecl, subs));
+  }
+
   Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     TypeID rootID, interfaceTyID;
@@ -5114,6 +5169,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(ReferenceStorage)
   CASE(PrimaryArchetype)
   CASE(OpenedArchetype)
+  CASE(OpaqueArchetype)
   CASE(NestedArchetype)
   CASE(GenericTypeParam)
   CASE(ProtocolComposition)
