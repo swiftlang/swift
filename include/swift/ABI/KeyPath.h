@@ -190,17 +190,17 @@ public:
     VTableOffset,
   };
   
-  constexpr static uint32_t
-  getResolutionStrategy(ComputedPropertyIDKind idKind) {
-    return idKind == Pointer ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
-         : (assert("no resolution strategy implemented" && false), 0);
-  }
+  enum ComputedPropertyIDResolution {
+    Resolved,
+    IndirectPointer,
+    FunctionCall,
+  };
   
   constexpr static KeyPathComponentHeader
   forComputedProperty(ComputedPropertyKind kind,
                       ComputedPropertyIDKind idKind,
                       bool hasArguments,
-                      bool resolvedID) {
+                      ComputedPropertyIDResolution resolution) {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_ComputedTag
         << _SwiftKeyPathComponentHeader_DiscriminatorShift)
@@ -213,8 +213,10 @@ public:
       | (idKind == VTableOffset
            ? _SwiftKeyPathComponentHeader_ComputedIDByVTableOffsetFlag : 0)
       | (hasArguments ? _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag : 0)
-      | (resolvedID ? _SwiftKeyPathComponentHeader_ComputedIDResolved
-                    : getResolutionStrategy(idKind)));
+      | (resolution == Resolved ? _SwiftKeyPathComponentHeader_ComputedIDResolved
+       : resolution == IndirectPointer ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
+       : resolution == FunctionCall ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFunctionCall
+       : (assert(false && "invalid resolution"), 0)));
   }
   
   constexpr static KeyPathComponentHeader
