@@ -1819,7 +1819,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
 
     FuncDecl *func = cast<FuncDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
-        func->getInterfaceType()->eraseDynamicSelfType()->getCanonicalType());
+        func->getInterfaceType()->getCanonicalType());
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
 
@@ -2131,7 +2131,11 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
 
           // We're capturing a 'self' value with dynamic 'Self' type;
           // handle it specially.
-          if (captureType->getClassOrBoundGenericClass()) {
+          //
+          // However, only do this if its a 'let'; if the capture is
+          // mutable, we're going to be capturing a box or an address.
+          if (captureType->getClassOrBoundGenericClass() &&
+              capturedVar->isLet()) {
             if (selfCapture)
               selfCapture = selfCapture->mergeFlags(capture);
             else
