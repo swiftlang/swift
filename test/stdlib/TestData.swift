@@ -1188,7 +1188,7 @@ class TestData : TestDataSuper {
         var d = Data()
 
         // d should go from .empty representation to .inline.
-        // Appending a small enough sequence to fit in linline should actually be copied.
+        // Appending a small enough sequence to fit in .inline should actually be copied.
         d.append(contentsOf: 0x00...0x01)
         expectEqual(Data([0x00, 0x01]), d)
 
@@ -1210,7 +1210,7 @@ class TestData : TestDataSuper {
         var d = Data()
 
         // d should go from .empty representation to .inline.
-        // Appending a small enough sequence to fit in linline should actually be copied.
+        // Appending a small enough sequence to fit in .inline should actually be copied.
         d.append(contentsOf: (0x00...0x01).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
         expectEqual(Data([0x00, 0x01]), d)
 
