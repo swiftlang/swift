@@ -1,6 +1,10 @@
-// RUN: %target-swift-emit-silgen -module-name dynamic_self %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name dynamic_self -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
-// RUN: %target-swift-emit-ir -module-name dynamic_self %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-silgen -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -swift-version 4 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-ir -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+
+// RUN: %target-swift-emit-silgen -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -swift-version 5 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-ir -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 protocol P {
   func f() -> Self
@@ -377,6 +381,36 @@ class Generic<T> {
     // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7GenericC2t3ACyxGXDyFAEXDycfU_ : $@convention(thin) <T> (@guaranteed @sil_unowned Generic<T>, @thick @dynamic_self Generic<T>.Type) -> @owned Generic<T> 
     _ = {[unowned self] in self }
     return self
+  }
+}
+
+protocol SelfReplaceable {
+  init<T>(t: T)
+}
+
+extension SelfReplaceable {
+  init(with fn: (Self.Type) -> Self) {
+    self = fn(Self.self)
+  }
+
+  init<T>(with genericFn: (Self.Type) -> T) {
+    self.init(t: genericFn(Self.self))
+  }
+}
+
+class SelfReplaceClass : SelfReplaceable {
+  let t: Any
+
+  required init<T>(t: T) {
+    self.t = t
+  }
+
+  convenience init(y: Int) {
+    self.init(with: { type in type.init(t: y) })
+  }
+
+  convenience init(z: Int) {
+    self.init(with: { type in z })
   }
 }
 

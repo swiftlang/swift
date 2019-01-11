@@ -2817,11 +2817,14 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
 /// \param inputSubstType Formal AST type of function value being thunked
 /// \param outputOrigType Abstraction pattern of the thunk
 /// \param outputSubstType Formal AST type of the thunk
+/// \param dynamicSelfType If true, the last parameter is a dummy used to pass
+/// DynamicSelfType metadata
 static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
                            AbstractionPattern inputOrigType,
                            CanAnyFunctionType inputSubstType,
                            AbstractionPattern outputOrigType,
-                           CanAnyFunctionType outputSubstType) {
+                           CanAnyFunctionType outputSubstType,
+                           CanType dynamicSelfType) {
   PrettyStackTraceSILFunction stackTrace("emitting reabstraction thunk in",
                                          &SGF.F);
   auto thunkType = SGF.F.getLoweredFunctionType();
@@ -2830,6 +2833,11 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
   SmallVector<ManagedValue, 8> params;
   SGF.collectThunkParams(loc, params);
+
+  // Ignore the self parameter at the SIL level. IRGen will use it to
+  // recover type metadata.
+  if (dynamicSelfType)
+    params.pop_back();
 
   ManagedValue fnValue = params.pop_back_val();
   auto fnType = fnValue.getType().castTo<SILFunctionType>();
@@ -2980,6 +2988,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     CanType &outputSubstType,
     GenericEnvironment *&genericEnv,
     SubstitutionMap &interfaceSubs,
+    CanType &dynamicSelfType,
     bool withoutActuallyEscaping) {
   assert(!expectedType->isPolymorphic());
   assert(!sourceType->isPolymorphic());
@@ -3080,6 +3089,18 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                       ? contextConvention
                       : ParameterConvention::Direct_Unowned});
 
+  // If this thunk involves DynamicSelfType in any way, add a capture for it
+  // in case we need to recover metadata.
+  if (sourceType->hasDynamicSelfType() ||
+      expectedType->hasDynamicSelfType()) {
+    dynamicSelfType = F.getSelfMetadataArgument()->getType().getASTType();
+    if (!isa<MetatypeType>(dynamicSelfType)) {
+      dynamicSelfType = CanMetatypeType::get(dynamicSelfType,
+                                             MetatypeRepresentation::Thick);
+    }
+    params.push_back({dynamicSelfType, ParameterConvention::Direct_Unowned});
+  }
+
   // Map the parameter and expected types out of context to get the interface
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
@@ -3147,11 +3168,13 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   GenericEnvironment *genericEnv = nullptr;
   auto toType = expectedType->getWithExtInfo(
       expectedType->getExtInfo().withNoEscape(false));
+  CanType dynamicSelfType;
   auto thunkType = SGF.buildThunkType(sourceType, toType,
                                       inputSubstType,
                                       outputSubstType,
                                       genericEnv,
-                                      interfaceSubs);
+                                      interfaceSubs,
+                                      dynamicSelfType);
   auto thunk = SGF.SGM.getOrCreateReabstractionThunk(
                                        thunkType,
                                        sourceType,
@@ -3167,7 +3190,8 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                    inputOrigType,
                    inputSubstType,
                    outputOrigType,
-                   outputSubstType);
+                   outputSubstType,
+                   dynamicSelfType);
   }
 
   CanSILFunctionType substFnType = thunkType;
@@ -3179,10 +3203,18 @@ static ManagedValue createThunk(SILGenFunction &SGF,
 
   // Create it in our current function.
   auto thunkValue = SGF.B.createFunctionRefFor(loc, thunk);
+  SmallVector<ManagedValue, 2> thunkArgs;
+  thunkArgs.push_back(fn.ensurePlusOne(SGF, loc));
+  if (dynamicSelfType) {
+    SILType dynamicSILType = SGF.getLoweredType(dynamicSelfType);
+    SILValue value = SGF.B.createMetatype(loc, dynamicSILType);
+    thunkArgs.push_back(ManagedValue::forUnmanaged(value));
+  }
+
   ManagedValue thunkedFn =
     SGF.B.createPartialApply(loc, thunkValue,
                              SILType::getPrimitiveObjectType(substFnType),
-                             interfaceSubs, fn.ensurePlusOne(SGF, loc),
+                             interfaceSubs, thunkArgs,
                              SILType::getPrimitiveObjectType(toType));
 
   if (!expectedType->isNoEscape()) {
@@ -3204,10 +3236,14 @@ static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
          noEscapingType->getExtInfo().withNoEscape(false));
 
   CanType inputSubstType, outputSubstType;
-  return SGF.buildThunkType(noEscapingType, escapingType,
-                            inputSubstType, outputSubstType,
-                            genericEnv, interfaceSubs,
-                            /*withoutActuallyEscaping=*/true);
+  CanType dynamicSelfType;
+  auto type = SGF.buildThunkType(noEscapingType, escapingType,
+                                 inputSubstType, outputSubstType,
+                                 genericEnv, interfaceSubs,
+                                 dynamicSelfType,
+                                 /*withoutActuallyEscaping=*/true);
+  assert(!dynamicSelfType && "not implemented");
+  return type;
 }
 
 static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF) {
@@ -3984,8 +4020,11 @@ SILGenFunction::emitCanonicalFunctionThunk(SILLocation loc, ManagedValue fn,
   // type
   CanType inputSubstType;
   CanType outputSubstType;
+  CanType dynamicSelfType;
   auto thunkTy = buildThunkType(nonCanonicalTy, canonicalTy, inputSubstType,
-                                outputSubstType, genericEnv, interfaceSubs);
+                                outputSubstType, genericEnv, interfaceSubs,
+                                dynamicSelfType);
+  assert(!dynamicSelfType && "not implemented");
   auto thunk = SGM.getOrCreateReabstractionThunk(thunkTy, nonCanonicalTy,
                                                  canonicalTy, F.isSerialized());
   if (thunk->empty()) {
