@@ -85,6 +85,8 @@ extension FlattenSequence.Iterator: IteratorProtocol {
 
 extension FlattenSequence.Iterator: Sequence { }
 
+extension FlattenSequence.Iterator: LazySequenceProtocol where Base: LazySequenceProtocol {}
+
 extension FlattenSequence: Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
