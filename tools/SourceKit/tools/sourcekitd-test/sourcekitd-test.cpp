@@ -560,6 +560,30 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     break;
 
+  case SourceKitRequest::ConformingMethodList:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestConformingMethodList);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    for (auto &Opt : Opts.RequestOptions) {
+      auto KeyValue = StringRef(Opt).split('=');
+      if (KeyValue.first == "expectedtypes") {
+        SmallVector<StringRef, 4> expectedTypeNames;
+        KeyValue.second.split(expectedTypeNames, ';');
+
+        auto typenames = sourcekitd_request_array_create(nullptr, 0);
+        for (auto &name : expectedTypeNames) {
+          std::string n = name;
+          sourcekitd_request_array_set_string(typenames, SOURCEKITD_ARRAY_APPEND, n.c_str());
+        }
+
+        sourcekitd_request_dictionary_set_value(Req, KeyExpectedTypes, typenames);
+      } else {
+        llvm::errs() << "invalid key '" << KeyValue.first << "' in -req-opts\n";
+        return 1;
+      }
+    }
+    break;
+
   case SourceKitRequest::CursorInfo:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCursorInfo);
     if (Opts.CollectActionables) {
@@ -1008,6 +1032,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::CodeCompleteCacheOnDisk:
     case SourceKitRequest::CodeCompleteSetPopularAPI:
     case SourceKitRequest::TypeContextInfo:
+    case SourceKitRequest::ConformingMethodList:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
       break;
 
