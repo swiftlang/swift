@@ -69,6 +69,8 @@ extension LazyMapSequence.Iterator: IteratorProtocol, Sequence {
   }
 }
 
+extension LazyMapSequence.Iterator: LazySequenceProtocol {}
+
 extension LazyMapSequence: LazySequenceProtocol {
   /// Returns an iterator over the elements of this sequence.
   ///
