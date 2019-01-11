@@ -541,6 +541,25 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       });
     }
 
+    if (triple.isOSWindows()) {
+      switch (triple.getArch()) {
+      default: llvm_unreachable("unsupported Windows architecture");
+      case llvm::Triple::arm:
+      case llvm::Triple::thumb:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM_"});
+        break;
+      case llvm::Triple::aarch64:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM64_"});
+        break;
+      case llvm::Triple::x86:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_X86_"});
+        break;
+      case llvm::Triple::x86_64:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_AMD64_"});
+        break;
+      }
+    }
+
     // The module map used for Glibc depends on the target we're compiling for,
     // and is not included in the resource directory with the other implicit
     // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
