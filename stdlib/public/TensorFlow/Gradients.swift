@@ -48,32 +48,29 @@
 
 public extension Differentiable {
   @inlinable
-  func gradient<R : Differentiable>(
+  func gradient<R : Differentiable & FloatingPoint>(
     in f: @autodiff (Self) -> Tensor<R>
-  ) -> CotangentVector
-    where R : Differentiable & FloatingPoint {
+  ) -> CotangentVector {
     return self.pullback(in: f)(Tensor<R>(1))
   }
 
   @inlinable
-  func valueWithGradient<R : Differentiable>(
+  func valueWithGradient<R : Differentiable & FloatingPoint>(
     in f: @autodiff (Self) -> Tensor<R>
-  ) -> (value: Tensor<R>, gradient: CotangentVector)
-    where R : Differentiable & FloatingPoint {
+  ) -> (value: Tensor<R>, gradient: CotangentVector) {
     let (y, pb) = self.valueWithPullback(in: f)
     return (y, pb(Tensor<R>(1)))
   }
 
   @inlinable
-  func gradient<T : Differentiable, R : Differentiable>(
+  func gradient<T : Differentiable, R : Differentiable & FloatingPoint>(
     at x: T, in f: @autodiff (Self, T) -> Tensor<R>
-  ) -> (CotangentVector, T.CotangentVector)
-    where R : Differentiable & FloatingPoint {
+  ) -> (CotangentVector, T.CotangentVector) {
     return self.pullback(at: x, in: f)(Tensor<R>(1))
   }
 
   @inlinable
-  func valueWithGradient<T : Differentiable, R : Differentiable>(
+  func valueWithGradient<T : Differentiable, R>(
     at x: T, in f: @autodiff (Self, T) -> Tensor<R>
   ) -> (value: Tensor<R>, gradient: (CotangentVector, T.CotangentVector))
     where R : Differentiable & FloatingPoint {
@@ -416,6 +413,36 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   ) -> Tensor {
     let seed = seed.broadcast(like: originalValue)
     return seed.squeezingShape(at: shapeIndex)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Reduction
+//===----------------------------------------------------------------------===//
+
+extension Tensor where Scalar : Differentiable & FloatingPoint {
+  @inlinable
+  func _adjointMean(_ seed: Tensor, _ originalValue: Tensor) -> Tensor {
+      return seed.broadcast(like: self) / Tensor(scalarCountTensor)
+  }
+
+  @inlinable
+  func _adjointSum(_ seed: Tensor, _ originalValue: Tensor) -> Tensor {
+      return seed.broadcast(like: self)
+  }
+
+  @inlinable
+  func _adjointMean(
+    _ seed: Tensor, _ originalValue: Tensor, squeezingAxes axes: [Int32]
+  ) -> Tensor {
+      return seed.broadcast(like: self) / Tensor(scalarCountTensor)
+  }
+
+  @inlinable
+  func _adjointSum(
+    _ seed: Tensor, _ originalValue: Tensor, squeezingAxes axes: [Int32]
+  ) -> Tensor {
+      return seed.broadcast(like: self)
   }
 }
 
