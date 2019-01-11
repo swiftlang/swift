@@ -1,6 +1,7 @@
-// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-simple-no-vjp-swift %swift-tensorflow-test-run-extra-options
 // RUN: %target-run-dynamic-compilation-swift
+//
+// Note: GPE testing is disabled because GPE does not interact well with
+// VJP-based AD. See SR-9638.
 //
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
