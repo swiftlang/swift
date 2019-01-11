@@ -2527,9 +2527,8 @@ for host in "${ALL_HOSTS[@]}"; do
 
                             if [[ "${ENABLE_ASAN}" ]] ; then
                                 # Limit the number of parallel tests.
-                                num_phys_cpu = $(sysctl hw.physicalcpu | cut -d : -f 2)
                                 cmake_options+=(
-                                    -DLLVM_LIT_ARGS="--threads=${num_phys_cpu}"
+                                    -DLLVM_LIT_ARGS="--threads=$(sysctl hw.physicalcpu | cut -d : -f 2)"
                                 )
                             fi
                         fi
