@@ -383,6 +383,22 @@ public:
     return value.silDifferentiableAttribute;
   }
 
+  SourceLoc getLocation() const {
+    switch (kind) {
+    case Kind::AutoDiffFunctionInst:
+      return getAutoDiffFunctionInst()->getLoc().getSourceLoc();
+    case Kind::IndirectDifferentiation:
+      return getIndirectDifferentiation().first->getLoc().getSourceLoc();
+    case Kind::FunctionConversion:
+      return getFunctionConversion()->getLoc();
+    case Kind::DifferentiableAttribute:
+      return getDifferentiableAttribute().first->getLocation();
+    case Kind::SILDifferentiableAttribute:
+      return getSILDifferentiableAttribute().second
+          ->getLocation().getSourceLoc();
+    }
+  }
+
   void print(llvm::raw_ostream &os) const;
 };
 
@@ -1856,9 +1872,8 @@ emitAssociatedFunctionReference(
   if (auto *originalFRI = findReferenceToVisibleFunction(original)) {
     auto loc = originalFRI->getLoc();
     auto *originalFn = originalFRI->getReferencedFunction();
-    auto *task = context.lookUpOrRegisterDifferentiationTask(originalFn,
-                                                             desiredIndices,
-                                                             invoker);
+    auto *task = context.lookUpOrRegisterDifferentiationTask(
+        originalFn, desiredIndices, invoker);
     taskCallback(task);
     SILFunction *assocFn = nullptr;
     switch (kind) {
@@ -1874,6 +1889,7 @@ emitAssociatedFunctionReference(
         reapplyFunctionConversion(ref, originalFRI, original, builder, loc);
     return std::make_pair(convertedRef, task->getIndices());
   }
+
   if (auto *witnessMethod = findWitnessMethod(original)) {
     auto loc = witnessMethod->getLoc();
     auto requirement = witnessMethod->getMember();
@@ -2363,10 +2379,8 @@ public:
   }
 
   void visitSILInstruction(SILInstruction *inst) {
-    // TODO: Change this to a note when we emit an error at the @autodiff
-    // function conversion location.
     getContext().emitNondifferentiabilityError(inst, getDifferentiationTask(),
-        diag::autodiff_expression_is_not_differentiable_error);
+        diag::autodiff_expression_is_not_differentiable);
     errorOccurred = true;
   }
 
@@ -3461,7 +3475,7 @@ public:
     // TODO: Change this to a note when we emit an error at the @autodiff
     // function conversion location.
     getContext().emitNondifferentiabilityError(inst, getDifferentiationTask(),
-        diag::autodiff_expression_is_not_differentiable_error);
+        diag::autodiff_expression_is_not_differentiable);
     errorOccurred = true;
   }
 
@@ -5055,18 +5069,22 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
   for (auto assocFnKind : {AutoDiffAssociatedFunctionKind::JVP,
                            AutoDiffAssociatedFunctionKind::VJP}) {
     SILAutoDiffIndices desiredIndices(0, adfi->getParameterIndices());
+    auto getInvoker =
+        [&](AutoDiffFunctionInst *inst) -> DifferentiationInvoker {
+      if (auto *expr = findDifferentialOperator(inst))
+        return expr;
+      return inst;
+    };
+    auto invoker = getInvoker(adfi);
     auto assocFnAndIndices = emitAssociatedFunctionReference(
         context, builder, desiredIndices, assocFnKind, origFnOperand,
-        DifferentiationInvoker(adfi), [](DifferentiationTask *newTask) {});
+        invoker, [](DifferentiationTask *newTask) {});
     if (!assocFnAndIndices) {
-      // Find the original differential operator expression. Show an error at
-      // the operator, highlight the argument, and show a note at the definition
-      // site of the argument.
-      if (auto *expr = findDifferentialOperator(adfi))
-        context
-            .diagnose(expr->getSubExpr()->getLoc(),
-                      diag::autodiff_function_not_differentiable)
-            .highlight(expr->getSubExpr()->getSourceRange());
+      // Show an error at the operator, highlight the argument, and show a note
+      // at the definition site of the argument.
+      auto loc = invoker.getLocation();
+      context.diagnose(loc, diag::autodiff_function_not_differentiable)
+          .highlight(loc);
       return true;
     }
     assert(assocFnAndIndices->second == desiredIndices &&
