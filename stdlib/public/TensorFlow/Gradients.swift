@@ -398,7 +398,6 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   func _adjointTransposed(
     _ seed: Tensor, _ originalValue: Tensor, _ permutations: Tensor<Int32>
   ) -> Tensor {
-    let seed = seed.broadcast(like: originalValue)
     return seed.transposed(withPermutations: permutations)
   }
 
@@ -406,13 +405,11 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   func _adjointTransposed(
     _ seed: Tensor, _ originalValue: Tensor, _ permutations: [Int32]
   ) -> Tensor {
-    let seed = seed.broadcast(like: originalValue)
     return seed.transposed(withPermutations: permutations)
   }
 
   @inlinable
   func _adjointTransposed(_ seed: Tensor, _ originalValue: Tensor) -> Tensor {
-    let seed = seed.broadcast(like: originalValue)
     return seed.transposed()
   }
 }
