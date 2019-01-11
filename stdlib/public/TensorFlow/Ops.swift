@@ -604,6 +604,10 @@ public extension Tensor {
   /// Returns a transposed tensor, with dimensions permuted in the specified
   /// order.
   @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointTransposed(_:_:_:)
+    where Scalar : Differentiable & FloatingPoint
+  )
   func transposed(withPermutations permutations: [Int32]) -> Tensor {
     return transposed(withPermutations: Tensor<Int32>(permutations))
   }
@@ -611,12 +615,20 @@ public extension Tensor {
   /// Returns a transposed tensor, with dimensions permuted in the specified
   /// order.
   @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointTransposed(_:_:_:)
+    where Scalar : Differentiable & FloatingPoint
+  )
   func transposed(withPermutations permutations: Int32...) -> Tensor {
     return transposed(withPermutations: permutations)
   }
 
   /// Returns a transposed tensor, with dimensions permuted in reverse order.
   @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointTransposed(_:_:)
+    where Scalar : Differentiable & FloatingPoint
+  )
   func transposed() -> Tensor {
     let defaultPermutations = rankTensor - 1 - Tensor<Int32>(
       rangeFrom: 0, to: rank, stride: 1
@@ -897,17 +909,18 @@ public func min<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
 /// Computes the square of the tensor.
 public extension Tensor where Scalar : Numeric {
   @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointSquared(_:_:)
+    where Scalar : Differentiable & FloatingPoint
+  )
   func squared() -> Tensor {
     return Raw.square(self)
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Non-elementwise math functions
-//===----------------------------------------------------------------------===//
-
 /// Computes the log-softmax of the specified tensor element-wise.
 @inlinable @inline(__always)
+@differentiable(adjoint: _adjointLogSoftmax(_:_:_:) where T : Differentiable)
 public func logSoftmax<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.logSoftmax(logits: x)
 }
