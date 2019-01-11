@@ -3141,6 +3141,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     with_pushd ${results_dir} \
                           call "${llvm_build_dir}/bin/llvm-lit" \
                                "${lldb_build_dir}/lit" -sv \
+                               ${LLVM_LIT_ARGS} \
                                --xunit-xml-output=${results_dir}/results.xml \
                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -t -E \"${DOTEST_EXTRA}\""
                     if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
@@ -3149,6 +3150,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         with_pushd ${results_dir} \
                            call "${llvm_build_dir}/bin/llvm-lit" \
                                 "${lldb_build_dir}/lit" -sv \
+                                ${LLVM_LIT_ARGS} \
                                 --xunit-xml-output=${results_dir}/results.xml \
                                 --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\" -t -E \"${DOTEST_EXTRA}\""
                     fi
