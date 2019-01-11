@@ -1151,6 +1151,8 @@ extension IteratorSequence: IteratorProtocol, Sequence {
   }
 }
 
+extension IteratorSequence: LazySequenceProtocol where Base: LazySequenceProtocol {}
+
 /* FIXME: ideally for compatability we would declare
 extension Sequence {
   @available(swift, deprecated: 5, message: "")
