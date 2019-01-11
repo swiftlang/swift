@@ -244,7 +244,7 @@ DynamicAttributeTests.testAllBackends("NormalAttribute String") {
                                     T$dtype: Float.tensorFlowDataType,
                                     strides: [1, 1, 1, 1] as [Int32],
                                     padding: loadVALIDString())
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 #endif //!CUDA
 
@@ -257,7 +257,7 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int32>") {
   let result = convImage.convolved2D(withFilter: convFilter,
                                      strides: loadStridesInt32(),
                                      padding: .valid)
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 #endif //!CUDA
 
@@ -267,7 +267,7 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int64>") {
                                     T$dtype: Float.tensorFlowDataType,
                                     strides: loadStridesInt64(),
                                     padding: "VALID")
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 #endif //!CUDA
 
