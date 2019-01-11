@@ -22,8 +22,8 @@ use(z)
 // CHECK-NEXT: !dbg ![[ZERO]]
 // CHECK-NEXT: }
 
+// CHECK: ![[FILE:[0-9]+]] = {{.*}}"<compiler-generated>"
 // CHECK: ![[SP]] = {{.*}}name: "transparent"
 // CHECK-SAME: file: ![[FILE:[0-9]+]]
 // CHECK-NOT: line:
-// CHECK: ![[FILE]] = {{.*}}"<compiler-generated>"
 // CHECK: ![[ZERO]] = !DILocation(line: 0,
