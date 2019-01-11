@@ -2084,9 +2084,15 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                     if buffer.count < buffer.capacity {
                         buffer.append(byte: element)
                     } else {
-                        buffer.withUnsafeBytes {_representation.append(contentsOf: $0)}
+                        buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
                         buffer.count = 0
                     }
+                }
+
+                // If we've still got bytes left in the buffer (i.e. the loop ended before we filled up the buffer and cleared it out), append them.
+                if buffer.count > 0 {
+                    buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
+                    buffer.count = 0
                 }
             }
         }
@@ -2372,9 +2378,15 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 if buffer.count < buffer.capacity {
                     buffer.append(byte: element)
                 } else {
-                    buffer.withUnsafeBytes {_representation.append(contentsOf: $0)}
+                    buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
                     buffer.count = 0
                 }
+            }
+
+            // If we've still got bytes left in the buffer (i.e. the loop ended before we filled up the buffer and cleared it out), append them.
+            if buffer.count > 0 {
+                buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
+                buffer.count = 0
             }
         }
     }

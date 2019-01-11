@@ -1183,6 +1183,57 @@ class TestData : TestDataSuper {
         expectEqual(Data(bytes: [1]), slice)
     }
 
+    // This test uses `repeatElement` to produce a sequence -- the produced sequence reports its actual count as its `.underestimatedCount`.
+    func test_appendingNonContiguousSequence_exactCount() {
+        var d = Data()
+
+        // d should go from .empty representation to .inline.
+        // Appending a small enough sequence to fit in linline should actually be copied.
+        d.append(contentsOf: repeatElement(UInt8(0x01), count: 2))
+        expectEqual(Data([0x01, 0x01]), d)
+
+        // Appending another small sequence should similarly still work.
+        d.append(contentsOf: repeatElement(UInt8(0x02), count: 1))
+        expectEqual(Data([0x01, 0x01, 0x02]), d)
+
+        // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
+        // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
+        d.append(contentsOf: repeatElement(UInt8(0x03), count: 24))
+        expectEqual(Data([0x01, 0x01, 0x02, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+                          0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+                          0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03]), d)
+    }
+
+    // This test is like test_appendingNonContiguousSequence_exactCount but uses a sequence which reports 0 for its `.underestimatedCount`.
+    // This attempts to hit the worst-case scenario of `Data.append<S>(_:)` -- a discontiguous sequence of unknown length.
+    func test_appendingNonContiguousSequence_underestimatedCount() {
+        // underestimatedRepeatedElement does the same thing as repeatElement, but reports an `.underestimatedCount` of 0.
+        let underestimatedRepeatedElement = { (element: UInt8, count: Int) in
+            return sequence(state: count) { (count: inout Int) -> UInt8? in
+                defer { count -= 1 }
+                return count > 0 ? element : nil
+            }
+        }
+
+        var d = Data()
+
+        // d should go from .empty representation to .inline.
+        // Appending a small enough sequence to fit in linline should actually be copied.
+        d.append(contentsOf: underestimatedRepeatedElement(UInt8(0x01), 2))
+        expectEqual(Data([0x01, 0x01]), d)
+
+        // Appending another small sequence should similarly still work.
+        d.append(contentsOf: underestimatedRepeatedElement(UInt8(0x02), 1))
+        expectEqual(Data([0x01, 0x01, 0x02]), d)
+
+        // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
+        // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
+        d.append(contentsOf: underestimatedRepeatedElement(UInt8(0x03), 24))
+        expectEqual(Data([0x01, 0x01, 0x02, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+                          0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+                          0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03]), d)
+    }
+
     func test_sequenceInitializers() {
         let seq = repeatElement(UInt8(0x02), count: 3) // ensure we fall into the sequence case
         
@@ -3753,6 +3804,8 @@ DataTests.test("test_copyBytes1") { TestData().test_copyBytes1() }
 DataTests.test("test_copyBytes2") { TestData().test_copyBytes2() }
 DataTests.test("test_sliceOfSliceViaRangeExpression") { TestData().test_sliceOfSliceViaRangeExpression() }
 DataTests.test("test_appendingSlices") { TestData().test_appendingSlices() }
+DataTests.test("test_appendingNonContiguousSequence_exactCount") { TestData().test_appendingNonContiguousSequence_exactCount() }
+DataTests.test("test_appendingNonContiguousSequence_underestimatedCount") { TestData().test_appendingNonContiguousSequence_underestimatedCount() }
 DataTests.test("test_sequenceInitializers") { TestData().test_sequenceInitializers() }
 DataTests.test("test_reversedDataInit") { TestData().test_reversedDataInit() }
 DataTests.test("test_replaceSubrangeReferencingMutable") { TestData().test_replaceSubrangeReferencingMutable() }
