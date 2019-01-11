@@ -118,8 +118,41 @@ func test7() -> Tensor<Float> {
   return x
 }
 
+/////////////////////////
+// Test 8: Take and return a struct conforming to TensorGroup
+////////////////////////
+
+extension Tensor : TensorModel {
+}
+
+extension TensorPair : TensorModel {
+}
+
+// TODO: try other dtype
+typealias Model = TensorPair<Tensor<Float>, Tensor<Float>>
+
+// This crashes GPE
+// @inline(never)
+// func createTensorPair() -> Model {
+//   return TensorPair(Tensor<Float>(1.0), Tensor<Float>(2.0))
+// }
+
+
+@inline(never)
+func createScalarTensor(_ f: Float) -> Tensor<Float> {
+  return Tensor<Float>(f)
+}
+
+@inline(never)
+func test8(_ m: Model) -> Model {
+  let new_x = model(m.first)
+  let new_y = test2Helper(m.first, m.second)
+  return Model(new_x, new_y)
+}
+
 public func driver() {
   _RuntimeConfig.printsDebugLog = true
+
   // let tracedFn = trace(test1)
   // let tracedFn = trace(test2)
   // let tracedFn = trace(test3)
@@ -142,7 +175,7 @@ public func driver() {
   // let y: Tensor<Float> = withDevice(.gpu) {
   //   return modelTracedFn(x)
   // }
-  // _hostOp(y)
+  // _hostOp(y)  // Should be 2.0
 
   // let model2TracedFn = trace(model2)
   // let z: Tensor<Float> = withDevice(.gpu) {
@@ -150,9 +183,18 @@ public func driver() {
   // }
   // _hostOp(z)
 
-  let tracedFn = trace(test7)
-  let z = tracedFn()
-  _hostOp(z)
+  // let tracedFn = trace(test7)
+  // let z = tracedFn()
+  // _hostOp(z)
+
+  let m = TensorPair(createScalarTensor(1.0), createScalarTensor(2.0))
+  _hostOp(m)
+
+  let tracedFn = trace(test8)
+  // TODO: cannot create m above here, because before traceFn() is called, we
+  // are still in tracing mode according to the current impl.
+  let newM = tracedFn(m)
+  _hostOp(newM)
 }
 
 driver()

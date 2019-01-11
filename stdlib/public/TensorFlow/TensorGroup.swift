@@ -84,7 +84,8 @@ extension TensorHandle : TensorGroup {
   }
 
   public func _unpackTensorHandles(
-      into address: UnsafeMutablePointer<CTensorHandle>?) {
+    into address: UnsafeMutablePointer<CTensorHandle>?) {
+    debugLog("Calling _unpackTensorHandles() over C handle \(_cTensorHandle) and writing into address \(address!.pointee)")
     address!.initialize(to: _cTensorHandle)
   }
 
@@ -148,6 +149,7 @@ extension Tensor : TensorGroup {
 
   public func _unpackTensorHandles(
       into address: UnsafeMutablePointer<CTensorHandle>?) {
+    debugLog("Calling _unpackTensorHandles() over C handle \(handle._cTensorHandle) and writing into address \(address!.pointee)")
     address!.initialize(to: handle._cTensorHandle)
   }
 
