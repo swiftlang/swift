@@ -101,6 +101,9 @@ where Elements: BidirectionalCollection {
 extension DefaultIndices: RandomAccessCollection
 where Elements: RandomAccessCollection { }
 
+extension DefaultIndices: LazySequenceProtocol
+  where Elements: LazySequenceProtocol {}
+
 extension Collection where Indices == DefaultIndices<Self> {
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
