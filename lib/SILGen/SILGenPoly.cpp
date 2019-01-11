@@ -466,6 +466,15 @@ ManagedValue Transform::transform(ManagedValue v,
 
   // Subtype conversions:
 
+  // A base class method returning Self can be used in place of a derived
+  // class method returning Self.
+  if (auto outputSelfType = dyn_cast<DynamicSelfType>(outputSubstType)) {
+    if (auto inputSelfType = dyn_cast<DynamicSelfType>(inputSubstType)) {
+      inputSubstType = inputSelfType.getSelfType();
+      outputSubstType = outputSelfType.getSelfType();
+    }
+  }
+
   //  - upcasts for classes
   if (outputSubstType->getClassOrBoundGenericClass() &&
       inputSubstType->getClassOrBoundGenericClass()) {
@@ -482,7 +491,9 @@ ManagedValue Transform::transform(ManagedValue v,
       // Upcast to a superclass.
       return SGF.B.createUpcast(Loc, v, loweredResultTy);
     } else {
-      // Unchecked-downcast to a covariant return type.
+      // FIXME: Should only happen with the DynamicSelfType case above,
+      // except that convenience inits return the static self and not
+      // DynamicSelfType.
       assert(inputSubstType->isExactSuperclassOf(outputSubstType)
              && "should be inheritance relationship between input and output");
       return SGF.B.createUncheckedRefCast(Loc, v, loweredResultTy);
