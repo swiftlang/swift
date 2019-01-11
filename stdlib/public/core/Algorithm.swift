@@ -160,3 +160,5 @@ extension EnumeratedSequence: Sequence {
     return Iterator(_base: _base.makeIterator())
   }
 }
+
+extension EnumeratedSequence: LazySequenceProtocol where Base: LazySequenceProtocol {}
