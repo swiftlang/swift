@@ -154,7 +154,9 @@ extension JoinedSequence: Sequence {
     return result
   }
 }
-  
+
+extension JoinedSequence: LazySequenceProtocol where Base: LazySequenceProtocol {}
+
 extension Sequence where Element : Sequence {
   /// Returns the concatenated elements of this sequence of sequences,
   /// inserting the given separator between each element.
