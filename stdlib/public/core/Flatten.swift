@@ -97,6 +97,8 @@ extension FlattenSequence: Sequence {
   }
 }
 
+extension FlattenSequence: LazySequenceProtocol where Base: LazySequenceProtocol {}
+
 extension Sequence where Element : Sequence {
   /// Returns the elements of this sequence of sequences, concatenated.
   ///
