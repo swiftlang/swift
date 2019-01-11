@@ -604,8 +604,15 @@ public extension Tensor {
   /// Returns a transposed tensor, with dimensions permuted in the specified
   /// order.
   @inlinable @inline(__always)
-  func transposed(withPermutations permutations: Int32...) -> Tensor {
+  func transposed(withPermutations permutations: [Int32]) -> Tensor {
     return transposed(withPermutations: Tensor<Int32>(permutations))
+  }
+
+  /// Returns a transposed tensor, with dimensions permuted in the specified
+  /// order.
+  @inlinable @inline(__always)
+  func transposed(withPermutations permutations: Int32...) -> Tensor {
+    return transposed(withPermutations: permutations)
   }
 
   /// Returns a transposed tensor, with dimensions permuted in reverse order.
@@ -1033,8 +1040,26 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func max(squeezingAxes axes: Int32...) -> Tensor {
+  func max(squeezingAxes axes: [Int32]) -> Tensor {
     return Raw.max(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+  }
+
+  /// Returns the maximum values along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func max(squeezingAxes axes: Int32...) -> Tensor {
+    return max(squeezingAxes: axes)
+  }
+
+  /// Returns the minimum values along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func min(squeezingAxes axes: [Int32]) -> Tensor {
+    return Raw.min(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
   /// Returns the minimum values along the specified axes. The reduced
@@ -1043,7 +1068,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   func min(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.min(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+    return min(squeezingAxes: axes)
   }
 
   /// Returns the indices of the maximum values along the specified axes. The
@@ -1069,7 +1094,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func min(alongAxes axes: Int32...) -> Tensor {
+  func min(alongAxes axes: [Int32]) -> Tensor {
     return Raw.min(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
@@ -1078,8 +1103,26 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func max(alongAxes axes: Int32...) -> Tensor {
+  func min(alongAxes axes: Int32...) -> Tensor {
+    return min(alongAxes: axes)
+  }
+
+  /// Returns the minimum along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func max(alongAxes axes: [Int32]) -> Tensor {
     return Raw.max(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+  }
+
+  /// Returns the minimum along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func max(alongAxes axes: Int32...) -> Tensor {
+    return max(alongAxes: axes)
   }
 
   /// Returns the index of the maximum value of the flattened scalars.
@@ -1137,9 +1180,35 @@ public extension Tensor where Scalar : Numeric {
     wrt: (self), adjoint: _adjointMean(_:_:squeezingAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
-  func mean(squeezingAxes axes: Int32...) -> Tensor {
+  func mean(squeezingAxes axes: [Int32]) -> Tensor {
     return Raw.mean(self, reductionIndices: Tensor<Int32>(axes),
                     keepDims: false)
+  }
+
+  /// Returns the arithmetic mean along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointMean(_:_:squeezingAxes:)
+    where Scalar : Differentiable & FloatingPoint
+  )
+  func mean(squeezingAxes axes: Int32...) -> Tensor {
+    return mean(squeezingAxes: axes)
+  }
+
+  /// Returns the sum along the specified axes. The reduced dimensions are
+  /// removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointSum(_:_:squeezingAxes:)
+    where Scalar : Differentiable & FloatingPoint
+  )
+  func sum(squeezingAxes axes: [Int32]) -> Tensor {
+    return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
   /// Returns the sum along the specified axes. The reduced dimensions are
@@ -1152,7 +1221,17 @@ public extension Tensor where Scalar : Numeric {
     where Scalar : Differentiable & FloatingPoint
   )
   func sum(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+    return sum(squeezingAxes: axes)
+  }
+
+  /// Returns the product along the specified axes. The reduced dimensions are
+  /// removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  @inlinable @inline(__always)
+  func product(squeezingAxes axes: [Int32]) -> Tensor {
+    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes),
+                    keepDims: false)
   }
 
   /// Returns the product along the specified axes. The reduced dimensions are
@@ -1161,8 +1240,20 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
   func product(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes),
-                    keepDims: false)
+    return product(squeezingAxes: axes)
+  }
+
+  /// Returns the arithmetic mean along the specified axes. The reduced
+  /// dimensions are retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointMean(_:_:squeezingAxes:)
+    where Scalar : Differentiable & FloatingPoint
+  )
+  func mean(alongAxes axes: [Int32]) -> Tensor {
+    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
   /// Returns the arithmetic mean along the specified axes. The reduced
@@ -1175,7 +1266,20 @@ public extension Tensor where Scalar : Numeric {
     where Scalar : Differentiable & FloatingPoint
   )
   func mean(alongAxes axes: Int32...) -> Tensor {
-    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+    return mean(alongAxes: axes)
+  }
+
+  /// Returns the sum along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointSum(_:_:squeezingAxes:)
+    where Scalar : Differentiable & FloatingPoint
+  )
+  func sum(alongAxes axes: [Int32]) -> Tensor {
+    return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
   /// Returns the sum along the specified axes. The reduced dimensions are
@@ -1188,7 +1292,16 @@ public extension Tensor where Scalar : Numeric {
     where Scalar : Differentiable & FloatingPoint
   )
   func sum(alongAxes axes: Int32...) -> Tensor {
-    return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+    return sum(alongAxes: axes)
+  }
+
+  /// Returns the product along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func product(alongAxes axes: [Int32]) -> Tensor {
+    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
   /// Returns the product along the specified axes. The reduced dimensions are
@@ -1197,7 +1310,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   func product(alongAxes axes: Int32...) -> Tensor {
-    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+    return product(alongAxes: axes)
   }
 }
 
