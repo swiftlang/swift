@@ -1202,10 +1202,21 @@ static bool parseDifferentiableAttr(
   if (P.parseToken(tok::r_square,
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
+  // Parse a trailing 'where' clause if any.
+  TrailingWhereClause *WhereClause = nullptr;
+  if (P.Tok.is(tok::kw_where)) {
+    SourceLoc whereLoc;
+    SmallVector<RequirementRepr, 4> requirementReprs;
+    bool firstTypeInComplete;
+    P.parseGenericWhereClause(whereLoc, requirementReprs, firstTypeInComplete,
+                              /*AllowLayoutConstraints=*/false);
+    WhereClause = TrailingWhereClause::create(SP.SILMod.getASTContext(),
+                                              whereLoc, requirementReprs);
+  }
   // Create a SILDifferentiableAttr and we are done.
   auto *Attr = SILDifferentiableAttr::create(
       SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str(),
-      adjointIsPrimitive, JVPName.str(), VJPName.str());
+      adjointIsPrimitive, JVPName.str(), VJPName.str(), WhereClause);
   DAs.push_back(Attr);
   return false;
 }
@@ -5937,6 +5948,19 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
               FunctionState.F->getModule(), requirements, Attr.exported,
               Attr.kind));
         }
+      }
+
+      // SWIFT_ENABLE_TENSORFLOW
+      for (auto &attr : DiffAttrs) {
+        // Resolve where clause requirements.
+        // If no where clause, continue.
+        if (!attr->getWhereClause())
+          continue;
+        SmallVector<Requirement, 2> requirements;
+        FunctionState.convertRequirements(
+            FunctionState.F, attr->getWhereClause()->getRequirements(),
+            requirements);
+        attr->setRequirements(requirements);
       }
 
       // Parse the basic block list.

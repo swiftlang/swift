@@ -420,8 +420,12 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       parameters.push_back(indices.parameters[i]);
     SILDifferentiableAttrLayout::emitRecord(
         Out, ScratchRecord, differentiableAttrAbbrCode,
-        S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getPrimalName())),
-        S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getAdjointName())),
+        DA->hasPrimal()
+            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getPrimalName()))
+            : IdentifierID(),
+        DA->hasAdjoint()
+            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getAdjointName()))
+            : IdentifierID(),
         DA->isAdjointPrimitive(),
         // TODO: Once we add synthesis for JVP and VJP, serialized
         // [differentiable] attrs should always have JVP and VJP, so we should
@@ -433,6 +437,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
             ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
             : IdentifierID(),
         indices.source, parameters);
+    S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.

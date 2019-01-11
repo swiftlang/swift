@@ -90,13 +90,14 @@ public func dhasjvp(_ x: Float, _ y: Float) -> (Float, (Float, Float) -> Float) 
 // VJP
 //===----------------------------------------------------------------------===//
 
+@inlinable
 @_silgen_name("hasvjp")
 @differentiable(vjp: dhasvjp)
 public func hasvjp(_ x: Float, _ y: Float) -> Float {
   return 1
 }
 
-// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 vjp @dhasvjp] @hasvjp
+// CHECK-LABEL: sil [serialized] [differentiable source 0 wrt 0, 1 vjp @dhasvjp] @hasvjp
 
 @_silgen_name("dhasvjp")
 public func dhasvjp(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float, Float)) {

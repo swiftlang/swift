@@ -132,24 +132,12 @@ extension TensorHandle : TensorSendableReceivable {
     let status = TF_NewStatus()
     internalConsistencyCheck(status != nil)
     let tensorHandle: TensorHandle<Scalar>
-    if _RuntimeConfig.usesTFEagerAPI {
-      let context = _ExecutionContext.global
-      let cTensorHandle = TFE_DequeueNamedTensorFromCtx(
-        context.eagerContext, Int32(tensorID),
-        Scalar.tensorFlowDataType.cDataType, status)
-      checkOk(status)
-      tensorHandle = TensorHandle<Scalar>(_owning: cTensorHandle!)
-    } else {
-      let cTensor: CTensor! = TF_DequeueNamedTensor(
-        computation.cSession, Int32(tensorID), status)
-      checkOk(status)
-      internalConsistencyCheck(
-        cTensor != nil,
-        "TF_DequeueNamedTensor() cannot return nil when the status is OK.")
-      TF_DeleteStatus(status)
-      tensorHandle = TensorHandle<Scalar>(copyingFromCTensor: cTensor)
-      TF_DeleteTensor(cTensor)
-    }
+    let context = _ExecutionContext.global
+    let cTensorHandle = TFE_DequeueNamedTensorFromCtx(
+      context.eagerContext, Int32(tensorID),
+      Scalar.tensorFlowDataType.cDataType, status)
+    checkOk(status)
+    tensorHandle = TensorHandle<Scalar>(_owning: cTensorHandle!)
     if _RuntimeConfig.printsDebugLog {
       debugLog("The received tensor of id \(tensorID) has content:")
       dumpTensorContent(tensorHandle._cTensorHandle, Scalar.self)
@@ -166,17 +154,9 @@ extension TensorHandle : TensorSendableReceivable {
     }
     let status = TF_NewStatus()
     internalConsistencyCheck(status != nil)
-    if _RuntimeConfig.usesTFEagerAPI {
-      let context = _ExecutionContext.global
-      TFE_EnqueueNamedTensorFromCtx(
-        context.eagerContext, Int32(tensorID), _cTensorHandle, status)
-    } else {
-      let cTensor = TFE_TensorHandleResolve(_cTensorHandle, status)
-      checkOk(status)
-      TF_EnqueueNamedTensor(
-        computation.cSession, Int32(tensorID), cTensor, status)
-      TF_DeleteTensor(cTensor)
-    }
+    let context = _ExecutionContext.global
+    TFE_EnqueueNamedTensorFromCtx(
+      context.eagerContext, Int32(tensorID), _cTensorHandle, status)
     debugLog("Tensor is sent.")
     checkOk(status)
     TF_DeleteStatus(status)

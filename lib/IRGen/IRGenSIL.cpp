@@ -3522,6 +3522,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   
   auto origCalleeType = site.getOrigCalleeType();
   auto substCalleeType = site.getSubstCalleeType();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  assert(!origCalleeType->isDifferentiable() && "Differentiable functions "
+         "should not reach here");
   
   auto args = site.getArguments();
   SILFunctionConventions origConv(origCalleeType, getSILModule());

@@ -158,7 +158,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     const SmallBitVector &parameterIndices, unsigned resultIndex,
     unsigned differentiationOrder,
     AutoDiffAssociatedFunctionKind kind, SILModule &module,
-    LookupConformanceFn lookupConformance) {
+    LookupConformanceFn lookupConformance,
+    GenericSignature *whereClauseGenSig) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -251,9 +252,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   }
 
   auto withNewResults = [&](SILFunctionType *base,
-                            ArrayRef<SILResultInfo> newResults)
+                            ArrayRef<SILResultInfo> newResults,
+                            GenericSignature *genericSignature)
       -> CanSILFunctionType {
-    return SILFunctionType::get(base->getGenericSignature(),
+    return SILFunctionType::get(genericSignature
+                                  ? genericSignature
+                                  : base->getGenericSignature(),
                                 base->getExtInfo(),
                                 base->getCoroutineKind(),
                                 base->getCalleeConvention(),
@@ -325,13 +329,18 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       curryLevels.back()->getResults().begin(),
       curryLevels.back()->getResults().end());
   results.push_back({closureType, ResultConvention::Owned});
-  CanSILFunctionType associatedFunction = withNewResults(curryLevels.back(),
-                                                         results);
+  CanSILFunctionType associatedFunction =
+      withNewResults(curryLevels.back(), results,
+                     curryLevels.size() == 1 ? whereClauseGenSig : nullptr);
   auto curryLevelsWithoutLast =
       ArrayRef<SILFunctionType *>(curryLevels).drop_back(1);
-  for (auto *curryLevel : reversed(curryLevelsWithoutLast))
+  for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
+    unsigned i = pair.index();
+    auto *curryLevel = pair.value();
     associatedFunction = withNewResults(
-        curryLevel, {{associatedFunction, ResultConvention::Owned}});
+        curryLevel, {{associatedFunction, ResultConvention::Owned}},
+        i == curryLevelsWithoutLast.size() - 1 ? whereClauseGenSig : nullptr);
+  }
   return associatedFunction;
 }
 

@@ -1079,7 +1079,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     SmallVector<RequirementRepr, 4> requirements;
     bool firstTypeInComplete;
     parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete,
-                            /*AllowLayoutConstraints=*/true);
+                            /*AllowLayoutConstraints=*/false);
     whereClause = TrailingWhereClause::create(Context, whereLoc, requirements);
   }
   return false;

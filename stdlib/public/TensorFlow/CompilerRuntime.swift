@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the Swift runtime support for TensorFlow computation.
-// Design notes on TF eager based runtime (non-eager path is to be removed):
+// Design notes on TF eager based runtime:
 //
 // 1. A global context (`_ExecutionContext.global`) is used to manage all tensor
 // computation and transfers.
@@ -31,14 +31,6 @@
 // - Support async on platforms other than Linux and FreeBSD.
 // - Revisit the concurrency model and see if Dispatch can be built without
 //   Foundation.
-//
-// NOTE:
-// - Much code is intentionally un-Swifty because TF/TFE support is likely to
-//   change. Variable pairs with versions for TF/TFE would be better represented
-//   as an enum, but since the TFE runtime is soon to be removed it doesn't make
-//   sense temporarily change the code.
-// - Code should be made Swifty after support is stabilized and churn rate is
-//   lower (e.g. variable pairs should be rewritten as an enums).
 //
 //===----------------------------------------------------------------------===//
 
@@ -171,9 +163,8 @@ private class S4TFTrace {
     // around TFE_Execute normally do.
     let eagerContext = _TFCGetGlobalEagerContext()
 
-    debugLog("Finalizing traced fn, with \(outputs.count) return values.")
-    let graphFn = finalize(tracedFunctionName: tracedFunctionName,
-                           outputs: outputs)
+    debugLog("Finalizing traced fn, with \(inputs.count) input and \(outputs.count) return values.")
+    let graphFn = finalize(tracedFunctionName: tracedFunctionName, outputs: outputs)
 
     let returnValueCount = outputs.count
     debugLog("Adding trace func \(tracedFunctionName) with \(returnValueCount) return values to eager context.")
@@ -280,14 +271,6 @@ public enum _RuntimeConfig {
   ///   functionality (e.g. no sends/recvs support).
   static public var usesSynchronousExecution = false
 
-  /// When true, uses the TF eager C API, and TF interpreter backend.
-  /// Otherwise uses the TF C API, with execution mode set below.
-  // NOTE: when this is false, sends/receives for variant and resources tensors
-  // are not supported and have undefined behavior.
-  static public var usesTFEagerAPI = true
-
-  /// Only defined when usesTFEagerAPI == false.
-  ///
   /// For CPU and GPU execution without XLA, use the auto mode. For XLA and/or
   /// TPU execution, set the enum value accordingly.
   static public var executionMode: _ExecutionMode = .auto
@@ -425,12 +408,7 @@ public final class _ExecutionContext {
   // NOTE: the following properties are intentionally not implemented as an enum
   // due to high churn, *please do not refactor for Swiftiness*.
   /// The set of all loaded programs indexed by their unique address.
-  /// Used when _RuntimeConfig.usesTFEagerAPI is true.
-  private var loadedTFEPrograms: [UnsafeRawPointer : CTFGraph] = [:]
-
-  /// Used when _RuntimeConfig.usesTFEagerAPI is false.
-  internal typealias ProgramInstance = (graph: CTFGraph, session: CTFSession)
-  private var loadedTFPrograms: [UnsafeRawPointer : ProgramInstance] = [:]
+  private var loadedPrograms: [UnsafeRawPointer : CTFGraph] = [:]
 
   /// The status for checking TensorFlow errors.
   private let status: CTFStatus = TF_NewStatus()
@@ -544,11 +522,6 @@ public final class _ExecutionContext {
   deinit {
     debugLog("De-initializing global context.")
     // Delete all loaded programs.
-    for (graph, session) in loadedTFPrograms.values {
-      TF_DeleteSession(session, status)
-      checkOk(status)
-      TF_DeleteGraph(graph)
-    }
     TFE_DeleteContext(eagerContext)
     TF_DeleteBuffer(tensorFlowConfig)
     TF_DeleteStatus(status)
@@ -738,7 +711,7 @@ fileprivate extension _ExecutionContext {
     return sync {
       debugLog("Loading a program.")
        // If the program is already loaded, do nothing.
-      if let graph = loadedTFEPrograms[address] {
+      if let graph = loadedPrograms[address] {
         return graph
       }
       // Here we have to do a fairly awkward dance to load the graph functions
@@ -773,66 +746,9 @@ fileprivate extension _ExecutionContext {
       }
 
        // Memorize the loaded program by address.
-      loadedTFEPrograms[address] = graph
+      loadedPrograms[address] = graph
       debugLog("Done loading a new program.")
       return graph
-    }
-  }
-
-  /// Returns a cached session along with its graph if it exists, or creates a
-  /// new one and caches it.
-  func session(
-    forProgram programByteAddress: UnsafeRawPointer,
-    programByteCount: Int
-  ) -> ProgramInstance {
-    return sync {
-      // If a program instance for this program is already cached, use that.
-      if let instance = loadedTFPrograms[programByteAddress] {
-        return instance
-      }
-
-      // Otherwise, load the graph, create a session, and cache them.
-      debugLog("Loading a tensor program as a TF graph.")
-      let newGraph = TF_NewGraph()!
-      // TensorFlow loads things through TF_Buffer.  Create one that avoids
-      // redundantly copying the program bytes.
-      var programBuf = TF_Buffer(data: programByteAddress,
-                                 length: programByteCount,
-                                 data_deallocator: nil)
-      let graphDefOptions = TF_NewImportGraphDefOptions()
-      TF_GraphImportGraphDef(newGraph, &programBuf, graphDefOptions, status)
-      TF_DeleteImportGraphDefOptions(graphDefOptions)
-      checkOk(status)
-      debugLog("Done loading a new program.")
-
-      // Prepare session options for initializing a session.
-      let sessionOptions = TF_NewSessionOptions()
-      TF_SetConfig(sessionOptions,
-                   tensorFlowConfig.pointee.data,
-                   tensorFlowConfig.pointee.length,
-                   status)
-      checkOk(status)
-
-      // If needed, enable remote execution in session options.
-      if case .remote(let grpcAddress) = _RuntimeConfig.session {
-        debugLog("Set TensorFlow server to \(grpcAddress).")
-        TF_SetTarget(sessionOptions, grpcAddress)
-      }
-      // Create a new session using the session options above.
-      let maybeNewSession = TF_NewSession(newGraph, sessionOptions, status)
-      checkOk(status)
-      let newSession = maybeNewSession!
-      TF_DeleteSessionOptions(sessionOptions)
-      // If this is the first session in TPU mode, make sure TPU is
-      // reset/initialized.
-      if loadedTFPrograms.isEmpty, _RuntimeConfig.executionMode.isTPU {
-        initializeTPU(withSession: newSession, graph: newGraph, status: status)
-      }
-
-      // Cache the session.
-      let newInstance = (graph: newGraph, session: newSession)
-      loadedTFPrograms[programByteAddress] = newInstance
-      return newInstance
     }
   }
 }
@@ -1031,159 +947,6 @@ extension TFEState {
   }
 }
 
-private class TFState {
-  let status: CTFStatus = TF_NewStatus()
-
-  /// The TF_Session to execute the function.
-  fileprivate let cSession: CTFSession
-  /// The graph that contains the function to execute. Not owned.
-  let graph: CTFGraph
-  /// The input tensors.
-  var inputTensors: [CTensor?] = []
-
-  init(_ programByteAddress: UnsafeRawPointer, programByteCount: Int) {
-    let context = _ExecutionContext.global
-    (graph, cSession) = context.session(forProgram: programByteAddress,
-                                        programByteCount: programByteCount)
-  }
-
-  deinit {
-    TF_DeleteStatus(status)
-  }
-}
-
-extension TFState {
-  func addInput(_ inputTensorHandle: CTensorHandle) {
-    // We assume the input tensors live in host memory.
-    let cTensor = TFE_TensorHandleResolve(inputTensorHandle, status)
-    checkOk(status)
-    inputTensors.append(cTensor!)
-  }
-
-  /// Runs the tensor program. Aborts the process on error, and emits an error
-  /// string to STDERR.
-  /// See the comment on _TensorComputation.helperFunctionCount on the concept
-  /// of a "helper function".
-  func execute(_ entryFunctionBaseName: String,
-               helperFunctionCount: Int,
-               returnValues: inout [CTensorHandle?]) {
-    let funcNodeName = "tfc_func_" + entryFunctionBaseName
-    let funcNode = TF_GraphOperationByName(graph, funcNodeName)
-    internalConsistencyCheck(
-      funcNode != nil,
-      "Cannot find func node name \(funcNodeName)"
-    )
-    internalConsistencyCheck(
-      TF_OperationNumOutputs(funcNode) == returnValues.count
-    )
-
-    // Prepare input related parameters for TF_SessionRun().
-    var inputNodeSpecs: [TF_Output] = []
-    for i in 0..<inputTensors.count {
-      let inputNodeName = "tfc_input_\(i)_\(entryFunctionBaseName)"
-      let inputNode = TF_GraphOperationByName(graph, inputNodeName)
-      internalConsistencyCheck(inputNode != nil,
-        "Cannot find input node name \(inputNodeName)")
-      inputNodeSpecs.append(TF_Output(oper: inputNode, index: 0))
-    }
-
-    // Prepare output related parameters for TF_SessionRun().
-    var outputNodeSpecs: [TF_Output] = []
-    for i in 0..<returnValues.count {
-      let outputNodeName = "tfc_output_\(i)_\(entryFunctionBaseName)"
-      let outputNode = TF_GraphOperationByName(graph, outputNodeName)
-      internalConsistencyCheck(outputNode != nil,
-                               "Cannot find output node name \(outputNodeName)")
-      outputNodeSpecs.append(TF_Output(oper: outputNode, index: 0))
-    }
-    var outputTensors: [CTensor?] = Array(repeating: nil,
-                                          count: returnValues.count)
-
-    // Prepare target related parameters for TF_SessionRun().
-    // A vector of TF_Operation* objects.
-    var targetNodeSpecs: [OpaquePointer?] = []
-    for i in 0..<helperFunctionCount {
-      let helperFuncNodeName = "tfc_func_\(entryFunctionBaseName)_helper_\(i)"
-      let helperFuncNode = TF_GraphOperationByName(graph, helperFuncNodeName)
-      guard helperFuncNode != nil else {
-        fatalError("Cannot find helper func node name \(helperFuncNodeName)")
-      }
-      targetNodeSpecs.append(helperFuncNode)
-    }
-
-    if returnValues.isEmpty {
-        debugLog("""
-          Function \(entryFunctionBaseName) has no result tensors, so adding \
-          it as a target node.
-          """)
-      targetNodeSpecs.append(funcNode)
-    }
-    if _RuntimeConfig.executionMode.isTPU {
-      debugLog("Enable TPU execution.")
-      // When infeed is enabled, run it along with the output tensor nodes
-      // below.
-      let infeedEnqueueNode = TF_GraphOperationByName(graph,
-                                                      "InfeedEnqueueTuple")
-      if let infeedEnqueueNode = infeedEnqueueNode {
-        targetNodeSpecs.append(infeedEnqueueNode)
-        debugLog("Running enqueue with \(inputTensors.count) input tensors.")
-      }
-    }
-    var runOptions: UnsafeMutablePointer<TF_Buffer>? = nil
-    var runMetadataOutput: UnsafeMutablePointer<TF_Buffer>? = nil
-    // When there's a run metadata output path specified, we enable `FULL_TRACE`
-    // in run options and dump that to the specified path after execution.
-    if _RuntimeConfig.runMetadataOutputPath != nil {
-      runOptions = TF_CreateRunOptions(/*enable_full_trace*/ 1)
-      runMetadataOutput = TF_NewBuffer()
-    }
-    debugLog("""
-      Calling TF_SessionRun on function \(entryFunctionBaseName), With \
-      \(targetNodeSpecs.count) target nodes.
-      """)
-    TF_SessionRun(
-      cSession, UnsafePointer(runOptions),
-      // input related parameters
-      inputNodeSpecs, inputTensors, Int32(inputTensors.count),
-      // output related parameters
-      outputNodeSpecs, &outputTensors, Int32(returnValues.count),
-      // target related parameters
-      targetNodeSpecs, Int32(targetNodeSpecs.count),
-      /*run_metadata*/ runMetadataOutput, status
-    )
-    if (TF_GetCode(status) != TF_OK) {
-      _ = fputs(TF_Message(status), stderr)
-      exit(-1)
-    }
-    debugLog("Done running TF computation.")
-
-    // If run metadata path was set, dump the run metadata proto to a file.
-    if let path = _RuntimeConfig.runMetadataOutputPath {
-      TF_DeleteBuffer(runOptions)
-      debugLog("Writing run metadata to \"\(path)\".")
-      writeContents(of: runMetadataOutput!, toFile: path)
-      TF_DeleteBuffer(runMetadataOutput)
-    }
-
-    // Delete input tensors.
-    for inputTensor in inputTensors {
-      TF_DeleteTensor(inputTensor)
-    }
-
-    // Synthesize TFE tensor handles to work with the existing Swift TF
-    // library code.
-    for i in 0..<returnValues.count {
-      assert(outputTensors[i] != nil)
-      returnValues[i] = TFE_NewTensorHandle(outputTensors[i], status)
-      checkOk(status)
-      TF_DeleteTensor(outputTensors[i])
-      if _RuntimeConfig.printsDebugLog {
-        dumpCTensorHandleContent(i, returnValues[i]!)
-      }
-    }
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // - MARK: Tensor computation
 //===----------------------------------------------------------------------===//
@@ -1230,8 +993,7 @@ public final class _TensorComputation {
 
   // NOTE: the following properties are intentionally not implemented as an enum
   // due to high churn, *please do not refactor for Swiftiness*.
-  private var stateTFE: TFEState?
-  private var stateTF: TFState?
+  private var state: TFEState
 
   /// The threads to run tensor computation in. In eager mode, we use N threads
   /// when the tensor computation involves N device functions. In non-eager
@@ -1306,37 +1068,19 @@ public final class _TensorComputation {
       \(String(cString: entryFunctionBaseNameAddress)).
       """)
     self.helperFunctionCount = helperFunctionCount
-    if _RuntimeConfig.usesTFEagerAPI {
-      self.stateTFE = TFEState(
+    self.state = TFEState(
         programByteAddress,
         programByteCount: programByteCount,
         helperFunctionCount: helperFunctionCount,
         entryFunctionBaseNameAddress: entryFunctionBaseNameAddress)
       debugLog("Done initializing TFE-specific state.")
-    } else {
-      self.stateTF = TFState(programByteAddress,
-        programByteCount: programByteCount)
-      debugLog("Done initializing TF-specific state.")
-    }
 
     debugLog("Populating the op's input list with \(inputTensorHandles.count) inputs.")
     for (i, inputTensorHandle) in inputTensorHandles.enumerated() {
       if _RuntimeConfig.printsDebugLog {
         dumpCTensorHandleContent(i, inputTensorHandle)
       }
-
-      if let stateTFE = stateTFE {
-        internalConsistencyCheck(_RuntimeConfig.usesTFEagerAPI)
-        stateTFE.addInput(inputTensorHandle)
-      } else {
-        internalConsistencyCheck(!_RuntimeConfig.usesTFEagerAPI)
-        guard let stateTF = stateTF else {
-          fatalError("""
-            stateTF must be defined when _RuntimeConfig.usesTFEagerAPI == false.
-            """)
-        }
-        stateTF.addInput(inputTensorHandle)
-      }
+      state.addInput(inputTensorHandle)
     }
 
     debugLog("Created returning info.")
@@ -1346,8 +1090,7 @@ public final class _TensorComputation {
 
     // If it's asynchronous, we execute the tensor computation via threads.
     if !_RuntimeConfig.usesSynchronousExecution {
-      let threadCount =
-        _RuntimeConfig.usesTFEagerAPI ? helperFunctionCount + 1 : 1
+      let threadCount = helperFunctionCount + 1
       for threadIndex in 0..<threadCount {
         // The function to launch in the parallel thread.
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -1409,15 +1152,13 @@ private extension _TensorComputation {
   // executed on initialization, thus this method will not be exposed to users.
   private func execute(threadIndex: Int) {
     debugLog("Executing thread \(threadIndex).")
-    if let stateTFE = stateTFE {
-      internalConsistencyCheck(_RuntimeConfig.usesTFEagerAPI)
       internalConsistencyCheck(threadIndex <= helperFunctionCount)
 
       if /*let tracedFn =*/ _RuntimeConfig.traceState.getFunction != nil {
-        debugLog("For thread \(threadIndex) finishing op creation for op \(stateTFE.op_descs[threadIndex]) in trace graph via TF_FinishOperation().")
+        debugLog("For thread \(threadIndex) finishing op creation for op \(state.op_descs[threadIndex]) in trace graph via TF_FinishOperation().")
         // this is always true
-        // internalConsistencyCheck(stateTFE.op_descs[threadIndex] != nil)
-        let result = TF_FinishOperation(stateTFE.op_descs[threadIndex], status)
+        // internalConsistencyCheck(state.op_descs[threadIndex] != nil)
+        let result = TF_FinishOperation(state.op_descs[threadIndex], status)
         checkOk(status)
         if threadIndex == 0 {
           debugLog("Tracking \(returnValues.count) outputs in tracedFn.")
@@ -1429,14 +1170,14 @@ private extension _TensorComputation {
         return
       }
       
-      let op = stateTFE.ops[threadIndex]
+      let op = state.ops[threadIndex]
       if threadIndex == 0 {
         var returnValueCount = Int32(returnValues.count)
         TFE_Execute(op, &returnValues, &returnValueCount, status)
         debugLog("""
-          returnValues.count=\(returnValues.count), \
-          returnValueCount=\(returnValueCount).
-          """)
+                   returnValues.count=\(returnValues.count), \
+                   returnValueCount=\(returnValueCount).
+                   """)
         internalConsistencyCheck(returnValueCount == returnValues.count)
       } else {
         var returnValueCountForHelper: Int32 = 0
@@ -1446,19 +1187,6 @@ private extension _TensorComputation {
       checkOk(status)
 
       debugLog("Done execution with eager.")
-      return
-    }
-    // Non-eager based execution.
-    internalConsistencyCheck(!_RuntimeConfig.usesTFEagerAPI)
-    internalConsistencyCheck(threadIndex == 0)
-    debugLog("Executing TF function \(entryFunctionBaseName).")
-    guard let stateTF = stateTF else {
-      fatalError("stateTF must be defined in non-eager mode.")
-    }
-    stateTF.execute(entryFunctionBaseName,
-                    helperFunctionCount: helperFunctionCount,
-                    returnValues: &returnValues)
-    debugLog("Done execution.")
   }
 }
 
@@ -1505,16 +1233,6 @@ public extension _TensorComputation {
     // optional.
     return returnValues.map { $0! }
 
-  }
-}
-
-extension _TensorComputation {
-  @usableFromInline
-  var cSession: CTFSession {
-    if let stateTF = stateTF {
-      return stateTF.cSession
-    }
-    fatalError("No TF Session is available!")
   }
 }
 

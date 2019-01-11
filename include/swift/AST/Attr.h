@@ -1314,13 +1314,17 @@ public:
 /// For example:
 ///   @differentiable(reverse, adjoint: foo(_:_:seed:) where T : FloatingPoint)
 ///   @differentiable(reverse, wrt: (self, .0, .1), adjoint: bar(_:_:_:seed:))
-class DifferentiableAttr : public DeclAttribute {
+class DifferentiableAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<DifferentiableAttr, AutoDiffParameter> {
 public:
   struct DeclNameWithLoc {
     DeclName Name;
     DeclNameLoc Loc;
   };
 private:
+  friend TrailingObjects;
+
   /// The number of parameters specified in 'wrt:'.
   unsigned NumParameters;
   /// The primal function.
@@ -1331,8 +1335,6 @@ private:
   Optional<DeclNameWithLoc> JVP;
   /// The VJP function.
   Optional<DeclNameWithLoc> VJP;
-  /// The constraint clauses for generic types.
-  TrailingWhereClause *WhereClause = nullptr;
   /// The primal function (optional), to be resolved by the type checker if
   /// specified.
   FuncDecl *PrimalFunction = nullptr;
@@ -1347,14 +1349,31 @@ private:
   FuncDecl *VJPFunction = nullptr;
   /// Checked parameter indices, to be resolved by the type checker.
   AutoDiffParameterIndices *CheckedParameterIndices = nullptr;
+  /// The trailing where clause, if it exists.
+  TrailingWhereClause *WhereClause = nullptr;
+  /// The requirements for autodiff associated functions. Resolved by the type
+  /// checker based on the original function's generic signature and the
+  /// attribute's where clause requirements. This is set only if the attribute's
+  /// where clause exists.
+  MutableArrayRef<Requirement> Requirements;
 
-  explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+  explicit DifferentiableAttr(ASTContext &context, SourceLoc atLoc,
+                              SourceRange baseRange,
                               ArrayRef<AutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> primal,
                               Optional<DeclNameWithLoc> adjoint,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               TrailingWhereClause *clause);
+
+  explicit DifferentiableAttr(ASTContext &context, SourceLoc atLoc,
+                              SourceRange baseRange,
+                              ArrayRef<AutoDiffParameter> parameters,
+                              Optional<DeclNameWithLoc> primal,
+                              Optional<DeclNameWithLoc> adjoint,
+                              Optional<DeclNameWithLoc> jvp,
+                              Optional<DeclNameWithLoc> vjp,
+                              ArrayRef<Requirement> requirements);
 
 public:
   static DifferentiableAttr *create(ASTContext &context, SourceLoc atLoc,
@@ -1365,6 +1384,15 @@ public:
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     TrailingWhereClause *clause);
+
+  static DifferentiableAttr *create(ASTContext &context, SourceLoc atLoc,
+                                    SourceRange baseRange,
+                                    ArrayRef<AutoDiffParameter> parameters,
+                                    Optional<DeclNameWithLoc> primal,
+                                    Optional<DeclNameWithLoc> adjoint,
+                                    Optional<DeclNameWithLoc> jvp,
+                                    Optional<DeclNameWithLoc> vjp,
+                                    ArrayRef<Requirement> requirements);
 
   Optional<DeclNameWithLoc> getPrimal() const { return Primal; }
   Optional<DeclNameWithLoc> getAdjoint() const { return Adjoint; }
@@ -1378,18 +1406,23 @@ public:
     CheckedParameterIndices = pi;
   }
 
-  TrailingWhereClause *getWhereClause() const { return WhereClause; }
-
-  AutoDiffParameter *getParametersData() {
-    return reinterpret_cast<AutoDiffParameter *>(this+1);
-  }
-
   /// The differentiation parameters, i.e. the list of parameters specified in
   /// 'wrt:'.
-  ArrayRef<AutoDiffParameter> getParameters() const;
-  MutableArrayRef<AutoDiffParameter> getParameters() {
-    return { getParametersData(), NumParameters };
+  ArrayRef<AutoDiffParameter> getParameters() const {
+    return { getTrailingObjects<AutoDiffParameter>(), NumParameters };
   }
+  MutableArrayRef<AutoDiffParameter> getParameters() {
+    return { getTrailingObjects<AutoDiffParameter>(), NumParameters };
+  }
+  size_t numTrailingObjects(OverloadToken<AutoDiffParameter>) const {
+    return NumParameters;
+ }
+
+  TrailingWhereClause *getWhereClause() const { return WhereClause; }
+
+  ArrayRef<Requirement> getRequirements() const { return Requirements; }
+  MutableArrayRef<Requirement> getRequirements() { return Requirements; }
+  void setRequirements(ASTContext &context, ArrayRef<Requirement> requirements);
 
   FuncDecl *getPrimalFunction() const { return PrimalFunction; }
   void setPrimalFunction(FuncDecl *decl) { PrimalFunction = decl; }

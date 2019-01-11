@@ -71,7 +71,6 @@ extension TestSuite {
 #if !TPU
     test(name + (TestSuite.willTargetGPU ? "_GPU" : "_CPU")) {
       _RuntimeConfig.executionMode = .auto
-      _RuntimeConfig.usesTFEagerAPI = true
       _RuntimeConfig.gpuMemoryAllowGrowth = true
       _RuntimeConfig.printsDebugLog = false
       withDevice(TestSuite.willTargetGPU ? .gpu : .cpu) {

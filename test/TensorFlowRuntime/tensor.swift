@@ -238,7 +238,7 @@ TensorTests.testAllBackends("Concatenation") {
 TensorTests.test("EwiseComparison") {
   let x = Tensor<Float>([0, 1, 2])
   let y = Tensor<Float>([2, 1, 3])
-  expectEqual(x.elementsLess(y).scalars, [true, false, true])
+  expectEqual((x .< y).scalars, [true, false, true])
 }
 
 TensorTests.test("LexicographicalComparison") {
@@ -255,7 +255,7 @@ TensorTests.testAllBackends("ArgMax") {
   let scalarsArgmax = x.argmax()
   expectEqual(ShapedArray(shape: [3], scalars: [1, 1, 1]), argmax0.array)
   expectEqual(ShapedArray(shape: [2], scalars: [2, 2]), argmax1.array)
-  expectEqual(5, scalarsArgmax)
+  expectEqual(ShapedArray(shape: [], scalars: [5]), scalarsArgmax.array)
 }
 
 TensorTests.testAllBackends("CeilFloor") {

@@ -7,20 +7,18 @@ import TensorFlow
 var someGlobal = Tensor<Int32>(1)
 
 public func iftest(z: Tensor<Int32>, y: Tensor<Int32>, c: Bool, d: Bool) -> Tensor<Int32> {
-  // expected-warning @-1 {{'z' implicitly copied to the accelerator}}
 
   var a = z
   if c {
     if d { fatalError() }
-    a = a + a // expected-note {{value used here}}
+    a = a + a
   } else {
     if d { fatalError() }
 
-    // expected-warning @+1 {{value implicitly copied to the accelerator}}
     a = someGlobal
   }
 
-  a = a * a  // expected-note {{value used here}}
+  a = a * a
   return a
 }
 
@@ -28,20 +26,17 @@ public func iftest(z: Tensor<Int32>, y: Tensor<Int32>, c: Bool, d: Bool) -> Tens
 // the return site, and this prevented the return block from being included in
 // the post dom set for the partitioning pass.
 public func postdom_crash1(w1: Tensor<Float>, inputBatch: Tensor<Float>) {
-  // expected-warning @-1 {{'w1' implicitly copied to the accelerator}}
-  // expected-warning @-2 {{'inputBatch' implicitly copied to the accelerator}}
   let iterationCount = 1000
   for _ in 0..<iterationCount {
-    _ = inputBatch • w1  // expected-note 2 {{value used here}}
+    _ = inputBatch • w1
   }
 }
 
 // This crashed the partitioning pass because the 1.0 scalar was hoisted out of
 // the loop.  The partitioning pass tried to sink it back in, but failed.
 public func sinking_crash(w1: Tensor<Float>) {
-  // expected-warning @-1 {{'w1' implicitly copied to the accelerator}}
   for _ in 0..<1000 {
-    let pred = w1+w1  // expected-note {{value used here}}
+    let pred = w1+w1
     let _ = 1.0 / Tensor<Float>(pred.scalarCountTensor)
   }
 }
@@ -59,11 +54,10 @@ public func endpointComputationCrash() {
 // This crashed lower graph because it produced an error about not being able
 // to lower a send and there wasn't enough error recovery to handle it well.
 public func lowerGraphCrash(x: Tensor<Int32>) {
-  // expected-warning @-1 {{'x' implicitly copied to the accelerator}}
 
-  _ = x*x  // expected-note {{value used here}}
+  _ = x*x
   for _ in 0..<1000 {
-    _ = x+someGlobal // expected-warning {{value implicitly copied to the accelerator}}
+    _ = x+someGlobal
   }
 }
 
@@ -141,7 +135,7 @@ public func sinkTensorToScalarCrash() {
 
   for _ in 0...10000 {
     w2 -= w1
-    loss = w2.mean()
+    loss = w2.mean().scalarized()
   }
 
   opaqueGenericFunction(loss)
@@ -186,8 +180,8 @@ func twoHandles() -> (TensorHandle<Int32>, ResourceHandle) {
 }
 
 public func testMultiResultUninlinable() {
-  let (x1, _) = twoHandles()  // expected-warning {{value implicitly copied to the accelerator}}
-  let _: TensorHandle<Float> = #tfop("Identity", x1)  // expected-note {{value used here}}
+  let (x1, _) = twoHandles()
+  let _: TensorHandle<Float> = #tfop("Identity", x1)
 }
 
 // Test support for copying multiple result outputs.
@@ -199,37 +193,27 @@ public func testMultiOutputsFnResults() -> (Tensor<Float>,  Tensor<Float>) {
   return (x.toHost(),y.toHost())
 }
 
-// expected-warning @+2{{implicitly copied to the accelerator}}
-// expected-warning @+1{{implicitly copied to the accelerator}}
 public func testMultiResultOp_tfop(x: Tensor<Float>, y: Tensor<Float>) {
   let (loss, backprop) : (TensorHandle<Float>, TensorHandle<Float>) =
     #tfop("SoftmaxCrossEntropyWithLogits", x, y)
-  // expected-note @-1{{value used here}}
-  // expected-note @-2{{value used here}}
   _hostOp(loss)
   _hostOp(backprop)
 }
 
-// expected-warning @+2{{implicitly copied to the accelerator}}
-// expected-warning @+1{{implicitly copied to the accelerator}}
 public func testMultiResultOp_rawop(x: Tensor<Float>, y: Tensor<Float>) {
-  // expected-note @+2{{value used here}}
-  // expected-note @+1{{value used here}}
   let results = TensorFlow.Raw.softmaxCrossEntropyWithLogits(features: x, labels: y)
   _hostOp(results.loss)
   _hostOp(results.backprop)
 }
 
 public func testMultiResultOp_send_recv() {
-  var x = Tensor<Float>([[1.0]])  // expected-warning {{implicitly copied to the host}}
+  var x = Tensor<Float>([[1.0]])
   // Accelerator -> Host
   _hostOp(x)
   x += [[2.0]]
-  // expected-warning @+1{{implicitly copied to the host}}
   let results = TensorFlow.Raw.softmaxCrossEntropyWithLogits(features: x, labels: x)
   // Accelerator -> Host
   _hostOp(results.loss)
-  // expected-note @+1{{value used here}}
   let adjustedLoss = results.loss.scalar! + 3.0
   // Host -> Accelerator
   let y = Tensor<Float>(adjustedLoss)
@@ -254,7 +238,7 @@ public func SR8191() {
   let t = Tensor<Float>(1.0)
   var i = 0
   repeat {
-    let y = t + t // expected-warning {{value implicitly copied to the host}}
+    let y = t + t
     _hostOp(y)
     i += 1
   } while i < 10
@@ -274,15 +258,11 @@ public func SR8191() {
 // "let _= a + b", and ends in that BB. So the tensor start point and tensor end
 // point should both be in that BB.
 public func SR8226(n: Float, m: Float, cond: Bool, cond2: Bool) {
-  // expected-warning @+1{{implicitly copied to the accelerator}}
   let a = Tensor<Float>([m, n])
 
   if cond {
-    // expected-warning @+1{{implicitly copied to the accelerator}}
     let b = Tensor<Float>([m, n])
     if cond2 {
-      // expected-note @+2{{value used here}}
-      // expected-note @+1{{value used here}}
       let _ = a + b
     }
   }
@@ -311,7 +291,6 @@ public func SR8222_cond_br_TensorHandle_Bool() {
   var i = Tensor<Int32>(0)
   repeat {
     let y = t + t
-    // expected-warning @-1{{implicitly copied to the host}}
     _hostOp(y)
     i += 1
   } while i != Tensor<Int32>(10)
@@ -385,14 +364,13 @@ extension AggregateStruct : TensorGroup {
 public func inlineDeabstracted_a() -> Tensor<Float> {
   return deabstractedCallee([1, 2, 3])
 }
-// expected-warning @+1 {{implicitly copied}}
+
 public func deabstractedCallee(_ t: Tensor<Float>) -> Tensor<Float> {
   // expected-error @+3 {{op named 'Dummy' is not registered in TensorFlow}}
   // expected-error @+2 {{op named 'Dummy' is not registered in TensorFlow}}
   // expected-error @+1 {{op named 'Dummy' is not registered in TensorFlow}}
   let aggregate: AggregateStruct = #tfop("Dummy") // packs results
 
-  // expected-note @+1 {{value used here}}
   return t ++ aggregate.a // concat uses an InputList
 }
 public func inlineDeabstracted_b() -> Tensor<Float> {

@@ -58,12 +58,11 @@ public func f(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
 }
 
 
-// expected-warning @+1 2 {{implicitly copied to the accelerator}}
 public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> Tensor<Float> {
   // Pack takes an input list, not multiple inputs.  Here we're checking that
   // we can pass in an array of Tensor's and an array of TensorHandle's.
-  let x: TensorHandle<Float> = #tfop("Pack", [a, a, a])  // expected-note {{value used here}}
-  let y: TensorHandle<Float> = #tfop("Pack", [b, b, b])  // expected-note {{value used here}}
+  let x: TensorHandle<Float> = #tfop("Pack", [a, a, a])
+  let y: TensorHandle<Float> = #tfop("Pack", [b, b, b])
   return (Tensor(handle: x)+Tensor(handle: y)).toHost()
 }
 
@@ -74,11 +73,10 @@ CHECK: graph_op "Pack"([{{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Fl
 CHECK-LABEL: ---- END OF INPUT FUNCTION
 */
 
-// expected-warning @+1 {{implicitly copied to the accelerator}}
 public func inputListMultipleUses(a: TensorHandle<Float>)
    -> (Tensor<Float>, [TensorHandle<Float>]) {
   let arr = [a, a, a]
-  let x: TensorHandle<Float> = #tfop("Pack", arr)  // expected-note {{value used here}}
+  let x: TensorHandle<Float> = #tfop("Pack", arr)
   return (Tensor(handle: x).toHost(), arr)
 }
 
@@ -199,7 +197,7 @@ public func testShapeList2() {
 
 @TensorFlowGraph
 func isZero(_ x: Tensor<Float>) -> Tensor<Bool> {
-  return x.elementsEqual(Tensor<Float>(0));
+  return x .== Tensor<Float>(0)
 }
 
 public func noescapeFuncAsAttr(_ f: @convention(tensorflow) (Tensor<Float>) -> Tensor<Bool>) {
@@ -268,9 +266,7 @@ public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
 // if they are only referred in code.  In this case, addOne should be
 // partitioned, but not getZero.
 //
-// expected-warning @+1 {{'x' implicitly copied to the accelerator}}
 private func addOne(_ x : Tensor<Float>) -> Tensor<Float> {
-  // expected-note @+1 {{value used here}}
   return x + Tensor<Float>(1.0)
 }
 private func getZero() -> Tensor<Float> { return Tensor<Float>(0.0) }

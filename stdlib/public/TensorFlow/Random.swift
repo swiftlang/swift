@@ -131,8 +131,9 @@ public final class UniformIntegerDistribution<T: FixedWidthInteger> {
 }
 
 @_fixed_layout
-public final class UniformFloatingPointDistribution<T: BinaryFloatingPoint>
-  where T.RawSignificand : FixedWidthInteger {
+public final class UniformFloatingPointDistribution<T : BinaryFloatingPoint>
+  where T.RawSignificand : FixedWidthInteger
+{
   public let lowerBound: T
   public let upperBound: T
 
@@ -147,8 +148,9 @@ public final class UniformFloatingPointDistribution<T: BinaryFloatingPoint>
 }
 
 @_fixed_layout
-public final class NormalDistribution<T: BinaryFloatingPoint>
-  where T.RawSignificand : FixedWidthInteger {
+public final class NormalDistribution<T : BinaryFloatingPoint>
+  where T.RawSignificand : FixedWidthInteger
+{
   public let mean: T
   public let standardDeviation: T
   private let uniformDist = UniformFloatingPointDistribution<T>()

@@ -98,9 +98,6 @@ private class TestCluster {
 }
 
 public func runAllTestsWithRemoteSession(taskCount: Int = 2) {
-  // This only works if we use the TFEager API.
-  _RuntimeConfig.usesTFEagerAPI = true
-
   // In the remote test mode, TF level debug log can be printed by changing the
   // params below, instead of changing _RuntimeConfig.printsDebugLog and
   // _RuntimeConfig.tensorflowVerboseLogLevel on a per-test basis. This is
