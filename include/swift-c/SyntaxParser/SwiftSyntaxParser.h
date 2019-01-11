@@ -182,7 +182,7 @@ swiftparse_parser_set_node_lookup(swiftparse_parser_t,
 /// Parse the provided \p source and invoke the callback that was set via
 /// \c swiftparse_parser_set_node_handler as each syntax node is parsed.
 ///
-/// Syntax nodes are provided in a top-bottom, depth-first order. For example,
+/// Syntax nodes are provided in a depth-first, source order. For example,
 /// token nodes will be provided ahead of the syntax node whose layout they are
 /// a part of. The memory that \c swiftparse_syntax_node_t points to is only
 /// valid to access for the duration of the \c swiftparse_node_handler_t block
