@@ -2640,86 +2640,29 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
+      auto elementAssocType =
+        cast<AssociatedTypeDecl>(
+          sequenceProto->lookupDirect(tc.Context.Id_Element).front());
+
       SequenceType = cs.createTypeVariable(Locator);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
                        sequenceProto->getDeclaredType(), Locator);
 
-      auto iteratorLocator =
-        cs.getConstraintLocator(Locator,
-                                ConstraintLocator::SequenceIteratorProtocol);
       auto elementLocator =
-        cs.getConstraintLocator(iteratorLocator,
-                                ConstraintLocator::GeneratorElementType);
+        cs.getConstraintLocator(Locator,
+                                ConstraintLocator::SequenceElementType);
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
       InitType = cs.generateConstraints(pattern, elementLocator);
       if (!InitType)
         return true;
-      
-      // Manually search for the iterator witness. If no iterator/element pair
-      // exists, solve for them.
-      Type iteratorType;
-      Type elementType;
-      
-      NameLookupOptions lookupOptions = defaultMemberTypeLookupOptions;
-      if (isa<AbstractFunctionDecl>(cs.DC))
-        lookupOptions |= NameLookupFlags::KnownPrivate;
-
-      auto sequenceType = cs.getType(expr)->getRValueType();
-      if (auto *selfType = sequenceType->getAs<DynamicSelfType>())
-        sequenceType = selfType->getSelfType();
-
-      // Look through one level of optional; this improves recovery but doesn't
-      // change the result.
-      if (auto sequenceObjectType = sequenceType->getOptionalObjectType())
-        sequenceType = sequenceObjectType;
-
-      // If the sequence type is an existential, we should not attempt to
-      // look up the member type at all, since we cannot represent associated
-      // types of existentials.
-      //
-      // We will diagnose it later.
-      if (!sequenceType->isExistentialType() &&
-          (sequenceType->mayHaveMembers() ||
-           sequenceType->isTypeVariableOrMember())) {
-        ASTContext &ctx = tc.Context;
-        auto iteratorAssocType =
-          cast<AssociatedTypeDecl>(
-            sequenceProto->lookupDirect(ctx.Id_Iterator).front());
-
-        auto subs = sequenceType->getContextSubstitutionMap(
-          cs.DC->getParentModule(),
-          sequenceProto);
-        iteratorType = iteratorAssocType->getDeclaredInterfaceType()
-          .subst(subs);
-
-        if (iteratorType) {
-          auto iteratorProto =
-            tc.getProtocol(Stmt->getForLoc(),
-                           KnownProtocolKind::IteratorProtocol);
-          if (!iteratorProto)
-            return true;
-
-          auto elementAssocType =
-            cast<AssociatedTypeDecl>(
-              iteratorProto->lookupDirect(ctx.Id_Element).front());
-
-          elementType = iteratorType->getTypeOfMember(
-                          cs.DC->getParentModule(),
-                          elementAssocType,
-                          elementAssocType->getDeclaredInterfaceType());
-        }
-      }
-
-      if (elementType.isNull()) {
-        elementType = cs.createTypeVariable(elementLocator);
-      }
 
       // Add a conversion constraint between the element type of the sequence
       // and the type of the element pattern.
+      auto elementType = DependentMemberType::get(SequenceType, elementAssocType);
       cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
                        elementLocator);
 

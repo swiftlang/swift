@@ -60,8 +60,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ClosureResult:
     case ParentType:
     case InstanceType:
-    case SequenceIteratorProtocol:
-    case GeneratorElementType:
+    case SequenceElementType:
     case AutoclosureResult:
     case GenericArgument:
     case NamedTupleElement:
@@ -146,8 +145,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "function result";
       break;
 
-    case GeneratorElementType:
-      out << "generator element type";
+    case SequenceElementType:
+      out << "sequence element type";
       break;
 
     case GenericArgument:
@@ -188,10 +187,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case RValueAdjustment:
       out << "rvalue adjustment";
-      break;
-
-    case SequenceIteratorProtocol:
-      out << "sequence iterator type";
       break;
 
     case SubscriptMember:
