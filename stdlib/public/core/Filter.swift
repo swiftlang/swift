@@ -83,6 +83,8 @@ extension LazyFilterSequence.Iterator: IteratorProtocol, Sequence {
   }
 }
 
+extension LazyFilterSequence.Iterator: LazySequenceProtocol {}
+
 extension LazyFilterSequence: Sequence {
   public typealias Element = Base.Element
   /// Returns an iterator over the elements of this sequence.
