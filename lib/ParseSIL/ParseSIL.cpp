@@ -1009,7 +1009,12 @@ static bool parseDeclSILOptional(bool *isTransparent,
     else if (isGlobalInit && SP.P.Tok.getText() == "global_init")
       *isGlobalInit = true;
     else if (isWeakLinked && SP.P.Tok.getText() == "_weakLinked")
-      *isWeakLinked = true;
+      if (M.getASTContext().LangOpts.Target.isOSBinFormatCOFF())
+        SP.P.diagnose(SP.P.Tok, diag::attr_unsupported_on_target,
+                      SP.P.Tok.getText(),
+                      M.getASTContext().LangOpts.Target.str());
+      else
+        *isWeakLinked = true;
     else if (inlineStrategy && SP.P.Tok.getText() == "noinline")
       *inlineStrategy = NoInline;
     else if (optimizationMode && SP.P.Tok.getText() == "Onone")

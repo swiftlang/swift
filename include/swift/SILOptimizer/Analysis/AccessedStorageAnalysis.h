@@ -15,6 +15,10 @@
 // used by AccessEnforcementOpts to locally fold access scopes and remove
 // dynamic checks based on whole module analysis.
 //
+// This analysis may return conservative results by setting
+// FunctionAccessedStorage.unidentifiedAccess. This does not imply that all
+// accesses within the function have Unidentified AccessedStorage.
+//
 // Note: This interprocedural analysis can be easily augmented to simultaneously
 // compute FunctionSideEffects, without using a separate analysis, by adding
 // FunctionSideEffects as a member of FunctionAccessedStorage. However, passes
@@ -125,7 +129,10 @@ namespace swift {
 /// additional StorageAccessInfo bits are recorded as results of this analysis.
 ///
 /// Any unidentified accesses are summarized as a single unidentifiedAccess
-/// property.
+/// property. This property may also be used to conservatively summarize
+/// results, either because the call graph is unknown or the access sets are too
+/// large. It does not imply that all accesses have Unidentified
+/// AccessedStorage, which is never allowed for class or global access.
 class FunctionAccessedStorage {
   using AccessedStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
 
@@ -163,6 +170,9 @@ public:
     storageAccessSet.clear();
     unidentifiedAccess = None;
   }
+
+  /// Return true if these effects are fully conservative.
+  bool hasWorstEffects() { return unidentifiedAccess == SILAccessKind::Modify; }
 
   /// Sets the most conservative effects, if we don't know anything about the
   /// function.
