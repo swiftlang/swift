@@ -3177,8 +3177,11 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // Methods returning 'Self' have a dynamic 'self'.
     //
     // FIXME: All methods of non-final classes should have this.
-    if (wantDynamicSelf && FD->hasDynamicSelf())
-      isDynamicSelf = true;
+    if (wantDynamicSelf) {
+      if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
+        if (!classDecl->isFinal())
+          isDynamicSelf = true;
+    }
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
@@ -3190,7 +3193,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     }
 
     // Convenience initializers have a dynamic 'self' in '-swift-version 5'.
-    if (Ctx.isSwiftVersionAtLeast(5)) {
+    /*if (Ctx.isSwiftVersionAtLeast(5))*/ {
       if (wantDynamicSelf && CD->isConvenienceInit())
         if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
           if (!classDecl->isFinal())
