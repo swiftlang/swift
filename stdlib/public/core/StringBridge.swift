@@ -302,12 +302,9 @@ extension String {
 // The @_swift_native_objc_runtime_base attribute
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
-@_fixed_layout // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSStringBase)
-public class __SwiftNativeNSString {
-  @usableFromInline // FIXME(sil-serialize-all)
-  @objc
-  internal init() {}
+class __SwiftNativeNSString {
+  @objc internal init() {}
   deinit {}
 }
 
