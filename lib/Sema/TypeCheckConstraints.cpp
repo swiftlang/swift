@@ -2669,6 +2669,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         lookupOptions |= NameLookupFlags::KnownPrivate;
 
       auto sequenceType = cs.getType(expr)->getRValueType();
+      if (auto *selfType = sequenceType->getAs<DynamicSelfType>())
+        sequenceType = selfType->getSelfType();
 
       // Look through one level of optional; this improves recovery but doesn't
       // change the result.

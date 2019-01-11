@@ -1955,6 +1955,8 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       // FIXME: It's kind of weird in general that we have to look
       // through lvalue, inout and IUO types here
       Type lookupBaseType = newBase->getWithoutSpecifierType();
+      if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
+        lookupBaseType = selfType->getSelfType();
 
       if (lookupBaseType->mayHaveMembers()) {
         auto *proto = assocType->getProtocol();
