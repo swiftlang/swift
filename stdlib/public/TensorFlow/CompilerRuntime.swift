@@ -238,7 +238,7 @@ public final class _ExecutionContext {
   // NOTE: the following properties are intentionally not implemented as an enum
   // due to high churn, *please do not refactor for Swiftiness*.
   /// The set of all loaded programs indexed by their unique address.
-  private var loadedTFEPrograms: [UnsafeRawPointer : CTFGraph] = [:]
+  private var loadedPrograms: [UnsafeRawPointer : CTFGraph] = [:]
 
   /// The status for checking TensorFlow errors.
   private let status: CTFStatus = TF_NewStatus()
@@ -406,7 +406,7 @@ fileprivate extension _ExecutionContext {
     return sync {
       debugLog("Loading a program.")
        // If the program is already loaded, do nothing.
-      if let graph = loadedTFEPrograms[address] {
+      if let graph = loadedPrograms[address] {
         return graph
       }
       // Here we have to do a fairly awkward dance to load the graph functions
@@ -441,7 +441,7 @@ fileprivate extension _ExecutionContext {
       }
 
        // Memorize the loaded program by address.
-      loadedTFEPrograms[address] = graph
+      loadedPrograms[address] = graph
       debugLog("Done loading a new program.")
       return graph
     }
@@ -620,7 +620,7 @@ public final class _TensorComputation {
   // TODO(hongm): Retire returnValues when eager based runtime is removed.
   var returnValues: [CTensorHandle?]
 
-  private var stateTFE: TFEState
+  private var state: TFEState
 
   /// The threads to run tensor computation in. In eager mode, we use N threads
   /// when the tensor computation involves N device functions. In non-eager
@@ -695,7 +695,7 @@ public final class _TensorComputation {
       \(String(cString: entryFunctionBaseNameAddress)).
       """)
     self.helperFunctionCount = helperFunctionCount
-    self.stateTFE = TFEState(
+    self.state = TFEState(
         programByteAddress,
         programByteCount: programByteCount,
         helperFunctionCount: helperFunctionCount,
@@ -707,7 +707,7 @@ public final class _TensorComputation {
       if _RuntimeConfig.printsDebugLog {
         dumpCTensorHandleContent(i, inputTensorHandle)
       }
-      stateTFE.addInput(inputTensorHandle)
+      state.addInput(inputTensorHandle)
     }
 
     debugLog("Created returning info.")
@@ -780,7 +780,7 @@ private extension _TensorComputation {
   private func execute(threadIndex: Int) {
     debugLog("Executing thread \(threadIndex).")
     internalConsistencyCheck(threadIndex <= helperFunctionCount)
-    let op = stateTFE.ops[threadIndex]
+    let op = state.ops[threadIndex]
     if threadIndex == 0 {
       var returnValueCount = Int32(returnValues.count)
       TFE_Execute(op, &returnValues, &returnValueCount, status)
