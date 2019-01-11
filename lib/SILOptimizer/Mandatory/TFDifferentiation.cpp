@@ -1849,11 +1849,11 @@ emitAssociatedFunctionReference(
   if (auto *inst = original->getDefiningInstruction()) {
     if (auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(inst)) {
       if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original) {
+        builder.createRetainValue(original.getLoc(), adfei->getFunctionOperand(),
+                                  builder.getDefaultAtomicity());
         SILValue assocFn = builder.createAutoDiffFunctionExtract(
             original.getLoc(), AutoDiffFunctionExtractee::VJP,
             /*differentiationOrder*/ 1, adfei->getFunctionOperand());
-        builder.createRetainValue(assocFn.getLoc(), assocFn,
-                                  builder.getDefaultAtomicity());
         auto autodiffFnType =
             adfei->getFunctionOperand()->getType().castTo<SILFunctionType>();
         if (autodiffFnType->getDifferentiationParameterIndices().test(

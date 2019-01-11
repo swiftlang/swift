@@ -28,8 +28,7 @@ CustomDerivativesTests.test("Differentiation of @autodiff function") {
   let diffableFoo = differentiableFunction { x in
     (value: foo(x), pullback: { v in v * x * 2 })
   }
-  let diffableFooWrapper: @autodiff (Float) -> Float = { x in diffableFoo(x) }
-  expectEqual(20, gradient(at: 10, in: diffableFooWrapper))
+  expectEqual(20, gradient(at: 10, in: { x in diffableFoo(x) }))
 }
 
 runAllTests()
