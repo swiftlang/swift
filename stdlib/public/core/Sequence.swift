@@ -491,6 +491,7 @@ extension PrefixSequence: Sequence {
   }
 }
 
+extension PrefixSequence: LazySequenceProtocol where Base: LazySequenceProtocol {}
 
 /// A sequence that lazily consumes and drops `n` elements from an underlying
 /// `Base` iterator before possibly returning the first available element.
