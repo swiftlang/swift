@@ -806,7 +806,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable @inline(__always) // This should always be inlined into _Representation.hash(into:).
+        @inline(__always) // This should always be inlined into _Representation.hash(into:).
         func hash(into hasher: inout Hasher) {
             // **NOTE**: this uses `count` (an Int) and NOT `length` (a UInt8)
             //           Despite having the same value, they hash differently. InlineSlice and LargeSlice both use `count` (an Int); if you combine the same bytes but with `length` over `count`, you can get a different hash.
@@ -1039,7 +1039,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             storage.copyBytes(to: pointer, from: range)
         }
 
-        @inlinable @inline(__always) // This should always be inlined into _Representation.hash(into:).
+        @inline(__always) // This should always be inlined into _Representation.hash(into:).
         func hash(into hasher: inout Hasher) {
             hasher.combine(count)
 
@@ -1243,7 +1243,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             storage.copyBytes(to: pointer, from: range)
         }
 
-        @inlinable @inline(__always) // This should always be inlined into _Representation.hash(into:).
+        @inline(__always) // This should always be inlined into _Representation.hash(into:).
         func hash(into hasher: inout Hasher) {
             hasher.combine(count)
 
@@ -1825,7 +1825,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
         
-        @inlinable @inline(__always) // This should always be inlined into Data.hash(into:).
+        @inline(__always) // This should always be inlined into Data.hash(into:).
         func hash(into hasher: inout Hasher) {
             switch self {
             case .empty:
