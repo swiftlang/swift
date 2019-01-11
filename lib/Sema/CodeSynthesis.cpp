@@ -2581,3 +2581,29 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   return ctor;
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+ConstructorDecl *swift::getMemberwiseInitializer(NominalTypeDecl *nominal) {
+  ConstructorDecl *memberwiseInitDecl = nullptr;
+  auto ctorDecls = nominal->lookupDirect(DeclBaseName::createConstructor());
+  for (auto decl : ctorDecls) {
+    auto ctorDecl = dyn_cast<ConstructorDecl>(decl);
+    if (!ctorDecl)
+      continue;
+    // Continue if:
+    // - Constructor is not a memberwise initializer.
+    // - Constructor is implicit and takes no arguments, and nominal has no
+    //   stored properties.
+    //   - This ad-hoc logic accepts empty struct constructors generated via
+    //     `TypeChecker::defineDefaultConstructor`. Alternatively,
+    //     `defaultDefaultConstructor` could be edited to mark empty
+    //     constructors as memberwise initializers.
+    if (!ctorDecl->isMemberwiseInitializer() &&
+        !(nominal->getStoredProperties().empty() && ctorDecl->isImplicit() &&
+          ctorDecl->getParameters()->size() == 0))
+      continue;
+    assert(!memberwiseInitDecl && "Memberwise initializer already found");
+    memberwiseInitDecl = ctorDecl;
+  }
+  return memberwiseInitDecl;
+}

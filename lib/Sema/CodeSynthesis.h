@@ -164,6 +164,10 @@ ConstructorDecl *createDesignatedInitOverride(TypeChecker &TC,
                                               ConstructorDecl *superclassCtor,
                                               DesignatedInitKind kind);
 
+// SWIFT_ENABLE_TENSORFLOW
+// Get memberwise initializer for a nominal type, if it exists.
+ConstructorDecl *getMemberwiseInitializer(NominalTypeDecl *nominal);
+
 } // end namespace swift
 
 #endif

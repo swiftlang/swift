@@ -175,29 +175,6 @@ getVectorSpaceStructDecl(NominalTypeDecl *nominal,
   return vectorSpaceStructDecl;
 }
 
-// Get memberwise initializer for a nominal type.
-static ConstructorDecl *getMemberwiseInitializer(NominalTypeDecl *nominal) {
-  ConstructorDecl *memberwiseInitDecl = nullptr;
-  auto ctorDecls = nominal->lookupDirect(DeclBaseName::createConstructor());
-  for (auto decl : ctorDecls) {
-    auto ctorDecl = dyn_cast<ConstructorDecl>(decl);
-    if (!ctorDecl)
-      continue;
-    // Continue if:
-    // - Constructor is not a memberwise initializer.
-    // - Constructor is implicit and takes no arguments, and nominal has no
-    //   stored properties. This is ad-hoc and accepts empt struct
-    //   constructors generated via `TypeChecker::defineDefaultConstructor`.
-    if (!ctorDecl->isMemberwiseInitializer() &&
-        !(nominal->getStoredProperties().empty() && ctorDecl->isImplicit() &&
-          ctorDecl->getParameters()->size() == 0))
-      continue;
-    assert(!memberwiseInitDecl && "Memberwise initializer already found");
-    memberwiseInitDecl = ctorDecl;
-  }
-  return memberwiseInitDecl;
-}
-
 // Synthesize body for a `Differentiable` method requirement.
 static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
                                             Identifier methodName,
@@ -680,14 +657,12 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
 }
 
 Type DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.Id_TangentVector) {
+  if (requirement->getBaseName() == TC.Context.Id_TangentVector)
     return deriveDifferentiable_VectorSpace(
         *this, AutoDiffAssociatedVectorSpaceKind::Tangent);
-  }
-  if (requirement->getBaseName() == TC.Context.Id_CotangentVector) {
+  if (requirement->getBaseName() == TC.Context.Id_CotangentVector)
     return deriveDifferentiable_VectorSpace(
         *this, AutoDiffAssociatedVectorSpaceKind::Cotangent);
-  }
   TC.diagnose(requirement->getLoc(), diag::broken_differentiable_requirement);
   return nullptr;
 }

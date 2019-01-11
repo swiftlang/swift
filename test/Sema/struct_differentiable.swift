@@ -3,6 +3,10 @@
 
 struct Empty : Differentiable {}
 
+// Test interaction with `AdditiveArithmetic` derived conformances.
+// Previously, this crashed due to duplicate memberwise initializer synthesis.
+struct EmptyAdditiveArithmetic : AdditiveArithmetic, Differentiable {}
+
 struct Simple : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float

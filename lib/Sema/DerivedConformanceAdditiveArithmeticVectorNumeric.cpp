@@ -76,22 +76,6 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   return lookup[0];
 }
 
-// Get memberwise initializer for a nominal type.
-static ConstructorDecl *getMemberwiseInitializer(NominalTypeDecl *nominal) {
-  ConstructorDecl *memberwiseInitDecl = nullptr;
-  for (auto member : nominal->getMembers()) {
-    // Find memberwise initializer.
-    if (!memberwiseInitDecl) {
-      auto initDecl = dyn_cast<ConstructorDecl>(member);
-      if (!initDecl || !initDecl->isMemberwiseInitializer())
-        continue;
-      assert(!memberwiseInitDecl && "Memberwise initializer already found");
-      memberwiseInitDecl = initDecl;
-    }
-  }
-  return memberwiseInitDecl;
-}
-
 // Return the `Scalar` associated type for a ValueDecl if it conforms to
 // `VectorNumeric` in the given context.
 // If the decl does not conform to `VectorNumeric`, return a null `Type`.
