@@ -1189,49 +1189,41 @@ class TestData : TestDataSuper {
 
         // d should go from .empty representation to .inline.
         // Appending a small enough sequence to fit in linline should actually be copied.
-        d.append(contentsOf: repeatElement(UInt8(0x01), count: 2))
-        expectEqual(Data([0x01, 0x01]), d)
+        d.append(contentsOf: 0x00...0x01)
+        expectEqual(Data([0x00, 0x01]), d)
 
         // Appending another small sequence should similarly still work.
-        d.append(contentsOf: repeatElement(UInt8(0x02), count: 1))
-        expectEqual(Data([0x01, 0x01, 0x02]), d)
+        d.append(contentsOf: 0x02...0x02)
+        expectEqual(Data([0x00, 0x01, 0x02]), d)
 
         // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
         // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
-        d.append(contentsOf: repeatElement(UInt8(0x03), count: 24))
-        expectEqual(Data([0x01, 0x01, 0x02, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
-                          0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
-                          0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03]), d)
+        d.append(contentsOf: 0x03...0x17)
+        expectEqual(Data([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                          0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]), d)
     }
 
     // This test is like test_appendingNonContiguousSequence_exactCount but uses a sequence which reports 0 for its `.underestimatedCount`.
     // This attempts to hit the worst-case scenario of `Data.append<S>(_:)` -- a discontiguous sequence of unknown length.
     func test_appendingNonContiguousSequence_underestimatedCount() {
-        // underestimatedRepeatedElement does the same thing as repeatElement, but reports an `.underestimatedCount` of 0.
-        let underestimatedRepeatedElement = { (element: UInt8, count: Int) in
-            return sequence(state: count) { (count: inout Int) -> UInt8? in
-                defer { count -= 1 }
-                return count > 0 ? element : nil
-            }
-        }
-
         var d = Data()
 
         // d should go from .empty representation to .inline.
         // Appending a small enough sequence to fit in linline should actually be copied.
-        d.append(contentsOf: underestimatedRepeatedElement(UInt8(0x01), 2))
-        expectEqual(Data([0x01, 0x01]), d)
+        d.append(contentsOf: (0x00...0x01).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        expectEqual(Data([0x00, 0x01]), d)
 
         // Appending another small sequence should similarly still work.
-        d.append(contentsOf: underestimatedRepeatedElement(UInt8(0x02), 1))
-        expectEqual(Data([0x01, 0x01, 0x02]), d)
+        d.append(contentsOf: (0x02...0x02).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        expectEqual(Data([0x00, 0x01, 0x02]), d)
 
         // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
         // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
-        d.append(contentsOf: underestimatedRepeatedElement(UInt8(0x03), 24))
-        expectEqual(Data([0x01, 0x01, 0x02, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
-                          0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
-                          0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03]), d)
+        d.append(contentsOf: (0x03...0x17).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        expectEqual(Data([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                          0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]), d)
     }
 
     func test_sequenceInitializers() {
