@@ -1826,11 +1826,12 @@ static WitnessMethodInst *findWitnessMethod(SILValue value) {
   return nullptr;
 }
 
-/// Emits a reference to the VJP of `original`, differentiated with respect to a
-/// superset of `desiredIndices`. Returns the `SILValue` for the VJP and the
-/// actual indices that the VJP is with respect to.
+/// Emits a reference to an associated function of `original`, differentiated
+/// with respect to a superset of `desiredIndices`. Returns the `SILValue` for
+/// the associated function and the actual indices that the associated function
+/// is with respect to.
 ///
-/// On failure, returns `None`.
+/// Returns `None` on failure.
 ///
 /// Creates new differentiation tasks, if necessary, using `invoker` as the
 /// invoker. Calls `taskCallback` for all newly-created tasks (but may also call
@@ -1843,15 +1844,27 @@ emitAssociatedFunctionReference(
     DifferentiationInvoker invoker,
     std::function<void(DifferentiationTask *)> taskCallback) {
 
-  auto fnType = original->getType().castTo<SILFunctionType>();
-  if (fnType->isDifferentiable()) {
-    SILValue assocFn = builder.createAutoDiffFunctionExtract(original.getLoc(),
-                                                             kind, 1, original);
-    if (!fnType->getDifferentiationParameterIndices()
-            .test(desiredIndices.parameters))
-      return None;
-    SILAutoDiffIndices indices(0, desiredIndices.parameters);
-    return std::make_pair(assocFn, indices);
+  // If `original` is itself an `AutoDiffFunctionExtractInst` whose kind matches
+  // the given kind and desired differentiation parameter indices, simply
+  // extract the associated function of its function operand, retain the
+  // associated function, and return it.
+  if (auto *inst = original->getDefiningInstruction()) {
+    if (auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(inst)) {
+      if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original) {
+        builder.createRetainValue(original.getLoc(), adfei->getFunctionOperand(),
+                                  builder.getDefaultAtomicity());
+        SILValue assocFn = builder.createAutoDiffFunctionExtract(
+            original.getLoc(), kind, /*differentiationOrder*/ 1,
+            adfei->getFunctionOperand());
+        auto autodiffFnType =
+            adfei->getFunctionOperand()->getType().castTo<SILFunctionType>();
+        if (autodiffFnType->getDifferentiationParameterIndices().test(
+                desiredIndices.parameters))
+          return None;
+        SILAutoDiffIndices indices(0, desiredIndices.parameters);
+        return std::make_pair(assocFn, indices);
+      }
+    }
   }
 
   // TODO: Refactor this function to recursively handle function conversions,
