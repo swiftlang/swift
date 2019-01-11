@@ -1150,7 +1150,7 @@ func address_only_with_nontrivial_subtype(_ a: NonTrivialSingleCaseEnum, _ value
 // This test makes sure that when we have a tuple that is partly address only
 // and partially an object that even though we access the object at +0 via a
 // load_borrow, we do not lose the +1 from the original tuple formation.
-// CHECK-LABEL: sil hidden [ossa] @$s6switch35partial_address_only_tuple_dispatchyyAA5KlassC_ypSgtF : $@convention(thin) (@guaranteed Klass, @in_guaranteed Optional<Any>) -> () {
+// CHECK-LABEL: sil hidden @$s6switch35partial_address_only_tuple_dispatchyyAA5KlassC_ypSgtF : $@convention(thin) (@guaranteed Klass, @in_guaranteed Optional<Any>) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Klass, [[ARG1:%.*]] : $*Optional<Any>):
 // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
 // CHECK:   [[ARG1_COPY:%.*]] = alloc_stack $Optional<Any>
@@ -1182,7 +1182,7 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s6switch50partial_address_only_tuple_dispatch_with_fail_caseyyAA5KlassC_ypSgtF : $@convention(thin) (@guaranteed Klass, @in_guaranteed Optional<Any>) -> () {
+// CHECK-LABEL: sil hidden @$s6switch50partial_address_only_tuple_dispatch_with_fail_caseyyAA5KlassC_ypSgtF : $@convention(thin) (@guaranteed Klass, @in_guaranteed Optional<Any>) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Klass, [[ARG1:%.*]] : $*Optional<Any>):
 // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
 // CHECK:   [[ARG1_COPY:%.*]] = alloc_stack $Optional<Any>
