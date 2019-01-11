@@ -4047,9 +4047,15 @@ void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
   Substitutions.profile(id);
 }
 
-static RecursiveTypeProperties getRecursivePropertiesOfMap(
-                                                      SubstitutionMap subMap) {
+static RecursiveTypeProperties getBoxRecursiveProperties(
+    SILLayout *Layout, SubstitutionMap subMap) {
   RecursiveTypeProperties props;
+  for (auto &field : Layout->getFields()) {
+    auto fieldProps = field.getLoweredType()->getRecursiveProperties();
+    fieldProps.removeHasTypeParameter();
+    fieldProps.removeHasDependentMember();
+    props |= fieldProps;
+  }
   for (auto replacementType : subMap.getReplacementTypes()) {
     if (replacementType) props |= replacementType->getRecursiveProperties();
   }
@@ -4058,7 +4064,8 @@ static RecursiveTypeProperties getRecursivePropertiesOfMap(
 
 SILBoxType::SILBoxType(ASTContext &C,
                        SILLayout *Layout, SubstitutionMap Substitutions)
-  : TypeBase(TypeKind::SILBox, &C, getRecursivePropertiesOfMap(Substitutions)),
+  : TypeBase(TypeKind::SILBox, &C,
+             getBoxRecursiveProperties(Layout, Substitutions)),
     Layout(Layout), Substitutions(Substitutions) {
   assert(Substitutions.isCanonical());
 }

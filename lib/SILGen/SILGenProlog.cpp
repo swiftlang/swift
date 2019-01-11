@@ -103,15 +103,22 @@ public:
     // Pop the next parameter info.
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
-    assert(
-        argType
-            == parent->getParent()->mapTypeIntoContext(
-                   SGF.getSILType(parameterInfo))
-        && "argument does not have same type as specified by parameter info");
-    (void)parameterInfo;
 
+    auto paramType = SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
-        argType, loc.getAsASTNode<ValueDecl>());
+        paramType, loc.getAsASTNode<ValueDecl>());
+
+    if (argType != paramType) {
+      // This is a hack to deal with the fact that Self.Type comes in as a
+      // static metatype, but we have to downcast it to a dynamic Self
+      // metatype to get the right semantics.
+      assert(
+        cast<DynamicSelfType>(
+          argType.castTo<MetatypeType>().getInstanceType())
+            .getSelfType()
+          == paramType.castTo<MetatypeType>().getInstanceType());
+      mv = SGF.B.createUncheckedBitCast(loc, mv, argType);
+    }
 
     if (isInOut)
       return mv;
@@ -216,7 +223,7 @@ struct ArgumentInitHelper {
     assert(ty && "no type?!");
 
     // Create an RValue by emitting destructured arguments into a basic block.
-    CanType canTy = ty->eraseDynamicSelfType()->getCanonicalType();
+    CanType canTy = ty->getCanonicalType();
     EmitBBArguments argEmitter(SGF, parent, l, parameters);
 
     // Note: inouts of tuples are not exploded, so we bypass visit().
@@ -235,17 +242,6 @@ struct ArgumentInitHelper {
 
     if (vd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
-    } else if (auto *metatypeTy = ty->getAs<MetatypeType>()) {
-      // This is a hack to deal with the fact that Self.Type comes in as a
-      // static metatype, but we have to downcast it to a dynamic Self
-      // metatype to get the right semantics.
-      if (metatypeTy->getInstanceType()->is<DynamicSelfType>()) {
-        auto loweredTy = SGF.getLoweredType(ty);
-        if (loweredTy != argrv.getType()) {
-          argrv = ManagedValue::forUnmanaged(
-            SGF.B.createUncheckedBitCast(loc, argrv.getValue(), loweredTy));
-        }
-      }
     } else {
       assert(vd->isImmutable() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
@@ -320,10 +316,7 @@ static void makeArgument(Type ty, ParamDecl *decl,
 
 void SILGenFunction::bindParameterForForwarding(ParamDecl *param,
                                      SmallVectorImpl<SILValue> &parameters) {
-  Type type = (param->hasType()
-               ? param->getType()
-               : F.mapTypeIntoContext(param->getInterfaceType()));
-  makeArgument(type->eraseDynamicSelfType(), param, parameters, *this);
+  makeArgument(param->getType(), param, parameters, *this);
 }
 
 void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
