@@ -2352,8 +2352,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
                         -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
                         -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB:BOOL=TRUE
-                        -DICU_UC_LIBDIR:PATH="${LIBICU_BUILD_DIR}/lib"
-                        -DICU_I18N_LIBDIR:PATH="${LIBICU_BUILD_DIR}/lib"
                     )
                 fi
 

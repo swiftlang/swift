@@ -531,7 +531,7 @@ class BuildScriptInvocation(object):
             # just invoke cmake from build-script directly rather than futzing
             # with build-script-impl. This makes even more sense since there
             # really isn't a security issue here.
-            if len(cmake_opts) > 0:
+            if cmake_opts:
                 impl_args += [
                     "--%s-cmake-options=%s" %
                     (product_name, ' '.join(cmake_opts))
