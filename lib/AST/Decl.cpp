@@ -2750,12 +2750,6 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC,
                                        treatUsableFromInlineAsPublic);
 }
 
-/// Check whether it's important to respect access control restrictions
-/// in current context.
-static bool isAccessControlDisabled(const ASTContext &ctx) {
-  return !ctx.LangOpts.EnableAccessControl;
-}
-
 /// Checks if \p VD may be used from \p useDC, taking \@testable imports into
 /// account.
 ///
@@ -2766,7 +2760,7 @@ static bool isAccessControlDisabled(const ASTContext &ctx) {
 static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
                                          const ValueDecl *VD,
                                          AccessLevel access) {
-  if (isAccessControlDisabled(VD->getASTContext()))
+  if (VD->getASTContext().isAccessControlDisabled())
     return true;
 
   AccessScope accessScope =
@@ -2788,7 +2782,7 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
 /// See ValueDecl::isAccessibleFrom for a description of \p forConformance.
 static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
                         AccessLevel access, bool forConformance) {
-  if (isAccessControlDisabled(VD->getASTContext()))
+  if (VD->getASTContext().isAccessControlDisabled())
     return true;
 
   auto *sourceDC = VD->getDeclContext();
