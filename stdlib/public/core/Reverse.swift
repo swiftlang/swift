@@ -95,6 +95,8 @@ extension ReversedCollection.Iterator: IteratorProtocol, Sequence {
   }
 }
 
+extension ReversedCollection.Iterator: LazySequenceProtocol where Base: LazySequenceProtocol {}
+
 extension ReversedCollection: Sequence {
   /// A type that represents a valid position in the collection.
   ///
