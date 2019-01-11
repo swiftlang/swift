@@ -1827,6 +1827,28 @@ emitAssociatedFunctionReference(
     DifferentiationInvoker invoker,
     std::function<void(DifferentiationTask *)> taskCallback) {
 
+  // If `original` is itself an `AutoDiffFunctionExtractInst` whose VJP matches
+  // the desired differentiation parameter indices, simply extract its VJP,
+  // retain it, and return it.
+  if (auto *inst = original->getDefiningInstruction()) {
+    if (auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(inst)) {
+      if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original) {
+        SILValue assocFn = builder.createAutoDiffFunctionExtract(
+            original.getLoc(), AutoDiffFunctionExtractee::VJP,
+            /*differentiationOrder*/ 1, adfei->getFunctionOperand());
+        builder.createRetainValue(assocFn.getLoc(), assocFn,
+                                  builder.getDefaultAtomicity());
+        auto autodiffFnType =
+            adfei->getFunctionOperand()->getType().castTo<SILFunctionType>();
+        if (autodiffFnType->getDifferentiationParameterIndices().test(
+                desiredIndices.parameters))
+          return None;
+        SILAutoDiffIndices indices(0, desiredIndices.parameters);
+        return std::make_pair(assocFn, indices);
+      }
+    }
+  }
+
   // TODO: Refactor this function to recursively handle function conversions,
   // rather than using `findReferenceToVisibleFunction`, `findWitnessMethod`,
   // and `reapplyFunctionConversion`.
