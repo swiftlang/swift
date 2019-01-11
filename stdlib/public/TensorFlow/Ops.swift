@@ -1098,6 +1098,10 @@ public extension Tensor where Scalar : Numeric & Comparable {
 public extension Tensor where Scalar : Numeric {
   // NOTE: This overload is necessary, otherwise `mean()` would refer
   // to the variadic method `mean(squeezingAxes:)` with zero indices.
+  @differentiable(
+    wrt: (self), adjoint: _adjointMean(_:_:)
+    where Scalar : Differentiable & FloatingPoint
+  )
   @inlinable @inline(__always)
   func mean() -> Tensor {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
@@ -1107,6 +1111,10 @@ public extension Tensor where Scalar : Numeric {
   // NOTE: This overload is necessary, otherwise `sum()` would refer
   // to the variadic method `sum(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointSum(_:_:)
+    where Scalar : Differentiable & FloatingPoint
+  )
   func sum() -> Tensor {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
     return Raw.sum(self, reductionIndices: axes)
@@ -1125,6 +1133,10 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointMean(_:_:squeezingAxes:)
+    where Scalar : Differentiable & FloatingPoint
+  )
   func mean(squeezingAxes axes: Int32...) -> Tensor {
     return Raw.mean(self, reductionIndices: Tensor<Int32>(axes),
                     keepDims: false)
@@ -1135,6 +1147,10 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointSum(_:_:squeezingAxes:)
+    where Scalar : Differentiable & FloatingPoint
+  )
   func sum(squeezingAxes axes: Int32...) -> Tensor {
     return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
@@ -1154,6 +1170,10 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointMean(_:_:squeezingAxes:)
+    where Scalar : Differentiable & FloatingPoint
+  )
   func mean(alongAxes axes: Int32...) -> Tensor {
     return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
@@ -1163,6 +1183,10 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
+  @differentiable(
+    wrt: (self), adjoint: _adjointSum(_:_:squeezingAxes:)
+    where Scalar : Differentiable & FloatingPoint
+  )
   func sum(alongAxes axes: Int32...) -> Tensor {
     return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
