@@ -153,3 +153,6 @@ extension Zip2Sequence: Sequence {
     )
   }
 }
+
+extension Zip2Sequence: LazySequenceProtocol where
+    Sequence1: LazySequenceProtocol, Sequence2: LazySequenceProtocol {}
