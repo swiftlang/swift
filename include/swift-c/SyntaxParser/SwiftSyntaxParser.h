@@ -125,6 +125,12 @@ typedef struct {
 
 //=== Parser Functions ----------------------------------------------------===//
 
+/// Container of the configuration state for parsing.
+///
+/// It keeps track of the callback blocks for parsing. Any other additional
+/// configuration option (like parsing options) could be set by a adding a
+/// function that accepts a \c swiftparse_parser_t object and modifies its
+/// state.
 typedef void *swiftparse_parser_t;
 
 SWIFTPARSE_PUBLIC swiftparse_parser_t
