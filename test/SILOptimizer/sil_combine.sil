@@ -285,8 +285,8 @@ bb3(%3 : $BoolLike):
 // CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
 // CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [[IN_GEP]] : $*Builtin.Int8
 // CHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
-// CHECK-NEXT:  [[IN_GEP_STORE:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
-// CHECK-NEXT:  store [[LITERAL]] to [[IN_GEP_STORE]] : $*Builtin.Int8
+// CHECK-NEXT:  [[UINT8:%.*]] = struct $UInt8 ([[LITERAL]] : $Builtin.Int8)
+// CHECK-NEXT:  store [[UINT8]] to [[IN]] : $*UInt8
 // CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
 sil @struct_extract_load_to_load_struct_element_addr : $@convention(thin) (@inout UInt8) -> (Builtin.Int8) {
 bb0(%0 : $*UInt8):
@@ -322,7 +322,7 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
 // CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
 // CHECK-NEXT: load
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: struct
 // CHECK-NEXT: store
 // CHECK-NEXT: struct_extract
 // CHECK-NEXT: tuple
