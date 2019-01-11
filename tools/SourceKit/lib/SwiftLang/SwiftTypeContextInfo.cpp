@@ -24,28 +24,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-/// Copy a memory buffer inserting '0' at the position of \c origBuf.
-// TODO: Share with code completion.
-static std::unique_ptr<llvm::MemoryBuffer>
-makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
-                               unsigned &Offset,
-                               const std::string bufferIdentifier) {
-
-  auto origBuffSize = origBuf->getBufferSize();
-  if (Offset > origBuffSize)
-    Offset = origBuffSize;
-
-  auto newBuffer = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-      origBuffSize + 1, bufferIdentifier);
-  auto *pos = origBuf->getBufferStart() + Offset;
-  auto *newPos =
-      std::copy(origBuf->getBufferStart(), pos, newBuffer->getBufferStart());
-  *newPos = '\0';
-  std::copy(pos, origBuf->getBufferEnd(), newPos + 1);
-
-  return std::unique_ptr<llvm::MemoryBuffer>(newBuffer.release());
-}
-
 static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
                                      llvm::MemoryBuffer *UnresolvedInputFile,
                                      unsigned Offset,
@@ -56,8 +34,8 @@ static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
       Lang.resolvePathSymlinks(UnresolvedInputFile->getBufferIdentifier());
 
   auto origOffset = Offset;
-  auto newBuffer = makeCodeCompletionMemoryBuffer(UnresolvedInputFile, Offset,
-                                                  bufferIdentifier);
+  auto newBuffer = SwiftLangSupport::makeCodeCompletionMemoryBuffer(
+      UnresolvedInputFile, Offset, bufferIdentifier);
 
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
@@ -107,12 +85,6 @@ static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
   return true;
 }
 
-/// Print 'description' or 'sourcetext' the given \c VD to \c OS. If
-/// \c usePlaceholder is true, call argument positions are substituted with
-/// type editor placeholders which is suitable for 'sourcetext'.
-static void printDeclDescription(llvm::raw_ostream &OS, Type baseTy,
-                                 ValueDecl *VD, bool usePlaceholder);
-
 void SwiftLangSupport::getExpressionContextInfo(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
@@ -144,15 +116,15 @@ void SwiftLangSupport::getExpressionContextInfo(
 
         // Description.
         unsigned DescriptionBegin = SS.size();
-        printDeclDescription(OS, Item.ExpectedTy, member,
-                             /*usePlaceholder=*/false);
+        SwiftLangSupport::printMemberDeclDescription(
+            member, Item.ExpectedTy, /*usePlaceholder=*/false, OS);
         unsigned DescriptionLength = SS.size() - DescriptionBegin;
         StringRef Description(SS.begin() + DescriptionBegin, DescriptionLength);
 
         // Sourcetext.
         unsigned SourceTextBegin = SS.size();
-        printDeclDescription(OS, Item.ExpectedTy, member,
-                             /*usePlaceholder=*/true);
+        SwiftLangSupport::printMemberDeclDescription(
+            member, Item.ExpectedTy, /*usePlaceholder=*/true, OS);
         unsigned SourceTextLength = SS.size() - SourceTextBegin;
         StringRef SourceText(SS.begin() + SourceTextBegin, SourceTextLength);
 
@@ -196,69 +168,5 @@ void SwiftLangSupport::getExpressionContextInfo(
   if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Args,
                                 Consumer, Error)) {
     SKConsumer.failed(Error);
-  }
-}
-
-static void printDeclDescription(llvm::raw_ostream &OS, Type baseTy,
-                                 ValueDecl *VD, bool usePlaceholder) {
-
-  // Base name.
-  OS << VD->getBaseName().userFacingName();
-
-  // Parameters.
-  auto *M = VD->getModuleContext();
-  auto substMap = baseTy->getMemberSubstitutionMap(M, VD);
-  auto printSingleParam = [&](ParamDecl *param) {
-    auto paramTy = param->getInterfaceType();
-
-    // Label.
-    if (!param->getArgumentName().empty())
-      OS << param->getArgumentName() << ": ";
-
-    // InOut.
-    if (param->isInOut()) {
-      OS << "&";
-      paramTy = paramTy->getInOutObjectType();
-    }
-
-    // Type.
-    if (usePlaceholder)
-      OS << "<#T##";
-
-    if (auto substitutedTy = paramTy.subst(substMap))
-      paramTy = substitutedTy;
-
-    if (paramTy->hasError() && param->getTypeLoc().hasLocation()) {
-      // Fallback to 'TypeRepr' printing.
-      param->getTypeLoc().getTypeRepr()->print(OS);
-    } else {
-      paramTy.print(OS);
-    }
-
-    if (usePlaceholder)
-      OS << "#>";
-  };
-  auto printParams = [&](ParameterList *params) {
-    OS << '(';
-    bool isFirst = true;
-    for (auto param : params->getArray()) {
-      if (isFirst)
-        isFirst = false;
-      else
-        OS << ", ";
-      printSingleParam(param);
-    }
-    OS << ')';
-  };
-  if (auto EED = dyn_cast<EnumElementDecl>(VD)) {
-    if (auto params = EED->getParameterList())
-      printParams(params);
-  } else if (auto *FD = dyn_cast<FuncDecl>(VD)) {
-    if (auto params = FD->getParameters())
-      printParams(params);
-  } else if (isa<VarDecl>(VD)) {
-    // Var decl doesn't have parameters.
-  } else {
-    llvm_unreachable("Invalid Decl type for context info implicit member");
   }
 }
