@@ -84,6 +84,27 @@ internal func _decodeUTF8(
   return Unicode.Scalar(_unchecked: value)
 }
 
+internal func _decodeScalar(
+  _ utf16: UnsafeBufferPointer<UInt16>, startingAt i: Int
+) -> (Unicode.Scalar, scalarLength: Int) {
+  let high = utf16[i]
+  if i + 1 >= utf16.count {
+    _internalInvariant(!_isLeadingSurrogate(high))
+    _internalInvariant(!_isTrailingSurrogate(high))
+    return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
+  } 
+  
+  if !_isLeadingSurrogate(high) {
+    _internalInvariant(!_isTrailingSurrogate(high))
+    return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
+  }
+  
+  let low = utf16[i+1]
+  _internalInvariant(_isLeadingSurrogate(high))
+  _internalInvariant(_isTrailingSurrogate(low))
+  return (Unicode.Scalar(_unchecked: _decodeSurrogatePair(leading: high, trailing: low)), 2)
+}
+
 @inlinable
 internal func _decodeScalar(
   _ utf8: UnsafeBufferPointer<UInt8>, startingAt i: Int
