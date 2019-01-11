@@ -229,11 +229,11 @@ class Z {
     fn0()
 
     var x = self
-    let fn1 = { _ = x }
+    let fn1 = { _ = x; _ = { _ = x } }
     fn1()
 
     var xx = (self, self)
-    let fn2 = { _ = xx }
+    let fn2 = { _ = xx; _ = { _ = xx } }
     fn2()
 
     return self.init()
