@@ -1337,6 +1337,8 @@ WARNING(attr_renamed_warning, none,
         "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
+ERROR(attr_unsupported_on_target, none,
+      "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 
 // availability
 ERROR(attr_availability_platform,none,
