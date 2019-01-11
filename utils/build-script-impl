@@ -1837,6 +1837,8 @@ function set_swiftsyntax_build_command() {
         --swift-build-exec="${SWIFT_BUILD}"
         --swift-test-exec="${SWIFT_TEST}"
         --swiftc-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+        --syntax-parser-header-dir="${SWIFT_SOURCE_DIR}/include/swift-c/SyntaxParser"
+        --syntax-parser-lib-dir="$(build_directory ${host} swift)/lib"
         --swift-syntax-test-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swift-syntax-test"
         --filecheck-exec="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck")
 }

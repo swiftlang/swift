@@ -85,6 +85,9 @@ if "@CMAKE_GENERATOR@" == "Xcode":
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
+if "@SWIFT_BUILD_SYNTAXPARSERLIB@" == "TRUE":
+    config.available_features.add('syntax_parser_lib')
+
 if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
     config.available_features.add('sourcekit')
 
