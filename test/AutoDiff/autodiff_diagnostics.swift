@@ -50,7 +50,8 @@ extension S : Differentiable, VectorNumeric {
   typealias CotangentVector = S
 }
 
-// expected-error @+1 {{property is not differentiable}}
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{property is not differentiable}}
 _ = gradient(at: S(p: 0)) { s in 2 * s.p }
 
 //===----------------------------------------------------------------------===//
