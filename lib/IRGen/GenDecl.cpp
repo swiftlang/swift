@@ -1466,8 +1466,9 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
     if (isDefinition)
       return RESULT(AvailableExternally, Default, Default);
 
-    auto linkage = isWeakImported ? llvm::GlobalValue::ExternalWeakLinkage
-                                  : llvm::GlobalValue::ExternalLinkage;
+    auto linkage = llvm::GlobalValue::ExternalLinkage;
+    if (!info.IsCOFFObject && isWeakImported)
+      linkage = llvm::GlobalValue::ExternalWeakLinkage;
     return {linkage, llvm::GlobalValue::DefaultVisibility, ImportedStorage};
   }
 

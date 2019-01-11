@@ -42,6 +42,7 @@ bool useDllStorage(const llvm::Triple &triple);
 class UniversalLinkageInfo {
 public:
   bool IsELFObject;
+  bool IsCOFFObject;
   bool UseDLLStorage;
 
   /// True iff are multiple llvm modules.
