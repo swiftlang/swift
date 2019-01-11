@@ -224,6 +224,21 @@ class Z {
     return self.init()
   }
 
+  static func testStaticMethodMutableDynamicSelfCaptures() -> Self {
+    let fn0 = { _ = self; _ = { _ = self } }
+    fn0()
+
+    var x = self
+    let fn1 = { _ = x }
+    fn1()
+
+    var xx = (self, self)
+    let fn2 = { _ = xx }
+    fn2()
+
+    return self.init()
+  }
+
   // Make sure the actual self value has the same lowered type as the
   // substituted result of a generic function call
   func testDynamicSelfSubstitution(_ b: Bool) -> Self {
