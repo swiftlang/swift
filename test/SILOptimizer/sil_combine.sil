@@ -1980,6 +1980,89 @@ bb3:
   return %0 : $B
 }
 
+// CHECK-LABEL: sil @dont_delete_readonly_function_dealloc_ref_simple
+// CHECK:      apply
+// CHECK-NEXT: dealloc_ref
+// CHECK:      return
+sil @dont_delete_readonly_function_dealloc_ref_simple : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_ref [stack] $B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%3) : $@convention(thin) (@owned B) -> @owned B
+  dealloc_ref [stack] %3 : $B
+  strong_release %r : $B
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @dont_delete_readonly_function_dealloc_ref_multibb
+// CHECK:      apply
+// CHECK:      dealloc_ref
+// CHECK-NEXT: strong_release
+// CHECK:      dealloc_ref
+// CHECK-NEXT: strong_release
+// CHECK:      return
+sil @dont_delete_readonly_function_dealloc_ref_multibb : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_ref [stack] $B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%3) : $@convention(thin) (@owned B) -> @owned B
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_ref [stack] %3 : $B
+  strong_release %r : $B
+  br bb3
+
+bb2:
+  dealloc_ref [stack] %3 : $B
+  strong_release %r : $B
+  br bb3
+
+bb3:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @delete_readonly_function_dealloc_ref_simple
+// CHECK-NOT:  apply
+// CHECK:      return
+sil @delete_readonly_function_dealloc_ref_simple : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_ref [stack] $B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%3) : $@convention(thin) (@owned B) -> @owned B
+  strong_release %r : $B
+  dealloc_ref [stack] %3 : $B
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @delete_readonly_function_dealloc_ref_multibb
+// CHECK-NOT:  apply
+// CHECK:      return
+sil @delete_readonly_function_dealloc_ref_multibb : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_ref [stack] $B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%3) : $@convention(thin) (@owned B) -> @owned B
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %r : $B
+  dealloc_ref [stack] %3 : $B
+  br bb3
+
+bb2:
+  strong_release %r : $B
+  dealloc_ref [stack] %3 : $B
+  br bb3
+
+bb3:
+  %10 = tuple ()
+  return %10 : $()
+}
+
 //CHECK-LABEL: sil @test_delete_readonly_try_apply
 //CHECK:      bb0(%0 : $ZZZ):
 //CHECK-NEXT:   [[IL:%[0-9]+]] = integer_literal $Builtin.Int1, 0

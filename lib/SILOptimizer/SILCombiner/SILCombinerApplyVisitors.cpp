@@ -547,6 +547,13 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
   // Compute the places where we have to insert release-instructions for the
   // owned arguments. This must not be done before the result of the
   // apply is destroyed. Therefore we compute the lifetime of the apply-result.
+
+  // TODO: this is not required anymore when we have ownership SIL. But with
+  // the current SIL it can happen that the retain of a parameter is moved
+  // _after_ the apply.
+  // When we have ownership SIL we can just destroy the parameters at the apply
+  // location.
+
   ValueLifetimeAnalysis VLA(FAS.getInstruction(), Users);
   ValueLifetimeAnalysis::Frontier Frontier;
   if (Users.empty()) {
@@ -555,6 +562,12 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
     Frontier.push_back(FAS.getInstruction());
   } else {
     if (!VLA.computeFrontier(Frontier, ValueLifetimeAnalysis::DontModifyCFG))
+      return false;
+    // As we are extending the lifetimes of owned parameters, we have to make
+    // sure that no dealloc_ref instructions are within this extended liferange.
+    // It could be that the dealloc_ref is deallocating a parameter and then
+    // we would have a release after the dealloc.
+    if (VLA.containsDeallocRef(Frontier))
       return false;
   }
 
