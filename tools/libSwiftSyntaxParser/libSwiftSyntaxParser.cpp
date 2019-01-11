@@ -41,6 +41,14 @@ class SynParser {
   swiftparse_node_lookup_t NodeLookup = nullptr;
 
 public:
+  swiftparse_node_handler_t getNodeHandler() const {
+    return NodeHandler;
+  }
+
+  swiftparse_node_lookup_t getNodeLookup() const {
+    return NodeLookup;
+  }
+
   void setNodeHandler(swiftparse_node_handler_t hdl) {
     auto prevBlk = NodeHandler;
     NodeHandler = Block_copy(hdl);
@@ -62,18 +70,23 @@ public:
 };
 
 class CLibParseActions : public SyntaxParseActions {
+  SynParser &SynParse;
   SourceManager &SM;
   unsigned BufferID;
-  swiftparse_node_handler_t NodeHandler;
-  swiftparse_node_lookup_t NodeLookup;
 
 public:
-  explicit CLibParseActions(SourceManager &sm, unsigned bufID,
-                            swiftparse_node_handler_t hdl,
-                            swiftparse_node_lookup_t lookup)
-  : SM(sm), BufferID(bufID), NodeHandler(hdl), NodeLookup(lookup) {}
+  CLibParseActions(SynParser &synParse, SourceManager &sm, unsigned bufID)
+  : SynParse(synParse), SM(sm), BufferID(bufID) {}
 
 private:
+  swiftparse_node_handler_t getNodeHandler() const {
+    return SynParse.getNodeHandler();
+  }
+
+  swiftparse_node_lookup_t getNodeLookup() const {
+    return SynParse.getNodeLookup();
+  }
+
   static void makeCTrivia(SmallVectorImpl<CTriviaPiece> &c_trivia,
                           const Trivia &trivia) {
     for (const auto &piece : trivia) {
@@ -128,14 +141,14 @@ private:
     CRawSyntaxNode node;
     makeCRawToken(node, tok.getKind(), c_leadingTrivia, c_trailingTrivia,
                   range);
-    return NodeHandler(&node);
+    return getNodeHandler()(&node);
   }
 
   OpaqueSyntaxNode recordMissingToken(tok tokenKind, SourceLoc loc) override {
     CRawSyntaxNode node;
     makeCRawToken(node, tokenKind, {}, {}, CharSourceRange{loc, 0});
     node.present = false;
-    return NodeHandler(&node);
+    return getNodeHandler()(&node);
   }
 
   OpaqueSyntaxNode recordRawSyntax(SyntaxKind kind,
@@ -149,11 +162,12 @@ private:
     node.layout_data.nodes_count = elements.size();
     makeCRange(node.range, range);
     node.present = true;
-    return NodeHandler(&node);
+    return getNodeHandler()(&node);
   }
 
   std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, SyntaxKind kind) override {
+    auto NodeLookup = getNodeLookup();
     if (!NodeLookup) {
       return {0, nullptr};
     }
@@ -175,7 +189,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
   langOpts.CollectParsedToken = false;
 
   auto parseActions =
-    std::make_shared<CLibParseActions>(SM, bufID, NodeHandler, NodeLookup);
+    std::make_shared<CLibParseActions>(*this, SM, bufID);
   ParserUnit PU(SM, SourceFileKind::Library, bufID, langOpts,
                 "syntax_parse_module", std::move(parseActions),
                 /*SyntaxCache=*/nullptr);
