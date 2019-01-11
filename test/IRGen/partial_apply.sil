@@ -50,12 +50,12 @@ entry(%a : $SwiftClass):
 // CHECK: define{{.*}} swiftcc void @partial_apply_two_classes_on_stack(%T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC*)
 // CHECK: entry:
 // CHECK:   [[CTX:%.*]] = alloca i8, i64 32, align 16
-// CHECK:   [[LAYOUT:%.*]] = bitcast i8* [[CTX]] to <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>*
+// CHECK:   [[CTX2:%.*]] = bitcast i8* [[CTX]] to %swift.opaque*
+// CHECK:   [[LAYOUT:%.*]] = bitcast %swift.opaque* [[CTX2]] to <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>*
 // CHECK:   [[CAPTURE1:%.*]] = getelementptr inbounds <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>, <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>* [[LAYOUT]], i32 0, i32 1
 // CHECK:   store %T13partial_apply10SwiftClassC* %0, %T13partial_apply10SwiftClassC** [[CAPTURE1]], align 8
 // CHECK:   [[CAPTURE2:%.*]] = getelementptr inbounds <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>, <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>* [[LAYOUT]], i32 0, i32 2
 // CHECK:   store %T13partial_apply10SwiftClassC* %1, %T13partial_apply10SwiftClassC** [[CAPTURE2]], align 8
-// CHECK:   [[CTX2:%.*]] = bitcast i8* [[CTX]] to %swift.opaque*
 // CHECK:   call swiftcc void @use_closure(i8* bitcast (void (%swift.refcounted*)* @"$s34partially_applyable_to_two_classesTA" to i8*), %swift.opaque* [[CTX2]])
 // CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T13partial_apply10SwiftClassC*)*)(%T13partial_apply10SwiftClassC* %0)
 // CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T13partial_apply10SwiftClassC*)*)(%T13partial_apply10SwiftClassC* %1)
