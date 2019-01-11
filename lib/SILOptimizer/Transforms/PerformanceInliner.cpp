@@ -104,7 +104,7 @@ class SILPerformanceInliner {
     /// The benefit of inlining an exclusivity-containing callee.
     /// The exclusivity needs to be: dynamic,
     /// has no nested conflict and addresses known storage
-    ExclusivityBenefit = RemovedCallBenefit + 300,
+    ExclusivityBenefit = RemovedCallBenefit + 125,
 
     /// The benefit of inlining class methods with -Osize.
     /// We only inline very small class methods with -Osize.
