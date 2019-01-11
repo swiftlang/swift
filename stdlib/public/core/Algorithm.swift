@@ -151,6 +151,8 @@ extension EnumeratedSequence.Iterator: IteratorProtocol, Sequence {
   }
 }
 
+extension EnumeratedSequence.Iterator: LazySequenceProtocol where Base: LazySequenceProtocol {}
+
 extension EnumeratedSequence: Sequence {
   /// Returns an iterator over the elements of this sequence.
   @inlinable
