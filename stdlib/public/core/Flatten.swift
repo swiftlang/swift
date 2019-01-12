@@ -214,6 +214,8 @@ extension FlattenSequence.Index : Hashable
 }
 
 extension FlattenCollection: Collection {
+  public typealias SubSequence = Slice<FlattenCollection<Base>>
+
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
