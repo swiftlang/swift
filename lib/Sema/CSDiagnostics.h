@@ -674,8 +674,7 @@ private:
                                           DeclName memberName);
 };
 
-/// Diagnose situations when we invoke an instance member on a type, or
-/// a type member on an instance, eg.
+/// Diagnose situations when we invoke an instance member on a metatype
 ///
 /// ```swift
 /// class Bar {}
@@ -692,17 +691,17 @@ private:
 /// ```
 
 class InvalidMemberAccessFailure final : public FailureDiagnostic {
-  Type BaseType;
-  DeclName Name;
-  
+Type BaseType;
+DeclName Name;
+
 public:
-  InvalidMemberAccessFailure(Expr *root, ConstraintSystem &cs, Type baseType,
-                      DeclName memberName, ConstraintLocator *locator)
-        : FailureDiagnostic(root, cs, locator), BaseType(baseType),
-          Name(memberName) {}
-  
-  bool diagnoseAsError() override;
-    
+InvalidMemberAccessFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                           DeclName memberName, ConstraintLocator *locator)
+: FailureDiagnostic(root, cs, locator), BaseType(baseType),
+Name(memberName) {}
+
+bool diagnoseAsError() override;
+
 };
 
 } // end namespace constraints

@@ -105,8 +105,8 @@ enum class FixKind : uint8_t {
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
 	
-	/// Remove the metatype if the base type is a metatype
-	RemoveMetatype,
+  /// Remove the metatype if the base type is a metatype
+  RemoveMetatype,
 };
 
 class ConstraintFix {

@@ -1479,6 +1479,6 @@ bool MissingMemberFailure::diagnoseAsError() {
 }
 
 bool InvalidMemberAccessFailure::diagnoseAsError() {
-	emitDiagnostic(getAnchor()->getLoc(), diag::could_not_use_instance_member_on_type, BaseType, Name, BaseType, false);
-	return true;
+  emitDiagnostic(getAnchor()->getLoc(), diag::could_not_use_instance_member_on_type, BaseType, Name, BaseType, false);
+  return true;
 }
