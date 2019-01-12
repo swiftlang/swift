@@ -3669,22 +3669,28 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   
   auto locator = getConstraintLocator(locatorB);
   
+  // If the base type is a metatype, then remove the metatype and assume as
+  // if it was never there in the first place.
   if (baseTy->is<MetatypeType>()) {
     
     auto instanceTy = baseTy->getMetatypeInstanceType();
     auto result = performMemberLookup(kind, member, instanceTy, functionRefKind, locator,
                                       /*includeInaccessibleMembers*/false);
     
+    // Lookup found some viable candidates, check if we can attempt any fixes
     if (!result.ViableCandidates.empty()) {
       if (shouldAttemptFixes()) {
         auto *fix = RemoveMetatype::create(*this, instanceTy, member, getConstraintLocator(locator));
         
         if (recordFix(fix)) {
+          // The fix was not successful, so bail out
           return SolutionKind::Error;
         }
         
+        // The fix was successful so record the fixed type and continue
         baseTy = instanceTy;
       } else {
+        // Can't attempt a fix, so bail out
         return SolutionKind::Error;
       }
     }
