@@ -1762,7 +1762,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
         // If exactly one of the type variables can bind to an lvalue, we
         // can't merge these two type variables.
-        if (rep1->getImpl().canBindToLValue()
+        if (kind == ConstraintKind::Equal &&
+            rep1->getImpl().canBindToLValue()
               != rep2->getImpl().canBindToLValue())
           return formUnsolvedResult();
 
