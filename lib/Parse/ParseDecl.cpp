@@ -858,7 +858,8 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   }
 
   return ParserResult<DifferentiableAttr>(
-    DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
+    DifferentiableAttr::create(Context, /*implicit*/ false, atLoc,
+                               SourceRange(loc, rParenLoc),
                                params, primalSpec, adjointSpec, jvpSpec,
                                vjpSpec, whereClause));
 }

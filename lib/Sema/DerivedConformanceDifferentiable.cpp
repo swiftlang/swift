@@ -520,8 +520,8 @@ getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
       auto *diffableAttr = DifferentiableAttr::create(
-          C, SourceLoc(), SourceLoc(), ArrayRef<AutoDiffParameter>(), None,
-          None, None, None, nullptr);
+          C, /*implicit*/ true, SourceLoc(), SourceLoc(), {}, None, None, None,
+          None, nullptr);
       member->getAttrs().add(diffableAttr);
       auto *getterType =
           member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
