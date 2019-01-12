@@ -836,7 +836,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   SourceLoc lParenLoc = loc, rParenLoc = loc;
 
   using DeclNameWithLoc = DifferentiableAttr::DeclNameWithLoc;
-  SmallVector<AutoDiffParameter, 8> params;
+  SmallVector<ParsedAutoDiffParameter, 8> params;
   Optional<DeclNameWithLoc> primalSpec;
   Optional<DeclNameWithLoc> adjointSpec;
   Optional<DeclNameWithLoc> jvpSpec;
@@ -865,7 +865,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 }
 
 bool Parser::parseDifferentiableAttributeArguments(
-    SmallVectorImpl<AutoDiffParameter> &params,
+    SmallVectorImpl<ParsedAutoDiffParameter> &params,
     Optional<DifferentiableAttr::DeclNameWithLoc> &primalSpec,
     Optional<DifferentiableAttr::DeclNameWithLoc> &adjointSpec,
     Optional<DifferentiableAttr::DeclNameWithLoc> &jvpSpec,
@@ -948,12 +948,12 @@ bool Parser::parseDifferentiableAttributeArguments(
                                  diag::attr_differentiable_expected_parameter))
           return true;
         params.push_back(
-          AutoDiffParameter::getIndexParameter(paramLoc, index));
+          ParsedAutoDiffParameter::getIndexParameter(paramLoc, index));
         break;
       }
       case tok::kw_self: {
         paramLoc = consumeToken(tok::kw_self);
-        params.push_back(AutoDiffParameter::getSelfParameter(paramLoc));
+        params.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
         break;
       }
       default:

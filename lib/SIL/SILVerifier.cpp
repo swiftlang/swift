@@ -4566,8 +4566,7 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   /// Verify the [differentiable] attribute.
-  void verifyDifferentiableAttr(SILFunction *F,
-                                       SILDifferentiableAttr &Attr) {
+  void verifyDifferentiableAttr(SILFunction *F, SILDifferentiableAttr &Attr) {
     std::function<unsigned(Type)> countParams;
     countParams = [&](Type type) -> unsigned {
       auto *fnTy = type->getAs<SILFunctionType>();

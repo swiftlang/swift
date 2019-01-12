@@ -168,7 +168,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   auto &ctx = getASTContext();
 
   auto testParamIndex = [&](unsigned index) -> bool {
-    return index < parameterIndices.size()  && parameterIndices[index];
+    return index < parameterIndices.size() && parameterIndices[index];
   };
 
   // Given a type, returns its formal SIL parameter info.
@@ -332,6 +332,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   CanSILFunctionType associatedFunction =
       withNewResults(curryLevels.back(), results,
                      curryLevels.size() == 1 ? whereClauseGenSig : nullptr);
+
   auto curryLevelsWithoutLast =
       ArrayRef<SILFunctionType *>(curryLevels).drop_back(1);
   for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {

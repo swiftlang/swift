@@ -1316,7 +1316,8 @@ public:
 ///   @differentiable(reverse, wrt: (self, .0, .1), adjoint: bar(_:_:_:seed:))
 class DifferentiableAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<DifferentiableAttr, AutoDiffParameter> {
+      private llvm::TrailingObjects<DifferentiableAttr,
+                                    ParsedAutoDiffParameter> {
 public:
   struct DeclNameWithLoc {
     DeclName Name;
@@ -1326,7 +1327,7 @@ private:
   friend TrailingObjects;
 
   /// The number of parameters specified in 'wrt:'.
-  unsigned NumParameters;
+  unsigned NumParsedParameters = 0;
   /// The primal function.
   Optional<DeclNameWithLoc> Primal;
   /// The adjoint function.
@@ -1347,8 +1348,9 @@ private:
   /// The VJP function (optional), to be resolved by the type checker if
   /// specified.
   FuncDecl *VJPFunction = nullptr;
-  /// Checked parameter indices, to be resolved by the type checker.
-  AutoDiffParameterIndices *CheckedParameterIndices = nullptr;
+  /// The differentiation parameters' indices, to be resolved by the type
+  /// checker.
+  AutoDiffParameterIndices *ParameterIndices = nullptr;
   /// The trailing where clause, if it exists.
   TrailingWhereClause *WhereClause = nullptr;
   /// The requirements for autodiff associated functions. Resolved by the type
@@ -1359,7 +1361,7 @@ private:
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
-                              ArrayRef<AutoDiffParameter> parameters,
+                              ArrayRef<ParsedAutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> primal,
                               Optional<DeclNameWithLoc> adjoint,
                               Optional<DeclNameWithLoc> jvp,
@@ -1368,7 +1370,7 @@ private:
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
-                              ArrayRef<AutoDiffParameter> parameters,
+                              AutoDiffParameterIndices *indices,
                               Optional<DeclNameWithLoc> primal,
                               Optional<DeclNameWithLoc> adjoint,
                               Optional<DeclNameWithLoc> jvp,
@@ -1378,7 +1380,7 @@ private:
 public:
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    ArrayRef<AutoDiffParameter> parameters,
+                                    ArrayRef<ParsedAutoDiffParameter> params,
                                     Optional<DeclNameWithLoc> primal,
                                     Optional<DeclNameWithLoc> adjoint,
                                     Optional<DeclNameWithLoc> jvp,
@@ -1387,7 +1389,7 @@ public:
 
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    ArrayRef<AutoDiffParameter> parameters,
+                                    AutoDiffParameterIndices *indices,
                                     Optional<DeclNameWithLoc> primal,
                                     Optional<DeclNameWithLoc> adjoint,
                                     Optional<DeclNameWithLoc> jvp,
@@ -1399,23 +1401,23 @@ public:
   Optional<DeclNameWithLoc> getJVP() const { return JVP; }
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
-  AutoDiffParameterIndices *getCheckedParameterIndices() const {
-    return CheckedParameterIndices;
+  AutoDiffParameterIndices *getParameterIndices() const {
+    return ParameterIndices;
   }
-  void setCheckedParameterIndices(AutoDiffParameterIndices *pi) {
-    CheckedParameterIndices = pi;
+  void setParameterIndices(AutoDiffParameterIndices *pi) {
+    ParameterIndices = pi;
   }
 
-  /// The differentiation parameters, i.e. the list of parameters specified in
-  /// 'wrt:'.
-  ArrayRef<AutoDiffParameter> getParameters() const {
-    return { getTrailingObjects<AutoDiffParameter>(), NumParameters };
+  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// specified in 'wrt:'.
+  ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
   }
-  MutableArrayRef<AutoDiffParameter> getParameters() {
-    return { getTrailingObjects<AutoDiffParameter>(), NumParameters };
+  MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
   }
-  size_t numTrailingObjects(OverloadToken<AutoDiffParameter>) const {
-    return NumParameters;
+  size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
+    return NumParsedParameters;
  }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }

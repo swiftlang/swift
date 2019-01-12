@@ -623,8 +623,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     scratch.clear();
     kind = SILCursor.readRecord(next.ID, scratch);
-    assert(kind == SIL_REVERSE_DIFFERENTIABLE_ATTR &&
-           "Missing reverse differentiable attribute");
+    assert(kind == SIL_DIFFERENTIABLE_ATTR &&
+           "Missing differentiable attribute");
 
     uint64_t primalNameId;
     uint64_t adjointNameId;

@@ -34,8 +34,10 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   return fn;
 }
 
-static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
-                                  SILModule &M) {
+// SWIFT_ENABLE_TENSORFLOW
+void
+SILFunctionBuilder::addFunctionAttributes(SILFunction *F, SILDeclRef constant,
+                                          DeclAttributes &Attrs, SILModule &M) {
   for (auto *A : Attrs.getAttributes<SemanticsAttr>())
     F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
 
@@ -57,6 +59,51 @@ static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
   // @_silgen_name and @_cdecl functions may be called from C code somewhere.
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Propagate @differentiable attributes.
+  // Don't propagate @differentiable to:
+  // - Non-getter accessors (setters, modifiers, etc).
+  // - Default argument generator functions.
+  // - Thunks. Those are currently handled in SILGenThunk.cpp.
+  auto *decl = constant.getDecl();
+  if ((!isa<AccessorDecl>(decl) || dyn_cast<AccessorDecl>(decl)->isGetter()) &&
+      constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
+      !constant.isThunk()) {
+    for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
+      auto *DA = cast<DifferentiableAttr>(A);
+      // Either only adjoint is specified, or both primal and adjoint are
+      // spcified.
+      StringRef primName, adjName, jvpName, vjpName;
+      bool hasPrimitiveAdjoint = false;
+      if (auto *primFn = DA->getPrimalFunction())
+        primName = M.allocateCopy(SILDeclRef(primFn).mangle());
+      if (auto *adjFn = DA->getAdjointFunction()) {
+        // If the adjoint is specified but the primal is not, then we treat the
+        // original as the primal.
+        if (primName.empty())
+          primName = F->getName();
+        adjName = M.allocateCopy(SILDeclRef(adjFn).mangle());
+        hasPrimitiveAdjoint = true;
+      } else {
+        assert(primName.empty() &&
+               "Primal cannot be present if adjoint is not");
+      }
+      if (auto *jvpFn = DA->getJVPFunction())
+        jvpName = M.allocateCopy(SILDeclRef(jvpFn).mangle());
+      if (auto *vjpFn = DA->getVJPFunction())
+        vjpName = M.allocateCopy(SILDeclRef(vjpFn).mangle());
+      // Get lowered argument indices.
+      auto paramIndices = DA->getParameterIndices();
+      auto loweredIndices = paramIndices->getLowered(
+          decl->getInterfaceType()->castTo<AnyFunctionType>());
+      SILAutoDiffIndices indices(/*source*/ 0, loweredIndices);
+      auto silDiffAttr = SILDifferentiableAttr::create(
+          M, indices, DA->getRequirements(), primName, adjName,
+          /*primitive*/ hasPrimitiveAdjoint, jvpName, vjpName);
+      F->addDifferentiableAttr(silDiffAttr);
+    }
+  }
 }
 
 SILFunction *
@@ -117,10 +164,9 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
-      // Add attributes for e.g. computed properties.
-      addFunctionAttributes(F, storage->getAttrs(), mod);
+      addFunctionAttributes(F, constant, storage->getAttrs(), mod);
     }
-    addFunctionAttributes(F, decl->getAttrs(), mod);
+    addFunctionAttributes(F, constant, decl->getAttrs(), mod);
   }
 
   return F;

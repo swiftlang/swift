@@ -60,6 +60,14 @@ class SILFunctionBuilder {
                                          ProfileCounter entryCount,
                                          IsThunk_t isThunk);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // `addFunctionAttributes` edited because @differentiable attribute
+  // propagation requires access to original function declaration (via
+  // SILDeclRef).
+  void addFunctionAttributes(SILFunction *F, SILDeclRef constant,
+                             DeclAttributes &Attrs, SILModule &M);
+
+
   /// Return the declaration of a function, or create it if it doesn't exist.
   SILFunction *getOrCreateFunction(
       SILLocation loc, StringRef name, SILLinkage linkage,

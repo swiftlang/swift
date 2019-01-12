@@ -887,7 +887,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
   // SWIFT_ENABLE_TENSORFLOW
-  BLOCK_RECORD(sil_block, SIL_REVERSE_DIFFERENTIABLE_ATTR);
+  BLOCK_RECORD(sil_block, SIL_DIFFERENTIABLE_ATTR);
   BLOCK_RECORD(sil_block, SIL_INST_GRAPH_OPERATION);
   BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION);
   BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION_EXTRACT);
@@ -2369,24 +2369,16 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
       vjpRef = addDeclRef(attr->getVJPFunction());
     }
 
-    SmallVector<uint32_t, 4> parameters;
-    for (auto param : attr->getParameters()) {
-      switch (param.getKind()) {
-      // The self parameter is uniquely identified by 0x01.
-      case AutoDiffParameter::Kind::Self:
-        parameters.push_back(1);
-        break;
-      // Index parameters are left-shifted by 1.
-      case AutoDiffParameter::Kind::Index:
-        parameters.push_back(param.getIndex() << 1);
-        break;
-      }
-    }
+    auto paramIndices = attr->getParameterIndices();
+    assert(paramIndices && "Checked parameter indices must be resolved");
+    SmallVector<bool, 4> indices;
+    for (unsigned i = 0; i < paramIndices->parameters.size(); i++)
+      indices.push_back(paramIndices->parameters[i]);
 
     DifferentiableDeclAttrLayout::emitRecord(
       Out, ScratchRecord, abbrCode, attr->isImplicit(), primalName, primalRef,
-      adjointName, adjointRef, jvpName, jvpRef, vjpName, vjpRef, parameters);
-    // TODO: Serialize CheckedParameterIndices.
+      adjointName, adjointRef, jvpName, jvpRef, vjpName, vjpRef, indices);
+
     writeGenericRequirements(attr->getRequirements(), DeclTypeAbbrCodes);
     return;
   }

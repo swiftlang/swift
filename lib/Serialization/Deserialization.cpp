@@ -2552,13 +2552,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         DeclID jvpDeclId;
         uint64_t vjpNameId;
         DeclID vjpDeclId;
-        ArrayRef<uint64_t> paramValues;
+        ArrayRef<uint64_t> parameters;
         SmallVector<Requirement, 4> requirements;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
             scratch, isImplicit, primalNameId, primalDeclId, adjointNameId,
             adjointDeclId, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
-            paramValues);
+            parameters);
 
         using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
         Optional<FuncSpecifier> primal;
@@ -2586,21 +2586,17 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
           vjpDecl = cast<FuncDecl>(getDecl(vjpDeclId));
         }
 
-        SmallVector<AutoDiffParameter, 4> parameters;
-        SourceLoc loc;
-        for (auto paramValue : paramValues) {
-          auto parameter = paramValue & 0x01
-            ? AutoDiffParameter::getSelfParameter(loc)
-            : AutoDiffParameter::getIndexParameter(loc, paramValue >> 1);
-          parameters.push_back(parameter);
-        }
-        // TODO: Deserialize CheckedParameterIndices.
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i = 0; i < parameters.size(); i++)
+          parametersBitVector[i] = parameters[i];
+        auto *indices = AutoDiffParameterIndices::get(parametersBitVector, ctx);
+
         readGenericRequirements(requirements, DeclTypeCursor);
 
         auto diffAttr =
-          DifferentiableAttr::create(ctx, isImplicit, loc, SourceRange(),
-                                     parameters, primal, adjoint, jvp, vjp,
-                                     requirements);
+            DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
+                                       SourceRange(), indices, primal, adjoint,
+                                       jvp, vjp, requirements);
         diffAttr->setPrimalFunction(primalDecl);
         diffAttr->setAdjointFunction(adjointDecl);
         diffAttr->setJVPFunction(jvpDecl);

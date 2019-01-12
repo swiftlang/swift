@@ -172,7 +172,7 @@ namespace sil_block {
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SIL_TWO_OPERANDS_EXTRA_ATTR,
     // SWIFT_ENABLE_TENSORFLOW
-    SIL_REVERSE_DIFFERENTIABLE_ATTR,
+    SIL_DIFFERENTIABLE_ATTR,
     SIL_INST_GRAPH_OPERATION,
     SIL_INST_AUTODIFF_FUNCTION,
     SIL_INST_AUTODIFF_FUNCTION_EXTRACT,
@@ -315,7 +315,7 @@ namespace sil_block {
 
   // SWIFT_ENABLE_TENSORFLOW
   using SILDifferentiableAttrLayout = BCRecordLayout<
-    SIL_REVERSE_DIFFERENTIABLE_ATTR,
+    SIL_DIFFERENTIABLE_ATTR,
     IdentifierIDField,  // Primal name.
     IdentifierIDField,  // Adjoint name.
     BCFixed<1>,         // Adjoint is primitive.

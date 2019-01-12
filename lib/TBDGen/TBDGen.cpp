@@ -177,7 +177,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     for (auto kind : {AutoDiffAssociatedFunctionKind::JVP,
                       AutoDiffAssociatedFunctionKind::VJP}) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-          kind, /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
+          kind, /*differentiationOrder*/ 1, DA->getParameterIndices(),
           AFD->getASTContext());
       addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
     }

@@ -527,7 +527,7 @@ getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
           member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
       AutoDiffParameterIndicesBuilder builder(getterType);
       builder.setParameter(0);
-      diffableAttr->setCheckedParameterIndices(builder.build(C));
+      diffableAttr->setParameterIndices(builder.build(C));
     }
   }
 

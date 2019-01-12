@@ -7,7 +7,7 @@ public struct Foo : Differentiable {
 }
 
 // CHECK-AST-LABEL: public struct Foo : Differentiable {
-// CHECK-AST:   @sil_stored @differentiable()
+// CHECK-AST:   @sil_stored @differentiable(wrt: (self))
 // CHECK-AST:   public var a: Float { get set }
 
 // CHECK-SILGEN-LABEL: // Foo.a.getter

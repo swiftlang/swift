@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -verify %s | %FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Normal types
@@ -143,9 +143,6 @@ extension DiffStoredProp : Differentiable {
   typealias TangentVector = DiffStoredProp
   typealias CotangentVector = DiffStoredProp
 }
-
-// CHECK-LABEL: DiffStoredProp.storedProp.getter
-// CHECK-NEXT: sil {{.*}} [differentiable source 0 wrt 0 jvp @storedPropJVP vjp @storedPropVJP]
 
 //===----------------------------------------------------------------------===//
 // Computed property

@@ -297,7 +297,7 @@ public:
     // has an associated `@differentiable` attribute.
     DifferentiableAttribute,
 
-    // Invoker by a `[differentiable]` attribute in SIL **without** being lined
+    // Invoker by a `[differentiable]` attribute in SIL **without** being linked
     // to a Swift AST attribute. This case has an associated `[differentiable]`
     // attribute.
     SILDifferentiableAttribute
@@ -990,6 +990,7 @@ public:
   lookUpOrRegisterDifferentiationTask(SILFunction *original,
                                       const SILAutoDiffIndices &indices,
                                       DifferentiationInvoker invoker) {
+    /*
     // If `original` has no differentiable attributes, it may be the case that
     // it has not been loaded yet. Load it, check for differentiable attributes,
     // and register the attributes as tasks so that they can be looked up.
@@ -1004,6 +1005,7 @@ public:
             DifferentiationInvoker(diffAttr, original));
       }
     }
+     */
 
     if (auto *existingTask = lookUpMinimalDifferentiationTask(original, indices))
       return existingTask;
@@ -1668,7 +1670,7 @@ emitAssociatedFunctionReference(
     }
 
     // Check that the requirement indices are the same as the desired indices.
-    auto *requirementParameterIndices = diffAttr->getCheckedParameterIndices();
+    auto *requirementParameterIndices = diffAttr->getParameterIndices();
     auto loweredRequirementIndices = requirementParameterIndices->getLowered(
         requirementDecl->getInterfaceType()->castTo<AnyFunctionType>());
     SILAutoDiffIndices requirementIndices(/*source*/ 0,
@@ -2248,7 +2250,7 @@ public:
 
 bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   LLVM_DEBUG(getADDebugStream() << "Performing primal synthesis for original"
-             << item.original->getName() << " and its corresponding adjoint "
+             << item.original->getName() << " and its corresponding primal "
              << item.target->getName() << '\n');
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
@@ -3672,8 +3674,8 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
 // a SILDifferentiableAttr. The expected generic signature is built from the
 // original generic signature and the attribute's requirements.
 static GenericSignature *
-getAutodiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr) {
-  auto original = attr->getOriginal();
+getAutodiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
+                                              SILFunction *original) {
   auto originalGenEnv = original->getGenericEnvironment();
   if (!originalGenEnv)
     return nullptr;
@@ -3704,7 +3706,8 @@ void DifferentiationTask::createEmptyPrimal() {
                         .getIdentifier("AD__" + original->getName().str() +
                                        "__primal_" + indices.mangle())
                         .str();
-  auto *primalGenericSig = getAutodiffAssociatedFunctionGenericSignature(attr);
+  auto *primalGenericSig =
+      getAutodiffAssociatedFunctionGenericSignature(attr, original);
   StructDecl *primalValueStructDecl = context.createPrimalValueStruct(this);
   primalInfo = std::unique_ptr<PrimalInfo>(
       new PrimalInfo(primalValueStructDecl, module));
@@ -3844,7 +3847,8 @@ void DifferentiationTask::createEmptyAdjoint() {
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__adjoint_" + getIndices().mangle())
                      .str();
-  auto *adjGenericSig = getAutodiffAssociatedFunctionGenericSignature(attr);
+  auto *adjGenericSig =
+      getAutodiffAssociatedFunctionGenericSignature(attr, original);
   auto *adjGenericEnv = adjGenericSig
       ? adjGenericSig->createGenericEnvironment()
       : nullptr;
@@ -3878,7 +3882,8 @@ void DifferentiationTask::createJVP() {
   // === Create an empty JVP. ===
   auto jvpName =
       "AD__" + original->getName().str() + "__jvp_" + getIndices().mangle();
-  auto *jvpGenericSig = getAutodiffAssociatedFunctionGenericSignature(attr);
+  auto *jvpGenericSig =
+      getAutodiffAssociatedFunctionGenericSignature(attr, original);
   auto *jvpGenericEnv = jvpGenericSig
       ? jvpGenericSig->createGenericEnvironment()
       : nullptr;
@@ -3929,7 +3934,7 @@ void DifferentiationTask::createVJP() {
                           << "  primal type: "
                           << primal->getLoweredFunctionType() << "\n"
                           << "  adjoint type: "
-                          <<  adjoint->getLoweredFunctionType() << "\n");
+                          << adjoint->getLoweredFunctionType() << "\n");
 
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
@@ -3939,7 +3944,8 @@ void DifferentiationTask::createVJP() {
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__vjp_" + getIndices().mangle())
                      .str();
-  auto *vjpGenericSig = getAutodiffAssociatedFunctionGenericSignature(attr);
+  auto *vjpGenericSig =
+      getAutodiffAssociatedFunctionGenericSignature(attr, original);
   auto *vjpGenericEnv = vjpGenericSig
       ? vjpGenericSig->createGenericEnvironment()
       : nullptr;
