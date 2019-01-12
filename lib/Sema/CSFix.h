@@ -104,6 +104,9 @@ enum class FixKind : uint8_t {
   /// fix this issue by pretending that member exists and matches
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
+	
+	/// Add or remove a metatype from a member
+	AddOrRemoveMetatype,
 };
 
 class ConstraintFix {
@@ -492,6 +495,27 @@ public:
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclName member,
                                         ConstraintLocator *locator);
+};
+	
+class AddOrRemoveMetatype final : public ConstraintFix {
+	Type BaseType;
+	DeclName Name;
+		
+public:
+	AddOrRemoveMetatype(ConstraintSystem &cs, Type baseType, DeclName member,
+											ConstraintLocator *locator)
+	: ConstraintFix(cs, FixKind::AddOrRemoveMetatype, locator),
+		BaseType(baseType), Name(member) {}
+	
+	std::string getName() const override {
+		return "add or remove metatype";
+	}
+	
+	bool diagnose(Expr *root, bool asNote = false) const override;
+	
+	static AddOrRemoveMetatype *create(ConstraintSystem &cs, Type baseType,
+															       DeclName member,
+																		 ConstraintLocator *locator);
 };
 
 } // end namespace constraints

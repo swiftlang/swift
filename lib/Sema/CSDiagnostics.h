@@ -696,7 +696,7 @@ class InvalidMemberAccessFailure final : public FailureDiagnostic {
   DeclName Name;
   
 public:
-  InvalidMemberAccess(Expr *root, ConstraintSystem &cs, Type baseType,
+  InvalidMemberAccessFailure(Expr *root, ConstraintSystem &cs, Type baseType,
                       DeclName memberName, ConstraintLocator *locator)
         : FailureDiagnostic(root, cs, locator), BaseType(baseType),
           Name(memberName) {}

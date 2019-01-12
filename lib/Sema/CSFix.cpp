@@ -258,3 +258,14 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
   return new (cs.getAllocator())
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
+
+bool AddOrRemoveMetatype::diagnose(Expr *root, bool asNote) const {
+	auto failure = InvalidMemberAccessFailure(root, getConstraintSystem(), BaseType,
+																					  Name, getLocator());
+	return failure.diagnose(asNote);
+}
+
+AddOrRemoveMetatype *AddOrRemoveMetatype::create(ConstraintSystem &cs, Type baseType,
+																	               DeclName member, ConstraintLocator *locator) {
+	return new (cs.getAllocator()) AddOrRemoveMetatype(cs, baseType, member, locator);
+}
