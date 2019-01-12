@@ -442,7 +442,7 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
         cast<GenericTypeParamType>(pair.first));
       assert(found != replacements.end() &&
              "Missing generic parameter?");
-      addConstraint(ConstraintKind::Equal, found->second, pair.second,
+      addConstraint(ConstraintKind::Bind, found->second, pair.second,
                     locator);
     }
   }
@@ -1149,7 +1149,7 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
   }
 
   // Otherwise, the types must be equivalent.
-  cs.addConstraint(ConstraintKind::Equal, objectTy, selfTy,
+  cs.addConstraint(ConstraintKind::Bind, objectTy, selfTy,
                    cs.getConstraintLocator(locator));
 }
 
@@ -1322,7 +1322,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
-    addConstraint(ConstraintKind::Equal, baseOpenedTy, selfObjTy,
+    addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator));
   } else if (!isDynamicResult) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
@@ -1847,7 +1847,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     auto elementObjTy = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
     addConstraint(ConstraintKind::Equal, elementTy, elementObjTy, locator);
-    
+
     // The element result is an lvalue or rvalue based on the key path class.
     addKeyPathApplicationConstraint(
                   keyPathIndexTy, choice.getBaseType(), elementTy, locator);

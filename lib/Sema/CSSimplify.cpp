@@ -1278,7 +1278,7 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
     if (super1->getClassOrBoundGenericClass() != classDecl2)
       continue;
 
-    return matchTypes(super1, type2, ConstraintKind::Equal,
+    return matchTypes(super1, type2, ConstraintKind::Bind,
                       subflags, locator);
   }
 
@@ -1302,7 +1302,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
 
     // Match up the parents, exactly.
     return matchTypes(nominal1->getParent(), nominal2->getParent(),
-                      ConstraintKind::Equal, subflags,
+                      ConstraintKind::Bind, subflags,
                       locator.withPathElement(ConstraintLocator::ParentType));
   }
 
@@ -1314,7 +1314,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
          "Mismatched parents of bound generics");
   if (bound1->getParent()) {
     auto result = matchTypes(bound1->getParent(), bound2->getParent(),
-                             ConstraintKind::Equal, subflags,
+                             ConstraintKind::Bind, subflags,
                              locator.withPathElement(
                                                 ConstraintLocator::ParentType));
     if (result.isFailure())
@@ -1328,7 +1328,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     return getTypeMatchFailure(locator);
   }
   for (unsigned i = 0, n = args1.size(); i != n; ++i) {
-    auto result = matchTypes(args1[i], args2[i], ConstraintKind::Equal,
+    auto result = matchTypes(args1[i], args2[i], ConstraintKind::Bind,
                              subflags, locator.withPathElement(
                                         LocatorPathElt::getGenericArgument(i)));
 
@@ -1953,7 +1953,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (isa<MetatypeType>(meta1) &&
           !(instanceType1->mayHaveSuperclass() &&
             instanceType2->getClassOrBoundGenericClass())) {
-        subKind = ConstraintKind::Equal;
+        subKind = ConstraintKind::Bind;
       }
 
       return matchTypes(
@@ -1979,7 +1979,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return getTypeMatchFailure(locator);
       return matchTypes(cast<LValueType>(desugar1)->getObjectType(),
                         cast<LValueType>(desugar2)->getObjectType(),
-                        ConstraintKind::Equal, subflags,
+                        ConstraintKind::Bind, subflags,
                         locator.withPathElement(
                           ConstraintLocator::LValueConversion));
     
@@ -1991,7 +1991,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       
       return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
                         cast<InOutType>(desugar2)->getObjectType(),
-                        ConstraintKind::Equal, subflags,
+                        ConstraintKind::Bind, subflags,
                   locator.withPathElement(ConstraintLocator::LValueConversion));
 
     case TypeKind::UnboundGeneric:
@@ -2207,7 +2207,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               auto inoutBaseType = inoutType1->getInOutObjectType();
 
               Type simplifiedInoutBaseType = getFixedTypeRecursive(
-                  inoutBaseType, kind == ConstraintKind::Equal);
+                  inoutBaseType, /*wantRValue=*/true);
 
               // FIXME: If the base is still a type variable, we can't tell
               // what to do here. Might have to try \c ArrayToPointer and make
@@ -2309,7 +2309,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (auto *lvt = type1->getAs<LValueType>()) {
       if (auto *iot = type2->getAs<InOutType>()) {
         return matchTypes(lvt->getObjectType(), iot->getObjectType(),
-                          ConstraintKind::Equal, subflags,
+                          ConstraintKind::Bind, subflags,
                           locator.withPathElement(
                                   ConstraintLocator::LValueConversion));
       }
@@ -2465,13 +2465,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Determine the constraint kind. For a deep equality constraint, only
         // perform equality.
         if (*restriction == ConversionRestrictionKind::DeepEquality)
-          constraintKind = ConstraintKind::Equal;
+          constraintKind = ConstraintKind::Bind;
 
         constraints.push_back(
           Constraint::createRestricted(*this, constraintKind, *restriction,
                                        type1, type2, fixedLocator));
 
-        if (constraints.back()->getKind() == ConstraintKind::Equal)
+        if (constraints.back()->getKind() == ConstraintKind::Bind)
           constraints.back()->setFavored();
 
         continue;
@@ -4090,7 +4090,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       }
 
       // Make sure we have the bridged value type.
-      if (matchTypes(unwrappedToType, bridgedValueType, ConstraintKind::Equal,
+      if (matchTypes(unwrappedToType, bridgedValueType, ConstraintKind::Bind,
                      subflags, locator).isFailure())
         return SolutionKind::Error;
 
@@ -5686,7 +5686,7 @@ void ConstraintSystem::addConstraint(Requirement req,
     kind = ConstraintKind::Subtype;
     break;
   case RequirementKind::SameType:
-    kind = ConstraintKind::Equal;
+    kind = ConstraintKind::Bind;
     break;
   case RequirementKind::Layout:
     // Only a class constraint can be modeled as a constraint, and only that can
