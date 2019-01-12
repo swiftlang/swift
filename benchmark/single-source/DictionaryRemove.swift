@@ -14,9 +14,13 @@
 // rdar://problem/19804127
 import TestsUtils
 
+let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
+
 public let DictionaryRemove = [
-  BenchmarkInfo(name: "DictionaryRemove", runFunction: run_DictionaryRemove, tags: [.validation, .api, .Dictionary]),
-  BenchmarkInfo(name: "DictionaryRemoveOfObjects", runFunction: run_DictionaryRemoveOfObjects, tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name: "DictionaryRemove",
+    runFunction: run_DictionaryRemove, tags: t, legacyFactor: 10),
+  BenchmarkInfo(name: "DictionaryRemoveOfObjects",
+    runFunction: run_DictionaryRemoveOfObjects, tags: t, legacyFactor: 100),
 ]
 
 @inline(never)
@@ -31,7 +35,7 @@ public func run_DictionaryRemove(_ N: Int) {
     CheckResults(dict.count == size)
 
     var tmpDict = dict
-    for _ in 1...1000*N {
+    for _ in 1...100*N {
         tmpDict = dict
         // Empty dictionary
         for i in 1...size {
@@ -73,7 +77,7 @@ public func run_DictionaryRemoveOfObjects(_ N: Int) {
     CheckResults(dict.count == size)
 
     var tmpDict = dict
-    for _ in 1...1000*N {
+    for _ in 1...10*N {
         tmpDict = dict
         // Empty dictionary
         for i in 1...size {

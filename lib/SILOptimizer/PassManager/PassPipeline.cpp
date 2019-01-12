@@ -249,10 +249,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel,
   // Split up operations on stack-allocated aggregates (struct, tuple).
   P.addSROA();
 
-  // Re-run predictable memory optimizations, since previous optimization
-  // passes sometimes expose oppotunities here.
-  P.addPredictableMemoryOptimizations();
-
   // Promote stack allocations to values.
   P.addMem2Reg();
 
