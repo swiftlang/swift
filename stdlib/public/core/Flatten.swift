@@ -133,8 +133,8 @@ extension LazySequenceProtocol where Element : Sequence {
   /// Returns a lazy sequence that concatenates the elements of this sequence of
   /// sequences.
   @inlinable // lazy-performance
-  public __consuming func joined() -> LazySequence<FlattenSequence<Elements>> {
-    return FlattenSequence(_base: elements).lazy
+  public __consuming func joined() -> FlattenSequence<Elements> {
+    return FlattenSequence(_base: elements)
   }
 }
 
