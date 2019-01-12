@@ -23,8 +23,7 @@ extension LazySequenceProtocol {
   @inlinable // lazy-performance
   public func flatMap<SegmentOfResult>(
     _ transform: @escaping (Elements.Element) -> SegmentOfResult
-  ) -> LazySequence<
-    FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
+  ) -> FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>> {
     return self.map(transform).joined()
   }
 
