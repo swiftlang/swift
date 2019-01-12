@@ -1547,6 +1547,12 @@ ConstraintSystem::matchTypesBindTypeVar(
   // If the left-hand type variable cannot bind to an lvalue,
   // but we still have an lvalue, fail.
   if (!typeVar->getImpl().canBindToLValue() && type->hasLValueType()) {
+      return getTypeMatchFailure(locator);
+  }
+
+  // If the left-hand type variable cannot bind to an inout,
+  // but we still have an inout, fail.
+  if (!typeVar->getImpl().canBindToInOut() && type->is<InOutType>()) {
     return getTypeMatchFailure(locator);
   }
 
@@ -1568,15 +1574,6 @@ ConstraintSystem::matchTypesBindTypeVar(
     }
   }
 
-  // Check whether the type variable must be bound to a materializable
-  // type.
-  if (typeVar->getImpl().mustBeMaterializable()) {
-    if (!type->isMaterializable())
-      return getTypeMatchFailure(locator);
-
-    setMustBeMaterializableRecursive(type);
-  }
-
   // Okay. Bind below.
 
   // A constraint that binds any pointer to a void pointer is
@@ -1586,6 +1583,16 @@ ConstraintSystem::matchTypesBindTypeVar(
     addConstraint(ConstraintKind::Defaultable, typeVar, type,
                   getConstraintLocator(locator));
     return getTypeMatchSuccess();
+  }
+
+  if (!typeVar->getImpl().canBindToLValue()) {
+    // When binding a fixed type to a type variable that cannot contain
+    // lvalues, any type variables within the fixed type cannot contain
+    // lvalues either.
+    type.visit([&](Type t) {
+      if (auto *tvt = dyn_cast<TypeVariableType>(t.getPointer()))
+        typeVar->getImpl().setCannotBindToLValue(getSavedBindings());
+    });
   }
 
   assignFixedType(typeVar, type);
@@ -2623,6 +2630,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     auto argType = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
         (TVO_CanBindToLValue |
+         TVO_CanBindToInOut |
          TVO_PrefersSubtypeBinding));
     addConstraint(ConstraintKind::FunctionInput, memberType, argType, locator);
   }
