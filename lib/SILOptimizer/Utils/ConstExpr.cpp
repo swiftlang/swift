@@ -37,6 +37,21 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 // ConstantFolding.h/cpp files should be subsumed by this, as this is a more
 // general framework.
 
+enum class WellKnownFunction {
+  // String.init()
+  StringInitEmpty,
+  // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  StringMakeUTF8
+};
+
+static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
+  if (fn->hasSemanticsAttr("string.init_empty"))
+    return WellKnownFunction::StringInitEmpty;
+  if (fn->hasSemanticsAttr("string.makeUTF8"))
+    return WellKnownFunction::StringMakeUTF8;
+  return None;
+}
+
 //===----------------------------------------------------------------------===//
 // ConstExprFunctionState implementation.
 //===----------------------------------------------------------------------===//
@@ -115,6 +130,9 @@ public:
   llvm::Optional<SymbolicValue> computeOpaqueCallResult(ApplyInst *apply,
                                                         SILFunction *callee);
 
+  llvm::Optional<SymbolicValue>
+  computeWellKnownCallResult(ApplyInst *apply, WellKnownFunction callee);
+
   SymbolicValue getSingleWriterAddressValue(SILValue addr);
   SymbolicValue getConstAddrAndLoadResult(SILValue addr);
   SymbolicValue loadAddrValue(SILValue addr, SymbolicValue addrVal);
@@ -149,6 +167,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // immediately.
   if (auto *ili = dyn_cast<IntegerLiteralInst>(value))
     return SymbolicValue::getInteger(ili->getValue(), evaluator.getASTContext());
+  if (auto *sli = dyn_cast<StringLiteralInst>(value))
+    return SymbolicValue::getString(sli->getValue(), evaluator.getASTContext());
 
   if (auto *fri = dyn_cast<FunctionRefInst>(value))
     return SymbolicValue::getFunction(fri->getReferencedFunction());
@@ -523,6 +543,46 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
   return evaluator.getUnknown((SILInstruction *)apply, UnknownReason::Default);
 }
 
+/// Given a call to a well known function, collect its arguments as constants,
+/// fold it, and return None.  If any of the arguments are not constants, marks
+/// the call's results as Unknown, and return an Unknown with information about
+/// the error.
+llvm::Optional<SymbolicValue>
+ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
+                                                   WellKnownFunction callee) {
+  auto conventions = apply->getSubstCalleeConv();
+  switch (callee) {
+  case WellKnownFunction::StringInitEmpty: { // String.init()
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           "unexpected String.init() signature");
+    auto result = SymbolicValue::getString("", evaluator.getASTContext());
+    setValue(apply, result);
+    return None;
+  }
+  case WellKnownFunction::StringMakeUTF8: {
+    // String.init(_builtinStringLiteral start: Builtin.RawPointer,
+    //             utf8CodeUnitCount: Builtin.Word,
+    //             isASCII: Builtin.Int1)
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 4 && "unexpected signature");
+    auto literal = getConstantValue(apply->getOperand(1));
+    if (literal.getKind() != SymbolicValue::String)
+      break;
+    auto literalVal = literal.getStringValue();
+
+    auto byteCount = getConstantValue(apply->getOperand(2));
+    if (byteCount.getKind() != SymbolicValue::Integer ||
+        byteCount.getIntegerValue().getLimitedValue() != literalVal.size())
+      break;
+    setValue(apply, literal);
+    return None;
+  }
+  }
+  llvm_unreachable("unhandled WellKnownFunction");
+}
+
 /// Given a call to a function, determine whether it is a call to a constexpr
 /// function.  If so, collect its arguments as constants, fold it and return
 /// None.  If not, mark the results as Unknown, and return an Unknown with
@@ -538,6 +598,10 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
                                 UnknownReason::Default);
 
   SILFunction *callee = calleeFn.getFunctionValue();
+
+  // If this is a well-known function, do not step into it.
+  if (auto wellKnownFunction = classifyFunction(callee))
+    return computeWellKnownCallResult(apply, *wellKnownFunction);
 
   // Verify that we can fold all of the arguments to the call.
   SmallVector<SymbolicValue, 4> paramConstants;

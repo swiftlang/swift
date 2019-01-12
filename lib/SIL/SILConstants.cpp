@@ -61,6 +61,9 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_IntegerInline:
     os << "int: " << getIntegerValue() << "\n";
     return;
+  case RK_String:
+    os << "string: \"" << getStringValue() << "\"\n";
+    return;
   case RK_Aggregate: {
     ArrayRef<SymbolicValue> elements = getAggregateValue();
     switch (elements.size()) {
@@ -111,6 +114,8 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_Integer:
   case RK_IntegerInline:
     return Integer;
+  case RK_String:
+    return String;
   case RK_DirectAddress:
   case RK_DerivedAddress:
     return Address;
@@ -131,6 +136,8 @@ SymbolicValue::cloneInto(ASTContext &astContext) const {
   case RK_IntegerInline:
   case RK_Integer:
     return SymbolicValue::getInteger(getIntegerValue(), astContext);
+  case RK_String:
+    return SymbolicValue::getString(getStringValue(), astContext);
   case RK_Aggregate: {
     auto elts = getAggregateValue();
     SmallVector<SymbolicValue, 4> results;
@@ -213,6 +220,34 @@ unsigned SymbolicValue::getIntegerValueBitWidth() const {
   assert (representationKind == RK_IntegerInline ||
           representationKind == RK_Integer);
   return auxInfo.integerBitwidth;
+}
+
+//===----------------------------------------------------------------------===//
+// Strings
+//===----------------------------------------------------------------------===//
+
+// Returns a SymbolicValue representing a UTF-8 encoded string.
+SymbolicValue SymbolicValue::getString(StringRef string,
+                                       ASTContext &astContext) {
+  // TODO: Could have an inline representation for strings if thre was demand,
+  // just store a char[8] as the storage.
+
+  auto *resultPtr = astContext.Allocate<char>(string.size()).data();
+  std::uninitialized_copy(string.begin(), string.end(), resultPtr);
+
+  SymbolicValue result;
+  result.representationKind = RK_String;
+  result.value.string = resultPtr;
+  result.auxInfo.stringNumBytes = string.size();
+  return result;
+}
+
+// Returns the UTF-8 encoded string underlying a SymbolicValue.
+StringRef SymbolicValue::getStringValue() const {
+  assert(getKind() == String);
+
+  assert(representationKind == RK_String);
+  return StringRef(value.string, auxInfo.stringNumBytes);
 }
 
 //===----------------------------------------------------------------------===//
