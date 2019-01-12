@@ -3666,8 +3666,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // then we can't solve this constraint.
   baseTy = simplifyType(baseTy, flags);
   Type baseObjTy = baseTy->getRValueType();
-
-  auto locator = getConstraintLocator(locatorB);
+	
+	auto locator = getConstraintLocator(locatorB);
+	
+	if (baseTy->is<MetatypeType>()) {
+		
+		auto instanceTy = baseTy->getMetatypeInstanceType();
+		auto result = performMemberLookup(kind, member, instanceTy, functionRefKind, locator,
+																			/*includeInaccessibleMembers*/false);
+		
+		if (!result.ViableCandidates.empty()) {
+			if (shouldAttemptFixes()) {
+				auto *fix = RemoveMetatype::create(*this, instanceTy, member, getConstraintLocator(locator));
+				
+				if (recordFix(fix)) {
+					return SolutionKind::Error;
+				}
+				
+				baseTy = instanceTy;
+			} else {
+				return SolutionKind::Error;
+			}
+		}
+	}
+	
   MemberLookupResult result =
     performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                         /*includeInaccessibleMembers*/false);
@@ -3699,12 +3721,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     return SolutionKind::Solved;
   }
-  
-  
+	
   // If we found some unviable results, then fail, but without recovery.
   if (!result.UnviableCandidates.empty())
     return SolutionKind::Error;
-  
+	
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
@@ -5492,6 +5513,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AutoClosureForwarding:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
+	case FixKind::RemoveMetatype:
     llvm_unreachable("handled elsewhere");
   }
 
