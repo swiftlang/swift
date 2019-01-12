@@ -1477,3 +1477,7 @@ bool MissingMemberFailure::diagnoseAsError() {
   corrections.noteAllCandidates();
   return true;
 }
+
+bool InvalidMemberAccessFailure::diagnoseAsError() {
+	return true;
+}

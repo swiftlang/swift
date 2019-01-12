@@ -674,6 +674,37 @@ private:
                                           DeclName memberName);
 };
 
+/// Diagnose situations when we invoke an instance member on a type, or
+/// a type member on an instance, eg.
+///
+/// ```swift
+/// class Bar {}
+///
+/// enum Foo {
+///
+///   static func f() {
+///     g(Bar())
+///   }
+///
+///   func g(_: Bar) {}
+///
+/// }
+/// ```
+
+class InvalidMemberAccessFailure final : public FailureDiagnostic {
+  Type BaseType;
+  DeclName Name;
+  
+public:
+  InvalidMemberAccess(Expr *root, ConstraintSystem &cs, Type baseType,
+                      DeclName memberName, ConstraintLocator *locator)
+        : FailureDiagnostic(root, cs, locator), BaseType(baseType),
+          Name(memberName) {}
+  
+  bool diagnoseAsError() override;
+    
+};
+
 } // end namespace constraints
 } // end namespace swift
 
