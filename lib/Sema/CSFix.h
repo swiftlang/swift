@@ -498,24 +498,24 @@ public:
 };
 	
 class RemoveMetatype final : public ConstraintFix {
-	Type BaseType;
-	DeclName Name;
-		
+Type BaseType;
+DeclName Name;
+
 public:
-	RemoveMetatype(ConstraintSystem &cs, Type baseType, DeclName member,
-											ConstraintLocator *locator)
-	: ConstraintFix(cs, FixKind::RemoveMetatype, locator),
-		BaseType(baseType), Name(member) {}
-	
-	std::string getName() const override {
-		return "add or remove metatype";
-	}
-	
-	bool diagnose(Expr *root, bool asNote = false) const override;
-	
-	static RemoveMetatype *create(ConstraintSystem &cs, Type baseType,
-															       DeclName member,
-																		 ConstraintLocator *locator);
+RemoveMetatype(ConstraintSystem &cs, Type baseType, DeclName member,
+               ConstraintLocator *locator)
+: ConstraintFix(cs, FixKind::RemoveMetatype, locator),
+BaseType(baseType), Name(member) {}
+
+std::string getName() const override {
+return "remove metatype";
+}
+
+bool diagnose(Expr *root, bool asNote = false) const override;
+
+static RemoveMetatype *create(ConstraintSystem &cs, Type baseType,
+                              DeclName member,
+                              ConstraintLocator *locator);
 };
 
 } // end namespace constraints
