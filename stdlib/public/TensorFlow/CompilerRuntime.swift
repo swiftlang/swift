@@ -180,38 +180,35 @@ private func configureRuntimeFromEnvironment() {
     if address == "local" {
       _RuntimeConfig.session = .local
       debugLog("Using local TF session.")
-      return
-    }
-
-    if let idx = address.firstIndex(of: ":") {
-      if let endIdx = address.index(idx, offsetBy: 3, limitedBy:address.endIndex) {
-        if address[idx..<endIdx] == "://" {
-          let `protocol` = address[address.startIndex..<idx]
-          let target = address[endIdx..<address.endIndex]
-          _RuntimeConfig.session = .remote(serverDef: """
-cluster {
-  job {
-    name: "localhost"
-    tasks {
-      key: 0
-      value: "127.0.0.1:0"
-    }
-    tasks {
-      key: 1
-      value: "\(target)"
-    }
-  }
-}
-job_name: "localhost"
-task_index: 0
-protocol: "\(`protocol`)"
-""")
-          debugLog("Setting TF server address to \(address) from env.")
-          return
-        }
+    } else {
+      guard let idx = address.firstIndex(of: ":"),
+         let endIdx = address.index(idx, offsetBy: 3, limitedBy: address.endIndex),
+         address[idx..<endIdx] == "://" else {
+        fatalError("SWIFT_TENSORFLOW_SERVER_ADDRESS must start with 'grpc://'.")
       }
+
+      let `protocol` = address[address.startIndex..<idx]
+      let target = address[endIdx..<address.endIndex]
+      _RuntimeConfig.session = .remote(serverDef: """
+        cluster {
+          job {
+            name: "localhost"
+            tasks {
+              key: 0
+              value: "127.0.0.1:0"
+            }
+            tasks {
+              key: 1
+              value: "\(target)"
+            }
+          }
+        }
+        job_name: "localhost"
+        task_index: 0
+        protocol: "\(`protocol`)"
+        """)
+      debugLog("Setting TF server address to \(address) from env.")
     }
-    fatalError("SWIFT_TENSORFLOW_SERVER_ADDRESS must start with 'grpc://'.")
   }
 
   if let value = getenv("SWIFT_TENSORFLOW_RUN_METADATA_OUTPUT") {
@@ -337,7 +334,7 @@ public final class _ExecutionContext {
     defer { TF_DeleteDeviceList(devices!) }
 
     // Sanity check and gather/log device info. When `gpuCount` > 0, set
-    // `self.gpuDeviceNamePrefix`. Likewise with tpuCount.
+    // `self.gpuDeviceNamePrefix`. Likewise with `tpuCount`.
     let deviceCount = TF_DeviceListCount(devices!)
     debugLog("There are \(deviceCount) devices.")
     var foundCPU = false
