@@ -260,7 +260,7 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
 }
 
 bool RemoveMetatype::diagnose(Expr *root, bool asNote) const {
-  auto failure = InvalidMemberAccessFailure(root, getConstraintSystem(), BaseType,
+  auto failure = UseInstanceMemberOnMetatypeFailure(root, getConstraintSystem(), BaseType,
                                             Name, getLocator());
   return failure.diagnose(asNote);
 }

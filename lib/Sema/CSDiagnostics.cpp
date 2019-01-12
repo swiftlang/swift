@@ -1478,7 +1478,7 @@ bool MissingMemberFailure::diagnoseAsError() {
   return true;
 }
 
-bool InvalidMemberAccessFailure::diagnoseAsError() {
+bool UseInstanceMemberOnMetatypeFailure::diagnoseAsError() {
   emitDiagnostic(getAnchor()->getLoc(), diag::could_not_use_instance_member_on_type, BaseType, Name, BaseType, false);
   return true;
 }

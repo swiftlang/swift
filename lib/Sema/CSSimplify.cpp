@@ -3714,7 +3714,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     break;
   }
   
-  
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
     addOverloadSet(memberTy, result.ViableCandidates, useDC, locator,
