@@ -1806,7 +1806,8 @@ collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
 //===----------------------------------------------------------------------===//
 
 static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
-  assert(!MemoryInfo.isDelegatingInit());
+  if (MemoryInfo.MemoryInst->isDelegatingSelfAllocated())
+    return true;
 
   return MemoryInfo.isNonDelegatingInit() &&
          MemoryInfo.getType()->getClassOrBoundGenericClass() != nullptr &&
@@ -1820,18 +1821,18 @@ void swift::ownership::collectDIElementUsesFrom(
     const DIMemoryObjectInfo &MemoryInfo, DIElementUseInfo &UseInfo,
     bool isDIFinished, bool TreatAddressToPointerAsInout) {
 
+  if (shouldPerformClassInitSelf(MemoryInfo)) {
+    ClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
+    UseCollector.collectClassInitSelfUses();
+    return;
+  }
+
   if (MemoryInfo.isDelegatingInit()) {
     // When we're analyzing a delegating constructor, we aren't field sensitive
     // at all. Just treat all members of self as uses of the single
     // non-field-sensitive value.
     assert(MemoryInfo.NumElements == 1 && "delegating inits only have 1 bit");
     collectDelegatingInitUses(MemoryInfo, UseInfo, MemoryInfo.MemoryInst);
-    return;
-  }
-
-  if (shouldPerformClassInitSelf(MemoryInfo)) {
-    ClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
-    UseCollector.collectClassInitSelfUses();
     return;
   }
 

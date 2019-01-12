@@ -481,9 +481,10 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Allocate the 'self' value.
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
 
-  if (ctor->hasClangNode()) {
-    // For an allocator thunk synthesized for an Objective-C init method,
-    // allocate using the metatype.
+  if (ctor->hasClangNode() || ctor->isConvenienceInit()) {
+    assert(ctor->hasClangNode() || ctor->isObjC());
+    // For an allocator thunk synthesized for an @objc convenience initializer
+    // or imported Objective-C init method, allocate using the metatype.
     SILValue allocArg = selfMetaValue;
 
     // When using Objective-C allocation, convert the metatype
@@ -572,10 +573,13 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // enforce its DI properties on stored properties.
   MarkUninitializedInst::Kind MUKind;
 
-  if (isDelegating)
-    MUKind = MarkUninitializedInst::DelegatingSelf;
-  else if (selfClassDecl->requiresStoredPropertyInits() &&
-           usesObjCAllocator) {
+  if (isDelegating) {
+    if (ctor->isObjC())
+      MUKind = MarkUninitializedInst::DelegatingSelfAllocated;
+    else
+      MUKind = MarkUninitializedInst::DelegatingSelf;
+  } else if (selfClassDecl->requiresStoredPropertyInits() &&
+             usesObjCAllocator) {
     // Stored properties will be initialized in a separate
     // .cxx_construct method called by the Objective-C runtime.
     assert(selfClassDecl->hasSuperclass() &&

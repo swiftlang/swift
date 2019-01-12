@@ -2287,9 +2287,6 @@ public:
         ->getInstanceType()->getClassOrBoundGenericClass();
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
-    require(!class2->isResilient(F.getModule().getSwiftModule(),
-                                 F.getResilienceExpansion()),
-            "cannot directly deallocate resilient class");
     while (class1 != class2) {
       class1 = class1->getSuperclassDecl();
       require(class1, "First operand not superclass of second instance type");

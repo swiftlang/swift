@@ -3397,10 +3397,12 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       Kind = MarkUninitializedInst::DerivedSelfOnly;
     else if (KindId.str() == "delegatingself")
       Kind = MarkUninitializedInst::DelegatingSelf;
+    else if (KindId.str() == "delegatingselfallocated")
+      Kind = MarkUninitializedInst::DelegatingSelfAllocated;
     else {
       P.diagnose(KindLoc, diag::expected_tok_in_sil_instr,
                  "var, rootself, crossmodulerootself, derivedself, "
-                 "derivedselfonly, or delegatingself");
+                 "derivedselfonly, delegatingself, or delegatingselfallocated");
       return true;
     }
 
