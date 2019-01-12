@@ -38,19 +38,18 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 // general framework.
 
 enum class WellKnownFunction {
-  Unknown,
   // String.init()
   StringInitEmpty,
   // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
   StringMakeUTF8
 };
 
-static WellKnownFunction classifyFunction(SILFunction *fn) {
+static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
   if (fn->hasSemanticsAttr("string.init_empty"))
     return WellKnownFunction::StringInitEmpty;
   if (fn->hasSemanticsAttr("string.makeUTF8"))
     return WellKnownFunction::StringMakeUTF8;
-  return WellKnownFunction::Unknown;
+  return None;
 }
 
 //===----------------------------------------------------------------------===//
@@ -130,6 +129,9 @@ public:
 
   llvm::Optional<SymbolicValue> computeOpaqueCallResult(ApplyInst *apply,
                                                         SILFunction *callee);
+
+  llvm::Optional<SymbolicValue>
+  computeWellKnownCallResult(ApplyInst *apply, WellKnownFunction callee);
 
   SymbolicValue getSingleWriterAddressValue(SILValue addr);
   SymbolicValue getConstAddrAndLoadResult(SILValue addr);
@@ -541,26 +543,15 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
   return evaluator.getUnknown((SILInstruction *)apply, UnknownReason::Default);
 }
 
-/// Given a call to a function, determine whether it is a call to a constexpr
-/// function.  If so, collect its arguments as constants, fold it and return
-/// None.  If not, mark the results as Unknown, and return an Unknown with
-/// information about the error.
+/// Given a call to a well known function, collect its arguments as constants,
+/// fold it, and return None.  If any of the arguments are not constants, marks
+/// the call's results as Unknown, and return an Unknown with information about
+/// the error.
 llvm::Optional<SymbolicValue>
-ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
+ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
+                                                   WellKnownFunction callee) {
   auto conventions = apply->getSubstCalleeConv();
-
-  // Determine the callee.
-  auto calleeFn = getConstantValue(apply->getOperand(0));
-  if (calleeFn.getKind() != SymbolicValue::Function)
-    return evaluator.getUnknown((SILInstruction *)apply,
-                                UnknownReason::Default);
-
-  SILFunction *callee = calleeFn.getFunctionValue();
-
-  // If this is a well-known function, do not step into it.
-  switch (classifyFunction(callee)) {
-  default:
-    break;
+  switch (callee) {
   case WellKnownFunction::StringInitEmpty: { // String.init()
     assert(conventions.getNumDirectSILResults() == 1 &&
            conventions.getNumIndirectSILResults() == 0 &&
@@ -589,6 +580,28 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     return None;
   }
   }
+  llvm_unreachable("unhandled WellKnownFunction");
+}
+
+/// Given a call to a function, determine whether it is a call to a constexpr
+/// function.  If so, collect its arguments as constants, fold it and return
+/// None.  If not, mark the results as Unknown, and return an Unknown with
+/// information about the error.
+llvm::Optional<SymbolicValue>
+ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
+  auto conventions = apply->getSubstCalleeConv();
+
+  // Determine the callee.
+  auto calleeFn = getConstantValue(apply->getOperand(0));
+  if (calleeFn.getKind() != SymbolicValue::Function)
+    return evaluator.getUnknown((SILInstruction *)apply,
+                                UnknownReason::Default);
+
+  SILFunction *callee = calleeFn.getFunctionValue();
+
+  // If this is a well-known function, do not step into it.
+  if (auto wellKnownFunction = classifyFunction(callee))
+    return computeWellKnownCallResult(apply, *wellKnownFunction);
 
   // Verify that we can fold all of the arguments to the call.
   SmallVector<SymbolicValue, 4> paramConstants;
