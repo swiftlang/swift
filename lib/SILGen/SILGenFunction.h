@@ -1757,6 +1757,7 @@ public:
                                     CanType &outputSubstType,
                                     GenericEnvironment *&genericEnv,
                                     SubstitutionMap &interfaceSubs,
+                                    CanType &dynamicSelfType,
                                     bool withoutActuallyEscaping=false);
 
   //===--------------------------------------------------------------------===//

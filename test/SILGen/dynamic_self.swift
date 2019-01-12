@@ -1,6 +1,10 @@
-// RUN: %target-swift-emit-silgen -module-name dynamic_self -enable-sil-ownership %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name dynamic_self -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
-// RUN: %target-swift-emit-ir -module-name dynamic_self %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-silgen -swift-version 4 %s -enable-sil-ownership -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -swift-version 4 -O %s -enable-sil-ownership -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-ir -swift-version 4 %s -enable-sil-ownership -disable-objc-attr-requires-foundation-module -enable-objc-interop
+
+// RUN: %target-swift-emit-silgen -swift-version 5 %s -enable-sil-ownership -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -swift-version 5 -O %s -enable-sil-ownership -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-ir -swift-version 5 %s -enable-sil-ownership -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 protocol P {
   func f() -> Self
@@ -224,6 +228,21 @@ class Z {
     return self.init()
   }
 
+  static func testStaticMethodMutableDynamicSelfCaptures() -> Self {
+    let fn0 = { _ = self; _ = { _ = self } }
+    fn0()
+
+    var x = self
+    let fn1 = { _ = x; _ = { _ = x } }
+    fn1()
+
+    var xx = (self, self)
+    let fn2 = { _ = xx; _ = { _ = xx } }
+    fn2()
+
+    return self.init()
+  }
+
   // Make sure the actual self value has the same lowered type as the
   // substituted result of a generic function call
   func testDynamicSelfSubstitution(_ b: Bool) -> Self {
@@ -362,6 +381,36 @@ class Generic<T> {
     // CHECK-LABEL: sil private @$s12dynamic_self7GenericC2t3ACyxGXDyFAEXDycfU_ : $@convention(thin) <T> (@guaranteed @sil_unowned Generic<T>, @thick @dynamic_self Generic<T>.Type) -> @owned Generic<T> 
     _ = {[unowned self] in self }
     return self
+  }
+}
+
+protocol SelfReplaceable {
+  init<T>(t: T)
+}
+
+extension SelfReplaceable {
+  init(with fn: (Self.Type) -> Self) {
+    self = fn(Self.self)
+  }
+
+  init<T>(with genericFn: (Self.Type) -> T) {
+    self.init(t: genericFn(Self.self))
+  }
+}
+
+class SelfReplaceClass : SelfReplaceable {
+  let t: Any
+
+  required init<T>(t: T) {
+    self.t = t
+  }
+
+  convenience init(y: Int) {
+    self.init(with: { type in type.init(t: y) })
+  }
+
+  convenience init(z: Int) {
+    self.init(with: { type in z })
   }
 }
 
