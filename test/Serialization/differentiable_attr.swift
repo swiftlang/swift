@@ -2,7 +2,10 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
+// RUN: llvm-bcanalyzer %t/differentiable_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/differentiable_attr.swiftmodule -o - | %FileCheck %s
+
+// BCANALYZER-NOT: UnknownCode
 
 struct CheckpointsFoo {}
 func pfoo(_ x: Float) -> (checkpoints: CheckpointsFoo, originalValue: Float) {

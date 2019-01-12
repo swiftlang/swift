@@ -2543,6 +2543,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
       // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Differentiable_DECL_ATTR: {
+        bool isImplicit;
         uint64_t primalNameId;
         DeclID primalDeclId;
         uint64_t adjointNameId;
@@ -2555,8 +2556,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         SmallVector<Requirement, 4> requirements;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, primalNameId, primalDeclId, adjointNameId, adjointDeclId,
-            jvpNameId, jvpDeclId, vjpNameId, vjpDeclId, paramValues);
+            scratch, isImplicit, primalNameId, primalDeclId, adjointNameId,
+            adjointDeclId, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
+            paramValues);
 
         using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
         Optional<FuncSpecifier> primal;
@@ -2596,8 +2598,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         readGenericRequirements(requirements, DeclTypeCursor);
 
         auto diffAttr =
-          DifferentiableAttr::create(ctx, loc, SourceRange(), parameters,
-                                     primal, adjoint, jvp, vjp, requirements);
+          DifferentiableAttr::create(ctx, isImplicit, loc, SourceRange(),
+                                     parameters, primal, adjoint, jvp, vjp,
+                                     requirements);
         diffAttr->setPrimalFunction(primalDecl);
         diffAttr->setAdjointFunction(adjointDecl);
         diffAttr->setJVPFunction(jvpDecl);
