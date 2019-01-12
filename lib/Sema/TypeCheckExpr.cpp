@@ -674,6 +674,12 @@ getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc,
                                  bool isCharacterLiteral);
 ) {
+  // This is a tempoprary workaround until ExpressibleByUnicodeScalarLiteral
+  // and ExpressibleByExtendedGraphemeClusterLiteral are removed as literal
+  // protocols for Strings to give character literals Character default type.
+  // Remove this at the same time as changing TypeChecker.cpp, line 171 to
+  // return these protocols only for character literals which will complete
+  // making String and Character literals distinct in time for Swift 6.
   if (isCharacterLiteral) {
     TypeChecker &tc = getTypeChecker();
     return lookupDefaultLiteralType(tc, tc.getStdlibModule(dc), "Character");

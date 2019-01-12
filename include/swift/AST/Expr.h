@@ -905,7 +905,7 @@ public:
 
   static bool isCharacterLiteralExpr(Expr *expr) {
     if (auto stringLiteral = dyn_cast_or_null<StringLiteralExpr>(expr))
-      return stringLiteral->Bits.StringLiteralExpr.IsCharacterLiteral;
+      return stringLiteral->isCharacterLiteral();
     return false;
   }
 
@@ -931,6 +931,10 @@ public:
 
   bool isSingleExtendedGraphemeCluster() const {
     return Bits.StringLiteralExpr.IsSingleExtendedGraphemeCluster;
+  }
+
+  bool isCharacterLiteral() const {
+    return Bits.StringLiteralExpr.IsCharacterLiteral;
   }
 
   /// Retrieve the builtin initializer that will be used to construct the string

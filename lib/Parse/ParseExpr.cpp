@@ -2002,6 +2002,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   L->getStringLiteralSegments(Tok, Segments);
 
   Token EntireTok = Tok;
+  bool isCharacterLiteral = Tok.isCharacterLiteral();
 
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
@@ -2011,9 +2012,16 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   if (Segments.size() == 1 &&
       Segments.front().Kind == Lexer::StringSegment::Literal) {
     consumeToken();
-    return makeParserResult(
-        createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc,
-                                           EntireTok.isCharacterLiteral()));
+    auto expr = createStringLiteralExprFromSegment(Context, L, Segments.front(),
+                                                   Loc, isCharacterLiteral);
+    if (isCharacterLiteral && !expr->isSingleExtendedGraphemeCluster())
+      diagnose(EntireTok, diag::character_literal_not_cluster);
+    return makeParserResult(expr);
+  }
+
+  if (isCharacterLiteral) {
+    diagnose(EntireTok, diag::character_literal_interpolating);
+    return nullptr;
   }
 
   // We are now sure this is a string interpolation expression.

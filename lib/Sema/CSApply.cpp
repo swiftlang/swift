@@ -30,7 +30,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Basic/Unicode.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -2026,8 +2025,8 @@ namespace {
 
       bool isStringLiteral = true;
       bool isGraphemeClusterLiteral = false;
-      bool isCharacter = StringLiteralExpr::isCharacterLiteralExpr(expr);
-      bool notCharacter = stringLiteral && !isCharacter;
+      bool isCharacter = stringLiteral && stringLiteral->isCharacterLiteral();
+      bool notCharacter = stringLiteral && !stringLiteral->isCharacterLiteral();
       ProtocolDecl *protocol = tc.getProtocol(
           expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
 
@@ -2065,20 +2064,22 @@ namespace {
       Diag<> brokenProtocolDiag;
       Diag<> brokenBuiltinProtocolDiag;
 
-      if (isCharacter && !stringLiteral->isSingleExtendedGraphemeCluster())
-        tc.diagnose(expr->getLoc(), diag::character_literal_not_cluster);
-
       auto migrateQuotes = [&]() {
         if (notCharacter) {
           SourceManager &SM = tc.Context.SourceMgr;
           SourceRange range = stringLiteral->getSourceRange();
           range.End = Lexer::getLocForEndOfToken(SM, range.Start);
-          StringRef body = SM
-          .extractText(CharSourceRange(SM, range.Start, range.End))
-          .drop_front().drop_back();
+          std::string body = SM
+            .extractText(CharSourceRange(SM, range.Start, range.End))
+            .drop_front().drop_back().str();
+
+          if (body == "'")
+            body = "\\'";
+          else if (body == "\\\"")
+            body = "\"";
 
           tc.diagnose(expr->getLoc(), diag::character_literal_migration, type)
-          .fixItReplaceChars(range.Start, range.End, "'" + body.str() + "'");
+            .fixItReplaceChars(range.Start, range.End, "'" + body + "'");
         }
       };
 
@@ -2146,7 +2147,7 @@ namespace {
 
         migrateQuotes();
 
-        // Check that character literal does not overflow destination when int.
+        // Check that character literal is ASCII when expressing integer type
         if (auto structTy = dyn_cast<StructType>(type->getCanonicalType())) {
           auto valueProp = structTy->getDecl()->getStoredProperties().front();
           if (auto intTy = dyn_cast<BuiltinIntegerType>(valueProp->getType()
@@ -2154,12 +2155,10 @@ namespace {
             if (notCharacter)
               tc.diagnose(expr->getLoc(), diag::character_literal_quotes);
 
-            StringRef Encoded = stringLiteral->getValue();
-            unsigned codepoint = unicode::extractFirstUnicodeScalar(Encoded);
-            if (intTy->isFixedWidth() && intTy->getFixedWidth() < 32 &&
-                codepoint >= (1 << intTy->getFixedWidth()))
-              tc.diagnose(expr->getLoc(), diag::character_literal_overflow,
-                          type, codepoint);
+            bool notASCII = stringLiteral->getValue()[0] & 0x80;
+            if (intTy && isCharacter && notASCII)
+              tc.diagnose(expr->getLoc(), diag::character_literal_not_ascii,
+                          type);
           }
         }
       }
