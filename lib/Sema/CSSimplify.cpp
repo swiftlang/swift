@@ -3666,7 +3666,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // then we can't solve this constraint.
   baseTy = simplifyType(baseTy, flags);
   Type baseObjTy = baseTy->getRValueType();
-	
+  
   auto locator = getConstraintLocator(locatorB);
   
   if (baseTy->is<MetatypeType>()) {
@@ -3713,7 +3713,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // Keep going!
     break;
   }
-
+  
+  
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
     addOverloadSet(memberTy, result.ViableCandidates, useDC, locator,
@@ -3725,6 +3726,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // If we found some unviable results, then fail, but without recovery.
   if (!result.UnviableCandidates.empty())
     return SolutionKind::Error;
+  
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
