@@ -3668,9 +3668,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // then we can't solve this constraint.
   baseTy = simplifyType(baseTy, flags);
   Type baseObjTy = baseTy->getRValueType();
-  
+
   auto locator = getConstraintLocator(locatorB);
-	
   MemberLookupResult result =
     performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                         /*includeInaccessibleMembers*/false);
@@ -3694,7 +3693,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // Keep going!
     break;
   }
-  
+
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
     addOverloadSet(memberTy, result.ViableCandidates, useDC, locator,
