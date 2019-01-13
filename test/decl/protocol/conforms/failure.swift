@@ -125,7 +125,6 @@ struct BadCase3 : PA { // expected-error {{type 'BadCase3' does not conform to p
 extension UInt32: ExpressibleByStringLiteral {}
 // expected-error@-1 {{type 'UInt32' does not conform to protocol 'ExpressibleByStringLiteral'}}
 // expected-error@-2 {{type 'UInt32' does not conform to protocol 'ExpressibleByExtendedGraphemeClusterLiteral'}}
-// expected-error@-3 {{type 'UInt32' does not conform to protocol 'ExpressibleByUnicodeScalarLiteral'}}
 
 // After successfully type-checking this (due to the presumption of
 // the type actually conforming), do not crash when failing to find

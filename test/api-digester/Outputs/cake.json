@@ -1246,6 +1246,26 @@
         },
         {
           "kind": "Conformance",
+          "name": "ExpressibleByUnicodeScalarLiteral",
+          "printedName": "ExpressibleByUnicodeScalarLiteral",
+          "children": [
+            {
+              "kind": "TypeWitness",
+              "name": "UnicodeScalarLiteralType",
+              "printedName": "UnicodeScalarLiteralType",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Conformance",
           "name": "CustomReflectable",
           "printedName": "CustomReflectable"
         },

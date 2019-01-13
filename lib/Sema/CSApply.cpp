@@ -2078,8 +2078,8 @@ namespace {
           else if (body == "\\\"")
             body = "\"";
 
-          tc.diagnose(expr->getLoc(), diag::character_literal_migration, type)
-            .fixItReplaceChars(range.Start, range.End, "'" + body + "'");
+//          tc.diagnose(expr->getLoc(), diag::character_literal_migration, type)
+//            .fixItReplaceChars(range.Start, range.End, "'" + body + "'");
         }
       };
 

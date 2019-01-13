@@ -62,7 +62,7 @@ tests.test("${Self}/success") {
   let isSigned = ${str(type.is_signed).lower()}
 
   //===--- Important cases ------------------------------------------------===//
-  expectEqual(0, ${Self}("0"))      // zero
+  expectEqual(0, ${Self}("0" as String))      // zero
   expectEqual(17, ${Self}("17"))    // non-zero with no radix
 
   // Leading zeroes, with and without a radix
@@ -86,7 +86,7 @@ tests.test("${Self}/success") {
   // Out-of-range values
   expectEqual(nil, ${Self}("${maxValue + 1}"))
   expectEqual(nil, ${Self}("${minValue - 1}"))
-  expectEqual(nil, ${Self}("\u{1D7FF}"))  // MATHEMATICAL MONOSPACE DIGIT NINE
+  expectEqual(nil, ${Self}("\u{1D7FF}" as String))  // MATHEMATICAL MONOSPACE DIGIT NINE
 
   // Cases that should fail to parse
   expectEqual(nil, ${Self}("--0")) // Zero w/ repeated plus

@@ -2014,14 +2014,17 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     consumeToken();
     auto expr = createStringLiteralExprFromSegment(Context, L, Segments.front(),
                                                    Loc, isCharacterLiteral);
-    if (isCharacterLiteral && !expr->isSingleExtendedGraphemeCluster())
+    if (isCharacterLiteral && !expr->isSingleExtendedGraphemeCluster()) {
       diagnose(EntireTok, diag::character_literal_not_cluster);
+      return makeParserResult(new (Context) ErrorExpr(Loc));
+    }
     return makeParserResult(expr);
   }
 
   if (isCharacterLiteral) {
+    consumeToken();
     diagnose(EntireTok, diag::character_literal_interpolating);
-    return nullptr;
+    return makeParserResult(new (Context) ErrorExpr(Loc));
   }
 
   // We are now sure this is a string interpolation expression.

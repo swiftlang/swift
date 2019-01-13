@@ -499,25 +499,24 @@ func stringliterals(_ d: [String: Int]) {
 }
 
 func testSingleQuoteStringLiterals() {
-  _ = 'abc' // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
-  _ = 'abc' + "def" // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
+  _ = 'abc' // expected-error{{character literal is not a single extended grapheme cluster}}
+  _ = 'abc' + "def" // expected-error{{character literal is not a single extended grapheme cluster}}
 
-  _ = 'ab\nc' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\nc"}}
+  _ = 'ab\nc' // expected-error{{character literal is not a single extended grapheme cluster}}
 
-  _ = "abc\('def')" // expected-error{{single-quoted string literal found, use '"'}}{{13-18="def"}}
-  _ = 'ab\("c")' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="ab\\("c")"}}
-  _ = 'a\('b')c' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="a\\('b')c"}}
-                 // expected-error@-1{{single-quoted string literal found, use '"'}}{{11-14="b"}}
+  _ = "abc\('def')" // expected-error{{character literal is not a single extended grapheme cluster}}
+  _ = 'ab\("c")' // expected-error{{character literal can not contain interpolations}}
+  _ = 'a\('b')c' // expected-error{{character literal can not contain interpolations}}
+
+  _ = 'ab\'c' // expected-error{{character literal is not a single extended grapheme cluster}}
+
+  _ = 'ab"c' // expected-error{{character literal is not a single extended grapheme cluster}}
+  _ = 'ab\"c' // expected-error{{character literal is not a single extended grapheme cluster}}
+  _ = 'ab\\"c' // expected-error{{character literal is not a single extended grapheme cluster}}
 
   _ = "abc' // expected-error{{unterminated string literal}}
   _ = 'abc" // expected-error{{unterminated string literal}}
   _ = "a'c"
-
-  _ = 'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab'c"}}
-
-  _ = 'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-13="ab\\"c"}}
-  _ = 'ab\"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\"c"}}
-  _ = 'ab\\"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-15="ab\\\\\\"c"}}
 }
 
 // <rdar://problem/17128913>

@@ -60,6 +60,7 @@ if #^EXPR3^# { }
 foo(#^EXPR4^#)
 // LITERAL_INT-NOT: source.lang.swift.literal
 // LITERAL_INT: key.kind: source.lang.swift.literal.integer
+// LITERAL_INT: key.kind: source.lang.swift.literal.string
 // LITERAL_INT-NOT: source.lang.swift.literal
 
 // RUN: %complete-test -tok=EXPR5 %s -raw | %FileCheck %s -check-prefix=LITERAL_TUPLE

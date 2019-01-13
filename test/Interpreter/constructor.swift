@@ -37,11 +37,11 @@ BChar()
 // CHECK: e
 BChar(1)
 // CHECK: f
-BChar("2")
+BChar("2" as UnicodeScalar)
 // CHECK: g
 BChar(1, "2")
 // CHECK: h
-BChar("1", "2")
+BChar("1" as UnicodeScalar, "2" as UnicodeScalar)
 
 // <rdar://problem/12965934> Destructors for classes with constrained type parameters
 

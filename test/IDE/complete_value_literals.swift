@@ -152,7 +152,7 @@ func testDouble0() {
 func testString0() {
   let x: Int = #^STRING_0^#
 }
-// STRING_0: Literal[String]/None: "{#(abc)#}"[#String#];
+// STRING_0: Literal[Nil]/None:                  nil;
 
 func testString1() {
   let x: MyString1 = #^STRING_1^#
