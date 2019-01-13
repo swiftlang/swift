@@ -201,23 +201,6 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   addTypeVariableConstraintsToWorkList(typeVar);
 }
 
-void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
-{
-  assert(type->isMaterializable() &&
-         "argument to setMustBeMaterializableRecursive may not be inherently "
-         "non-materializable");
-  type = getFixedTypeRecursive(type, /*wantRValue=*/false);
-  type = type->lookThroughAllOptionalTypes();
-
-  if (auto typeVar = type->getAs<TypeVariableType>()) {
-    typeVar->getImpl().setMustBeMaterializable(getSavedBindings());
-  } else if (auto *tupleTy = type->getAs<TupleType>()) {
-    for (auto elt : tupleTy->getElementTypes()) {
-      setMustBeMaterializableRecursive(elt);
-    }
-  }
-}
-
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
