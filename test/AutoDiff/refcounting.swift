@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck -check-prefix=CHECK-VJP %s
-// RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-use-vjp=false %s | %FileCheck -check-prefix=CHECK-NOVJP %s
 
 public class NonTrivialStuff : Equatable {
   public init() {}
@@ -35,8 +34,6 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 
 // CHECK-VJP-LABEL: struct {{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0 {
 // CHECK-VJP-NEXT:   @sil_stored @usableFromInline
-// CHECK-VJP-NEXT:   var v_0: Vector
-// CHECK-VJP-NEXT:   @sil_stored @usableFromInline
 // CHECK-VJP-NEXT:   var pullback_0: (Vector) -> (Vector, Vector)
 // CHECK-VJP-NEXT: }
 
@@ -45,10 +42,8 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-VJP-LABEL: @{{.*}}testOwnedVector{{.*}}__primal_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@owned {{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, @owned Vector) {
 // CHECK-VJP:   [[ADD_VJP:%.*]] = function_ref @AD__$s11refcounting6VectorV1poiyA2C_ACtFZ__vjp_src_0_wrt_0_1 : $@convention(method) (@guaranteed Vector, @guaranteed Vector, @thin Vector.Type) -> (@owned Vector, @owned @callee_guaranteed (@guaranteed Vector) -> (@owned Vector, @owned Vector))
 // CHECK-VJP:   [[ADD_VJP_RESULT:%.*]] = apply [[ADD_VJP]]({{.*}}, {{.*}}, {{.*}}) : $@convention(method) (@guaranteed Vector, @guaranteed Vector, @thin Vector.Type) -> (@owned Vector, @owned @callee_guaranteed (@guaranteed Vector) -> (@owned Vector, @owned Vector))
-// CHECK-VJP:   [[ADD_ORIGINAL_RESULT:%.*]] = tuple_extract [[ADD_VJP_RESULT]] : $(Vector, @callee_guaranteed (@guaranteed Vector) -> (@owned Vector, @owned Vector)), 0
 // CHECK-VJP:   [[ADD_PULLBACK:%.*]] = tuple_extract [[ADD_VJP_RESULT]] : $(Vector, @callee_guaranteed (@guaranteed Vector) -> (@owned Vector, @owned Vector)), 1
 // CHECK-VJP-NOT:   release_value [[ADD_VJP_RESULT]]
-// CHECK-VJP-NOT:   release_value [[ADD_ORIGINAL_RESULT]]
 // CHECK-VJP-NOT:   release_value [[ADD_PULLBACK]]
 
 // The adjoint should not release primal values because they are passed in as @guaranteed.
