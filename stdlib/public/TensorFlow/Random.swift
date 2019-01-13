@@ -207,7 +207,7 @@ public final class BetaDistribution {
   ///
   /// - Returns: Sample obtained using Cheng's BB algorithm.
   private static func chengsAlgorithmBB<G: RandomNumberGenerator>(
-    _ alpha: Float, 
+    _ alpha0: Float, 
     _ a: Float, 
     _ b: Float, 
     using rng: inout G
@@ -240,7 +240,7 @@ public final class BetaDistribution {
     } while r + alpha * (log(alpha) - log(b + w)) < t
 
     w = min(w, Float.greatestFiniteMagnitude)
-    return a == alpha ? w / (b + w) : b / (b + w)
+    return a == alpha0 ? w / (b + w) : b / (b + w)
   }
 
   /// Returns one sample from a Beta(alpha, beta) distribution using Cheng's BC 
@@ -254,7 +254,7 @@ public final class BetaDistribution {
   ///
   /// - Returns: Sample obtained using Cheng's BB algorithm.
   private static func chengsAlgorithmBC<G: RandomNumberGenerator>(
-    _ alpha: Float, 
+    _ alpha0: Float, 
     _ a: Float, 
     _ b: Float, 
     using rng: inout G
@@ -297,6 +297,6 @@ public final class BetaDistribution {
     }
 
     w = min(w, Float.greatestFiniteMagnitude)
-    return a == alpha ? w / (b + w) : b / (b + w)
+    return a == alpha0 ? w / (b + w) : b / (b + w)
   }
 }
