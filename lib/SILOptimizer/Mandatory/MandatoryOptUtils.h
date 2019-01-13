@@ -24,23 +24,8 @@ namespace swift {
 class SILBuilderWithScope;
 class AssignInst;
 
-enum class PartialInitializationKind {
-  /// The box contains a fully-initialized value.
-  IsNotInitialization,
-
-  /// The box contains a class instance that we own, but the instance has
-  /// not been initialized and should be freed with a special SIL
-  /// instruction made for this purpose.
-  IsReinitialization,
-
-  /// The box contains an undefined value that should be ignored.
-  IsInitialization,
-};
-
-void lowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
-                            PartialInitializationKind isInitialization)
+void lowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst)
     LLVM_LIBRARY_VISIBILITY;
-
 } // namespace swift
 
 #endif

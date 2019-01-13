@@ -3603,6 +3603,22 @@ public:
   }
 };
 
+enum class PartialInitializationKind {
+  /// Unknown initialization method
+  Unknown,
+
+  /// The box contains a fully-initialized value.
+  IsNotInitialization,
+
+  /// The box contains a class instance that we own, but the instance has
+  /// not been initialized and should be freed with a special SIL
+  /// instruction made for this purpose.
+  IsReinitialization,
+
+  /// The box contains an undefined value that should be ignored.
+  IsInitialization,
+};
+
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in
 /// Raw SIL.
@@ -3612,6 +3628,7 @@ class AssignInst
   friend SILBuilder;
 
   FixedOperandList<2> Operands;
+  PartialInitializationKind InitKind;
 
   AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
 
@@ -3628,6 +3645,9 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  PartialInitializationKind getInitKind() const { return InitKind; }
+  void setInitKind(PartialInitializationKind initKind) { InitKind = initKind; }
 };
 
 /// Indicates that a memory location is uninitialized at this point and needs to

@@ -1884,20 +1884,16 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     Use.Inst = nullptr;
     NonLoadUses.erase(Inst);
 
-    PartialInitializationKind PartialInitKind;
-
     if (TheMemory.isClassInitSelf() &&
         Use.Kind == DIUseKind::SelfInit) {
       assert(InitKind == IsInitialization);
-      PartialInitKind = PartialInitializationKind::IsReinitialization;
+      AI->setInitKind(PartialInitializationKind::IsReinitialization);
     } else {
-      PartialInitKind = (InitKind == IsInitialization
-                         ? PartialInitializationKind::IsInitialization
-                         : PartialInitializationKind::IsNotInitialization);
+      AI->setInitKind((InitKind == IsInitialization
+                      ? PartialInitializationKind::IsInitialization
+                      : PartialInitializationKind::IsNotInitialization));
     }
 
-    SILBuilderWithScope B(Inst);
-    lowerAssignInstruction(B, AI, PartialInitKind);
     return;
   }
 

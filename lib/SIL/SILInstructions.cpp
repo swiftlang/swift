@@ -813,7 +813,8 @@ StringRef swift::getSILAccessEnforcementName(SILAccessEnforcement enforcement) {
 }
 
 AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
-    : InstructionBase(Loc), Operands(this, Src, Dest) {}
+    : InstructionBase(Loc), Operands(this, Src, Dest),
+      InitKind(PartialInitializationKind::Unknown) {}
 
 MarkFunctionEscapeInst *
 MarkFunctionEscapeInst::create(SILDebugLocation Loc,

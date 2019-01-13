@@ -38,30 +38,36 @@ using namespace swift;
 /// Emit the sequence that an assign instruction lowers to once we know
 /// if it is an initialization or an assignment.  If it is an assignment,
 /// a live-in value can be provided to optimize out the reload.
-void swift::lowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
-                                   PartialInitializationKind isInitialization) {
+void swift::lowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst) {
   LLVM_DEBUG(llvm::dbgs() << "  *** Lowering [isInit="
-                          << unsigned(isInitialization)
+                          << unsigned(Inst->getInitKind())
                           << "]: " << *Inst << "\n");
 
   ++NumAssignRewritten;
 
   SILValue Src = Inst->getSrc();
   SILLocation Loc = Inst->getLoc();
+  PartialInitializationKind initKind = Inst->getInitKind();
 
-  if (isInitialization == PartialInitializationKind::IsInitialization ||
+  // Unknown initKind is considered unprocessed. Just lower it as
+  // NotInitialization
+  if (initKind == PartialInitializationKind::Unknown) {
+    initKind = PartialInitializationKind::IsNotInitialization;
+  }
+
+  if (initKind == PartialInitializationKind::IsInitialization ||
       Inst->getDest()->getType().isTrivial(Inst->getModule())) {
 
     // If this is an initialization, or the storage type is trivial, we
     // can just replace the assignment with a store.
-    assert(isInitialization != PartialInitializationKind::IsReinitialization);
+    assert(initKind != PartialInitializationKind::IsReinitialization);
     B.createTrivialStoreOr(Loc, Src, Inst->getDest(),
                            StoreOwnershipQualifier::Init);
     Inst->eraseFromParent();
     return;
   }
 
-  if (isInitialization == PartialInitializationKind::IsReinitialization) {
+  if (initKind == PartialInitializationKind::IsReinitialization) {
     // We have a case where a convenience initializer on a class
     // delegates to a factory initializer from a protocol extension.
     // Factory initializers give us a whole new instance, so the existing
@@ -81,7 +87,7 @@ void swift::lowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
     return;
   }
 
-  assert(isInitialization == PartialInitializationKind::IsNotInitialization);
+  assert(initKind == PartialInitializationKind::IsNotInitialization);
   // Otherwise, we need to replace the assignment with the full
   // load/store/release dance. Note that the new value is already
   // considered to be retained (by the semantics of the storage type),

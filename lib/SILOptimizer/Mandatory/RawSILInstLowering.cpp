@@ -30,11 +30,16 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
       SILInstruction *Inst = &*I;
       ++I;
 
-      // Unprocessed assigns just lower into assignments, not initializations.
+      // Lower 'assign' depending on initialization kind defined by definite
+      // initialization.
+      //
+      // Unknown is considered unprocessed and is just NotInitialization
+      // Initialization becomes an init store instruction
+      // Reinititialization becomes a load, store, and a dealloc_partial_ref
+      // NotInitialization becomes a take load, and an init store
       if (auto *AI = dyn_cast<AssignInst>(Inst)) {
         SILBuilderWithScope B(AI);
-        lowerAssignInstruction(B, AI,
-                               PartialInitializationKind::IsNotInitialization);
+        lowerAssignInstruction(B, AI);
         // Assign lowering may split the block. If it did,
         // reset our iteration range to the block after the insertion.
         if (B.getInsertionBB() != &BB)
