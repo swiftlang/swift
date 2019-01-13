@@ -1444,6 +1444,8 @@ private:
                                  unsigned independentVariableIndex);
   void setUsefulIfDifferentiable(SILValue value,
                                  unsigned dependentVariableIndex);
+  void recursivelySetVariedIfDifferentiable(SILValue value,
+                                            unsigned independentVariableIndex);
 
 public:
   explicit DifferentiableActivityInfo(SILFunction &f,
@@ -1541,7 +1543,12 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
         // Handle `store`.
         else if (auto *si = dyn_cast<StoreInst>(&inst)) {
           if (isVaried(si->getSrc(), i))
-            setVariedIfDifferentiable(si->getDest(), i);
+            recursivelySetVariedIfDifferentiable(si->getDest(), i);
+        }
+        // Handle `copy_addr`.
+        else if (auto *cai = dyn_cast<CopyAddrInst>(&inst)) {
+          if (isVaried(cai->getSrc(), i))
+            recursivelySetVariedIfDifferentiable(cai->getDest(), i);
         }
         // Handle everything else.
         else {
@@ -1585,12 +1592,16 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             setUsefulIfDifferentiable(si->getSrc(), i);
         }
         // Handle side-effecting operations.
+        // All address operands are useful if any result is useful.
         else if (inst.mayHaveSideEffects()) {
-          for (auto &op : inst.getAllOperands())
-            if (op.get()->getType().isAddress())
-              setUsefulIfDifferentiable(op.get(), i);
-          for (auto result : inst.getResults())
-            setUsefulIfDifferentiable(result, i);
+          for (auto result : inst.getResults()) {
+            if (isUseful(result, i)) {
+              for (auto &op : inst.getAllOperands())
+                if (op.get()->getType().isAddress())
+                  setUsefulIfDifferentiable(op.get(), i);
+              break;
+            }
+          }
         }
         // Handle everything else.
         else {
@@ -1617,6 +1628,14 @@ void DifferentiableActivityInfo::setUsefulIfDifferentiable(
   if (!value->getType().isDifferentiable(function.getModule()))
     return;
   usefulValueSets[dependentVariableIndex].insert(value);
+}
+
+void DifferentiableActivityInfo::recursivelySetVariedIfDifferentiable(
+    SILValue value, unsigned independentVariableIndex) {
+  setVariedIfDifferentiable(value, independentVariableIndex);
+  if (auto *inst = value->getDefiningInstruction())
+    for (auto &op : inst->getAllOperands())
+      recursivelySetVariedIfDifferentiable(op.get(), independentVariableIndex);
 }
 
 bool DifferentiableActivityInfo::isIndependent(
