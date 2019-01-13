@@ -503,19 +503,19 @@ class AllowTypeOrInstanceMember final : public ConstraintFix {
 
 public:
   AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType, DeclName member,
-                 ConstraintLocator *locator)
+                            ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowTypeOrInstanceMember, locator),
         BaseType(baseType), Name(member) {}
 
   std::string getName() const override {
-    return "remove metatype";
+    return "allow type or instance member";
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
-                                DeclName member,
-                                ConstraintLocator *locator);
+                                           DeclName member,
+                                           ConstraintLocator *locator);
 };
 
 } // end namespace constraints

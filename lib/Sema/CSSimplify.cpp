@@ -3828,22 +3828,26 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // FIXME(diagnostics): If there were no viable results, but there are
     // unviable ones, we'd have to introduce fix for each specific problem.
     if (!result.UnviableCandidates.empty()) {
-      
+      // Check if we have unviable candidates whose reason for rejection
+      // is either UR_InstanceMemberOnType or UR_TypeMemberOnInstance
       auto unviable = [&](const std::pair<OverloadChoice,
                           MemberLookupResult::UnviableReason> &e) {
         return e.second == MemberLookupResult::UR_InstanceMemberOnType ||
                e.second == MemberLookupResult::UR_TypeMemberOnInstance;
       };
       
+      // If we do, then allow them
       if (llvm::all_of(result.UnviableCandidates, unviable)) {
         
         auto *fix = AllowTypeOrInstanceMember::create(*this, baseTy, member,
                                                       getConstraintLocator(locator));
         
         if (recordFix(fix)) {
+          // We couldn't record a fix, so bail out
           return SolutionKind::Error;
         }
         
+        // The fix was successful, so let's add it to the list of overloads
         auto overloadChoices = SmallVector<OverloadChoice, 4>();
         
         for (auto &c : result.UnviableCandidates) {
