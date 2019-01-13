@@ -1547,6 +1547,12 @@ ConstraintSystem::matchTypesBindTypeVar(
   // If the left-hand type variable cannot bind to an lvalue,
   // but we still have an lvalue, fail.
   if (!typeVar->getImpl().canBindToLValue() && type->hasLValueType()) {
+      return getTypeMatchFailure(locator);
+  }
+
+  // If the left-hand type variable cannot bind to an inout,
+  // but we still have an inout, fail.
+  if (!typeVar->getImpl().canBindToInOut() && type->is<InOutType>()) {
     return getTypeMatchFailure(locator);
   }
 
@@ -1568,15 +1574,6 @@ ConstraintSystem::matchTypesBindTypeVar(
     }
   }
 
-  // Check whether the type variable must be bound to a materializable
-  // type.
-  if (typeVar->getImpl().mustBeMaterializable()) {
-    if (!type->isMaterializable())
-      return getTypeMatchFailure(locator);
-
-    setMustBeMaterializableRecursive(type);
-  }
-
   // Okay. Bind below.
 
   // A constraint that binds any pointer to a void pointer is
@@ -1586,6 +1583,16 @@ ConstraintSystem::matchTypesBindTypeVar(
     addConstraint(ConstraintKind::Defaultable, typeVar, type,
                   getConstraintLocator(locator));
     return getTypeMatchSuccess();
+  }
+
+  if (!typeVar->getImpl().canBindToLValue()) {
+    // When binding a fixed type to a type variable that cannot contain
+    // lvalues, any type variables within the fixed type cannot contain
+    // lvalues either.
+    type.visit([&](Type t) {
+      if (auto *tvt = dyn_cast<TypeVariableType>(t.getPointer()))
+        typeVar->getImpl().setCannotBindToLValue(getSavedBindings());
+    });
   }
 
   assignFixedType(typeVar, type);
@@ -1723,7 +1730,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
         // If exactly one of the type variables can bind to an lvalue, we
         // can't merge these two type variables.
-        if (rep1->getImpl().canBindToLValue()
+        if (kind == ConstraintKind::Equal &&
+            rep1->getImpl().canBindToLValue()
               != rep2->getImpl().canBindToLValue())
           return formUnsolvedResult();
 
@@ -1751,46 +1759,44 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BindParam: {
       if (typeVar2 && !typeVar1) {
         // Simplify the left-hand type and perform the "occurs" check.
-        typeVar2 = getRepresentative(typeVar2);
+        auto rep2 = getRepresentative(typeVar2);
         type1 = simplifyType(type1, flags);
         if (!isBindable(typeVar2, type1))
           return formUnsolvedResult();
 
         if (auto *iot = type1->getAs<InOutType>()) {
-          assignFixedType(typeVar2, LValueType::get(iot->getObjectType()));
+          if (!rep2->getImpl().canBindToLValue())
+            return getTypeMatchFailure(locator);
+          assignFixedType(rep2, LValueType::get(iot->getObjectType()));
         } else {
-          assignFixedType(typeVar2, type1);
+          assignFixedType(rep2, type1);
         }
         return getTypeMatchSuccess();
       } else if (typeVar1 && !typeVar2) {
         // Simplify the right-hand type and perform the "occurs" check.
-        typeVar1 = getRepresentative(typeVar1);
+        auto rep1 = getRepresentative(typeVar1);
         type2 = simplifyType(type2, flags);
-        if (!isBindable(typeVar1, type2))
+        if (!isBindable(rep1, type2))
           return formUnsolvedResult();
 
-        // If the right-hand side of the BindParam constraint
-        // is `lvalue` type, we'll have to make sure that
-        // left-hand side is bound to type variable which
-        // is wrapped in `inout` type to preserve inout/lvalue pairing.
         if (auto *lvt = type2->getAs<LValueType>()) {
-          auto *tv = createTypeVariable(typeVar1->getImpl().getLocator());
-          assignFixedType(typeVar1, InOutType::get(tv));
-
-          typeVar1 = tv;
-          type2 = lvt->getObjectType();
+          if (!rep1->getImpl().canBindToInOut())
+            return getTypeMatchFailure(locator);
+          assignFixedType(rep1, InOutType::get(lvt->getObjectType()));
+        } else {
+          assignFixedType(rep1, type2);
         }
-
-        // If we have a binding for the right-hand side
-        // (argument type used in the body) don't try
-        // to bind it to the left-hand side (parameter type)
-        // directly, because there could be an implicit
-        // conversion between them, and actual binding
-        // can only come from the left-hand side.
-        addUnsolvedConstraint(
-            Constraint::create(*this, ConstraintKind::Equal, typeVar1, type2,
-                               getConstraintLocator(locator)));
         return getTypeMatchSuccess();
+      } if (typeVar1 && typeVar2) {
+        auto rep1 = getRepresentative(typeVar1);
+        auto rep2 = getRepresentative(typeVar2);
+
+        if (!rep1->getImpl().canBindToInOut() ||
+            !rep2->getImpl().canBindToLValue()) {
+          // Merge the equivalence classes corresponding to these two variables.
+          mergeEquivalenceClasses(rep1, rep2);
+          return getTypeMatchSuccess();
+        }
       }
 
       return formUnsolvedResult();
@@ -2623,6 +2629,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     auto argType = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
         (TVO_CanBindToLValue |
+         TVO_CanBindToInOut |
          TVO_PrefersSubtypeBinding));
     addConstraint(ConstraintKind::FunctionInput, memberType, argType, locator);
   }
