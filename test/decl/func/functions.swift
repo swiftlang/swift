@@ -202,6 +202,6 @@ class D {
   static func foo() {}
 
   func bar() {
-    foo() // expected-errpr {{static member 'foo' cannot be used on instance of type 'D'}}
+    foo() // expected-error {{static member 'foo' cannot be used on instance of type 'D'}}
   }
 }

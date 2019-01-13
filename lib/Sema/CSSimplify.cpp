@@ -3847,11 +3847,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           return SolutionKind::Error;
         }
         
-        // The fix was successful, so let's add it to the list of overloads
+        // The fix was successful, so let's add it to the overload set
+        // and return the solution as solved
         auto overloadChoices = SmallVector<OverloadChoice, 4>();
         
-        for (auto &c : result.UnviableCandidates) {
-          overloadChoices.push_back(c.first);
+        for (auto &pair : result.UnviableCandidates) {
+          overloadChoices.push_back(pair.first);
         }
         
         addOverloadSet(memberTy, ArrayRef<OverloadChoice>(overloadChoices), useDC,
