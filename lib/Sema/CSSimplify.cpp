@@ -3668,33 +3668,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   Type baseObjTy = baseTy->getRValueType();
   
   auto locator = getConstraintLocator(locatorB);
-  
-  // If the base type is a metatype, then remove the metatype and assume as
-  // if it was never there in the first place.
-  if (baseTy->is<MetatypeType>()) {
-    
-    auto instanceTy = baseTy->getMetatypeInstanceType();
-    auto result = performMemberLookup(kind, member, instanceTy, functionRefKind, locator,
-                                      /*includeInaccessibleMembers*/false);
-    
-    // Lookup found some viable candidates, check if we can attempt any fixes
-    if (!result.ViableCandidates.empty()) {
-      if (shouldAttemptFixes()) {
-        auto *fix = RemoveMetatype::create(*this, instanceTy, member, getConstraintLocator(locator));
-        
-        if (recordFix(fix)) {
-          // The fix was not successful, so bail out
-          return SolutionKind::Error;
-        }
-        
-        // The fix was successful so record the fixed type and continue
-        baseTy = instanceTy;
-      } else {
-        // Can't attempt a fix, so bail out
-        return SolutionKind::Error;
-      }
-    }
-  }
 	
   MemberLookupResult result =
     performMemberLookup(kind, member, baseTy, functionRefKind, locator,
@@ -3729,7 +3702,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   }
 	
   // If we found some unviable results, then fail, but without recovery.
-  if (!result.UnviableCandidates.empty())
+  if (!result.UnviableCandidates.empty() && !shouldAttemptFixes())
     return SolutionKind::Error;
   
 
@@ -3852,8 +3825,31 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     // FIXME(diagnostics): If there were no viable results, but there are
     // unviable ones, we'd have to introduce fix for each specific problem.
-    if (!result.UnviableCandidates.empty())
+    if (!result.UnviableCandidates.empty()) {
+      if (llvm::all_of(result.UnviableCandidates, [&](const std::pair<OverloadChoice, MemberLookupResult::UnviableReason> &e) {
+        return e.second == MemberLookupResult::UR_InstanceMemberOnType;
+      })) {
+        
+        auto *fix = RemoveMetatype::create(*this, baseTy->getMetatypeInstanceType(), member, getConstraintLocator(locator));
+        
+        if (recordFix(fix)) {
+          // The fix was not successful, so bail out
+          return SolutionKind::Error;
+        }
+        
+        auto overloadChoices = SmallVector<OverloadChoice, 4>(result.UnviableCandidates.size());
+        
+        for (auto &c : result.UnviableCandidates) {
+          overloadChoices.push_back(c.first);
+        }
+        
+        addOverloadSet(memberTy, overloadChoices, useDC, locator,
+                       result.getFavoredChoice(), {});
+        return SolutionKind::Solved;
+      }
+      
       return SolutionKind::Error;
+    }
 
     // Since member with given base and name doesn't exist, let's try to
     // fake its presence based on use, that makes it possible to diagnose
