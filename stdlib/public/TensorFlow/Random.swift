@@ -174,40 +174,40 @@ public final class NormalDistribution<T : BinaryFloatingPoint>
 
 @_fixed_layout
 public final class BetaDistribution {
-  public let α: Float
-  public let β: Float
+  public let alpha: Float
+  public let beta: Float
   private let uniformDistribution = UniformFloatingPointDistribution<Float>()
 
-  public init(α: Float = 0, β: Float = 1) {
-    self.α = α
-    self.β = β
+  public init(alpha: Float = 0, beta: Float = 1) {
+    self.alpha = alpha
+    self.beta = beta
   }
 
   public func next<G: RandomNumberGenerator>(using rng: inout G) -> Float {
     // Generate a sample using Cheng's sampling algorithm from:
     // R. C. H. Cheng, "Generating beta variates with nonintegral shape 
     // parameters.". Communications of the ACM, 21, 317-322, 1978.
-    let a = min(α, β)
-    let b = max(α, β)
+    let a = min(alpha, beta)
+    let b = max(alpha, beta)
     if a > 1 {
-      return BetaDistribution.chengsAlgorithmBB(α, a, b, using: &rng)
+      return BetaDistribution.chengsAlgorithmBB(alpha, a, b, using: &rng)
     } else {
-      return BetaDistribution.chengsAlgorithmBC(α, b, a, using: &rng)
+      return BetaDistribution.chengsAlgorithmBC(alpha, b, a, using: &rng)
     }
   }
 
-  /// Returns one sample from a Beta(α, β) distribution using Cheng's BB 
-  /// algorithm, when both α and β are greater than 1.
+  /// Returns one sample from a Beta(alpha, beta) distribution using Cheng's BB 
+  /// algorithm, when both alpha and beta are greater than 1.
   ///
   /// - Parameters:
-  ///     - α: First Beta distribution shape parameter.
-  ///     - a: `min(α, β)`, where α and β are the Beta distribution parameters. 
-  ///     - b: `max(α, β)`, where α and β are the Beta distribution parameters.
+  ///     - alpha: First Beta distribution shape parameter.
+  ///     - a: `min(alpha, beta)`.
+  ///     - b: `max(alpha, beta)`.
   ///     - rng: Random number generator.
   ///
   /// - Returns: Sample obtained using Cheng's BB algorithm.
   private static func chengsAlgorithmBB<G: RandomNumberGenerator>(
-    _ α: Float, 
+    _ alpha: Float, 
     _ a: Float, 
     _ b: Float, 
     using rng: inout G
@@ -234,27 +234,27 @@ public final class BetaDistribution {
       }
 
       t = log(z)
-      if (s >= t) {
+      if s >= t {
         break
       }
     } while r + alpha * (log(alpha) - log(b + w)) < t
 
     w = min(w, Float.greatestFiniteMagnitude)
-    return a == α ? w / (b + w) : b / (b + w)
+    return a == alpha ? w / (b + w) : b / (b + w)
   }
 
-  /// Returns one sample from a Beta(α, β) distribution using Cheng's BC 
-  /// algorithm, when at least one of α and β is less than 1.
+  /// Returns one sample from a Beta(alpha, beta) distribution using Cheng's BC 
+  /// algorithm, when at least one of alpha and beta is less than 1.
   ///
   /// - Parameters:
-  ///     - α: First Beta distribution shape parameter.
-  ///     - a: `max(α, β)`, where α and β are the Beta distribution parameters. 
-  ///     - b: `min(α, β)`, where α and β are the Beta distribution parameters.
+  ///     - alpha: First Beta distribution shape parameter.
+  ///     - a: `max(alpha, beta)`.
+  ///     - b: `min(alpha, beta)`.
   ///     - rng: Random number generator.
   ///
   /// - Returns: Sample obtained using Cheng's BB algorithm.
   private static func chengsAlgorithmBC<G: RandomNumberGenerator>(
-    _ α: Float, 
+    _ alpha: Float, 
     _ a: Float, 
     _ b: Float, 
     using rng: inout G
@@ -267,7 +267,7 @@ public final class BetaDistribution {
 
     var w: Float = 0.0
     
-    while (true) {
+    while true {
       let u1 = Float.random(in: 0.0...1.0, using: &rng)
       let u2 = Float.random(in: 0.0...1.0, using: &rng)
       let y = u1 * u2
@@ -297,6 +297,6 @@ public final class BetaDistribution {
     }
 
     w = min(w, Float.greatestFiniteMagnitude)
-    return a == α ? w / (b + w) : b / (b + w)
+    return a == alpha ? w / (b + w) : b / (b + w)
   }
 }
