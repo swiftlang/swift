@@ -977,12 +977,24 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   add_dependencies(dispatch libdispatch-install)
   add_dependencies(BlocksRuntime libdispatch-install)
 
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    set(SOURCEKIT_RUNTIME_DIR bin)
+  else()
+    set(SOURCEKIT_RUNTIME_DIR lib)
+  endif()
   swift_install_in_component(sourcekit-inproc
                              FILES
                                $<TARGET_FILE:dispatch>
                                $<TARGET_FILE:BlocksRuntime>
-                             DESTINATION
-                               lib${LLVM_LIBDIR_SUFFIX})
+                             DESTINATION ${SOURCEKIT_RUNTIME_DIR})
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    swift_install_in_component(sourcekit-inproc
+                               FILES
+                                 $<TARGET_LINKER_FILE:dispatch>
+                                 $<TARGET_LINKER_FILE:BlocksRuntime>
+                               DESTINATION lib)
+  endif()
+
 
   # FIXME(compnerd) this should be taken care of by the
   # INTERFACE_INCLUDE_DIRECTORIES above
