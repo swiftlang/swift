@@ -3344,6 +3344,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     bool hasInstanceMembers = false;
     bool hasInstanceMethods = false;
     bool hasStaticMembers = false;
+    bool isMetatype = baseTy->is<MetatypeType>();
     Type instanceTy = baseObjTy;
     if (baseObjTy->is<ModuleType>()) {
       hasStaticMembers = true;
@@ -3425,8 +3426,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
     if (decl->isInstanceMember()) {
-      if ((isa<FuncDecl>(decl) && !hasInstanceMethods) ||
-          (!isa<FuncDecl>(decl) && !hasInstanceMembers)) {
+      if (((isa<FuncDecl>(decl) && !hasInstanceMethods)
+           || (!isa<FuncDecl>(decl) && !hasInstanceMembers))
+           || isMetatype) {
         result.addUnviable(candidate,
                            MemberLookupResult::UR_InstanceMemberOnType);
         return;
@@ -3826,25 +3828,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // FIXME(diagnostics): If there were no viable results, but there are
     // unviable ones, we'd have to introduce fix for each specific problem.
     if (!result.UnviableCandidates.empty()) {
-      if (llvm::all_of(result.UnviableCandidates, [&](const std::pair<OverloadChoice, MemberLookupResult::UnviableReason> &e) {
-        return e.second == MemberLookupResult::UR_InstanceMemberOnType;
-      })) {
+      
+      auto unviable = [&](const std::pair<OverloadChoice,
+                          MemberLookupResult::UnviableReason> &e) {
+        return e.second == MemberLookupResult::UR_InstanceMemberOnType ||
+               e.second == MemberLookupResult::UR_TypeMemberOnInstance;
+      };
+      
+      if (llvm::all_of(result.UnviableCandidates, unviable)) {
         
-        auto *fix = RemoveMetatype::create(*this, baseTy->getMetatypeInstanceType(), member, getConstraintLocator(locator));
+        auto *fix = AllowTypeOrInstanceMember::create(*this, baseTy, member,
+                                                      getConstraintLocator(locator));
         
         if (recordFix(fix)) {
-          // The fix was not successful, so bail out
           return SolutionKind::Error;
         }
         
-        auto overloadChoices = SmallVector<OverloadChoice, 4>(result.UnviableCandidates.size());
+        auto overloadChoices = SmallVector<OverloadChoice, 4>();
         
         for (auto &c : result.UnviableCandidates) {
           overloadChoices.push_back(c.first);
         }
         
-        addOverloadSet(memberTy, overloadChoices, useDC, locator,
-                       result.getFavoredChoice(), {});
+        addOverloadSet(memberTy, ArrayRef<OverloadChoice>(overloadChoices), useDC,
+                       locator, result.getFavoredChoice(), {});
         return SolutionKind::Solved;
       }
       
@@ -5515,7 +5522,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AutoClosureForwarding:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
-  case FixKind::RemoveMetatype:
+  case FixKind::AllowTypeOrInstanceMember:
     llvm_unreachable("handled elsewhere");
   }
 

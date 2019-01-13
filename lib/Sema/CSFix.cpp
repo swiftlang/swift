@@ -259,13 +259,13 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
 
-bool RemoveMetatype::diagnose(Expr *root, bool asNote) const {
-  auto failure = UseInstanceMemberOnMetatypeFailure(root, getConstraintSystem(), BaseType,
+bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
+  auto failure = AllowTypeOrInstanceMemberFailure(root, getConstraintSystem(), BaseType,
                                             Name, getLocator());
   return failure.diagnose(asNote);
 }
 
-RemoveMetatype *RemoveMetatype::create(ConstraintSystem &cs, Type baseType,
+AllowTypeOrInstanceMember *AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
                                        DeclName member, ConstraintLocator *locator) {
-  return new (cs.getAllocator()) RemoveMetatype(cs, baseType, member, locator);
+  return new (cs.getAllocator()) AllowTypeOrInstanceMember(cs, baseType, member, locator);
 }

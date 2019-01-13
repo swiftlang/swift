@@ -1478,7 +1478,15 @@ bool MissingMemberFailure::diagnoseAsError() {
   return true;
 }
 
-bool UseInstanceMemberOnMetatypeFailure::diagnoseAsError() {
-  emitDiagnostic(getAnchor()->getLoc(), diag::could_not_use_instance_member_on_type, BaseType, Name, BaseType, false);
+bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
+  auto loc = getAnchor()->getLoc();
+  
+  if (BaseType->is<MetatypeType>()) {
+    auto instanceTy = BaseType->getMetatypeInstanceType();
+    emitDiagnostic(loc, diag::could_not_use_instance_member_on_type, instanceTy, Name, instanceTy, false);
+  } else {
+    emitDiagnostic(loc, diag::could_not_use_type_member_on_instance, BaseType, Name);
+  }
+  
   return true;
 }

@@ -675,6 +675,7 @@ private:
 };
 
 /// Diagnose situations when we use an instance member on a metatype
+/// or a type member on an instance
 ///
 /// ```swift
 /// class Bar {}
@@ -690,13 +691,13 @@ private:
 /// }
 /// ```
 
-class UseInstanceMemberOnMetatypeFailure final : public FailureDiagnostic {
+class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
   Type BaseType;
   DeclName Name;
 
 public:
-  UseInstanceMemberOnMetatypeFailure(Expr *root, ConstraintSystem &cs, Type baseType,
-                                          DeclName memberName, ConstraintLocator *locator)
+  AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                                   DeclName memberName, ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), BaseType(baseType),
         Name(memberName) {}
 

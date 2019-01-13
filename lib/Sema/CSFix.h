@@ -105,8 +105,8 @@ enum class FixKind : uint8_t {
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
 	
-  /// Remove the metatype if the base type is a metatype
-  RemoveMetatype,
+  /// Allow access to type member on instance or instance member on type
+  AllowTypeOrInstanceMember,
 };
 
 class ConstraintFix {
@@ -497,14 +497,14 @@ public:
                                         ConstraintLocator *locator);
 };
 	
-class RemoveMetatype final : public ConstraintFix {
+class AllowTypeOrInstanceMember final : public ConstraintFix {
   Type BaseType;
   DeclName Name;
 
 public:
-  RemoveMetatype(ConstraintSystem &cs, Type baseType, DeclName member,
+  AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType, DeclName member,
                  ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::RemoveMetatype, locator),
+      : ConstraintFix(cs, FixKind::AllowTypeOrInstanceMember, locator),
         BaseType(baseType), Name(member) {}
 
   std::string getName() const override {
@@ -513,7 +513,7 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static RemoveMetatype *create(ConstraintSystem &cs, Type baseType,
+  static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
                                 DeclName member,
                                 ConstraintLocator *locator);
 };
