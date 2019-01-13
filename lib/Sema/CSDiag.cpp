@@ -845,9 +845,6 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
   if (isa<EnumElementDecl>(member))
     Diag.emplace(diagnose(loc, diag::could_not_use_enum_element_on_instance,
                           memberName));
-  else
-    Diag.emplace(diagnose(loc, diag::could_not_use_type_member_on_instance,
-                          baseObjTy, memberName));
 
   Diag->highlight(nameLoc.getSourceRange());
 
@@ -3430,10 +3427,6 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
       if (isa<TypeExpr>(baseExpr)) {
         TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
                     instanceType, UDE->getName())
-          .highlight(baseExpr->getSourceRange());
-      } else {
-        TC.diagnose(UDE->getLoc(), diag::could_not_use_instance_member_on_type,
-                    instanceType, UDE->getName(), instanceType, false)
           .highlight(baseExpr->getSourceRange());
       }
       return true;

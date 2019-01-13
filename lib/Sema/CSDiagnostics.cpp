@@ -1480,10 +1480,12 @@ bool MissingMemberFailure::diagnoseAsError() {
 
 bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getAnchor()->getLoc();
+  auto &tc = getTypeChecker();
   
   if (BaseType->is<MetatypeType>()) {
     auto instanceTy = BaseType->getMetatypeInstanceType();
-    emitDiagnostic(loc, diag::could_not_use_instance_member_on_type, instanceTy, Name, instanceTy, false);
+    tc.diagnose(loc, diag::could_not_use_instance_member_on_type, instanceTy, Name, instanceTy, false)
+      .highlight(getAnchor()->getSourceRange());
   } else {
     emitDiagnostic(loc, diag::could_not_use_type_member_on_instance, BaseType, Name);
   }
