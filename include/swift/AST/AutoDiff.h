@@ -356,8 +356,6 @@ class VectorSpace {
 public:
   /// A tangent space kind.
   enum class Kind {
-    /// `Builtin.FP<...>`.
-    BuiltinFloat,
     /// A type that conforms to `VectorNumeric`.
     Vector,
     /// A product of vector spaces as a tuple.
@@ -367,14 +365,11 @@ public:
 private:
   Kind kind;
   union Value {
-    // Builtin float
-    BuiltinFloatType *builtinFPType;
     // Vector
     Type vectorType;
     // Tuple
     TupleType *tupleType;
 
-    Value(BuiltinFloatType *builtinFP) : builtinFPType(builtinFP) {}
     Value(Type vectorType) : vectorType(vectorType) {}
     Value(TupleType *tupleType) : tupleType(tupleType) {}
   } value;
@@ -385,9 +380,6 @@ private:
 public:
   VectorSpace() = delete;
 
-  static VectorSpace getBuiltinFloat(BuiltinFloatType *builtinFP) {
-    return {Kind::BuiltinFloat, builtinFP};
-  }
   static VectorSpace getVector(Type vectorType) {
     return {Kind::Vector, vectorType};
   }
@@ -395,15 +387,10 @@ public:
     return {Kind::Tuple, tupleTy};
   }
 
-  bool isBuiltinFloat() const { return kind == Kind::BuiltinFloat; }
   bool isVector() const { return kind == Kind::Vector; }
   bool isTuple() const { return kind == Kind::Tuple; }
 
   Kind getKind() const { return kind; }
-  BuiltinFloatType *getBuiltinFloat() const {
-    assert(kind == Kind::BuiltinFloat);
-    return value.builtinFPType;
-  }
   Type getVector() const {
     assert(kind == Kind::Vector);
     return value.vectorType;

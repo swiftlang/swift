@@ -4104,10 +4104,6 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
     return vs;
   };
 
-  // Builtins floats are their own Tangent/Cotangent.
-  if (auto *builtinFloat = getAs<BuiltinFloatType>())
-    return cache(VectorSpace::getBuiltinFloat(builtinFloat));
-
   // Tuples' Tangent/Cotangent is a tuple of each element's Tangent/Cotangent.
   if (auto *tupleTy = getAs<TupleType>()) {
     SmallVector<TupleTypeElt, 8> newElts;

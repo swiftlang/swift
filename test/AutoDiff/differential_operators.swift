@@ -1,5 +1,4 @@
 // RUN: %target-run-simple-swift
-// RUN: %target-run-simple-no-vjp-swift
 // REQUIRES: executable_test
 
 import Swift
