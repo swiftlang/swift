@@ -520,7 +520,6 @@ ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
 //===----------------------------------------------------------------------===//
 
 ValueOwnershipKind SILValue::getOwnershipKind() const {
-  // Once we have multiple return values, this must be changed.
   ValueOwnershipKindClassifier Classifier;
   return Classifier.visit(const_cast<ValueBase *>(Value));
 }
