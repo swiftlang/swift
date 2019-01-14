@@ -285,32 +285,6 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
 } // end namespace markup
 } // end namespace swift
 
-static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
-  // Hide private stdlib declarations.
-  if (D->isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/false) ||
-      // ShowInInterfaceAttr is for decls to show in interface as exception but
-      // they are not intended to be used directly.
-      D->getAttrs().hasAttribute<ShowInInterfaceAttr>())
-    return true;
-
-  if (AvailableAttr::isUnavailable(D))
-    return true;
-
-  if (auto *ClangD = D->getClangDecl()) {
-    if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
-      return true;
-  }
-
-  // Hide editor placeholders.
-  if (D->getBaseName().isEditorPlaceholder())
-    return true;
-
-  if (!D->isUserAccessible())
-    return true;
-
-  return false;
-}
-
 using DeclFilter = std::function<bool(ValueDecl *, DeclVisibilityKind)>;
 static bool DefaultFilter(ValueDecl* VD, DeclVisibilityKind Kind) {
   return true;
