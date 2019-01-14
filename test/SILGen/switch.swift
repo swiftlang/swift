@@ -1126,10 +1126,136 @@ func address_only_with_trivial_subtype(_ a: TrivialSingleCaseEnum, _ value: Any)
 // CHECK: [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
 // CHECK: [[TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 1
 // CHECK: switch_enum [[TUP_0_VAL]]
+//
+// CHECK: bb1([[CASE_VAL:%.*]] :
+// CHECK-NEXT:   end_borrow [[CASE_VAL]]
+// CHECK-NEXT:   destroy_addr [[TUP_1]]
+// CHECK-NEXT:   end_borrow [[TUP_0_VAL]]
+// CHECK-NEXT:   destroy_addr [[TUP_0]]
+// CHECK-NEXT:   dealloc_stack [[MEM]]
+//
+// CHECK: bb2:
+// CHECK-NEXT:   destroy_addr [[MEM]]
+// CHECK-NEXT:   dealloc_stack [[MEM]]
 // CHECK: } // end sil function '$s6switch36address_only_with_nontrivial_subtypeyyAA24NonTrivialSingleCaseEnumO_yptF'
 func address_only_with_nontrivial_subtype(_ a: NonTrivialSingleCaseEnum, _ value: Any) {
   switch (a, value) {
   case (.a, _):
+    break
+  default:
+    break
+  }
+}
+
+// This test makes sure that when we have a tuple that is partly address only
+// and partially an object that even though we access the object at +0 via a
+// load_borrow, we do not lose the +1 from the original tuple formation.
+// CHECK-LABEL: sil hidden @$s6switch35partial_address_only_tuple_dispatchyyAA5KlassC_ypSgtF : $@convention(thin) (@guaranteed Klass, @in_guaranteed Optional<Any>) -> () {
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $Klass, [[ARG1:%.*]] : @trivial $*Optional<Any>):
+// CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
+// CHECK:   [[ARG1_COPY:%.*]] = alloc_stack $Optional<Any>
+// CHECK:   copy_addr [[ARG1]] to [initialization] [[ARG1_COPY]]
+// CHECK:   [[TUP:%.*]] = alloc_stack $(Klass, Optional<Any>)
+// CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
+// CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
+// CHECK:   store [[ARG0_COPY]] to [init] [[TUP_0]]
+// CHECK:   copy_addr [take] [[ARG1_COPY]] to [initialization] [[TUP_1]]
+// CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
+// CHECK:   [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
+// CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
+// CHECK:   destroy_addr [[TUP_1]]
+// CHECK:   end_borrow [[TUP_0_VAL]]
+// CHECK:   destroy_addr [[TUP_0]]
+// CHECK:   dealloc_stack [[TUP]]
+// CHECK:   br bb2
+//
+// CHECK: bb1:
+// CHECK:   destroy_addr [[TUP]]
+// CHECK:   dealloc_stack [[TUP]]
+// CHECK: } // end sil function '$s6switch35partial_address_only_tuple_dispatchyyAA5KlassC_ypSgtF'
+func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
+  switch (name, value) {
+  case (_, _):
+    break
+  default:
+    break
+  }
+}
+
+// CHECK-LABEL: sil hidden @$s6switch50partial_address_only_tuple_dispatch_with_fail_caseyyAA5KlassC_ypSgtF : $@convention(thin) (@guaranteed Klass, @in_guaranteed Optional<Any>) -> () {
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $Klass, [[ARG1:%.*]] : @trivial $*Optional<Any>):
+// CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
+// CHECK:   [[ARG1_COPY:%.*]] = alloc_stack $Optional<Any>
+// CHECK:   copy_addr [[ARG1]] to [initialization] [[ARG1_COPY]]
+// CHECK:   [[TUP:%.*]] = alloc_stack $(Klass, Optional<Any>)
+// CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
+// CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
+// CHECK:   store [[ARG0_COPY]] to [init] [[TUP_0]]
+// CHECK:   copy_addr [take] [[ARG1_COPY]] to [initialization] [[TUP_1]]
+// CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
+// CHECK:   [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
+// CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
+// CHECK:   checked_cast_br [[TUP_0_VAL]] : $Klass to $AnyObject, [[IS_ANYOBJECT_BB:bb[0-9]+]], [[ISNOT_ANYOBJECT_BB:bb[0-9]+]]
+//
+// CHECK: [[IS_ANYOBJECT_BB]]([[ANYOBJECT:%.*]] : @guaranteed $AnyObject):
+// CHECK:   [[ANYOBJECT_COPY:%.*]] = copy_value [[ANYOBJECT]]
+//          ... CASE BODY ...
+// CHECK:   destroy_addr [[TUP_1]]
+// CHECK:   end_borrow [[TUP_0_VAL]]
+// CHECK:   destroy_addr [[TUP_0]]
+// CHECK:   dealloc_stack [[TUP]]
+// CHECK:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[ISNOT_ANYOBJECT_BB]](
+// CHECK:   switch_enum_addr [[TUP_1]] : $*Optional<Any>, case #Optional.some!enumelt.1: [[HAS_TUP_1_BB:bb[0-9]+]], default [[NO_TUP_1_BB:bb[0-9]+]]
+//
+// CHECK: [[HAS_TUP_1_BB]]:
+// CHECK-NEXT: [[OPT_ANY_ADDR:%.*]] = alloc_stack $Optional<Any>
+// CHECK-NEXT: copy_addr [[TUP_1]] to [initialization] [[OPT_ANY_ADDR]]
+// CHECK-NEXT: [[SOME_ANY_ADDR:%.*]] = unchecked_take_enum_data_addr [[OPT_ANY_ADDR]]
+// CHECK-NEXT: [[ANYOBJECT_ADDR:%.*]] = alloc_stack $AnyObject
+// CHECK-NEXT: checked_cast_addr_br copy_on_success Any in {{%.*}} : $*Any to AnyObject in {{%.*}} : $*AnyObject, [[IS_ANY_BB:bb[0-9]+]], [[ISNOT_ANY_BB:bb[0-9]+]]
+//
+// Make sure that we clean up everything here. We are exiting here.
+//
+// CHECK: [[IS_ANY_BB]]:
+// CHECK-NEXT:   [[ANYOBJECT:%.*]] = load [take] [[ANYOBJECT_ADDR]]
+// CHECK-NEXT:   debug_value
+// CHECK-NEXT:   destroy_value [[ANYOBJECT]]
+// CHECK-NEXT:   dealloc_stack [[ANYOBJECT_ADDR]]
+// CHECK-NEXT:   destroy_addr [[SOME_ANY_ADDR]]
+// CHECK-NEXT:   dealloc_stack [[OPT_ANY_ADDR]]
+// CHECK-NEXT:   destroy_addr [[TUP_1]]
+// CHECK-NEXT:   end_borrow [[TUP_0_VAL]]
+// CHECK-NEXT:   destroy_addr [[TUP_0]]
+// CHECK-NEXT:   dealloc_stack [[TUP]]
+// CHECK-NEXT:   dealloc_stack
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[ISNOT_ANY_BB]]:
+// CHECK-NEXT:   dealloc_stack [[ANYOBJECT_ADDR]]
+// CHECK-NEXT:   destroy_addr [[SOME_ANY_ADDR]]
+// CHECK-NEXT:   dealloc_stack [[OPT_ANY_ADDR]]
+// CHECK-NEXT:   end_borrow
+// CHECK-NEXT:   br [[UNFORWARD_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_TUP_1_BB]]:
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: br [[UNFORWARD_BB]]
+//
+// CHECK: [[UNFORWARD_BB]]:
+// CHECK-NEXT:   destroy_addr [[TUP]]
+// CHECK-NEXT:   dealloc_stack [[TUP]]
+// CHECK:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// ...
+// CHECK: } // end sil function '$s6switch50partial_address_only_tuple_dispatch_with_fail_caseyyAA5KlassC_ypSgtF'
+func partial_address_only_tuple_dispatch_with_fail_case(_ name: Klass, _ value: Any?) {
+  switch (name, value) {
+  case let (x as AnyObject, _):
+    break
+  case let (_, y as AnyObject):
     break
   default:
     break
