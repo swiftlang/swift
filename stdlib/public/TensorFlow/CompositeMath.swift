@@ -19,31 +19,25 @@
 /// Computes `sigmoid` of the specified tensor element-wise.
 /// Specifically, computes `1 / (1 + exp(-x))`.
 @inlinable @inline(__always)
-public func sigmoid<T>(_ x: Tensor<T>) -> Tensor<T>
-  where T : Differentiable & FloatingPoint
-{
-  return 1 / (1 + exp(-x))
+@differentiable(adjoint: _adjointSigmoid(_:_:_:) where T : Differentiable)
+public func sigmoid<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+  return Raw.sigmoid(x)
 }
 
 /// Computes `relu` of the specified tensor element-wise.
 /// Specifically, computes `max(0, x)`.
 @inlinable @inline(__always)
-@differentiable(adjoint: _adjointRelu(_:_:_:))
-public func relu<T>(_ x: Tensor<T>) -> Tensor<T>
-  where T : Differentiable & FloatingPoint
-{
+@differentiable(adjoint: _adjointRelu(_:_:_:) where T : Differentiable)
+public func relu<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return max(0, x)
 }
 
 /// Computes the softmax of the specified tensor element-wise.
-/// Specifically, computes `exp(x) / exp(x).sum()`.
+/// Specifically, computes `exp(x) / exp(x).sum(alongAxes: -1)`.
 @inlinable @inline(__always)
-public func softmax<T>(_ x: Tensor<T>) -> Tensor<T>
-  where T : Differentiable & FloatingPoint
-{
-  let expx = exp(x)
-  let sum = expx.sum()
-  return expx / sum
+@differentiable(adjoint: _adjointSoftmax(_:_:_:) where T : Differentiable)
+public func softmax<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+  return Raw.softmax(logits: x)
 }
 
 /// Computes the softmax of the specified tensor along the specified axis.

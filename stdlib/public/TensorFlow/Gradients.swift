@@ -355,10 +355,19 @@ func _adjointRsqrt<T : Differentiable & FloatingPoint>(
   return -seed / 2 * pow(originalValue, 3)
 }
 
-func _adjointSquared<T : Differentiable & FloatingPoint>(
+@inlinable
+func _adjointLogSoftmax<T : Differentiable & FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
-  return 2 * x * seed
+  let seed = seed.broadcast(like: originalValue)
+  return seed - seed.sum(alongAxes: -1) * exp(originalValue)
+}
+
+extension Tensor where Scalar : Differentiable & FloatingPoint {
+  @inlinable
+  func _adjointSquared(_ seed: Tensor, _ originalValue: Tensor) -> Tensor {
+    return 2 * self * seed
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -389,8 +398,19 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   func _adjointTransposed(
     _ seed: Tensor, _ originalValue: Tensor, _ permutations: Tensor<Int32>
   ) -> Tensor {
-    let seed = seed.broadcast(like: originalValue)
     return seed.transposed(withPermutations: permutations)
+  }
+
+  @inlinable
+  func _adjointTransposed(
+    _ seed: Tensor, _ originalValue: Tensor, _ permutations: [Int32]
+  ) -> Tensor {
+    return seed.transposed(withPermutations: permutations)
+  }
+
+  @inlinable
+  func _adjointTransposed(_ seed: Tensor, _ originalValue: Tensor) -> Tensor {
+    return seed.transposed()
   }
 }
 
@@ -632,7 +652,22 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
 //===----------------------------------------------------------------------===//
 
 @inlinable
-func _adjointRelu<T : Differentiable &  FloatingPoint>(
+func _adjointSigmoid<T : Differentiable & FloatingPoint>(
+  _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
+) -> Tensor<T> {
+  return Raw.sigmoidGrad(originalValue, dy: seed)
+}
+
+@inlinable
+func _adjointSoftmax<T : Differentiable & FloatingPoint>(
+  _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
+) -> Tensor<T> {
+  let sumChannels = (seed * originalValue).sum(alongAxes: -1)
+  return (seed - sumChannels) * originalValue
+}
+
+@inlinable
+func _adjointRelu<T : Differentiable & FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return Tensor(x .> 0) * seed
