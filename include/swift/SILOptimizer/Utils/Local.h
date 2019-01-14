@@ -282,6 +282,9 @@ public:
     return LiveBlocks.count(BB) && BB != DefValue->getParent();
   }
 
+  /// Checks if there is a dealloc_ref inside the value's live range.
+  bool containsDeallocRef(const Frontier &Frontier);
+
   /// For debug dumping.
   void dump() const;
 
