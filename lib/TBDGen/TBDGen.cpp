@@ -172,12 +172,21 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
   // SWIFT_ENABLE_TENSORFLOW
   // The AutoDiff pass creates an order-1 JVP and VJP for every function with a
-  // @differentiable attribute.
+  // `@differentiable` attribute.
   if (auto *DA = AFD->getAttrs().getAttribute<DifferentiableAttr>()) {
-    for (auto kind : {AutoDiffAssociatedFunctionKind::JVP,
-                      AutoDiffAssociatedFunctionKind::VJP}) {
+    // FIXME: When we get rid of `vjp:` and `jvp:` arguments in `@differentiable`,
+    // we will no longer need to see whether they are specified.
+    if (!DA->getJVP()) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-          kind, /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
+          AutoDiffAssociatedFunctionKind::JVP,
+          /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
+          AFD->getASTContext());
+      addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
+    }
+    if (!DA->getVJP()) {
+      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+          AutoDiffAssociatedFunctionKind::VJP,
+          /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
           AFD->getASTContext());
       addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
     }
@@ -240,6 +249,28 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
 
     if (VD->isLazilyInitializedGlobal())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // The AutoDiff pass creates an order-1 JVP and VJP for every var with a
+  // `@differentiable` attribute.
+  if (auto *DA = VD->getAttrs().getAttribute<DifferentiableAttr>()) {
+    // FIXME: When we get rid of `vjp:` and `jvp:` arguments in `@differentiable`,
+    // we will no longer need to see whether they are specified.
+    if (!DA->getJVP()) {
+      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+          AutoDiffAssociatedFunctionKind::JVP,
+          /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
+          VD->getASTContext());
+      addSymbol(SILDeclRef(VD->getGetter()).asAutoDiffAssociatedFunction(id));
+    }
+    if (!DA->getVJP()) {
+      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+        AutoDiffAssociatedFunctionKind::VJP,
+        /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
+        VD->getASTContext());
+      addSymbol(SILDeclRef(VD->getGetter()).asAutoDiffAssociatedFunction(id));
+    }
   }
 
   visitAbstractStorageDecl(VD);
