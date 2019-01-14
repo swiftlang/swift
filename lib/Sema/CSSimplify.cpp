@@ -3344,7 +3344,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     bool hasInstanceMembers = false;
     bool hasInstanceMethods = false;
     bool hasStaticMembers = false;
-    bool isMetatype = baseTy->is<MetatypeType>();
+    bool isMetatypeBase = baseTy->is<MetatypeType>();
     Type instanceTy = baseObjTy;
     if (baseObjTy->is<ModuleType>()) {
       hasStaticMembers = true;
@@ -3428,7 +3428,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (decl->isInstanceMember()) {
       if (((isa<FuncDecl>(decl) && !hasInstanceMethods)
            || (!isa<FuncDecl>(decl) && !hasInstanceMembers))
-           || isMetatype) {
+           || isMetatypeBase) {
         result.addUnviable(candidate,
                            MemberLookupResult::UR_InstanceMemberOnType);
         return;
@@ -3701,10 +3701,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     return SolutionKind::Solved;
   }
-	
-  // If we found some unviable results, then fail, but without recovery.
-  if (!result.UnviableCandidates.empty() && !shouldAttemptFixes())
-    return SolutionKind::Error;
   
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
@@ -3829,14 +3825,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (!result.UnviableCandidates.empty()) {
       // Check if we have unviable candidates whose reason for rejection
       // is either UR_InstanceMemberOnType or UR_TypeMemberOnInstance
-      auto unviable = [&](const std::pair<OverloadChoice,
-                          MemberLookupResult::UnviableReason> &e) {
-        return e.second == MemberLookupResult::UR_InstanceMemberOnType ||
-               e.second == MemberLookupResult::UR_TypeMemberOnInstance;
-      };
       
       // If we do, then allow them
-      if (llvm::all_of(result.UnviableCandidates, unviable)) {
+      if (llvm::all_of(result.UnviableCandidates,
+                       [&](const std::pair<OverloadChoice,
+                           MemberLookupResult::UnviableReason> &e) {
+        return e.second == MemberLookupResult::UR_InstanceMemberOnType ||
+               e.second == MemberLookupResult::UR_TypeMemberOnInstance;
+      })) {
         
         auto *fix = AllowTypeOrInstanceMember::create(*this, baseTy, member,
                                                       getConstraintLocator(locator));
@@ -3851,10 +3847,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         auto overloadChoices = SmallVector<OverloadChoice, 4>();
         
         for (auto &pair : result.UnviableCandidates) {
-          overloadChoices.push_back(pair.first);
+          overloadChoices.push_back(std::move(pair.first));
         }
         
-        addOverloadSet(memberTy, ArrayRef<OverloadChoice>(overloadChoices), useDC,
+        addOverloadSet(memberTy, overloadChoices, useDC,
                        locator, result.getFavoredChoice(), {});
         return SolutionKind::Solved;
       }
