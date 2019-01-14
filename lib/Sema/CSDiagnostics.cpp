@@ -1484,7 +1484,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   
   Expr *expr = getParentExpr();
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
-  auto member = cs.getResolvedOverloadSets()->Choice.getDecl();
+  auto member = getResolvedOverload(getLocator())->Choice.getDecl();
   
   // If the base is an implicit self type reference, and we're in a
   // an initializer, then the user wrote something like:
