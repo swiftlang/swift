@@ -814,9 +814,9 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
     case MemberLookupResult::UR_InstanceMemberOnType:
-        break;
+        llvm_unreachable("instance member on type is diagnosed via fixes");
     case MemberLookupResult::UR_TypeMemberOnInstance:
-        break;
+        llvm_unreachable("type member on instance is diagnosed via fixes");
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue: {
       auto diagIDsubelt = diag::cannot_pass_rvalue_mutating_subelement;
