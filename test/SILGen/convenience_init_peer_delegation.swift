@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-objc-interop -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 class X {
   init() {
@@ -75,6 +75,77 @@ func invocations(xt: X.Type) {
   _ = xt.init(requiredConvenience: ())
   // CHECK: class_method {{%.*}}, #X.init!allocator.1
   _ = xt.init(requiredDoubleConvenience: ())
+}
+
+class ObjCBase {
+  init(swift: ()) {}
+  @objc(initAsObjC) init(objc: ()) {}
+
+  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfC
+  // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfc :
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfC'
+  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfc
+  // CHECK: class_method {{%.+}} : $@thick ObjCBase.Type, #ObjCBase.init!allocator.1
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfc'
+  // CHECK-LABEL: sil hidden [thunk] @$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfcTo
+  // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfc :
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfcTo'
+  @objc convenience init(objcToSwift: ()) {
+    self.init(swift: ())
+  }
+
+  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation8ObjCBaseC07swiftToE1CACyt_tcfC
+  // CHECK: class_method %0 : $@thick ObjCBase.Type, #ObjCBase.init!allocator.1
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC07swiftToE1CACyt_tcfC'
+  convenience init(swiftToObjC: ()) {
+    self.init(objc: ())
+  }
+
+  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfC
+  // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfc :
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfC'
+  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfc
+  // CHECK: objc_method {{%.+}} : $ObjCBase, #ObjCBase.init!initializer.1.foreign
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfc'
+  // CHECK-LABEL: sil hidden [thunk] @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfcTo
+  // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfc :
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC06objcToE1CACyt_tcfcTo'
+  @objc convenience init(objcToObjC: ()) {
+    self.init(objc: ())
+  }
+
+  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation8ObjCBaseC22objcToSwiftConvenienceACyt_tcfC
+  // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC22objcToSwiftConvenienceACyt_tcfc :
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC22objcToSwiftConvenienceACyt_tcfC'
+  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation8ObjCBaseC22objcToSwiftConvenienceACyt_tcfc
+  // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC07swiftToE1CACyt_tcfC :
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC22objcToSwiftConvenienceACyt_tcfc'
+  // CHECK-LABEL: sil hidden [thunk] @$s32convenience_init_peer_delegation8ObjCBaseC22objcToSwiftConvenienceACyt_tcfcTo
+  // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC22objcToSwiftConvenienceACyt_tcfc :
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC22objcToSwiftConvenienceACyt_tcfcTo'
+  @objc convenience init(objcToSwiftConvenience: ()) {
+    self.init(swiftToObjC: ())
+  }
+
+  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation8ObjCBaseC07swiftToE12CConvenienceACyt_tcfC
+  // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC11objcToSwiftACyt_tcfC
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC07swiftToE12CConvenienceACyt_tcfC'
+  convenience init(swiftToObjCConvenience: ()) {
+    self.init(objcToSwift: ())
+  }
+
+  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfC
+  // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfc :
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfC'
+  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfc
+  // CHECK: objc_method {{%.+}} : $ObjCBase, #ObjCBase.init!initializer.1.foreign
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfc'
+  // CHECK-LABEL: sil hidden [thunk] @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfcTo
+  // CHECK: function_ref @$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfc :
+  // CHECK: end sil function '$s32convenience_init_peer_delegation8ObjCBaseC06objcToE12CConvenienceACyt_tcfcTo'
+  @objc convenience init(objcToObjCConvenience: ()) {
+    self.init(objcToObjC: ())
+  }
 }
 
 // CHECK-LABEL: sil_vtable X

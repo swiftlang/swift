@@ -2325,6 +2325,7 @@ mark_uninitialized
   mu_kind ::= 'derivedself'
   mu_kind ::= 'derivedselfonly'
   mu_kind ::= 'delegatingself'
+  mu_kind ::= 'delegatingselfallocated'
 
   %2 = mark_uninitialized [var] %1 : $*T
   // $T must be an address
@@ -2345,6 +2346,7 @@ the mark_uninitialized instruction refers to:
 - ``derivedself``: designates ``self`` in a derived (non-root) class
 - ``derivedselfonly``: designates ``self`` in a derived (non-root) class whose stored properties have already been initialized
 - ``delegatingself``: designates ``self`` on a struct, enum, or class in a delegating constructor (one that calls self.init)
+- ``delegatingselfallocated``: designates ``self`` on a class convenience initializer's initializing entry point
 
 The purpose of the ``mark_uninitialized`` instruction is to enable
 definitive initialization analysis for global variables (when marked as
