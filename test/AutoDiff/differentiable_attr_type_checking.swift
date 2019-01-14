@@ -836,6 +836,7 @@ struct Tensor<Scalar> {}
 extension Tensor : Differentiable where Scalar : Differentiable {
   typealias TangentVector = Tensor
   typealias CotangentVector = Tensor
+  typealias AllDifferentiableVariables = Tensor
   func moved(along direction: Tensor) -> Tensor { return self }
   func tangentVector(from cotangent: Tensor) -> Tensor { return cotangent }
 }
