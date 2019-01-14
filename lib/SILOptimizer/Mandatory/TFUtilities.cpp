@@ -51,11 +51,11 @@ static llvm::cl::opt<bool> TFDumpIntermediatesToTmp(
 
 // The flag below is referenced in multiple translation units.
 namespace llvm {
-// This flag is used as a crutch to develop and test IRGen code that handles
-// graph_op insts.
-// TODO: Fold this flag into -Onone mode.
+// This (internal) flag is used to enable IRGen to generate code for op-by-op
+// dispatch and defaults to true.  When this flag is false, GPE is turned off
+// completely for non-tensorflow convention functions even in the -O mode.
 llvm::cl::opt<bool> TFDynamicCompilation(
-    "tf-dynamic-compilation", llvm::cl::init(false),
+    "tf-dynamic-compilation", llvm::cl::init(true),
     llvm::cl::desc(
         "When true, skip the partitioning and lowering pass, so that graph_op "
         "instructions flow to IRGen. This flag should not be turned on by end "
