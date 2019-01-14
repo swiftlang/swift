@@ -70,7 +70,6 @@
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Instrumentation.h"
-#include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
 
 #include <thread>
@@ -131,7 +130,7 @@ static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
 
 static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
                                    legacy::PassManagerBase &PM) {
-  PM.add(createThreadSanitizerLegacyPassPass());
+  PM.add(createThreadSanitizerPass());
 }
 
 static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
