@@ -3528,6 +3528,23 @@ bool Parser::canDelayMemberDeclParsing() {
   return !BackTrack.willBacktrack();
 }
 
+bool Parser::delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                                  SourceLoc PosBeforeLB,
+                                  ParseDeclOptions Options,
+                                  IterableDeclContext *IDC) {
+  bool error = false;
+
+  if (Tok.is(tok::r_brace)) {
+    RBLoc = consumeToken();
+  } else {
+    RBLoc = Tok.getLoc();
+    error = true;
+  }
+  State->delayDeclList(IDC, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
+                        PosBeforeLB);
+  return error;
+}
+
 /// Parse an 'extension' declaration.
 ///
 /// \verbatim
@@ -3592,14 +3609,8 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Scope S(this, ScopeKind::Extension);
     ParseDeclOptions Options(PD_HasContainerType | PD_InExtension);
     if (canDelayMemberDeclParsing()) {
-      if (Tok.is(tok::r_brace)) {
-        RBLoc = consumeToken();
-      } else {
-        RBLoc = Tok.getLoc();
+      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, ext))
         status.setIsParseError();
-      }
-      State->delayDeclList(ext, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
-                           PosBeforeLB);
     } else {
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_extension,
                         Options, ext))
@@ -5732,14 +5743,8 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
     if (canDelayMemberDeclParsing()) {
-      if (Tok.is(tok::r_brace)) {
-        RBLoc = consumeToken();
-      } else {
-        RBLoc = Tok.getLoc();
+      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, ED))
         Status.setIsParseError();
-      }
-      State->delayDeclList(ED, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
-                           PosBeforeLB);
     } else {
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_enum,
                         Options, ED))
@@ -6017,14 +6022,8 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     Scope S(this, ScopeKind::StructBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_InStruct);
     if (canDelayMemberDeclParsing()) {
-      if (Tok.is(tok::r_brace)) {
-        RBLoc = consumeToken();
-      } else {
-        RBLoc = Tok.getLoc();
+      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, SD))
         Status.setIsParseError();
-      }
-      State->delayDeclList(SD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
-                           PosBeforeLB);
     } else {
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
                         Options,SD))
@@ -6141,14 +6140,8 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
                              PD_InClass);
     if (canDelayMemberDeclParsing()) {
-      if (Tok.is(tok::r_brace)) {
-        RBLoc = consumeToken();
-      } else {
-        RBLoc = Tok.getLoc();
+      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, CD))
         Status.setIsParseError();
-      }
-      State->delayDeclList(CD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
-                           PosBeforeLB);
     } else {
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
                         Options, CD))
@@ -6246,15 +6239,8 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                PD_DisallowInit |
                                PD_InProtocol);
       if (canDelayMemberDeclParsing()) {
-        if (Tok.is(tok::r_brace)) {
-          RBraceLoc = consumeToken();
-        } else {
-          RBraceLoc = Tok.getLoc();
+        if (delayParsingDeclList(LBraceLoc, RBraceLoc, PosBeforeLB, Options, Proto))
           Status.setIsParseError();
-        }
-        State->delayDeclList(Proto, Options.toRaw(), CurDeclContext,
-                             { LBraceLoc, RBraceLoc },
-                             PosBeforeLB);
       } else {
         if (parseDeclList(LBraceLoc, RBraceLoc, diag::expected_rbrace_protocol,
                           Options, Proto))

@@ -798,6 +798,13 @@ public:
 
   void parseDeclListDelayed(IterableDeclContext *IDC);
 
+  bool canDelayMemberDeclParsing();
+
+  bool delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                            SourceLoc PosBeforeLB,
+                            ParseDeclOptions Options,
+                            IterableDeclContext *IDC);
+
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
                                             DeclAttributes &Attributes);
 
@@ -1428,8 +1435,6 @@ public:
   parsePlatformVersionConstraintSpec();
   ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
   parsePlatformAgnosticVersionConstraintSpec();
-
-  bool canDelayMemberDeclParsing();
 };
 
 /// Describes a parsed declaration name.
