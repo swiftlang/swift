@@ -42,6 +42,10 @@ static bool doesClosureHaveBody(AbstractClosureExpr *ACE) {
 
 /// Check whether a root AST node is unmapped, i.e not profiled.
 static bool isUnmapped(ASTNode N) {
+  // Do not map AST nodes with invalid source locations.
+  if (N.getStartLoc().isInvalid() || N.getEndLoc().isInvalid())
+    return true;
+
   if (auto *E = N.dyn_cast<Expr *>()) {
     auto *CE = dyn_cast<AbstractClosureExpr>(E);
 
@@ -396,7 +400,12 @@ class SourceMappingRegion {
 public:
   SourceMappingRegion(ASTNode Node, CounterExpr &Count,
                       Optional<SourceLoc> StartLoc, Optional<SourceLoc> EndLoc)
-      : Node(Node), Count(&Count), StartLoc(StartLoc), EndLoc(EndLoc) {}
+      : Node(Node), Count(&Count), StartLoc(StartLoc), EndLoc(EndLoc) {
+    assert((!StartLoc || StartLoc->isValid()) &&
+           "Expected start location to be valid");
+    assert((!EndLoc || EndLoc->isValid()) &&
+           "Expected start location to be valid");
+  }
 
   SourceMappingRegion(SourceMappingRegion &&Region) = default;
   SourceMappingRegion &operator=(SourceMappingRegion &&RHS) = default;
