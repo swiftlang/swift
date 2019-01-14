@@ -119,9 +119,9 @@ public:
   /// True if the memory object is the 'self' argument of a class designated
   /// initializer.
   bool isClassInitSelf() const {
-    if (isDelegatingInit())
+    if (MemoryInst->isDelegatingSelf())
       return false;
-      
+
     if (!MemoryInst->isVar()) {
       if (auto decl = getType()->getAnyNominal()) {
         if (isa<ClassDecl>(decl)) {
@@ -153,14 +153,13 @@ public:
     return isClassInitSelf() && !MemoryInst->isRootSelf();
   }
 
-  /// isDelegatingInit - True if this is a delegating initializer, one that
-  /// calls 'self.init'.
+  /// True if this is a delegating initializer, one that calls 'self.init'.
   bool isDelegatingInit() const {
-    return MemoryInst->isDelegatingSelf();
+    return MemoryInst->isDelegatingSelf() ||
+           MemoryInst->isDelegatingSelfAllocated();
   }
 
-  /// isNonDelegatingInit - True if this is an initializer that initializes
-  /// stored properties.
+  /// True if this is an initializer that initializes stored properties.
   bool isNonDelegatingInit() const {
     switch (MemoryInst->getKind()) {
     case MarkUninitializedInst::Var:
@@ -171,6 +170,7 @@ public:
     case MarkUninitializedInst::DerivedSelfOnly:
       return true;
     case MarkUninitializedInst::DelegatingSelf:
+    case MarkUninitializedInst::DelegatingSelfAllocated:
       return false;
     }
     return false;
