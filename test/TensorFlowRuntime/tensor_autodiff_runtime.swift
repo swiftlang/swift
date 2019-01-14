@@ -90,6 +90,30 @@ TensorADTests.testAllBackends("mean") {
   expectTrue(meanGradAlongAxes(input) == expected)
 }
 
+TensorADTests.testAllBackends("transposed") {
+  let input = Tensor<Float>(ones: [2, 3])
+  let transposed = Tensor<Float>(ones: [3, 2])
+  let transposedPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed() }
+  let transposedPermutationsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: [1, 0]) }
+  let transposedVariadiicsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: 1, 0) }
+
+  expectTrue(transposedPullback(transposed) == input)
+  expectTrue(transposedPermutationsPullback(transposed) == input)
+  expectTrue(transposedVariadiicsPullback(transposed)  == input)
+}
+
+TensorADTests.testAllBackends("relu") {
+  let f = { (a: Tensor<Float>) in relu(a) }
+  print(gradient(at: [5, -5, 0], in: f))
+  expectTrue([1, 0, 0] == gradient(at: [5, -5, 0], in: f))
+}
+
+TensorADTests.testAllBackends("softmax") {
+  let pb = pullback(at: Tensor(ones: [2, 2])) { (a: Tensor<Float>) in softmax(a) }
+  expectTrue([[0, 0], [0, 0]] == pb([[1, 1], [1, 1]]))
+  expectTrue([[-0.25, 0.25], [0.75, -0.75]] == pb([[1, 2], [4, 1]]))
+}
+
 TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {
   @differentiable(adjoint: adjointFoo)
   func foo(_ x: Tensor<Float>) -> Tensor<Float> {
