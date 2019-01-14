@@ -1312,6 +1312,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       return checkIgnoredExpr(IIO->getSubExpr());
     if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr()))
       return checkIgnoredExpr(C);
+    if (auto *OE = dyn_cast<OpenExistentialExpr>(OEE->getSubExpr()))
+      return checkIgnoredExpr(OE);
   }
 
   if (auto *LE = dyn_cast<LiteralExpr>(valueE)) {
