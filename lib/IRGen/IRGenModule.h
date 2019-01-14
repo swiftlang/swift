@@ -93,6 +93,7 @@ namespace swift {
   class ProtocolCompositionType;
   class RootProtocolConformance;
   struct SILDeclRef;
+  class SILDefaultWitnessTable;
   class SILGlobalVariable;
   class SILModule;
   class SILProperty;
@@ -311,11 +312,7 @@ public:
   
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
-  /// If \p emitForParallelEmission is true ensures that symbols that are
-  /// expressed as relative pointers are collocated in the same output module
-  /// with their base symbol. For example, witness methods need to be collocated
-  /// with the witness table in the same LLVM module.
-  void emitGlobalTopLevel(bool emitForParallelEmission = false);
+  void emitGlobalTopLevel();
 
   /// Emit references to each of the protocol descriptors defined in this
   /// IR module.
@@ -354,6 +351,10 @@ public:
   void forceLocalEmitOfLazyFunction(SILFunction *f) {
     DefaultIGMForFunction[f] = CurrentIGM;
   }
+
+  void ensureRelativeSymbolCollocation(SILWitnessTable &wt);
+
+  void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
@@ -1389,8 +1390,6 @@ public:
   void addSwiftErrorAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
   void emitSharedContextDescriptor(DeclContext *dc);
-
-  void ensureRelativeSymbolCollocation(SILWitnessTable &wt);
 
   llvm::GlobalVariable *
   getGlobalForDynamicallyReplaceableThunk(LinkEntity &entity, llvm::Type *type,

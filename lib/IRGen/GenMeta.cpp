@@ -4046,6 +4046,9 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   if (isResilient(protocol, ResilienceExpansion::Minimal))
     defaultWitnesses = getSILModule().lookUpDefaultWitnessTable(protocol);
 
+  if (defaultWitnesses)
+    IRGen.ensureRelativeSymbolCollocation(*defaultWitnesses);
+
   {
     ProtocolDescriptorBuilder builder(*this, protocol, defaultWitnesses);
     builder.emit();
