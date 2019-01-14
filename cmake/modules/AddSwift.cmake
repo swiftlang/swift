@@ -2076,7 +2076,7 @@ endfunction()
 function(_add_swift_executable_single name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE_SINGLE
-    "EXCLUDE_FROM_ALL"
+    "EXCLUDE_FROM_ALL;FORCE_BUILD_OPTIMIZED"
     "SDK;ARCHITECTURE"
     "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
@@ -2086,6 +2086,9 @@ function(_add_swift_executable_single name)
   translate_flag(${SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL}
       "EXCLUDE_FROM_ALL"
       SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL_FLAG)
+  translate_flag(${SWIFTEXE_FORCE_BUILD_OPTIMIZED}
+      "FORCE_BUILD_OPTIMIZED"
+      SWIFTEXE_FORCE_BUILD_OPTIMIZED_FLAG)
 
   # Check arguments.
   precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
@@ -2107,7 +2110,8 @@ function(_add_swift_executable_single name)
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
-    RESULT_VAR_NAME c_compile_flags)
+    RESULT_VAR_NAME c_compile_flags
+    ${SWIFTEXE_FORCE_BUILD_OPTIMIZED_FLAG})
   _add_variant_link_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
@@ -2245,7 +2249,7 @@ endfunction()
 function(add_swift_executable name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
+    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR;FORCE_BUILD_OPTIMIZED"
     ""
     "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
@@ -2259,6 +2263,9 @@ function(add_swift_executable name)
   translate_flag(${SWIFTEXE_DISABLE_ASLR}
       "DISABLE_ASLR"
       SWIFTEXE_DISABLE_ASLR_FLAG)
+  translate_flag(${SWIFTEXE_FORCE_BUILD_OPTIMIZED}
+      "FORCE_BUILD_OPTIMIZED"
+      SWIFTEXE_FORCE_BUILD_OPTIMIZED_FLAG)
 
   set(SWIFTEXE_SOURCES ${SWIFTEXE_UNPARSED_ARGUMENTS})
 
@@ -2273,7 +2280,8 @@ function(add_swift_executable name)
       COMPILE_FLAGS ${SWIFTEXE_COMPILE_FLAGS}
       ${SWIFTEXE_EXCLUDE_FROM_ALL_FLAG}
       ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
-      ${SWIFTEXE_DISABLE_ASLR_FLAG})
+      ${SWIFTEXE_DISABLE_ASLR_FLAG}
+      ${SWIFTEXE_FORCE_BUILD_OPTIMIZED_FLAG})
 endfunction()
 
 macro(add_swift_tool_subdirectory name)
