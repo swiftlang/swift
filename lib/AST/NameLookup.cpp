@@ -1437,6 +1437,11 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
 }
 
 void NominalTypeDecl::addedMember(Decl *member) {
+  // Remember if we added a destructor.
+  if (auto *CD = dyn_cast<ClassDecl>(this))
+    if (isa<DestructorDecl>(member))
+      CD->setHasDestructor();
+
   // If we have a lookup table, add the new member to it.
   if (LookupTable.getPointer()) {
     LookupTable.getPointer()->addMember(member);

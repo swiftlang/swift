@@ -3050,8 +3050,6 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   } else if (auto *cd = dyn_cast<ClassDecl>(D)) {
     auto handler = [&] (Decl *D) {
       cd->addMember(D);
-      if (isa<DestructorDecl>(D))
-        cd->setHasDestructor();
     };
     parseDeclList(cd->getBraces().Start, RBLoc, Id,
                   ParseDeclOptions(DelayedState->Flags), handler);
@@ -6160,8 +6158,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
     } else {
       auto Handler = [&] (Decl *D) {
         CD->addMember(D);
-        if (isa<DestructorDecl>(D))
-          CD->setHasDestructor();
       };
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
                         Options, Handler))
