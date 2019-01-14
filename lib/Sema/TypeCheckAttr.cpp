@@ -2860,14 +2860,17 @@ void AttributeChecker::visitTFParameterAttr(TFParameterAttr *attr) {
 void AttributeChecker::visitFieldwiseProductSpaceAttr(
     FieldwiseProductSpaceAttr *attr) {
   // If we make this attribute user-facing, we'll need to do various checks.
-  //   - check that this attribute is on a Tangent/Cotangent type alias
-  //   - check that we can access the raw fields of the Tangent/Cotangent from
+  //   - check that this attribute is on a
+  //     Tangent/Cotangent/AllDifferentiableVariables type alias
+  //   - check that we can access the raw fields of the
+  //     Tangent/Cotangent/AllDifferentiableVariables structs from
   //     this module (e.g. the Tangent can't be a public resilient struct
   //     defined in a different module).
-  //   - check that the stored properties of the Tangent/Cotangent match
+  //   - check that the stored properties of the
+  //     Tangent/Cotangent/AllDifferentiableVariables match
   //
   // If we don't make this attribute user-facing, we can avoid doing checks
-  // here: the assertions in TFDifferentiation suffice.
+  // here: the assertions in Differentiation.cpp suffice.
 }
 
 void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {

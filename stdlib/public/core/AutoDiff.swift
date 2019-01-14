@@ -61,17 +61,24 @@ public protocol ShapedVectorNumeric : VectorNumeric {
 public protocol Differentiable {
   /// The tangent bundle of this differentiable manifold.
   associatedtype TangentVector : Differentiable & AdditiveArithmetic
-    // FIXME(SR-9595): Unexpected error when type checking constrained
-    // associated types.
     where TangentVector.TangentVector == TangentVector,
           TangentVector.CotangentVector == CotangentVector
 
   /// The cotangent bundle of this differentiable manifold.
   associatedtype CotangentVector : Differentiable & AdditiveArithmetic
-    // FIXME(SR-9595): Unexpected error when type checking constrained
-    // associated types.
     where CotangentVector.TangentVector == CotangentVector,
           CotangentVector.CotangentVector == TangentVector
+
+  /// The type of all differentiable variables in this type.
+  associatedtype AllDifferentiableVariables
+    where AllDifferentiableVariables : Differentiable,
+          AllDifferentiableVariables.AllDifferentiableVariables ==
+              AllDifferentiableVariables,
+          AllDifferentiableVariables.TangentVector == TangentVector,
+          AllDifferentiableVariables.CotangentVector == CotangentVector
+
+  /// All differentiable variables in this type.
+  var allDifferentiableVariables: AllDifferentiableVariables { get set }
 
   /// Returns `self` moved along the value space towards the given tangent
   /// vector. In Riemannian geometry (mathematics), this represents an
@@ -80,6 +87,13 @@ public protocol Differentiable {
 
   /// Convert a cotangent vector to its corresponding tangent vector.
   func tangentVector(from cotangent: CotangentVector) -> TangentVector
+}
+
+public extension Differentiable where AllDifferentiableVariables == Self {
+  var allDifferentiableVariables: AllDifferentiableVariables {
+    get { return self }
+    set { self = newValue }
+  }
 }
 
 // FIXME: The `Self : AdditiveArithmetic` constraint should be implied by
@@ -213,6 +227,16 @@ public func valueWithPullback<T, U, V, R>(
   where T : Differentiable, U : Differentiable, V : Differentiable,
         R : Differentiable {
   return Builtin.autodiffApply_vjp_arity3(f, x, y, z)
+}
+
+// NOTE: This is not an official API.
+// TODO: Remove this once we flesh out differentiability for curried functions.
+@inlinable
+public func _valueWithPullback<T, U, R>(
+  at x: T, _ y: U, in f: @autodiff (T) -> (U) -> R
+) -> (value: R, pullback: (R.CotangentVector) -> (T.CotangentVector, U.CotangentVector))
+  where T : Differentiable, U : Differentiable, R : Differentiable {
+  return Builtin.autodiffApply_vjp_method(f, x, y)
 }
 
 // Pullback

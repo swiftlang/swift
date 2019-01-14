@@ -236,6 +236,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // Parameterized.allParameters
     if (name.isSimpleName(ctx.Id_allParameters))
       return getRequirement(KnownProtocolKind::Parameterized);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Differentiable.allDifferentiableVariables
+    if (name.isSimpleName(ctx.Id_allDifferentiableVariables))
+      return getRequirement(KnownProtocolKind::Differentiable);
     
     return nullptr;
   }
@@ -354,8 +359,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // SWIFT_ENABLE_TENSORFLOW
     // Differentiable.TangentVector
     // Differentiable.CotangentVector
+    // Differentiable.AllDifferentiableVariables
     if (name.isSimpleName(ctx.Id_TangentVector) ||
-        name.isSimpleName(ctx.Id_CotangentVector))
+        name.isSimpleName(ctx.Id_CotangentVector) ||
+        name.isSimpleName(ctx.Id_AllDifferentiableVariables))
       return getRequirement(KnownProtocolKind::Differentiable);
 
     // SWIFT_ENABLE_TENSORFLOW
