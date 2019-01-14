@@ -2817,6 +2817,11 @@ ERROR(builtin_string_literal_broken_proto,none,
 ERROR(string_literal_broken_proto,none,
       "protocol 'ExpressibleByStringLiteral' is broken", ())
 
+ERROR(character_literal_nolatin1,none,
+      "character literal '%1' is obsolete latin1 encoding and can't express %0",
+      (Type, unsigned))
+ERROR(character_literal_overflow,none,
+      "character literal '%1' overflows when stored into %0", (Type, unsigned))
 ERROR(character_literal_not_ascii,none,
       "character literal can only contain ASCII when expressing %0", (Type))
 ERROR(character_literal_quotes,none,

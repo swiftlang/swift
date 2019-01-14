@@ -30,6 +30,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Unicode.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -2078,6 +2079,7 @@ namespace {
           else if (body == "\\\"")
             body = "\"";
 
+// To be enabled to encourage "" -> '' when the tests are ready.
 //          tc.diagnose(expr->getLoc(), diag::character_literal_migration, type)
 //            .fixItReplaceChars(range.Start, range.End, "'" + body + "'");
         }
@@ -2155,10 +2157,32 @@ namespace {
             if (notCharacter)
               tc.diagnose(expr->getLoc(), diag::character_literal_quotes);
 
-            bool notASCII = stringLiteral->getValue()[0] & 0x80;
-            if (intTy && isCharacter && notASCII)
-              tc.diagnose(expr->getLoc(), diag::character_literal_not_ascii,
-                          type);
+            if (isCharacter && intTy->isFixedWidth()) {
+              StringRef Encoded = stringLiteral->getValue();
+              unsigned scalar = unicode::extractFirstUnicodeScalar(Encoded);
+
+              // Declare protocol EnableExpressingIntegerByUnicodeScalar to
+              // opt in to ability to express 21 bit unicode scalar values
+              // with a character literal - otherwise it it is ASCII only.
+              SmallVector<ValueDecl *, 1> results;
+              dc->getParentModule()->lookupValue({ },
+                  tc.Context.getIdentifier(getProtocolName(
+                    KnownProtocolKind::EnableExpressingIntegerByUnicodeScalar)),
+                  NLKind::UnqualifiedLookup, results);
+
+              if (results.size() != 0) {
+                unsigned numBits = intTy->getFixedWidth();
+                if(numBits < 32 && scalar >= (1 << numBits))
+                  tc.diagnose(expr->getLoc(), diag::character_literal_overflow,
+                              type, scalar);
+                else if (numBits == 8 && scalar > 0x7f)
+                  tc.diagnose(expr->getLoc(), diag::character_literal_nolatin1,
+                              type, scalar);
+              }
+              else if (scalar > 0x7f)
+                tc.diagnose(expr->getLoc(), diag::character_literal_not_ascii,
+                            type);
+            }
           }
         }
       }

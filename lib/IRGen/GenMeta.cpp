@@ -4013,6 +4013,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ExpressibleByStringLiteral:
   case KnownProtocolKind::ExpressibleByNilLiteral:
   case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
+  case KnownProtocolKind::EnableExpressingIntegerByUnicodeScalar:
   case KnownProtocolKind::ExpressibleByColorLiteral:
   case KnownProtocolKind::ExpressibleByImageLiteral:
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
