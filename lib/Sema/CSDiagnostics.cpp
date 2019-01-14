@@ -1480,7 +1480,6 @@ bool MissingMemberFailure::diagnoseAsError() {
 
 bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getAnchor()->getLoc();
-  auto &tc = getTypeChecker();
   auto &cs = getConstraintSystem();
   
   Expr *expr = getParentExpr();
@@ -1532,11 +1531,11 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       
       if (TypeDC->getSelfNominalTypeDecl() == instanceTy->getAnyNominal()) {
         if (propertyInitializer) {
-          tc.diagnose(loc, diag::instance_member_in_initializer,
+          emitDiagnostic(loc, diag::instance_member_in_initializer,
                       Name);
           return true;
         } else {
-          tc.diagnose(loc, diag::instance_member_in_default_parameter,
+          emitDiagnostic(loc, diag::instance_member_in_default_parameter,
                       Name);
           return true;
         }
@@ -1551,7 +1550,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     if (memberTypeContext && currentTypeContext &&
         memberTypeContext->getSemanticDepth() <
         currentTypeContext->getSemanticDepth()) {
-      tc.diagnose(loc, diag::could_not_use_instance_member_on_type,
+      emitDiagnostic(loc, diag::could_not_use_instance_member_on_type,
                   currentTypeContext->getDeclaredInterfaceType(), Name,
                   memberTypeContext->getDeclaredInterfaceType(),
                   true)
@@ -1560,7 +1559,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
     
     // Just emit a generic "instance member cannot be used" error
-    tc.diagnose(loc, diag::could_not_use_instance_member_on_type, instanceTy, Name,
+    emitDiagnostic(loc, diag::could_not_use_instance_member_on_type, instanceTy, Name,
                 instanceTy, false)
       .highlight(getAnchor()->getSourceRange());
     return true;
@@ -1587,19 +1586,19 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       // of a protocol -- otherwise a diagnostic talking about
       // static members doesn't make a whole lot of sense
       if (auto TAD = dyn_cast<TypeAliasDecl>(member)) {
-        Diag.emplace(tc.diagnose(loc,
+        Diag.emplace(emitDiagnostic(loc,
                               diag::typealias_outside_of_protocol,
                               TAD->getName()));
       } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
-        Diag.emplace(tc.diagnose(loc,
+        Diag.emplace(emitDiagnostic(loc,
                               diag::assoc_type_outside_of_protocol,
                               ATD->getName()));
       } else if (isa<ConstructorDecl>(member)) {
-        Diag.emplace(tc.diagnose(loc,
+        Diag.emplace(emitDiagnostic(loc,
                               diag::construct_protocol_by_name,
                               instanceTy));
       } else {
-        Diag.emplace(tc.diagnose(loc,
+        Diag.emplace(emitDiagnostic(loc,
                               diag::could_not_use_type_member_on_protocol_metatype,
                               baseObjTy, Name));
       }
@@ -1621,11 +1620,11 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
     
     if (isa<EnumElementDecl>(member)) {
-      Diag.emplace(tc.diagnose(loc, diag::could_not_use_enum_element_on_instance,
+      Diag.emplace(emitDiagnostic(loc, diag::could_not_use_enum_element_on_instance,
                                Name));
     }
     else {
-      Diag.emplace(tc.diagnose(loc, diag::could_not_use_type_member_on_instance,
+      Diag.emplace(emitDiagnostic(loc, diag::could_not_use_type_member_on_instance,
                                baseObjTy, Name));
     }
     
