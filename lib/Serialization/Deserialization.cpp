@@ -2587,7 +2587,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         }
 
         llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i = 0; i < parameters.size(); i++)
+        for (unsigned i : indices(parameters))
           parametersBitVector[i] = parameters[i];
         auto *indices = AutoDiffParameterIndices::get(parametersBitVector, ctx);
 

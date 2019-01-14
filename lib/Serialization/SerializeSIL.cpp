@@ -414,10 +414,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   for (auto *DA : F.getDifferentiableAttrs()) {
     unsigned differentiableAttrAbbrCode =
         SILAbbrCodes[SILDifferentiableAttrLayout::Code];
-    auto &indices = DA->getIndices();
+    auto &paramIndices = DA->getIndices();
     SmallVector<bool, 4> parameters;
-    for (unsigned i = 0; i < indices.parameters.size(); i++)
-      parameters.push_back(indices.parameters[i]);
+    for (unsigned i : indices(parameters))
+      parameters.push_back(paramIndices.parameters[i]);
     SILDifferentiableAttrLayout::emitRecord(
         Out, ScratchRecord, differentiableAttrAbbrCode,
         DA->hasPrimal()
@@ -436,7 +436,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         DA->hasVJP()
             ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
             : IdentifierID(),
-        indices.source, parameters);
+        paramIndices.source, parameters);
     S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
   }
 

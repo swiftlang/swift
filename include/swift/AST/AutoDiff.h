@@ -115,7 +115,7 @@ public:
                                        ASTContext &C);
 
 private:
-  AutoDiffParameterIndices(llvm::SmallBitVector parameters)
+  AutoDiffParameterIndices(const llvm::SmallBitVector &parameters)
       : parameters(parameters) {}
 
 public:

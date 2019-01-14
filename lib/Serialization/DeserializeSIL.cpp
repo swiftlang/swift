@@ -643,7 +643,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     llvm::SmallBitVector parametersBitVector(parameters.size());
     StringRef jvpName = MF->getIdentifier(jvpNameId).str();
     StringRef vjpName = MF->getIdentifier(vjpNameId).str();
-    for (unsigned i = 0; i < parameters.size(); i++)
+    for (unsigned i : indices(parameters))
       parametersBitVector[i] = parameters[i];
     SILAutoDiffIndices indices(source, parametersBitVector);
 

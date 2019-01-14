@@ -2459,7 +2459,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   } else {
     // 'wrt:' is specified. Validate and collect the selected parameters.
     int lastIndex = -1;
-    for (size_t i = 0; i < parsedWrtParams.size(); i++) {
+    for (unsigned i : indices(parsedWrtParams)) {
       auto paramLoc = parsedWrtParams[i].getLoc();
       switch (parsedWrtParams[i].getKind()) {
       case ParsedAutoDiffParameter::Kind::Index: {

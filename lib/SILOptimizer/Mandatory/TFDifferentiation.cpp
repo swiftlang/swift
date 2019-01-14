@@ -990,23 +990,6 @@ public:
   lookUpOrRegisterDifferentiationTask(SILFunction *original,
                                       const SILAutoDiffIndices &indices,
                                       DifferentiationInvoker invoker) {
-    /*
-    // If `original` has no differentiable attributes, it may be the case that
-    // it has not been loaded yet. Load it, check for differentiable attributes,
-    // and register the attributes as tasks so that they can be looked up.
-    if (original->getDifferentiableAttrs().empty() &&
-        original->isExternalDeclaration()) {
-      auto loaded = module.loadFunction(original);
-      assert(loaded && "Cannot load original function");
-      (void)loaded;
-      for (auto *diffAttr : original->getDifferentiableAttrs()) {
-        registerDifferentiationTask(
-            original, diffAttr->getIndices(),
-            DifferentiationInvoker(diffAttr, original));
-      }
-    }
-     */
-
     if (auto *existingTask = lookUpMinimalDifferentiationTask(original, indices))
       return existingTask;
     return registerDifferentiationTask(original, indices, invoker);
