@@ -416,7 +416,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         SILAbbrCodes[SILDifferentiableAttrLayout::Code];
     auto &paramIndices = DA->getIndices();
     SmallVector<bool, 4> parameters;
-    for (unsigned i : indices(parameters))
+    for (unsigned i : indices(paramIndices.parameters))
       parameters.push_back(paramIndices.parameters[i]);
     SILDifferentiableAttrLayout::emitRecord(
         Out, ScratchRecord, differentiableAttrAbbrCode,
