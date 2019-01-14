@@ -151,8 +151,7 @@ static Type getAssociatedType(VarDecl *decl, DeclContext *DC, Identifier id) {
     return Type();
   Type associatedType = ProtocolConformanceRef::getTypeWitnessByName(
       declType, *conf, id, C.getLazyResolver());
-  assert(associatedType &&
-         "Differentiable protocol associated type not found");
+  assert(associatedType && "Differentiable protocol associated type not found");
   return associatedType;
 }
 
@@ -163,7 +162,7 @@ getAssociatedStructDecl(NominalTypeDecl *nominal, Identifier id) {
   // Differentiable protocol.
   auto &C = nominal->getASTContext();
   auto *diffableProtocol = C.getProtocol(KnownProtocolKind::Differentiable);
-  assert(diffableProtocol && "could not find Differentiable protocol");
+  assert(diffableProtocol && "Differentiable protocol not found");
   auto associatedTypeLookup = diffableProtocol->lookupDirect(id);
   assert(associatedTypeLookup.size() == 1);
   auto *dependentType = DependentMemberType::get(
@@ -432,6 +431,187 @@ deriveDifferentiable_tangentVector(DerivedConformance &derived) {
       deriveBodyDifferentiable_tangentVector);
 }
 
+
+// Returns the underlying `allDifferentiableVariables` of a VarDecl `x`.
+// If `x` conforms to `Differentiable`, return `allDifferentiableVariables`.
+// Otherwise, return `x`.
+static ValueDecl *getUnderlyingAllDiffableVariables(ModuleDecl *module,
+                                                    VarDecl *varDecl) {
+  auto &C = module->getASTContext();
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
+  auto allDiffableVarsReq =
+      getProtocolRequirement(diffableProto, C.Id_allDifferentiableVariables);
+  auto confRef =
+      module->lookupConformance(varDecl->getType(), diffableProto);
+  if (!confRef)
+    return varDecl;
+  auto conf = confRef->getConcrete();
+  auto allDiffableVarsDecl =
+     conf->getWitnessDecl(allDiffableVarsReq, /*lazyResolver*/ nullptr);
+  return allDiffableVarsDecl;
+}
+
+// Synthesize getter body for `allDifferentiableVariables` computed property.
+static void
+derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl) {
+  auto *nominal = getterDecl->getDeclContext()->getSelfNominalTypeDecl();
+  auto &C = nominal->getASTContext();
+  auto *module = nominal->getModuleContext();
+
+  auto *allDiffableVarsStruct =
+      getAssociatedStructDecl(nominal, C.Id_AllDifferentiableVariables);
+  assert(allDiffableVarsStruct &&
+         "'AllDifferentiableVariables' struct not found but should exist");
+  auto *allDiffableVarsInitDecl =
+      getMemberwiseInitializer(allDiffableVarsStruct);
+  assert(allDiffableVarsInitDecl &&
+         "'AllDifferentiableVariables' memberwise initializer not found");
+
+  auto *selfDecl = getterDecl->getImplicitSelfDecl();
+  auto *selfDRE =
+      new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+
+  auto *initDRE = new (C) DeclRefExpr(allDiffableVarsInitDecl, DeclNameLoc(),
+                                      /*Implicit*/ true);
+  initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
+
+  auto allDiffableVarsType = nominal->mapTypeIntoContext(
+      allDiffableVarsStruct->getDeclaredInterfaceType());
+  Expr *baseExpr = TypeExpr::createImplicit(allDiffableVarsType, C);
+  auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, baseExpr);
+  initExpr->setThrows(false);
+  initExpr->setImplicit();
+
+  SmallVector<Expr *, 2> members;
+  SmallVector<Identifier, 2> memberNames;
+
+  llvm::DenseMap<Identifier, VarDecl *> diffPropertyMap;
+  SmallVector<VarDecl *, 8> diffProperties;
+  getStoredPropertiesForDifferentiation(nominal, diffProperties);
+  for (auto *member : diffProperties)
+    diffPropertyMap[member->getName()] = member;
+
+  for (auto initParam : *allDiffableVarsInitDecl->getParameters()) {
+    auto member = diffPropertyMap[initParam->getName()];
+    Expr *memberExpr = new (C) MemberRefExpr(selfDRE, SourceLoc(), member,
+                                             DeclNameLoc(), /*Implicit*/ true);
+    memberExpr->setType(member->getType());
+    auto memberAllDiffableVarsDecl =
+        getUnderlyingAllDiffableVariables(module, member);
+    if (member != memberAllDiffableVarsDecl) {
+      memberExpr = new (C) MemberRefExpr(memberExpr, SourceLoc(),
+                                         memberAllDiffableVarsDecl,
+                                         DeclNameLoc(), /*Implicit*/ true);
+    }
+    members.push_back(memberExpr);
+    memberNames.push_back(member->getName());
+  }
+  Expr *callExpr = CallExpr::createImplicit(C, initExpr, members, memberNames);
+
+  ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
+  getterDecl->setBody(
+      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
+}
+
+// Synthesize setter body for `allDifferentiableVariables` computed property.
+static void
+derivedBody_allDifferentiableVariablesSetter(AbstractFunctionDecl *setterDecl) {
+  auto *nominal = setterDecl->getDeclContext()->getSelfNominalTypeDecl();
+  auto &C = nominal->getASTContext();
+  auto *module = nominal->getModuleContext();
+
+  auto *selfDecl = setterDecl->getImplicitSelfDecl();
+  Expr *selfDRE =
+      new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+
+  auto *allDiffableVarsStruct =
+      getAssociatedStructDecl(nominal, C.Id_AllDifferentiableVariables);
+  assert(allDiffableVarsStruct &&
+         "'AllDifferentiableVariables' struct not found but should exist");
+  auto *newValueDecl = setterDecl->getParameters()->get(0);
+  Expr *newValueDRE =
+      new (C) DeclRefExpr(newValueDecl, DeclNameLoc(), /*Implicit*/ true);
+
+  // Map `AllDifferentiableVariables` struct members to their names for
+  // efficient lookup.
+  llvm::DenseMap<Identifier, VarDecl *> diffPropertyMap;
+  for (auto member : allDiffableVarsStruct->getStoredProperties())
+    diffPropertyMap[member->getName()] = member;
+
+  SmallVector<ASTNode, 2> assignExprs;
+  SmallVector<VarDecl *, 8> diffProperties;
+  getStoredPropertiesForDifferentiation(nominal, diffProperties);
+  for (auto *member : diffProperties) {
+    // Skip immutable members.
+    if (member->isLet())
+      continue;
+    // Create lhs: either `self.x` or `self.x.allDifferentiableVariables`.
+    auto lhsAllDiffableVars = getUnderlyingAllDiffableVariables(module, member);
+    Expr *lhs;
+    if (member == lhsAllDiffableVars) {
+      lhs = new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
+                                  /*Implicit*/ true);
+    } else {
+      auto *paramDRE = new (C) MemberRefExpr(selfDRE, SourceLoc(), member,
+                                             DeclNameLoc(), /*Implicit*/ true);
+      lhs = new (C) MemberRefExpr(paramDRE, SourceLoc(), lhsAllDiffableVars,
+                                  DeclNameLoc(), /*Implicit*/ true);
+    }
+    // Create rhs: `newValue.x`.
+    auto *rhs = new (C) MemberRefExpr(newValueDRE, SourceLoc(),
+                                      diffPropertyMap[member->getName()],
+                                      DeclNameLoc(), /*Implicit*/ true);
+    // Create assign expression.
+    auto *assignExpr = new (C) AssignExpr(lhs, SourceLoc(), rhs,
+                                          /*Implicit*/ true);
+    assignExprs.push_back(assignExpr);
+  }
+
+  setterDecl->setBody(
+      BraceStmt::create(C, SourceLoc(), assignExprs, SourceLoc(), true));
+}
+
+// Synthesize `allDifferentiableVariables` computed property declaration.
+static ValueDecl *
+deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
+  auto nominal = derived.Nominal;
+  auto &TC = derived.TC;
+  auto &C = TC.Context;
+
+  // Get `AllDifferentiableVariables` struct.
+  auto allDiffableVarsStruct =
+      getAssociatedStructDecl(nominal, C.Id_AllDifferentiableVariables);
+
+  auto returnInterfaceTy = allDiffableVarsStruct->getDeclaredInterfaceType();
+  auto returnTy = nominal->mapTypeIntoContext(returnInterfaceTy);
+
+  VarDecl *allDiffableVarsDecl;
+  PatternBindingDecl *pbDecl;
+  std::tie(allDiffableVarsDecl, pbDecl) = derived.declareDerivedProperty(
+      C.Id_allDifferentiableVariables, returnInterfaceTy, returnTy,
+      /*isStatic*/ false, /*isFinal*/ true);
+
+  auto *getterDecl = derived.declareDerivedPropertyGetter(
+      derived.TC, allDiffableVarsDecl, returnTy);
+  getterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesGetter);
+
+  auto *setterDecl = derived.declareDerivedPropertySetter(
+      derived.TC, allDiffableVarsDecl, returnTy);
+  setterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesSetter);
+
+  allDiffableVarsDecl->setAccessors(StorageImplInfo::getMutableComputed(),
+                                    SourceLoc(), {getterDecl, setterDecl},
+                                    SourceLoc());
+
+  derived.addMembersToConformanceContext(
+      {getterDecl, setterDecl, allDiffableVarsDecl, pbDecl});
+
+  addExpectedOpaqueAccessorsToStorage(TC, allDiffableVarsDecl);
+  triggerAccessorSynthesis(TC, allDiffableVarsDecl);
+
+  return allDiffableVarsDecl;
+}
+
 // Return associated `TangentVector`, `CotangentVector`, or
 // `AllDifferentiableVariables` struct for a nominal type, if it exists.
 // If not, synthesize the struct.
@@ -568,7 +748,8 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   auto nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
-  // Check if all members have associated types equal to `Self`.
+  // Check if all members have specified associated type equal to `Self`.
+  // For example, check if all members have `Self == TangentVector`.
   SmallVector<VarDecl *, 16> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, diffProperties);
   bool allMembersAssocTypeEqualsSelf =
@@ -584,8 +765,10 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   auto nominalConformsToAddArith =
       TC.conformsToProtocol(nominal->getDeclaredInterfaceType(), addArithProto,
                             parentDC, ConformanceCheckFlags::Used);
+
   // Return `Self` if conditions are met.
-  if (allMembersAssocTypeEqualsSelf && nominalConformsToAddArith) {
+  if (id == C.Id_AllDifferentiableVariables ||
+      (allMembersAssocTypeEqualsSelf && nominalConformsToAddArith)) {
     auto selfType =
         parentDC->mapTypeIntoContext(nominal->getDeclaredInterfaceType());
     auto *aliasDecl = new (C) TypeAliasDecl(SourceLoc(), SourceLoc(), id,
@@ -601,17 +784,6 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
     C.addSynthesizedDecl(aliasDecl);
     return selfType;
   }
-
-  // Get or synthesize `TangentVector`, `CotangentVector`, and
-  // `AllDifferentiableVariables` structs at once. Synthesizing both structs is
-  // necessary in order to correctly set their mutually recursive associated
-  // types.
-  auto tangentStruct =
-      getOrSynthesizeAssociatedStruct(derived, C.Id_TangentVector);
-  auto cotangentStruct =
-      getOrSynthesizeAssociatedStruct(derived, C.Id_CotangentVector);
-  auto allDiffableVarsStruct =
-      getOrSynthesizeAssociatedStruct(derived, C.Id_AllDifferentiableVariables);
 
   // Add a typealias declaration with the given name and underlying target
   // struct type to the source struct.
@@ -645,20 +817,70 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
     C.addSynthesizedDecl(aliasDecl);
   };
 
+  // Otherwise, check if all members have all `Differentiable` protocol
+  // associated types equal to `Self`:
+  // `Self == TangentVector == CotangentVector == AllDifferentiableVariables`.
+  bool allMembersAssocTypesEqualsSelf =
+      llvm::all_of(diffProperties, [&](VarDecl *member) {
+        auto tangentType =
+            getAssociatedType(member, nominal, C.Id_TangentVector);
+        auto cotangentType =
+            getAssociatedType(member, nominal, C.Id_CotangentVector);
+        auto allDiffableVarsType =
+            getAssociatedType(member, nominal, C.Id_AllDifferentiableVariables);
+        return member->getType()->isEqual(tangentType) &&
+            member->getType()->isEqual(cotangentType) &&
+            member->getType()->isEqual(allDiffableVarsType);
+      });
+
+  // If all members have all `Differentiable` protocol associated types equal to
+  // `Self`, get or synthesize `AllDifferentiableVariables` struct and let
+  // `TangentVector` and `CotangentVector` alias to it.
+  if (allMembersAssocTypesEqualsSelf) {
+    auto allDiffableVarsStruct = getOrSynthesizeAssociatedStruct(
+        derived, C.Id_AllDifferentiableVariables);
+    addAssociatedTypeAliasDecl(C.Id_AllDifferentiableVariables,
+                               allDiffableVarsStruct, allDiffableVarsStruct);
+    addAssociatedTypeAliasDecl(C.Id_TangentVector,
+                               allDiffableVarsStruct, allDiffableVarsStruct);
+    addAssociatedTypeAliasDecl(C.Id_CotangentVector,
+                               allDiffableVarsStruct, allDiffableVarsStruct);
+    TC.validateDecl(allDiffableVarsStruct);
+    return parentDC->mapTypeIntoContext(
+        allDiffableVarsStruct->getDeclaredInterfaceType());
+  }
+
+  // Otherwise, get or synthesize `TangentVector`, `CotangentVector`, and
+  // `AllDifferentiableVariables` structs at once. Synthesizing all three
+  // structs at once is necessary in order to correctly set their mutually
+  // recursive associated types.
+  auto tangentStruct =
+      getOrSynthesizeAssociatedStruct(derived, C.Id_TangentVector);
+  auto cotangentStruct =
+      getOrSynthesizeAssociatedStruct(derived, C.Id_CotangentVector);
+  auto allDiffableVarsStruct =
+      getOrSynthesizeAssociatedStruct(derived, C.Id_AllDifferentiableVariables);
+
   // Add associated typealiases for structs.
   addAssociatedTypeAliasDecl(C.Id_TangentVector, tangentStruct, tangentStruct);
-  addAssociatedTypeAliasDecl(C.Id_TangentVector, cotangentStruct,
-                             cotangentStruct);
-  addAssociatedTypeAliasDecl(C.Id_CotangentVector, tangentStruct,
-                             cotangentStruct);
-  addAssociatedTypeAliasDecl(C.Id_CotangentVector, cotangentStruct,
-                             tangentStruct);
+  addAssociatedTypeAliasDecl(C.Id_TangentVector,
+                             cotangentStruct, cotangentStruct);
+  addAssociatedTypeAliasDecl(C.Id_TangentVector,
+                             allDiffableVarsStruct, tangentStruct);
+
+  addAssociatedTypeAliasDecl(C.Id_CotangentVector,
+                             tangentStruct, cotangentStruct);
+  addAssociatedTypeAliasDecl(C.Id_CotangentVector,
+                             cotangentStruct, tangentStruct);
+  addAssociatedTypeAliasDecl(C.Id_CotangentVector,
+                             allDiffableVarsStruct, cotangentStruct);
+
   addAssociatedTypeAliasDecl(C.Id_AllDifferentiableVariables,
                              allDiffableVarsStruct, allDiffableVarsStruct);
-  addAssociatedTypeAliasDecl(C.Id_TangentVector, allDiffableVarsStruct,
-                             tangentStruct);
-  addAssociatedTypeAliasDecl(C.Id_CotangentVector, allDiffableVarsStruct,
-                             cotangentStruct);
+  addAssociatedTypeAliasDecl(C.Id_AllDifferentiableVariables,
+                             tangentStruct, tangentStruct);
+  addAssociatedTypeAliasDecl(C.Id_AllDifferentiableVariables,
+                             cotangentStruct, cotangentStruct);
 
   TC.validateDecl(tangentStruct);
   TC.validateDecl(cotangentStruct);
@@ -701,6 +923,8 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
     return deriveDifferentiable_moved(*this);
   if (requirement->getBaseName() == TC.Context.Id_tangentVector)
     return deriveDifferentiable_tangentVector(*this);
+  if (requirement->getBaseName() == TC.Context.Id_allDifferentiableVariables)
+    return deriveDifferentiable_allDifferentiableVariables(*this);
   TC.diagnose(requirement->getLoc(), diag::broken_differentiable_requirement);
   return nullptr;
 }
