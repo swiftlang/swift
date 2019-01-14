@@ -1514,7 +1514,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       instanceTy = AMT->getInstanceType();
     }
     
-    if (expr && expr->isImplicit() && cs.DC->getContextKind() == DeclContextKind::Initializer) {
+    if (expr && expr->isImplicit() &&
+        cs.DC->getContextKind() == DeclContextKind::Initializer) {
       auto *TypeDC = cs.DC->getParent();
       bool propertyInitializer = true;
       // If the parent context is not a type context, we expect it
@@ -1531,12 +1532,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       
       if (TypeDC->getSelfNominalTypeDecl() == instanceTy->getAnyNominal()) {
         if (propertyInitializer) {
-          emitDiagnostic(loc, diag::instance_member_in_initializer,
-                      Name);
+          emitDiagnostic(loc, diag::instance_member_in_initializer, Name);
           return true;
         } else {
-          emitDiagnostic(loc, diag::instance_member_in_default_parameter,
-                      Name);
+          emitDiagnostic(loc, diag::instance_member_in_default_parameter, Name);
           return true;
         }
       }
@@ -1551,17 +1550,17 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         memberTypeContext->getSemanticDepth() <
         currentTypeContext->getSemanticDepth()) {
       emitDiagnostic(loc, diag::could_not_use_instance_member_on_type,
-                  currentTypeContext->getDeclaredInterfaceType(), Name,
-                  memberTypeContext->getDeclaredInterfaceType(),
-                  true)
-        .highlight(baseRange).highlight(member->getSourceRange());
+                     currentTypeContext->getDeclaredInterfaceType(), Name,
+                     memberTypeContext->getDeclaredInterfaceType(), true)
+          .highlight(baseRange)
+          .highlight(member->getSourceRange());
       return true;
     }
     
     // Just emit a generic "instance member cannot be used" error
-    emitDiagnostic(loc, diag::could_not_use_instance_member_on_type, instanceTy, Name,
-                instanceTy, false)
-      .highlight(getAnchor()->getSourceRange());
+    emitDiagnostic(loc, diag::could_not_use_instance_member_on_type, instanceTy,
+                   Name, instanceTy, false)
+        .highlight(getAnchor()->getSourceRange());
     return true;
   } else {
     // If the base of the lookup is a protocol metatype, suggest
@@ -1586,21 +1585,18 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       // of a protocol -- otherwise a diagnostic talking about
       // static members doesn't make a whole lot of sense
       if (auto TAD = dyn_cast<TypeAliasDecl>(member)) {
-        Diag.emplace(emitDiagnostic(loc,
-                              diag::typealias_outside_of_protocol,
-                              TAD->getName()));
+        Diag.emplace(emitDiagnostic(loc, diag::typealias_outside_of_protocol,
+                                    TAD->getName()));
       } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
-        Diag.emplace(emitDiagnostic(loc,
-                              diag::assoc_type_outside_of_protocol,
-                              ATD->getName()));
+        Diag.emplace(emitDiagnostic(loc, diag::assoc_type_outside_of_protocol,
+                                    ATD->getName()));
       } else if (isa<ConstructorDecl>(member)) {
-        Diag.emplace(emitDiagnostic(loc,
-                              diag::construct_protocol_by_name,
-                              instanceTy));
+        Diag.emplace(emitDiagnostic(loc, diag::construct_protocol_by_name,
+                                    instanceTy));
       } else {
         Diag.emplace(emitDiagnostic(loc,
-                              diag::could_not_use_type_member_on_protocol_metatype,
-                              baseObjTy, Name));
+                                    diag::could_not_use_type_member_on_protocol_metatype,
+                                    baseObjTy, Name));
       }
       
       Diag->highlight(baseRange).highlight(getAnchor()->getSourceRange());
@@ -1621,11 +1617,11 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     
     if (isa<EnumElementDecl>(member)) {
       Diag.emplace(emitDiagnostic(loc, diag::could_not_use_enum_element_on_instance,
-                               Name));
+                                  Name));
     }
     else {
       Diag.emplace(emitDiagnostic(loc, diag::could_not_use_type_member_on_instance,
-                               baseObjTy, Name));
+                                  baseObjTy, Name));
     }
     
     Diag->highlight(getAnchor()->getSourceRange());
@@ -1676,7 +1672,6 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
             lastCS->getType(binaryExpr->getArg()->getElement(1));
             if (secondArgType->isEqual(baseObjTy)) {
               Diag->fixItInsert(loc, ".");
-              //return;
               return true;
             }
           }
