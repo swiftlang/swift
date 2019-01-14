@@ -5740,7 +5740,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     RBLoc = LBLoc;
     Status.setIsParseError();
   } else {
-    Scope S(this, ScopeKind::ClassBody);
+    Scope S(this, ScopeKind::EnumBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
     if (canDelayMemberDeclParsing()) {
       if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, ED))
