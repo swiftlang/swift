@@ -1485,7 +1485,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   
   Expr *expr = getParentExpr();
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
-  auto member = getAnchor()->getReferencedDecl().getDecl();
+  auto member = cs.getResolvedOverloadSets()->Choice.getDecl();
   
   // If the base is an implicit self type reference, and we're in a
   // an initializer, then the user wrote something like:
@@ -1508,7 +1508,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   // Produce a tailored diagnostic for these cases since this
   // comes up and is otherwise non-obvious what is going on.
   
-  if (BaseType->is<MetatypeType>()) {
+  if (BaseType->is<MetatypeType>() && !member->isStatic()) {
     auto instanceTy = BaseType->getRValueType();
     
     if (auto *AMT = instanceTy->getAs<AnyMetatypeType>()) {
