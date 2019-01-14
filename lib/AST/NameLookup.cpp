@@ -65,12 +65,11 @@ void DebuggerClient::anchor() {}
 
 void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
                                             DeclVisibilityKind reason) {
-  if (D->getASTContext().LangOpts.EnableAccessControl) {
-    if (D->isInvalid())
-      return;
-    if (!D->isAccessibleFrom(DC))
-      return;
-  }
+  if (D->isInvalid())
+    return;
+  if (!D->isAccessibleFrom(DC))
+    return;
+
   ChainedConsumer.foundDecl(D, reason);
 }
 
@@ -1843,7 +1842,7 @@ static void configureLookup(const DeclContext *dc,
                             ReferencedNameTracker *&tracker,
                             bool &isLookupCascading) {
   auto &ctx = dc->getASTContext();
-  if (!ctx.LangOpts.EnableAccessControl)
+  if (ctx.isAccessControlDisabled())
     options |= NL_IgnoreAccessControl;
 
   // Find the dependency tracker we'll need for this lookup.

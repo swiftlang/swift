@@ -761,7 +761,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
 
 static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
                                        ASTContext &ctx) {
-  if (!ctx.LangOpts.EnableAccessControl)
+  if (ctx.isAccessControlDisabled())
     return;
 
   auto &diags = ctx.Diags;
@@ -1479,7 +1479,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // read-only.  Observing properties look at change, read-only properties
     // have nothing to observe!
     bool baseIsSettable = baseASD->isSettable(baseASD->getDeclContext());
-    if (baseIsSettable && ctx.LangOpts.EnableAccessControl) {
+    if (baseIsSettable) {
       baseIsSettable =
          baseASD->isSetterAccessibleFrom(overrideASD->getDeclContext());
     }

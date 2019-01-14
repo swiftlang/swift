@@ -497,7 +497,7 @@ protected:
   AccessScope getRequiredAccessScope();
 
   bool isUsableFromInlineRequired() {
-    if (!TC.getLangOpts().EnableAccessControl)
+    if (TC.Context.isAccessControlDisabled())
       return false;
 
     assert(RequiredAccessScopeAndUsableFromInline.hasValue() &&
