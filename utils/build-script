@@ -533,8 +533,8 @@ class BuildScriptInvocation(object):
             # really isn't a security issue here.
             if cmake_opts:
                 impl_args += [
-                    "--%s-cmake-options=%s" %
-                    (product_name, ' '.join(cmake_opts))
+                    "--{}-cmake-options={}".format(
+                        product_name, ' '.join(cmake_opts))
                 ]
 
         if args.build_stdlib_deployment_targets:
