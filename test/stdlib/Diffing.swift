@@ -574,7 +574,7 @@ TestSuite(suite).test("Three way diff demo code") {
 
 TestSuite(suite).test("Diff reversal demo code") {
     let diff = OrderedCollectionDifference<Int>([])!
-    let reversed = OrderedCollectionDifference<Int>(
+    let _ = OrderedCollectionDifference<Int>(
         diff.map({(change) -> OrderedCollectionDifference<Int>.Change in
             switch change {
             case .insert(offset: let o, element: let e, associatedWith: let a):
@@ -584,7 +584,6 @@ TestSuite(suite).test("Diff reversal demo code") {
             }
         })
     )!
-    // print(reversed)
 }
 
 TestSuite(suite).test("Naive application by enumeration") {
@@ -637,10 +636,10 @@ TestSuite(suite).test("Fast applicator boundary conditions") {
 }
 
 TestSuite(suite).test("Fast applicator fuzzer") {
-    func makeArray() -> [UInt32] {
-        var arr = [UInt32]()
-        for _ in 0..<arc4random_uniform(10) {
-            arr.append(arc4random_uniform(20))
+    func makeArray() -> [Int] {
+        var arr = [Int]()
+        for _ in 0..<Int.random(in: 0..<10) {
+            arr.append(Int.random(in: 0..<20))
         }
         return arr
     }
@@ -648,16 +647,20 @@ TestSuite(suite).test("Fast applicator fuzzer") {
         let a = makeArray()
         let b = makeArray()
         let d = b.shortestEditScript(from: a)
-        expectEqual(b, a.applying(d)!)
-        if self.testRun!.failureCount > 0 {
-            print("""
-                // repro:
-                let a = \(a)
-                let b = \(b)
-                let d = b.shortestEditScript(from: a)
-                expectEqual(b, a.applying(d))
-            """)
-            break
+        let applied = a.applying(d)
+        expectNotNil(applied)
+        if let applied = applied {
+            expectEqual(b, applied)
+            if (b != applied) {
+                print("""
+                    // repro:
+                    let a = \(a)
+                    let b = \(b)
+                    let d = b.shortestEditScript(from: a)
+                    expectEqual(b, a.applying(d))
+                """)
+                break
+            }
         }
     }
 }
