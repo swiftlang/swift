@@ -229,6 +229,16 @@ public func valueWithPullback<T, U, V, R>(
   return Builtin.autodiffApply_vjp_arity3(f, x, y, z)
 }
 
+// NOTE: This is not an official API.
+// TODO: Remove this once we flesh out differentiability for curried functions.
+@inlinable
+public func _valueWithPullback<T, U, R>(
+  at x: T, _ y: U, in f: @autodiff (T) -> (U) -> R
+) -> (value: R, pullback: (R.CotangentVector) -> (T.CotangentVector, U.CotangentVector))
+  where T : Differentiable, U : Differentiable, R : Differentiable {
+  return Builtin.autodiffApply_vjp_method(f, x, y)
+}
+
 // Pullback
 
 @inlinable
