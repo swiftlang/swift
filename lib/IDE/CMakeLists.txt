@@ -2,6 +2,7 @@ add_swift_host_library(swiftIDE STATIC
   CodeCompletion.cpp
   CodeCompletionCache.cpp
   CommentConversion.cpp
+  ExprContextAnalysis.cpp
   Formatting.cpp
   Refactoring.cpp
   ModuleInterfacePrinting.cpp
@@ -13,7 +14,9 @@ add_swift_host_library(swiftIDE STATIC
   IDETypeChecking.cpp
   APIDigesterData.cpp
   SourceEntityWalker.cpp
+  TypeContextInfo.cpp
   LINK_LIBRARIES
+    swiftAST
     swiftFrontend
     swiftClangImporter
     swiftDWARFImporter

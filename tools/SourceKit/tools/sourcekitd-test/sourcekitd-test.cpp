@@ -554,6 +554,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
+  case SourceKitRequest::TypeContextInfo:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestTypeContextInfo);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    break;
+
   case SourceKitRequest::CursorInfo:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCursorInfo);
     if (Opts.CollectActionables) {
@@ -1001,6 +1007,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::CodeCompleteUpdate:
     case SourceKitRequest::CodeCompleteCacheOnDisk:
     case SourceKitRequest::CodeCompleteSetPopularAPI:
+    case SourceKitRequest::TypeContextInfo:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
       break;
 

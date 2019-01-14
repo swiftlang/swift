@@ -2412,6 +2412,10 @@ public:
 
   bool isUsableFromInline() const;
 
+  /// Returns \c true if this declaration is *not* intended to be used directly
+  /// by application developers despite of the visibility.
+  bool shouldHideFromEditor() const;
+
   bool hasAccess() const {
     return TypeAndAccess.getInt().hasValue();
   }
