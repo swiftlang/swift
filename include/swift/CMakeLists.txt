@@ -1,6 +1,4 @@
-if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_STANDALONE_OVERLAY)
-  add_subdirectory(Runtime)
-endif()
+add_subdirectory(Runtime)
 
 if(SWIFT_BUILD_REMOTE_MIRROR)
   add_subdirectory(SwiftRemoteMirror)
