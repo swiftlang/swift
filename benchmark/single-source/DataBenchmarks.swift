@@ -40,12 +40,89 @@ public let DataBenchmarks = [
       0, 1, 2, 3, 4, 5, 6,
     ])) } }, tags: d, legacyFactor: 20),
 
-  BenchmarkInfo(name: "Data.init.Sequence.ExactCount", runFunction: {
+  BenchmarkInfo(name: "Data.init.Sequence.809B.Count", runFunction: {
+    _init($0*100, sequence: Bytes(count: 809, exact: true)) }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.809B.Count0", runFunction: {
+    _init($0*100, sequence: Bytes(count: 809, exact: false)) }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.809B.Count.I", runFunction: {
+    for _ in 0..<$0*100 {
+      blackHole(Data(Bytes(count: 809, exact: true))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.809B.Count0.I", runFunction: {
+    for _ in 0..<$0*100 {
+      blackHole(Data(Bytes(count: 809, exact: false))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.2047B.Count.I", runFunction: {
+    for _ in 0..<$0*50 {
+    blackHole(Data(Bytes(count: 2047, exact: true))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.2047B.Count0.I", runFunction: {
+    for _ in 0..<$0*50 {
+      blackHole(Data(Bytes(count: 2047, exact: false))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.2049B.Count.I", runFunction: {
+    for _ in 0..<$0*50 {
+    blackHole(Data(Bytes(count: 2049, exact: true))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.2049B.Count0.I", runFunction: {
+    for _ in 0..<$0*50 {
+    blackHole(Data(Bytes(count: 2049, exact: false))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.511B.Count.I", runFunction: {
+    for _ in 0..<$0*150 {
+    blackHole(Data(Bytes(count: 511, exact: true))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.511B.Count0.I", runFunction: {
+    for _ in 0..<$0*150 {
+      blackHole(Data(Bytes(count: 511, exact: false))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.513B.Count.I", runFunction: {
+    for _ in 0..<$0*150 {
+    blackHole(Data(Bytes(count: 513, exact: true))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.513B.Count0.I", runFunction: {
+    for _ in 0..<$0*150 {
+    blackHole(Data(Bytes(count: 513, exact: false))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.64kB.Count", runFunction: {
+    _init($0, sequence: Bytes(count: 2<<15, exact: true)) }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.64kB.Count0", runFunction: {
+    _init($0, sequence: Bytes(count: 2<<15, exact: false)) }, tags: d),
+  BenchmarkInfo(name: "Array.init.Sequence.64kB.Count.I", runFunction: {
+    for _ in 1...$0 {
+      blackHole(Array(Bytes(count: 2<<15, exact: true))) } }, tags: d),
+  BenchmarkInfo(name: "Array.init.Sequence.64kB.Count0.I", runFunction: {
+    for _ in 1...$0 {
+      blackHole(Array(Bytes(count: 2<<15, exact: false))) } }, tags: d),
+  BenchmarkInfo(name: "Array.init.Sequence.64kB.Count.RE.I", runFunction: {
+    for _ in 1...$0 {
+      blackHole(Array(repeatElement(UInt8(0xA0), count: 2<<15))) } }, tags: d),
+  BenchmarkInfo(name: "Array.init.Sequence.64kB.Count0.RE.I", runFunction: {
+    for _ in 1...$0 {
+      blackHole(Array(Count0(repeatElement(UInt8(0xA0), count: 2<<15)))) } },
+    tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.64kB.Count.I", runFunction: {
+    for _ in 0..<$0 {
+      blackHole(Data(Bytes(count: 2<<15, exact: true))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.64kB.Count0.I", runFunction: {
+    for _ in 0..<$0 {
+      blackHole(Data(Bytes(count: 2<<15, exact: false))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.809B.Count.RE", runFunction: {
+    _init($0*100, sequence: repeatElement(UInt8(0xA0), count: 809)) }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.809B.Count0.RE", runFunction: {
+    _init($0*100, sequence: Count0(repeatElement(UInt8(0xA0), count: 809))) },
+    tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.809B.Count.RE.I", runFunction: {
     for _ in 0..<$0*100 {
       blackHole(Data(repeatElement(UInt8(0xA0), count: 809)))
     } }, tags: d),
-  BenchmarkInfo(name: "Data.init.Sequence.UnderestimatedCount", runFunction: {
-    for _ in 0..<$0*100 { blackHole(Data(repeatElementSeq(809))) } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.809B.Count0.RE.I", runFunction: {
+    for _ in 0..<$0*100 {
+      blackHole(Data(Count0(repeatElement(UInt8(0xA0), count: 809))))
+    } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.64kB.Count.RE", runFunction: {
+    _init($0, sequence: repeatElement(UInt8(0xA0), count: 2<<15)) }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.64kB.Count0.RE", runFunction: {
+    _init($0, sequence: Count0(repeatElement(UInt8(0xA0), count: 2<<15))) },
+    tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.64kB.Count.RE.I", runFunction: {
+    for _ in 0..<$0 {
+      blackHole(Data(repeatElement(UInt8(0xA0), count: 2<<15)))
+    } }, tags: d),
+  BenchmarkInfo(name: "Data.init.Sequence.64kB.Count0.RE.I", runFunction: {
+    for _ in 0..<$0 {
+      blackHole(Data(Count0(repeatElement(UInt8(0xA0), count: 2<<15))))
+    } }, tags: d),
 
   BenchmarkInfo(name: "DataSubscriptSmall",
     runFunction: { let data = small
@@ -120,12 +197,72 @@ public let DataBenchmarks = [
   BenchmarkInfo(name: "DataAppendSequence",
     runFunction: { append($0*100, sequenceLength: 809, to: medium) },
     tags: d, legacyFactor: 100),
-  BenchmarkInfo(name: "Data.append.Sequence.ExactCount", runFunction: {
+  BenchmarkInfo(name: "Data.append.Sequence.809B.Count", runFunction: {
+    append($0*100, sequence: Bytes(count: 809, exact: true), to: medium) },
+    tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.809B.Count0", runFunction: {
+    append($0*100, sequence: Bytes(count: 809, exact: false) , to: medium) },
+    tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.809B.Count.I",
+    runFunction: { for _ in 1...$0*100 { var copy = medium
+      copy.append(contentsOf: Bytes(count: 809, exact: true)) } }, tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.809B.Count0.I",
+    runFunction: { for _ in 1...$0*100 { var copy = medium
+      copy.append(contentsOf: Bytes(count: 809, exact: false)) } }, tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.64kB.Count", runFunction: {
+    append($0, sequence: Bytes(count: 2<<15, exact: true), to: medium) },
+    tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.64kB.Count0", runFunction: {
+    append($0, sequence: Bytes(count: 2<<15, exact: false), to: medium) },
+    tags: d),
+  BenchmarkInfo(name: "Array.append.Sequence.64kB.Count.I", runFunction: {
+    for _ in 1...$0 { var copy = mediumArray
+      copy.append(contentsOf: Bytes(count: 2<<15, exact: true)) } }, tags: d),
+  BenchmarkInfo(name: "Array.append.Sequence.64kB.Count0.I", runFunction: {
+    for _ in 1...$0 { var copy = mediumArray
+      copy.append(contentsOf: Bytes(count: 2<<15, exact: false)) } }, tags: d),
+  BenchmarkInfo(name: "Array.append.Sequence.64kB.Count.RE.I", runFunction: {
+    for _ in 1...$0 { var copy = mediumArray
+      copy.append(contentsOf: repeatElement(UInt8(0xA0), count: 2<<15)) } },
+    tags: d),
+  BenchmarkInfo(name: "Array.append.Sequence.64kB.Count0.RE.I", runFunction: {
+    for _ in 1...$0 { var copy = mediumArray
+      copy.append(contentsOf: Count0(repeatElement(UInt8(0xA0), count: 2<<15)))
+    } }, tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.64kB.Count.I", runFunction: {
+    for _ in 1...$0 { var copy = medium
+      copy.append(contentsOf: Bytes(count: 2<<15, exact: true)) } }, tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.64kB.Count0.I", runFunction: {
+    for _ in 1...$0 { var copy = medium
+      copy.append(contentsOf: Bytes(count: 2<<15, exact: false)) } }, tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.809B.Count.RE.I", runFunction: {
+    for _ in 1...$0*100 { var copy = medium
+      copy.append(contentsOf: repeatElement(UInt8(0xA0), count: 809)) } },
+    tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.809B.Count0.RE.I", runFunction: {
+    for _ in 1...$0*100 { var copy = medium
+    copy.append(contentsOf: Count0(repeatElement(UInt8(0xA0), count: 809))) } },
+    tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.809B.Count.RE", runFunction: {
     append($0*100, sequence: repeatElement(UInt8(0xA0), count: 809),
            to: medium) }, tags: d),
-  BenchmarkInfo(name: "Data.append.Sequence.UnderestimatedCount", runFunction: {
-    append($0*100, sequence: repeatElementSeq(809), to: medium) },
+  BenchmarkInfo(name: "Data.append.Sequence.809B.Count0.RE", runFunction: {
+    append($0*100, sequence: Count0(repeatElement(UInt8(0xA0), count: 809)),
+           to: medium) }, tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.64kB.Count.RE.I", runFunction: {
+    for _ in 1...$0 { var copy = medium
+      copy.append(contentsOf: repeatElement(UInt8(0xA0), count: 2<<15)) } },
     tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.64kB.Count0.RE.I", runFunction: {
+    for _ in 1...$0 { var copy = medium
+    copy.append(contentsOf: Count0(repeatElement(UInt8(0xA0), count: 2<<15))) }
+  }, tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.64kB.Count.RE", runFunction: {
+    append($0, sequence: repeatElement(UInt8(0xA0), count: 2<<15),
+           to: medium) }, tags: d),
+  BenchmarkInfo(name: "Data.append.Sequence.64kB.Count0.RE", runFunction: {
+    append($0, sequence: Count0(repeatElement(UInt8(0xA0), count: 2<<15)),
+           to: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataAppendDataSmallToSmall",
     runFunction: { append($0*500, data: small, to: small) }, tags: d,
@@ -194,10 +331,36 @@ let small = sampleData(.small)
 let medium = sampleData(.medium)
 let large = sampleData(.large)
 
+let mediumArray: [UInt8] = (1...1033).map { UInt8(truncatingIfNeeded: $0) }
+
 let repeatElementSeq = { count in
   return sequence(state: count) { (i: inout Int) -> UInt8? in
     defer { i = i &- 1 }; return i > 0 ? UInt8(0xA0) : nil
   }
+}
+
+struct Count0<S: Sequence> : Sequence {
+  let base: S
+  init (_ base:S) { self.base = base }
+  func makeIterator() -> S.Iterator { return base.makeIterator() }
+  var underestimatedCount: Int { return 0 }
+}
+
+struct Bytes: Sequence, IteratorProtocol {
+    let count: Int
+    let exact: Bool
+    var  i: Int = 0
+    init(count: Int, exact: Bool) {
+        self.count = count
+        self.exact = exact
+    }
+    mutating func next() -> UInt8? {
+        defer { i = i &+ 1 }
+        return (i < count) ? UInt8(truncatingIfNeeded: i) : nil
+    }
+    var underestimatedCount: Int {
+        return exact ? count : 0
+    }
 }
 
 enum SampleKind {
@@ -312,6 +475,13 @@ where S.Element == UInt8 {
   for _ in 1...N {
     var copy = data
     copy.append(contentsOf: sequence)
+  }
+}
+
+@inline(never)
+func _init<S: Sequence>(_ N: Int, sequence: S) where S.Element == UInt8 {
+  for _ in 1...N {
+    blackHole(Data(sequence))
   }
 }
 
