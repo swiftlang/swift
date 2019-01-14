@@ -508,7 +508,7 @@ public:
         BaseType(baseType), Name(member) {}
 
   std::string getName() const override {
-    return "allow type or instance member";
+    return "allow access to instance member on type or a type member on instance";
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
