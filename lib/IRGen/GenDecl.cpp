@@ -41,7 +41,6 @@
 #include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/TypeBuilder.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
