@@ -1390,7 +1390,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   bool isInitializingToAllocatingInitThunk = false;
   if (native.kind == SILDeclRef::Kind::Initializer) {
     if (auto ctor = dyn_cast<ConstructorDecl>(native.getDecl())) {
-      if (!ctor->isDesignatedInit()) {
+      if (!ctor->isDesignatedInit() && !ctor->isObjC()) {
         isInitializingToAllocatingInitThunk = true;
         native = SILDeclRef(ctor, SILDeclRef::Kind::Allocator);
       }
