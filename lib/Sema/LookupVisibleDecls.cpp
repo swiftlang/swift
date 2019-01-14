@@ -129,8 +129,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
 
   // Check access when relevant.
   if (!Member->getDeclContext()->isLocalContext() &&
-      !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member) &&
-      FromContext->getASTContext().LangOpts.EnableAccessControl) {
+      !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member)) {
     if (!Member->isAccessibleFrom(FromContext))
       return false;
   }

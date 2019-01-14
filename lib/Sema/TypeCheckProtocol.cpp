@@ -1274,7 +1274,7 @@ bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
                                         ValueDecl *witness,
                                         bool *isSetter) {
   *isSetter = false;
-  if (!TC.getLangOpts().EnableAccessControl)
+  if (TC.Context.isAccessControlDisabled())
     return false;
 
   AccessScope actualScopeToCheck = getRequiredAccessScope();

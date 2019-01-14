@@ -936,6 +936,12 @@ public:
     return LangOpts.isSwiftVersionAtLeast(major, minor);
   }
 
+  /// Check whether it's important to respect access control restrictions
+  /// in current context.
+  bool isAccessControlDisabled() const {
+    return !LangOpts.EnableAccessControl;
+  }
+
 private:
   friend Decl;
   Optional<RawComment> getRawComment(const Decl *D);

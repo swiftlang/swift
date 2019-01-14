@@ -90,7 +90,7 @@ namespace {
                         bool isMemberLookup)
       : Result(result), DC(dc), Options(options),
         IsMemberLookup(isMemberLookup) {
-      if (!dc->getASTContext().LangOpts.EnableAccessControl)
+      if (dc->getASTContext().isAccessControlDisabled())
         Options |= NameLookupFlags::IgnoreAccessControl;
     }
 
