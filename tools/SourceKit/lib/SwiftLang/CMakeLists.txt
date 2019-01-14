@@ -8,6 +8,7 @@ add_sourcekit_library(SourceKitSwiftLang
   SwiftIndexing.cpp
   SwiftLangSupport.cpp
   SwiftSourceDocInfo.cpp
+  SwiftTypeContextInfo.cpp
   LINK_LIBS
     SourceKitCore swiftDriver swiftFrontend
     swiftDWARFImporter swiftClangImporter swiftIDE

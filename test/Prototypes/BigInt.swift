@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// XFAIL: linux
+
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 -o %t/a.out %s
 // RUN: %target-run %t/a.out
@@ -17,7 +17,13 @@
 // REQUIRES: CPU=x86_64
 
 import StdlibUnittest
+#if os(Windows)
+import MSVCRT
+#elseif os(Linux) || os(Android)
+import Glibc
+#elseif os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
 import Darwin
+#endif
 
 extension FixedWidthInteger {
   /// Returns the high and low parts of a potentially overflowing addition.
@@ -154,9 +160,9 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   static func _randomWord() -> Word {
     // This handles up to a 64-bit word
     if Word.bitWidth > UInt32.bitWidth {
-      return Word(arc4random()) << 32 | Word(arc4random())
+      return Word(UInt32.random(in: 0...UInt32.max)) << 32 | Word(UInt32.random(in: 0...UInt32.max))
     } else {
-      return Word(truncatingIfNeeded: arc4random())
+      return Word(truncatingIfNeeded: UInt32.random(in: 0...UInt32.max))
     }
   }
 
@@ -1450,7 +1456,7 @@ func testBinaryInit<T: BinaryInteger>(_ x: T) -> BigInt {
 }
 
 func randomBitLength() -> Int {
-  return Int(arc4random_uniform(1000) + 2)
+  return Int.random(in: 2...1000)
 }
 
 var BitTests = TestSuite("Bit")

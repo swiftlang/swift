@@ -524,6 +524,10 @@ public:
   void findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
                std::function<void(ArrayRef<StringRef>, StringRef Error)> Receiver) override;
 
+  void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+                                ArrayRef<const char *> Args,
+                                TypeContextInfoConsumer &Consumer) override;
+
   void getStatistics(StatisticsReceiver) override;
 
 private:
