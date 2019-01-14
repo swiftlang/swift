@@ -24,4 +24,5 @@ let _: @autodiff (AdditiveTangentIsSelf) -> Float = { x in
 // CHECK-AST-NOT:     @differentiable
 // CHECK-AST:         @_fieldwiseProductSpace typealias TangentVector = AdditiveTangentIsSelf
 // CHECK-AST:         @_fieldwiseProductSpace typealias CotangentVector = AdditiveTangentIsSelf
+// CHECK-AST:         @_fieldwiseProductSpace typealias AllDifferentiableVariables = AdditiveTangentIsSelf
 

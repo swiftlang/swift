@@ -119,6 +119,7 @@ extension Tensor : Differentiable
 {
   public typealias TangentVector = Tensor
   public typealias CotangentVector = Tensor
+  public typealias AllDifferentiableVariables = Tensor
   @inlinable @inline(__always)
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return cotangent

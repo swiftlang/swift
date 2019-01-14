@@ -132,8 +132,10 @@ IDENTIFIER(allParameters)
 IDENTIFIER(Parameter)
 IDENTIFIER(Parameters)
 // Differentiable
+IDENTIFIER(AllDifferentiableVariables)
 IDENTIFIER(CotangentVector)
 IDENTIFIER(TangentVector)
+IDENTIFIER(allDifferentiableVariables)
 IDENTIFIER(moved)
 IDENTIFIER(tangentVector)
 

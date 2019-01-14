@@ -26,6 +26,7 @@ struct VectorSpacesEqualSelf : AdditiveArithmetic, Differentiable {
   var b: Float
   typealias TangentVector = VectorSpacesEqualSelf
   typealias CotangentVector = VectorSpacesEqualSelf
+  typealias AllDifferentiableVariables = VectorSpacesEqualSelf
 }
 
 // Test generic type with vector space types to `Self`.
