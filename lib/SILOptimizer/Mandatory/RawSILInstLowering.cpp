@@ -10,14 +10,80 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "MandatoryOptUtils.h"
+#define DEBUG_TYPE "raw-sil-inst-lowering"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "llvm/ADT/Statistic.h"
+
+STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
 
 using namespace swift;
+
+/// Emit the sequence that an assign instruction lowers to once we know
+/// if it is an initialization or an assignment.  If it is an assignment,
+/// a live-in value can be provided to optimize out the reload.
+static void lowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst) {
+  LLVM_DEBUG(llvm::dbgs() << "  *** Lowering [isInit="
+                          << unsigned(Inst->getInitKind())
+                          << "]: " << *Inst << "\n");
+
+  ++NumAssignRewritten;
+
+  SILValue Src = Inst->getSrc();
+  SILLocation Loc = Inst->getLoc();
+  PartialInitializationKind initKind = Inst->getInitKind();
+
+  // Unknown initKind is considered unprocessed. Just lower it as
+  // NotInitialization
+  if (initKind == PartialInitializationKind::Unknown) {
+    initKind = PartialInitializationKind::IsNotInitialization;
+  }
+
+  if (initKind == PartialInitializationKind::IsInitialization ||
+      Inst->getDest()->getType().isTrivial(Inst->getModule())) {
+
+    // If this is an initialization, or the storage type is trivial, we
+    // can just replace the assignment with a store.
+    assert(initKind != PartialInitializationKind::IsReinitialization);
+    B.createTrivialStoreOr(Loc, Src, Inst->getDest(),
+                           StoreOwnershipQualifier::Init);
+    Inst->eraseFromParent();
+    return;
+  }
+
+  if (initKind == PartialInitializationKind::IsReinitialization) {
+    // We have a case where a convenience initializer on a class
+    // delegates to a factory initializer from a protocol extension.
+    // Factory initializers give us a whole new instance, so the existing
+    // instance, which has not been initialized and never will be, must be
+    // freed using dealloc_partial_ref.
+    SILValue Pointer =
+        B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Take);
+    B.createStore(Loc, Src, Inst->getDest(), StoreOwnershipQualifier::Init);
+
+    auto MetatypeTy = CanMetatypeType::get(
+        Inst->getDest()->getType().getASTType(), MetatypeRepresentation::Thick);
+    auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
+    SILValue Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
+
+    B.createDeallocPartialRef(Loc, Pointer, Metatype);
+    Inst->eraseFromParent();
+    return;
+  }
+
+  assert(initKind == PartialInitializationKind::IsNotInitialization);
+  // Otherwise, we need to replace the assignment with a store [assign] which
+  // lowers to the load/store/release dance. Note that the new value is already
+  // considered to be retained (by the semantics of the storage type),
+  // and we're transferring that ownership count into the destination.
+
+  B.createStore(Inst->getLoc(), Src, Inst->getDest(),
+                StoreOwnershipQualifier::Assign);
+  Inst->eraseFromParent();
+}
 
 /// lowerRawSILOperations - There are a variety of raw-sil instructions like
 /// 'assign' that are only used by this pass.  Now that definite initialization
