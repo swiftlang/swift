@@ -631,6 +631,9 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();
 
+  // Finally serialize the SIL if we are asked to.
+  P.addSerializeSILPass();
+
   return P;
 }
 
