@@ -82,6 +82,8 @@
     "UnfoldSequence.swift",
     "UIntBuffer.swift",
     "KeyValuePairs.swift",
+    "Diffing.swift",
+    "OrderedCollectionDifference.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
