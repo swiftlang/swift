@@ -3844,14 +3844,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         
         // The fix was successful, so let's add it to the overload set
         // and return the solution as solved
-        auto overloadChoices = SmallVector<OverloadChoice, 4>();
+        auto choices = SmallVector<OverloadChoice, 4>();
         
         for (auto &pair : result.UnviableCandidates) {
-          overloadChoices.push_back(std::move(pair.first));
+          choices.push_back(std::move(pair.first));
         }
         
-        addOverloadSet(memberTy, overloadChoices, useDC,
-                       locator, result.getFavoredChoice(), {});
+        addOverloadSet(memberTy, choices, useDC, locator,
+                       result.getFavoredChoice(), {});
         return SolutionKind::Solved;
       }
       
