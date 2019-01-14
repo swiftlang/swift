@@ -592,7 +592,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         break;
 
       case SelfTypeRelationship::Equivalent:
-        cs.addConstraint(ConstraintKind::Equal, selfTy1, selfTy2, locator);
+        cs.addConstraint(ConstraintKind::Bind, selfTy1, selfTy2, locator);
         break;
 
       case SelfTypeRelationship::Subclass:
