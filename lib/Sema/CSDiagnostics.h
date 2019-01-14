@@ -674,7 +674,7 @@ private:
                                           DeclName memberName);
 };
 
-/// Diagnose situations when we use an instance member on a metatype
+/// Diagnose situations when we use an instance member on a type
 /// or a type member on an instance
 ///
 /// ```swift
@@ -690,7 +690,6 @@ private:
 ///
 /// }
 /// ```
-
 class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
   Type BaseType;
   DeclName Name;
@@ -702,7 +701,6 @@ public:
         Name(memberName) {}
 
   bool diagnoseAsError() override;
-
 };
 
 } // end namespace constraints
