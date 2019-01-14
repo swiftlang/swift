@@ -3045,20 +3045,13 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
     parseDeclList(ext->getBraces().Start, RBLoc, Id,
                   ParseDeclOptions(DelayedState->Flags),
-                  [&] (Decl *D) { ext->addMember(D); });
+                  ext);
     ext->setBraces({LBLoc, RBLoc});
-  } else if (auto *cd = dyn_cast<ClassDecl>(D)) {
-    auto handler = [&] (Decl *D) {
-      cd->addMember(D);
-    };
-    parseDeclList(cd->getBraces().Start, RBLoc, Id,
-                  ParseDeclOptions(DelayedState->Flags), handler);
-    cd->setBraces({LBLoc, RBLoc});
   } else {
     auto *ntd = cast<NominalTypeDecl>(D);
     parseDeclList(ntd->getBraces().Start, RBLoc, Id,
                   ParseDeclOptions(DelayedState->Flags),
-                  [&] (Decl *D) { ntd->addMember(D); });
+                  ntd);
     ntd->setBraces({LBLoc, RBLoc});
   }
 }
@@ -3475,13 +3468,14 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
 /// \endverbatim
 bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                            Diag<> ErrorDiag, ParseDeclOptions Options,
-                           llvm::function_ref<void(Decl*)> handler) {
+                           IterableDeclContext *IDC) {
   ParserStatus Status;
   bool PreviousHadSemi = true;
   {
     SyntaxParsingContext ListContext(SyntaxContext, SyntaxKind::MemberDeclList);
     while (Tok.isNot(tok::r_brace)) {
-      Status |= parseDeclItem(PreviousHadSemi, Options, handler);
+      Status |= parseDeclItem(PreviousHadSemi, Options,
+                              [&](Decl *D) { IDC->addMember(D); });
       if (Tok.isAny(tok::eof, tok::pound_endif, tok::pound_else,
                     tok::pound_elseif)) {
         IsInputIncomplete = true;
@@ -3608,7 +3602,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                            PosBeforeLB);
     } else {
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_extension,
-                        Options, [&] (Decl *D) { ext->addMember(D); }))
+                        Options, ext))
         status.setIsParseError();
     }
 
@@ -5748,7 +5742,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
                            PosBeforeLB);
     } else {
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_enum,
-                        Options, [&] (Decl *D) { ED->addMember(D); }))
+                        Options, ED))
         Status.setIsParseError();
     }
   }
@@ -6033,7 +6027,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
                            PosBeforeLB);
     } else {
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
-                        Options, [&](Decl *D) {SD->addMember(D);}))
+                        Options,SD))
         Status.setIsParseError();
     }
   }
@@ -6156,11 +6150,8 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
       State->delayDeclList(CD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
                            PosBeforeLB);
     } else {
-      auto Handler = [&] (Decl *D) {
-        CD->addMember(D);
-      };
       if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
-                        Options, Handler))
+                        Options, CD))
         Status.setIsParseError();
     }
   }
@@ -6266,7 +6257,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                              PosBeforeLB);
       } else {
         if (parseDeclList(LBraceLoc, RBraceLoc, diag::expected_rbrace_protocol,
-                          Options, [&](Decl *D) {Proto->addMember(D);}))
+                          Options, Proto))
           Status.setIsParseError();
       }
     }
