@@ -673,12 +673,6 @@ class TestData : TestDataSuper {
         expectEqual("SGVsbG8gV29ybGQ=", base64, "trivial base64 conversion should work")
     }
 
-    func test_dataHash() {
-        let dataStruct = "Hello World".data(using: .utf8)!
-        let dataObj = dataStruct as NSData
-        expectEqual(dataObj.hashValue, dataStruct.hashValue, "Data and NSData should have the same hash value")
-    }
-
     func test_base64Data_medium() {
         let data = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut at tincidunt arcu. Suspendisse nec sodales erat, sit amet imperdiet ipsum. Etiam sed ornare felis. Nunc mauris turpis, bibendum non lectus quis, malesuada placerat turpis. Nam adipiscing non massa et semper. Nulla convallis semper bibendum. Aliquam dictum nulla cursus mi ultricies, at tincidunt mi sagittis. Nulla faucibus at dui quis sodales. Morbi rutrum, dui id ultrices venenatis, arcu urna egestas felis, vel suscipit mauris arcu quis risus. Nunc venenatis ligula at orci tristique, et mattis purus pulvinar. Etiam ultricies est odio. Nunc eleifend malesuada justo, nec euismod sem ultrices quis. Etiam nec nibh sit amet lorem faucibus dapibus quis nec leo. Praesent sit amet mauris vel lacus hendrerit porta mollis consectetur mi. Donec eget tortor dui. Morbi imperdiet, arcu sit amet elementum interdum, quam nisl tempor quam, vitae feugiat augue purus sed lacus. In ac urna adipiscing purus venenatis volutpat vel et metus. Nullam nec auctor quam. Phasellus porttitor felis ac nibh gravida suscipit tempus at ante. Nunc pellentesque iaculis sapien a mattis. Aenean eleifend dolor non nunc laoreet, non dictum massa aliquam. Aenean quis turpis augue. Praesent augue lectus, mollis nec elementum eu, dignissim at velit. Ut congue neque id ullamcorper pellentesque. Maecenas euismod in elit eu vehicula. Nullam tristique dui nulla, nec convallis metus suscipit eget. Cras semper augue nec cursus blandit. Nulla rhoncus et odio quis blandit. Praesent lobortis dignissim velit ut pulvinar. Duis interdum quam adipiscing dolor semper semper. Nunc bibendum convallis dui, eget mollis magna hendrerit et. Morbi facilisis, augue eu fringilla convallis, mauris est cursus dolor, eu posuere odio nunc quis orci. Ut eu justo sem. Phasellus ut erat rhoncus, faucibus arcu vitae, vulputate erat. Aliquam nec magna viverra, interdum est vitae, rhoncus sapien. Duis tincidunt tempor ipsum ut dapibus. Nullam commodo varius metus, sed sollicitudin eros. Etiam nec odio et dui tempor blandit posuere.".data(using: .utf8)!
         let base64 = data.base64EncodedString()
@@ -1187,6 +1181,49 @@ class TestData : TestDataSuper {
         var d2 = Data()
         d2.append(slice)
         expectEqual(Data(bytes: [1]), slice)
+    }
+
+    // This test uses `repeatElement` to produce a sequence -- the produced sequence reports its actual count as its `.underestimatedCount`.
+    func test_appendingNonContiguousSequence_exactCount() {
+        var d = Data()
+
+        // d should go from .empty representation to .inline.
+        // Appending a small enough sequence to fit in .inline should actually be copied.
+        d.append(contentsOf: 0x00...0x01)
+        expectEqual(Data([0x00, 0x01]), d)
+
+        // Appending another small sequence should similarly still work.
+        d.append(contentsOf: 0x02...0x02)
+        expectEqual(Data([0x00, 0x01, 0x02]), d)
+
+        // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
+        // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
+        d.append(contentsOf: 0x03...0x17)
+        expectEqual(Data([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                          0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]), d)
+    }
+
+    // This test is like test_appendingNonContiguousSequence_exactCount but uses a sequence which reports 0 for its `.underestimatedCount`.
+    // This attempts to hit the worst-case scenario of `Data.append<S>(_:)` -- a discontiguous sequence of unknown length.
+    func test_appendingNonContiguousSequence_underestimatedCount() {
+        var d = Data()
+
+        // d should go from .empty representation to .inline.
+        // Appending a small enough sequence to fit in .inline should actually be copied.
+        d.append(contentsOf: (0x00...0x01).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        expectEqual(Data([0x00, 0x01]), d)
+
+        // Appending another small sequence should similarly still work.
+        d.append(contentsOf: (0x02...0x02).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        expectEqual(Data([0x00, 0x01, 0x02]), d)
+
+        // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
+        // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
+        d.append(contentsOf: (0x03...0x17).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        expectEqual(Data([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                          0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]), d)
     }
 
     func test_sequenceInitializers() {
@@ -3728,7 +3765,6 @@ DataTests.test("testCopyBytes_oversized") { TestData().testCopyBytes_oversized()
 DataTests.test("testCopyBytes_ranges") { TestData().testCopyBytes_ranges() }
 DataTests.test("test_base64Data_small") { TestData().test_base64Data_small() }
 DataTests.test("test_base64Data_medium") { TestData().test_base64Data_medium() }
-DataTests.test("test_dataHash") { TestData().test_dataHash() }
 DataTests.test("test_discontiguousEnumerateBytes") { TestData().test_discontiguousEnumerateBytes() }
 DataTests.test("test_basicReadWrite") { TestData().test_basicReadWrite() }
 DataTests.test("test_writeFailure") { TestData().test_writeFailure() }
@@ -3760,6 +3796,8 @@ DataTests.test("test_copyBytes1") { TestData().test_copyBytes1() }
 DataTests.test("test_copyBytes2") { TestData().test_copyBytes2() }
 DataTests.test("test_sliceOfSliceViaRangeExpression") { TestData().test_sliceOfSliceViaRangeExpression() }
 DataTests.test("test_appendingSlices") { TestData().test_appendingSlices() }
+DataTests.test("test_appendingNonContiguousSequence_exactCount") { TestData().test_appendingNonContiguousSequence_exactCount() }
+DataTests.test("test_appendingNonContiguousSequence_underestimatedCount") { TestData().test_appendingNonContiguousSequence_underestimatedCount() }
 DataTests.test("test_sequenceInitializers") { TestData().test_sequenceInitializers() }
 DataTests.test("test_reversedDataInit") { TestData().test_reversedDataInit() }
 DataTests.test("test_replaceSubrangeReferencingMutable") { TestData().test_replaceSubrangeReferencingMutable() }
