@@ -21,6 +21,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Basic/PathRemapper.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Index/Index.h"
 #include "clang/Basic/FileManager.h"
@@ -582,11 +583,14 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      bool isDebugCompilation, StringRef targetTriple,
                      ArrayRef<const clang::FileEntry *> fileDependencies,
                      const clang::CompilerInstance &clangCI,
-                     DiagnosticEngine &diags) {
+                     DiagnosticEngine &diags, const PathRemapper &debugPrefixMap) {
   auto &fileMgr = clangCI.getFileManager();
   auto *module = primarySourceFile->getParentModule();
   bool isSystem = module->isSystemModule();
-  auto *mainFile = fileMgr.getFile(primarySourceFile->getFilename());
+  auto mainFilename =
+      debugPrefixMap.remapPath(primarySourceFile->getFilename());
+  auto *mainFile = fileMgr.getVirtualFile(mainFilename, 0, 0);
+
   // FIXME: Get real values for the following.
   StringRef swiftVersion;
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
@@ -652,7 +656,8 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
                            bool indexSystemModules,
                            bool isDebugCompilation,
                            StringRef targetTriple,
-                           const DependencyTracker &dependencyTracker) {
+                           const DependencyTracker &dependencyTracker,
+                           const PathRemapper &debugPrefixMap) {
   auto &astContext = primarySourceFile->getASTContext();
   auto &clangCI = astContext.getClangModuleLoader()->getClangInstance();
   auto &diags = astContext.Diags;
@@ -676,11 +681,10 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
   collectFileDependencies(fileDependencies, dependencyTracker, module, fileMgr);
 #endif
 
-  return recordSourceFileUnit(primarySourceFile, indexUnitToken,
-                              indexStorePath, indexSystemModules,
-                              isDebugCompilation, targetTriple,
-                              fileDependencies.getArrayRef(),
-                              clangCI, diags);
+  return recordSourceFileUnit(primarySourceFile, indexUnitToken, indexStorePath,
+                              indexSystemModules, isDebugCompilation,
+                              targetTriple, fileDependencies.getArrayRef(),
+                              clangCI, diags, debugPrefixMap);
 }
 
 bool index::indexAndRecord(ModuleDecl *module,
@@ -722,11 +726,10 @@ bool index::indexAndRecord(ModuleDecl *module,
         diags.diagnose(SourceLoc(), diag::error_index_inputs_more_than_outputs);
         return true;
       }
-      if (recordSourceFileUnit(SF, indexUnitTokens[unitIndex],
-                               indexStorePath, indexSystemModules,
-                               isDebugCompilation, targetTriple,
-                               fileDependencies.getArrayRef(),
-                               clangCI, diags))
+      if (recordSourceFileUnit(SF, indexUnitTokens[unitIndex], indexStorePath,
+                               indexSystemModules, isDebugCompilation,
+                               targetTriple, fileDependencies.getArrayRef(),
+                               clangCI, diags, {}))
         return true;
       unitIndex += 1;
     }

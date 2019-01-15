@@ -1364,7 +1364,8 @@ static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
     if (index::indexAndRecord(PrimarySourceFile, PSPs.OutputFilename,
                               opts.IndexStorePath, opts.IndexSystemModules,
                               isDebugCompilation, Invocation.getTargetTriple(),
-                              *Instance.getDependencyTracker())) {
+                              *Instance.getDependencyTracker(),
+                              Invocation.getIRGenOptions().DebugPrefixMap)) {
       return true;
     }
   } else {

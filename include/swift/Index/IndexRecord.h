@@ -21,6 +21,7 @@ namespace swift {
 class DependencyTracker;
 class ModuleDecl;
 class SourceFile;
+class PathRemapper;
 
 namespace index {
 
@@ -44,7 +45,8 @@ namespace index {
 bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
                     StringRef indexStorePath, bool indexSystemModules,
                     bool isDebugCompilation, StringRef targetTriple,
-                    const DependencyTracker &dependencyTracker);
+                    const DependencyTracker &dependencyTracker,
+                    const PathRemapper &debugPrefixMap);
 
 /// Index the given module and store the results to \p indexStorePath.
 ///
