@@ -21,6 +21,7 @@
 // RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: optimized_stdlib
 
 import Swift
 import StdlibUnittest
