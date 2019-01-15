@@ -13,8 +13,8 @@ public struct Foo : Differentiable {
 // CHECK-AST:     @_fieldwiseProductSpace typealias AllDifferentiableVariables = Foo.AllDifferentiableVariables
 // CHECK-AST:     @_fieldwiseProductSpace typealias TangentVector = Foo.AllDifferentiableVariables
 // CHECK-AST:     @_fieldwiseProductSpace typealias CotangentVector = Foo.AllDifferentiableVariables
-// CHECK-AST:   typealias TangentVector = Foo.AllDifferentiableVariables
-// CHECK-AST:   typealias CotangentVector = Foo.AllDifferentiableVariables
+// CHECK-AST:   @_fieldwiseProductSpace typealias TangentVector = Foo.AllDifferentiableVariables
+// CHECK-AST:   @_fieldwiseProductSpace typealias CotangentVector = Foo.AllDifferentiableVariables
 
 // CHECK-SILGEN-LABEL: // Foo.a.getter
 // CHECK-SILGEN: sil [transparent] [serialized] [differentiable source 0 wrt 0] @$s33derived_differentiable_properties3FooV1aSfvg : $@convention(method) (Foo) -> Float
