@@ -421,6 +421,9 @@ class BuildScriptInvocation(object):
                 'WATCHOS_DEPLOYMENT_TARGET']:
             os.environ.pop(v, None)
 
+        # Set NINJA_STATUS to format ninja output
+        os.environ['NINJA_STATUS'] = '[%f/%t][%p][%es] '
+
     def build_ninja(self):
         if not os.path.exists(self.workspace.source_dir("ninja")):
             diagnostics.fatal(
