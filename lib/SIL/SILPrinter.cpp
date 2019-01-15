@@ -1297,6 +1297,9 @@ public:
       *this << "[derivedselfonly] ";
       break;
     case MarkUninitializedInst::DelegatingSelf: *this << "[delegatingself] ";break;
+    case MarkUninitializedInst::DelegatingSelfAllocated:
+      *this << "[delegatingselfallocated] ";
+      break;
     }
     
     *this << getIDAndType(MU->getOperand());

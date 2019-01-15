@@ -1397,14 +1397,21 @@ public:
     // protocols, which only witness initializing initializers.
     else if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
       useAllocatingCtor = !proto->isObjC();
-    // Similarly, class initializers self.init-delegate to each other via
-    // their allocating entry points, unless delegating to an ObjC-only,
-    // non-factory initializer.
+    // Factory initializers are effectively "allocating" initializers with no
+    // corresponding initializing entry point.
+    } else if (ctorRef->getDecl()->isFactoryInit()) {
+       useAllocatingCtor = true;
+    // If we're emitting a class initializer's non-allocating entry point and
+    // delegating to an initializer exposed to Objective-C, use the initializing
+    // entry point to avoid replacing an existing allocated object.
+    } else if (!SGF.AllocatorMetatype && ctorRef->getDecl()->isObjC()) {
+      useAllocatingCtor = false;
+    // In general, though, class initializers self.init-delegate to each other
+    // via their allocating entry points.
     } else {
       assert(isa<ClassDecl>(nominal)
              && "some new kind of init context we haven't implemented");
-      useAllocatingCtor = ctorRef->getDecl()->isFactoryInit()
-        || !requiresForeignEntryPoint(ctorRef->getDecl());
+      useAllocatingCtor = !requiresForeignEntryPoint(ctorRef->getDecl());
     }
 
     // Load the 'self' argument.
@@ -1472,9 +1479,16 @@ public:
         arg->isSelfExprOf(
             cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false);
 
-    constant =
-        constant.asForeign(!isObjCReplacementSelfCall &&
-                           requiresForeignEntryPoint(ctorRef->getDecl()));
+    if (!isObjCReplacementSelfCall) {
+      if (useAllocatingCtor) {
+        constant =
+            constant.asForeign(requiresForeignEntryPoint(ctorRef->getDecl()));
+      } else {
+        // Note: if we ever implement delegating from one designated initializer
+        // to another, this won't be correct; that should do a direct dispatch.
+        constant = constant.asForeign(ctorRef->getDecl()->isObjC());
+      }
+    }
 
     // Determine the callee. This is normally the allocating
     // entry point, unless we're delegating to an ObjC initializer.
@@ -1485,7 +1499,8 @@ public:
           constant, subs, expr));
     } else if ((useAllocatingCtor || constant.isForeign) &&
                !isSelfCallToReplacedInDynamicReplacement &&
-               getMethodDispatch(ctorRef->getDecl()) == MethodDispatch::Class) {
+               ((constant.isForeign && !useAllocatingCtor) ||
+                getMethodDispatch(ctorRef->getDecl()) == MethodDispatch::Class)) {
       // Dynamic dispatch to the initializer.
       Scope S(SGF, expr);
       setCallee(Callee::forClassMethod(
