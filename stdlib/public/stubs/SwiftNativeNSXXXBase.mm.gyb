@@ -100,7 +100,7 @@ SWIFT_RUNTIME_STDLIB_API
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc {
-  swift_rootObjCDealloc(reinterpret_cast<HeapObject *>(self));
+  free(reinterpret_cast<void *>(self));
 }
 #pragma clang diagnostic pop
 
