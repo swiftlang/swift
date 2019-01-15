@@ -1113,7 +1113,7 @@ protected:
       case MetadataKind::Tuple: {
         auto numElementsAddress = address +
           TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements();
-        uint32_t numElements;
+        StoredSize numElements;
         if (!Reader->readInteger(RemoteAddress(numElementsAddress),
                                  &numElements))
           return nullptr;
