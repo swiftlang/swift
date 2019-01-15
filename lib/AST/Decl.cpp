@@ -2578,9 +2578,9 @@ bool ValueDecl::shouldHideFromEditor() const {
   return false;
 }
 
-/// Return the access level of an internal or public declaration
-/// that's been testably imported.
-static AccessLevel getTestableOrPrivateImportsAccess(const ValueDecl *decl) {
+/// Return maximally open access level which could be associated with the
+/// given declaration accounting for @testable importers.
+static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
     if (!cls->isFinal())
@@ -2606,6 +2606,11 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
                                            AccessLevel access,
                                            const DeclContext *useDC,
                                            bool treatUsableFromInlineAsPublic) {
+  // If access control is disabled in the current context, adjust
+  // access level of the current declaration to be as open as possible.
+  if (useDC && VD->getASTContext().isAccessControlDisabled())
+    return getMaximallyOpenAccessFor(VD);
+
   if (treatUsableFromInlineAsPublic &&
       access == AccessLevel::Internal &&
       VD->isUsableFromInline()) {
@@ -2618,7 +2623,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
     if (!useSF) return access;
     if (useSF->hasTestableOrPrivateImport(access, VD))
-      return getTestableOrPrivateImportsAccess(VD);
+      return getMaximallyOpenAccessFor(VD);
   }
 
   return access;
@@ -2646,16 +2651,16 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   case AccessLevel::Internal:
     if (getModuleContext()->isTestingEnabled() ||
         getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getTestableOrPrivateImportsAccess(this);
+      effectiveAccess = getMaximallyOpenAccessFor(this);
     break;
   case AccessLevel::FilePrivate:
     if (getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getTestableOrPrivateImportsAccess(this);
+      effectiveAccess = getMaximallyOpenAccessFor(this);
     break;
   case AccessLevel::Private:
     effectiveAccess = AccessLevel::FilePrivate;
     if (getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getTestableOrPrivateImportsAccess(this);
+      effectiveAccess = getMaximallyOpenAccessFor(this);
     break;
   }
 
@@ -2851,9 +2856,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   case AccessLevel::FilePrivate:
     if (useDC->getModuleScopeContext() != sourceDC->getModuleScopeContext()) {
       auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
-      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
-        return true;
-      return false;
+      return useSF && useSF->hasTestableOrPrivateImport(access, VD);
     }
     return true;
   case AccessLevel::Internal: {
@@ -2862,10 +2865,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     if (useFile->getParentModule() == sourceModule)
       return true;
     auto *useSF = dyn_cast<SourceFile>(useFile);
-    if (!useSF) return false;
-    if (useSF->hasTestableOrPrivateImport(access, sourceModule))
-      return true;
-    return false;
+    return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Public:
   case AccessLevel::Open:

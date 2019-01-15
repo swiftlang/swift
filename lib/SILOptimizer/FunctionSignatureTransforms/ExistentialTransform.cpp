@@ -401,6 +401,8 @@ void ExistentialTransform::populateThunkBody() {
         break;
       }
       case ExistentialRepresentation::Class: {
+        /// If the operand is not object type, we would need an explicit load.
+        assert(OrigOperand->getType().isObject());
         archetypeValue =
             Builder.createOpenExistentialRef(Loc, OrigOperand, OpenedSILType);
         ApplyArgs.push_back(archetypeValue);

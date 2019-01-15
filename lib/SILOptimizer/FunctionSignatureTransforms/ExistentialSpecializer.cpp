@@ -19,6 +19,7 @@
 #include "ExistentialTransform.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -48,9 +49,18 @@ class ExistentialSpecializer : public SILFunctionTransform {
   /// Specialize existential args in function F.
   void specializeExistentialArgsInAppliesWithinFunction(SILFunction &F);
 
+  /// Find concrete type using protocolconformance analysis.
+  bool findConcreteTypeFromSoleConformingType(
+    SILFunctionArgument *Arg, CanType &ConcreteType);
+
   /// CallerAnalysis information.
   CallerAnalysis *CA;
 
+  // Determine the set of types a protocol conforms to in whole-module
+  // compilation mode.
+  ProtocolConformanceAnalysis *PCA;
+
+  ClassHierarchyAnalysis *CHA;
 public:
   void run() override {
 
@@ -64,11 +74,38 @@ public:
     /// Get CallerAnalysis information handy.
     CA = PM->getAnalysis<CallerAnalysis>();
 
+    /// Get ProtocolConformanceAnalysis.
+    PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();
+
+    /// Get ClassHierarchyAnalysis.
+    CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
     /// Perform specialization.
     specializeExistentialArgsInAppliesWithinFunction(*F);
   }
 };
 } // namespace
+
+/// Find concrete type from Sole Conforming Type.
+bool ExistentialSpecializer::findConcreteTypeFromSoleConformingType(
+    SILFunctionArgument *Arg, CanType &ConcreteType) {
+  auto ArgType = Arg->getType();
+  auto SwiftArgType = ArgType.getASTType();
+
+  /// Do not handle composition types yet.
+  if (isa<ProtocolCompositionType>(SwiftArgType))
+    return false;
+  assert(ArgType.isExistentialType());
+  /// Find the protocol decl.
+  auto *PD = dyn_cast<ProtocolDecl>(SwiftArgType->getAnyNominal());
+  if (!PD)
+    return false;
+
+  // Get SoleConformingType in ConcreteType using ProtocolConformanceAnalysis
+  // and ClassHierarchyAnalysis.
+  if (!PCA->getSoleConformingType(PD, CHA, ConcreteType))
+    return false;
+  return true;
+}
 
 /// Check if the argument Arg is used in a destroy_use instruction.
 static void
@@ -81,6 +118,14 @@ findIfCalleeUsesArgInDestroyUse(SILValue Arg,
       break;
     }
   }
+}
+
+/// Helper function to ensure that the argument is not InOut or InOut_Aliasable
+static bool isNonInoutIndirectArgument(SILValue Arg,
+                                       SILArgumentConvention ArgConvention) {
+  return !Arg->getType().isObject() && ArgConvention.isIndirectConvention() &&
+         ArgConvention != SILArgumentConvention::Indirect_Inout &&
+         ArgConvention != SILArgumentConvention::Indirect_InoutAliasable;
 }
 
 /// Check if any apply argument meets the criteria for existential
@@ -122,7 +167,14 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
     Operand &ArgOper = Apply.getArgumentRef(Idx);
     CanType ConcreteType =
         ConcreteExistentialInfo(ArgOper.get(), ArgOper.getUser()).ConcreteType;
-    if (!ConcreteType) {
+    auto ArgConvention = F->getConventions().getSILArgumentConvention(Idx);
+    /// Find the concrete type, either via sole type or via
+    /// findInitExistential..
+    CanType SoleConcreteType;
+    if (!((F->getModule().isWholeModule() &&
+           isNonInoutIndirectArgument(CalleeArg, ArgConvention) &&
+           findConcreteTypeFromSoleConformingType(CalleeArg, SoleConcreteType)) ||
+          ConcreteType)) {
       LLVM_DEBUG(
           llvm::dbgs()
               << "ExistentialSpecializer Pass: Bail! cannot find ConcreteType "
