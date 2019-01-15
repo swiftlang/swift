@@ -59,17 +59,6 @@ getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B, SILLocation Loc,
   }
 }
 
-/// Given an RValue of aggregate type, compute the values of the elements by
-/// emitting a series of tuple_element instructions.
-static void getScalarizedElements(SILValue V,
-                                  SmallVectorImpl<SILValue> &ElementVals,
-                                  SILLocation Loc, SILBuilder &B) {
-  TupleType *TT = V->getType().castTo<TupleType>();
-  for (auto Index : indices(TT->getElements())) {
-    ElementVals.push_back(B.emitTupleExtract(Loc, V, Index));
-  }
-}
-
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
 /// can return the newly generated sub-element loads.
 static SILValue scalarizeLoad(LoadInst *LI,
@@ -442,8 +431,9 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       // Scalarize StoreInst
       if (auto *SI = dyn_cast<StoreInst>(User)) {
         SILBuilderWithScope B(User, SI);
-        getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
-
+        B.emitDestructureValueOperation(
+            SI->getLoc(), SI->getSrc(),
+            [&](unsigned index, SILValue v) { ElementTmps.push_back(v); });
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
           B.createTrivialStoreOr(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
                                  SI->getOwnershipQualifier(),
