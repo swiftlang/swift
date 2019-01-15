@@ -1468,6 +1468,19 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
                                 AssociatedConformance requirement,
                                 CanType associatedType,
                                 ProtocolConformanceRef associatedConformance) {
+  // Substitute out opaque types.
+  auto substAssocType = associatedType
+    .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal)
+    ->getCanonicalType();
+  if (substAssocType != associatedType) {
+    auto substAssocConformance = associatedConformance
+      .substOpaqueTypesWithUnderlyingTypes(associatedType,
+                                           ResilienceExpansion::Minimal);
+    
+    associatedType = substAssocType;
+    associatedConformance = substAssocConformance;
+  }
+  
   bool hasArchetype = associatedType->hasArchetype();
 
   assert(isa<NormalProtocolConformance>(Conformance) && "has associated type");
