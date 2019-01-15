@@ -116,7 +116,7 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB,
                                 bool FullParse,
-                                bool DisableDelayedParsing) {
+                                bool DelayBodyParsing) {
   assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
          "cannot parse in full with the given parameters!");
 
@@ -129,7 +129,7 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
 
   SharedTimer timer("Parsing");
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
-           PersistentState, STreeCreator, DisableDelayedParsing);
+           PersistentState, STreeCreator, DelayBodyParsing);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
@@ -158,21 +158,21 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB,
-                                bool DisableDelayedParsing) {
+                                bool DelayBodyParsing) {
   return parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
                                  PersistentState, DelayedParseCB,
                                  /*FullParse=*/SF.shouldBuildSyntaxTree(),
-                                 DisableDelayedParsing);
+                                 DelayBodyParsing);
 }
 
 bool swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                                     PersistentParserState *PersistentState,
                                     DelayedParsingCallbacks *DelayedParseCB,
-                                    bool DisableDelayedParsing) {
+                                    bool DelayBodyParsing) {
   bool Done = false;
   return parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
                                  PersistentState, DelayedParseCB,
-                                 /*FullParse=*/true, DisableDelayedParsing);
+                                 /*FullParse=*/true, DelayBodyParsing);
 }
 
 

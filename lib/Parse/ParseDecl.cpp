@@ -3496,7 +3496,7 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 
 bool Parser::canDelayMemberDeclParsing() {
   // If explicitly disabled, respect the flag.
-  if (DisableDelayedParsing)
+  if (!DelayBodyParsing)
     return false;
   // There's no fundamental reasons that SIL cannnot be lasily parsed. We need
   // to keep SILParserTUStateBase persistent to make it happen.
@@ -3520,6 +3520,9 @@ bool Parser::canDelayMemberDeclParsing() {
   // so we cannot lazily parse members.
   if (isCodeCompletionFirstPass())
     return false;
+
+  // Skip until the matching right curly bracket; if we find a pound directive,
+  // we can't lazily parse.
   BacktrackingScope BackTrack(*this);
   bool HasPoundDirective;
   skipUntilMatchingRBrace(*this, HasPoundDirective, SyntaxContext);

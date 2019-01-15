@@ -207,8 +207,15 @@ public:
   /// Always empty if !SF.shouldBuildSyntaxTree().
   ParsedTrivia TrailingTrivia;
 
-  /// Whether we should disable delayed parsing.
-  bool DisableDelayedParsing;
+  /// Whether we should delay parsing nominal type and extension bodies,
+  /// and skip function bodies.
+  ///
+  /// This is false in primary files, since we want to type check all
+  /// declarations and function bodies.
+  ///
+  /// This is true for non-primary files, where declarations only need to be
+  /// lazily parsed and type checked.
+  bool DelayBodyParsing;
 
   /// The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
@@ -357,16 +364,16 @@ public:
          SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DisableDelayedParsing = false);
+         bool DelayBodyParsing = true);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DisableDelayedParsing = false);
+         bool DelayBodyParsing = true);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserTUStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DisableDelayedParsing = false);
+         bool DelayBodyParsing = true);
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }
