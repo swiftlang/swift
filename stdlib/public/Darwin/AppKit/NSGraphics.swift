@@ -181,7 +181,10 @@ extension NSWindow.Depth {
 }
 
 extension NSAnimationEffect {
-  private class _CompletionHandlerDelegate : NSObject {
+  // NOTE: older overlays called this class _CompletionHandlerDelegate.
+  // The two must coexist without a conflicting ObjC class name, so it
+  // was renamed. The old name must not be used in the new runtime.
+  private class __CompletionHandlerDelegate : NSObject {
     var completionHandler: () -> Void = { }
     @objc func animationEffectDidEnd(_ contextInfo: UnsafeMutableRawPointer?) {
       completionHandler()
@@ -190,7 +193,7 @@ extension NSAnimationEffect {
   @available(swift 4)
   public func show(centeredAt centerLocation: NSPoint, size: NSSize,
                    completionHandler: @escaping () -> Void = { }) {
-    let delegate = _CompletionHandlerDelegate()
+    let delegate = __CompletionHandlerDelegate()
     delegate.completionHandler = completionHandler
     // Note that the delegate of `__NSShowAnimationEffect` is retained for the
     // duration of the animation.
@@ -199,7 +202,7 @@ extension NSAnimationEffect {
         centerLocation,
         size,
         delegate,
-        #selector(_CompletionHandlerDelegate.animationEffectDidEnd(_:)),
+        #selector(__CompletionHandlerDelegate.animationEffectDidEnd(_:)),
         nil)
   }
 }

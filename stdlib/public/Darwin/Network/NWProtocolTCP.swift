@@ -10,12 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOTE: older overlays had Network.NWProtocolTCP as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC7Network14_NWProtocolTCP is the
+// mangled name for Network._NWProtocolTCP.
+@_objcRuntimeName(_TtC7Network14_NWProtocolTCP)
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public class NWProtocolTCP : NWProtocol {
 	public static let definition: NWProtocolDefinition = {
 		NWProtocolDefinition(nw_protocol_copy_tcp_definition(), "tcp")
 	}()
 
+  // Set the ObjC name of this class to be nested in the customized ObjC
+  // name of NWProtocolTCP.
+  @_objcRuntimeName(_TtCC7Network14_NWProtocolTCP7Options)
 	public class Options : NWProtocolOptions {
 
 		private var _noDelay: Bool = false
@@ -244,6 +252,9 @@ public class NWProtocolTCP : NWProtocol {
 
 	/// Access TCP metadata using NWConnection.metadata(protocolDefinition: NWProtocolTCP.definition)
 	/// or in received ContentContext
+  // Set the ObjC name of this class to be nested in the customized ObjC
+  // name of NWProtocolTCP.
+  @_objcRuntimeName(_TtCC7Network14_NWProtocolTCP8Metadata)
 	public class Metadata: NWProtocolMetadata {
 		override internal init(_ nw: nw_protocol_metadata_t) {
 			super.init(nw)

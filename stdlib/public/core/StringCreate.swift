@@ -38,7 +38,7 @@ extension String {
       return String(_StringGuts(smol))
     }
 
-    let storage = _StringStorage.create(initializingFrom: input, isASCII: true)
+    let storage = __StringStorage.create(initializingFrom: input, isASCII: true)
     return storage.asString
   }
 
@@ -83,7 +83,7 @@ extension String {
       return String(_StringGuts(smol))
     }
 
-    let storage = _StringStorage.create(
+    let storage = __StringStorage.create(
       initializingFrom: input, isASCII: isASCII)
     return storage.asString
   }
@@ -98,7 +98,7 @@ extension String {
     }
 
     let isASCII = asciiPreScanResult
-    let storage = _StringStorage.create(
+    let storage = __StringStorage.create(
       initializingFrom: input, isASCII: isASCII)
     return storage.asString
   }

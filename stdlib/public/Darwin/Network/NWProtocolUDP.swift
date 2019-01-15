@@ -10,12 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOTE: older overlays had Network.NWProtocolUDP as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC7Network14_NWProtocolUDP is the
+// mangled name for Network._NWProtocolUDP.
+@_objcRuntimeName(_TtC7Network14_NWProtocolUDP)
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public class NWProtocolUDP : NWProtocol {
 	public static let definition: NWProtocolDefinition = {
 		NWProtocolDefinition(nw_protocol_copy_udp_definition(), "udp")
 	}()
 
+  // Set the ObjC name of this class to be nested in the customized ObjC
+  // name of NWProtocolUDP.
+  @_objcRuntimeName(_TtCC7Network14_NWProtocolUDP7Options)
 	public class Options : NWProtocolOptions {
 
 		private var _preferNoChecksum: Bool = false
@@ -42,7 +50,10 @@ public class NWProtocolUDP : NWProtocol {
 		}
 	}
 
-    public class Metadata: NWProtocolMetadata {
+  // Set the ObjC name of this class to be nested in the customized ObjC
+  // name of NWProtocolUDP.
+  @_objcRuntimeName(_TtCC7Network14_NWProtocolUDP8Metadata)
+  public class Metadata: NWProtocolMetadata {
 		override internal init(_ nw: nw_protocol_metadata_t) {
 			super.init(nw)
 		}

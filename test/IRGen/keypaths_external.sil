@@ -41,13 +41,13 @@ sil @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer,
 sil @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int
 
 // -- %t
-// CHECK: [[KP_T:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 1, {{.*}} @"got.$s23keypaths_external_other1GV1xxvpMV"
+// CHECK: [[KP_T:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 1, {{.*}} @"{{got.|__imp_}}$s23keypaths_external_other1GV1xxvpMV"
 // CHECK-SAME:   @"symbolic x"
 //            -- computed get-only property, identified by indirect pointer
 // CHECK-SAME:   <i32 0x0208_0002>
 
 // -- %u
-// CHECK: [[KP_U:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 3, {{.*}} @"got.$s23keypaths_external_other1GVyxqd__cSHRd__luipMV"
+// CHECK: [[KP_U:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 3, {{.*}} @"{{got.|__imp_}}$s23keypaths_external_other1GVyxqd__cSHRd__luipMV"
 // CHECK-SAME:   @"symbolic q_"
 // CHECK-SAME:   @"symbolic x"
 // CHECK-SAME:   @"keypath_get_witness_table

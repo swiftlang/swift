@@ -126,10 +126,10 @@ extension _AbstractStringStorage {
     switch knownOther {
     case .storage:
       return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: _StringStorage.self))
+        _unsafeUncheckedDowncast(other, to: __StringStorage.self))
     case .shared:
       return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: _SharedStringStorage.self))
+        _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
 #if !(arch(i386) || arch(arm))
     case .tagged:
       fallthrough
@@ -172,7 +172,10 @@ private typealias CountAndFlags = _StringObject.CountAndFlags
 // Optional<_StringBreadcrumbs>.
 //
 
-final internal class _StringStorage
+// NOTE: older runtimes called this class _StringStorage. The two
+// must coexist without conflicting ObjC class names, so it was
+// renamed. The old name must not be used in the new runtime.
+final internal class __StringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {
 #if arch(i386) || arch(arm)
   // The total allocated storage capacity. Note that this includes the required
@@ -299,7 +302,7 @@ final internal class _StringStorage
 
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
-    // While _StringStorage instances aren't immutable in general,
+    // While __StringStorage instances aren't immutable in general,
     // mutations may only occur when instances are uniquely referenced.
     // Therefore, it is safe to return self here; any outstanding Objective-C
     // reference will make the instance non-unique.
@@ -350,13 +353,13 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
 }
 
 // Creation
-extension _StringStorage {
+extension __StringStorage {
   @_effects(releasenone)
   private static func create(
     realCodeUnitCapacity: Int, countAndFlags: CountAndFlags
-  ) -> _StringStorage {
+  ) -> __StringStorage {
     let storage = Builtin.allocWithTailElems_2(
-      _StringStorage.self,
+      __StringStorage.self,
       realCodeUnitCapacity._builtinWordValue, UInt8.self,
       1._builtinWordValue, Optional<_StringBreadcrumbs>.self)
 #if arch(i386) || arch(arm)
@@ -380,12 +383,12 @@ extension _StringStorage {
   @_effects(releasenone)
   private static func create(
     capacity: Int, countAndFlags: CountAndFlags
-  ) -> _StringStorage {
+  ) -> __StringStorage {
     _internalInvariant(capacity >= countAndFlags.count)
 
     let realCapacity = determineCodeUnitCapacity(capacity)
     _internalInvariant(realCapacity > capacity)
-    return _StringStorage.create(
+    return __StringStorage.create(
       realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
   }
 
@@ -394,11 +397,11 @@ extension _StringStorage {
     initializingFrom bufPtr: UnsafeBufferPointer<UInt8>,
     capacity: Int,
     isASCII: Bool
-  ) -> _StringStorage {
+  ) -> __StringStorage {
     let countAndFlags = CountAndFlags(
       mortalCount: bufPtr.count, isASCII: isASCII)
     _internalInvariant(capacity >= bufPtr.count)
-    let storage = _StringStorage.create(
+    let storage = __StringStorage.create(
       capacity: capacity, countAndFlags: countAndFlags)
     let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
     storage.mutableStart.initialize(from: addr, count: bufPtr.count)
@@ -409,14 +412,14 @@ extension _StringStorage {
   @_effects(releasenone)
   internal static func create(
     initializingFrom bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool
-  ) -> _StringStorage {
-    return _StringStorage.create(
+  ) -> __StringStorage {
+    return __StringStorage.create(
       initializingFrom: bufPtr, capacity: bufPtr.count, isASCII: isASCII)
   }
 }
 
 // Usage
-extension _StringStorage {
+extension __StringStorage {
   @inline(__always)
   private var mutableStart: UnsafeMutablePointer<UInt8> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
@@ -504,7 +507,7 @@ extension _StringStorage {
 }
 
 // Appending
-extension _StringStorage {
+extension __StringStorage {
   // Perform common post-RRC adjustments and invariant enforcement.
   @_effects(releasenone)
   private func _postRRCAdjust(newCount: Int, newIsASCII: Bool) {
@@ -564,7 +567,7 @@ extension _StringStorage {
 }
 
 // Removing
-extension _StringStorage {
+extension __StringStorage {
   @_effects(releasenone)
   internal func remove(from lower: Int, to upper: Int) {
     _internalInvariant(lower <= upper)
@@ -646,7 +649,10 @@ extension _StringStorage {
 }
 
 // For shared storage and bridging literals
-final internal class _SharedStringStorage
+// NOTE: older runtimes called this class _SharedStringStorage. The two
+// must coexist without conflicting ObjC class names, so it was
+// renamed. The old name must not be used in the new runtime.
+final internal class __SharedStringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {
   internal var _owner: AnyObject?
   internal var start: UnsafePointer<UInt8>
@@ -775,7 +781,7 @@ final internal class _SharedStringStorage
 
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
-    // While _StringStorage instances aren't immutable in general,
+    // While __StringStorage instances aren't immutable in general,
     // mutations may only occur when instances are uniquely referenced.
     // Therefore, it is safe to return self here; any outstanding Objective-C
     // reference will make the instance non-unique.
@@ -786,7 +792,7 @@ final internal class _SharedStringStorage
 
 }
 
-extension _SharedStringStorage {
+extension __SharedStringStorage {
 #if !INTERNAL_CHECKS_ENABLED
   @inline(__always)
   internal func _invariantCheck() {}

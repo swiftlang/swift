@@ -37,7 +37,7 @@ public class Class {
 // CHECK-SAME:   void (%T11dead_method5ClassC*)* @"$s11dead_method5ClassCfD",
 
 // -- value witness table
-// CHECK-SAME:   i8** @"$sBoWV",
+// CHECK-SAME:   i8** {{@"\$sBoWV"|null}},
 
 // -- nominal type descriptor
 // CHECK-SAME:   @"$s11dead_method5ClassCMn",

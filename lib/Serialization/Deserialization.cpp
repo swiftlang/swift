@@ -1140,21 +1140,20 @@ getActualCtorInitializerKind(uint8_t raw) {
   return None;
 }
 
-/// Determine whether the two modules are re-exported to the same module.
-static bool reExportedToSameModule(const ModuleDecl *fromModule,
-                                   const ModuleDecl *toModule) {
+static bool isReExportedToModule(const ValueDecl *value,
+                                 const ModuleDecl *expectedModule) {
+  const DeclContext *valueDC = value->getDeclContext();
   auto fromClangModule
-    = dyn_cast<ClangModuleUnit>(fromModule->getFiles().front());
+      = dyn_cast<ClangModuleUnit>(valueDC->getModuleScopeContext());
   if (!fromClangModule)
     return false;
+  std::string exportedName = fromClangModule->getExportedModuleName();
 
   auto toClangModule
-  = dyn_cast<ClangModuleUnit>(toModule->getFiles().front());
-  if (!toClangModule)
-    return false;
-
-  return fromClangModule->getExportedModuleName() ==
-    toClangModule->getExportedModuleName();
+      = dyn_cast<ClangModuleUnit>(expectedModule->getFiles().front());
+  if (toClangModule)
+    return exportedName == toClangModule->getExportedModuleName();
+  return exportedName == expectedModule->getName().str();
 }
 
 /// Remove values from \p values that don't match the expected type or module.
@@ -1197,7 +1196,7 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
     // module to the original definition in a base module.
     if (expectedModule && !value->hasClangNode() &&
         value->getModuleContext() != expectedModule &&
-        !reExportedToSameModule(value->getModuleContext(), expectedModule))
+        !isReExportedToModule(value, expectedModule))
       return true;
 
     // If we're expecting a member within a constrained extension with a
@@ -1357,6 +1356,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       if (entry.Kind != llvm::BitstreamEntry::Record)
         return Identifier();
 
+      scratch.clear();
       unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
                                                     &blobData);
       switch (recordID) {
