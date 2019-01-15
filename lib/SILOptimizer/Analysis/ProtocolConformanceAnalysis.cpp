@@ -139,4 +139,26 @@ ProtocolConformanceAnalysis::findSoleConformingType(ProtocolDecl *Protocol) {
   return SoleConformingNTD;
 }
 
+// Wrapper function to findSoleConformingType that checks for additional
+// constraints for classes using ClassHierarchyAnalysis.
+bool ProtocolConformanceAnalysis::getSoleConformingType(
+    ProtocolDecl *Protocol, ClassHierarchyAnalysis *CHA, CanType &ConcreteType) {
+  // Determine the sole conforming type.
+  auto *NTD = findSoleConformingType(Protocol);
+  if (!NTD)
+    return false;
+
+  // Sole conforming class should not be open access or have any derived class.
+  ClassDecl *CD;
+  if ((CD = dyn_cast<ClassDecl>(NTD)) &&
+      (CD->getEffectiveAccess() == AccessLevel::Open ||
+       CHA->hasKnownDirectSubclasses(CD))) {
+    return false;
+  }
+
+  // Save the concrete type.
+  ConcreteType = NTD->getDeclaredType()->getCanonicalType();
+  return true;
+}
+
 ProtocolConformanceAnalysis::~ProtocolConformanceAnalysis() {}
