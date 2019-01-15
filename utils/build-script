@@ -292,6 +292,10 @@ class BuildScriptInvocation(object):
             args.build_subdir = \
                 workspace.compute_build_subdir(args)
 
+        if args.install_destdir is None:
+            args.install_destdir = os.path.join(args.build_subdir,
+                '{}-{}'.format('toolchain', args.host_target))
+
         # Add optional stdlib-deployment-targets
         if args.android:
             if args.android_arch == "armv7":
@@ -580,6 +584,10 @@ class BuildScriptInvocation(object):
         if args.install_symroot:
             impl_args += [
                 "--install-symroot", os.path.abspath(args.install_symroot)
+            ]
+        if args.install_destdir:
+            impl_args += [
+                "--install-destdir", os.path.abspath(args.install_destdir)
             ]
 
         if args.skip_build:

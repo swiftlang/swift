@@ -137,6 +137,7 @@ EXPECTED_DEFAULTS = {
     'host_test': False,
     'install_prefix': targets.install_prefix(),
     'install_symroot': None,
+    'install_destdir': None,
     'ios': False,
     'ios_all': False,
     'legacy_impl': False,
@@ -524,6 +525,7 @@ EXPECTED_OPTIONS = [
     PathOption('--host-lipo'),
     PathOption('--install-prefix'),
     PathOption('--install-symroot'),
+    PathOption('--install-destdir'),
     PathOption('--symbols-package'),
 
     IntOption('--benchmark-num-o-iterations'),
