@@ -71,3 +71,5 @@ Var _NativeDictionary._storage has declared type change from _RawDictionaryStora
 Var _NativeSet._storage has declared type change from _RawSetStorage to __RawSetStorage
 Var _RawDictionaryStorage.empty has declared type change from _EmptyDictionarySingleton to __EmptyDictionarySingleton
 Var _RawSetStorage.empty has declared type change from _EmptySetSingleton to __EmptySetSingleton
+
+Func tryReallocateUniquelyReferenced(buffer:newMinimumCapacity:) has been removed
