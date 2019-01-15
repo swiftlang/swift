@@ -299,43 +299,7 @@ internal final class __DataStorage {
         __DataStorage.move(_bytes!.advanced(by: origLength), bytes, length)
     }
     
-<<<<<<< HEAD
-    @inlinable // This is @inlinable despite escaping the _DataStorage boundary layer because it is trivially computed.
-=======
-    // fast-path for appending directly from another data storage
-    @inlinable
-    func append(_ otherData: __DataStorage, startingAt start: Int, endingAt end: Int) {
-        let otherLength = otherData.length
-        if otherLength == 0 { return }
-        if let bytes = otherData.bytes {
-            append(bytes.advanced(by: start), length: end - start)
-        }
-    }
-    
-    @inlinable
-    func append(_ otherData: Data) {
-        guard otherData.count > 0 else { return }
-        otherData.withUnsafeBytes {
-        append($0.baseAddress!, length: $0.count)
-    }
-    }
-    
-    @inlinable
-    func increaseLength(by extraLength: Int) {
-        if extraLength == 0 { return }
-        
-        let origLength = _length
-        let newLength = origLength + extraLength
-        if _capacity < newLength || _bytes == nil {
-            ensureUniqueBufferReference(growingTo: newLength, clear: true)
-        } else if _needToZero {
-            memset(_bytes!.advanced(by: origLength), 0, extraLength)
-        }
-        _length = newLength
-    }
-
-    @inlinable
->>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
+    @inlinable // This is @inlinable despite escaping the __DataStorage boundary layer because it is trivially computed.
     func get(_ index: Int) -> UInt8 {
         return _bytes!.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
     }
@@ -352,27 +316,7 @@ internal final class __DataStorage {
         UnsafeMutableRawBufferPointer(start: pointer, count: range.upperBound - range.lowerBound).copyMemory(from: offsetPointer)
     }
 
-<<<<<<< HEAD
     @usableFromInline // This is not @inlinable as it is a non-trivial, non-generic function.
-=======
-    @inlinable
-    func replaceBytes(in range: NSRange, with bytes: UnsafeRawPointer?) {
-        if range.length == 0 { return }
-        if _length < range.location + range.length {
-            let newLength = range.location + range.length
-            if _capacity < newLength {
-                ensureUniqueBufferReference(growingTo: newLength, clear: false)
-            }
-            _length = newLength
-        } else {
-            ensureUniqueBufferReference()
-        }
-        __DataStorage.move(_bytes!.advanced(by: range.location - _offset), bytes!, range.length)
-
-    }
-    
-    @inlinable
->>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
     func replaceBytes(in range_: NSRange, with replacementBytes: UnsafeRawPointer?, length replacementLength: Int) {
         let range = NSRange(location: range_.location - _offset, length: range_.length)
         let currentLength = _length
@@ -576,15 +520,9 @@ internal final class __DataStorage {
         _freeBytes()
     }
     
-<<<<<<< HEAD
-    @inlinable // This is @inlinable despite escaping the _DataStorage boundary layer because it is trivially computed.
-    func mutableCopy(_ range: Range<Int>) -> _DataStorage {
-        return _DataStorage(bytes: _bytes?.advanced(by: range.lowerBound - _offset), length: range.upperBound - range.lowerBound, copy: true, deallocator: nil, offset: range.lowerBound)
-=======
-    @inlinable
+    @inlinable // This is @inlinable despite escaping the __DataStorage boundary layer because it is trivially computed.
     func mutableCopy(_ range: Range<Int>) -> __DataStorage {
         return __DataStorage(bytes: _bytes?.advanced(by: range.lowerBound - _offset), length: range.upperBound - range.lowerBound, copy: true, deallocator: nil, offset: range.lowerBound)
->>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
     }
 
     @inlinable // This is @inlinable despite escaping the _DataStorage boundary layer because it is generic and trivially computed.
@@ -905,15 +843,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     internal struct InlineSlice {
         // ***WARNING***
         // These ivars are specifically laid out so that they cause the enum _Representation to be 16 bytes on 64 bit platforms. This means we _MUST_ have the class type thing last
-<<<<<<< HEAD
         @usableFromInline var slice: Range<HalfInt>
-        @usableFromInline var storage: _DataStorage
-=======
-        @usableFromInline
-        var slice: Range<HalfInt>
-        @usableFromInline
-        var storage: __DataStorage
->>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
+        @usableFromInline var storage: __DataStorage
 
         @inlinable // This is @inlinable as trivially computable.
         static func canStore(count: Int) -> Bool {
@@ -965,25 +896,15 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             self.init(large.storage, range: range)
         }
 
-<<<<<<< HEAD
         @inlinable // This is @inlinable as a trivial initializer.
-        init(_ storage: _DataStorage, count: Int) {
-=======
-        @inlinable
         init(_ storage: __DataStorage, count: Int) {
->>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
             assert(count < HalfInt.max)
             self.storage = storage
             slice = 0..<HalfInt(count)
         }
 
-<<<<<<< HEAD
         @inlinable // This is @inlinable as a trivial initializer.
-        init(_ storage: _DataStorage, range: Range<Int>) {
-=======
-        @inlinable
         init(_ storage: __DataStorage, range: Range<Int>) {
->>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
             assert(range.lowerBound < HalfInt.max)
             assert(range.upperBound < HalfInt.max)
             self.storage = storage
@@ -1168,15 +1089,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     internal struct LargeSlice {
         // ***WARNING***
         // These ivars are specifically laid out so that they cause the enum _Representation to be 16 bytes on 64 bit platforms. This means we _MUST_ have the class type thing last
-<<<<<<< HEAD
         @usableFromInline var slice: RangeReference
-        @usableFromInline var storage: _DataStorage
-=======
-        @usableFromInline
-        var slice: RangeReference
-        @usableFromInline
-        var storage: __DataStorage
->>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
+        @usableFromInline var storage: __DataStorage
 
         @inlinable // This is @inlinable as a convenience initializer.
         init(_ buffer: UnsafeRawBufferPointer) {
@@ -1195,12 +1109,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable // This is @inlinable as a convenience initializer.
         init(_ inline: InlineData) {
-<<<<<<< HEAD
-            let storage = inline.withUnsafeBytes { return _DataStorage(bytes: $0.baseAddress, length: $0.count) }
+            let storage = inline.withUnsafeBytes { return __DataStorage(bytes: $0.baseAddress, length: $0.count) }
             self.init(storage, count: inline.count)
-=======
-            self.init(inline.withUnsafeBytes { return __DataStorage(bytes: $0.baseAddress, length: $0.count) }, count: inline.count)
->>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
         }
 
         @inlinable // This is @inlinable as a trivial initializer.
@@ -1209,13 +1119,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             self.slice = RangeReference(slice.range)
         }
 
-<<<<<<< HEAD
         @inlinable // This is @inlinable as a trivial initializer.
-        init(_ storage: _DataStorage, count: Int) {
-=======
-        @inlinable
         init(_ storage: __DataStorage, count: Int) {
->>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
             self.storage = storage
             self.slice = RangeReference(0..<count)
         }
@@ -1421,13 +1326,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-<<<<<<< HEAD
         @inlinable // This is @inlinable as a trivial initializer.
-        init(_ storage: _DataStorage, count: Int) {
-=======
-        @inlinable
         init(_ storage: __DataStorage, count: Int) {
->>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
             if count == 0 {
                 self = .empty
             } else if InlineData.canStore(count: count) {
