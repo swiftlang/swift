@@ -90,6 +90,23 @@ internal let _registerSaveWords = _countGPRegisters + _countFPRegisters * _fpReg
 internal let _countGPRegisters = 16
 @usableFromInline
 internal let _registerSaveWords = _countGPRegisters
+
+#elseif arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows))
+// ARM Procedure Call Standard for aarch64. (IHI0055B)
+// The va_list type may refer to any parameter in a parameter list may be in one
+// of three memory locations depending on its type and position in the argument
+// list :
+// 1. GP register save area x0 - x7
+// 2. 128-bit FP/SIMD register save area q0 - q7
+// 3. Stack argument area
+@usableFromInline
+internal let _countGPRegisters = 8
+@usableFromInline
+internal let _countFPRegisters = 8
+@usableFromInline
+internal let _fpRegisterWords = 16 /  MemoryLayout<Int>.size
+@usableFromInline
+internal let _registerSaveWords = _countGPRegisters + (_countFPRegisters * _fpRegisterWords)
 #endif
 
 #if arch(s390x)
@@ -391,7 +408,7 @@ extension Float80 : CVarArg, _CVarArgAligned {
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
-  
+
   /// Returns the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
   @inlinable // FIXME(sil-serialize-all)
@@ -402,7 +419,7 @@ extension Float80 : CVarArg, _CVarArgAligned {
 }
 #endif
 
-#if arch(x86_64) || arch(s390x)
+#if arch(x86_64) || arch(s390x) || (arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows)))
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
@@ -412,6 +429,7 @@ extension Float80 : CVarArg, _CVarArgAligned {
 @_fixed_layout
 @usableFromInline // c-abi
 final internal class __VaListBuilder {
+  #if arch(x86_64) || arch(s390x)
   @_fixed_layout // c-abi
   @usableFromInline
   internal struct Header {
@@ -428,15 +446,19 @@ final internal class __VaListBuilder {
     @usableFromInline // c-abi
     internal var reg_save_area: UnsafeMutablePointer<Int>?
   }
+  #endif
 
   @usableFromInline // c-abi
   internal var gpRegistersUsed = 0
   @usableFromInline // c-abi
   internal var fpRegistersUsed = 0
 
+  #if arch(x86_64) || arch(s390x)
   @usableFromInline // c-abi
   final  // Property must be final since it is used by Builtin.addressof.
   internal var header = Header()
+  #endif
+
   @usableFromInline // c-abi
   internal var storage: ContiguousArray<Int>
 
@@ -453,12 +475,16 @@ final internal class __VaListBuilder {
   internal func append(_ arg: CVarArg) {
     var encoded = arg._cVarArgEncoding
 
-#if arch(x86_64)
+#if arch(x86_64) || arch(arm64)
     let isDouble = arg is _CVarArgPassedAsDouble
 
     if isDouble && fpRegistersUsed < _countFPRegisters {
-      var startIndex = _countGPRegisters
-           + (fpRegistersUsed * _fpRegisterWords)
+      #if arch(arm64)
+        var startIndex = fpRegistersUsed * _fpRegisterWords
+      #else
+        var startIndex = _countGPRegisters
+             + (fpRegistersUsed * _fpRegisterWords)
+      #endif
       for w in encoded {
         storage[startIndex] = w
         startIndex += 1
@@ -468,7 +494,12 @@ final internal class __VaListBuilder {
     else if encoded.count == 1
       && !isDouble
       && gpRegistersUsed < _countGPRegisters {
-      storage[gpRegistersUsed] = encoded[0]
+      #if arch(arm64)
+        let startIndex = ( _fpRegisterWords * _countFPRegisters) + gpRegistersUsed
+      #else
+        let startIndex = gpRegistersUsed
+      #endif
+      storage[startIndex] = encoded[0]
       gpRegistersUsed += 1
     }
     else {
@@ -493,12 +524,23 @@ final internal class __VaListBuilder {
 
   @inlinable // c-abi
   internal func va_list() -> CVaListPointer {
-    header.reg_save_area = storage._baseAddress
-    header.overflow_arg_area
-      = storage._baseAddress + _registerSaveWords
-    return CVaListPointer(
-             _fromUnsafeMutablePointer: UnsafeMutableRawPointer(
-               Builtin.addressof(&self.header)))
+    #if arch(x86_64) || arch(s390x)
+      header.reg_save_area = storage._baseAddress
+      header.overflow_arg_area
+        = storage._baseAddress + _registerSaveWords
+      return CVaListPointer(
+               _fromUnsafeMutablePointer: UnsafeMutableRawPointer(
+                 Builtin.addressof(&self.header)))
+    #elseif arch(arm64)
+      let vr_top = storage._baseAddress + (_fpRegisterWords * _countFPRegisters)
+      let gr_top = vr_top + _countGPRegisters
+
+      return CVaListPointer(__stack: gr_top,
+                            __gr_top: gr_top,
+                            __vr_top: vr_top,
+                            __gr_off: -64,
+                            __vr_off: -128)
+    #endif
   }
 }
 
