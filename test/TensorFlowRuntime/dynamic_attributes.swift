@@ -238,7 +238,6 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Float") {
   expectEqual(false, result2.scalar!)
 }
 
-#if !CUDA
 DynamicAttributeTests.testAllBackends("NormalAttribute String") {
   let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
                                     T$dtype: Float.tensorFlowDataType,
@@ -246,22 +245,18 @@ DynamicAttributeTests.testAllBackends("NormalAttribute String") {
                                     padding: loadVALIDString())
   expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
-#endif //!CUDA
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Bool>") {
   // There aren't any ops that take bool list attributes!
 }
 
-#if !CUDA
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int32>") {
   let result = convImage.convolved2D(withFilter: convFilter,
                                      strides: loadStridesInt32(),
                                      padding: .valid)
   expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
-#endif //!CUDA
 
-#if !CUDA
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int64>") {
   let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
                                     T$dtype: Float.tensorFlowDataType,
@@ -269,7 +264,6 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int64>") {
                                     padding: "VALID")
   expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
-#endif //!CUDA
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Double>") {
   let input = Tensor<Double>([-1, 0.1, 4.3, 1.2])
