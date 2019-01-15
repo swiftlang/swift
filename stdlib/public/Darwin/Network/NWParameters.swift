@@ -16,6 +16,11 @@
 /// endpoint requirements); preferences for data transfer and quality of service;
 /// and the protocols to be used for a connection along with any protocol-specific
 /// options.
+// NOTE: older overlays had Network.NWParameters as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC7Network13_NWParameters is the
+// mangled name for Network._NWParameters.
+@_objcRuntimeName(_TtC7Network13_NWParameters)
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public final class NWParameters : CustomDebugStringConvertible {
 	public var debugDescription: String {
@@ -422,6 +427,9 @@ public final class NWParameters : CustomDebugStringConvertible {
 	/// transport-level protocol, and an optional internet-level protocol. If the internet-
 	/// level protocol is not specified, any available and applicable IP address family
 	/// may be used.
+  // Set the ObjC name of this class to be nested in the customized ObjC
+  // name of NWParameters.
+	@_objcRuntimeName(_TtCC7Network13_NWParameters13ProtocolStack)
 	public class ProtocolStack {
 		public var applicationProtocols: [NWProtocolOptions] {
 			set {

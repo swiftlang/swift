@@ -34,7 +34,12 @@ public struct DispatchWorkItemFlags : OptionSet, RawRepresentable {
 	public static let enforceQoS = DispatchWorkItemFlags(rawValue: 0x20)
 }
 
+// NOTE: older overlays had Dispatch.DispatchWorkItem as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC8Dispatch17_DispatchWorkItem is the
+// mangled name for Dispatch._DispatchWorkItem.
 @available(macOS 10.10, iOS 8.0, *)
+@_objcRuntimeName(_TtC8Dispatch17_DispatchWorkItem)
 public class DispatchWorkItem {
 	internal var _block: _DispatchBlock
 
