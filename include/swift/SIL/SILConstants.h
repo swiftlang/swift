@@ -103,6 +103,12 @@ private:
     /// "aggregate" member of the value union.
     RK_Aggregate,
 
+    /// This value is an enum with no payload.
+    RK_Enum,
+
+    /// This value is an enum with a payload.
+    RK_EnumWithPayload,
+
     /// This represents the address of a memory object.
     RK_DirectAddress,
 
@@ -135,6 +141,14 @@ private:
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
     /// information about the array elements and count.
     const SymbolicValue *aggregate;
+
+    /// When this SymbolicValue is of "Enum" kind, this pointer stores
+    /// information about the enum case type.
+    EnumElementDecl *enumVal;
+
+    /// When this SymbolicValue is of "EnumWithPayload" kind, this pointer
+    /// stores information about the enum case type and its payload.
+    EnumWithPayloadSymbolicValue *enumValWithPayload;
 
     /// When the representationKind is "DirectAddress", this pointer is the
     /// memory object referenced.
@@ -185,6 +199,12 @@ public:
 
     /// This can be an array, struct, tuple, etc.
     Aggregate,
+
+    /// This is an enum without payload.
+    Enum,
+
+    /// This is an enum with payload (formally known as "associated value").
+    EnumWithPayload,
 
     /// This value represents the address of, or into, a memory object.
     Address,
@@ -270,6 +290,25 @@ public:
                                     ASTContext &astContext);
 
   ArrayRef<SymbolicValue> getAggregateValue() const;
+
+  /// This returns a constant Symbolic value for the enum case in `decl`, which
+  /// must not have an associated value.
+  static SymbolicValue getEnum(EnumElementDecl *decl) {
+    assert(decl);
+    SymbolicValue result;
+    result.representationKind = RK_Enum;
+    result.value.enumVal = decl;
+    return result;
+  }
+
+  /// `payload` must be a constant.
+  static SymbolicValue getEnumWithPayload(EnumElementDecl *decl,
+                                          SymbolicValue payload,
+                                          ASTContext &astContext);
+
+  EnumElementDecl *getEnumValue() const;
+
+  SymbolicValue getEnumPayloadValue() const;
 
   /// Return a symbolic value that represents the address of a memory object.
   static SymbolicValue getAddress(SymbolicValueMemoryObject *memoryObject) {
