@@ -1872,6 +1872,8 @@ function set_stresstester_build_script_helper_command() {
         --swiftc-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
         --swift-build-exec="${SWIFT_BUILD}"
         --swift-test-exec="${SWIFT_TEST}"
+        --syntax-parser-header-dir="${SWIFT_SOURCE_DIR}/include/swift-c/SyntaxParser"
+        --syntax-parser-lib-dir="$(build_directory ${host} swift)/lib"
         --sourcekitd-dir="$(build_directory ${host} swift)/lib"
         --swiftsyntax-dir="$(build_directory ${host} swiftsyntax)/${swiftsyntax_config}"
         --config="${config}")
