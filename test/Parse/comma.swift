@@ -1163,3 +1163,291 @@ let kp66 = \SS[first: 1,, second: 1,] // expected-error{{unexpected ',' separato
 let kp67 = \SS[first: 2, second: 2,,] // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}} expected-error{{instance member 'subscript' cannot be used on type 'SS'}}
 let kp68 = \SS[first: 2,, second: 2,,] // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}} expected-error{{instance member 'subscript' cannot be used on type 'SS'}}
 
+class C0 {
+    init() {}
+}
+
+let c01 = C0()
+let c02 = C0(,) // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+let c03 = C0(,,) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+
+class C1 {
+    init(_ int: Int) {}
+}
+
+let c11 = C1(,,-2) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+let c12 = C1(,-1) // expected-error{{unexpected ',' separator}}
+let c13 = C1(0)
+let c14 = C1(1,)
+let c15 = C1(2,,) // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+
+class C2 {
+    init(int: Int) {}
+}
+
+let c21 = C2(,,int: -2) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+let c22 = C2(,int: -1) // expected-error{{unexpected ',' separator}}
+let c23 = C2(int: 0)
+let c24 = C2(int: 1,)
+let c25 = C2(int: 2,,) // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+
+class C3 {
+    init(_ first: Int, _ second: Int) {}
+}
+
+let c31 = C3(,,-2, -2) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+let c32 = C3(,-1, -1) // expected-error{{unexpected ',' separator}}
+let c33 = C3(0, 0)
+let c34 = C3(0,, 0) // expected-error{{unexpected ',' separator}}
+let c35 = C3(1, 1,)
+let c36 = C3(1,, 1,) // expected-error{{unexpected ',' separator}}
+let c37 = C3(2, 2,,) // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+let c38 = C3(2,, 2,,) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+
+class C4 {
+    init(first: Int, _ second: Int) {}
+}
+
+let c41 = C4(,,first: -2, -2) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+let c42 = C4(,first: -1, -1) // expected-error{{unexpected ',' separator}}
+let c43 = C4(first: 0, 0)
+let c44 = C4(first: 0,, 0) // expected-error{{unexpected ',' separator}}
+let c45 = C4(first: 1, 1,)
+let c46 = C4(first: 1,, 1,) // expected-error{{unexpected ',' separator}}
+let c47 = C4(first: 2, 2,,) // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+let c48 = C4(first: 2,, 2,,) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+
+class C5 {
+    init(_ first: Int, second: Int) {}
+}
+
+let c51 = C5(,,-2, second: -2) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+let c52 = C5(, -1, second: -1) // expected-error{{unexpected ',' separator}}
+let c53 = C5(0, second: 0)
+let c54 = C5(0,, second: 0) // expected-error{{unexpected ',' separator}}
+let c55 = C5(1, second: 1,)
+let c56 = C5(1,, second: 1,) // expected-error{{unexpected ',' separator}}
+let c57 = C5(2, second: 2,,) // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+let c58 = C5(2,, second: 2,,) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+
+class C6 {
+    init(first: Int, second: Int) {}
+}
+
+let c61 = C6(,,first: -2, second: -2) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+let c62 = C6(, first: -1, second: -1) // expected-error{{unexpected ',' separator}}
+let c63 = C6(first: 0, second: 0)
+let c64 = C6(first: 0,, second: 0) // expected-error{{unexpected ',' separator}}
+let c65 = C6(first: 0, second: 0,)
+let c66 = C6(first: 1,, second: 1,) // expected-error{{unexpected ',' separator}}
+let c67 = C6(first: 2, second: 2,,) // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+let c68 = C6(first: 2,, second: 2,,) // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+
+class BI0 {
+    init() {}
+}
+
+class DI01 : BI0 {
+    override init() { super.init() }
+}
+
+class DI02 : BI0 {
+    override init() { super.init(,) } // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class DI03 : BI0 {
+    override init() { super.init(,,) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class BI1 {
+    init(_ first: Int) {}
+}
+
+class DI11 : BI1 {
+    override init(_ first: Int) { super.init(,,-2) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+}
+
+class DI12 : BI1 {
+    override init(_ first: Int) { super.init(,-1) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI13 : BI1 {
+    override init(_ first: Int) { super.init(0) }
+}
+
+class DI14 : BI1 {
+    override init(_ first: Int) { super.init(1,) }
+}
+
+class DI15 : BI1 {
+    override init(_ first: Int) { super.init(2,,) } // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class BI2 {
+    init(first: Int) {}
+}
+
+class DI21 : BI2 {
+    override init(first: Int) { super.init(,,first: -2) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+}
+
+class DI22 : BI2 {
+    override init(first: Int) { super.init(,first: -1) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI23 : BI2 {
+    override init(first: Int) { super.init(first: 0) }
+}
+
+class DI24 : BI2 {
+    override init(first: Int) { super.init(first: 1,) }
+}
+
+class DI25 : BI2 {
+    override init(first: Int) { super.init(first: 2,,) } // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class BI3 {
+    init(_ first: Int, _ second: Int) {}
+}
+
+class DI31 : BI3 {
+    override init(_ first: Int, _ second: Int) { super.init(,,-2, -2) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+}
+
+class DI32 : BI3 {
+    override init(_ first: Int, _ second: Int) { super.init(,-1, -1) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI33 : BI3 {
+    override init(_ first: Int, _ second: Int) { super.init(0, 0) }
+}
+
+class DI34 : BI3 {
+    override init(_ first: Int, _ second: Int) { super.init(0,, 0) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI35 : BI3 {
+    override init(_ first: Int, _ second: Int) { super.init(1, 1,) }
+}
+
+class DI36 : BI3 {
+    override init(_ first: Int, _ second: Int) { super.init(1,, 1,) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI37 : BI3 {
+    override init(_ first: Int, _ second: Int) { super.init(2, 2,,) } // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class DI38 : BI3 {
+    override init(_ first: Int, _ second: Int) { super.init(2,, 2,,) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class BI4 {
+    init(first: Int, _ second: Int) {}
+}
+
+class DI41 : BI4 {
+    override init(first: Int, _ second: Int) { super.init(,,first: -2, -2) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+}
+
+class DI42 : BI4 {
+    override init(first: Int, _ second: Int) { super.init(,first: -1, -1) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI43 : BI4 {
+    override init(first: Int, _ second: Int) { super.init(first: 0, 0) }
+}
+
+class DI44 : BI4 {
+    override init(first: Int, _ second: Int) { super.init(first: 0,, 0) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI45 : BI4 {
+    override init(first: Int, _ second: Int) { super.init(first: 1, 1,) }
+}
+
+class DI46 : BI4 {
+    override init(first: Int, _ second: Int) { super.init(first: 1,, 1,) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI47 : BI4 {
+    override init(first: Int, _ second: Int) { super.init(first: 2, 2,,) } // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class DI48 : BI4 {
+    override init(first: Int, _ second: Int) { super.init(first: 2,, 2,,) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class BI5 {
+    init(_ first: Int, second: Int) {}
+}
+
+class DI51 : BI5 {
+    override init(_ first: Int, second: Int) { super.init(,,-2, second: -2) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+}
+
+class DI52 : BI5 {
+    override init(_ first: Int, second: Int) { super.init(,-1, second: -1) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI53 : BI5 {
+    override init(_ first: Int, second: Int) { super.init(0, second: 0) }
+}
+
+class DI54 : BI5 {
+    override init(_ first: Int, second: Int) { super.init(0,, second: 0) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI55 : BI5 {
+    override init(_ first: Int, second: Int) { super.init(1, second: 1,) }
+}
+
+class DI56 : BI5 {
+    override init(_ first: Int, second: Int) { super.init(1,, second: 1,) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI57 : BI5 {
+    override init(_ first: Int, second: Int) { super.init(2, second: 2,,) } // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class DI58 : BI5 {
+    override init(_ first: Int, second: Int) { super.init(2,, second: 2,,) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class BI6 {
+    init(first: Int, second: Int) {}
+}
+
+class DI61 : BI6 {
+    override init(first: Int, second: Int) { super.init(,,first: -2, second: -2) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}}
+}
+
+class DI62 : BI6 {
+    override init(first: Int, second: Int) { super.init(,first: -1, second: -1) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI63 : BI6 {
+    override init(first: Int, second: Int) { super.init(first: 0, second: 0) }
+}
+
+class DI64 : BI6 {
+    override init(first: Int, second: Int) { super.init(first: 0,, second: 0) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI65 : BI6 {
+    override init(first: Int, second: Int) { super.init(first: 1, second: 1,) }
+}
+
+class DI66 : BI6 {
+    override init(first: Int, second: Int) { super.init(first: 1,, second: 1,) } // expected-error{{unexpected ',' separator}}
+}
+
+class DI67 : BI6 {
+    override init(first: Int, second: Int) { super.init(first: 2, second: 2,,) } // expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
+class DI68 : BI6 {
+    override init(first: Int, second: Int) { super.init(first: 2,, second: 2,,) } // expected-error{{unexpected ',' separator}} expected-error{{unexpected ',' separator}} expected-error{{expected expression in list of expressions}}
+}
+
