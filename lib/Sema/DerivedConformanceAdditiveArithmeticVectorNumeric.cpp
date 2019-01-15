@@ -76,22 +76,6 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   return lookup[0];
 }
 
-// Get memberwise initializer for a nominal type.
-static ConstructorDecl *getMemberwiseInitializer(NominalTypeDecl *nominal) {
-  ConstructorDecl *memberwiseInitDecl = nullptr;
-  for (auto member : nominal->getMembers()) {
-    // Find memberwise initializer.
-    if (!memberwiseInitDecl) {
-      auto initDecl = dyn_cast<ConstructorDecl>(member);
-      if (!initDecl || !initDecl->isMemberwiseInitializer())
-        continue;
-      assert(!memberwiseInitDecl && "Memberwise initializer already found");
-      memberwiseInitDecl = initDecl;
-    }
-  }
-  return memberwiseInitDecl;
-}
-
 // Return the `Scalar` associated type for a ValueDecl if it conforms to
 // `VectorNumeric` in the given context.
 // If the decl does not conform to `VectorNumeric`, return a null `Type`.
@@ -182,7 +166,7 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
   auto &C = nominal->getASTContext();
 
   // Create memberwise initializer: `Nominal.init(...)`.
-  auto *memberwiseInitDecl = getMemberwiseInitializer(nominal);
+  auto *memberwiseInitDecl = nominal->getMemberwiseInitializer();
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
@@ -361,7 +345,7 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
-  auto *memberwiseInitDecl = getMemberwiseInitializer(nominal);
+  auto *memberwiseInitDecl = nominal->getMemberwiseInitializer();
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
@@ -416,7 +400,7 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   // The implicit memberwise constructor must be explicitly created so that it
   // can called when synthesizing the `zero` property getter. Normally, the
   // memberwise constructor is synthesized during SILGen, which is too late.
-  if (!getMemberwiseInitializer(nominal)) {
+  if (!nominal->getMemberwiseInitializer()) {
     auto *initDecl = createImplicitConstructor(
         TC, nominal, ImplicitConstructorKind::Memberwise);
     nominal->addMember(initDecl);

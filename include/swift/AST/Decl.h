@@ -3231,6 +3231,10 @@ public:
   /// declared with @TFParameter).
   void getAllTFParameters(SmallVectorImpl<VarDecl *> &result) const;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Get the memberwise initializer of the nominal type, if it exists.
+  ConstructorDecl *getMemberwiseInitializer();
+
 private:
   /// Predicate used to filter StoredPropertyRange.
   struct ToStoredProperty {
