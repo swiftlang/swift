@@ -139,7 +139,8 @@ private:
     SourceFile &SF = *AFD->getDeclContext()->getParentSourceFile();
     SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
     unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
-    Parser TheParser(BufferID, SF, nullptr, &ParserState);
+    Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
+                     /*DelayBodyParsing=*/false);
     TheParser.SyntaxContext->disable();
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
     if (CodeCompletionFactory) {
@@ -165,7 +166,8 @@ static void parseDelayedDecl(
   SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
   unsigned BufferID =
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
-  Parser TheParser(BufferID, SF, nullptr, &ParserState);
+  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
+                   /*DelayBodyParsing=*/false);
 
   // Disable libSyntax creation in the delayed parsing.
   TheParser.SyntaxContext->disable();
@@ -1105,7 +1107,8 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
-                                  /*PersistentState=*/nullptr, Impl.SPActions));
+                                  /*PersistentState=*/nullptr, Impl.SPActions,
+                                  /*DelayBodyParsing=*/false));
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
@@ -1122,7 +1125,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
                       TriviaRetentionMode::WithoutTrivia,
                       Offset, EndOffset));
   Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,
-    /*PersistentState=*/nullptr, Impl.SPActions));
+    /*PersistentState=*/nullptr, Impl.SPActions, /*DelayBodyParsing=*/false));
 }
 
 ParserUnit::~ParserUnit() {

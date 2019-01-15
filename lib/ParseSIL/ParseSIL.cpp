@@ -127,6 +127,18 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
         SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
   }
 
+  // Not supported right now.
+  if (SF.Kind == SourceFileKind::REPL)
+    DelayBodyParsing = false;
+  if (SF.hasInterfaceHash())
+    DelayBodyParsing = false;
+  if (SF.shouldCollectToken())
+    DelayBodyParsing = false;
+  if (SF.shouldBuildSyntaxTree())
+    DelayBodyParsing = false;
+  if (SIL)
+    DelayBodyParsing = false;
+
   SharedTimer timer("Parsing");
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
            PersistentState, STreeCreator, DelayBodyParsing);

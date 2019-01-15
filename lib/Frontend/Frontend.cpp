@@ -849,7 +849,7 @@ void CompilerInstance::parseLibraryFile(
     // Parser may stop at some erroneous constructions like #else, #endif
     // or '}' in some cases, continue parsing until we are done
     parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr, &PersistentState,
-                        DelayedCB);
+                        DelayedCB, /*DelayedBodyParsing=*/!IsPrimary);
   } while (!Done);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
@@ -928,7 +928,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     // with 'sil' definitions.
     parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
                         TheSILModule ? &SILContext : nullptr, &PersistentState,
-                        DelayedParseCB);
+                        DelayedParseCB, /*DelayedBodyParsing=*/false);
 
     if (mainIsPrimary && (Done || CurTUElem < MainFile.Decls.size())) {
       switch (LimitStage) {
@@ -1055,11 +1055,14 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     if (BufferID == MainBufferID)
       continue;
 
+    auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
+
     SourceFile *NextInput = createSourceFileForMainModule(
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID);
 
-    parseIntoSourceFileFull(*NextInput, BufferID, &PersistentState);
+    parseIntoSourceFileFull(*NextInput, BufferID, &PersistentState,
+                            nullptr, /*DelayBodyParsing=*/!IsPrimary);
   }
 
   // Now parse the main file.
@@ -1069,7 +1072,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
 
     parseIntoSourceFileFull(MainFile, MainFile.getBufferID().getValue(),
-                            &PersistentState);
+                            &PersistentState, nullptr,
+                            /*DelayBodyParsing=*/false);
   }
 
   assert(Context->LoadedModules.size() == 1 &&
