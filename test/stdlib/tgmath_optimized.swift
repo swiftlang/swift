@@ -6,8 +6,10 @@
 
 #if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
   import Glibc
-#else
+#elseif os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
   import Darwin
+#elseif os(Windows)
+  import MSVCRT
 #endif
 import StdlibUnittest
 
