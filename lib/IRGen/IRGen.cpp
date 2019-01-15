@@ -964,11 +964,11 @@ static void performParallelIRGeneration(
   }
 
   // Emit the module contents.
-  irgen.emitGlobalTopLevel();
+  irgen.emitGlobalTopLevel(true /*emitForParallelEmission*/);
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
-      CurrentIGMPtr IGM = irgen.getGenModule(SF);
+      IRGenModule *IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF);
     } else {
       File->collectLinkLibraries([&](LinkLibrary LinkLib) {
