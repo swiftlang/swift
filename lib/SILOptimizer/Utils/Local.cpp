@@ -1371,6 +1371,44 @@ bool ValueLifetimeAnalysis::isWithinLifetime(SILInstruction *Inst) {
   llvm_unreachable("Expected to find use of value in block!");
 }
 
+// Searches \p BB backwards from the instruction before \p FrontierInst
+// to the beginning of the list and returns true if we find a dealloc_ref
+// /before/ we find \p DefValue (the instruction that defines our target value).
+static bool blockContainsDeallocRef(SILBasicBlock *BB, SILInstruction *DefValue,
+                                    SILInstruction *FrontierInst) {
+  SILBasicBlock::reverse_iterator End = BB->rend();
+  SILBasicBlock::reverse_iterator Iter = FrontierInst->getReverseIterator();
+  for (++Iter; Iter != End; ++Iter) {
+    SILInstruction *I = &*Iter;
+    if (isa<DeallocRefInst>(I))
+      return true;
+    if (I == DefValue)
+      return false;
+  }
+  return false;
+}
+
+bool ValueLifetimeAnalysis::containsDeallocRef(const Frontier &Frontier) {
+  SmallPtrSet<SILBasicBlock *, 8> FrontierBlocks;
+  // Search in live blocks where the value is not alive until the end of the
+  // block, i.e. the live range is terminated by a frontier instruction.
+  for (SILInstruction *FrontierInst : Frontier) {
+    SILBasicBlock *BB = FrontierInst->getParent();
+    if (blockContainsDeallocRef(BB, DefValue, FrontierInst))
+      return true;
+    FrontierBlocks.insert(BB);
+  }
+  // Search in all other live blocks where the value is alive until the end of
+  // the block.
+  for (SILBasicBlock *BB : LiveBlocks) {
+    if (FrontierBlocks.count(BB) == 0) {
+      if (blockContainsDeallocRef(BB, DefValue, BB->getTerminator()))
+        return true;
+    }
+  }
+  return false;
+}
+
 void ValueLifetimeAnalysis::dump() const {
   llvm::errs() << "lifetime of def: " << *DefValue;
   for (SILInstruction *Use : UserSet) {
