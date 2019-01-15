@@ -100,12 +100,13 @@ allocObjectImpl.pointee = {
 
 /// Checks that `op` performs `base` allocations of Base and `sub` allocations
 /// of Sub.
+@inline(never)
 func check(base: Int = 0, sub: Int = 0,
            file: StaticString = #file, line: UInt = #line,
-           op: () -> Void) {
+           op: () -> AnyObject) {
   baseCounter = 0
   subCounter = 0
-  op()
+  _ = op()
   precondition(baseCounter == base,
                "expected \(base) Base instances, got \(baseCounter)",
                file: file, line: line)
@@ -114,48 +115,49 @@ func check(base: Int = 0, sub: Int = 0,
                file: file, line: line)
 }
 
+
 // CHECK: START
 print("START")
 
 // Check that this whole setup works.
 // CHECK-NEXT: init(swift:) Base
-check(base: 1) { _ = Base(swift: ()) }
+check(base: 1) { Base(swift: ()) }
 // CHECK-NEXT: init(swift:) Sub
-check(sub: 1) { _ = Sub(swift: ()) }
+check(sub: 1) { Sub(swift: ()) }
 // CHECK-NEXT: init(objc:) Base
-check(base: 1) { _ = Base(objc: ()) }
+check(base: 1) { Base(objc: ()) }
 // CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { _ = Sub(objc: ()) }
+check(sub: 1) { Sub(objc: ()) }
 
 // CHECK-NEXT: init(swiftToSwift:) Sub
 // CHECK-NEXT: init(swift:) Sub
-check(sub: 1) { _ = Sub(swiftToSwift: ()) }
+check(sub: 1) { Sub(swiftToSwift: ()) }
 // CHECK-NEXT: init(objcToSwift:) Sub
 // CHECK-NEXT: init(swift:) Sub
-check(sub: 2) { _ = Sub(objcToSwift: ()) }
+check(sub: 2) { Sub(objcToSwift: ()) }
 // CHECK-NEXT: init(swiftToObjC:) Sub
 // CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { _ = Sub(swiftToObjC: ()) }
+check(sub: 1) { Sub(swiftToObjC: ()) }
 // CHECK-NEXT: init(objcToObjC:) Sub
 // CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { _ = Sub(objcToObjC: ()) }
+check(sub: 1) { Sub(objcToObjC: ()) }
 
 // CHECK-NEXT: init(swiftToSwiftConvenience:) Sub
 // CHECK-NEXT: init(swiftToSwift:) Sub
 // CHECK-NEXT: init(swift:) Sub
-check(sub: 1) { _ = Sub(swiftToSwiftConvenience: ()) }
+check(sub: 1) { Sub(swiftToSwiftConvenience: ()) }
 // CHECK-NEXT: init(objcToSwiftConvenience:) Sub
 // CHECK-NEXT: init(swiftToSwift:) Sub
 // CHECK-NEXT: init(swift:) Sub
-check(sub: 2) { _ = Sub(objcToSwiftConvenience: ()) }
+check(sub: 2) { Sub(objcToSwiftConvenience: ()) }
 // CHECK-NEXT: init(swiftToObjCConvenience:) Sub
 // CHECK-NEXT: init(objcToObjC:) Sub
 // CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { _ = Sub(swiftToObjCConvenience: ()) }
+check(sub: 1) { Sub(swiftToObjCConvenience: ()) }
 // CHECK-NEXT: init(objcToObjCConvenience:) Sub
 // CHECK-NEXT: init(objcToObjC:) Sub
 // CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { _ = Sub(objcToObjCConvenience: ()) }
+check(sub: 1) { Sub(objcToObjCConvenience: ()) }
 
 // Force ObjC dispatch without conforming Sub or Base to the protocol,
 // because it's possible that `required` perturbs things and we want to test
@@ -164,21 +166,21 @@ let SubAsObjC = unsafeBitCast(Sub.self as AnyObject,
                               to: ForceObjCDispatch.Type.self)
 
 // CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { _ = SubAsObjC.init(objc: ()) }
+check(sub: 1) { SubAsObjC.init(objc: ()) }
 // CHECK-NEXT: init(objcToSwift:) Sub
 // CHECK-NEXT: init(swift:) Sub
-check(sub: 2) { _ = SubAsObjC.init(objcToSwift: ()) }
+check(sub: 2) { SubAsObjC.init(objcToSwift: ()) }
 // CHECK-NEXT: init(objcToObjC:) Sub
 // CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { _ = SubAsObjC.init(objcToObjC: ()) }
+check(sub: 1) { SubAsObjC.init(objcToObjC: ()) }
 // CHECK-NEXT: init(objcToSwiftConvenience:) Sub
 // CHECK-NEXT: init(swiftToSwift:) Sub
 // CHECK-NEXT: init(swift:) Sub
-check(sub: 2) { _ = SubAsObjC.init(objcToSwiftConvenience: ()) }
+check(sub: 2) { SubAsObjC.init(objcToSwiftConvenience: ()) }
 // CHECK-NEXT: init(objcToObjCConvenience:) Sub
 // CHECK-NEXT: init(objcToObjC:) Sub
 // CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { _ = SubAsObjC.init(objcToObjCConvenience: ()) }
+check(sub: 1) { SubAsObjC.init(objcToObjCConvenience: ()) }
 
 // CHECK-NEXT: END
 print("END")
