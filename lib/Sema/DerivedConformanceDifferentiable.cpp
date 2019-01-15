@@ -786,8 +786,9 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   }
 
   // Add a typealias declaration with the given name and underlying target
-  // struct type to the source struct.
-  auto addAssociatedTypeAliasDecl = [&](Identifier name, StructDecl *source,
+  // struct type to the source nominal type.
+  auto addAssociatedTypeAliasDecl = [&](Identifier name,
+                                        NominalTypeDecl *source,
                                         StructDecl *target) {
     auto lookup = source->lookupDirect(name);
     assert(lookup.size() < 2 &&
@@ -845,6 +846,10 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
                                allDiffableVarsStruct, allDiffableVarsStruct);
     addAssociatedTypeAliasDecl(C.Id_CotangentVector,
                                allDiffableVarsStruct, allDiffableVarsStruct);
+    addAssociatedTypeAliasDecl(C.Id_TangentVector,
+                               nominal, allDiffableVarsStruct);
+    addAssociatedTypeAliasDecl(C.Id_CotangentVector,
+                               nominal, allDiffableVarsStruct);
     TC.validateDecl(allDiffableVarsStruct);
     return parentDC->mapTypeIntoContext(
         allDiffableVarsStruct->getDeclaredInterfaceType());
