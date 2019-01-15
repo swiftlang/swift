@@ -1852,6 +1852,7 @@ extension ${Self} : VectorNumeric {
 extension ${Self} : Differentiable {
   public typealias TangentVector = ${Self}
   public typealias CotangentVector = ${Self}
+  public typealias AllDifferentiableVariables = ${Self}
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return cotangent
   }

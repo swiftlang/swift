@@ -1,6 +1,7 @@
-// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-simple-no-vjp-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-eager-swift
+//
+// Note: GPE testing is disabled because GPE does not interact well with
+// VJP-based AD. See SR-9638.
 //
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
@@ -60,6 +61,57 @@ TensorADTests.testAllBackends("negate") {
   let f = { (a: Tensor<Float>) in -a }
   expectTrue([-1] == gradient(at: [0], in: f))
   expectTrue([-1] == gradient(at: [10], in: f))
+}
+
+TensorADTests.testAllBackends("sum") {
+  let input = Tensor<Float>(randomNormal: [2, 2])
+  let sumPullbackScalar = pullback(at: input) { (a: Tensor<Float>) in a.sum() }
+  let sumPullbackSqueezingAxes = pullback(at: input) { (a: Tensor<Float>) in a.sum(squeezingAxes: 0, 1) }
+  let sumPullbackAlongAxes = pullback(at: input) { (a: Tensor<Float>) in a.sum(alongAxes: 0, 1) }
+
+  let expected = Tensor<Float>(ones: [2, 2])
+  expectTrue(sumPullbackScalar(Tensor(1)) == expected)
+  expectTrue(sumPullbackSqueezingAxes(Tensor(1)) == expected)
+  expectTrue(sumPullbackAlongAxes(Tensor(1))  == expected)
+  expectTrue(sumPullbackScalar(Tensor(3)) == expected * 3)
+  expectTrue(sumPullbackSqueezingAxes(Tensor(3)) == expected * 3)
+  expectTrue(sumPullbackAlongAxes(Tensor(3)) == expected * 3)
+}
+
+TensorADTests.testAllBackends("mean") {
+  let meanGradScalar = gradient { (a: Tensor<Float>) in a.mean() }
+  let meanGradSqueezingAxes = gradient { (a: Tensor<Float>) in a.mean(squeezingAxes: 0, 1) }
+  let meanGradAlongAxes = gradient { (a: Tensor<Float>) in a.mean(alongAxes: 0, 1) }
+
+  let input = Tensor<Float>(ones: [2, 2])
+  let expected = Tensor<Float>(shape: [2, 2], repeating: 0.25)
+  expectTrue(meanGradScalar(input) == expected)
+  expectTrue(meanGradSqueezingAxes(input) == expected)
+  expectTrue(meanGradAlongAxes(input) == expected)
+}
+
+TensorADTests.testAllBackends("transposed") {
+  let input = Tensor<Float>(ones: [2, 3])
+  let transposed = Tensor<Float>(ones: [3, 2])
+  let transposedPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed() }
+  let transposedPermutationsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: [1, 0]) }
+  let transposedVariadiicsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: 1, 0) }
+
+  expectTrue(transposedPullback(transposed) == input)
+  expectTrue(transposedPermutationsPullback(transposed) == input)
+  expectTrue(transposedVariadiicsPullback(transposed)  == input)
+}
+
+TensorADTests.testAllBackends("relu") {
+  let f = { (a: Tensor<Float>) in relu(a) }
+  print(gradient(at: [5, -5, 0], in: f))
+  expectTrue([1, 0, 0] == gradient(at: [5, -5, 0], in: f))
+}
+
+TensorADTests.testAllBackends("softmax") {
+  let pb = pullback(at: Tensor(ones: [2, 2])) { (a: Tensor<Float>) in softmax(a) }
+  expectTrue([[0, 0], [0, 0]] == pb([[1, 1], [1, 1]]))
+  expectTrue([[-0.25, 0.25], [0.75, -0.75]] == pb([[1, 2], [4, 1]]))
 }
 
 TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {

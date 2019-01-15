@@ -50,7 +50,7 @@ import CTensorFlow
 public func enableTPU(serverAddress: String? = nil, infeed: Bool = true) {
   _RuntimeConfig.executionMode = .tpu
   if let serverAddress = serverAddress {
-    _RuntimeConfig.session = .remote(grpcAddress: serverAddress)
+    _RuntimeConfig.session = .remote(serverDef: serverAddress)
   }
   #tfop("tfc.configureTPU", enableInfeed: infeed) as Void
 }
@@ -283,12 +283,11 @@ public enum _RuntimeConfig {
   static public var runMetadataOutputPath: String? = nil
 
   /// Specifies whether the TensorFlow computation runs in a local (in-process)
-  /// session, or a remote session with the specified server address (must start
-  /// with "grpc://" in that case).
+  /// session, or a remote session with the specified server definition.
   @_frozen
   public enum RuntimeSession {
     case local
-    case remote(grpcAddress: String)
+    case remote(serverDef: String)
   }
   static public var session: RuntimeSession = .local
 
@@ -347,14 +346,35 @@ private func configureRuntimeFromEnvironment() {
     if address == "local" {
       _RuntimeConfig.session = .local
       debugLog("Using local TF session.")
-      return
-    }
+    } else {
+      guard let idx = address.firstIndex(of: ":"),
+         let endIdx = address.index(idx, offsetBy: 3, limitedBy: address.endIndex),
+         address[idx..<endIdx] == "://" else {
+        fatalError("SWIFT_TENSORFLOW_SERVER_ADDRESS must start with 'grpc://'.")
+      }
 
-    guard address.prefix(7) == "grpc://" else {
-      fatalError("SWIFT_TENSORFLOW_SERVER_ADDRESS must start with 'grpc://'.")
+      let `protocol` = address[address.startIndex..<idx]
+      let target = address[endIdx..<address.endIndex]
+      _RuntimeConfig.session = .remote(serverDef: """
+        cluster {
+          job {
+            name: "localhost"
+            tasks {
+              key: 0
+              value: "127.0.0.1:0"
+            }
+            tasks {
+              key: 1
+              value: "\(target)"
+            }
+          }
+        }
+        job_name: "localhost"
+        task_index: 0
+        protocol: "\(`protocol`)"
+        """)
+      debugLog("Setting TF server address to \(address) from env.")
     }
-    _RuntimeConfig.session = .remote(grpcAddress: address)
-    debugLog("Setting TF server address to \(address) from env.")
   }
 
   if let value = getenv("SWIFT_TENSORFLOW_RUN_METADATA_OUTPUT") {
@@ -394,6 +414,9 @@ public final class _ExecutionContext {
 
   /// Only set when there is some usable GPU.
   fileprivate let gpuDeviceNamePrefix: String?
+
+  /// Only set when there is some usable TPU.
+  fileprivate let tpuDeviceNamePrefix: String?
 
   /// The buffer storing a serialized TensorFlow config proto.
   public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
@@ -457,10 +480,10 @@ public final class _ExecutionContext {
     TFE_DeleteContextOptions(opts)
     checkOk(status)
 
-    if case .remote(let grpcAddress) = _RuntimeConfig.session {
-      debugLog("Setting up the server def to \(grpcAddress)...")
+    if case .remote(let serverDef) = _RuntimeConfig.session {
+      debugLog("Setting up the server def to \(serverDef)...")
       let serverDef: UnsafeMutablePointer! =
-        TFE_GetServerDef(grpcAddress, status)
+        TFE_GetServerDef(serverDef, status)
       checkOk(status)
       TFE_ContextSetServerDef(eagerContext, /*keep_alive_secs*/0,
         serverDef.pointee.data, serverDef.pointee.length, status)
@@ -477,11 +500,12 @@ public final class _ExecutionContext {
     defer { TF_DeleteDeviceList(devices!) }
 
     // Sanity check and gather/log device info. When `gpuCount` > 0, set
-    // `self.gpuDeviceNamePrefix`.
+    // `self.gpuDeviceNamePrefix`. Likewise with `tpuCount`.
     let deviceCount = TF_DeviceListCount(devices!)
     debugLog("There are \(deviceCount) devices.")
     var foundCPU = false
     var gpuCount = 0
+    var tpuCount = 0
     for deviceId in 0..<deviceCount {
       let cDeviceName = TF_DeviceListName(devices, deviceId, status)
       checkOk(status)
@@ -498,6 +522,9 @@ public final class _ExecutionContext {
       if deviceType == "GPU" {
         gpuCount += 1
       }
+      if deviceType == "TPU" {
+        tpuCount += 1
+      }
     }
     guard foundCPU else {
       fatalError("CPU should always be an available device.")
@@ -509,6 +536,14 @@ public final class _ExecutionContext {
       self.gpuDeviceNamePrefix = "/job:localhost/replica:0/task:0/device:GPU:"
     } else {
       self.gpuDeviceNamePrefix = nil
+    }
+
+    if tpuCount > 0 {
+      // According to server def generated when you set
+      // SWIFT_TENSORFLOW_SERVER_ADDRESS, the TPUs will all be on task 1.
+      self.tpuDeviceNamePrefix = "/job:localhost/replica:0/task:1/device:TPU:"
+    } else {
+      self.tpuDeviceNamePrefix = nil
     }
 
     // Initialize the mutex.
@@ -733,6 +768,8 @@ internal extension _ExecutionContext {
         return "\(cpuDeviceNamePrefix)\(index)"
       case .gpu:
         return "\(gpuDeviceNamePrefix!)\(index)"
+      case .tpu:
+        return "\(tpuDeviceNamePrefix!)\(index)"
       }
     }
     return nil
@@ -1746,7 +1783,8 @@ public enum DeviceKind {
   case cpu
   /// Graphics processing units.
   case gpu
-  // TODO: TPU?
+  /// Tensor processing units.
+  case tpu
 }
 
 @usableFromInline

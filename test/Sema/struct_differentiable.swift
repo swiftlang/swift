@@ -3,11 +3,16 @@
 
 struct Empty : Differentiable {}
 
+// Test interaction with `AdditiveArithmetic` derived conformances.
+// Previously, this crashed due to duplicate memberwise initializer synthesis.
+struct EmptyAdditiveArithmetic : AdditiveArithmetic, Differentiable {}
+
 struct Simple : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
 }
-let simple = Simple(w: 1, b: 1)
+var simple = Simple(w: 1, b: 1)
+simple.allDifferentiableVariables = simple + simple
 assert(simple.moved(along: simple) == simple + simple)
 assert(simple.tangentVector(from: simple) == simple)
 
@@ -16,7 +21,8 @@ struct Mixed : AdditiveArithmetic, Differentiable {
   var simple: Simple
   var float: Float
 }
-let mixed = Mixed(simple: simple, float: 1)
+var mixed = Mixed(simple: simple, float: 1)
+mixed.allDifferentiableVariables = Mixed(simple: simple, float: 2)
 assert(mixed.moved(along: mixed) == mixed + mixed)
 assert(mixed.tangentVector(from: mixed) == mixed)
 
@@ -26,6 +32,7 @@ struct VectorSpacesEqualSelf : AdditiveArithmetic, Differentiable {
   var b: Float
   typealias TangentVector = VectorSpacesEqualSelf
   typealias CotangentVector = VectorSpacesEqualSelf
+  typealias AllDifferentiableVariables = VectorSpacesEqualSelf
 }
 
 // Test generic type with vector space types to `Self`.
@@ -36,7 +43,8 @@ struct GenericVectorSpacesEqualSelf<T> : AdditiveArithmetic, Differentiable
   var w: T
   var b: T
 }
-let genericSame = GenericVectorSpacesEqualSelf<Double>(w: 1, b: 1)
+var genericSame = GenericVectorSpacesEqualSelf<Double>(w: 1, b: 1)
+genericSame.allDifferentiableVariables = genericSame + genericSame
 assert(genericSame.moved(along: genericSame) == genericSame + genericSame)
 assert(genericSame.tangentVector(from: genericSame) == genericSame)
 
@@ -95,6 +103,7 @@ struct DifferentiableSubset : Differentiable {
 }
 let tangentSubset = DifferentiableSubset.TangentVector(w: 1, b: 1)
 let cotangentSubset = DifferentiableSubset.CotangentVector(w: 1, b: 1)
+let allDiffVarsSubset = DifferentiableSubset.AllDifferentiableVariables(w: 1, b: 1)
 
 _ = pullback(at: DifferentiableSubset(w: 1, b: 2, flag: false)) { model in
   model.w + model.b
@@ -117,6 +126,16 @@ struct HasCustomMethod : Differentiable {
      print("Hello world")
      return self
   }
+}
+
+// Test type that conforms to `KeyPathIterable`.
+// The `AllDifferentiableVariables` struct should also conform to `KeyPathIterable`.
+struct TestKeyPathIterable : Differentiable, KeyPathIterable {
+  var w: Float
+  @noDerivative let technicallyDifferentiable: Float = .pi
+}
+func testKeyPathIterable(x: TestKeyPathIterable) {
+  _ = x.allDifferentiableVariables.allKeyPaths
 }
 
 /*

@@ -1575,6 +1575,7 @@ namespace decls_block {
   // SWIFT_ENABLE_TENSORFLOW
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
     IdentifierIDField, // Primal name.
     DeclIDField, // Primal function declaration.
     IdentifierIDField, // Adjoint name.

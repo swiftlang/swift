@@ -386,7 +386,8 @@ SIMPLE_DECL_ATTR(_nonoverride, NonOverride,
 
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(differentiable, Differentiable,
-          OnAccessor | OnFunc | OnVar | LongAttribute, 80)
+  OnAccessor | OnFunc | OnVar | LongAttribute | AllowMultipleAttributes,
+  80)
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  OnAccessor | OnFunc | OnConstructor | OnSubscript,
                  /* Not serialized */ 81)

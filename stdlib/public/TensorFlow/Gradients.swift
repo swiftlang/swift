@@ -48,32 +48,29 @@
 
 public extension Differentiable {
   @inlinable
-  func gradient<R : Differentiable>(
+  func gradient<R : Differentiable & FloatingPoint>(
     in f: @autodiff (Self) -> Tensor<R>
-  ) -> CotangentVector
-    where R : Differentiable & FloatingPoint {
+  ) -> CotangentVector {
     return self.pullback(in: f)(Tensor<R>(1))
   }
 
   @inlinable
-  func valueWithGradient<R : Differentiable>(
+  func valueWithGradient<R : Differentiable & FloatingPoint>(
     in f: @autodiff (Self) -> Tensor<R>
-  ) -> (value: Tensor<R>, gradient: CotangentVector)
-    where R : Differentiable & FloatingPoint {
+  ) -> (value: Tensor<R>, gradient: CotangentVector) {
     let (y, pb) = self.valueWithPullback(in: f)
     return (y, pb(Tensor<R>(1)))
   }
 
   @inlinable
-  func gradient<T : Differentiable, R : Differentiable>(
+  func gradient<T : Differentiable, R : Differentiable & FloatingPoint>(
     at x: T, in f: @autodiff (Self, T) -> Tensor<R>
-  ) -> (CotangentVector, T.CotangentVector)
-    where R : Differentiable & FloatingPoint {
+  ) -> (CotangentVector, T.CotangentVector) {
     return self.pullback(at: x, in: f)(Tensor<R>(1))
   }
 
   @inlinable
-  func valueWithGradient<T : Differentiable, R : Differentiable>(
+  func valueWithGradient<T : Differentiable, R>(
     at x: T, in f: @autodiff (Self, T) -> Tensor<R>
   ) -> (value: Tensor<R>, gradient: (CotangentVector, T.CotangentVector))
     where R : Differentiable & FloatingPoint {
@@ -358,10 +355,19 @@ func _adjointRsqrt<T : Differentiable & FloatingPoint>(
   return -seed / 2 * pow(originalValue, 3)
 }
 
-func _adjointSquared<T : Differentiable & FloatingPoint>(
+@inlinable
+func _adjointLogSoftmax<T : Differentiable & FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
-  return 2 * x * seed
+  let seed = seed.broadcast(like: originalValue)
+  return seed - seed.sum(alongAxes: -1) * exp(originalValue)
+}
+
+extension Tensor where Scalar : Differentiable & FloatingPoint {
+  @inlinable
+  func _adjointSquared(_ seed: Tensor, _ originalValue: Tensor) -> Tensor {
+    return 2 * self * seed
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -392,8 +398,19 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   func _adjointTransposed(
     _ seed: Tensor, _ originalValue: Tensor, _ permutations: Tensor<Int32>
   ) -> Tensor {
-    let seed = seed.broadcast(like: originalValue)
     return seed.transposed(withPermutations: permutations)
+  }
+
+  @inlinable
+  func _adjointTransposed(
+    _ seed: Tensor, _ originalValue: Tensor, _ permutations: [Int32]
+  ) -> Tensor {
+    return seed.transposed(withPermutations: permutations)
+  }
+
+  @inlinable
+  func _adjointTransposed(_ seed: Tensor, _ originalValue: Tensor) -> Tensor {
+    return seed.transposed()
   }
 }
 
@@ -416,6 +433,36 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   ) -> Tensor {
     let seed = seed.broadcast(like: originalValue)
     return seed.squeezingShape(at: shapeIndex)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Reduction
+//===----------------------------------------------------------------------===//
+
+extension Tensor where Scalar : Differentiable & FloatingPoint {
+  @inlinable
+  func _adjointMean(_ seed: Tensor, _ originalValue: Tensor) -> Tensor {
+      return seed.broadcast(like: self) / Tensor(scalarCountTensor)
+  }
+
+  @inlinable
+  func _adjointSum(_ seed: Tensor, _ originalValue: Tensor) -> Tensor {
+      return seed.broadcast(like: self)
+  }
+
+  @inlinable
+  func _adjointMean(
+    _ seed: Tensor, _ originalValue: Tensor, squeezingAxes axes: [Int32]
+  ) -> Tensor {
+      return seed.broadcast(like: self) / Tensor(scalarCountTensor)
+  }
+
+  @inlinable
+  func _adjointSum(
+    _ seed: Tensor, _ originalValue: Tensor, squeezingAxes axes: [Int32]
+  ) -> Tensor {
+      return seed.broadcast(like: self)
   }
 }
 
@@ -605,7 +652,22 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
 //===----------------------------------------------------------------------===//
 
 @inlinable
-func _adjointRelu<T : Differentiable &  FloatingPoint>(
+func _adjointSigmoid<T : Differentiable & FloatingPoint>(
+  _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
+) -> Tensor<T> {
+  return Raw.sigmoidGrad(originalValue, dy: seed)
+}
+
+@inlinable
+func _adjointSoftmax<T : Differentiable & FloatingPoint>(
+  _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
+) -> Tensor<T> {
+  let sumChannels = (seed * originalValue).sum(alongAxes: -1)
+  return (seed - sumChannels) * originalValue
+}
+
+@inlinable
+func _adjointRelu<T : Differentiable & FloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
   return Tensor(x .> 0) * seed
