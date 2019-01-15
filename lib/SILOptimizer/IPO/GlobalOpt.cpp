@@ -137,9 +137,6 @@ protected:
   /// can be statically initialized.
   void optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Calls);
 
-  /// Perform peephole optimizations on the initializer list.
-  void peepholeInitializer(SILFunction *InitFunc);
-
   /// Optimize access to the global variable, which is known to have a constant
   /// value. Replace all loads from the global address by invocations of a
   /// getter that returns the value of this variable.
@@ -735,8 +732,6 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
       InitializerCount[InitF] > 1)
     return;
 
-  peepholeInitializer(InitF);
-
   // If the globalinit_func is trivial, continue; otherwise bail.
   SingleValueInstruction *InitVal;
   SILGlobalVariable *SILG = getVariableOfStaticInitializer(InitF, InitVal);
@@ -757,58 +752,6 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
 
   replaceLoadsByKnownValue(CallToOnce, AddrF, InitF, SILG, InitVal, Calls);
   HasChanged = true;
-}
-
-void SILGlobalOpt::peepholeInitializer(SILFunction *InitFunc) {
-  if (InitFunc->size() != 1)
-    return;
-  SILBasicBlock *BB = &InitFunc->front();
-
-  for (auto &I : *BB) {
-    if (auto *SI = dyn_cast<StoreInst>(&I)) {
-
-      // If struct S has a single field, replace
-      //   %a = struct_element_addr %s : $*S
-      //   store %x to %a
-      // with
-      //   %y = struct $S (%x)
-      //   store %y to %s
-      //
-      // This pattern occurs with resilient static properties, like
-      // struct ResilientStruct {
-      //   var singleField: Int
-      //   public static let x = ResilientStruct(singleField: 27)
-      // }
-      //
-      // TODO: handle structs with multiple fields.
-      SILValue Addr = SI->getDest();
-      auto *SEA = dyn_cast<StructElementAddrInst>(Addr);
-      if (!SEA)
-        continue;
-
-      if (SEA->getOperand()->getType().isAddressOnly(InitFunc))
-        continue;
-
-      StructDecl *Decl = SEA->getStructDecl();
-      auto beginProp = Decl->getStoredProperties().begin();
-      if (std::next(beginProp) != Decl->getStoredProperties().end())
-        continue;
-
-      assert(*beginProp == SEA->getField());
-
-      SILBuilder B(SI);
-      SILValue StructAddr = SEA->getOperand();
-      StructInst *Struct = B.createStruct(SEA->getLoc(),
-                                          StructAddr->getType().getObjectType(),
-                                          { SI->getSrc() });
-      SI->setOperand(StoreInst::Src, Struct);
-      SI->setOperand(StoreInst::Dest, StructAddr);
-      if (SEA->use_empty()) {
-        SEA->eraseFromParent();
-      }
-      HasChanged = true;
-    }
-  }
 }
 
 static bool canBeChangedExternally(SILGlobalVariable *SILG) {

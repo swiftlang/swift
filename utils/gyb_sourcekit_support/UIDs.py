@@ -159,6 +159,7 @@ UID_KEYS = [
     KEY('ActionUnavailableReason', 'key.actionunavailablereason'),
     KEY('CompileID', 'key.compileid'),
     KEY('CompilerArgsString', 'key.compilerargs-string'),
+    KEY('ImplicitMembers', 'key.implicitmembers'),
 ]
 
 
@@ -178,6 +179,7 @@ UID_REQUESTS = [
     REQUEST('CodeCompleteSetPopularAPI',
             'source.request.codecomplete.setpopularapi'),
     REQUEST('CodeCompleteSetCustom', 'source.request.codecomplete.setcustom'),
+    REQUEST('TypeContextInfo', 'source.request.typecontextinfo'),
     REQUEST('CursorInfo', 'source.request.cursorinfo'),
     REQUEST('RangeInfo', 'source.request.rangeinfo'),
     REQUEST('RelatedIdents', 'source.request.relatedidents'),

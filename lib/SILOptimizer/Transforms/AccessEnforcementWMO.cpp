@@ -15,11 +15,11 @@
 ///
 /// This maps each access of identified storage onto a disjoint access
 /// location. Local accesses (Box and Stack) already have unique AccessedStorage
-/// and should be removed by an earlier function pass. This pass handles Class
-/// and Global access by partitioning their non-unique AccessedStorage objects
-/// into unique DisjointAccessLocations. These disjoint access locations may be
-/// accessed across multiple functions, so a module pass is required to identify
-/// and optimize them.
+/// and should be removed by an earlier function pass if possible. This pass
+/// handles Class and Global access by partitioning their non-unique
+/// AccessedStorage objects into unique DisjointAccessLocations. These disjoint
+/// access locations may be accessed across multiple functions, so a module pass
+/// is required to identify and optimize them.
 ///
 /// Class accesses are partitioned by their fully qualified property
 /// name. Global accesses are partitioned by the global variable name. Argument
@@ -48,7 +48,9 @@
 ///
 /// Note: This optimization must be aware of all possible access to a Class or
 /// Global address. This includes unpaired access instructions and keypath
-/// instructions. Ignoring any access pattern would weaken enforcement.
+/// instructions. Ignoring any access pattern would weaken enforcement. For
+/// example, AccessedStorageAnalysis cannot be used here because that analysis
+/// may conservatively summarize some functions.
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-enforcement-wmo"

@@ -13,8 +13,14 @@
 import TestsUtils
 
 public let Dictionary2 = [
-  BenchmarkInfo(name: "Dictionary2", runFunction: run_Dictionary2, tags: [.validation, .api, .Dictionary]),
-  BenchmarkInfo(name: "Dictionary2OfObjects", runFunction: run_Dictionary2OfObjects, tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name: "Dictionary2",
+    runFunction: run_Dictionary2,
+    tags: [.validation, .api, .Dictionary],
+    legacyFactor: 5),
+  BenchmarkInfo(name: "Dictionary2OfObjects",
+    runFunction: run_Dictionary2OfObjects,
+    tags: [.validation, .api, .Dictionary],
+    legacyFactor: 5),
 ]
 
 @inline(never)
@@ -22,7 +28,7 @@ public func run_Dictionary2(_ N: Int) {
   let size = 500
   let ref_result = 199
   var res = 0
-  for _ in 1...5*N {
+  for _ in 1...N {
     var x: [String: Int] = [:]
     for i in 1...size {
       x[String(i, radix:16)] = i
@@ -64,7 +70,7 @@ public func run_Dictionary2OfObjects(_ N: Int) {
   let size = 500
   let ref_result = 199
   var res = 0
-  for _ in 1...5*N {
+  for _ in 1...N {
     var x: [Box<String>:Box<Int>] = [:]
     for i in 1...size {
       x[Box(String(i, radix:16))] = Box(i)

@@ -367,6 +367,7 @@ public struct String {
   ///     let empty = ""
   ///     let alsoEmpty = String()
   @inlinable @inline(__always)
+  @_semantics("string.init_empty")
   public init() { self.init(_StringGuts()) }
 }
 
@@ -590,10 +591,10 @@ extension Sequence where Element: StringProtocol {
   internal func _joined(separator: String) -> String {
     // A likely-under-estimate, but lets us skip some of the growth curve
     // for large Sequences.
-    let understimatedCap =
+    let underestimatedCap =
       (1 &+ separator._guts.count) &* self.underestimatedCount
     var result = ""
-    result.reserveCapacity(understimatedCap)
+    result.reserveCapacity(underestimatedCap)
     if separator.isEmpty {
       for x in self {
         result.append(x._ephemeralString)

@@ -984,7 +984,7 @@ static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
   return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
 }
 
-void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
+void IRGenerator::emitGlobalTopLevel() {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
@@ -992,13 +992,6 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
     // Don't bother adding external declarations to the function order.
     if (!silFn.isDefinition()) continue;
     FunctionOrder.insert(std::make_pair(&silFn, nextOrderNumber++));
-  }
-
-  // Ensure that relative symbols are collocated in the same LLVM module.
-  for (SILWitnessTable &wt : PrimaryIGM->getSILModule().getWitnessTableList()) {
-    CurrentIGMPtr IGM = getGenModule(wt.getDeclContext());
-    if (emitForParallelEmission)
-      IGM->ensureRelativeSymbolCollocation(wt);
   }
 
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {

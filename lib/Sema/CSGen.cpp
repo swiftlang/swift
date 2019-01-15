@@ -1610,6 +1610,7 @@ namespace {
               CS.getConstraintLocator(expr,
                                       ConstraintLocator::ApplyArgument),
               (TVO_CanBindToLValue |
+               TVO_CanBindToInOut |
                TVO_PrefersSubtypeBinding));
           CS.addConstraint(
               ConstraintKind::FunctionInput, methodTy, argTy,
@@ -1678,7 +1679,7 @@ namespace {
                                 options))
               return Type();
 
-            CS.addConstraint(ConstraintKind::Equal,
+            CS.addConstraint(ConstraintKind::Bind,
                              typeVars[i], specializations[i].getType(),
                              locator);
           }
@@ -3736,7 +3737,7 @@ static bool canSatisfy(Type type1, Type type2, bool openArchetypes,
 }
 
 bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, true, ConstraintKind::Equal, &DC);
+  return canSatisfy(T1, T2, true, ConstraintKind::Bind, &DC);
 }
 
 bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {

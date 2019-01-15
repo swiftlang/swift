@@ -2775,7 +2775,7 @@ public:
         }
       }
 
-      if (TC.getLangOpts().EnableAccessControl) {
+      if (!TC.Context.isAccessControlDisabled()) {
         // Require the superclass to be open if this is outside its
         // defining module.  But don't emit another diagnostic if we
         // already complained about the class being inherently

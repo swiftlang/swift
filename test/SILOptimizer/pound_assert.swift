@@ -455,3 +455,45 @@ func testStructPassedAsProtocols() {
   #assert(callProtoSimpleMethod(s) == 0) // expected-error {{#assert condition not constant}}
     // expected-note@-1 {{could not fold operation}}
 }
+
+//===----------------------------------------------------------------------===//
+// Strings
+//
+// TODO: The constant evaluator does not implement string accesses/comparisons
+// so theses tests cannot test that the implemented string operations produce
+// correct values in the arrays. These tests only test that the implemented
+// string operations do not crash or produce unknown values. As soon as we have
+// string accesses/comparisons, modify these tests to check the values in the
+// strings.
+//===----------------------------------------------------------------------===//
+
+struct ContainsString {
+  let x: Int
+  let str: String
+}
+
+func stringInitEmptyTopLevel() {
+  let c = ContainsString(x: 1, str: "")
+  #assert(c.x == 1)
+}
+
+func stringInitNonEmptyTopLevel() {
+  let c = ContainsString(x: 1, str: "hello world")
+  #assert(c.x == 1)
+}
+
+func stringInitEmptyFlowSensitive() -> ContainsString {
+  return ContainsString(x: 1, str: "")
+}
+
+func invokeStringInitEmptyFlowSensitive() {
+  #assert(stringInitEmptyFlowSensitive().x == 1)
+}
+
+func stringInitNonEmptyFlowSensitive() -> ContainsString {
+  return ContainsString(x: 1, str: "hello world")
+}
+
+func invokeStringInitNonEmptyFlowSensitive() {
+  #assert(stringInitNonEmptyFlowSensitive().x == 1)
+}

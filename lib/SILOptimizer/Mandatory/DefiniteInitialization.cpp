@@ -834,7 +834,30 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
         break;
     }
     assert(valueMetatype);
-    auto metatypeArgument = load->getFunction()->getSelfMetadataArgument();
+    SILValue metatypeArgument = load->getFunction()->getSelfMetadataArgument();
+
+    // SILFunction parameter types never have a DynamicSelfType, since it only
+    // makes sense in the context of a given method's body. Since the
+    // value_metatype instruction might produce a DynamicSelfType we have to
+    // cast the metatype argument.
+    //
+    // FIXME: Semantically, we're "opening" the class metatype here to produce
+    // the "opened" DynamicSelfType. Ideally it would be modeled as an opened
+    // archetype associated with the original metatype or class instance value,
+    // instead of as a "global" type.
+    auto metatypeSelfType = metatypeArgument->getType()
+        .castTo<MetatypeType>().getInstanceType();
+    auto valueSelfType = valueMetatype->getType()
+        .castTo<MetatypeType>().getInstanceType();
+    if (metatypeSelfType != valueSelfType) {
+      assert(metatypeSelfType ==
+             cast<DynamicSelfType>(valueSelfType).getSelfType());
+
+      SILBuilderWithScope B(valueMetatype);
+      metatypeArgument = B.createUncheckedTrivialBitCast(
+          valueMetatype->getLoc(), metatypeArgument,
+          valueMetatype->getType());
+    }
     replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument,
                                      [](SILInstruction*) { });
   }
@@ -1927,13 +1950,12 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
     SILValue Metatype;
 
-    // A convenience initializer should never deal in partially allocated
-    // objects.
-    assert(!TheMemory.isDelegatingInit());
-
-    // In a designated initializer, we know the class of the thing
-    // we're cleaning up statically.
-    Metatype = B.createMetatype(Loc, SILMetatypeTy);
+    // In an inherited convenience initializer, we must use the dynamic
+    // type of the object since nothing is initialized yet.
+    if (TheMemory.isDelegatingInit())
+      Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
+    else
+      Metatype = B.createMetatype(Loc, SILMetatypeTy);
 
     // We've already destroyed any instance variables initialized by this
     // constructor, now destroy instance variables initialized by subclass

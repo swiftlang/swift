@@ -1086,7 +1086,7 @@ static bool diagnoseTypeRequirementFailure(ConstraintSystem &cs,
                 rhs);
     return true;
 
-  case ConstraintKind::Equal: { // same type
+  case ConstraintKind::Bind: { // same type
     TC.diagnose(anchor->getLoc(), diag::types_not_equal, ownerType, lhs, rhs);
     return true;
   }

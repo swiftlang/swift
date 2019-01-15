@@ -6791,9 +6791,8 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
   // If the base of the access is mutable, then we may be invoking a getter or
   // setter that requires the base to be mutable.
   auto *SD = cast<AbstractStorageDecl>(member);
-  bool isSettableFromHere = SD->isSettable(UseDC)
-    && (!UseDC->getASTContext().LangOpts.EnableAccessControl
-        || SD->isSetterAccessibleFrom(UseDC));
+  bool isSettableFromHere =
+      SD->isSettable(UseDC) && SD->isSetterAccessibleFrom(UseDC);
 
   // If neither the property's getter nor its setter are mutating, the base
   // can be an rvalue.

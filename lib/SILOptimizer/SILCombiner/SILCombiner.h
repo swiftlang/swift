@@ -220,6 +220,7 @@ public:
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *LI);
   SILInstruction *visitLoadInst(LoadInst *LI);
+  SILInstruction *visitStoreInst(StoreInst *si);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitAllocRefInst(AllocRefInst *AR);

@@ -19,4 +19,5 @@ void CodeCompletionConsumer::anchor() { }
 void EditorConsumer::anchor() { }
 void OptionsDictionary::anchor() {}
 void DocInfoConsumer::anchor() { }
+void TypeContextInfoConsumer::anchor() { }
 void LangSupport::anchor() { }
