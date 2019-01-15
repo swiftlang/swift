@@ -140,6 +140,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::AMDPAL:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
+  case llvm::Triple::COWS:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
