@@ -10,7 +10,7 @@
 
 // 2. Only interface is present.
 // RUN: %empty-directory(%t/Lib.swiftmodule)
-// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.swiftmodule/$(basename %target-swiftmodule-name .swiftmodule).swiftinterface
+// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.swiftmodule/%target-cpu.swiftinterface
 // RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 // RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-serialized %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 // RUN: not env SWIFT_FORCE_MODULE_LOADING=only-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
@@ -29,7 +29,7 @@
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -I %t %s 2>&1 | %FileCheck -check-prefix=FROM-SERIALIZED %s
 
 // 4. Both are present.
-// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.swiftmodule/$(basename %target-swiftmodule-name .swiftmodule).swiftinterface
+// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.swiftmodule/%target-cpu.swiftinterface
 // RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 // RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-serialized %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-SERIALIZED %s
 // RUN: not env SWIFT_FORCE_MODULE_LOADING=only-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
@@ -59,12 +59,12 @@
 // RUN: %empty-directory(%t/Lib.swiftmodule)
 // RUN: touch %t/Lib.swiftmodule/garbage.swiftmodule
 // RUN: touch %t/Lib.swiftmodule/garbage.swiftinterface
-// RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=$(basename %target-swiftmodule-name .swiftmodule) %s
-// RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-serialized %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=$(basename %target-swiftmodule-name .swiftmodule) %s
+// RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%target-cpu %s
+// RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-serialized %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%target-cpu %s
 // RUN: not env SWIFT_FORCE_MODULE_LOADING=only-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=NO-SUCH-MODULE %s
-// RUN: not env SWIFT_FORCE_MODULE_LOADING=only-serialized %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=$(basename %target-swiftmodule-name .swiftmodule) %s
+// RUN: not env SWIFT_FORCE_MODULE_LOADING=only-serialized %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%target-cpu %s
 // (default)
-// RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -I %t %s 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=$(basename %target-swiftmodule-name .swiftmodule) %s
+// RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -I %t %s 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%target-cpu %s
 
 // 8. Only the interface is present but for the wrong architecture.
 // (Diagnostics for the module only are tested elsewhere.)
