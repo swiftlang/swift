@@ -497,9 +497,6 @@ protected:
   AccessScope getRequiredAccessScope();
 
   bool isUsableFromInlineRequired() {
-    if (TC.Context.isAccessControlDisabled())
-      return false;
-
     assert(RequiredAccessScopeAndUsableFromInline.hasValue() &&
            "must check access first using getRequiredAccessScope");
     return RequiredAccessScopeAndUsableFromInline.getValue().second;
