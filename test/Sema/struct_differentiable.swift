@@ -3,6 +3,10 @@
 
 struct Empty : Differentiable {}
 
+// Test interaction with `AdditiveArithmetic` derived conformances.
+// Previously, this crashed due to duplicate memberwise initializer synthesis.
+struct EmptyAdditiveArithmetic : AdditiveArithmetic, Differentiable {}
+
 struct Simple : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
@@ -122,6 +126,16 @@ struct HasCustomMethod : Differentiable {
      print("Hello world")
      return self
   }
+}
+
+// Test type that conforms to `KeyPathIterable`.
+// The `AllDifferentiableVariables` struct should also conform to `KeyPathIterable`.
+struct TestKeyPathIterable : Differentiable, KeyPathIterable {
+  var w: Float
+  @noDerivative let technicallyDifferentiable: Float = .pi
+}
+func testKeyPathIterable(x: TestKeyPathIterable) {
+  _ = x.allDifferentiableVariables.allKeyPaths
 }
 
 /*

@@ -32,3 +32,33 @@ let _: @autodiff (AdditiveTangentIsSelf) -> Float = { x in
 // CHECK-AST:         @_fieldwiseProductSpace typealias CotangentVector = AdditiveTangentIsSelf
 // FIXME:             `typealias AllDifferentiableVariables` should have `@_fieldwiseProductSpace`.
 // CHECK-AST:         typealias AllDifferentiableVariables = AdditiveTangentIsSelf
+
+struct TestNoDerivative : Differentiable {
+  var w: Float
+  @noDerivative var technicallyDifferentiable: Float
+}
+
+// CHECK-AST-LABEL: struct TestNoDerivative : Differentiable {
+// CHECK-AST:         @sil_stored var w: Float { get set }
+// CHECK-AST:         @sil_stored @noDerivative var technicallyDifferentiable: Float { get set }
+// CHECK-AST:         @_fieldwiseProductSpace struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, VectorNumeric
+// CHECK-AST:           @_fieldwiseProductSpace typealias AllDifferentiableVariables = TestNoDerivative.AllDifferentiableVariables
+// CHECK-AST:           @_fieldwiseProductSpace typealias TangentVector = TestNoDerivative.AllDifferentiableVariables
+// CHECK-AST:           @_fieldwiseProductSpace typealias CotangentVector = TestNoDerivative.AllDifferentiableVariables
+// CHECK-AST:         @_fieldwiseProductSpace typealias TangentVector = TestNoDerivative.AllDifferentiableVariables
+// CHECK-AST:         @_fieldwiseProductSpace typealias CotangentVector = TestNoDerivative.AllDifferentiableVariables
+
+struct TestKeyPathIterable : Differentiable, KeyPathIterable {
+  var w: Float
+  @noDerivative var technicallyDifferentiable: Float
+}
+
+// CHECK-AST-LABEL: struct TestKeyPathIterable : Differentiable, KeyPathIterable {
+// CHECK-AST:         @sil_stored var w: Float { get set }
+// CHECK-AST:         @sil_stored @noDerivative var technicallyDifferentiable: Float { get set }
+// CHECK-AST:         @_fieldwiseProductSpace struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, KeyPathIterable, VectorNumeric
+// CHECK-AST:           @_fieldwiseProductSpace typealias AllDifferentiableVariables = TestKeyPathIterable.AllDifferentiableVariables
+// CHECK-AST:           @_fieldwiseProductSpace typealias TangentVector = TestKeyPathIterable.AllDifferentiableVariables
+// CHECK-AST:           @_fieldwiseProductSpace typealias CotangentVector = TestKeyPathIterable.AllDifferentiableVariables
+// CHECK-AST:         @_fieldwiseProductSpace typealias TangentVector = TestKeyPathIterable.AllDifferentiableVariables
+// CHECK-AST:         @_fieldwiseProductSpace typealias CotangentVector = TestKeyPathIterable.AllDifferentiableVariables
