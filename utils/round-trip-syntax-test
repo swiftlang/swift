@@ -3,6 +3,7 @@
 from __future__ import print_function, unicode_literals
 
 import argparse
+import difflib
 import logging
 import os
 import subprocess
@@ -36,62 +37,52 @@ class RoundTripTask(object):
         return [self.swift_syntax_test, self.action,
                 '-input-source-filename', self.input_filename]
 
-    @property
-    def diff_command(self):
-        return ['/usr/bin/diff', '-u', self.input_filename, '-']
-
-    def diff(self):
-        logging.debug(' '.join(self.diff_command))
-        diff = subprocess.Popen(self.diff_command, stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-        stdout, stderr = diff.communicate(self.stdout)
-        if diff.returncode != 0:
-            return stdout
-        assert stdout == ''
-        assert stderr == ''
-        return None
-
     def run(self):
         command = self.test_command
         logging.debug(' '.join(command))
-        self.output_file = tempfile.NamedTemporaryFile('w')
-        self.stderr_file = tempfile.NamedTemporaryFile('w')
+        self.output_file = tempfile.NamedTemporaryFile('w', delete=False)
+        self.stderr_file = tempfile.NamedTemporaryFile('w', delete=False)
 
         process = subprocess.Popen(command, stdout=self.output_file,
                                    stderr=self.stderr_file)
         process.wait()
         self.returncode = process.returncode
 
+        self.output_file.close()
+        self.stderr_file.close()
+
         with open(self.output_file.name, 'r') as stdout_in:
             self.stdout = stdout_in.read()
         with open(self.stderr_file.name, 'r') as stderr_in:
             self.stderr = stderr_in.read()
 
-        self.output_file.flush()
-        self.stderr_file.flush()
+        os.remove(self.output_file.name)
+        os.remove(self.stderr_file.name)
 
-        try:
-            if self.returncode != 0:
-                if self.skip_bad_syntax:
-                    logging.warning('---===WARNING===--- Lex/parse had error'
-                                    ' diagnostics, so not diffing. Skipping'
-                                    ' this file due to -skip-bad-syntax.')
-                    logging.error(' '.join(command))
-                    return None
-                else:
-                    logging.error('---===ERROR===--- Lex/parse had error'
-                                  ' diagnostics, so not diffing.')
-                    logging.error(' '.join(command))
-                    logging.error(self.stdout)
-                    logging.error(self.stderr)
-                    raise RuntimeError()
-        finally:
-            self.output_file.close()
-            self.stderr_file.close()
+        if self.returncode != 0:
+            if self.skip_bad_syntax:
+                logging.warning('---===WARNING===--- Lex/parse had error'
+                                ' diagnostics, so not diffing. Skipping'
+                                ' this file due to -skip-bad-syntax.')
+                logging.error(' '.join(command))
+                return None
+            else:
+                logging.error('---===ERROR===--- Lex/parse had error'
+                              ' diagnostics, so not diffing.')
+                logging.error(' '.join(command))
+                logging.error(self.stdout)
+                logging.error(self.stderr)
+                raise RuntimeError()
 
-        diff = self.diff()
-        return diff
+        contents = ''.join(map(lambda l: l.decode('utf-8', errors='replace'),
+                               open(self.input_filename).readlines()))
+        lines = difflib.unified_diff(contents,
+                                     self.stdout.decode('utf-8',
+                                                        errors='replace'),
+                                     fromfile=self.input_filename,
+                                     tofile='-')
+        diff = '\n'.join(line for line in lines)
+        return diff if diff else None
 
 
 def swift_files_in_dir(d):
