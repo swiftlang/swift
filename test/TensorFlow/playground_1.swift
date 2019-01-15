@@ -5,9 +5,9 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -debugger-support -dump-ast -playground %t/main.swift %S/PlaygroundsRuntime.swift
-// RUN: %target-swift-frontend -debugger-support -Xllvm -tf-dump-intermediates -O -emit-sil -playground %t/main.swift %S/PlaygroundsRuntime.swift
-// RUN: %target-swift-frontend -debugger-support -Xllvm -tf-dump-intermediates -O -emit-sil -playground %t/main.swift %S/PlaygroundsRuntime.swift -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -debugger-support -dump-ast -playground %t/main.swift %S/PlaygroundsRuntime.swift
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -debugger-support -Xllvm -tf-dump-intermediates -O -emit-sil -playground %t/main.swift %S/PlaygroundsRuntime.swift
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -debugger-support -Xllvm -tf-dump-intermediates -O -emit-sil -playground %t/main.swift %S/PlaygroundsRuntime.swift -verify | %FileCheck %s
 
 import TensorFlow
 

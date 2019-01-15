@@ -1,8 +1,8 @@
 // FIXME: TFPartition fails in `GraphFunctionDeviceInfo::finalizeUsedDevices()`
 // because used device set includes RUNTIME device.
-// UN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
+// UN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
 
-// RUN: %target-run-dynamic-compilation-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //

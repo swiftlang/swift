@@ -17,3 +17,21 @@
 
 @differentiable() private func privateDiffable(_ x: Float, _ y: Float) -> Float { return x }
 @differentiable(wrt: (.0)) private func privateDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
+
+extension Float {
+  // This should generate public symbols for both JVP and VJP.
+  @differentiable
+  var x: Float {
+    return .zero
+  }
+
+  // This should generate public symbols for JVP but not VJP, because VJP is user-defined.
+  @differentiable(vjp: vjpY)
+  var y: Float {
+    return .zero
+  }
+
+  func vjpY() -> (Float, (Float) -> Float) {
+    return (.zero, { $0 })
+  }
+}
