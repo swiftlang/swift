@@ -29,7 +29,7 @@ representation that can be used for code distribution, but it can also express
 target-specific concepts as well as LLVM can.
 
 For more information on developing the implementation of SIL and SIL passes, see
-SILProgrammersManual.md.
+`SILProgrammersManual.md <SILProgrammersManual.md>`_ .
 
 SIL in the Swift Compiler
 -------------------------
