@@ -735,12 +735,10 @@ void CompilerInstance::createREPLFile(const ImplicitImports &implicitImports) {
 }
 
 std::unique_ptr<DelayedParsingCallbacks>
-CompilerInstance::computeDelayedParsingCallback(bool isPrimary) {
+CompilerInstance::computeDelayedParsingCallback() {
   if (Invocation.isCodeCompletion())
     return llvm::make_unique<CodeCompleteDelayedCallbacks>(
         SourceMgr.getCodeCompletionLoc());
-  if (!isPrimary)
-    return llvm::make_unique<AlwaysDelayedCallbacks>();
   return nullptr;
 }
 
@@ -754,22 +752,13 @@ void CompilerInstance::addMainFileToModule(
 void CompilerInstance::parseAndCheckTypesUpTo(
     const ImplicitImports &implicitImports, SourceFile::ASTStage_t limitStage) {
   FrontendStatsTracer tracer(Context->Stats, "parse-and-check-types");
-  // Delayed parsing callback for the primary file, or all files
-  // in non-WMO mode.
-  std::unique_ptr<DelayedParsingCallbacks> PrimaryDelayedCB{
-      computeDelayedParsingCallback(true)};
-
-  // Delayed parsing callback for non-primary files. Not used in
-  // WMO mode.
-  std::unique_ptr<DelayedParsingCallbacks> SecondaryDelayedCB{
-      computeDelayedParsingCallback(false)};
+  std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
+      computeDelayedParsingCallback()};
 
   PersistentParserState PersistentState(getASTContext());
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
-      implicitImports, PersistentState,
-      PrimaryDelayedCB.get(),
-      SecondaryDelayedCB.get());
+      implicitImports, PersistentState, DelayedCB.get());
   if (Invocation.isCodeCompletion()) {
     // When we are doing code completion, make sure to emit at least one
     // diagnostic, so that ASTContext is marked as erroneous.  In this case
@@ -788,7 +777,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   // interwined.
   if (MainBufferID != NO_SUCH_BUFFER) {
     parseAndTypeCheckMainFileUpTo(limitStage, PersistentState,
-                                  PrimaryDelayedCB.get(), TypeCheckOptions);
+                                  DelayedCB.get(), TypeCheckOptions);
   }
 
   assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
@@ -829,8 +818,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
 void CompilerInstance::parseLibraryFile(
     unsigned BufferID, const ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
-    DelayedParsingCallbacks *PrimaryDelayedCB,
-    DelayedParsingCallbacks *SecondaryDelayedCB) {
+    DelayedParsingCallbacks *DelayedCB) {
   FrontendStatsTracer tracer(Context->Stats, "parse-library-file");
 
   auto *NextInput = createSourceFileForMainModule(
@@ -838,7 +826,6 @@ void CompilerInstance::parseLibraryFile(
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
   auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
-  auto *DelayedCB = IsPrimary ? PrimaryDelayedCB : SecondaryDelayedCB;
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
@@ -878,8 +865,7 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
     const ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
-    DelayedParsingCallbacks *PrimaryDelayedCB,
-    DelayedParsingCallbacks *SecondaryDelayedCB) {
+    DelayedParsingCallbacks *DelayedCB) {
   FrontendStatsTracer tracer(Context->Stats,
                              "parse-partial-modules-and-library-files");
   bool hadLoadError = false;
@@ -894,8 +880,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   // Then parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID != MainBufferID) {
-      parseLibraryFile(BufferID, implicitImports, PersistentState,
-                       PrimaryDelayedCB, SecondaryDelayedCB);
+      parseLibraryFile(BufferID, implicitImports, PersistentState, DelayedCB);
     }
   }
   return hadLoadError;
