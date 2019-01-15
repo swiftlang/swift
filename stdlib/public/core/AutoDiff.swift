@@ -23,20 +23,37 @@
 /// A type that represents an unranked vector space. Values of this type are
 /// elements in this vector space and have either no shape or a static shape.
 public protocol VectorNumeric : AdditiveArithmetic {
-  /// The type of scalars in the vector space.
-  associatedtype Scalar : AdditiveArithmetic
-
-  static func * (lhs: Scalar, rhs: Self) -> Self
-  static func *= (lhs: inout Self, rhs: Scalar)
+  static func * <Scalar : BinaryInteger>(lhs: Scalar, rhs: Self) -> Self
+  static func * <Scalar : BinaryFloatingPoint>(lhs: Scalar, rhs: Self) -> Self
+  static func *= <Scalar : BinaryInteger>(lhs: inout Self, rhs: Scalar)
+  static func *= <Scalar : BinaryFloatingPoint>(lhs: inout Self, rhs: Scalar)
 }
 
 public extension VectorNumeric {
-  static func * (lhs: Self, rhs: Scalar) -> Self {
+  static func * <Scalar : BinaryInteger>(lhs: Self, rhs: Scalar) -> Self {
     return rhs * lhs
   }
 
-  static func *= (lhs: inout Self, rhs: Scalar) {
+  static func *= <Scalar : BinaryInteger>(lhs: inout Self, rhs: Scalar) {
     lhs = rhs * lhs
+  }
+
+  static func * <Scalar : BinaryFloatingPoint>(lhs: Self, rhs: Scalar) -> Self {
+    return rhs * lhs
+  }
+
+  static func *= <Scalar : BinaryFloatingPoint>(lhs: inout Self, rhs: Scalar) {
+    lhs = rhs * lhs
+  }
+}
+
+public extension VectorNumeric where Self : BinaryFloatingPoint {
+  static func * <Scalar : BinaryInteger>(lhs: Scalar, rhs: Self) -> Self {
+    return Self(lhs) * rhs
+  }
+
+  static func * <Scalar : BinaryFloatingPoint>(lhs: Scalar, rhs: Self) -> Self {
+    return Self(lhs) * rhs
   }
 }
 
