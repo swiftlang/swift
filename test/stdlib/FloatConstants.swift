@@ -4,6 +4,8 @@
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
 #endif
 
 _ = FLT_RADIX // expected-warning {{is deprecated}}

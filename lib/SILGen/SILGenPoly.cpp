@@ -673,11 +673,11 @@ static void explodeTuple(SILGenFunction &SGF, SILLocation loc,
   bool isPlusOne = managedTuple.hasCleanup();
 
   if (managedTuple.getType().isAddress()) {
-    SGF.B.emitShallowDestructureAddressOperation(loc, managedTuple.forward(SGF),
-                                                 elements);
+    SGF.B.emitDestructureAddressOperation(loc, managedTuple.forward(SGF),
+                                          elements);
   } else {
-    SGF.B.emitShallowDestructureValueOperation(loc, managedTuple.forward(SGF),
-                                               elements);
+    SGF.B.emitDestructureValueOperation(loc, managedTuple.forward(SGF),
+                                        elements);
   }
 
   for (auto element : elements) {

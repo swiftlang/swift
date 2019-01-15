@@ -59,17 +59,6 @@ getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B, SILLocation Loc,
   }
 }
 
-/// Given an RValue of aggregate type, compute the values of the elements by
-/// emitting a series of tuple_element instructions.
-static void getScalarizedElements(SILValue V,
-                                  SmallVectorImpl<SILValue> &ElementVals,
-                                  SILLocation Loc, SILBuilder &B) {
-  TupleType *TT = V->getType().castTo<TupleType>();
-  for (auto Index : indices(TT->getElements())) {
-    ElementVals.push_back(B.emitTupleExtract(Loc, V, Index));
-  }
-}
-
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
 /// can return the newly generated sub-element loads.
 static SILValue scalarizeLoad(LoadInst *LI,
@@ -78,8 +67,9 @@ static SILValue scalarizeLoad(LoadInst *LI,
   SmallVector<SILValue, 4> ElementTmps;
 
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
-    auto *SubLI = B.createLoad(LI->getLoc(), ElementAddrs[i],
-                               LoadOwnershipQualifier::Unqualified);
+    auto *SubLI = B.createTrivialLoadOr(LI->getLoc(), ElementAddrs[i],
+                                        LI->getOwnershipQualifier(),
+                                        true /*supports unqualified*/);
     ElementTmps.push_back(SubLI);
   }
 
@@ -118,7 +108,7 @@ public:
 
 private:
   LLVM_NODISCARD bool collectUses(SILValue Pointer);
-  LLVM_NODISCARD bool collectContainerUses(AllocBoxInst *ABI);
+  LLVM_NODISCARD bool collectContainerUses(SILValue boxValue);
 };
 } // end anonymous namespace
 
@@ -130,8 +120,10 @@ bool ElementUseCollector::collectFrom() {
   return collectUses(TheMemory.getAddress());
 }
 
-bool ElementUseCollector::collectContainerUses(AllocBoxInst *abi) {
-  for (auto *ui : abi->getUses()) {
+bool ElementUseCollector::collectContainerUses(SILValue boxValue) {
+  assert(isa<AllocBoxInst>(boxValue) || isa<CopyValueInst>(boxValue));
+
+  for (auto *ui : boxValue->getUses()) {
     auto *user = ui->getUser();
 
     // dealloc_box deallocated a box containing uninitialized memory. This can
@@ -142,6 +134,14 @@ bool ElementUseCollector::collectContainerUses(AllocBoxInst *abi) {
     // Retaining the box doesn't effect the value inside the box.
     if (isa<StrongRetainInst>(user) || isa<RetainValueInst>(user))
       continue;
+
+    // Like retaining, copies do not effect the underlying value. We do need to
+    // recursively visit the copies users though.
+    if (auto *cvi = dyn_cast<CopyValueInst>(user)) {
+      if (!collectContainerUses(cvi))
+        return false;
+      continue;
+    }
 
     // Since we are trying to promote loads/stores, any releases of the box are
     // not considered uses of the underlying value due to:
@@ -162,7 +162,8 @@ bool ElementUseCollector::collectContainerUses(AllocBoxInst *abi) {
     // FIXME: Since we do not support promoting strong_release or release_value
     // today this will cause the underlying allocation to never be
     // eliminated. That should be implemented and fixed.
-    if (isa<StrongReleaseInst>(user) || isa<ReleaseValueInst>(user)) {
+    if (isa<StrongReleaseInst>(user) || isa<ReleaseValueInst>(user) ||
+        isa<DestroyValueInst>(user)) {
       Releases.push_back(user);
       continue;
     }
@@ -430,11 +431,13 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       // Scalarize StoreInst
       if (auto *SI = dyn_cast<StoreInst>(User)) {
         SILBuilderWithScope B(User, SI);
-        getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
-
+        B.emitDestructureValueOperation(
+            SI->getLoc(), SI->getSrc(),
+            [&](unsigned index, SILValue v) { ElementTmps.push_back(v); });
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                        StoreOwnershipQualifier::Unqualified);
+          B.createTrivialStoreOr(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
+                                 SI->getOwnershipQualifier(),
+                                 true /*supports unqualified*/);
         SI->eraseFromParent();
         continue;
       }
