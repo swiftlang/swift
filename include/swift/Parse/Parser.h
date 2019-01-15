@@ -165,7 +165,9 @@ public:
 
   DelayedParsingCallbacks *DelayedParseCB = nullptr;
 
-  bool isDelayedParsingEnabled() const { return DelayedParseCB != nullptr; }
+  bool isDelayedParsingEnabled() const {
+    return DelayBodyParsing || DelayedParseCB != nullptr;
+  }
 
   void setDelayedParsingCallbacks(DelayedParsingCallbacks *DelayedParseCB) {
     this->DelayedParseCB = DelayedParseCB;
