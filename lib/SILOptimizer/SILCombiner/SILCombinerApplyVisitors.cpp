@@ -667,21 +667,9 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     return None;
 
   // Determine the sole conforming type.
-  auto *NTD = PCA->findSoleConformingType(PD);
-  if (!NTD)
+  CanType ConcreteType;
+  if (!PCA->getSoleConformingType(PD, CHA, ConcreteType))
     return None;
-
-  // Sole conforming class should not be open access or have any derived class.
-  ClassDecl *CD;
-  if ((CD = dyn_cast<ClassDecl>(NTD)) &&
-      (CD->getEffectiveAccess() == AccessLevel::Open ||
-       CHA->hasKnownDirectSubclasses(CD))) {
-    return None;
-  }
-
-  // Create SIL type for the concrete type.
-  auto ElementType = NTD->getDeclaredType();
-  auto ConcreteType = ElementType->getCanonicalType();
 
   // Determine OpenedArchetypeDef and SubstituionMap.
   ConcreteOpenedExistentialInfo COAI(ArgOperand, ConcreteType, PD);
