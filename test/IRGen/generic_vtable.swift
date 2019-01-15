@@ -41,7 +41,7 @@ public class Concrete : Derived<Int> {
 // -- destructor
 // CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseCfD"
 // -- value witness table
-// CHECK-SAME: i8** @"$sBoWV"
+// CHECK-SAME: i8** {{@"\$sBoWV"|null}}
 // -- vtable entry for 'm1()'
 // CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m1yyF"
 // -- vtable entry for 'm2()'

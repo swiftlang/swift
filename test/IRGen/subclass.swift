@@ -13,7 +13,7 @@
 // CHECK: @_DATA__TtC8subclass1A = private constant {{.* } }}{
 // CHECK: @"$s8subclass1ACMf" = internal global [[A_METADATA:<{.* }>]] <{
 // CHECK-SAME:   void ([[A]]*)* @"$s8subclass1ACfD",
-// CHECK-SAME:   i8** @"$sBoWV",
+// CHECK-SAME:   i8** {{@"\$sBoWV"|null}},
 // CHECK-SAME:   i64 ptrtoint ([[OBJC_CLASS]]* @"$s8subclass1ACMm" to i64),
 // CHECK-SAME:   [[OBJC_CLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // CHECK-SAME:   [[OPAQUE]]* @_objc_empty_cache,
@@ -25,7 +25,7 @@
 // CHECK: @_DATA__TtC8subclass1B = private constant {{.* } }}{
 // CHECK: @"$s8subclass1BCMf" = internal global <{ {{.*}} }> <{
 // CHECK-SAME:   void ([[B]]*)* @"$s8subclass1BCfD",
-// CHECK-SAME:   i8** @"$sBoWV",
+// CHECK-SAME:   i8** {{@"\$sBoWV"|null}},
 // CHECK-SAME:   i64 ptrtoint ([[OBJC_CLASS]]* @"$s8subclass1BCMm" to i64),
 // CHECK-SAME:   [[TYPE]]* {{.*}} @"$s8subclass1ACMf",
 // CHECK-SAME:   [[OPAQUE]]* @_objc_empty_cache,

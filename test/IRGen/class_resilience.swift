@@ -30,7 +30,7 @@
 
 // CHECK: @"$s16class_resilience14ResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS]] zeroinitializer
 
-// CHECK: @"$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq" = external global %swift.method_descriptor
+// CHECK: @"$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq" = external{{( dllimport)?}} global %swift.method_descriptor
 
 // CHECK: @"$s16class_resilience14ResilientChildCMn" = {{(protected )?}}{{(dllexport )?}}constant <{{.*}}> <{
 // --       flags: class, unique, has vtable, has override table, in-place initialization, has resilient superclass
@@ -54,7 +54,7 @@
 // --       field offset vector offset:
 // CHECK-SAME:   i32 0,
 // -- superclass:
-// CHECK-SAME:   @"got.$s15resilient_class22ResilientOutsideParentCMn"
+// CHECK-SAME:   @"{{got.|__imp_}}$s15resilient_class22ResilientOutsideParentCMn"
 // --       singleton metadata initialization cache:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMl"
 // --       resilient pattern:
@@ -65,17 +65,17 @@
 // CHECK-SAME:   i32 2,
 // CHECK-SAME:   %swift.method_override_descriptor {
 // --       base class:
-// CHECK-SAME:   @"got.$s15resilient_class22ResilientOutsideParentCMn"
+// CHECK-SAME:   @"{{got.|__imp_}}$s15resilient_class22ResilientOutsideParentCMn"
 // --       base method:
-// CHECK-SAME:   @"got.$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq"
+// CHECK-SAME:   @"{{got.|__imp_}}$s15resilient_class22ResilientOutsideParentC8getValueSiyFTq"
 // --       implementation:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildC8getValueSiyF"
 // CHECK-SAME:   }
 // CHECK-SAME:   %swift.method_override_descriptor {
 // --       base class:
-// CHECK-SAME:   @"got.$s15resilient_class22ResilientOutsideParentCMn"
+// CHECK-SAME:   @"{{got.|__imp_}}$s15resilient_class22ResilientOutsideParentCMn"
 // --       base method:
-// CHECK-SAME:   @"got.$s15resilient_class22ResilientOutsideParentCACycfCTq"
+// CHECK-SAME:   @"{{got.|__imp_}}$s15resilient_class22ResilientOutsideParentCACycfCTq"
 // --       implementation:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCACycfC"
 // CHECK-SAME:   }
