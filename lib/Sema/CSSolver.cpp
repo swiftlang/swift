@@ -1567,17 +1567,33 @@ void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
   if (LiteralProtocols.size() <= 1)
     return;
 
-  llvm::SmallVector<Type, 2> defaultTypes;
-  for (auto *protocol : LiteralProtocols)
-    defaultTypes.push_back(CS.TC.getDefaultType(protocol, CS.DC));
+  llvm::SmallVector<std::pair<ProtocolDecl *, Type>, 2> candidates;
+  llvm::SmallVector<ProtocolDecl *, 2> skippedProtocols;
 
-  auto result = 0;
-  for (unsigned long i = 1; i < LiteralProtocols.size(); ++i) {
+  for (auto *protocol : LiteralProtocols) {
+    if (auto defaultType = CS.TC.getDefaultType(protocol, CS.DC)) {
+      candidates.push_back({protocol, defaultType});
+      continue;
+    }
+
+    // Looks like argument expected to conform to something like
+    // `ExpressibleByNilLiteral` which doesn't have a default
+    // type and as a result can't participate in minimalization.
+    skippedProtocols.push_back(protocol);
+  }
+
+  if (candidates.size() <= 1)
+    return;
+
+  unsigned result = 0;
+  for (unsigned i = 1, n = candidates.size(); i != n; ++i) {
+    const auto &candidate = candidates[i];
+
     auto first =
-        CS.TC.conformsToProtocol(defaultTypes[i], LiteralProtocols[result],
+        CS.TC.conformsToProtocol(candidate.second, candidates[result].first,
                                  CS.DC, ConformanceCheckFlags::InExpression);
     auto second =
-        CS.TC.conformsToProtocol(defaultTypes[result], LiteralProtocols[i],
+        CS.TC.conformsToProtocol(candidates[result].second, candidate.first,
                                  CS.DC, ConformanceCheckFlags::InExpression);
     if ((first && second) || (!first && !second))
       return;
@@ -1586,9 +1602,9 @@ void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
       result = i;
   }
 
-  auto *protocol = LiteralProtocols[result];
   LiteralProtocols.clear();
-  LiteralProtocols.insert(protocol);
+  LiteralProtocols.insert(candidates[result].first);
+  LiteralProtocols.insert(skippedProtocols.begin(), skippedProtocols.end());
 }
 
 void ConstraintSystem::ArgumentInfoCollector::dump() const {
