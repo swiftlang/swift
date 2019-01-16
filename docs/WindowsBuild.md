@@ -103,7 +103,7 @@ pushd S:\build\Ninja-DebugAssert\cmark-windows-amd64" "S:\cmark"
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=Debug^
   -DCMAKE_C_COMPILER=cl^
-  -DCMAKE_CXX_COMPIELR=cl^
+  -DCMAKE_CXX_COMPILER=cl^
   S:\cmark
 popd
 cmake --build "S:\build\Ninja-DebugAssert\cmark-windows-amd64"
