@@ -3562,11 +3562,16 @@ class ClassDecl final : public NominalTypeDecl {
   void createObjCMethodLookup();
 
   struct {
+    /// The superclass decl and a bit to indicate whether the
+    /// superclass was computed yet or not.
+    llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
+
     /// The superclass type and a bit to indicate whether the
     /// superclass was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> Superclass;
+    llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
+  friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
 
@@ -3899,11 +3904,16 @@ class ProtocolDecl final : public NominalTypeDecl {
   bool existentialTypeSupportedSlow(LazyResolver *resolver);
 
   struct {
+    /// The superclass decl and a bit to indicate whether the
+    /// superclass was computed yet or not.
+    llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
+
     /// The superclass type and a bit to indicate whether the
     /// superclass was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> Superclass;
+    llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
+  friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
 
