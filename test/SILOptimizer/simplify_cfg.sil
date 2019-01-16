@@ -2483,10 +2483,12 @@ sil @rethrow_function : $@convention(thin) (@owned @callee_owned (Int) -> (Int, 
 sil @non_throwing_closure : $@convention(thin) (Int) -> Int
 
 // CHECK-LABEL: sil @replace_try_apply_with_apply
-// CHECK: [[R:%[0-9]+]] = apply [nothrow] %0(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
+// CHECK: [[R:%[0-9]+]] = apply [nothrow] %1(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
+// CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return [[R]] : $Int
 sil @replace_try_apply_with_apply : $@convention(thin) () -> Int {
 bb0:
+  %as = alloc_stack $Builtin.Int32
   %0 = function_ref @rethrow_function : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
   %1 = function_ref @non_throwing_closure : $@convention(thin) (Int) -> Int
   %2 = thin_to_thick_function %1 : $@convention(thin) (Int) -> Int to $@callee_owned (Int) -> Int
@@ -2494,9 +2496,11 @@ bb0:
   try_apply %0(%3) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error), normal bb1, error bb2
 
 bb1(%5 : $Int):
+  dealloc_stack %as: $*Builtin.Int32
   return %5 : $Int
 
 bb2(%8 : $Error):
+  dealloc_stack %as: $*Builtin.Int32
   unreachable
 }
 
