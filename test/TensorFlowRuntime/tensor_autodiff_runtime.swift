@@ -47,14 +47,16 @@ TensorADTests.testAllBackends("/") {
 
 TensorADTests.testAllBackends("matmul") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in matmul(a, b) }
-  expectTrue(([[0]], [[0]]) == gradient(at: [[0]], [[0]], in: f))
-  expectTrue(([[10]], [[1]]) == gradient(at: [[1]], [[10]], in: f))
+  let v = Tensor<Float>(ones: [1, 1])
+  expectTrue(([[0]], [[0]]) == pullback(at: [[0]], [[0]], in: f)(v))
+  expectTrue(([[10]], [[1]]) == pullback(at: [[1]], [[10]], in: f)(v))
 }
 
 TensorADTests.testAllBackends("•") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a • b }
-  expectTrue(([[0]], [[0]]) == gradient(at: [[0]], [[0]], in: f))
-  expectTrue(([[10]], [[1]]) == gradient(at: [[1]], [[10]], in: f))
+  let v = Tensor<Float>(ones: [1, 1])
+  expectTrue(([[0]], [[0]]) == pullback(at: [[0]], [[0]], in: f)(v))
+  expectTrue(([[10]], [[1]]) == pullback(at: [[1]], [[10]], in: f)(v))
 }
 
 TensorADTests.testAllBackends("negate") {
@@ -104,7 +106,6 @@ TensorADTests.testAllBackends("transposed") {
 
 TensorADTests.testAllBackends("relu") {
   let f = { (a: Tensor<Float>) in relu(a) }
-  print(gradient(at: [5, -5, 0], in: f))
   expectTrue([1, 0, 0] == gradient(at: [5, -5, 0], in: f))
 }
 
@@ -112,6 +113,11 @@ TensorADTests.testAllBackends("softmax") {
   let pb = pullback(at: Tensor(ones: [2, 2])) { (a: Tensor<Float>) in softmax(a) }
   expectTrue([[0, 0], [0, 0]] == pb([[1, 1], [1, 1]]))
   expectTrue([[-0.25, 0.25], [0.75, -0.75]] == pb([[1, 2], [4, 1]]))
+}
+
+TensorADTests.testAllBackends("log_softmax") {
+  let pb = pullback(at: Tensor(ones: [3, 3])) { (a: Tensor<Float>) in logSoftmax(a) }
+  expectTrue(Tensor(shape: [3, 3], repeating: 5.9604645e-08) == pb(Tensor(ones: [3, 3])))
 }
 
 TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {
