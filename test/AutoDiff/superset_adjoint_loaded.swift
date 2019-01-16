@@ -6,7 +6,7 @@
 // There was a bug where the AD pass would not see the custom [differentiable]
 // attribute on `Float.*` wrt both parameters until after the AD pass generated
 // its own adjoint for `Float.*` wrt the second parameter. This test verifies
-// that the AD pass uses the custom adjoint defined on `Float.*`.
+// that the AD pass uses the custom VJP defined on `Float.*`.
 
 func mul3(_ x: Float) -> Float {
   return 3 * x
@@ -15,4 +15,4 @@ func mul3(_ x: Float) -> Float {
 let _ = gradient(at: 0, in: mul3)
 
 // CHECK-LABEL: sil{{.*}} @AD__{{.*}}mul3{{.*}}__primal{{.*}}
-// CHECK: function_ref AD__$sSf1moiyS2f_SftFZ__vjp_src_0_wrt_0_1
+// CHECK: function_ref @$sSf12_vjpMultiply3lhs3rhsSf_Sf_SftSfctSf_SftFZSf_SftSfcfU_
