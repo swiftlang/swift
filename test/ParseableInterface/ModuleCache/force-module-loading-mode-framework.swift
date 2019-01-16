@@ -1,5 +1,5 @@
-// UNSUPPORTED: CPU=powerpc64le
 // RUN: %empty-directory(%t)
+// XFAIL: CPU=powerpc64le
 
 // 1. Not finding things is okay.
 // RUN: not env SWIFT_FORCE_MODULE_LOADING=prefer-parseable %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s 2>&1 | %FileCheck -check-prefix=NO-SUCH-MODULE %s

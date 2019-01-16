@@ -1,4 +1,3 @@
-// UNSUPPORTED: CPU=powerpc64le
 // <rdar://problem/15358345> Check that we always use PIC relocations on all
 // platforms.
 
@@ -61,3 +60,7 @@ public func use_global() -> Int {
 // aarch64:        str [[REG2]], [sp]
 // aarch64:        bl swift_endAccess
 // aarch64:        ldr x0, [sp]
+
+// powerpc64le-LABEL: {{_?}}$s4main10use_globalSiyF:
+// powerpc64le:        bl swift_beginAccess
+// powerpc64le:       addi 3, 3, ($s4main6globalSivp)@toc@l

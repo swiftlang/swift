@@ -1,4 +1,4 @@
-// UNSUPPORTED: CPU=powerpc64le
+// XFAIL: CPU=powerpc64le
 // RUN: %empty-directory(%t)
 // RUN: mkdir %t/idx
 

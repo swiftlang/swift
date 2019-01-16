@@ -1,5 +1,5 @@
-// UNSUPPORTED: CPU=powerpc64le
 REQUIRES: sftp_server
+// XFAIL: CPU=powerpc64le
 
 RUN: %empty-directory(%t)
 RUN: %empty-directory(%t/REMOTE/input)
