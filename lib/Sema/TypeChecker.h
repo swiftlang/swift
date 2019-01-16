@@ -2128,6 +2128,20 @@ public:
   /// Attempt to omit needless words from the name of the given declaration.
   Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
+  /// Calculate edit distance between declaration names.
+  static unsigned getCallEditDistance(DeclName writtenName,
+                                      DeclName correctedName,
+                                      unsigned maxEditDistance);
+
+  enum : unsigned {
+    /// Never consider a candidate that's this distance away or worse.
+    UnreasonableCallEditDistance = 8,
+
+    /// Don't consider candidates that score worse than the given distance
+    /// from the best candidate.
+    MaxCallEditDistanceFromBestCandidate = 1
+  };
+
   /// Check for a typo correction.
   void performTypoCorrection(DeclContext *DC,
                              DeclRefKind refKind,
