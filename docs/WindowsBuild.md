@@ -133,7 +133,7 @@ cmake --build "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
 - Update your path to include the LLVM tools.
 
 ```cmd
-set PATH=%PATH%;S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin
+set PATH=S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin;%PATH%
 ```
 
 ### 7. Build Swift
