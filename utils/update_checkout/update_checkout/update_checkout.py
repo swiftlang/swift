@@ -386,11 +386,11 @@ def full_target_name(repository, target):
     raise RuntimeError('Cannot determine if %s is a branch or a tag' % target)
 
 
-def skip_list_for_platform(config):
+def skip_list_for_platform(config, treat_like_platform=None):
     # If there is a platforms key only include the repo if the
     # plaform is in the list
     skip_list = []
-    platform_name = platform.system()
+    platform_name = treat_like_platform or platform.system()
 
     for repo_name, repo_info in config['repos'].items():
         if 'platforms' in repo_info:
@@ -479,6 +479,10 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         help="Number of threads to run at once",
         default=0,
         dest="n_processes")
+    parser.add_argument(
+        '--platform',
+        help='Clone as if the platform was the one specified, useful for e.g. Docker use.',
+        dest="platform")
     args = parser.parse_args()
 
     if not args.scheme:
@@ -526,7 +530,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         if scheme is None:
             scheme = config['default-branch-scheme']
 
-        skip_repo_list = skip_list_for_platform(config)
+        skip_repo_list = skip_list_for_platform(config, args.platform)
         skip_repo_list.extend(args.skip_repository_list)
         clone_results = obtain_all_additional_swift_sources(args, config,
                                                             clone_with_ssh,
