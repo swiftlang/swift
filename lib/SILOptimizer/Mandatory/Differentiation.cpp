@@ -1308,7 +1308,7 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
         else if (auto *sei = dyn_cast<StructExtractInst>(&inst)) {
           if (isVaried(sei->getOperand(), i)) {
             auto hasNoDeriv = sei->getField()->getAttrs()
-              .hasAttribute<NoDerivativeAttr>();
+                .hasAttribute<NoDerivativeAttr>();
             if (!hasNoDeriv) {
               for (auto result: inst.getResults())
                 setVariedIfDifferentiable(result, i);
