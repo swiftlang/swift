@@ -204,3 +204,33 @@ enum Indirect<T> {
 func makeIndirectEnum<T>(_ payload: T) -> Indirect<T> {
   return Indirect.payload((payload, other: payload))
 }
+
+// https://bugs.swift.org/browse/SR-9675
+
+enum TrailingClosureConcrete {
+  case label(fn: () -> Int)
+  case noLabel(() -> Int)
+  case twoElementsLabel(x: Int, fn: () -> Int)
+  case twoElementsNoLabel(_ x: Int, _ fn: () -> Int)
+}
+
+func useTrailingClosureConcrete() {
+  _ = TrailingClosureConcrete.label { 0 }
+  _ = TrailingClosureConcrete.noLabel { 0 }
+  _ = TrailingClosureConcrete.twoElementsLabel(x: 0) { 0 }
+  _ = TrailingClosureConcrete.twoElementsNoLabel(0) { 0 }
+}
+
+enum TrailingClosureGeneric<T> {
+  case label(fn: () -> T)
+  case noLabel(() -> T)
+  case twoElementsLabel(x: T, fn: () -> T)
+  case twoElementsNoLabel(_ x: T, _ fn: () -> T)
+}
+
+func useTrailingClosureGeneric<T>(t: T) {
+  _ = TrailingClosureGeneric<T>.label { t }
+  _ = TrailingClosureGeneric<T>.noLabel { t }
+  _ = TrailingClosureGeneric<T>.twoElementsLabel(x: t) { t }
+  _ = TrailingClosureGeneric<T>.twoElementsNoLabel(t) { t }
+}
