@@ -1011,7 +1011,11 @@ public:
 
 ADContext::ADContext(SILModuleTransform &transform)
     : transform(transform), module(*transform.getModule()),
-      passManager(*transform.getPassManager()) {}
+      passManager(*transform.getPassManager()) {
+  // Note: `getSILLoader` performs important initialization and is necessary to
+  // prevent test failures related to `lookUpFunctionInWitnessTable`.
+  (void)module.getSILLoader();
+}
 
 void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                               const DifferentiationTask *task,
