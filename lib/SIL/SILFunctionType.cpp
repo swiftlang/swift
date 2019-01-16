@@ -2663,8 +2663,10 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   AnyFunctionType::Param selfParam = fnType.getParams()[0];
 
   // The formal method parameters.
+  // If we actually partially-apply this, assume we'll need a thick function.
   fnType = cast<FunctionType>(fnType.getResult());
-  auto innerExtInfo = fnType->getExtInfo();
+  auto innerExtInfo =
+    fnType->getExtInfo().withRepresentation(FunctionTypeRepresentation::Swift);
   auto methodParams = fnType->getParams();
 
   auto resultType = fnType.getResult();
