@@ -73,13 +73,25 @@ template <typename T> static inline void debugDump(T &v) {
 static void createEntryArguments(SILFunction *f) {
   auto *entry = f->getEntryBlock();
   auto conv = f->getConventions();
+  auto &ctx = f->getASTContext();
+  auto moduleDecl = f->getModule().getSwiftModule();
   assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
          "Entry already has arguments?!");
+  // Create a dummy argument declaration.
+  // Necessary to prevent crash during argument explosion optimization.
+  auto createDummyParamDecl = [&] {
+    return new (ctx)
+        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                  Identifier(), SourceLoc(), Identifier(), moduleDecl);
+  };
   for (auto indResultTy : conv.getIndirectSILResultTypes())
     entry->createFunctionArgument(
-        f->mapTypeIntoContext(indResultTy).getAddressType());
-  for (auto paramTy : conv.getParameterSILTypes())
-    entry->createFunctionArgument(f->mapTypeIntoContext(paramTy));
+        f->mapTypeIntoContext(indResultTy).getAddressType(),
+        createDummyParamDecl());
+  for (auto paramTy : conv.getParameterSILTypes()) {
+    entry->createFunctionArgument(f->mapTypeIntoContext(paramTy),
+                                  createDummyParamDecl());
+  }
 }
 
 /// Looks up a function in the current module. If it exists, returns it.
