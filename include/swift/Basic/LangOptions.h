@@ -292,7 +292,7 @@ namespace swift {
     bool EnableExperimentalDependencies = false;
     
     /// Enable the experimental opaque result types feature.
-    bool EnableOpaqueResultTypes = false;
+    bool EnableOpaqueResultTypes = true;
 
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
