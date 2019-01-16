@@ -37,6 +37,10 @@ llvm::cl::opt<bool> EnableSILInliningOfGenerics(
   "sil-inline-generics", llvm::cl::init(false),
   llvm::cl::desc("Enable inlining of generics"));
 
+llvm::cl::opt<bool>
+    EnableSILAgressiveInlining("sil-agressive-inline", llvm::cl::init(false),
+                               llvm::cl::desc("Enable agressive inlining"));
+
 //===----------------------------------------------------------------------===//
 //                           Performance Inliner
 //===----------------------------------------------------------------------===//
@@ -104,7 +108,7 @@ class SILPerformanceInliner {
     /// The benefit of inlining an exclusivity-containing callee.
     /// The exclusivity needs to be: dynamic,
     /// has no nested conflict and addresses known storage
-    ExclusivityBenefit = RemovedCallBenefit + 125,
+    ExclusivityBenefit = RemovedCallBenefit + 10,
 
     /// The benefit of inlining class methods with -Osize.
     /// We only inline very small class methods with -Osize.
@@ -320,6 +324,10 @@ bool SILPerformanceInliner::isProfitableToInline(
   // the exclusivity heuristic or not. We can *only* do that
   // if AllAccessesBeneficialToInline is true
   int ExclusivityBenefitWeight = 0;
+  int ExclusivityBenefitBase = ExclusivityBenefit;
+  if (EnableSILAgressiveInlining) {
+    ExclusivityBenefitBase += 500;
+  }
 
   SubstitutionMap CalleeSubstMap = AI.getSubstitutionMap();
 
@@ -421,7 +429,8 @@ bool SILPerformanceInliner::isProfitableToInline(
           if (BAI->hasNoNestedConflict() &&
               (storage.isUniquelyIdentified() ||
                storage.getKind() == AccessedStorage::Class)) {
-            BlockW.updateBenefit(ExclusivityBenefitWeight, ExclusivityBenefit);
+            BlockW.updateBenefit(ExclusivityBenefitWeight,
+                                 ExclusivityBenefitBase);
           } else {
             AllAccessesBeneficialToInline = false;
           }
