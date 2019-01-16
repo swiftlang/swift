@@ -22,11 +22,11 @@
 // For more information, visit:
 // https://en.wikipedia.org/wiki/Automatic_differentiation
 //
-// Each function in this file is the VJP of some corresponding function
-// defined in Ops.swift with respect to all arguments. The attribute
-// '@differentiable(reverse, vjp: ...)' is used to define the VJP for a
-// function. The automatic differentiation pass will identify these VJPs and
-// chain them together to produce arbitrary differentiable programs.
+// Every function in this file is the VJP of some corresponding function
+// defined in Ops.swift, with respect to all arguments. The attribute
+// '@differentiable(vjp: ...)' is used to register a function's VJP. The
+// automatic differentiation pass identifies these VJPs and chains them
+// together to produce arbitrary differentiable programs.
 //
 // NOTE:
 // - Currently, we do not want to expose VJP functions to users. The name of

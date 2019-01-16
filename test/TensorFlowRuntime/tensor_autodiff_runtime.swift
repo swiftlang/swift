@@ -24,14 +24,14 @@ TensorADTests.testAllBackends("TestSimpleGrad") {
 
 TensorADTests.testAllBackends("+") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a + b }
-  expectTrue(([1], [1]) == gradient(at: [0], [0], in: f))
-  expectTrue(([1], [1]) == gradient(at: [1], [10], in: f))
+  expectTrue((Tensor(1), Tensor(1)) == gradient(at: Tensor(0), Tensor(0), in: f))
+  expectTrue(([1], [1]) == pullback(at: [1], [10], in: f)([1]))
 }
 
 TensorADTests.testAllBackends("-") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a - b }
-  expectTrue(([1], [-1]) == gradient(at: [0], [0], in: f))
-  expectTrue(([1], [-1]) == gradient(at: [1], [10], in: f))
+  expectTrue((Tensor(1), Tensor(-1)) == gradient(at: Tensor(0), Tensor(0), in: f))
+  expectTrue(([1], [-1]) == pullback(at: [1], [10], in: f)([1]))
 }
 
 TensorADTests.testAllBackends("*") {
