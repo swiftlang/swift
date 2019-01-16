@@ -254,14 +254,11 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
 
       // Coming out of SILGen, we assume that raw stores are initializations,
       // unless they have trivial type (which we classify as InitOrAssign).
-      PMOUseKind Kind;
-      if (InStructSubElement)
-        Kind = PMOUseKind::PartialStore;
-      else if (PointeeType.isTrivial(User->getModule()))
-        Kind = PMOUseKind::InitOrAssign;
-      else
-        Kind = PMOUseKind::Initialization;
-
+      auto Kind = ([&]() -> PMOUseKind {
+        if (PointeeType.isTrivial(User->getModule()))
+          return PMOUseKind::InitOrAssign;
+        return PMOUseKind::Initialization;
+      })();
       Uses.emplace_back(User, Kind);
       continue;
     }
@@ -270,9 +267,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
   if (auto *SI = dyn_cast<Store##Name##Inst>(User)) {                          \
     if (UI->getOperandNumber() == 1) {                                         \
       PMOUseKind Kind;                                                         \
-      if (InStructSubElement)                                                  \
-        Kind = PMOUseKind::PartialStore;                                       \
-      else if (SI->isInitializationOfDest())                                   \
+      if (SI->isInitializationOfDest())                                        \
         Kind = PMOUseKind::Initialization;                                     \
       else                                                                     \
         Kind = PMOUseKind::Assign;                                             \
@@ -294,16 +289,17 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       // the destination, then this is an unknown assignment.  Note that we'll
       // revisit this instruction and add it to Uses twice if it is both a load
       // and store to the same aggregate.
-      PMOUseKind Kind;
-      if (UI->getOperandNumber() == 0)
-        Kind = PMOUseKind::Load;
-      else if (InStructSubElement)
-        Kind = PMOUseKind::PartialStore;
-      else if (CAI->isInitializationOfDest())
-        Kind = PMOUseKind::Initialization;
-      else
-        Kind = PMOUseKind::Assign;
-
+      //
+      // Inline constructor.
+      auto Kind = ([&]() -> PMOUseKind {
+        if (UI->getOperandNumber() == CopyAddrInst::Src)
+          return PMOUseKind::Load;
+        if (PointeeType.isTrivial(CAI->getModule()))
+          return PMOUseKind::InitOrAssign;
+        if (CAI->isInitializationOfDest())
+          return PMOUseKind::Initialization;
+        return PMOUseKind::Assign;
+      })();
       Uses.emplace_back(User, Kind);
       continue;
     }

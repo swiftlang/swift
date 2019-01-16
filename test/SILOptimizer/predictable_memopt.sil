@@ -24,11 +24,12 @@ bb0(%0 : $Int):
 // Verify that promotion has promoted the tuple load away, and we know that
 // %0 is being returned through scalar instructions in SSA form.
 //
-// CHECK-LABEL: sil @tuple_reg_promotion
+// CHECK-LABEL: sil @tuple_reg_promotion :
 // CHECK: bb0(%0 : $Int):
 // CHECK-NEXT: [[TUPLE:%[0-9]+]] = tuple ({{.*}} : $Int, {{.*}} : $Int)
 // CHECK-NEXT: [[TUPLE_ELT:%[0-9]+]] = tuple_extract [[TUPLE]] : $(Int, Int), 0
 // CHECK-NEXT: return [[TUPLE_ELT]] : $Int
+// CHECK-NEXT: } // end sil function 'tuple_reg_promotion'
 sil @tuple_reg_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                         
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
@@ -290,10 +291,14 @@ bb0(%0 : $Int32):
   // CHECK-NEXT: return [[IL]]
   return %25 : $Builtin.Int32
 }
+// CHECK: } // end sil function 'promote_alloc_stack'
 
-// CHECK-LABEL: sil @copy_addr_to_load
+// CHECK-LABEL: sil @copy_addr_to_load : $@convention(thin) (Int) -> Int {
+// CHECK: bb0(%0 : $Int):
+// CHECK-NEXT: return %0
+// CHECK-NEXT: } // end sil function 'copy_addr_to_load'
 sil @copy_addr_to_load : $@convention(thin) (Int) -> Int {
-bb0(%0 : $Int):               // CHECK: bb0(%0 : $Int):
+bb0(%0 : $Int):
   %1 = alloc_stack $Int
   store %0 to %1 : $*Int
   %2 = alloc_stack $Int
@@ -304,14 +309,16 @@ bb0(%0 : $Int):               // CHECK: bb0(%0 : $Int):
 
   dealloc_stack %2 : $*Int
   dealloc_stack %1 : $*Int
-  // CHECK-NEXT: return %0
   return %3 : $Int
 }
 
 // rdar://15170149
-// CHECK-LABEL: sil @store_to_copyaddr
-sil @store_to_copyaddr : $(Bool) -> Bool {
-bb0(%0 : $Bool):  // CHECK: bb0(%0 :
+// CHECK-LABEL: sil @store_to_copyaddr : $@convention(thin) (Bool) -> Bool {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT: return [[ARG]]
+// CHECK-NEXT: } // end sil function 'store_to_copyaddr'
+sil @store_to_copyaddr : $@convention(thin) (Bool) -> Bool {
+bb0(%0 : $Bool):
   %1 = alloc_stack $Bool
   store %0 to %1 : $*Bool
   %3 = alloc_stack $Bool
@@ -321,7 +328,7 @@ bb0(%0 : $Bool):  // CHECK: bb0(%0 :
   %12 = load %1 : $*Bool
   dealloc_stack %3 : $*Bool
   dealloc_stack %1 : $*Bool
-  return %12 : $Bool                              // CHECK-NEXT: return %0
+  return %12 : $Bool
 }
 
 // CHECK-LABEL: sil @cross_block_load_promotion
