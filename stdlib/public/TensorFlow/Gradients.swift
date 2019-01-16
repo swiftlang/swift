@@ -25,18 +25,15 @@
 // Each function in this file is the VJP of some corresponding function
 // defined in Ops.swift with respect to all arguments. The attribute
 // '@differentiable(reverse, vjp: ...)' is used to define the VJP for a
-// function. The automatic differentiation pass will pick up these VJPs and
-// chain them together for arbitrary differentiable programs.
+// function. The automatic differentiation pass will identify these VJPs and
+// chain them together to produce arbitrary differentiable programs.
 //
 // NOTE:
 // - Currently, we do not want to expose VJP functions to users. The name of
 //   each VJP function should start with an underscore.
-// TODO:
-// - Add VJPs for more ops ('sum', 'mean', etc).
-// - Fix VJPs for broadcasting ops (need to perform reduction).
 //
-// FIXME:
-// - Handle scalar broadcasting.
+// TODO:
+// - Fix VJPs for broadcasting ops (need to perform reduction).
 //
 //===----------------------------------------------------------------------===//
 
@@ -211,7 +208,6 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
     let value = lhs + rhs
     return (value, { v in
-      let v = v.broadcast(like: value)
       return (v.unbroadcast(like: lhs), v.unbroadcast(like: rhs))
     })
   }
@@ -222,7 +218,6 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
     let value = lhs - rhs
     return (value, { v in
-      let v = v.broadcast(like: value)
       return (v.unbroadcast(like: lhs), -v.unbroadcast(like: rhs))
     })
   }
@@ -232,7 +227,6 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
     lhs: Tensor, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
     return (lhs * rhs, { v in
-
       ((rhs * v).unbroadcast(like: lhs),
        (lhs * v).unbroadcast(like: rhs))
     })
@@ -356,7 +350,7 @@ func _vjpPow<T : Differentiable & FloatingPoint>(
 extension Tensor where Scalar : Differentiable & FloatingPoint {
   @inlinable
   static func _vjpNegate(_ x: Tensor) -> (Tensor, (Tensor) -> Tensor) {
-    return (-x, { v in -v.broadcast(like: x) })
+    return (-x, { v in -v })
   }
 }
 
@@ -408,7 +402,7 @@ func _vjpTanh<T : Differentiable & FloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = tanh(x)
-  return (value, { v in v * ( 1 - value.squared()) })
+  return (value, { v in v * (1 - value.squared()) })
 }
 
 @inlinable
