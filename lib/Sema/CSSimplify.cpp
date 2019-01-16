@@ -3433,9 +3433,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
     if (decl->isInstanceMember()) {
-      if (((isa<FuncDecl>(decl) && !hasInstanceMethods)
-           || (!isa<FuncDecl>(decl) && !hasInstanceMembers))
-           || isMetatypeBase) {
+      if (((isa<FuncDecl>(decl) && !hasInstanceMethods) ||
+           (!isa<FuncDecl>(decl) && !hasInstanceMembers)) ||
+          (isMetatypeBase && !(functionRefKind == FunctionRefKind::Unapplied ||
+                               functionRefKind == FunctionRefKind::Compound))) {
         result.addUnviable(candidate,
                            MemberLookupResult::UR_InstanceMemberOnType);
         return;
