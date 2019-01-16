@@ -322,6 +322,71 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Needed to use a DeclContext* as a request parameter.
+/// Without this wrapper, compilation fails missing simple_display for
+/// DeclContext* Defining said simple_display results in ambiguitites when
+/// simple_display is called for some Decl subclass pointers.
+
+struct DeclContextWrapper {
+  const DeclContext *dc;
+
+  DeclContextWrapper(const DeclContext *dc) : dc(dc) {}
+
+  SourceLoc getLoc() const { return SourceLoc(); }
+
+  friend hash_code hash_value(const DeclContextWrapper &x) {
+    return hash_value(x.dc);
+  }
+
+  friend bool operator==(const DeclContextWrapper &lhs,
+                         const DeclContextWrapper &rhs) {
+    return lhs.dc == rhs.dc;
+  }
+
+  friend bool operator!=(const DeclContextWrapper &lhs,
+                         const DeclContextWrapper &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const DeclContextWrapper &x);
+class TypeChecker;
+
+// Find the type in the cache or look it up
+class DefaultTypeRequest
+    : public SimpleRequest<DefaultTypeRequest, CacheKind::SeparatelyCached,
+                           Type, const char *, bool, const DeclContextWrapper> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &eval, const char *, bool,
+                                const DeclContextWrapper) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Caching
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+
+private:
+  const char *getTypeName() const { return std::get<0>(getStorage()); }
+  bool getPerformLocalLookup() const { return std::get<1>(getStorage()); }
+  const DeclContext *getDeclContext() const {
+    return std::get<2>(getStorage()).dc;
+  }
+  TypeChecker &getTypeChecker() const;
+  SourceFile *getSourceFile() const;
+  llvm::DenseMap<const char *, Type> *getCache() const;
+};
+
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
 

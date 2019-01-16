@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Lexer.h"
 using namespace swift;
 
@@ -633,7 +634,7 @@ Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
   return closure;
 }
 
-static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
+static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
                                      StringRef name) {
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(dc))
@@ -655,116 +656,78 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
   return cast<TypeAliasDecl>(TD)->getDeclaredInterfaceType();
 }
 
+static std::pair<const char *, bool>
+getDefaultTypeNameAndPerformLocalLookup(const ProtocolDecl *protocol);
+
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
-  Type *type = nullptr;
-  const char *name = nullptr;
-  bool performLocalLookup = true;
+  auto typeNameAndPerformLocalLookup =
+      getDefaultTypeNameAndPerformLocalLookup(protocol);
+  if (!typeNameAndPerformLocalLookup.first)
+    return nullptr;
+  Type type = evaluateOrDefault(
+      Context.evaluator,
+      DefaultTypeRequest{typeNameAndPerformLocalLookup.first,
+                         typeNameAndPerformLocalLookup.second, dc},
+      nullptr);
+  return type;
+}
 
-  // ExpressibleByUnicodeScalarLiteral -> UnicodeScalarType
-  if (protocol ==
-           getProtocol(
-               SourceLoc(),
-               KnownProtocolKind::ExpressibleByUnicodeScalarLiteral)) {
-    type = &UnicodeScalarType;
-    name = "UnicodeScalarType";
-  }
-  // ExpressibleByExtendedGraphemeClusterLiteral -> ExtendedGraphemeClusterType
-  else if (protocol ==
-           getProtocol(
-               SourceLoc(),
-               KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral)) {
-    type = &ExtendedGraphemeClusterType;
-    name = "ExtendedGraphemeClusterType";
-  }
-  // ExpressibleByStringLiteral -> StringLiteralType
-  // ExpressibleByStringInterpolation -> StringLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByStringLiteral) ||
-           protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByStringInterpolation)) {
-    type = &StringLiteralType;
-    name = "StringLiteralType";
-  }
-  // ExpressibleByIntegerLiteral -> IntegerLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-    type = &IntLiteralType;
-    name = "IntegerLiteralType";
-  }
-  // ExpressibleByFloatLiteral -> FloatLiteralType
-  else if (protocol == getProtocol(SourceLoc(),
-                                   KnownProtocolKind::ExpressibleByFloatLiteral)){
-    type = &FloatLiteralType;
-    name = "FloatLiteralType";
-  }
-  // ExpressibleByBooleanLiteral -> BoolLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByBooleanLiteral)){
-    type = &BooleanLiteralType;
-    name = "BooleanLiteralType";
-  }
-  // ExpressibleByArrayLiteral -> Array
-  else if (protocol == getProtocol(SourceLoc(),
-                                   KnownProtocolKind::ExpressibleByArrayLiteral)){
-    type = &ArrayLiteralType;
-    name = "Array";
-    performLocalLookup = false;
-  }
-  // ExpressibleByDictionaryLiteral -> Dictionary
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByDictionaryLiteral)) {
-    type = &DictionaryLiteralType;
-    name = "Dictionary";
-    performLocalLookup = false;
-  }
-  // _ExpressibleByColorLiteral -> _ColorLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByColorLiteral)) {
-    type = &ColorLiteralType;
-    name = "_ColorLiteralType";
-  }
-  // _ExpressibleByImageLiteral -> _ImageLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByImageLiteral)) {
-    type = &ImageLiteralType;
-    name = "_ImageLiteralType";
-  }
-  // _ExpressibleByFileReferenceLiteral -> _FileReferenceLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByFileReferenceLiteral)) {
-    type = &FileReferenceLiteralType;
-    name = "_FileReferenceLiteralType";
-  }
+static std::pair<const char *, bool>
+getDefaultTypeNameAndPerformLocalLookup(const ProtocolDecl *protocol) {
+  TypeChecker &tc = TypeChecker::createForContext(protocol->getASTContext());
 
-  if (!type)
+#define TYPE_NAME_CASE(KIND, NAME, PERFORM_LOCAL_LOOKUP)                       \
+  if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::KIND))        \
+    return std::make_pair(NAME, PERFORM_LOCAL_LOOKUP);
+
+  TYPE_NAME_CASE(ExpressibleByUnicodeScalarLiteral, "UnicodeScalarType", true)
+  TYPE_NAME_CASE(ExpressibleByExtendedGraphemeClusterLiteral,
+                 "ExtendedGraphemeClusterType", true)
+  TYPE_NAME_CASE(ExpressibleByStringLiteral, "StringLiteralType", true)
+  TYPE_NAME_CASE(ExpressibleByStringInterpolation, "StringLiteralType", true)
+  TYPE_NAME_CASE(ExpressibleByIntegerLiteral, "IntegerLiteralType", true)
+  TYPE_NAME_CASE(ExpressibleByFloatLiteral, "FloatLiteralType", true)
+  TYPE_NAME_CASE(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)
+  TYPE_NAME_CASE(ExpressibleByArrayLiteral, "Array", false)
+  TYPE_NAME_CASE(ExpressibleByDictionaryLiteral, "Dictionary", false)
+  TYPE_NAME_CASE(ExpressibleByColorLiteral, "_ColorLiteralType", true)
+  TYPE_NAME_CASE(ExpressibleByImageLiteral, "_ImageLiteralType", true)
+  TYPE_NAME_CASE(ExpressibleByFileReferenceLiteral, "_FileReferenceLiteralType",
+                 true)
+
+#undef DEFAULT_TYPE_NAME_CASE
+
+  return std::make_pair(nullptr, false);
+}
+
+llvm::Expected<Type>
+swift::DefaultTypeRequest::evaluate(Evaluator &evaluator, const char *name,
+                                    const bool performLocalLookup,
+                                    const DeclContextWrapper x) const {
+  if (!name)
     return nullptr;
 
-  // If we haven't found the type yet, look for it now.
-  if (!*type) {
-    if (performLocalLookup)
-      *type = lookupDefaultLiteralType(*this, dc, name);
+  const DeclContext *dc = x.dc;
+  TypeChecker &tc = getTypeChecker();
 
-    if (!*type)
-      *type = lookupDefaultLiteralType(*this, getStdlibModule(dc), name);
+  Type type;
+  if (performLocalLookup)
+    type = lookupDefaultLiteralType(tc, dc, name);
 
-    // Strip off one level of sugar; we don't actually want to print
-    // the name of the typealias itself anywhere.
-    if (type && *type) {
-      if (auto boundTypeAlias =
-                 dyn_cast<TypeAliasType>(type->getPointer()))
-        *type = boundTypeAlias->getSinglyDesugaredType();
-    }
+  if (!type)
+    type = lookupDefaultLiteralType(tc, tc.getStdlibModule(dc), name);
+
+  // Strip off one level of sugar; we don't actually want to print
+  // the name of the typealias itself anywhere.
+  if (type) {
+    if (auto boundTypeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
+      type = boundTypeAlias->getSinglyDesugaredType();
   }
+  return type;
+}
 
-  return *type;
+TypeChecker &DefaultTypeRequest::getTypeChecker() const {
+  return TypeChecker::createForContext(getDeclContext()->getASTContext());
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
