@@ -23,7 +23,7 @@
 
 namespace swift {
 
-class AutoDiffParameter {
+class ParsedAutoDiffParameter {
 public:
   enum class Kind { Index, Self };
 
@@ -38,14 +38,15 @@ private:
   } V;
 
 public:
-  AutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
+  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
     : Loc(loc), Kind(kind), V(value) {}
 
-  static AutoDiffParameter getIndexParameter(SourceLoc loc, unsigned index) {
+  static ParsedAutoDiffParameter getIndexParameter(SourceLoc loc,
+                                                   unsigned index) {
     return { loc, Kind::Index, index };
   }
 
-  static AutoDiffParameter getSelfParameter(SourceLoc loc) {
+  static ParsedAutoDiffParameter getSelfParameter(SourceLoc loc) {
     return { loc, Kind::Self, {} };
   }
 
@@ -62,7 +63,7 @@ public:
     return Loc;
   }
 
-  bool isEqual(const AutoDiffParameter &other) const {
+  bool isEqual(const ParsedAutoDiffParameter &other) const {
     if (getKind() == other.getKind() && getKind() == Kind::Index)
       return getIndex() == other.getIndex();
     return getKind() == other.getKind() && getKind() == Kind::Self;
@@ -88,6 +89,7 @@ class Type;
 class AutoDiffParameterIndices : public llvm::FoldingSetNode {
   friend AutoDiffParameterIndicesBuilder;
 
+public:
   /// Bits corresponding to parameters in the set are "on", and bits
   /// corresponding to parameters not in the set are "off".
   ///
@@ -109,11 +111,12 @@ class AutoDiffParameterIndices : public llvm::FoldingSetNode {
   ///
   const llvm::SmallBitVector parameters;
 
-  AutoDiffParameterIndices(llvm::SmallBitVector parameters)
-      : parameters(parameters) {}
-
   static AutoDiffParameterIndices *get(llvm::SmallBitVector parameters,
                                        ASTContext &C);
+
+private:
+  AutoDiffParameterIndices(const llvm::SmallBitVector &parameters)
+      : parameters(parameters) {}
 
 public:
   /// Allocates and initializes an `AutoDiffParameterIndices` corresponding to
@@ -230,7 +233,7 @@ struct SILAutoDiffIndices {
       : source(source), parameters(parameters) {}
 
   /// Creates a set of AD indices from the given source index and an array of
-  /// parameter indices. Elements in `parameters` must be acending integers.
+  /// parameter indices. Elements in `parameters` must be ascending integers.
   /*implicit*/ SILAutoDiffIndices(unsigned source,
                                   ArrayRef<unsigned> parameters);
 

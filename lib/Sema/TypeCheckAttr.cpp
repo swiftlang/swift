@@ -2437,15 +2437,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Validate the 'wrt:' parameters.
   bool isMethod = original->getImplicitSelfDecl() ? true : false;
 
-  // These are the wrt param indices specified by the user, which have not yet
-  // been checked.
-  auto uncheckedWrtParams = attr->getParameters();
+  // These are the parsed wrt param indices, which have not yet been checked.
+  auto parsedWrtParams = attr->getParsedParameters();
 
   // We will put the checked wrt param indices here.
   AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
       originalFnTy);
 
-  if (uncheckedWrtParams.empty()) {
+  if (parsedWrtParams.empty()) {
     if (isProperty)
       autoDiffParameterIndicesBuilder.setParameter(0);
     else {
@@ -2460,11 +2459,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   } else {
     // 'wrt:' is specified. Validate and collect the selected parameters.
     int lastIndex = -1;
-    for (size_t i = 0; i < uncheckedWrtParams.size(); i++) {
-      auto paramLoc = uncheckedWrtParams[i].getLoc();
-      switch (uncheckedWrtParams[i].getKind()) {
-      case AutoDiffParameter::Kind::Index: {
-        unsigned index = uncheckedWrtParams[i].getIndex();
+    for (unsigned i : indices(parsedWrtParams)) {
+      auto paramLoc = parsedWrtParams[i].getLoc();
+      switch (parsedWrtParams[i].getKind()) {
+      case ParsedAutoDiffParameter::Kind::Index: {
+        unsigned index = parsedWrtParams[i].getIndex();
         if ((int)index <= lastIndex) {
           TC.diagnose(paramLoc,
                       diag::differentiable_attr_wrt_indices_must_be_ascending);
@@ -2480,7 +2479,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         lastIndex = index;
         break;
       }
-      case AutoDiffParameter::Kind::Self: {
+      case ParsedAutoDiffParameter::Kind::Self: {
         // 'self' is only applicable to instance methods.
         if (!isInstanceMethod) {
           TC.diagnose(paramLoc,
@@ -2528,10 +2527,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   for (unsigned i : range(wrtParamTypes.size())) {
     auto wrtParamType = original->mapTypeIntoContext(wrtParamTypes[i]);
     SourceLoc loc;
-    if (uncheckedWrtParams.empty()) {
+    if (parsedWrtParams.empty()) {
       loc = attr->getLocation();
     } else {
-      loc = uncheckedWrtParams[i].getLoc();
+      loc = parsedWrtParams[i].getLoc();
     }
     if (wrtParamType->isAnyClassReferenceType() ||
         wrtParamType->isExistentialType()) {
@@ -2601,7 +2600,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   // Memorize the checked parameter indices in the attribute.
-  attr->setCheckedParameterIndices(checkedWrtParamIndices);
+  attr->setParameterIndices(checkedWrtParamIndices);
 
   // Checks that the `candidate` function type equals the `required` function
   // type, disregarding parameter labels.

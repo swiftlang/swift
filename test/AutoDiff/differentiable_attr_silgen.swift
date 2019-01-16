@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -verify %s | %FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Normal types
@@ -65,7 +65,7 @@ public func no_prim_or_adj(_ x: Float) -> Float {
   return x * x
 }
 
-// CHECK-LABEL: sil [differentiable source 0 wrt 0] @no_prim_or_adj : $@convention(thin) (Float) -> Float
+// CHECK-LABEL: sil [differentiable source 0 wrt 0 primitive] @no_prim_or_adj : $@convention(thin) (Float) -> Float
 
 //===----------------------------------------------------------------------===//
 // JVP
@@ -77,7 +77,7 @@ public func hasjvp(_ x: Float, _ y: Float) -> Float {
   return 1
 }
 
-// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 jvp @dhasjvp] @hasjvp
+// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 primitive jvp @dhasjvp] @hasjvp
 
 @_silgen_name("dhasjvp")
 public func dhasjvp(_ x: Float, _ y: Float) -> (Float, (Float, Float) -> Float) {
@@ -97,7 +97,7 @@ public func hasvjp(_ x: Float, _ y: Float) -> Float {
   return 1
 }
 
-// CHECK-LABEL: sil [serialized] [differentiable source 0 wrt 0, 1 vjp @dhasvjp] @hasvjp
+// CHECK-LABEL: sil [serialized] [differentiable source 0 wrt 0, 1 primitive vjp @dhasvjp] @hasvjp
 
 @_silgen_name("dhasvjp")
 public func dhasvjp(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float, Float)) {
@@ -144,9 +144,6 @@ extension DiffStoredProp : Differentiable {
   typealias CotangentVector = DiffStoredProp
 }
 
-// CHECK-LABEL: DiffStoredProp.storedProp.getter
-// CHECK-NEXT: sil {{.*}} [differentiable source 0 wrt 0 jvp @storedPropJVP vjp @storedPropVJP]
-
 //===----------------------------------------------------------------------===//
 // Computed property
 //===----------------------------------------------------------------------===//
@@ -188,4 +185,4 @@ extension DiffComputedProp : Differentiable {
 }
 
 // CHECK-LABEL: DiffComputedProp.computedProp.getter
-// CHECK-NEXT: sil {{.*}} [differentiable source 0 wrt 0 jvp @computedPropJVP vjp @computedPropVJP]
+// CHECK-NEXT: sil {{.*}} [differentiable source 0 wrt 0 primitive jvp @computedPropJVP vjp @computedPropVJP]

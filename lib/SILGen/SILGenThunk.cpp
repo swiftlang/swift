@@ -219,17 +219,11 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
   if (constant.autoDiffAssociatedFunctionIdentifier)
     return;
 
-  // FIXME: When the underyling uncurried function is in a different module,
-  // `DA->getCheckedParameterIndices()` is `nullptr` so we can't generate the
-  // VJP of the curry thunk.
-  if (!DA->getCheckedParameterIndices())
-    return;
-
   SmallVector<SILDeclRef, 2> assocFnConstants;
   for (auto kind : {AutoDiffAssociatedFunctionKind::JVP,
                     AutoDiffAssociatedFunctionKind::VJP}) {
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
-        kind, /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
+        kind, /*differentiationOrder*/ 1, DA->getParameterIndices(),
         SwiftModule->getASTContext());
     auto assocFnConstant =
         constant.asAutoDiffAssociatedFunction(autoDiffFuncId);
@@ -243,9 +237,9 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
                                .getIdentifier(assocFnConstant.mangle())
                                .str());
 
-  auto loweredParamIndices = DA->getCheckedParameterIndices()->getLowered(
+  auto loweredParamIndices = DA->getParameterIndices()->getLowered(
       fd->getInterfaceType()->castTo<AnyFunctionType>());
-  auto *SILDA = SILDifferentiableAttr::create(
+  auto *silDiffAttr = SILDifferentiableAttr::create(
       M, SILAutoDiffIndices(/*source*/ 0, loweredParamIndices),
       /*requirements*/ DA->getRequirements(),
       /*primalName*/ StringRef(),
@@ -253,7 +247,7 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
       /*adjointIsPrimitive*/ false,
       /*jvpName*/ assocFnNames[0],
       /*vjpName*/ assocFnNames[1]);
-  f->addDifferentiableAttr(SILDA);
+  f->addDifferentiableAttr(silDiffAttr);
 }
 
 void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {

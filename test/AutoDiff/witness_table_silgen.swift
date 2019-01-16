@@ -18,7 +18,9 @@ struct S : Proto, VectorNumeric {
   static func - (lhs: S, rhs: S) -> S { return S(p: lhs.p - rhs.p) }
   static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
 
+  @_fieldwiseProductSpace
   typealias TangentVector = S
+  @_fieldwiseProductSpace
   typealias CotangentVector = S
 
   @differentiable(wrt: (self), vjp: vjpP)

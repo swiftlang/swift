@@ -7,7 +7,7 @@ public struct Foo : Differentiable {
 }
 
 // CHECK-AST-LABEL: public struct Foo : Differentiable {
-// CHECK-AST:   @sil_stored @differentiable()
+// CHECK-AST:   @sil_stored @differentiable(wrt: (self))
 // CHECK-AST:   public var a: Float { get set }
 // CHECK-AST:   @_fieldwiseProductSpace struct AllDifferentiableVariables
 // CHECK-AST:     @_fieldwiseProductSpace typealias AllDifferentiableVariables = Foo.AllDifferentiableVariables
@@ -17,7 +17,7 @@ public struct Foo : Differentiable {
 // CHECK-AST:   @_fieldwiseProductSpace typealias CotangentVector = Foo.AllDifferentiableVariables
 
 // CHECK-SILGEN-LABEL: // Foo.a.getter
-// CHECK-SILGEN: sil [transparent] [serialized] [differentiable source 0 wrt 0] @$s33derived_differentiable_properties3FooV1aSfvg : $@convention(method) (Foo) -> Float
+// CHECK-SILGEN: sil [transparent] [serialized] [differentiable source 0 wrt 0 primitive] @$s33derived_differentiable_properties3FooV1aSfvg : $@convention(method) (Foo) -> Float
 
 struct AdditiveTangentIsSelf : AdditiveArithmetic, Differentiable {
   var a: Float

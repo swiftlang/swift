@@ -702,7 +702,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived, Identifier id
           member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
       AutoDiffParameterIndicesBuilder builder(getterType);
       builder.setParameter(0);
-      diffableAttr->setCheckedParameterIndices(builder.build(C));
+      diffableAttr->setParameterIndices(builder.build(C));
     }
   }
 
