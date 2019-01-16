@@ -3973,7 +3973,10 @@ ClassDecl *ProtocolDecl::getSuperclassDecl() const {
 void ProtocolDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
-  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassDecl.setPointerAndInt(
+    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
+    true);
 }
 
 bool ProtocolDecl::walkInheritedProtocols(
@@ -6478,7 +6481,10 @@ ClassDecl *ClassDecl::getSuperclassDecl() const {
 void ClassDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
-  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassDecl.setPointerAndInt(
+    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
+    true);
 }
 
 ClangNode Decl::getClangNodeImpl() const {
