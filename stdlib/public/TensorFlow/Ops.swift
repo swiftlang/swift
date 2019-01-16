@@ -1610,8 +1610,8 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///
   /// - Parameters:
   ///   - axis: The batch dimension.
-  ///   - offset: The scalar offset, also known as beta.
-  ///   - scale: The scalar scale, also known as gamma.
+  ///   - offset: The offset, also known as beta.
+  ///   - scale: The scale, also known as gamma.
   ///   - epsilon: A small value added to the denominator for numerical
   ///     stability.
   @inlinable @inline(__always)
@@ -1621,8 +1621,8 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   )
   func batchNormalized(
     alongAxis axis: Int32,
-    offset: Scalar = 0,
-    scale: Scalar = 1,
+    offset: Tensor = Tensor(0),
+    scale: Tensor = Tensor(1),
     epsilon: Scalar = 0.001
   ) -> Tensor {
     let mean = self.mean(alongAxes: axis)
