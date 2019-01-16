@@ -6,6 +6,7 @@
 
 func test1(_ a: [String], s: String) {
   _ = a.index(of: s)
+  _ = a.index(where: { _ in true })
 }
 func test2(_ s: String, c: Character) {
   _ = s.index(of: c)
