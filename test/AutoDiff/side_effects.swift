@@ -39,4 +39,14 @@ let _: @autodiff (Float) -> Float = { x in
   return local + x
 }
 
+// Test differentiation with partial application of @noescape closure.
+// Addresses SR-9653.
+func noEscapePartialApplyTest() {
+  var y: Float = 0 // expected-warning {{variable 'y' was written to, but never read}}
+  let _ = gradient(at: 0) { (x: Float) -> Float in
+    y = x
+    return x + x
+  }
+}
+
 // TODO: Add file checks.
