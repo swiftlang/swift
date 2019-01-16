@@ -572,7 +572,7 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
   // Add here the checks for any specific @_semantics attributes that need
   // to be skipped during the early inlining pass.
   ArraySemanticsCall ASC(AI.getInstruction());
-  if (ASC && !ASC.canInlineEarly())
+  if (ASC)
     return true;
 
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
