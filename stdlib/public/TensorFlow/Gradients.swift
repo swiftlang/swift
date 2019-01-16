@@ -575,10 +575,10 @@ extension Tensor where Scalar : BinaryFloatingPoint & Differentiable,
   @inlinable
   func _vjpBatchNormalized(
     alongAxis axis: Int32,
-    offset: Scalar,
-    scale: Scalar,
+    offset: Tensor,
+    scale: Tensor,
     epsilon: Scalar
-  ) -> (Tensor, (Tensor) -> (Tensor, Scalar, Scalar)) {
+  ) -> (Tensor, (Tensor) -> (Tensor, Tensor, Tensor)) {
     let value = batchNormalized(alongAxis: axis, offset: offset, scale: scale,
                                 epsilon: epsilon)
     return (value, { v in
@@ -599,8 +599,7 @@ extension Tensor where Scalar : BinaryFloatingPoint & Differentiable,
       let dim = Tensor(Tensor<Int32>(self.shapeTensor[axis]))
       let tmp = (dNorm * inv) + (dVariance * 2 * dMean / dim)
       let dSelf = tmp + (dMean / dim)
-      return (dSelf, _TFGetScalarOrDie(dOffset.handle),  
-              _TFGetScalarOrDie(dScale.handle))
+      return (dSelf, dOffset, dScale)
     })
   }
 }
