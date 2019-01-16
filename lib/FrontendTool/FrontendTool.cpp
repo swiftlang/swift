@@ -25,14 +25,14 @@
 #include "ReferenceDependencies.h"
 #include "TBD.h"
 
-#include "swift/Subsystems.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ExperimentalDependencies.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
@@ -48,18 +48,19 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
-#include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
-#include "swift/Option/Options.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
+#include "swift/Option/Options.h"
 #include "swift/PrintAsObjC/PrintAsObjC.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Subsystems.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
@@ -762,6 +763,7 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
   return Context.hadError();
 }
 
+
 static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (Invocation.getFrontendOptions()
@@ -775,10 +777,16 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     const std::string &referenceDependenciesFilePath =
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
-    if (!referenceDependenciesFilePath.empty())
-      (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
-                                      *Instance.getDependencyTracker(),
-                                      referenceDependenciesFilePath);
+    if (!referenceDependenciesFilePath.empty()) {
+      if (Invocation.getLangOptions().EnableExperimentalDependencies)
+        (void)experimental_dependencies::emitReferenceDependencies(
+            Instance.getASTContext().Diags, SF,
+            *Instance.getDependencyTracker(), referenceDependenciesFilePath);
+      else
+        (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
+                                        *Instance.getDependencyTracker(),
+                                        referenceDependenciesFilePath);
+    }
   }
 }
 

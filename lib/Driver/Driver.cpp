@@ -409,6 +409,7 @@ static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
   return true;
 }
 
+/// Returns true on error.
 static bool populateOutOfDateMap(InputInfoMap &map,
                                  llvm::sys::TimePoint<> &LastBuildTime,
                                  StringRef argsHashStr,
@@ -417,8 +418,11 @@ static bool populateOutOfDateMap(InputInfoMap &map,
                                  bool ShowIncrementalBuildDecisions) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
-  if (!buffer)
+  if (!buffer) {
+    if (ShowIncrementalBuildDecisions)
+      llvm::outs() << "Incremental compilation could not read build record.\n";
     return false;
+  }
 
   namespace yaml = llvm::yaml;
   using InputInfo = CompileJobAction::InputInfo;

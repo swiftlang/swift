@@ -662,18 +662,7 @@ public:
   }
 
 private:
-  Type IntLiteralType;
   Type MaxIntegerType;
-  Type FloatLiteralType;
-  Type BooleanLiteralType;
-  Type UnicodeScalarType;
-  Type ExtendedGraphemeClusterType;
-  Type StringLiteralType;
-  Type ArrayLiteralType;
-  Type DictionaryLiteralType;
-  Type ColorLiteralType;
-  Type ImageLiteralType;
-  Type FileReferenceLiteralType;
   Type StringType;
   Type SubstringType;
   Type IntType;

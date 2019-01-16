@@ -50,6 +50,7 @@ namespace swift {
   HAS_TRIVIAL_DISPLAY(double);
   HAS_TRIVIAL_DISPLAY(bool);
   HAS_TRIVIAL_DISPLAY(std::string);
+  HAS_TRIVIAL_DISPLAY(const char *);
 
 #undef HAS_TRIVIAL_DISPLAY
 

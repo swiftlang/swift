@@ -1233,6 +1233,9 @@ private:
   Optional<std::vector<Token>> AllCorrectedTokens;
 
   std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
+
+public:
+  llvm::DenseMap<const char *, Type> defaultTypeRequestCache;
 };
 
 

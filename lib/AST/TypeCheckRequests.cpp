@@ -13,6 +13,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -428,4 +429,53 @@ void USRGenerationRequest::noteCycleStep(DiagnosticEngine &diags) const {
   const auto &storage = getStorage();
   auto &d = std::get<0>(storage);
   diags.diagnose(d, diag::circular_reference);
+}
+
+//----------------------------------------------------------------------------//
+// DefaultTypeRequest.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const DeclContextWrapper &x) {
+  if (!x.dc) {
+    out << "(null)";
+    return;
+  }
+  x.dc->printContext(out);
+}
+
+void DefaultTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  diags.diagnose(SourceLoc(), diag::circular_reference);
+}
+
+void DefaultTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  diags.diagnose(SourceLoc(), diag::circular_reference_through);
+}
+
+//----------------------------------------------------------------------------//
+// DefaultTypeRequest caching.
+//----------------------------------------------------------------------------//
+
+SourceFile *DefaultTypeRequest::getSourceFile() const {
+  return getDeclContext()->getParentSourceFile();
+}
+
+llvm::DenseMap<const char *, Type> *DefaultTypeRequest::getCache() const {
+  SourceFile *SF = getSourceFile();
+  return !SF ? nullptr : &SF->defaultTypeRequestCache;
+}
+
+Optional<Type> DefaultTypeRequest::getCachedResult() const {
+  auto const *cache = getCache();
+  if (!cache)
+    return None;
+  auto const &iter = cache->find(getTypeName());
+  return iter == cache->end() ? None : Optional<Type>(iter->second);
+}
+
+void DefaultTypeRequest::cacheResult(Type value) const {
+  auto *cache = getCache();
+  if (!cache)
+    return;
+  cache->insert(std::make_pair(getTypeName(), value));
 }
