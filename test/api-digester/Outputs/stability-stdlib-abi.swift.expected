@@ -8,8 +8,6 @@ Class _EmptySetSingleton has changed its super class from _RawSetStorage to __Ra
 Class _RawDictionaryStorage has been renamed to Class __RawDictionaryStorage
 Class _RawSetStorage has been renamed to Class __RawSetStorage
 Class _SetStorage has changed its super class from _RawSetStorage to __RawSetStorage
-Class _SharedStringStorage has been renamed to Class __SharedStringStorage
-Class _StringStorage has been renamed to Class __StringStorage
 Constructor Dictionary._Variant.init(cocoa:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
 Constructor Dictionary.init(_cocoa:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
 Constructor Set._Variant.init(cocoa:) has parameter 0 type change from _CocoaSet to __CocoaSet
@@ -36,9 +34,9 @@ Func _SetStorage.resize(original:capacity:move:) has parameter 0 type change fro
 Struct _CocoaDictionary has been renamed to Struct __CocoaDictionary
 Struct _CocoaSet has been renamed to Struct __CocoaSet
 Var Dictionary._Variant.asCocoa has declared type change from _CocoaDictionary to __CocoaDictionary
-Var Dictionary._Variant.object has declared type change from _BridgeStorage<_RawDictionaryStorage, _NSDictionary> to _BridgeStorage<__RawDictionaryStorage>
+Var Dictionary._Variant.object has declared type change from _BridgeStorage<_RawDictionaryStorage> to _BridgeStorage<__RawDictionaryStorage>
 Var Set._Variant.asCocoa has declared type change from _CocoaSet to __CocoaSet
-Var Set._Variant.object has declared type change from _BridgeStorage<_RawSetStorage, _NSSet> to _BridgeStorage<__RawSetStorage>
+Var Set._Variant.object has declared type change from _BridgeStorage<_RawSetStorage> to _BridgeStorage<__RawSetStorage>
 Var _CocoaDictionary.Index.dictionary has declared type change from _CocoaDictionary to __CocoaDictionary
 Var _NativeDictionary._storage has declared type change from _RawDictionaryStorage to __RawDictionaryStorage
 Var _NativeSet._storage has declared type change from _RawSetStorage to __RawSetStorage

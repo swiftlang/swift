@@ -1100,7 +1100,7 @@ extension _StringObject {
       }
       if _countAndFlags.isNativelyStored {
         let anyObj = Builtin.reinterpretCast(largeAddressBits) as AnyObject
-        _internalInvariant(anyObj is _StringStorage)
+        _internalInvariant(anyObj is __StringStorage)
       }
     }
 

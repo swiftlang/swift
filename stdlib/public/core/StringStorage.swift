@@ -126,10 +126,10 @@ extension _AbstractStringStorage {
     switch knownOther {
     case .storage:
       return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: _StringStorage.self))
+        _unsafeUncheckedDowncast(other, to: __StringStorage.self))
     case .shared:
       return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: _SharedStringStorage.self))
+        _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
 #if !(arch(i386) || arch(arm))
     case .tagged:
       fallthrough
