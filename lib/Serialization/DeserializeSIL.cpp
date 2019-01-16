@@ -626,34 +626,28 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     assert(kind == SIL_DIFFERENTIABLE_ATTR &&
            "Missing differentiable attribute");
 
-    uint64_t primalNameId;
-    uint64_t adjointNameId;
-    bool adjointIsPrimitive;
     uint64_t jvpNameId;
     uint64_t vjpNameId;
     uint64_t source;
     ArrayRef<uint64_t> parameters;
-    SILDifferentiableAttrLayout::readRecord(scratch, primalNameId,
-                                            adjointNameId, adjointIsPrimitive,
-                                            jvpNameId, vjpNameId, source,
-                                            parameters);
+    SmallVector<Requirement, 8> requirements;
 
-    StringRef primalName = MF->getIdentifier(primalNameId).str();
-    StringRef adjointName = MF->getIdentifier(adjointNameId).str();
+    SILDifferentiableAttrLayout::readRecord(scratch, jvpNameId, vjpNameId,
+                                            source, parameters);
+
     llvm::SmallBitVector parametersBitVector(parameters.size());
     StringRef jvpName = MF->getIdentifier(jvpNameId).str();
     StringRef vjpName = MF->getIdentifier(vjpNameId).str();
     for (unsigned i : indices(parameters))
       parametersBitVector[i] = parameters[i];
     SILAutoDiffIndices indices(source, parametersBitVector);
-
-    SmallVector<Requirement, 8> requirements;
     MF->readGenericRequirements(requirements, SILCursor);
 
     auto *attr = SILDifferentiableAttr::create(SILMod, indices, requirements,
-                                               primalName, adjointName,
-                                               adjointIsPrimitive, jvpName,
-                                               vjpName);
+                                               /*primal*/ StringRef(),
+                                               /*adjoint*/ StringRef(),
+                                               /*adjointIsPrimitive*/ true,
+                                               jvpName, vjpName);
     fn->addDifferentiableAttr(attr);
   }
 

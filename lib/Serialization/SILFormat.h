@@ -316,9 +316,6 @@ namespace sil_block {
   // SWIFT_ENABLE_TENSORFLOW
   using SILDifferentiableAttrLayout = BCRecordLayout<
     SIL_DIFFERENTIABLE_ATTR,
-    IdentifierIDField,  // Primal name.
-    IdentifierIDField,  // Adjoint name.
-    BCFixed<1>,         // Adjoint is primitive.
     IdentifierIDField,  // JVP name.
     IdentifierIDField,  // VJP name.
     BCFixed<32>,        // Indices' source.

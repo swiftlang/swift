@@ -239,7 +239,7 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
 
   auto loweredParamIndices = DA->getParameterIndices()->getLowered(
       fd->getInterfaceType()->castTo<AnyFunctionType>());
-  auto *SILDA = SILDifferentiableAttr::create(
+  auto *silDiffAttr = SILDifferentiableAttr::create(
       M, SILAutoDiffIndices(/*source*/ 0, loweredParamIndices),
       /*requirements*/ DA->getRequirements(),
       /*primalName*/ StringRef(),
@@ -247,7 +247,7 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
       /*adjointIsPrimitive*/ false,
       /*jvpName*/ assocFnNames[0],
       /*vjpName*/ assocFnNames[1]);
-  f->addDifferentiableAttr(SILDA);
+  f->addDifferentiableAttr(silDiffAttr);
 }
 
 void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {

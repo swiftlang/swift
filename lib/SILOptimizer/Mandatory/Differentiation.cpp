@@ -785,9 +785,6 @@ private:
   SmallDenseMap<std::pair<SILFunction *, SILAutoDiffIndices>, unsigned>
       enqueuedTaskIndices;
 
-  /// The SIL loader owned by the module.
-  SerializedSILLoader *silLoader = module.getSILLoader();
-
   /// The VectorNumeric protocol in the standard library.
   ProtocolDecl *vectorNumericProtocol =
       astCtx.getProtocol(KnownProtocolKind::VectorNumeric);
@@ -910,6 +907,7 @@ private:
       SILFunction *original, const SILAutoDiffIndices &indices) {
     if (auto *attr = lookUpDifferentiableAttr(original, indices))
       return attr;
+    assert(original->isDefinition());
     return createDifferentiableAttr(original, indices);
   }
 
@@ -967,16 +965,6 @@ public:
                               DifferentiationInvoker invoker) {
     // Make sure this pair of original and indices is unique.
     assert(!lookUpDifferentiationTask(original, indices));
-    // Make sure this function either has a body or has a
-    // `[differentiable]` attribute that is a superset of all the
-    if (original->isExternalDeclaration()) {
-      // If it's serialized, deserialize it.
-      assert(original->isSerialized() &&
-             "Differentiation task cannot be on a function without a body");
-      auto *deserializedFn = silLoader->lookupSILFunction(original);
-      assert(deserializedFn && "Cannot deserialize original function");
-      (void)deserializedFn;
-    }
     auto *attr = getOrCreateDifferentiableAttr(original, indices);
     std::unique_ptr<DifferentiationTask> task(
         new DifferentiationTask(*this, original, std::move(attr), invoker));
@@ -1761,7 +1749,9 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
     pvStruct->getAttrs().add(
         new (astCtx) UsableFromInlineAttr(/*implicit*/ true));
   }
-  pvStruct->setGenericEnvironment(task->getOriginal()->getGenericEnvironment());
+  if (auto originalGenSig =
+          task->getOriginal()->getLoweredFunctionType()->getGenericSignature())
+    pvStruct->setGenericEnvironment(originalGenSig->createGenericEnvironment());
   file.addVisibleDecl(pvStruct);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
@@ -3615,14 +3605,22 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
                                          SILDifferentiableAttr *&&attr,
                                          DifferentiationInvoker invoker)
     : context(context), original(original), attr(attr), invoker(invoker) {
-  if (attr->hasPrimal())
+  if (attr->hasPrimal()) {
     primal = lookUpOrLinkFunction(attr->getPrimalName(), context.getModule());
-  if (attr->hasAdjoint())
+    assert(primal);
+  }
+  if (attr->hasAdjoint()) {
     adjoint = lookUpOrLinkFunction(attr->getAdjointName(), context.getModule());
-  if (attr->hasJVP())
+    assert(adjoint);
+  }
+  if (attr->hasJVP()) {
     jvp = lookUpOrLinkFunction(attr->getJVPName(), context.getModule());
-  if (attr->hasVJP())
+    assert(jvp);
+  }
+  if (attr->hasVJP()) {
     vjp = lookUpOrLinkFunction(attr->getVJPName(), context.getModule());
+    assert(vjp);
+  }
 
   if (!jvp)
     createJVP();
@@ -3657,14 +3655,15 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
 // a SILDifferentiableAttr. The expected generic signature is built from the
 // original generic signature and the attribute's requirements.
 static GenericSignature *
-getAutodiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
+getAutoDiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
                                               SILFunction *original) {
-  auto originalGenEnv = original->getGenericEnvironment();
-  if (!originalGenEnv)
+  auto originalGenSig =
+      original->getLoweredFunctionType()->getGenericSignature();
+  if (!originalGenSig)
     return nullptr;
   GenericSignatureBuilder builder(original->getASTContext());
   // Add original generic signature.
-  builder.addGenericSignature(originalGenEnv->getGenericSignature());
+  builder.addGenericSignature(originalGenSig);
   // Add where clause requirements.
   auto source =
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
@@ -3690,7 +3689,7 @@ void DifferentiationTask::createEmptyPrimal() {
                                        "__primal_" + indices.mangle())
                         .str();
   auto *primalGenericSig =
-      getAutodiffAssociatedFunctionGenericSignature(attr, original);
+      getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   StructDecl *primalValueStructDecl = context.createPrimalValueStruct(this);
   primalInfo = std::unique_ptr<PrimalInfo>(
       new PrimalInfo(primalValueStructDecl, module));
@@ -3733,13 +3732,14 @@ void DifferentiationTask::createEmptyAdjoint() {
 
   auto &module = context.getModule();
   auto *original = getOriginal();
+  auto origTy = original->getLoweredFunctionType();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that the calls `module.Types.getTypeLowering()` below
-  // can understand the original function's generic parameter types.
+  // will know the original function's generic parameter types.
   Lowering::GenericContextScope genericContextScope(
-      module.Types, original->getLoweredFunctionType()->getGenericSignature());
+      module.Types, origTy->getGenericSignature());
 
   // Given a type, returns its formal SIL parameter info.
   auto getFormalParameterInfo = [&](CanType type) -> SILParameterInfo {
@@ -3775,7 +3775,6 @@ void DifferentiationTask::createEmptyAdjoint() {
   // parameters.
   SmallVector<SILParameterInfo, 8> adjParams;
   SmallVector<SILResultInfo, 8> adjResults;
-  auto origTy = original->getLoweredFunctionType();
   auto origParams = origTy->getParameters();
 
   // Add adjoint parameter for the seed.
@@ -3831,7 +3830,7 @@ void DifferentiationTask::createEmptyAdjoint() {
                                     "__adjoint_" + getIndices().mangle())
                      .str();
   auto *adjGenericSig =
-      getAutodiffAssociatedFunctionGenericSignature(attr, original);
+      getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *adjGenericEnv = adjGenericSig
       ? adjGenericSig->createGenericEnvironment()
       : nullptr;
@@ -3862,11 +3861,19 @@ void DifferentiationTask::createJVP() {
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
 
+  // RAII that pushes the original function's generic signature to
+  // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+  // will know the original function's generic parameter types.
+  Lowering::GenericContextScope genericContextScope(
+      module.Types, originalTy->getGenericSignature());
+
   // === Create an empty JVP. ===
-  auto jvpName =
-      "AD__" + original->getName().str() + "__jvp_" + getIndices().mangle();
+  auto jvpName = original->getASTContext()
+                     .getIdentifier("AD__" + original->getName().str() +
+                                    "__jvp_" + getIndices().mangle())
+                     .str();
   auto *jvpGenericSig =
-      getAutodiffAssociatedFunctionGenericSignature(attr, original);
+      getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *jvpGenericEnv = jvpGenericSig
       ? jvpGenericSig->createGenericEnvironment()
       : nullptr;
@@ -3883,22 +3890,13 @@ void DifferentiationTask::createJVP() {
                           original->isSerialized());
   jvp->setUnqualifiedOwnership();
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
-  attr->setJVPName(jvp->getName());
+  attr->setJVPName(jvpName);
 
-  // Entry block arguments
+  // Create JVP entry BB and arguments.
   auto jvpConv = jvp->getConventions();
   auto *entry = jvp->createBasicBlock();
-  unsigned argumentIndex = 0;
-  for (auto indResultTy : jvpConv.getIndirectSILResultTypes())
-    entry->createFunctionArgument(
-        jvp->mapTypeIntoContext(indResultTy).getAddressType(),
-        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
-  for (auto paramTy : jvpConv.getParameterSILTypes())
-    entry->createFunctionArgument(
-        jvp->mapTypeIntoContext(paramTy),
-        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
-
-  // Return undef
+  createEntryArguments(jvp);
+  // Return undef.
   SILBuilder builder(entry);
   auto loc = jvp->getLocation();
   builder.createReturn(
@@ -3922,13 +3920,19 @@ void DifferentiationTask::createVJP() {
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
 
+  // RAII that pushes the original function's generic signature to
+  // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+  // will know the original function's generic parameter types.
+  Lowering::GenericContextScope genericContextScope(
+      module.Types, originalTy->getGenericSignature());
+
   // === Create an empty VJP. ===
   auto vjpName = original->getASTContext()
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__vjp_" + getIndices().mangle())
                      .str();
   auto *vjpGenericSig =
-      getAutodiffAssociatedFunctionGenericSignature(attr, original);
+      getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *vjpGenericEnv = vjpGenericSig
       ? vjpGenericSig->createGenericEnvironment()
       : nullptr;
@@ -4034,17 +4038,9 @@ void DifferentiationTask::createVJP() {
   }
 #endif
 
-  // Create the entry block with indirect results and parameters.
+  // Create VJP entry BB and arguments.
   auto *entry = vjp->createBasicBlock();
-  unsigned argumentIndex = 0;
-  for (auto indResultTy : vjpConv.getIndirectSILResultTypes())
-    entry->createFunctionArgument(
-        vjp->mapTypeIntoContext(indResultTy).getAddressType(),
-        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
-  for (auto paramTy : vjpConv.getParameterSILTypes())
-    entry->createFunctionArgument(
-        vjp->mapTypeIntoContext(paramTy),
-        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
+  createEntryArguments(vjp);
 
   SILBuilder builder(entry);
   auto loc = vjp->getLocation();
@@ -4079,9 +4075,13 @@ void DifferentiationTask::createVJP() {
 
   // Get and call the primal.
   auto *primalRef = builder.createFunctionRef(loc, primal);
+
+  auto vjpSubstMap = vjpGenericEnv
+    ? vjpGenericEnv->getForwardingSubstitutionMap()
+    : vjp->getForwardingSubstitutionMap();
+
   auto *primalApply = builder.createApply(
-      loc, primalRef, vjp->getForwardingSubstitutionMap(), primalArgs,
-      /*isNonThrowing*/ false);
+      loc, primalRef, vjpSubstMap, primalArgs, /*isNonThrowing*/ false);
 
   // Collect the primal's direct results.
   SmallVector<SILValue, 8> primalDirectResults;
@@ -4128,7 +4128,7 @@ void DifferentiationTask::createVJP() {
   // Get and partially apply the adjoint.
   auto *adjointRef = builder.createFunctionRef(loc, adjoint);
   auto *adjointPartialApply = builder.createPartialApply(
-      loc, adjointRef, vjp->getForwardingSubstitutionMap(), partialAdjointArgs,
+      loc, adjointRef, vjpSubstMap, partialAdjointArgs,
       ParameterConvention::Direct_Guaranteed);
 
   // === Clean up the stack allocations. ===

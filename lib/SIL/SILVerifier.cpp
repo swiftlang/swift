@@ -4581,6 +4581,10 @@ public:
     // Parameter indices must be specified.
     require(!Attr.getIndices().parameters.empty(),
             "Parameter indices cannot be empty");
+    // JVP and VJP must be specified in canonical SIL.
+    if (F->getModule().getStage() == SILStage::Canonical)
+      require(!Attr.getJVPName().empty() && !Attr.getVJPName().empty(),
+              "JVP and VJP must be specified in canonical SIL");
     // Verify if specified parameter indices are valid.
     auto numParams = countParams(F->getLoweredFunctionType());
     int lastIndex = -1;
