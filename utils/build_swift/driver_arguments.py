@@ -526,6 +526,11 @@ def create_argument_parser():
     option(['--swiftevolve'], store_true('build_swiftevolve'),
            help='build the swift-evolve tool')
 
+    option(['--indexstore-db'], store_true('build_indexstoredb'),
+           help='build IndexStoreDB')
+    option(['--sourcekit-lsp'], store_true('build_sourcekitlsp'),
+           help='build SourceKitLSP')
+
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
 
@@ -879,6 +884,11 @@ def create_argument_parser():
            toggle_false('test_android_host'),
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
+
+    option('--skip-test-indexstore-db', toggle_false('test_indexstoredb'),
+           help='skip testing indexstore-db')
+    option('--skip-test-sourcekit-lsp', toggle_false('test_sourcekitlsp'),
+           help='skip testing sourcekit-lsp')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
