@@ -1,1 +1,2 @@
 Class __SwiftNativeNSString has been removed
+Func tryReallocateUniquelyReferenced(buffer:newMinimumCapacity:) has been removed
