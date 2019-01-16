@@ -2372,7 +2372,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     auto paramIndices = attr->getParameterIndices();
     assert(paramIndices && "Checked parameter indices must be resolved");
     SmallVector<bool, 4> indices;
-    for (unsigned i = 0; i < paramIndices->parameters.size(); i++)
+    for (unsigned i : swift::indices(paramIndices->parameters))
       indices.push_back(paramIndices->parameters[i]);
 
     DifferentiableDeclAttrLayout::emitRecord(
