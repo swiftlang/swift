@@ -523,7 +523,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = reshaped(toShape: newShape)
     return (value, { v in
-      return v.reshaped(toShape: newShape)
+      return v.reshaped(toShape: self.shapeTensor)
     })
   }
 
