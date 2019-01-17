@@ -814,9 +814,16 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
     case MemberLookupResult::UR_InstanceMemberOnType:
-        llvm_unreachable("instance member on type is diagnosed via fixes");
-    case MemberLookupResult::UR_TypeMemberOnInstance:
-        llvm_unreachable("type member on instance is diagnosed via fixes");
+    case MemberLookupResult::UR_TypeMemberOnInstance: {
+      AllowTypeOrInstanceMemberFailure failure(
+          nullptr, CS, baseObjTy, memberName,
+          CS.getConstraintLocator(E, ConstraintLocator::Member));
+      auto diagnosed = failure.diagnoseAsError();
+      assert(diagnosed &&
+             "Failed to produce missing or extraneous metatype diagnostic");
+      (void)diagnosed;
+      return;
+    }
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue: {
       auto diagIDsubelt = diag::cannot_pass_rvalue_mutating_subelement;
