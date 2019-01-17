@@ -1352,7 +1352,12 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
     return true;
   }
 
-  llvm::SmallString<128> importLine{"#import \""};
+  llvm::SmallString<128> importLine;
+  if (Impl.SwiftContext.LangOpts.EnableObjCInterop)
+    importLine = "#import \"";
+  else
+    importLine = "#include \"";
+
   importLine += header;
   importLine += "\"\n";
 
