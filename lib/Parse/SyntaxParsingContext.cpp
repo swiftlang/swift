@@ -229,8 +229,6 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind,
   case SyntaxKind::IdentifierExpr:
   case SyntaxKind::SpecializeExpr:
   case SyntaxKind::MemberAccessExpr:
-  case SyntaxKind::DotSelfExpr:
-  case SyntaxKind::ImplicitMemberExpr:
   case SyntaxKind::SimpleTypeIdentifier:
   case SyntaxKind::MemberTypeIdentifier:
   case SyntaxKind::FunctionCallExpr:

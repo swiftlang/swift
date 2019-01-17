@@ -52,6 +52,7 @@ class C {
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
     foo(nil, nil, nil)
     _ = type(of: a).self
+    _ = a.`self`
     _ = A -> B.C<Int>
     _ = [(A) throws -> B]()
   }
