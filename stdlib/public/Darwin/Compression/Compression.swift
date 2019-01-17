@@ -53,9 +53,6 @@ public enum FilterError: Error {
 
   /// Non-empty write after an output filter has been finalized
   case writeToFinalizedFilter
-
-  /// Invalid count argument in a read() call
-  case readCountInvalid
 }
 
 /**
@@ -154,7 +151,7 @@ public class OutputFilter {
     try data!.withUnsafeBytes { (src_ptr: UnsafePointer<UInt8>) in
       _stream.src_size = data!.count
       _stream.src_ptr = src_ptr
-      while (_stream.src_size > 0) { _ = try process(false) }
+      while (_stream.src_size > 0) { _ = try process(finalizing: false) }
     }
   }
 
@@ -174,13 +171,13 @@ public class OutputFilter {
     // Finalize stream
     _stream.src_size = 0
     var status = COMPRESSION_STATUS_OK
-    while (status != COMPRESSION_STATUS_END) { status = try process(true) }
-
-    // Notify end of stream
-    try _writeFunc(nil)
+    while (status != COMPRESSION_STATUS_END) { status = try process(finalizing: true) }
 
     // Update state
     _finalized = true
+
+    // Notify end of stream
+    try _writeFunc(nil)
   }
 
   // Cleanup resources.  The filter is finalized now if it was not finalized yet.
@@ -195,7 +192,7 @@ public class OutputFilter {
 
   // Call compression_stream_process with current src, and dst set to _buf, then write output to the closure
   // Return status
-  private func process(_ finalize: Bool) throws -> compression_status {
+  private func process(finalizing finalize: Bool) throws -> compression_status {
     // Process current input, and write to buf
     _stream.dst_ptr = _buf
     _stream.dst_size = _bufCapacity
@@ -262,11 +259,10 @@ public class InputFilter {
 
    - Throws:
    `FilterError.filterProcessError` if an error occurs during processing
-   `FilterError.readCountInvalid` if `count` <= 0
    */
   public func readData(ofLength count: Int) throws -> Data? {
     // Sanity check
-    guard count > 0 else { throw FilterError.readCountInvalid }
+    precondition(count > 0, "number of bytes to read can't be 0")
 
     // End reached, return early, nothing to do
     if _endReached { return nil }
@@ -295,7 +291,7 @@ public class InputFilter {
           try buf.withUnsafeBytes { (src_ptr: UnsafePointer<UInt8>) in
 
             // Next byte to read
-            _stream.src_ptr = src_ptr.advanced(by: buf.count - _stream.src_size)
+            _stream.src_ptr = src_ptr + buf.count - _stream.src_size
 
             let status = compression_stream_process(&_stream, (_eofReached ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0))
             guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.filterProcessError }
