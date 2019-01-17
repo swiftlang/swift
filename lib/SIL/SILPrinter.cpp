@@ -1272,6 +1272,22 @@ public:
     }
   }
 
+  void printAssignOwnershipQualifier(AssignOwnershipQualifier Qualifier) {
+    switch (Qualifier) {
+    case AssignOwnershipQualifier::Unknown:
+      return;
+    case AssignOwnershipQualifier::Init:
+      *this << "[init] ";
+      return;
+    case AssignOwnershipQualifier::Reassign:
+      *this << "[reassign] ";
+      return;
+    case AssignOwnershipQualifier::Reinit:
+      *this << "[reinit] ";
+      return;
+    }
+  }
+
   void visitStoreInst(StoreInst *SI) {
     *this << Ctx.getID(SI->getSrc()) << " to ";
     printStoreOwnershipQualifier(SI->getOwnershipQualifier());
@@ -1288,7 +1304,9 @@ public:
   }
 
   void visitAssignInst(AssignInst *AI) {
-    *this << Ctx.getID(AI->getSrc()) << " to " << getIDAndType(AI->getDest());
+    *this << Ctx.getID(AI->getSrc()) << " to ";
+    printAssignOwnershipQualifier(AI->getOwnershipQualifier());
+    *this << getIDAndType(AI->getDest());
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {

@@ -1886,11 +1886,11 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     if (TheMemory.isClassInitSelf() &&
         Use.Kind == DIUseKind::SelfInit) {
       assert(InitKind == IsInitialization);
-      AI->setInitKind(PartialInitializationKind::IsReinitialization);
+      AI->setOwnershipQualifier(AssignOwnershipQualifier::Reinit);
     } else {
-      AI->setInitKind((InitKind == IsInitialization
-                      ? PartialInitializationKind::IsInitialization
-                      : PartialInitializationKind::IsNotInitialization));
+      AI->setOwnershipQualifier((InitKind == IsInitialization
+                                ? AssignOwnershipQualifier::Init
+                                : AssignOwnershipQualifier::Reassign));
     }
 
     return;

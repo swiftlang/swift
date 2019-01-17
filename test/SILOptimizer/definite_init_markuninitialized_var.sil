@@ -195,7 +195,7 @@ bb0(%0 : $Int):
 sil [ossa] @assign_test_nontrivial : $@convention(thin) () -> () {
 bb0:
   // Assignments of nontrivial types.  The first becomes an initialize (i.e.,
-  // lone store), the second becomes an assignment (retain/release dance).
+  // lone store), the second becomes a reassignment (retain/release dance).
 
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
@@ -207,15 +207,13 @@ bb0:
   // CHECK: [[C1:%[0-9]+]] = apply
 
   assign %4 to %c : $*SomeClass
-  // CHECK-NEXT: store
+  // CHECK-NEXT: assign [[C1]] to [init]
 
   %8 = apply %f() : $@convention(thin) () -> @owned SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   assign %8 to %c : $*SomeClass
-  // CHECK-NEXT: load
-  // CHECK-NEXT: store [[C2]]
-  // CHECK-NEXT: destroy_value
+  // CHECK-NEXT: assign [[C2]] to [reassign]
 
   destroy_addr %c : $*SomeClass
   // CHECK-NEXT: destroy_addr
@@ -293,7 +291,7 @@ bb0:
 sil [ossa] @assign_test_unowned : $@convention(thin) () -> () {
 bb0:
   // Assignments of unowned pointer.  The first becomes an initialize, and the
-  // second becomes an assignment.
+  // second becomes a reassignment.
 
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <@sil_unowned SomeClass>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <@sil_unowned SomeClass>, 0
@@ -310,7 +308,7 @@ bb0:
   %5a = copy_value %5 : $@sil_unowned SomeClass
   // CHECK-NEXT: [[C1u_copy:%.*]] = copy_value [[C1u]]
   assign %5a to %c : $*@sil_unowned SomeClass
-  // CHECK-NEXT: store [[C1u_copy]] to [init]
+  // CHECK-NEXT: assign [[C1u_copy]] to [init]
   destroy_value %4 : $SomeClass
   // CHECK-NEXT: destroy_value [[C1]]
 
@@ -321,12 +319,10 @@ bb0:
   // CHECK: [[C2u:%[0-9]+]] = ref_to_unowned [[C2]]
 
   %9a = copy_value %9 : $@sil_unowned SomeClass
-  // CHECK-NEXT: copy_value [[C2u]]
+  // CHECK-NEXT: [[C2u_copy:%.*]] = copy_value [[C2u]]
 
   assign %9a to %c : $*@sil_unowned SomeClass
-  // CHECK-NEXT: load
-  // CHECK-NEXT: store
-  // CHECK-NEXT: destroy_value
+  // CHECK-NEXT: assign [[C2u_copy]] to [reassign]
 
   destroy_value %8 : $SomeClass
   // CHECK-NEXT: destroy_value [[C2]]
@@ -509,11 +505,11 @@ bb1:
   // CHECK-NEXT: [[V1:%[0-9]+]] = apply
   %12 = apply %2() : $@convention(thin) () -> @owned SomeClass
 
-  // This assign becomes a simple store, since it is an initialize. This updates
-  // the control variable to say that it is initialized.
+  // This assign will become a simple store, since it is an initialize. This
+  // updates the control variable to say that it is initialized.
   // CHECK: integer_literal $Builtin.Int1, -1
   // CHECK: store {{.*}} to [trivial] [[CONTROL]]
-  // CHECK: store [[V1]] to [init] [[CLASSVAL]]
+  // CHECK: assign [[V1]] to [init] [[CLASSVAL]]
   assign %12 to %6 : $*SomeClass                // id: %13
   br bb2                                          // id: %14
 
@@ -523,7 +519,7 @@ bb2:
   // CHECK-NEXT: [[V2:%[0-9]+]] = apply
   %17 = apply %3() : $@convention(thin) () -> @owned SomeClass
 
-  // This assign is either an initialize or an assign depending on whether %0 is
+  // This assign is either an initialize or a reassign depending on whether %0 is
   // true or not.  This gets expanded out to a conditional destroy of the value.
   // CHECK:   load [trivial] [[CONTROL]]
   // CHECK:   cond_br
@@ -531,7 +527,7 @@ bb2:
   // CHECK:   destroy_addr [[CLASSVAL]]
   // CHECK:   br bb5
   // CHECK: bb5:
-  // CHECK: store [[V2]] to [init] [[CLASSVAL]]
+  // CHECK: assign [[V2]] to [init] [[CLASSVAL]]
   assign %17 to %6 : $*SomeClass                // id: %18
   destroy_addr %6 : $*SomeClass                 // id: %19
   dealloc_stack %5 : $*SomeClass // id: %20
