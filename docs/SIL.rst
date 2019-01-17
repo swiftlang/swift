@@ -1,4 +1,3 @@
-.. @raise litre.TestsAreMissing
 .. highlight:: none
 
 Swift Intermediate Language (SIL)

@@ -1,6 +1,5 @@
 :orphan:
 
-.. @raise litre.TestsAreMissing
 .. default-role:: code
 
 ====================================
