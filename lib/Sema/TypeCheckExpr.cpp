@@ -677,12 +677,13 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
 static std::pair<const char *, bool>
 getDefaultTypeNameAndPerformLocalLookup(const ProtocolDecl *protocol) {
   TypeChecker &tc = TypeChecker::createForContext(protocol->getASTContext());
-  
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
-\
-  if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))        \
+
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName,          \
+                                                  performLocalLookup)          \
+                                                                               \
+  if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))          \
     return std::make_pair(typeName, performLocalLookup);
-  
+
 #include "swift/AST/KnownProtocols.def"
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
 
