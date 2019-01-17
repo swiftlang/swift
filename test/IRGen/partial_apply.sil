@@ -602,4 +602,27 @@ bb0(%0 : $*A2<A3>):
   return %5 : $@callee_guaranteed () -> (@owned A1, @error Error)
 }
 
+sil @capture_class : $@convention(thin) (@guaranteed A3) -> ()
+
+// CHECK: define swiftcc i8* @partial_apply_stack_in_coroutine(i8* {{.*}}, %T13partial_apply2A3C*)
+// CHECK: entry:
+// CHECK:   [[CLOSURE_CONTEXT:%.*]] = bitcast %T13partial_apply2A3C* %1 to %swift.opaque*
+// CHECK:   [[CONTEXT:%.*]] = bitcast %swift.opaque* [[CLOSURE_CONTEXT]] to %swift.refcounted*
+// CHECK:   call swiftcc void @"$s13capture_classTA"(%swift.refcounted* swiftself [[CONTEXT]])
+sil @partial_apply_stack_in_coroutine : $@yield_once (@owned A3) -> () {
+entry(%0: $A3):
+  %f = function_ref @capture_class : $@convention(thin) (@guaranteed A3) -> ()
+  %p = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@convention(thin) (@guaranteed A3) -> ()
+  apply %p() : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %p : $@noescape @callee_guaranteed () -> ()
+  %1000 = integer_literal $Builtin.Int32, 1000
+  yield (), resume resume, unwind unwind
+
+resume:
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  unwind
+}
 sil_vtable A3 {}
