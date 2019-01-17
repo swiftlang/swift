@@ -17,7 +17,7 @@ import Foundation
 /**
  Compression algorithms, wraps the C API constants.
  */
-public enum Algorithm {
+public enum Algorithm: CaseIterable {
 
   /// LZFSE
   case lzfse
