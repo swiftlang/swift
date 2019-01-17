@@ -294,7 +294,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// arenas.
   struct Arena {
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
-    llvm::FoldingSet<NameAliasType> NameAliasTypes;
+    llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
     llvm::DenseMap<std::pair<Type,char>,
@@ -1999,6 +1999,19 @@ LazyGenericContextData *ASTContext::getOrCreateLazyGenericContextData(
                                                               lazyLoader);
 }
 
+bool ASTContext::hasDelayedConformanceErrors() const {
+  for (const auto &entry : getImpl().DelayedConformanceDiags) {
+    auto &diagnostics = entry.getSecond();
+    if (std::any_of(diagnostics.begin(), diagnostics.end(),
+                    [](const ASTContext::DelayedConformanceDiag &diag) {
+                      return diag.IsError;
+                    }))
+      return true;
+  }
+
+  return false;
+}
+
 void ASTContext::addDelayedConformanceDiag(
        NormalProtocolConformance *conformance,
        DelayedConformanceDiag fn) {
@@ -2896,30 +2909,30 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
 // Type manipulation routines.
 //===----------------------------------------------------------------------===//
 
-NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
+TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
                              SubstitutionMap substitutions,
                              Type underlying,
                              RecursiveTypeProperties properties)
-    : SugarType(TypeKind::NameAlias, underlying, properties),
+    : SugarType(TypeKind::TypeAlias, underlying, properties),
       typealias(typealias) {
   // Record the parent (or absence of a parent).
   if (parent) {
-    Bits.NameAliasType.HasParent = true;
+    Bits.TypeAliasType.HasParent = true;
     *getTrailingObjects<Type>() = parent;
   } else {
-    Bits.NameAliasType.HasParent = false;
+    Bits.TypeAliasType.HasParent = false;
   }
 
   // Record the substitutions.
   if (substitutions) {
-    Bits.NameAliasType.HasSubstitutionMap = true;
+    Bits.TypeAliasType.HasSubstitutionMap = true;
     *getTrailingObjects<SubstitutionMap>() = substitutions;
   } else {
-    Bits.NameAliasType.HasSubstitutionMap = false;
+    Bits.TypeAliasType.HasSubstitutionMap = false;
   }
 }
 
-NameAliasType *NameAliasType::get(TypeAliasDecl *typealias, Type parent,
+TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
                                   SubstitutionMap substitutions,
                                   Type underlying) {
   // Compute the recursive properties.
@@ -2947,30 +2960,30 @@ NameAliasType *NameAliasType::get(TypeAliasDecl *typealias, Type parent,
 
   // Profile the type.
   llvm::FoldingSetNodeID id;
-  NameAliasType::Profile(id, typealias, parent, substitutions, underlying);
+  TypeAliasType::Profile(id, typealias, parent, substitutions, underlying);
 
   // Did we already record this type?
   void *insertPos;
-  auto &types = ctx.getImpl().getArena(arena).NameAliasTypes;
+  auto &types = ctx.getImpl().getArena(arena).TypeAliasTypes;
   if (auto result = types.FindNodeOrInsertPos(id, insertPos))
     return result;
 
   // Build a new type.
   auto size = totalSizeToAlloc<Type, SubstitutionMap>(parent ? 1 : 0,
                                                       genericSig ? 1 : 0);
-  auto mem = ctx.Allocate(size, alignof(NameAliasType), arena);
-  auto result = new (mem) NameAliasType(typealias, parent, substitutions,
+  auto mem = ctx.Allocate(size, alignof(TypeAliasType), arena);
+  auto result = new (mem) TypeAliasType(typealias, parent, substitutions,
                                         underlying, storedProperties);
   types.InsertNode(result, insertPos);
   return result;
 }
 
-void NameAliasType::Profile(llvm::FoldingSetNodeID &id) const {
+void TypeAliasType::Profile(llvm::FoldingSetNodeID &id) const {
   Profile(id, getDecl(), getParent(), getSubstitutionMap(),
           Type(getSinglyDesugaredType()));
 }
 
-void NameAliasType::Profile(
+void TypeAliasType::Profile(
                            llvm::FoldingSetNodeID &id,
                            TypeAliasDecl *typealias,
                            Type parent, SubstitutionMap substitutions,

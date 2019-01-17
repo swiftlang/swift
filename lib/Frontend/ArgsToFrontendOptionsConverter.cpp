@@ -60,6 +60,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
     Opts.IndexStorePath = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_prebuilt_module_cache_path)) {
+    Opts.PrebuiltModuleCachePath = A->getValue();
+  }
 
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
 

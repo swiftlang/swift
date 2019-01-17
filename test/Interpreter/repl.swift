@@ -222,3 +222,33 @@ if true && true { if true && true { print(true && true) } }
 "ok"
 // CHECK: = "ok"
 
+// Make sure that class inheritance works
+class A {
+  var foo: String { return "" }
+  func bar() -> String { return "" }
+  subscript(_ x: Int) -> String { return "" }
+}
+
+class B : A {
+  override var foo: String {
+    return "property ok"
+  }
+
+  override init() {}
+
+  override func bar() -> String {
+    return "instance ok"
+  }
+
+  override subscript(_ x: Int) -> String {
+    return "subscript ok"
+  }
+}
+
+let b = B()
+let _ = b.foo
+// CHECK: = "property ok"
+let _ = b.bar()
+// CHECK: = "instance ok"
+let _ = b[42]
+// CHECK: = "subscript ok"

@@ -47,6 +47,7 @@ namespace swift {
   class DiagnosticEngine;
   class Expr;
   class Lexer;
+  class ParsedTypeSyntax;
   class PersistentParserState;
   class SILParserTUStateBase;
   class ScopeInfo;
@@ -60,7 +61,6 @@ namespace swift {
     class AbsolutePosition;
     class RawSyntax;
     enum class SyntaxKind;
-    class TypeSyntax;
   }// end of syntax namespace
 
   /// Different contexts in which BraceItemList are parsed.
@@ -205,6 +205,9 @@ public:
   /// trailing trivias for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
   syntax::Trivia TrailingTrivia;
+
+  /// Whether we should disable delayed parsing.
+  bool DisableDelayedParsing;
 
   /// The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
@@ -351,21 +354,27 @@ public:
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserTUStateBase *SIL,
-         PersistentParserState *PersistentState);
+         PersistentParserState *PersistentState,
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
+         bool DisableDelayedParsing = false);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
-         PersistentParserState *PersistentState = nullptr);
+         PersistentParserState *PersistentState = nullptr,
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
+         bool DisableDelayedParsing = false);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserTUStateBase *SIL = nullptr,
-         PersistentParserState *PersistentState = nullptr);
+         PersistentParserState *PersistentState = nullptr,
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
+         bool DisableDelayedParsing = false);
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }
 
   /// Calling this function to finalize libSyntax tree creation without destroying
   /// the parser instance.
-  void finalizeSyntaxTree() {
+  ParsedRawSyntaxNode finalizeSyntaxTree() {
     assert(Tok.is(tok::eof) && "not done parsing yet");
-    SyntaxContext->finalizeRoot();
+    return SyntaxContext->finalizeRoot();
   }
 
   //===--------------------------------------------------------------------===//
@@ -990,12 +999,12 @@ public:
   ///   type-simple:
   ///     '[' type ']'
   ///     '[' type ':' type ']'
-  SyntaxParserResult<syntax::TypeSyntax, TypeRepr> parseTypeCollection();
+  SyntaxParserResult<ParsedTypeSyntax, TypeRepr> parseTypeCollection();
 
-  SyntaxParserResult<syntax::TypeSyntax, OptionalTypeRepr>
+  SyntaxParserResult<ParsedTypeSyntax, OptionalTypeRepr>
   parseTypeOptional(TypeRepr *Base);
 
-  SyntaxParserResult<syntax::TypeSyntax, ImplicitlyUnwrappedOptionalTypeRepr>
+  SyntaxParserResult<ParsedTypeSyntax, ImplicitlyUnwrappedOptionalTypeRepr>
   parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
 
   bool isOptionalToken(const Token &T) const;
@@ -1333,8 +1342,7 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
-  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
-  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
+  ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
   ParserResult<Expr> parseExprPoundAssert();
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParserResult<Expr>
@@ -1414,8 +1422,8 @@ public:
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<PlatformVersionConstraintAvailabilitySpec>
   parsePlatformVersionConstraintSpec();
-  ParserResult<LanguageVersionConstraintAvailabilitySpec>
-  parseLanguageVersionConstraintSpec();
+  ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
+  parsePlatformAgnosticVersionConstraintSpec();
 
   bool canDelayMemberDeclParsing();
 };

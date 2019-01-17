@@ -1579,6 +1579,11 @@ namespace {
       if (typeOperation != TypeOperation::None)
         return CS.getASTContext().TheAnyType;
 
+      // If this is `Builtin.trigger_fallback_diagnostic()`, fail
+      // without producing any diagnostics, in order to test fallback error.
+      if (isTriggerFallbackDiagnosticBuiltin(expr, CS.getASTContext()))
+        return Type();
+
       // Open a member constraint for constructor delegations on the
       // subexpr type.
       if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)) {
@@ -1605,6 +1610,7 @@ namespace {
               CS.getConstraintLocator(expr,
                                       ConstraintLocator::ApplyArgument),
               (TVO_CanBindToLValue |
+               TVO_CanBindToInOut |
                TVO_PrefersSubtypeBinding));
           CS.addConstraint(
               ConstraintKind::FunctionInput, methodTy, argTy,
@@ -1673,7 +1679,7 @@ namespace {
                                 options))
               return Type();
 
-            CS.addConstraint(ConstraintKind::Equal,
+            CS.addConstraint(ConstraintKind::Bind,
                              typeVars[i], specializations[i].getType(),
                              locator);
           }
@@ -3129,6 +3135,19 @@ namespace {
       return tv;
     }
 
+    static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,
+                                                   ASTContext &Context) {
+      auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase());
+      if (!DRE)
+        return false;
+
+      if (DRE->getDecl() != Context.TheBuiltinModule)
+        return false;
+
+      auto member = UDE->getName().getBaseName().userFacingName();
+      return member.equals("trigger_fallback_diagnostic");
+    }
+
     enum class TypeOperation { None,
                                Join,
                                JoinInout,
@@ -3313,22 +3332,6 @@ namespace {
         if (auto ACE = dyn_cast<AutoClosureExpr>(expr)) {
           expr = ACE->getSingleExpressionBody();
           continue;
-        }
-
-        // Strip off 'Bool' to 'Builtin.Int1' conversion. Otherwise, we'll have
-        // to handle multiple ways of type-checking.
-        if (expr->isImplicit()) {
-          if (auto call = dyn_cast<CallExpr>(expr)) {
-            if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(call->getFn())) {
-              auto RefD = DSCE->getFn()->getReferencedDecl().getDecl();
-              if (RefD->getBaseName() == TC.Context.Id_getBuiltinLogicValue &&
-                  RefD->getDeclContext()->getSelfNominalTypeDecl() ==
-                      TC.Context.getBoolDecl()) {
-                expr = DSCE->getBase();
-                continue;
-              }
-            }
-          }
         }
 
         // Remove any semantic expression injected by typechecking.
@@ -3702,6 +3705,7 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
     return true;
 
   TypeChecker *TC = &createTypeChecker(DC.getASTContext());
+  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
 
   ConstraintSystemOptions Options;
   ConstraintSystem CS(*TC, &DC, Options);
@@ -3733,7 +3737,7 @@ static bool canSatisfy(Type type1, Type type2, bool openArchetypes,
 }
 
 bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, true, ConstraintKind::Equal, &DC);
+  return canSatisfy(T1, T2, true, ConstraintKind::Bind, &DC);
 }
 
 bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {

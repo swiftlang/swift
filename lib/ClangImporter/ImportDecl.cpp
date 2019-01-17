@@ -322,9 +322,19 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
 
   case MappedCTypeKind::VaList:
-   if (ClangTypeSize != ClangCtx.getTypeSize(ClangCtx.VoidPtrTy)) {
-      if (ClangCtx.getTargetInfo().getBuiltinVaListKind() !=
-          clang::TargetInfo::AArch64ABIBuiltinVaList)
+    switch (ClangCtx.getTargetInfo().getBuiltinVaListKind()) {
+      case clang::TargetInfo::CharPtrBuiltinVaList:
+      case clang::TargetInfo::VoidPtrBuiltinVaList:
+      case clang::TargetInfo::PowerABIBuiltinVaList:
+      case clang::TargetInfo::AAPCSABIBuiltinVaList:
+        assert(ClangCtx.getTypeSize(ClangCtx.VoidPtrTy) == ClangTypeSize &&
+               "expected va_list type to be sizeof(void *)");
+        break;
+      case clang::TargetInfo::AArch64ABIBuiltinVaList:
+        break;
+      case clang::TargetInfo::PNaClABIBuiltinVaList:
+      case clang::TargetInfo::SystemZBuiltinVaList:
+      case clang::TargetInfo::X86_64ABIBuiltinVaList:
         return std::make_pair(Type(), "");
     }
     break;
@@ -2406,7 +2416,7 @@ namespace {
             // the name in the imported module and the same name in the
             // standard library.
             if (auto *NAT =
-                  dyn_cast<NameAliasType>(SwiftType.getPointer()))
+                  dyn_cast<TypeAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
             auto *NTD = SwiftType->getAnyNominal();
@@ -4406,9 +4416,6 @@ namespace {
       // Compute the requirement signature.
       if (!result->isRequirementSignatureComputed())
         result->computeRequirementSignature();
-
-      auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
-      result->setGenericEnvironment(env);
 
       result->setMemberLoader(&Impl, 0);
 

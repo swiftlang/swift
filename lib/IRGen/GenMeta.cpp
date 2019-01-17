@@ -119,7 +119,7 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
     var->setSection(".rdata");
     break;
   case llvm::Triple::Wasm:
-    llvm_unreachable("web assembly object format is not supported.");
+    var->setSection(".rodata");
     break;
   }
 }
@@ -510,6 +510,7 @@ namespace {
     
     void layout() {
       super::layout();
+      asImpl().addGenericSignature();
     }
   
     ConstantReference getParent() {
@@ -522,7 +523,7 @@ namespace {
     }
     
     GenericSignature *getGenericSignature() {
-      return nullptr;
+      return DC->getGenericSignatureOfContext();
     }
     
     bool isUniqueDescriptor() {

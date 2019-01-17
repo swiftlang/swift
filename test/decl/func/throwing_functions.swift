@@ -258,3 +258,23 @@ struct IllegalContext {
     }
   }
 }
+
+// Crash in 'uncovered try' diagnostic when calling a function value - rdar://46973064
+struct FunctionHolder {
+  let fn: () throws -> ()
+  func receive() {
+    do {
+      _ = fn()
+      // expected-error@-1 {{call can throw but is not marked with 'try'}}
+      // expected-note@-2 {{did you mean to use 'try'?}}
+      // expected-note@-3 {{did you mean to handle error as optional value?}}
+      // expected-note@-4 {{did you mean to disable error propagation?}}
+      _ = "\(fn())"
+      // expected-error@-1 {{call can throw but is not marked with 'try'}}
+      // expected-note@-2 {{did you mean to use 'try'?}}
+      // expected-note@-3 {{did you mean to handle error as optional value?}}
+      // expected-note@-4 {{did you mean to disable error propagation?}}
+    } catch {}
+  }
+}
+

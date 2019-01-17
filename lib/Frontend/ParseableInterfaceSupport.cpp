@@ -19,6 +19,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -130,7 +131,8 @@ static std::string getCacheHash(ASTContext &Ctx,
 
 static CompilerInvocation
 createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
-                                         StringRef CacheDir) {
+                                         StringRef CacheDir,
+                                         StringRef PrebuiltCacheDir) {
   auto &SearchPathOpts = Ctx.SearchPathOpts;
   auto &LangOpts = Ctx.LangOpts;
 
@@ -144,8 +146,10 @@ createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
   SubInvocation.setInputKind(InputFileKind::SwiftModuleInterface);
   SubInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
   SubInvocation.setTargetTriple(LangOpts.Target);
-  SubInvocation.setClangModuleCachePath(CacheDir);
+
   SubInvocation.setModuleName(ModuleName);
+  SubInvocation.setClangModuleCachePath(CacheDir);
+  SubInvocation.getFrontendOptions().PrebuiltModuleCachePath = PrebuiltCacheDir;
 
   // Inhibit warnings from the SubInvocation since we are assuming the user
   // is not in a position to fix them.
@@ -167,7 +171,7 @@ createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
 static void computeCachedOutputPath(ASTContext &Ctx,
                                     const CompilerInvocation &SubInvocation,
                                     StringRef InPath,
-                                    llvm::SmallString<128> &OutPath) {
+                                    llvm::SmallString<256> &OutPath) {
   OutPath = SubInvocation.getClangModuleCachePath();
   llvm::sys::path::append(OutPath, SubInvocation.getModuleName());
   OutPath.append("-");
@@ -300,16 +304,19 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
   return false;
 }
 
-static bool buildSwiftModuleFromSwiftInterface(
+bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
     clang::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
-    CompilerInvocation &SubInvocation, StringRef ModuleCachePath,
-    DependencyTracker *OuterTracker) {
+    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
+    StringRef ModuleCachePath, DependencyTracker *OuterTracker,
+    bool ShouldSerializeDeps) {
   bool SubError = false;
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
     // Note that we don't assume ModuleCachePath is the same as the Clang
     // module cache path at this point.
     if (!ModuleCachePath.empty())
       (void)llvm::sys::fs::create_directory(ModuleCachePath);
+
+    configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
 
     FrontendOptions &FEOpts = SubInvocation.getFrontendOptions();
     const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
@@ -405,7 +412,8 @@ static bool buildSwiftModuleFromSwiftInterface(
       SubError = true;
       return;
     }
-    SerializationOpts.Dependencies = Deps;
+    if (ShouldSerializeDeps)
+      SerializationOpts.Dependencies = Deps;
     SILMod->setSerializeSILAction([&]() {
       serialize(Mod, SerializationOpts, SILMod.get());
     });
@@ -436,12 +444,13 @@ static bool serializedASTLooksValidOrCannotBeRead(clang::vfs::FileSystem &FS,
 /// Load a .swiftmodule associated with a .swiftinterface either from a
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
 /// the results.
-std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
-    AccessPathElem ModuleID, StringRef DirName, StringRef ModuleFilename,
+std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
+    AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
     StringRef ModuleDocFilename,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    llvm::SmallVectorImpl<char> &Scratch) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
+
+  namespace path = llvm::sys::path;
 
   // If running in OnlySerialized mode, ParseableInterfaceModuleLoader
   // should not have been constructed at all.
@@ -449,15 +458,15 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
 
   auto &FS = *Ctx.SourceMgr.getFileSystem();
   auto &Diags = Ctx.Diags;
-  llvm::SmallString<128> ModPath, InPath, OutPath;
+  llvm::SmallString<256> ModPath, InPath, OutPath;
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
-  ModPath = DirName;
-  llvm::sys::path::append(ModPath, ModuleFilename);
+  ModPath = DirPath;
+  path::append(ModPath, ModuleFilename);
 
   auto Ext = file_types::getExtension(file_types::TY_SwiftParseableInterfaceFile);
   InPath = ModPath;
-  llvm::sys::path::replace_extension(InPath, Ext);
+  path::replace_extension(InPath, Ext);
   if (!FS.exists(InPath))
     return std::make_error_code(std::errc::no_such_file_or_directory);
 
@@ -472,32 +481,66 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
     return std::make_error_code(std::errc::not_supported);
   }
 
-  // At this point we're either in PreferParseable mode or there's no credible
-  // adjacent .swiftmodule so we'll go ahead and start trying to convert the
-  // .swiftinterface.
+  // If we have a prebuilt cache path, check that too if the interface comes
+  // from the SDK.
+  if (!PrebuiltCacheDir.empty()) {
+    StringRef SDKPath = Ctx.SearchPathOpts.SDKPath;
+    if (!SDKPath.empty() && hasPrefix(path::begin(InPath),
+                                      path::end(InPath),
+                                      path::begin(SDKPath),
+                                      path::end(SDKPath))) {
+      // Assemble the expected path: $PREBUILT_CACHE/Foo.swiftmodule or
+      // $PREBUILT_CACHE/Foo.swiftmodule/arch.swiftmodule. Note that there's no
+      // cache key here.
+      OutPath = PrebuiltCacheDir;
 
-  // Set up a _potential_ sub-invocation to consume the .swiftinterface and emit
-  // the .swiftmodule.
-  CompilerInvocation SubInvocation =
-      createInvocationForBuildingFromInterface(Ctx, ModuleID.first.str(), CacheDir);
-  computeCachedOutputPath(Ctx, SubInvocation, InPath, OutPath);
-  configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
+      // FIXME: Would it be possible to only have architecture-specific names
+      // here? Then we could skip this check.
+      StringRef InParentDirName = path::filename(path::parent_path(InPath));
+      if (path::extension(InParentDirName) == ".swiftmodule") {
+        assert(path::stem(InParentDirName) == ModuleID.first.str());
+        path::append(OutPath, InParentDirName);
+      }
+      path::append(OutPath, ModuleFilename);
 
-  // Evaluate if we need to run this sub-invocation, and if so run it.
-  if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags, dependencyTracker)) {
-    if (::buildSwiftModuleFromSwiftInterface(FS, Diags, ModuleID.second,
-                                             SubInvocation, CacheDir,
-                                             dependencyTracker))
-      return std::make_error_code(std::errc::invalid_argument);
+      if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags,
+                                 dependencyTracker)) {
+        OutPath.clear();
+      }
+    }
+  }
+
+  if (OutPath.empty()) {
+    // At this point we're either in PreferParseable mode or there's no credible
+    // adjacent .swiftmodule so we'll go ahead and start trying to convert the
+    // .swiftinterface.
+
+    // Set up a _potential_ sub-invocation to consume the .swiftinterface and
+    // emit the .swiftmodule.
+    CompilerInvocation SubInvocation =
+        createInvocationForBuildingFromInterface(Ctx, ModuleID.first.str(),
+                                                 CacheDir, PrebuiltCacheDir);
+    computeCachedOutputPath(Ctx, SubInvocation, InPath, OutPath);
+
+    // Evaluate if we need to run this sub-invocation, and if so run it.
+    if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags,
+                               dependencyTracker)) {
+      if (buildSwiftModuleFromSwiftInterface(FS, Diags, ModuleID.second,
+                                             SubInvocation, InPath, OutPath,
+                                             CacheDir, dependencyTracker,
+                                             /*ShouldSerializeDeps*/true))
+        return std::make_error_code(std::errc::invalid_argument);
+    }
   }
 
   // Finish off by delegating back up to the SerializedModuleLoaderBase
   // routine that can load the recently-manufactured serialized module.
   LLVM_DEBUG(llvm::dbgs() << "Loading " << OutPath
              << " via normal module loader\n");
+  llvm::SmallString<256> DocPath{DirPath};
+  path::append(DocPath, ModuleDocFilename);
   auto ErrorCode = SerializedModuleLoaderBase::openModuleFiles(
-      ModuleID, CacheDir, llvm::sys::path::filename(OutPath),
-      ModuleDocFilename, ModuleBuffer, ModuleDocBuffer, Scratch);
+      ModuleID, OutPath, DocPath, ModuleBuffer, ModuleDocBuffer);
   LLVM_DEBUG(llvm::dbgs() << "Loaded " << OutPath
              << " via normal module loader");
   if (ErrorCode) {
@@ -509,17 +552,23 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
 
 bool
 ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-    ASTContext &Ctx, StringRef CacheDir, StringRef ModuleName,
-    StringRef InPath, StringRef OutPath) {
+    ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
+    StringRef ModuleName, StringRef InPath, StringRef OutPath) {
   CompilerInvocation SubInvocation =
-      createInvocationForBuildingFromInterface(Ctx, ModuleName, CacheDir);
-  configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
+      createInvocationForBuildingFromInterface(Ctx, ModuleName, CacheDir,
+                                               PrebuiltCacheDir);
 
   auto &FS = *Ctx.SourceMgr.getFileSystem();
   auto &Diags = Ctx.Diags;
-  return ::buildSwiftModuleFromSwiftInterface(FS, Diags, /*DiagLoc*/SourceLoc(),
-                                              SubInvocation, /*CachePath*/"",
-                                              /*OuterTracker*/nullptr);
+  // FIXME: We don't really want to ignore dependencies here, but we have to
+  // identify which ones are important, and make them relocatable
+  // (SDK-relative) if we want to ship the built swiftmodules to another
+  // machine. Just leave them out for now.
+  return buildSwiftModuleFromSwiftInterface(FS, Diags, /*DiagLoc*/SourceLoc(),
+                                            SubInvocation, InPath, OutPath,
+                                            /*CachePath*/"",
+                                            /*OuterTracker*/nullptr,
+                                            /*ShouldSerializeDeps*/false);
 }
 
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
@@ -639,7 +688,7 @@ static bool isPublicOrUsableFromInline(Type ty) {
   return !ty.findIf([](Type typePart) -> bool {
     // FIXME: If we have an internal typealias for a non-internal type, we ought
     // to be able to print it by desugaring.
-    if (auto *aliasTy = dyn_cast<NameAliasType>(typePart.getPointer()))
+    if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
       return !isPublicOrUsableFromInline(aliasTy->getDecl());
     if (auto *nominal = typePart->getAnyNominal())
       return !isPublicOrUsableFromInline(nominal);

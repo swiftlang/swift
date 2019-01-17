@@ -72,6 +72,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   const IRGenOptions &Opts;
   ClangImporter &CI;
   SourceManager &SM;
+  llvm::Module &M;
   llvm::DIBuilder DBuilder;
   IRGenModule &IGM;
   const PathRemapper &DebugPrefixMap;
@@ -559,36 +560,55 @@ private:
 
   llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
-                                    StringRef ConfigMacros = StringRef()) {
+                                    uint64_t Signature = ~1ULL,
+                                    StringRef ASTFile = StringRef()) {
     // Look in the cache first.
     auto Val = DIModuleCache.find(Key);
     if (Val != DIModuleCache.end())
       return cast<llvm::DIModule>(Val->second);
 
+    // For Clang modules / PCH, create a Skeleton CU pointing to the PCM/PCH.
+    bool CreateSkeletonCU = !ASTFile.empty();
+    bool IsRootModule = !Parent;
+    if (CreateSkeletonCU && IsRootModule) {
+      llvm::DIBuilder DIB(M);
+      DIB.createCompileUnit(IGM.ObjCInterop ? llvm::dwarf::DW_LANG_ObjC
+                                            : llvm::dwarf::DW_LANG_C99,
+                            DIB.createFile(Name, IncludePath),
+                            TheCU->getProducer(), true, StringRef(), 0, ASTFile,
+                            llvm::DICompileUnit::FullDebug, Signature);
+      DIB.finalize();
+    }
+
     StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
-    auto M = DBuilder.createModule(
-        Parent, Name, ConfigMacros, DebugPrefixMap.remapPath(IncludePath),
-        Sysroot);
+    auto M =
+        DBuilder.createModule(Parent, Name, ConfigMacros, IncludePath, Sysroot);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
 
   llvm::DIModule *
   getOrCreateModule(clang::ExternalASTSource::ASTSourceDescriptor Desc) {
+    // PCH files don't have a signature field in the control block,
+    // but LLVM detects skeleton CUs by looking for a non-zero DWO id.
+    // We use the lower 64 bits for debug info.
+    uint64_t Signature =
+        Desc.getSignature()
+            ? (uint64_t)Desc.getSignature()[1] << 32 | Desc.getSignature()[0]
+            : ~1ULL;
+
     // Handle Clang modules.
     if (const clang::Module *ClangModule = Desc.getModuleOrNull()) {
       llvm::DIModule *Parent = nullptr;
       if (ClangModule->Parent)
         Parent = getOrCreateModule(*ClangModule->Parent);
-
-      return getOrCreateModule(ClangModule, Parent,
-                               Desc.getModuleName(), Desc.getPath(),
-                               ConfigMacros);
+      return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
+                               Desc.getPath(), Signature, Desc.getASTFile());
     }
     // Handle PCH.
     return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
-                             Desc.getModuleName(), Desc.getPath(),
-                             ConfigMacros);
+                             Desc.getModuleName(), Desc.getPath(), Signature,
+                             Desc.getASTFile());
   };
 
   llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
@@ -1309,13 +1329,13 @@ private:
 
     // Sugared types.
 
-    case TypeKind::NameAlias: {
-      auto *NameAliasTy = cast<NameAliasType>(BaseTy);
-      auto *Decl = NameAliasTy->getDecl();
+    case TypeKind::TypeAlias: {
+      auto *TypeAliasTy = cast<TypeAliasType>(BaseTy);
+      auto *Decl = TypeAliasTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
-      auto AliasedTy = NameAliasTy->getSinglyDesugaredType();
+      auto AliasedTy = TypeAliasTy->getSinglyDesugaredType();
       auto File = getOrCreateFile(L.Filename);
-      // For NameAlias types, the DeclContext for the aliasED type is
+      // For TypeAlias types, the DeclContext for the aliasED type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
          DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), AliasedTy,
@@ -1480,7 +1500,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        ClangImporter &CI, IRGenModule &IGM,
                                        llvm::Module &M,
                                        StringRef MainOutputFilenameForDebugInfo)
-    : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), DBuilder(M),
+    : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), M(M), DBuilder(M),
       IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap), MetadataTypeDecl(nullptr),
       InternalType(nullptr), LastDebugLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfoLevel > IRGenDebugInfoLevel::None &&

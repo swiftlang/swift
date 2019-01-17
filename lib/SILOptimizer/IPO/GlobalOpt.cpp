@@ -253,12 +253,14 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
   if (auto *F = M.lookUpFunction(getterNameTmp))
     return F;
 
-  auto Linkage = (varDecl->getEffectiveAccess() >= AccessLevel::Public
-                  ? SILLinkage::PublicNonABI
-                  : SILLinkage::Private);
-  auto Serialized = (varDecl->getEffectiveAccess() >= AccessLevel::Public
-                     ? IsSerialized
-                     : IsNotSerialized);
+  auto Linkage = SILLinkage::Private;
+  auto Serialized = IsNotSerialized;
+
+  if (varDecl->getEffectiveAccess() >= AccessLevel::Public &&
+      !varDecl->isResilient()) {
+    Linkage = SILLinkage::PublicNonABI;
+    Serialized = IsSerialized;
+  }
 
   auto refType = M.Types.getLoweredType(varDecl->getInterfaceType());
 
@@ -690,7 +692,16 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
       auto *PTAI = dyn_cast<PointerToAddressInst>(Use->getUser());
       assert(PTAI && "All uses should be pointer_to_address");
       for (auto PTAIUse : PTAI->getUses()) {
-        replaceLoadSequence(PTAIUse->getUser(), NewAI, B);
+        SILInstruction *Load = PTAIUse->getUser();
+        if (auto *CA = dyn_cast<CopyAddrInst>(Load)) {
+          // The result of the initializer is stored to another location.
+          SILBuilder B(CA);
+          B.createStore(CA->getLoc(), NewAI, CA->getDest(),
+                        StoreOwnershipQualifier::Unqualified);
+        } else {
+          // The result of the initializer is used as a value.
+          replaceLoadSequence(Load, NewAI, B);
+        }
       }
     }
 

@@ -1908,8 +1908,9 @@ namespace {
       else
         (void)0;
       
-      // If the property has storage, emit the ivar name last.
-      if (prop->hasStorage())
+      // If the property is an instance property and has storage, emit the ivar
+      // name last.
+      if (!prop->isStatic() && prop->hasStorage())
         outs << ",V" << prop->getName();
     }
 
@@ -2054,9 +2055,10 @@ namespace {
         var->setSection(".data");
         break;
       case llvm::Triple::ELF:
+      case llvm::Triple::Wasm:
         var->setSection(".data");
         break;
-      default:
+      case llvm::Triple::UnknownObjectFormat:
         llvm_unreachable("Don't know how to emit private global constants for "
                          "the selected object format.");
       }

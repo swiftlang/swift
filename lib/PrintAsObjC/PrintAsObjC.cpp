@@ -1071,7 +1071,7 @@ private:
   /// thereof.
   bool isCFTypeRef(Type ty) {
     const TypeAliasDecl *TAD = nullptr;
-    while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
+    while (auto aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
       TAD = aliasTy->getDecl();
       ty = aliasTy->getSinglyDesugaredType();
     }
@@ -1122,7 +1122,7 @@ private:
 
     ASTContext &ctx = M.getASTContext();
     bool isSettable = VD->isSettable(nullptr);
-    if (isSettable && ctx.LangOpts.EnableAccessControl)
+    if (isSettable && !ctx.isAccessControlDisabled())
       isSettable = (VD->getSetterFormalAccess() >= minRequiredAccess);
     if (!isSettable)
       os << ", readonly";
@@ -1612,7 +1612,7 @@ private:
     return true;
   }
 
-  void visitNameAliasType(NameAliasType *aliasTy,
+  void visitTypeAliasType(TypeAliasType *aliasTy,
                                Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
     if (printIfKnownSimpleType(alias, optionalKind))
@@ -2053,7 +2053,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
     llvm_unreachable("unhandled type");
   }
 
-  void visitNameAliasType(NameAliasType *aliasTy) {
+  void visitTypeAliasType(TypeAliasType *aliasTy) {
     if (aliasTy->getDecl()->hasClangNode() &&
         !aliasTy->getDecl()->isCompatibilityAlias()) {
       Callback(*this, aliasTy->getDecl());
@@ -2511,7 +2511,7 @@ public:
       });
       if (!hasDomainCase) {
         os << "static NSString * _Nonnull const " << getNameForObjC(ED)
-           << "Domain = @\"" << M.getName() << "." << ED->getName() << "\";\n";
+           << "Domain = @\"" << getErrorDomainStringForObjC(ED) << "\";\n";
       }
     }
 

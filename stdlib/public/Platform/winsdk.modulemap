@@ -30,6 +30,12 @@ module WinSDK [system] [extern_c] {
       export *
     }
 
+    // api-ms-win-heapapi-l1-1-0.dll
+    module heap {
+      header "heapapi.h"
+      export *
+    }
+
     // api-ms-win-core-interlocked-l1-1-0.dll
     module interlocked {
       header "interlockedapi.h"
@@ -45,6 +51,12 @@ module WinSDK [system] [extern_c] {
     // api-ms-win-core-namedpipe-l1-1-2-0.dll
     module namedpipe {
       header "namedpipeapi.h"
+      export *
+    }
+
+    // api-ms-win-core-Path-l1-0.dll
+    module path {
+      header "PathCch.h"
       export *
     }
 
@@ -73,5 +85,9 @@ module WinSDK [system] [extern_c] {
     }
   }
 
+  module Shell {
+    header "ShlObj.h"
+    export *
+  }
 }
 

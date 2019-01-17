@@ -17,10 +17,10 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/SyntaxKind.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/LazyResolver.h"
@@ -535,28 +535,32 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   bool SomeVersion = (!Introduced.empty() ||
                       !Deprecated.empty() ||
                       !Obsoleted.empty());
-  if (!PlatformKind.hasValue() && Platform == "swift") {
+  if (!PlatformKind.hasValue() &&
+      (Platform == "swift" || Platform == "_PackageDescription")) {
+
     if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Deprecated) {
       diagnose(AttrLoc,
-               diag::attr_availability_swift_expected_deprecated_version,
-               AttrName);
+               diag::attr_availability_platform_agnostic_expected_deprecated_version,
+               AttrName, Platform);
       return nullptr;
     }
     if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
-      diagnose(AttrLoc, diag::attr_availability_swift_infeasible_option,
-               "unavailable", AttrName);
+      diagnose(AttrLoc, diag::attr_availability_platform_agnostic_infeasible_option,
+               "unavailable", AttrName, Platform);
       return nullptr;
     }
     assert(PlatformAgnostic == PlatformAgnosticAvailabilityKind::None);
 
     if (!SomeVersion) {
-      diagnose(AttrLoc, diag::attr_availability_swift_expected_option,
-               AttrName);
+      diagnose(AttrLoc, diag::attr_availability_platform_agnostic_expected_option,
+               AttrName, Platform);
       return nullptr;
     }
 
     PlatformKind = PlatformKind::none;
-    PlatformAgnostic = PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+    PlatformAgnostic = (Platform == "swift") ?
+                         PlatformAgnosticAvailabilityKind::SwiftVersionSpecific :
+                         PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific;
   }
 
 
@@ -902,7 +906,15 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       !isInSILMode()) {
     diagnose(Loc, diag::only_allowed_in_sil, AttrName);
     DiscardAttribute = true;
-  }  
+  }
+
+  if (Context.LangOpts.Target.isOSBinFormatCOFF()) {
+    if (DK == DAK_WeakLinked) {
+      diagnose(Loc, diag::attr_unsupported_on_target, AttrName,
+               Context.LangOpts.Target.str());
+      DiscardAttribute = true;
+    }
+  }
 
   // Filled in during parsing.  If there is a duplicate
   // diagnostic this can be used for better error presentation.
@@ -1334,12 +1346,17 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       //  @available(iOS, introduced: 8.0)
       //  @available(OSX, introduced: 10.10)
       //
-      // Similarly if we have a language version spec in the spec
-      // list, create an implicit AvailableAttr with the specified
-      // version as the introduced argument. For example, if we have
+      // Similarly if we have a language version spec or PackageDescription
+      // version in the spec list, create an implicit AvailableAttr
+      // with the specified version as the introduced argument. 
+      // For example, if we have
       //   @available(swift 3.1)
       // we will synthesize
       //   @available(swift, introduced: 3.1)
+      // or, if we have
+      //   @available(_PackageDescription 4.2)
+      // we will synthesize
+      //   @available(_PackageDescription, introduced: 4.2)
 
       for (auto *Spec : Specs) {
         PlatformKind Platform;
@@ -1354,13 +1371,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           VersionRange = PlatformVersionSpec->getVersionSrcRange();
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
-        } else if (auto *LanguageVersionSpec =
-                   dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
+        } else if (auto *PlatformAgnosticVersionSpec =
+                   dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
           Platform = PlatformKind::none;
-          Version = LanguageVersionSpec->getVersion();
-          VersionRange = LanguageVersionSpec->getVersionSrcRange();
-          PlatformAgnostic =
-            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+          Version = PlatformAgnosticVersionSpec->getVersion();
+          VersionRange = PlatformAgnosticVersionSpec->getVersionSrcRange();
+          PlatformAgnostic = PlatformAgnosticVersionSpec->isLanguageVersionSpecific() ?
+                               PlatformAgnosticAvailabilityKind::SwiftVersionSpecific :
+                               PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific;
 
         } else {
           continue;
@@ -3485,6 +3503,9 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 }
 
 bool Parser::canDelayMemberDeclParsing() {
+  // If explicitly disabled, respect the flag.
+  if (DisableDelayedParsing)
+    return false;
   // There's no fundamental reasons that SIL cannnot be lasily parsed. We need
   // to keep SILParserTUStateBase persistent to make it happen.
   if (isInSILMode())
@@ -4406,9 +4427,11 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
   if (peekToken().is(tok::r_brace)) {
     accessors.LBLoc = consumeToken(tok::l_brace);
     // Give syntax node an empty accessor list.
-    if (SyntaxContext->isEnabled())
+    if (SyntaxContext->isEnabled()) {
+      SourceLoc listLoc = accessors.LBLoc.getAdvancedLoc(1);
       SyntaxContext->addSyntax(
-          SyntaxFactory::makeBlankAccessorList(SyntaxContext->getArena()));
+        ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
+    }
     accessors.RBLoc = consumeToken(tok::r_brace);
 
     // In the limited syntax, fall out and let the caller handle it.

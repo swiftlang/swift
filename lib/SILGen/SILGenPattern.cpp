@@ -743,7 +743,7 @@ forwardIntoSubtree(SILGenFunction &SGF, SILLocation loc,
   (void)consumptionKind;
 
   // If we have an object and it is take always, we need to borrow the value
-  // since we do not own the value at this point.
+  // since our subtree does not own the value.
   if (outerMV.getType().isObject()) {
     assert(consumptionKind == CastConsumptionKind::TakeAlways &&
            "Object without cleanup that is not take_always?!");
@@ -1210,7 +1210,9 @@ void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
     testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();
   }
 
-  SGF.B.createCondBranch(loc, testBool, trueBB, falseBB);
+  // Extract the i1 from the Bool struct.
+  auto i1Value = SGF.emitUnwrapIntegerResult(loc, testBool);
+  SGF.B.createCondBranch(loc, i1Value, trueBB, falseBB);
 
   SGF.B.setInsertionPoint(falseBB);
   failure(loc);
@@ -1427,86 +1429,30 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 
   // If our source is an address that is loadable, perform a load_borrow.
   if (src.getType().isAddress() && src.getType().isLoadable(SGF.getModule())) {
+    // We should only see take_on_success if we have a base type that is address
+    // only.
+    assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
+           "Can only occur if base type is address only?!");
     src = {SGF.B.createLoadBorrow(loc, src.getFinalManagedValue()),
            CastConsumptionKind::BorrowAlways};
   }
 
   // Then if we have an object...
   if (src.getType().isObject()) {
-    // Make sure that if we ahve a copy_on_success, non-trivial value that we do
+    // Make sure that if we have a copy_on_success, non-trivial value that we do
     // not have a value with @owned ownership.
     assert((!src.getType().isTrivial(SGF.getModule()) ||
             src.getFinalConsumption() != CastConsumptionKind::CopyOnSuccess ||
             src.getOwnershipKind() != ValueOwnershipKind::Owned) &&
            "@owned value without cleanup + copy_on_success");
 
-    // If we have are asked to perform TakeOnSuccess, borrow the value instead.
-    //
-    // The reason why do this for TakeOnSuccess is that we want to not have to
-    // deal with unforwarding of aggregate tuples in failing cases since that
-    // causes ownership invariants to be violated since we already forwarded the
-    // aggregate to create cleanups on its elements.
-    //
-    // In contrast, we do still want to allow for TakeAlways variants to not
-    // need to borrow, so we do not borrow if we take always.
-    if (!src.getType().isTrivial(SGF.getModule()) &&
-        src.getFinalConsumption() == CastConsumptionKind::TakeOnSuccess) {
-      src = {src.getFinalManagedValue().borrow(SGF, loc),
-             CastConsumptionKind::BorrowAlways};
-    }
+    // We should only see take_on_success if we have a base type that is address
+    // only.
+    assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
+           "Can only occur if base type is address only?!");
 
     // Then perform a forward or reborrow destructure on the object.
     return emitTupleObjectDispatch(rows, src, handleCase, outerFailure);
-  }
-
-  // At this point we know that we must have an address only type, since we
-  // would have loaded it earlier.
-  SILValue v = src.getFinalManagedValue().forward(SGF);
-  assert(v->getType().isAddressOnly(SGF.getModule()) &&
-         "Loadable values were handled earlier");
-
-  SmallVector<ConsumableManagedValue, 4> destructured;
-
-  // Break down the values.
-  auto tupleSILTy = v->getType();
-  for (unsigned i : range(tupleSILTy.castTo<TupleType>()->getNumElements())) {
-    SILType fieldTy = tupleSILTy.getTupleElementType(i);
-    auto &fieldTL = SGF.getTypeLowering(fieldTy);
-
-    SILValue member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
-    ConsumableManagedValue memberCMV;
-
-    // If we have a loadable sub-type of our tuple...
-    if (fieldTL.isLoadable()) {
-      switch (src.getFinalConsumption()) {
-      case CastConsumptionKind::TakeAlways: {
-        // and our consumption is take always, perform a load [take] and
-        // continue.
-        auto memberMV = ManagedValue::forUnmanaged(member);
-        memberCMV = {SGF.B.createLoadTake(loc, memberMV),
-                     CastConsumptionKind::TakeAlways};
-        break;
-      }
-      case CastConsumptionKind::TakeOnSuccess:
-      case CastConsumptionKind::CopyOnSuccess: {
-        // otherwise we have take on success or copy on success perform a
-        // load_borrow.
-        auto memberMV = ManagedValue::forUnmanaged(member);
-        memberCMV = {SGF.B.createLoadBorrow(loc, memberMV),
-                     CastConsumptionKind::BorrowAlways};
-        break;
-      }
-      case CastConsumptionKind::BorrowAlways:
-        llvm_unreachable("Borrow always can not be used on objects");
-      }
-    } else {
-      // Otherwise, if we have an address only type, just get the managed
-      // subobject.
-      memberCMV =
-          getManagedSubobject(SGF, member, fieldTL, src.getFinalConsumption());
-    }
-
-    destructured.push_back(memberCMV);
   }
 
   // Construct the specialized rows.
@@ -1521,18 +1467,110 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     }
   }
 
+  // At this point we know that we must have an address only type, since we
+  // would have loaded it earlier.
+  SILValue v = src.getFinalManagedValue().forward(SGF);
+  assert(v->getType().isAddressOnly(SGF.getModule()) &&
+         "Loadable values were handled earlier");
+
+  // The destructured tuple that we pass off to our sub pattern. This may
+  // contain values that we have performed a load_borrow from subsequent to
+  // "performing a SILGenPattern borrow".
+  SmallVector<ConsumableManagedValue, 4> subPatternArgs;
+
+  // An array of values that have the same underlying values as our
+  // subPatternArgs, but may have a different cleanup and final consumption
+  // kind. These are at +1 and are unforwarded.
+  SmallVector<ConsumableManagedValue, 4> unforwardArgs;
+
+  // Break down the values.
+  auto tupleSILTy = v->getType();
+  for (unsigned i : range(tupleSILTy.castTo<TupleType>()->getNumElements())) {
+    SILType fieldTy = tupleSILTy.getTupleElementType(i);
+    auto &fieldTL = SGF.getTypeLowering(fieldTy);
+
+    SILValue member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
+    // Inline constructor.
+    auto memberCMV = ([&]() -> ConsumableManagedValue {
+      if (!fieldTL.isLoadable()) {
+        // If we have an address only type, just get the managed
+        // subobject.
+        return getManagedSubobject(SGF, member, fieldTL,
+                                   src.getFinalConsumption());
+      }
+
+      // If we have a loadable type, then we have a loadable sub-type of the
+      // underlying address only tuple.
+      auto memberMV = ManagedValue::forUnmanaged(member);
+      switch (src.getFinalConsumption()) {
+      case CastConsumptionKind::TakeAlways: {
+        // If our original source value is take always, perform a load [take].
+        return {SGF.B.createLoadTake(loc, memberMV),
+                CastConsumptionKind::TakeAlways};
+      }
+      case CastConsumptionKind::TakeOnSuccess: {
+        // If we have a take_on_success, we propagate down the member as a +1
+        // address value and do not load.
+        //
+        // DISCUSSION: Unforwarding objects violates ownership since
+        // unforwarding relies on forwarding an aggregate into subvalues and
+        // on failure disabling the subvalue cleanups and re-enabling the
+        // cleanup for the aggregate (which was already destroyed). So we are
+        // forced to use an address here so we can forward/unforward this
+        // value. We maintain our invariants that loadable types are always
+        // loaded and are never take on success by passing down to our
+        // subPattern a borrow of this value. See below.
+        return getManagedSubobject(SGF, member, fieldTL,
+                                   src.getFinalConsumption());
+      }
+      case CastConsumptionKind::CopyOnSuccess: {
+        // We translate copy_on_success => borrow_always.
+        auto memberMV = ManagedValue::forUnmanaged(member);
+        return {SGF.B.createLoadBorrow(loc, memberMV),
+                CastConsumptionKind::BorrowAlways};
+      }
+      case CastConsumptionKind::BorrowAlways: {
+        llvm_unreachable(
+            "Borrow always can only occur along object only code paths");
+      }
+      }
+    }());
+
+    // If we aren't loadable, add to the unforward array.
+    if (!fieldTL.isLoadable()) {
+      unforwardArgs.push_back(memberCMV);
+    } else {
+      // If we have a loadable type that we didn't load, we must have had a
+      // take_on_success address. This means that our parent cleanup is
+      // currently persistently active, so we needed to propagate an active +1
+      // cleanup on our address so we can take if we actually succeed. That
+      // being said, we do not want to pass objects with take_on_success into
+      // the actual subtree. So we perform a load_borrow at this point. This
+      // will ensure that we will always finish the end_borrow before we jumped
+      // to a failure point, but at the same time the original +1 value will be
+      // appropriately destroyed/forwarded around.
+      if (memberCMV.getType().isAddress()) {
+        unforwardArgs.push_back(memberCMV);
+        auto val = memberCMV.getFinalManagedValue();
+        memberCMV = {SGF.B.createLoadBorrow(loc, val),
+                     CastConsumptionKind::BorrowAlways};
+      }
+    }
+    subPatternArgs.push_back(memberCMV);
+  }
+
   // Maybe revert to the original cleanups during failure branches.
   const FailureHandler *innerFailure = &outerFailure;
   FailureHandler specializedFailure = [&](SILLocation loc) {
     ArgUnforwarder unforwarder(SGF);
-    unforwarder.unforwardBorrowedValues(src, destructured);
+    unforwarder.unforwardBorrowedValues(src, unforwardArgs);
     outerFailure(loc);
   };
   if (ArgUnforwarder::requiresUnforwarding(SGF, src))
     innerFailure = &specializedFailure;
 
   // Recurse.
-  handleCase(destructured, specializedRows, *innerFailure);
+  handleCase(subPatternArgs, specializedRows, *innerFailure);
 }
 
 static CanType getTargetType(const RowToSpecialize &row) {
@@ -1562,6 +1600,17 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
     return src;
   }
 
+  // We know that we must have a loadable type at this point since address only
+  // types do not need reabstraction and are addresses. So we should have exited
+  // above already.
+  assert(src.getType().isLoadable(SGF.getModule()) &&
+         "Should have a loadable value at this point");
+
+  // Since our finalValue is loadable, we could not have had a take_on_success
+  // here.
+  assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
+         "Loadable types can not have take_on_success?!");
+
   std::unique_ptr<TemporaryInitialization> init;
   SGFContext ctx;
   if (requiresAddress) {
@@ -1569,39 +1618,35 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
     ctx = SGFContext(init.get());
   }
 
-  ManagedValue substValue = SGF.getManagedValue(loc, src);
-  ManagedValue finalValue;
+  // This will always produce a +1 take always value no matter what src's
+  // ownership is.
+  ManagedValue finalValue = SGF.getManagedValue(loc, src);
   if (hasAbstraction) {
-    assert(src.getType().isObject() &&
-           "address-only type with abstraction difference?");
-    // Produce the value at +1.
-    finalValue = SGF.emitSubstToOrigValue(loc, substValue,
-                                          abstraction, sourceType, ctx);
-  } else {
-    finalValue = substValue;
+    // Reabstract the value if we need to. This should produce a +1 value as
+    // well.
+    finalValue =
+        SGF.emitSubstToOrigValue(loc, finalValue, abstraction, sourceType, ctx);
+  }
+  assert(finalValue.isPlusOne(SGF));
+
+  // If we at this point do not require an address, return final value. We know
+  // that it is a +1 take always value.
+  if (!requiresAddress) {
+    return ConsumableManagedValue::forOwned(finalValue);
   }
 
-  if (requiresAddress) {
-    if (finalValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
-      finalValue = finalValue.copy(SGF, loc);
-    SGF.B.emitStoreValueOperation(loc, finalValue.forward(SGF),
-                                  init->getAddress(),
-                                  StoreOwnershipQualifier::Init);
-    init->finishInitialization(SGF);
+  // At this point, we know that we have a non-address only type since we are
+  // materializing an object into memory and addresses can not be stored into
+  // memory.
+  SGF.B.emitStoreValueOperation(loc, finalValue.forward(SGF),
+                                init->getAddress(),
+                                StoreOwnershipQualifier::Init);
+  init->finishInitialization(SGF);
 
-    // If we had borrow_always, we need to switch to copy_on_success since
-    // that is the address only variant of borrow_always.
-    auto consumption = src.getFinalConsumption();
-    if (consumption == CastConsumptionKind::BorrowAlways)
-      consumption = CastConsumptionKind::CopyOnSuccess;
-    ConsumableManagedValue result = {init->getManagedAddress(), consumption};
-    if (ArgUnforwarder::requiresUnforwarding(SGF, src))
-      borrowedValues.push_back(result);
-
-    return result;
-  }
-
-  return ConsumableManagedValue::forOwned(finalValue);
+  // We know that either our initial value was already take_always or we made a
+  // copy of the underlying value. In either case, we now have a take_always +1
+  // value.
+  return ConsumableManagedValue::forOwned(init->getManagedAddress());
 }
 
 /// Perform specialized dispatch for a sequence of IsPatterns.
@@ -1936,27 +1981,18 @@ void PatternMatchEmission::emitEnumElementDispatch(
 
   // If our source is an address that is loadable, perform a load_borrow.
   if (src.getType().isAddress() && src.getType().isLoadable(SGF.getModule())) {
+    assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
+           "Can only have take_on_success with address only values");
     src = {SGF.B.createLoadBorrow(loc, src.getFinalManagedValue()),
            CastConsumptionKind::BorrowAlways};
   }
 
   // If we have an object...
   if (src.getType().isObject()) {
-    // And we have a non-trivial object type that we are asked to perform take
-    // on success for, borrow the value instead.
-    //
-    // The reason why do this for TakeOnSuccess is that we want to not have to
-    // deal with unforwarding of aggregate tuples in failing cases since that
-    // causes ownership invariants to be violated since we already forwarded the
-    // aggregate to create cleanups on its elements.
-    //
-    // In contrast, we do still want to allow for TakeAlways variants to not
-    // need to borrow, so we do not borrow if we take always.
-    if (!src.getType().isTrivial(SGF.getModule()) &&
-        src.getFinalConsumption() == CastConsumptionKind::TakeOnSuccess) {
-      src = {src.getFinalManagedValue().borrow(SGF, loc),
-             CastConsumptionKind::BorrowAlways};
-    }
+    // Do a quick assert that we do not have take_on_success. This should only
+    // be passed take_on_success if src is an address only type.
+    assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
+           "Can only have take_on_success with address only values");
 
     // Finally perform the enum element dispatch.
     return emitEnumElementObjectDispatch(rows, src, handleCase, outerFailure,
@@ -2250,15 +2286,8 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
 
   // Extract the i1 from the Bool struct.
-  StructDecl *BoolStruct = cast<StructDecl>(Context.getBoolDecl());
-  auto Members = BoolStruct->lookupDirect(Context.Id_value_);
-  assert(Members.size() == 1 &&
-         "Bool should have only one property with name '_value'");
-  auto Member = dyn_cast<VarDecl>(Members[0]);
-  assert(Member &&"Bool should have a property with name '_value' of type Int1");
-  auto *ETI = SGF.B.createStructExtract(loc, srcValue, Member);
-
-  SGF.B.createSwitchValue(loc, SILValue(ETI), defaultBB, caseBBs);
+  auto i1Value = SGF.emitUnwrapIntegerResult(loc, srcValue);
+  SGF.B.createSwitchValue(loc, i1Value, defaultBB, caseBBs);
 
   // Okay, now emit all the cases.
   for (unsigned i = 0, e = caseInfos.size(); i != e; ++i) {

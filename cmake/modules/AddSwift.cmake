@@ -606,7 +606,6 @@ endfunction()
 #     [C_COMPILE_FLAGS flag1...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
-#     [API_NOTES_NON_OVERLAY]
 #     [FILE_DEPENDS target1 ...]
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
@@ -661,9 +660,6 @@ endfunction()
 # LINK_FLAGS
 #   Extra linker flags.
 #
-# API_NOTES_NON_OVERLAY
-#   Generate API notes for non-overlayed modules with this target.
-#
 # FILE_DEPENDS
 #   Additional files this library depends on.
 #
@@ -686,7 +682,6 @@ endfunction()
 #   Sources to add into this library
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
-        API_NOTES_NON_OVERLAY
         DONT_EMBED_BITCODE
         FORCE_BUILD_OPTIMIZED
         IS_SDK_OVERLAY
@@ -760,9 +755,10 @@ function(_add_swift_library_single target name)
     endif()
   endif()
 
-  if (SWIFT_COMPILER_VERSION)
-    if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" "-Xlinker" "-compatibility_version" "-Xlinker" "1")
+  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-compatibility_version" "-Xlinker" "1")
+    if (SWIFT_COMPILER_VERSION)
+      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" )
     endif()
   endif()
 
@@ -804,22 +800,6 @@ function(_add_swift_library_single target name)
       gyb_dependency_targets
       SWIFTLIB_SINGLE_SOURCES
       "${SWIFTLIB_SINGLE_ARCHITECTURE}")
-
-  # Figure out whether and which API notes to create.
-  set(SWIFTLIB_SINGLE_API_NOTES)
-  if(SWIFTLIB_SINGLE_API_NOTES_NON_OVERLAY)
-    # Adopt all of the non-overlay API notes.
-    foreach(framework_name ${SWIFT_API_NOTES_INPUTS})
-      if (${framework_name} STREQUAL "WatchKit" AND
-          ${SWIFTLIB_SINGLE_SDK} STREQUAL "OSX")
-        # HACK: don't build WatchKit API notes for OS X.
-      else()
-        # Always build the "non-overlay" apinotes to keep them in sync
-        # rdar://40496966
-        list(APPEND SWIFTLIB_SINGLE_API_NOTES "${framework_name}")
-      endif()
-    endforeach()
-  endif()
 
   # Remove the "swift" prefix from the name to determine the module name.
   if(SWIFTLIB_IS_STDLIB_CORE)
@@ -870,7 +850,6 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
-      API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
       MODULE_NAME ${module_name}
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
       ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
@@ -1211,7 +1190,7 @@ function(_add_swift_library_single target name)
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
-    "${SWIFTLIB_FORCE_BUILD_OPTIMIZED_keyword}"
+    "${SWIFTLIB_SINGLE_FORCE_BUILD_OPTIMIZED_keyword}"
     RESULT_VAR_NAME c_compile_flags
     )
   _add_variant_link_flags(
@@ -1421,6 +1400,7 @@ function(add_swift_host_library name)
     ${ASHL_SHARED_keyword}
     ${ASHL_STATIC_keyword}
     ${ASHL_SOURCES}
+    ${ASHL_FORCE_BUILD_OPTIMIZED_keyword}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     DEPENDS ${ASHL_DEPENDS}
@@ -1433,11 +1413,13 @@ function(add_swift_host_library name)
     INSTALL_IN_COMPONENT "dev"
     )
 
-  swift_install_in_component(dev
-    TARGETS ${name}
-    ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-    LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-    RUNTIME DESTINATION bin)
+  if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
+    swift_install_in_component(dev
+      TARGETS ${name}
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+      RUNTIME DESTINATION bin)
+  endif()
 
   swift_is_installing_component(dev is_installing)
   if(NOT is_installing)
@@ -1469,7 +1451,6 @@ endfunction()
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
 #     [DONT_EMBED_BITCODE]
-#     [API_NOTES_NON_OVERLAY]
 #     [INSTALL]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
@@ -1548,9 +1529,6 @@ endfunction()
 # LINK_FLAGS
 #   Extra linker flags.
 #
-# API_NOTES_NON_OVERLAY
-#   Generate API notes for non-overlayed modules with this target.
-#
 # DONT_EMBED_BITCODE
 #   Don't embed LLVM bitcode in this target, even if it is enabled globally.
 #
@@ -1587,7 +1565,6 @@ endfunction()
 #   Sources to add into this library.
 function(add_swift_target_library name)
   set(SWIFTLIB_options
-        API_NOTES_NON_OVERLAY
         DONT_EMBED_BITCODE
         FORCE_BUILD_OPTIMIZED
         HAS_SWIFT_CONTENT
@@ -1859,24 +1836,7 @@ function(add_swift_target_library name)
       endif()
 
       foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
-        if("${lib}" STREQUAL "ICU_UC")
-          list(APPEND swiftlib_private_link_libraries_targets
-               "${SWIFT_${sdk}_${arch}_ICU_UC}")
-          # temporary fix for atomic needing to be
-          # after object files for libswiftCore.so
-          if("${sdk}" STREQUAL "ANDROID")
-            list(APPEND swiftlib_private_link_libraries_targets
-                 "-latomic")
-          # the same issue on FreeBSD, missing symbols:
-          # __atomic_store, __atomic_compare_exchange, __atomic_load
-          elseif("${sdk}" STREQUAL "FREEBSD")
-            list(APPEND swiftlib_private_link_libraries_targets
-                 "${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${arch}.a")
-          endif()
-        elseif("${lib}" STREQUAL "ICU_I18N")
-          list(APPEND swiftlib_private_link_libraries_targets
-               "${SWIFT_${sdk}_${arch}_ICU_I18N}")
-        elseif(TARGET "${lib}${VARIANT_SUFFIX}")
+        if(TARGET "${lib}${VARIANT_SUFFIX}")
           list(APPEND swiftlib_private_link_libraries_targets
               "${lib}${VARIANT_SUFFIX}")
         else()
@@ -1919,7 +1879,6 @@ function(add_swift_target_library name)
         INCORPORATE_OBJECT_LIBRARIES ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES}
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY}
         ${SWIFTLIB_DONT_EMBED_BITCODE_keyword}
-        ${SWIFTLIB_API_NOTES_NON_OVERLAY_keyword}
         ${SWIFTLIB_IS_STDLIB_keyword}
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
@@ -2015,10 +1974,19 @@ function(add_swift_target_library name)
             WORLD_READ)
       endif()
 
-      swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
-          FILES "${UNIVERSAL_LIBRARY_NAME}"
-          DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+      if(sdk STREQUAL WINDOWS AND CMAKE_SYSTEM_NAME STREQUAL Windows)
+        swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+          TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
+          RUNTIME DESTINATION "bin"
+          LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+          ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
           PERMISSIONS ${file_permissions})
+      else()
+        swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+            FILES "${UNIVERSAL_LIBRARY_NAME}"
+            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+            PERMISSIONS ${file_permissions})
+      endif()
       if(sdk STREQUAL WINDOWS)
         foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
           if(TARGET ${name}-windows-${arch}_IMPLIB)
@@ -2319,31 +2287,28 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(ADDSWIFTHOSTTOOL_multiple_parameter_options
-        SWIFT_COMPONENT)
+  set(options)
+  set(single_parameter_options SWIFT_COMPONENT)
+  set(multiple_parameter_options)
 
-  cmake_parse_arguments(
-      ADDSWIFTHOSTTOOL # prefix
-      "" # options
-      "" # single-value args
-      "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
-      ${ARGN})
+  cmake_parse_arguments(ASHT
+    "${options}"
+    "${single_parameter_options}"
+    "${multiple_parameter_options}"
+    ${ARGN})
 
-  precondition(ADDSWIFTHOSTTOOL_SWIFT_COMPONENT
+  precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")
 
   # Create the executable rule.
-  add_swift_executable(
-    ${executable} 
-    ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
-  )
+  add_swift_executable(${executable}
+    ${ASHT_UNPARSED_ARGUMENTS})
 
-  swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+  swift_install_in_component(${ASHT_SWIFT_COMPONENT}
     TARGETS ${executable}
     RUNTIME DESTINATION bin)
 
-  swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-    is_installing)
+  swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
 
   if(NOT is_installing)
     set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})

@@ -84,6 +84,7 @@ KNOWN_SETTINGS=(
     swiftpm-build-type          "Debug"          "the build variant for swiftpm"
     swiftsyntax-build-type      "Debug"          "the build variant for swiftSyntax"
     skstresstester-build-type   "Debug"          "the build variant for the SourceKit stress tester"
+    swiftevolve-build-type      "Debug"          "the build variant for the swift-evolve tool"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
     enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
@@ -126,6 +127,7 @@ KNOWN_SETTINGS=(
     skip-build-swiftpm          ""               "set to skip building swiftpm"
     skip-build-swiftsyntax      ""               "set to skip building swiftSyntax"
     skip-build-skstresstester   ""               "set to skip building the SourceKit stress tester"
+    skip-build-swiftevolve      ""               "set to skip building the swift-evolve tool"
     skip-build-xctest           ""               "set to skip building xctest"
     skip-build-foundation       ""               "set to skip building foundation"
     skip-build-libdispatch      ""               "set to skip building libdispatch"
@@ -140,6 +142,7 @@ KNOWN_SETTINGS=(
     skip-test-swiftpm           ""               "set to skip testing swiftpm"
     skip-test-swiftsyntax       ""               "set to skip testing swiftSyntax"
     skip-test-skstresstester    ""               "set to skip testing the SourceKit stress tester"
+    skip-test-swiftevolve       ""               "set to skip testing the swift-evolve tool"
     skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-libdispatch       ""               "set to skip testing libdispatch"
@@ -197,6 +200,7 @@ KNOWN_SETTINGS=(
     install-swiftsyntax         ""               "whether to install swiftsyntax"
     skip-install-swiftsyntax-module ""           "set to skip installing swiftsyntax modules"
     install-skstresstester      ""               "whether to install the SourceKit stress tester"
+    install-swiftevolve         ""               "whether to install the swift-evolve tool"
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
     install-libdispatch         ""               "whether to install libdispatch"
@@ -1177,7 +1181,9 @@ LLDB_SOURCE_DIR="${WORKSPACE}/lldb"
 LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
 SWIFTPM_SOURCE_DIR="${WORKSPACE}/swiftpm"
 SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
-SKSTRESSTESTER_SOURCE_DIR="${WORKSPACE}/swift-stress-tester/SourceKitStressTester"
+STRESSTEST_PACKAGE_DIR="${WORKSPACE}/swift-stress-tester"
+SKSTRESSTESTER_SOURCE_DIR="${STRESSTEST_PACKAGE_DIR}/SourceKitStressTester"
+SWIFTEVOLVE_SOURCE_DIR="${STRESSTEST_PACKAGE_DIR}/SwiftEvolve"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
@@ -1251,13 +1257,16 @@ fi
 if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
-# The SourceKit stress tester is dependent on SwiftSyntax, so it must be added
-# to the list of build products first.
+# The SourceKit stress tester and swift-evolve are dependent on SwiftSyntax, so
+# it must be added to the list of build products first.
 if [[ ! "${SKIP_BUILD_SWIFTSYNTAX}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftsyntax)
 fi
 if [[ ! "${SKIP_BUILD_SKSTRESSTESTER}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" skstresstester)
+fi
+if [[ ! "${SKIP_BUILD_SWIFTEVOLVE}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" swiftevolve)
 fi
 
 # Checks if a given product is enabled (i.e. part of $PRODUCTS array)
@@ -1572,6 +1581,9 @@ function build_directory_bin() {
             skstresstester)
                 echo "${root}/${SKSTRESSTESTER_BUILD_TYPE}/bin"
                 ;;
+            swiftevolve)
+                echo "${root}/${SWIFTEVOLVE_BUILD_TYPE}/bin"
+                ;;
             xctest)
                 echo "${root}/${XCTEST_BUILD_TYPE}/bin"
                 ;;
@@ -1717,6 +1729,9 @@ function cmake_config_opt() {
             skstresstester)
                 echo "--config ${SKSTRESSTESTER_BUILD_TYPE}"
                 ;;
+            swiftevolve)
+                echo "--config ${SWIFTEVOLVE_BUILD_TYPE}"
+                ;;
             xctest)
                 echo "--config ${XCTEST_BUILD_TYPE}"
                 ;;
@@ -1822,13 +1837,18 @@ function set_swiftsyntax_build_command() {
         --swift-build-exec="${SWIFT_BUILD}"
         --swift-test-exec="${SWIFT_TEST}"
         --swiftc-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+        --syntax-parser-header-dir="${SWIFT_SOURCE_DIR}/include/swift-c/SyntaxParser"
+        --syntax-parser-lib-dir="$(build_directory ${host} swift)/lib"
         --swift-syntax-test-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swift-syntax-test"
         --filecheck-exec="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck")
 }
 
-function set_skstresstester_build_command() {
+function set_stresstester_build_script_helper_command() {
+    local package_name="$1"
+    local package_build_type="$2"
+
     if [ "${SKIP_BUILD_SWIFTSYNTAX}" ]; then
-        echo "Error: Cannot build the SourceKit stress tester without SwiftSyntax."
+        echo "Error: Cannot build $package_name without SwiftSyntax."
         exit 1
     fi
 
@@ -1837,23 +1857,36 @@ function set_skstresstester_build_command() {
         swiftsyntax_config="release"
     fi
     local config="debug"
-    if [[ $(is_cmake_release_build_type "${SKSTRESSTESTER_BUILD_TYPE}") ]] ; then
+    if [[ $(is_cmake_release_build_type "${package_build_type}") ]] ; then
         config="release"
     fi
 
-    skstresstester_build_command=("${SKSTRESSTESTER_SOURCE_DIR}/Utilities/build-script-helper.py")
+    stresstester_build_script_helper_command=("${STRESSTEST_PACKAGE_DIR}/build-script-helper.py")
     if [[ "${VERBOSE_BUILD}" ]] ; then
-        skstresstester_build_command+=(-v)
+        stresstester_build_script_helper_command+=(-v)
     fi
 
-    skstresstester_build_command+=(
+    stresstester_build_script_helper_command+=(
+        --package-dir="${package_name}"
         --build-dir="${build_dir}"
         --swiftc-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
         --swift-build-exec="${SWIFT_BUILD}"
         --swift-test-exec="${SWIFT_TEST}"
+        --syntax-parser-header-dir="${SWIFT_SOURCE_DIR}/include/swift-c/SyntaxParser"
+        --syntax-parser-lib-dir="$(build_directory ${host} swift)/lib"
         --sourcekitd-dir="$(build_directory ${host} swift)/lib"
         --swiftsyntax-dir="$(build_directory ${host} swiftsyntax)/${swiftsyntax_config}"
         --config="${config}")
+}
+
+function set_skstresstester_build_command() {
+    set_stresstester_build_script_helper_command SourceKitStressTester "${SKSTRESSTESTER_BUILD_TYPE}"
+    skstresstester_build_command=("${stresstester_build_script_helper_command[@]}")
+}
+
+function set_swiftevolve_build_command() {
+    set_stresstester_build_script_helper_command SwiftEvolve "${SWIFTEVOLVE_BUILD_TYPE}"
+    swiftevolve_build_command=("${stresstester_build_script_helper_command[@]}")
 }
 
 # Construct the appropriate options to pass to an Xcode
@@ -2495,6 +2528,11 @@ for host in "${ALL_HOSTS[@]}"; do
                                 -DLLDB_ALLOW_STATIC_BINDINGS=1
                                 -DLLDB_CODESIGN_IDENTITY=""
                             )
+
+                            if [[ "${ENABLE_ASAN}" ]] ; then
+                                # Limit the number of parallel tests.
+                                LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --threads=$(sysctl hw.physicalcpu | awk '{print $2}')"
+                            fi
                         fi
                         ;;
                 esac
@@ -2543,6 +2581,16 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 set_skstresstester_build_command
                 call "${skstresstester_build_command[@]}"
+
+                continue
+                ;;
+            swiftevolve)
+                if [[ "$(uname -s)" != "Darwin" ]]; then
+                    echo "error: unable to build swift-evolve on this platform"
+                    continue
+                fi
+                set_swiftevolve_build_command
+                call "${swiftevolve_build_command[@]}"
 
                 continue
                 ;;
@@ -3094,7 +3142,8 @@ for host in "${ALL_HOSTS[@]}"; do
                      call ${NINJA_BIN} unittests/LLDBUnitTests
                     with_pushd ${results_dir} \
                           call "${llvm_build_dir}/bin/llvm-lit" \
-                               "${lldb_build_dir}/lit" -sv \
+                               "${lldb_build_dir}/lit" \
+                               ${LLVM_LIT_ARGS} \
                                --xunit-xml-output=${results_dir}/results.xml \
                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -t -E \"${DOTEST_EXTRA}\""
                     if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
@@ -3102,9 +3151,10 @@ for host in "${ALL_HOSTS[@]}"; do
                              "${LLDB_TEST_SWIFT_COMPATIBILITY}"
                         with_pushd ${results_dir} \
                            call "${llvm_build_dir}/bin/llvm-lit" \
-                                "${lldb_build_dir}/lit" -sv \
+                                "${lldb_build_dir}/lit" \
+                                ${LLVM_LIT_ARGS} \
                                 --xunit-xml-output=${results_dir}/results.xml \
-                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\" -t -E \"${DOTEST_EXTRA}\""
+                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\" -t -E \"${DOTEST_EXTRA}\"" --filter=compat
                     fi
                 else
                     with_pushd "${results_dir}" \
@@ -3171,6 +3221,14 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 echo "--- Running tests for ${product} ---"
                 call "${skstresstester_build_command[@]}" test
+                continue
+                ;;
+            swiftevolve)
+                if [[ "${SKIP_TEST_SWIFTEVOLVE}" ]]; then
+                    continue
+                fi
+                echo "--- Running tests for ${product} ---"
+                call "${swiftevolve_build_command[@]}" test
                 continue
                 ;;
             xctest)
@@ -3515,6 +3573,23 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 echo "--- Installing ${product} ---"
                 call "${skstresstester_build_command[@]}" --prefix="${host_install_destdir}${host_install_prefix}" install
+                continue
+                ;;
+            swiftevolve)
+                if [[ -z "${INSTALL_SWIFTEVOLVE}" ]] ; then
+                    continue
+                fi
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "--install-destdir is required to install products."
+                    exit 1
+                fi
+                if [[ -z "${INSTALL_SWIFTSYNTAX}" ]] ; then
+                    echo "--install-swiftsyntax is required to install swift-evolve"
+                    exit 1
+                fi
+
+                echo "--- Installing ${product} ---"
+                call "${swiftevolve_build_command[@]}" --prefix="${host_install_destdir}${host_install_prefix}" install
                 continue
                 ;;
             xctest)

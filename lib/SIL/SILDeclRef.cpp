@@ -444,6 +444,11 @@ bool SILDeclRef::isTransparent() const {
 
 /// True if the function should have its body serialized.
 IsSerialized_t SILDeclRef::isSerialized() const {
+  // Native-to-foreign thunks are only referenced from the Objective-C
+  // method table.
+  if (isForeign)
+    return IsNotSerialized;
+
   DeclContext *dc;
   if (auto closure = getAbstractClosureExpr())
     dc = closure->getLocalContext();

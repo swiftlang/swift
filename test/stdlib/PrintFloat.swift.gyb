@@ -9,8 +9,10 @@
 import StdlibUnittest
 #if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
   import Glibc
-#else
+#elseif os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
   import Darwin
+#elseif os(Windows)
+  import MSVCRT
 #endif
 
 // It takes about an hour to run the Float formatter over all 2 billion

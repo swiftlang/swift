@@ -561,13 +561,14 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
 
 static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
                                               CompilerInstance &Instance) {
-  const auto &InputsAndOutputs =
-      Invocation.getFrontendOptions().InputsAndOutputs;
-  assert(InputsAndOutputs.hasSingleInput());
-  StringRef InputPath = InputsAndOutputs.getFilenameOfFirstInput();
+  const FrontendOptions &FEOpts = Invocation.getFrontendOptions();
+  assert(FEOpts.InputsAndOutputs.hasSingleInput());
+  StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
+  StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
   return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getASTContext(), Invocation.getClangModuleCachePath(),
-      Invocation.getModuleName(), InputPath, Invocation.getOutputFilename());
+      PrebuiltCachePath, Invocation.getModuleName(), InputPath,
+      Invocation.getOutputFilename());
 }
 
 static bool compileLLVMIR(CompilerInvocation &Invocation,
@@ -1247,11 +1248,7 @@ static bool performCompileStepsPostSILGen(
     return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
 
   {
-    const bool haveModulePath = PSPs.haveModuleOrModuleDocOutputPaths();
-    if (haveModulePath && !SM->isSerialized())
-      SM->serialize();
-
-    if (haveModulePath) {
+    if (PSPs.haveModuleOrModuleDocOutputPaths()) {
       if (Action == FrontendOptions::ActionType::MergeModules ||
           Action == FrontendOptions::ActionType::EmitModuleOnly) {
         // What if MSF is a module?

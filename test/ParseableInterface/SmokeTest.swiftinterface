@@ -14,6 +14,7 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print SmokeTest -I %t -source-filename x -print-interface > %t/SmokeTest.txt
 // RUN: %FileCheck %s < %t/SmokeTest.txt
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t/SmokeTest.txt
+// RUN: llvm-bcanalyzer -dump %t/SmokeTest.swiftmodule | not grep FILE_DEPENDENCY
 
 // CHECK-LABEL: public class TestClass
 public class TestClass {

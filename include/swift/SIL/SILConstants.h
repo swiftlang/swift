@@ -95,6 +95,10 @@ private:
     /// This value is represented with an inline integer representation.
     RK_IntegerInline,
 
+    /// This value is represented with a bump-pointer allocated char array
+    /// representing a UTF-8 encoded string.
+    RK_String,
+
     /// This value is a struct or tuple of constants.  This is tracked by the
     /// "aggregate" member of the value union.
     RK_Aggregate,
@@ -124,6 +128,10 @@ private:
     /// This holds the bits of an integer for an inline representation.
     uint64_t integerInline;
 
+    /// When this SymbolicValue is of "String" kind, this pointer stores
+    /// information about the StringRef value it holds.
+    const char *string;
+
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
     /// information about the array elements and count.
     const SymbolicValue *aggregate;
@@ -147,6 +155,9 @@ private:
     /// representation, which makes the number of entries in the list derivable.
     unsigned integerBitwidth;
 
+    /// This is the number of bytes for an RK_String representation.
+    unsigned stringNumBytes;
+
     /// This is the number of elements for an RK_Aggregate representation.
     unsigned aggregateNumElements;
   } auxInfo;
@@ -167,6 +178,10 @@ public:
 
     /// This is an integer constant.
     Integer,
+
+    /// String values may have SIL type of Builtin.RawPointer or Builtin.Word
+    /// type.
+    String,
 
     /// This can be an array, struct, tuple, etc.
     Aggregate,
@@ -242,6 +257,13 @@ public:
   APInt getIntegerValue() const;
   unsigned getIntegerValueBitWidth() const;
 
+  /// Returns a SymbolicValue representing a UTF-8 encoded string.
+  static SymbolicValue getString(StringRef string,
+                                 ASTContext &astContext);
+
+  /// Returns the UTF-8 encoded string underlying a SymbolicValue.
+  StringRef getStringValue() const;
+
   /// This returns an aggregate value with the specified elements in it.  This
   /// copies the elements into the specified ASTContext.
   static SymbolicValue getAggregate(ArrayRef<SymbolicValue> elements,
@@ -267,6 +289,9 @@ public:
   /// indices involved.
   SymbolicValueMemoryObject *
   getAddressValue(SmallVectorImpl<unsigned> &accessPath) const;
+
+  /// Return just the memory object for an address value.
+  SymbolicValueMemoryObject *getAddressValueMemoryObject() const;
 
   //===--------------------------------------------------------------------===//
   // Helpers
@@ -311,6 +336,24 @@ struct SymbolicValueMemoryObject {
   /// Create a new memory object whose overall type is as specified.
   static SymbolicValueMemoryObject *create(Type type, SymbolicValue value,
                                            ASTContext &astContext);
+
+  /// Given that this memory object contains an aggregate value like
+  /// {{1, 2}, 3}, and given an access path like [0,1], return the indexed
+  /// element, e.g. "2" in this case.
+  ///
+  /// Returns uninit memory if the access path points at or into uninit memory.
+  ///
+  /// Precondition: The access path must be valid for this memory object's type.
+  SymbolicValue getIndexedElement(ArrayRef<unsigned> accessPath);
+
+  /// Given that this memory object contains an aggregate value like
+  /// {{1, 2}, 3}, given an access path like [0,1], and given a new element like
+  /// "4", set the indexed element to the specified scalar, producing {{1, 4},
+  /// 3} in this case.
+  ///
+  /// Precondition: The access path must be valid for this memory object's type.
+  void setIndexedElement(ArrayRef<unsigned> accessPath,
+                         SymbolicValue newElement, ASTContext &astCtx);
 
 private:
   const Type type;

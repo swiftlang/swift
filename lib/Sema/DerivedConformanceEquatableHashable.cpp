@@ -1185,9 +1185,9 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
       auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
       if (!canDeriveConformance(getConformanceContext(), Nominal,
                                 hashableProto)) {
-        TC.diagnose(ConformanceDecl->getLoc(), diag::type_does_not_conform,
-                    Nominal->getDeclaredType(),
-                    hashableProto->getDeclaredType());
+        ConformanceDecl->diagnose(diag::type_does_not_conform,
+                                  Nominal->getDeclaredType(),
+                                  hashableProto->getDeclaredType());
         return nullptr;
       }
 
@@ -1213,13 +1213,13 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
       // hashValue has an explicit implementation, but hash(into:) doesn't.
       // Emit a deprecation warning, then derive hash(into:) in terms of
       // hashValue.
-      TC.diagnose(hashValueDecl->getLoc(), diag::hashvalue_implementation,
-                  Nominal->getDeclaredType());
+      hashValueDecl->diagnose(diag::hashvalue_implementation,
+                              Nominal->getDeclaredType());
       return deriveHashable_hashInto(*this,
                                      &deriveBodyHashable_compat_hashInto);
     }
   }
 
-  TC.diagnose(requirement->getLoc(), diag::broken_hashable_requirement);
+  requirement->diagnose(diag::broken_hashable_requirement);
   return nullptr;
 }

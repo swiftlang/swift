@@ -220,6 +220,7 @@ public:
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *LI);
   SILInstruction *visitLoadInst(LoadInst *LI);
+  SILInstruction *visitStoreInst(StoreInst *si);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitAllocRefInst(AllocRefInst *AR);
@@ -296,26 +297,27 @@ private:
   FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
 
   // Build concrete existential information using findInitExistential.
-  Optional<ConcreteExistentialInfo>
-  buildConcreteExistentialInfo(Operand &ArgOperand);
+  Optional<ConcreteOpenedExistentialInfo>
+  buildConcreteOpenedExistentialInfo(Operand &ArgOperand);
 
   // Build concrete existential information using SoleConformingType.
-  Optional<ConcreteExistentialInfo>
-  buildConcreteExistentialInfoFromSoleConformingType(Operand &ArgOperand);
+  Optional<ConcreteOpenedExistentialInfo>
+  buildConcreteOpenedExistentialInfoFromSoleConformingType(Operand &ArgOperand);
 
   // Common utility function to build concrete existential information for all
   // arguments of an apply instruction.
-  void buildConcreteExistentialInfos(
+  void buildConcreteOpenedExistentialInfos(
       FullApplySite Apply,
-      llvm::SmallDenseMap<unsigned, ConcreteExistentialInfo> &CEIs,
+      llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
       SILBuilderContext &BuilderCtx,
       SILOpenedArchetypesTracker &OpenedArchetypesTracker);
 
-  bool canReplaceArg(FullApplySite Apply, const ConcreteExistentialInfo &CEI,
-                     unsigned ArgIdx);
+  bool canReplaceArg(FullApplySite Apply, const OpenedArchetypeInfo &OAI,
+                     const ConcreteExistentialInfo &CEI, unsigned ArgIdx);
+
   SILInstruction *createApplyWithConcreteType(
       FullApplySite Apply,
-      const llvm::SmallDenseMap<unsigned, ConcreteExistentialInfo> &CEIs,
+      const llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
       SILBuilderContext &BuilderCtx);
 
   // Common utility function to replace the WitnessMethodInst using a
@@ -328,6 +330,7 @@ private:
   SILInstruction *
   propagateConcreteTypeOfInitExistential(FullApplySite Apply,
                                          WitnessMethodInst *WMI);
+
   SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite Apply);
 
   /// Propagate concrete types from ProtocolConformanceAnalysis.

@@ -249,10 +249,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel,
   // Split up operations on stack-allocated aggregates (struct, tuple).
   P.addSROA();
 
-  // Re-run predictable memory optimizations, since previous optimization
-  // passes sometimes expose oppotunities here.
-  P.addPredictableMemoryOptimizations();
-
   // Promote stack allocations to values.
   P.addMem2Reg();
 
@@ -415,6 +411,7 @@ static bool addMidLevelPassPipeline(SILPassPipelinePlan &P,
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionElimination();
+  P.addDeadStoreElimination();
   P.addDeadObjectElimination();
 
   // These few passes are needed to cleanup between loop unrolling and GlobalOpt.
@@ -633,6 +630,9 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
 
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();
+
+  // Finally serialize the SIL if we are asked to.
+  P.addSerializeSILPass();
 
   return P;
 }

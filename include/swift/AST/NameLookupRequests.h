@@ -133,7 +133,7 @@ public:
 /// Request the superclass declaration for the given class.
 class SuperclassDeclRequest :
     public SimpleRequest<SuperclassDeclRequest,
-                         CacheKind::Uncached, // FIXME: Cache these
+                         CacheKind::SeparatelyCached,
                          ClassDecl *,
                          NominalTypeDecl *> {
 public:
@@ -149,6 +149,8 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
+  Optional<ClassDecl *> getCachedResult() const;
+  void cacheResult(ClassDecl *value) const;
 
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;

@@ -331,8 +331,11 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (MLM != ModuleLoadingMode::OnlySerialized) {
     auto const &Clang = clangImporter->getClangInstance();
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
+    StringRef PrebuiltModuleCachePath =
+        Invocation.getFrontendOptions().PrebuiltModuleCachePath;
     auto PIML = ParseableInterfaceModuleLoader::create(*Context,
                                                        ModuleCachePath,
+                                                       PrebuiltModuleCachePath,
                                                        getDependencyTracker(),
                                                        MLM);
     Context->addModuleLoader(std::move(PIML));

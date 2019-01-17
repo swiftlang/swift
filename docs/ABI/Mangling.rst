@@ -1,6 +1,5 @@
 :orphan:
 
-.. @raise litre.TestsAreMissing
 .. _ABI:
 
 .. highlight:: none
@@ -633,7 +632,9 @@ Property behaviors are implemented using private protocol conformances.
 ::
 
   concrete-protocol-conformance ::= type protocol-conformance-ref any-protocol-conformance-list 'HC'
-  protocol-conformance-ref ::= protocol module? 'HP'
+  protocol-conformance-ref ::= protocol 'HP'   // same module as conforming type
+  protocol-conformance-ref ::= protocol 'Hp'   // same module as protocol
+  protocol-conformance-ref ::= protocol module // "retroactive"
 
   any-protocol-conformance ::= concrete-protocol-conformance
   any-protocol-conformance ::= dependent-protocol-conformance
@@ -651,10 +652,13 @@ Property behaviors are implemented using private protocol conformances.
   dependent-associated-conformance ::= type protocol
 
 A compact representation used to represent mangled protocol conformance witness
-arguments at runtime. The ``module`` is only specified for conformances that are
-"retroactive", meaning that the context in which the conformance is defined is
-in neither the protocol or type module. The concrete protocol conformances that
-follow are for the conditional conformance requirements.
+arguments at runtime. The ``module`` is only specified for conformances that
+are "retroactive", meaning that the context in which the conformance is defined
+is in neither the protocol or type module. For a non-retroactive conformance
+where both the type *and* the protocol are in the same module, or for
+synthesized conformances that have no owning module, the "HP" operator is
+preferred. The concrete protocol conformances that follow are for the
+conditional conformance requirements.
 
 Dependent protocol conformances mangle the access path required to extract a
 protocol conformance from some conformance passed into the environment. The

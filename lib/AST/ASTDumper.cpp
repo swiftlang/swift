@@ -1436,7 +1436,8 @@ public:
           cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
           break;
         case AvailabilitySpecKind::LanguageVersionConstraint:
-          cast<LanguageVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+        case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
+          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
           break;
         case AvailabilitySpecKind::OtherPlatform:
           cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
@@ -3226,8 +3227,8 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-    void visitNameAliasType(NameAliasType *T, StringRef label) {
-      printCommon(label, "name_alias_type");
+    void visitTypeAliasType(TypeAliasType *T, StringRef label) {
+      printCommon(label, "type_alias_type");
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
         printRec("parent", T->getParent());

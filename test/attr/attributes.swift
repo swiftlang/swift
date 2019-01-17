@@ -273,3 +273,12 @@ class HasStorage {
 @_invalid_attribute_ // expected-error {{unknown attribute '_invalid_attribute_'}}
 @inline(__always)
 public func sillyFunction() {}
+
+// rdar://problem/45732251: unowned/unowned(unsafe) optional lets are permitted
+func unownedOptionals(x: C) {
+  unowned let y: C? = x
+  unowned(unsafe) let y2: C? = x
+
+  _ = y
+  _ = y2
+}

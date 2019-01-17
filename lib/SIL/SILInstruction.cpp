@@ -41,7 +41,7 @@ const SILDebugScope *SILInstruction::getDebugScope() const {
   return Location.getScope();
 }
 
-void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
+void SILInstruction::setDebugScope(const SILDebugScope *DS) {
   if (getDebugScope() && getDebugScope()->InlinedCallSite)
     assert(DS->InlinedCallSite && "throwing away inlined scope info");
 

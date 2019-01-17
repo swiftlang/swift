@@ -964,11 +964,11 @@ static void performParallelIRGeneration(
   }
 
   // Emit the module contents.
-  irgen.emitGlobalTopLevel(true /*emitForParallelEmission*/);
+  irgen.emitGlobalTopLevel();
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
-      IRGenModule *IGM = irgen.getGenModule(SF);
+      CurrentIGMPtr IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF);
     } else {
       File->collectLinkLibraries([&](LinkLibrary LinkLib) {
@@ -1160,7 +1160,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
     Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
     break;
   case llvm::Triple::Wasm:
-    llvm_unreachable("web assembly object format is not supported.");
+    Section = WasmASTSectionName;
     break;
   }
   ASTSym->setSection(Section);

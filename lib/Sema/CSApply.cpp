@@ -2514,8 +2514,92 @@ namespace {
             /*implicit=*/expr->isImplicit(), Type(), getType);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
+			
+      // Check for ambiguous member if the base is an Optional
+      if (baseTy->getOptionalObjectType()) {
+        diagnoseAmbiguousNominalMember(baseTy, result);
+      }
 
       return coerceToType(result, resultTy, cs.getConstraintLocator(expr));
+    }
+    
+    /// Diagnose if the base type is optional, we're referring to a nominal
+    /// type member via the dot syntax and the member name matches
+    /// Optional<T>.{member name}
+    void diagnoseAmbiguousNominalMember(Type baseTy, Expr *result) {
+      if (auto baseTyUnwrapped = baseTy->lookThroughAllOptionalTypes()) {
+        // Return if the base type doesn't have a nominal type decl
+        if (!baseTyUnwrapped->getNominalOrBoundGenericNominal()) {
+          return;
+        }
+        
+        // Otherwise, continue digging
+        if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
+          auto calledValue = DSCE->getCalledValue();
+          auto isOptional = false;
+          Identifier memberName;
+          
+          // Try cast the assigned value to an enum case
+          //
+          // This will always succeed if the base is Optional<T> & the
+          // assigned case comes from Optional<T>
+          if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
+            isOptional = EED->getParentEnum()->isOptionalDecl();
+            memberName = EED->getBaseName().getIdentifier();
+          }
+          
+          // Return if the enum case doesn't come from Optional<T>
+          if (!isOptional) {
+            return;
+          }
+          
+          // Look up the enum case in the unwrapped type to check if it exists
+          // as a member
+          auto baseTyNominalDecl = baseTyUnwrapped
+                                   ->getNominalOrBoundGenericNominal();
+          auto &tc = cs.getTypeChecker();
+          auto results = tc.lookupMember(baseTyNominalDecl->getModuleContext(),
+                                         baseTyUnwrapped,
+                                         memberName,
+                                         defaultMemberLookupOptions);
+          
+          // Lookup didn't find anything, so return
+          if (results.empty()) {
+            return;
+          }
+          
+          if (auto member = results.front().getValueDecl()) {
+            // Lookup returned a member that is an instance member,
+            // so return
+            if (member->isInstanceMember()) {
+              return;
+            }
+            
+            // Return if the member is an enum case w/ assoc values, as we only
+            // care (for now) about cases with no assoc values (like none)
+            if (auto EED = dyn_cast<EnumElementDecl>(member)) {
+              if (EED->hasAssociatedValues()) {
+                return;
+              }
+            }
+            
+            // Emit a diagnostic with some fixits
+            auto baseTyName = baseTy->getCanonicalType().getString();
+            auto baseTyUnwrappedName = baseTyUnwrapped->getString();
+            auto loc = DSCE->getLoc();
+            auto startLoc = DSCE->getStartLoc();
+            
+            tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
+                        baseTyName, baseTyUnwrappedName, memberName.str());
+            
+            tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
+              .fixItInsert(startLoc, "Optional");
+            tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
+                        baseTyUnwrappedName, memberName.str())
+              .fixItInsert(startLoc, baseTyUnwrappedName);
+          }
+        }
+      }
     }
     
   private:
@@ -3143,10 +3227,7 @@ namespace {
       auto resultTy = simplifyType(cs.getType(expr));
       cs.setType(expr, resultTy);
 
-      // Convert the condition to a logic value.
-      auto cond
-        = solution.convertBooleanTypeToBuiltinI1(expr->getCondExpr(),
-                                                 cs.getConstraintLocator(expr));
+      auto cond = cs.coerceToRValue(expr->getCondExpr());
       expr->setCondExpr(cond);
 
       // Coerce the then/else branches to the common type.
@@ -6286,13 +6367,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                               toType->getCanonicalType() });
   if (knownRestriction != solution.ConstraintRestrictions.end()) {
     switch (knownRestriction->second) {
-
-    case ConversionRestrictionKind::TupleToTuple:
-    case ConversionRestrictionKind::LValueToRValue:
-        // Restrictions that don't need to be recorded.
-        // Should match recordRestriction() in CSSimplify
-        break;
-
     case ConversionRestrictionKind::DeepEquality: {
       if (toType->hasUnresolvedType())
         break;
@@ -6717,9 +6791,8 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
   // If the base of the access is mutable, then we may be invoking a getter or
   // setter that requires the base to be mutable.
   auto *SD = cast<AbstractStorageDecl>(member);
-  bool isSettableFromHere = SD->isSettable(UseDC)
-    && (!UseDC->getASTContext().LangOpts.EnableAccessControl
-        || SD->isSetterAccessibleFrom(UseDC));
+  bool isSettableFromHere =
+      SD->isSettable(UseDC) && SD->isSetterAccessibleFrom(UseDC);
 
   // If neither the property's getter nor its setter are mutating, the base
   // can be an rvalue.
@@ -7319,11 +7392,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setArg(arg);
     cs.setType(apply, fnType->getResult());
     apply->setIsSuper(isSuper);
-
-    // We need the layout of nominal types returned from a function call.
-    if (auto nominalResult = fnType->getResult()->getAnyNominal()) {
-      tc.requestNominalLayout(nominalResult);
-    }
 
     cs.setExprTypes(apply);
     Expr *result = tc.substituteInputSugarTypeForResult(apply);
@@ -8008,81 +8076,6 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
     return nullptr;
 
   rewriter.finalize(result);
-  return result;
-}
-
-Expr *
-Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
-                                        ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
-
-  // Load lvalues here.
-  expr = cs.coerceToRValue(expr);
-
-  auto &tc = cs.getTypeChecker();
-  auto &ctx = tc.Context;
-
-  auto type = cs.getType(expr);
-
-  // We allow UnresolvedType <c $T for all $T, so we might end up here
-  // in diagnostics. Just bail out.
-  if (type->is<UnresolvedType>())
-    return expr;
-
-  // Look for the builtin name. If we don't have it, we need to call the
-  // general name via the witness table.
-  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-  if (isa<AbstractFunctionDecl>(cs.DC))
-    lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto members = tc.lookupMember(cs.DC, type,
-                                 tc.Context.Id_getBuiltinLogicValue,
-                                 lookupOptions);
-
-  // Find the builtin method.
-  if (members.size() != 1) {
-    tc.diagnose(expr->getLoc(), diag::broken_bool);
-    return expr;
-  }
-  auto *builtinMethod = dyn_cast<FuncDecl>(members[0].getValueDecl());
-  if (!builtinMethod) {
-    tc.diagnose(expr->getLoc(), diag::broken_bool);
-    return expr;
-  }
-
-  // The method is not generic, so there are no substitutions.
-  tc.validateDeclForNameLookup(builtinMethod);
-  auto builtinMethodType = builtinMethod->getInterfaceType()
-    ->castTo<FunctionType>();
-
-  // Form an unbound reference to the builtin method.
-  auto *declRef = new (ctx) DeclRefExpr(builtinMethod,
-                                        DeclNameLoc(expr->getLoc()),
-                                        /*Implicit=*/true);
-  declRef->setFunctionRefKind(FunctionRefKind::DoubleApply);
-  cs.setType(declRef, builtinMethodType);
-
-  auto getType = [&](const Expr *E) -> Type {
-    return cs.getType(E);
-  };
-
-  // Apply 'self' to get the method value.
-  auto *methodRef = new (ctx) DotSyntaxCallExpr(declRef,
-                                                SourceLoc(),
-                                                expr);
-  cs.setType(methodRef, builtinMethodType->getResult());
-
-  // Apply the empty argument list to get the final result.
-  auto *result = CallExpr::createImplicit(ctx, methodRef,
-                                          { }, { }, getType);
-  cs.setType(result, builtinMethodType->getResult()
-                  ->castTo<FunctionType>()->getResult());
-  cs.setType(result->getArg(), ctx.TheEmptyTupleType);
-
-  if (!cs.getType(result)->isBuiltinIntegerType(1)) {
-    tc.diagnose(expr->getLoc(), diag::broken_bool);
-    return result;
-  }
-
   return result;
 }
 

@@ -40,7 +40,7 @@
 //       /
 //      |
 //      V
-//   class _RawDictionaryStorage
+//   class __RawDictionaryStorage
 //   +-----------------------------------------------------------+
 //   | <isa>                                                     |
 //   | <refcount>                                                |
@@ -62,7 +62,7 @@
 //   +----------------------------------------------+
 //   | enum Dictionary<K,V>._Variant                |
 //   | +----------------------------------------+   |
-//   | | [ struct _CocoaDictionary              |   |
+//   | | [ struct __CocoaDictionary             |   |
 //   | +---|------------------------------------+   |
 //   +----/-----------------------------------------+
 //       /
@@ -75,9 +75,9 @@
 //   +--------------+
 //     ^
 //     |
-//      \  struct _CocoaDictionary.Index
+//      \  struct __CocoaDictionary.Index
 //   +--|------------------------------------+
-//   |  * base: _CocoaDictionary             |
+//   |  * base: __CocoaDictionary            |
 //   |  allKeys: array of all keys           |
 //   |  currentKeyIndex: index into allKeys  |
 //   +---------------------------------------+
@@ -87,8 +87,8 @@
 // ---------------------------
 //
 // The native backing store is represented by three different classes:
-// * `_RawDictionaryStorage`
-// * `_EmptyDictionarySingleton` (extends Raw)
+// * `__RawDictionaryStorage`
+// * `__EmptyDictionarySingleton` (extends Raw)
 // * `_DictionaryStorage<K: Hashable, V>` (extends Raw)
 //
 // (Hereafter `Raw`, `Empty`, and `Storage`, respectively)
@@ -340,7 +340,7 @@
 ///
 ///     let glyphIndex = imagePaths.firstIndex(where: { $0.value.hasPrefix("/glyphs") })
 ///     if let index = glyphIndex {
-///         print("The '\(imagesPaths[index].key)' image is a glyph.")
+///         print("The '\(imagePaths[index].key)' image is a glyph.")
 ///     } else {
 ///         print("No glyphs found!")
 ///     }
@@ -401,7 +401,7 @@ public struct Dictionary<Key: Hashable, Value> {
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_cocoa: __owned _CocoaDictionary) {
+  internal init(_cocoa: __owned __CocoaDictionary) {
     _variant = _Variant(cocoa: _cocoa)
   }
 
@@ -422,7 +422,7 @@ public struct Dictionary<Key: Hashable, Value> {
       Dictionary can be backed by NSDictionary buffer only when both Key \
       and Value are bridged verbatim to Objective-C
       """)
-    self.init(_cocoa: _CocoaDictionary(_immutableCocoaDictionary))
+    self.init(_cocoa: __CocoaDictionary(_immutableCocoaDictionary))
   }
 #endif
 
@@ -921,10 +921,10 @@ extension Dictionary {
   }
 
   /// Returns a new dictionary containing only the key-value pairs that have
-  /// non-`nil` values as the result from the transform by the given closure.
+  /// non-`nil` values as the result of transformation by the given closure.
   ///
-  /// Use this method to receive a dictionary of non-optional values when your
-  /// transformation can produce an optional value.
+  /// Use this method to receive a dictionary with non-optional values when
+  /// your transformation produces optional values.
   ///
   /// In this example, note the difference in the result of using `mapValues`
   /// and `compactMapValues` with a transformation that returns an optional
@@ -1744,7 +1744,7 @@ extension Dictionary {
     internal enum _Variant {
       case native(_HashTable.Index)
 #if _runtime(_ObjC)
-      case cocoa(_CocoaDictionary.Index)
+      case cocoa(__CocoaDictionary.Index)
 #endif
     }
 
@@ -1766,7 +1766,7 @@ extension Dictionary {
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
-    internal init(_cocoa index: __owned _CocoaDictionary.Index) {
+    internal init(_cocoa index: __owned __CocoaDictionary.Index) {
       self.init(_variant: .cocoa(index))
     }
 #endif
@@ -1824,7 +1824,7 @@ extension Dictionary.Index {
 
 #if _runtime(_ObjC)
   @usableFromInline
-  internal var _asCocoa: _CocoaDictionary.Index {
+  internal var _asCocoa: __CocoaDictionary.Index {
     @_transparent
     get {
       switch _variant {
@@ -1925,7 +1925,7 @@ extension Dictionary {
     internal enum _Variant {
       case native(_NativeDictionary<Key, Value>.Iterator)
 #if _runtime(_ObjC)
-      case cocoa(_CocoaDictionary.Iterator)
+      case cocoa(__CocoaDictionary.Iterator)
 #endif
     }
 
@@ -1944,7 +1944,7 @@ extension Dictionary {
 
 #if _runtime(_ObjC)
     @inlinable
-    internal init(_cocoa: __owned _CocoaDictionary.Iterator) {
+    internal init(_cocoa: __owned __CocoaDictionary.Iterator) {
       self.init(_variant: .cocoa(_cocoa))
     }
 #endif
@@ -1998,7 +1998,7 @@ extension Dictionary.Iterator {
 
 #if _runtime(_ObjC)
   @usableFromInline @_transparent
-  internal var _asCocoa: _CocoaDictionary.Iterator {
+  internal var _asCocoa: __CocoaDictionary.Iterator {
     get {
       switch _variant {
       case .native:

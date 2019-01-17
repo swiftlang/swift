@@ -934,9 +934,11 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
       loweredFuncTy, loweredFuncTy->getExtInfo().withNoEscape(false),
       loweredFuncTy->getWitnessMethodConformanceOrNone());
 
+  CanType dynamicSelfType;
   auto thunkTy = buildThunkType(loweredBlockTy, loweredFuncTyWithoutNoEscape,
                                 inputSubstType, outputSubstType,
-                                genericEnv, interfaceSubs);
+                                genericEnv, interfaceSubs, dynamicSelfType);
+  assert(!dynamicSelfType && "Not implemented");
 
   auto thunk = SGM.getOrCreateReabstractionThunk(thunkTy,
                                                  loweredBlockTy,
@@ -973,7 +975,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   // Handle the escaping to noescape conversion.
   assert(loweredFuncTy->isNoEscape());
   return B.createConvertEscapeToNoEscape(
-      loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy), false);
+      loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy));
 }
 
 static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
@@ -1388,7 +1390,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   bool isInitializingToAllocatingInitThunk = false;
   if (native.kind == SILDeclRef::Kind::Initializer) {
     if (auto ctor = dyn_cast<ConstructorDecl>(native.getDecl())) {
-      if (!ctor->isDesignatedInit()) {
+      if (!ctor->isDesignatedInit() && !ctor->isObjC()) {
         isInitializingToAllocatingInitThunk = true;
         native = SILDeclRef(ctor, SILDeclRef::Kind::Allocator);
       }

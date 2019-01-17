@@ -17,7 +17,7 @@
 import EnumExhaustivity
 
 func test(_ value: RegularEnum, _ exhaustiveValue: ExhaustiveEnum) {
-  switch value { // expected-error {{switch must be exhaustive}} expected-note {{handle unknown values using "@unknown default"}}
+  switch value { // expected-error {{switch covers known cases, but 'RegularEnum' may have additional unknown values}} expected-note {{handle unknown values using "@unknown default"}}
   case .A: break
   case .B: break
   }
@@ -43,7 +43,7 @@ func testAttributes(
   case .A, .B: break
   }
 
-  switch retetb { // expected-error {{switch must be exhaustive}} expected-note {{handle unknown values using "@unknown default"}}
+  switch retetb { // expected-error {{switch covers known cases, but 'RegularEnumTurnedExhaustiveThenBackViaAPINotes' may have additional unknown values}} expected-note {{handle unknown values using "@unknown default"}}
   case .A, .B: break
   }
 

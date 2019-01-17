@@ -62,6 +62,7 @@ open class ToplevelType {
   public init() {}
   public init(recordName: String) {}
   open func member(_ x: @escaping ([Any]?) -> Void) {}
+  open func trailing(_ x: @escaping ([Any]?) -> Void) {}
 }
 
 public var GlobalAttribute: String = ""

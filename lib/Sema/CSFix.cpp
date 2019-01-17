@@ -235,3 +235,26 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) InsertExplicitCall(cs, locator);
 }
+
+bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {
+  auto failure = SubscriptMisuseFailure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+UseSubscriptOperator *UseSubscriptOperator::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) UseSubscriptOperator(cs, locator);
+}
+
+bool DefineMemberBasedOnUse::diagnose(Expr *root, bool asNote) const {
+  auto failure = MissingMemberFailure(root, getConstraintSystem(), BaseType,
+                                      Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
+DefineMemberBasedOnUse *
+DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
+                               DeclName member, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DefineMemberBasedOnUse(cs, baseType, member, locator);
+}

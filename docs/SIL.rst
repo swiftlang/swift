@@ -1,4 +1,3 @@
-.. @raise litre.TestsAreMissing
 .. highlight:: none
 
 Swift Intermediate Language (SIL)
@@ -984,6 +983,7 @@ Linkage
   sil-linkage ::= 'private'
   sil-linkage ::= 'public_external'
   sil-linkage ::= 'hidden_external'
+  sil-linkage ::= 'non_abi'
 
 A linkage specifier controls the situations in which two objects in
 different SIL modules are *linked*, i.e. treated as the same object.
@@ -1047,6 +1047,25 @@ not needed.
 
 If an object has any uses, then it must be linked to a definition
 with non-external linkage.
+
+Public non-ABI linkage
+``````````````````````
+
+The `non_abi` linkage is a special linkage used for definitions which
+only exist in serialized SIL, and do not define visible symbols in the
+object file.
+
+A definition with `non_abi` linkage behaves like it has `shared` linkage,
+except that it must be serialized in the SIL module even if not referenced
+from anywhere else in the module. For example, this means it is considered
+a root for dead function elimination.
+
+When a `non_abi` definition is deserialized, it will have `shared_external`
+linkage.
+
+There is no `non_abi_external` linkage. Instead, when referencing a
+`non_abi` declaration that is defined in a different translation unit from
+the same Swift module, you must use `hidden_external` linkage.
 
 Summary
 ```````
@@ -2325,6 +2344,7 @@ mark_uninitialized
   mu_kind ::= 'derivedself'
   mu_kind ::= 'derivedselfonly'
   mu_kind ::= 'delegatingself'
+  mu_kind ::= 'delegatingselfallocated'
 
   %2 = mark_uninitialized [var] %1 : $*T
   // $T must be an address
@@ -2345,6 +2365,7 @@ the mark_uninitialized instruction refers to:
 - ``derivedself``: designates ``self`` in a derived (non-root) class
 - ``derivedselfonly``: designates ``self`` in a derived (non-root) class whose stored properties have already been initialized
 - ``delegatingself``: designates ``self`` on a struct, enum, or class in a delegating constructor (one that calls self.init)
+- ``delegatingselfallocated``: designates ``self`` on a class convenience initializer's initializing entry point
 
 The purpose of the ``mark_uninitialized`` instruction is to enable
 definitive initialization analysis for global variables (when marked as
@@ -4750,7 +4771,7 @@ A ``convert_escape_to_noescape [not_guaranteed] %opd`` indicates that the
 lifetime of its operand was not guaranteed by SILGen and a mandatory pass must
 be run to ensure the lifetime of ``%opd``` for the conversion's uses.
 
-A ``convert_escape_to_noescape [escaped]`` indiciates that the result was
+A ``convert_escape_to_noescape [escaped]`` indicates that the result was
 passed to a function (materializeForSet) which escapes the closure in a way not
 expressed by the convert's users. The mandatory pass must ensure the lifetime
 in a conservative way.

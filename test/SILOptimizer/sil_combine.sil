@@ -285,8 +285,8 @@ bb3(%3 : $BoolLike):
 // CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
 // CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [[IN_GEP]] : $*Builtin.Int8
 // CHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
-// CHECK-NEXT:  [[IN_GEP_STORE:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
-// CHECK-NEXT:  store [[LITERAL]] to [[IN_GEP_STORE]] : $*Builtin.Int8
+// CHECK-NEXT:  [[UINT8:%.*]] = struct $UInt8 ([[LITERAL]] : $Builtin.Int8)
+// CHECK-NEXT:  store [[UINT8]] to [[IN]] : $*UInt8
 // CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
 sil @struct_extract_load_to_load_struct_element_addr : $@convention(thin) (@inout UInt8) -> (Builtin.Int8) {
 bb0(%0 : $*UInt8):
@@ -322,7 +322,7 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
 // CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
 // CHECK-NEXT: load
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: struct
 // CHECK-NEXT: store
 // CHECK-NEXT: struct_extract
 // CHECK-NEXT: tuple
@@ -1980,6 +1980,89 @@ bb3:
   return %0 : $B
 }
 
+// CHECK-LABEL: sil @dont_delete_readonly_function_dealloc_ref_simple
+// CHECK:      apply
+// CHECK-NEXT: dealloc_ref
+// CHECK:      return
+sil @dont_delete_readonly_function_dealloc_ref_simple : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_ref [stack] $B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%3) : $@convention(thin) (@owned B) -> @owned B
+  dealloc_ref [stack] %3 : $B
+  strong_release %r : $B
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @dont_delete_readonly_function_dealloc_ref_multibb
+// CHECK:      apply
+// CHECK:      dealloc_ref
+// CHECK-NEXT: strong_release
+// CHECK:      dealloc_ref
+// CHECK-NEXT: strong_release
+// CHECK:      return
+sil @dont_delete_readonly_function_dealloc_ref_multibb : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_ref [stack] $B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%3) : $@convention(thin) (@owned B) -> @owned B
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_ref [stack] %3 : $B
+  strong_release %r : $B
+  br bb3
+
+bb2:
+  dealloc_ref [stack] %3 : $B
+  strong_release %r : $B
+  br bb3
+
+bb3:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @delete_readonly_function_dealloc_ref_simple
+// CHECK-NOT:  apply
+// CHECK:      return
+sil @delete_readonly_function_dealloc_ref_simple : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_ref [stack] $B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%3) : $@convention(thin) (@owned B) -> @owned B
+  strong_release %r : $B
+  dealloc_ref [stack] %3 : $B
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @delete_readonly_function_dealloc_ref_multibb
+// CHECK-NOT:  apply
+// CHECK:      return
+sil @delete_readonly_function_dealloc_ref_multibb : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_ref [stack] $B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%3) : $@convention(thin) (@owned B) -> @owned B
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %r : $B
+  dealloc_ref [stack] %3 : $B
+  br bb3
+
+bb2:
+  strong_release %r : $B
+  dealloc_ref [stack] %3 : $B
+  br bb3
+
+bb3:
+  %10 = tuple ()
+  return %10 : $()
+}
+
 //CHECK-LABEL: sil @test_delete_readonly_try_apply
 //CHECK:      bb0(%0 : $ZZZ):
 //CHECK-NEXT:   [[IL:%[0-9]+]] = integer_literal $Builtin.Int1, 0
@@ -3575,3 +3658,42 @@ bb0(%0 : $Builtin.Int64):
   return %4 : $Builtin.Int64
 }
 
+// <rdar://46746188> crash in swift_getObjCClassFromObject
+// class TestDocument: NSPersistentDocument {
+//   override init() {
+//     super.init()
+//   }
+//   convenience init(type: String) throws {
+//     self.init()
+//   }
+// }
+// After inlining the __allocating_init, we have two uses of the value_metatype.
+// The second use goes through a thick_to_objc_metatype. When SILCombine replaces 
+// thick_to_objc_metatype with value_metatype, it cannot extend the liverange
+// of value_metatype's operand.
+@objc class TestObjCInit {
+  init()
+
+  convenience init(type: String) throws
+}
+// CHECK-LABEL: sil hidden [thunk] @objc_init_partial_dealloc : $@convention(objc_method) (@owned TestObjCInit) -> Optional<TestObjCInit> {
+// CHECK: bb0(%0 : $TestObjCInit):
+// CHECK:   [[VMT2:%.*]] = value_metatype $@objc_metatype TestObjCInit.Type, %0 : $TestObjCInit
+// CHECK:   [[VMT:%.*]] = value_metatype $@thick TestObjCInit.Type, %0 : $TestObjCInit
+// CHECK:   dealloc_partial_ref %0 : $TestObjCInit, [[VMT]] : $@thick TestObjCInit.Type
+// CHECK-NOT: value_metatype
+// CHECK:   [[O:%.*]] = alloc_ref_dynamic [objc] [[VMT2]] : $@objc_metatype TestObjCInit.Type, $TestObjCInit
+// CHECK:   [[M:%.*]] = objc_method [[O]] : $TestObjCInit, #TestObjCInit.init!initializer.1.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+// CHECK:   apply [[M]]([[O]]) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+// CHECK-LABEL: } // end sil function 'objc_init_partial_dealloc'
+sil hidden [thunk] @objc_init_partial_dealloc : $@convention(objc_method) (@owned TestObjCInit) -> Optional<TestObjCInit> {
+bb0(%2 : $TestObjCInit):
+  %8 = value_metatype $@thick TestObjCInit.Type, %2 : $TestObjCInit
+  dealloc_partial_ref %2 : $TestObjCInit, %8 : $@thick TestObjCInit.Type
+  %11 = thick_to_objc_metatype %8 : $@thick TestObjCInit.Type to $@objc_metatype TestObjCInit.Type
+  %12 = alloc_ref_dynamic [objc] %11 : $@objc_metatype TestObjCInit.Type, $TestObjCInit
+  %13 = objc_method %12 : $TestObjCInit, #TestObjCInit.init!initializer.1.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+  %14 = apply %13(%12) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+  %19 = enum $Optional<TestObjCInit>, #Optional.some!enumelt.1, %14 : $TestObjCInit
+  return %19 : $Optional<TestObjCInit>
+}

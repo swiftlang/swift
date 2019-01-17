@@ -201,23 +201,6 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   addTypeVariableConstraintsToWorkList(typeVar);
 }
 
-void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
-{
-  assert(type->isMaterializable() &&
-         "argument to setMustBeMaterializableRecursive may not be inherently "
-         "non-materializable");
-  type = getFixedTypeRecursive(type, /*wantRValue=*/false);
-  type = type->lookThroughAllOptionalTypes();
-
-  if (auto typeVar = type->getAs<TypeVariableType>()) {
-    typeVar->getImpl().setMustBeMaterializable(getSavedBindings());
-  } else if (auto *tupleTy = type->getAs<TupleType>()) {
-    for (auto elt : tupleTy->getElementTypes()) {
-      setMustBeMaterializableRecursive(elt);
-    }
-  }
-}
-
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
@@ -459,7 +442,7 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
         cast<GenericTypeParamType>(pair.first));
       assert(found != replacements.end() &&
              "Missing generic parameter?");
-      addConstraint(ConstraintKind::Equal, found->second, pair.second,
+      addConstraint(ConstraintKind::Bind, found->second, pair.second,
                     locator);
     }
   }
@@ -492,7 +475,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   Type parentTy;
   SubstitutionMap subMap;
 
-  if (auto *NAT = dyn_cast<NameAliasType>(type.getPointer())) {
+  if (auto *NAT = dyn_cast<TypeAliasType>(type.getPointer())) {
     decl = NAT->getDecl();
     parentTy = NAT->getParent();
     subMap = NAT->getSubstitutionMap();
@@ -583,7 +566,11 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
         auto known = replacements.find(
           cast<GenericTypeParamType>(genericParam->getCanonicalType()));
-        assert(known != replacements.end());
+        // FIXME: This should be an assert, however protocol generic signatures
+        // drop outer generic parameters.
+        // assert(known != replacements.end());
+        if (known == replacements.end())
+          return ErrorType::get(TC.Context);
         return known->second;
       }
 
@@ -728,8 +715,7 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
   if (!storage->isSettable(useDC, base))
     return false;
   
-  if (TC.Context.LangOpts.EnableAccessControl &&
-      !storage->isSetterAccessibleFrom(useDC))
+  if (!storage->isSetterAccessibleFrom(useDC))
     return false;
 
   // If there is no base, or if the base isn't being used, it is settable.
@@ -1162,7 +1148,7 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
   }
 
   // Otherwise, the types must be equivalent.
-  cs.addConstraint(ConstraintKind::Equal, objectTy, selfTy,
+  cs.addConstraint(ConstraintKind::Bind, objectTy, selfTy,
                    cs.getConstraintLocator(locator));
 }
 
@@ -1335,7 +1321,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
-    addConstraint(ConstraintKind::Equal, baseOpenedTy, selfObjTy,
+    addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator));
   } else if (!isDynamicResult) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
@@ -1860,7 +1846,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     auto elementObjTy = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
     addConstraint(ConstraintKind::Equal, elementTy, elementObjTy, locator);
-    
+
     // The element result is an lvalue or rvalue based on the key path class.
     addKeyPathApplicationConstraint(
                   keyPathIndexTy, choice.getBaseType(), elementTy, locator);
@@ -2205,8 +2191,16 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   {
     DiagnosticTransaction transaction(TC.Diags);
 
-    TC.diagnose(commonAnchor->getLoc(), diag::ambiguous_reference_to_decl,
-                decl->getDescriptiveKind(), decl->getFullName());
+    const auto *fix = viableSolutions.front().second;
+    if (fix->getKind() == FixKind::UseSubscriptOperator) {
+      auto *UDE = cast<UnresolvedDotExpr>(commonAnchor);
+      TC.diagnose(commonAnchor->getLoc(),
+                  diag::could_not_find_subscript_member_did_you_mean,
+                  getType(UDE->getBase()));
+    } else {
+      TC.diagnose(commonAnchor->getLoc(), diag::ambiguous_reference_to_decl,
+                  decl->getDescriptiveKind(), decl->getFullName());
+    }
 
     for (const auto &viable : viableSolutions) {
       // Create scope so each applied solution is rolled back.

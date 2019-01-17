@@ -218,8 +218,7 @@ SILGenBuilder::createConvertFunction(SILLocation loc, ManagedValue fn,
 }
 
 ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
-    SILLocation loc, ManagedValue fn, SILType resultTy,
-    bool isEscapedByUser) {
+    SILLocation loc, ManagedValue fn, SILType resultTy) {
 
   auto fnType = fn.getType().castTo<SILFunctionType>();
   auto resultFnType = resultTy.castTo<SILFunctionType>();
@@ -234,8 +233,8 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
   (void)fnType;
   (void)resultFnType;
   SILValue fnValue = fn.getValue();
-  SILValue result = createConvertEscapeToNoEscape(
-      loc, fnValue, resultTy, isEscapedByUser, false);
+  SILValue result =
+      createConvertEscapeToNoEscape(loc, fnValue, resultTy, false);
   return ManagedValue::forTrivialObjectRValue(result);
 }
 

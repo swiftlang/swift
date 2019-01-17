@@ -902,7 +902,7 @@ swift::matchWitness(TypeChecker &tc,
   // Match a type in the requirement to a type in the witness.
   auto matchTypes = [&](Type reqType,
                         Type witnessType) -> Optional<RequirementMatch> {
-    cs->addConstraint(ConstraintKind::Equal, reqType, witnessType, locator);
+    cs->addConstraint(ConstraintKind::Bind, reqType, witnessType, locator);
     // FIXME: Check whether this has already failed.
     return None;
   };
@@ -967,9 +967,12 @@ witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
   assert(requirement->isProtocolRequirement());
   auto *PD = cast<ProtocolDecl>(requirement->getDeclContext());
   if (auto A = witness->getAttrs().getAttribute<ImplementsAttr>()) {
-    Type T = A->getProtocolType().getType();
-    if (T->castTo<ProtocolType>()->getDecl() == PD) {
-      return A->getMemberName() == requirement->getFullName();
+    if (Type T = A->getProtocolType().getType()) {
+      if (auto ProtoTy = T->getAs<ProtocolType>()) {
+        if (ProtoTy->getDecl() == PD) {
+          return A->getMemberName() == requirement->getFullName();
+        }
+      }
     }
   }
   return false;
@@ -1271,9 +1274,6 @@ bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
                                         ValueDecl *witness,
                                         bool *isSetter) {
   *isSetter = false;
-  if (!TC.getLangOpts().EnableAccessControl)
-    return false;
-
   AccessScope actualScopeToCheck = getRequiredAccessScope();
 
   // Setting the 'forConformance' flag means that we admit witnesses in

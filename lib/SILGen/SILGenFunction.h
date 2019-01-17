@@ -668,12 +668,6 @@ public:
                                CanAnyFunctionType blockTy,
                                CanSILFunctionType loweredBlockTy);
 
-  /// Given a non-canonical function type, create a thunk for the function's
-  /// canonical type.
-  ManagedValue emitCanonicalFunctionThunk(SILLocation loc, ManagedValue fn,
-                                          CanSILFunctionType nonCanonicalTy,
-                                          CanSILFunctionType canonicalTy);
-
   /// Thunk with the signature of a base class method calling a derived class
   /// method.
   ///
@@ -1343,6 +1337,8 @@ public:
                                            SILValue semanticValue,
                                            SILType storageType);
 
+  SILValue emitUnwrapIntegerResult(SILLocation loc, SILValue value);
+  
   /// Load an r-value out of the given address. This does not handle
   /// reabstraction or bridging. If that is needed, use the other emit load
   /// entry point.
@@ -1759,6 +1755,7 @@ public:
                                     CanType &outputSubstType,
                                     GenericEnvironment *&genericEnv,
                                     SubstitutionMap &interfaceSubs,
+                                    CanType &dynamicSelfType,
                                     bool withoutActuallyEscaping=false);
 
   //===--------------------------------------------------------------------===//

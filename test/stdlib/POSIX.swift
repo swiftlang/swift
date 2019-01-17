@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift %t
 // REQUIRES: executable_test
+// UNSUPPORTED: OS=windows-msvc
 
 import StdlibUnittest
 #if os(Linux) || os(Android)

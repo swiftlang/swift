@@ -1297,6 +1297,9 @@ public:
       *this << "[derivedselfonly] ";
       break;
     case MarkUninitializedInst::DelegatingSelf: *this << "[delegatingself] ";break;
+    case MarkUninitializedInst::DelegatingSelfAllocated:
+      *this << "[delegatingselfallocated] ";
+      break;
     }
     
     *this << getIDAndType(MU->getOperand());
@@ -1414,7 +1417,6 @@ public:
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
-          << (CI->isEscapedByUser() ? "[escaped] " : "")
           << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {

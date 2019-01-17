@@ -16,7 +16,9 @@ import TestsUtils
 public let DeadArray = BenchmarkInfo(
   name: "DeadArray",
   runFunction: run_DeadArray,
-  tags: [.regression, .unstable])
+  tags: [.regression, .unstable],
+  legacyFactor: 200
+)
 
 @inline(__always)
 func debug(_ m:String) {}
@@ -28,7 +30,7 @@ func bar() { Count += 1 }
 
 @inline(never)
 func runLoop(_ var1: Int, var2: Int) {
-  for _ in 0..<100_000 {
+  for _ in 0..<500 {
     debug("Var1: \(var1) Var2: \(var2)")
     bar()
   }
@@ -40,5 +42,5 @@ public func run_DeadArray(_ N: Int) {
     Count = 0
     runLoop(0, var2: 0)
   }
-  CheckResults(Count == 100_000)
+  CheckResults(Count == 500)
 }

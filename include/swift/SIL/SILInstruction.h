@@ -326,7 +326,7 @@ class SILInstruction
   /// Update this instruction's SILDebugScope. This function should
   /// never be called directly. Use SILBuilder, SILBuilderWithScope or
   /// SILClonerWithScope instead.
-  void setDebugScope(SILBuilder &B, const SILDebugScope *DS);
+  void setDebugScope(const SILDebugScope *DS);
 
   /// Total number of created and deleted SILInstructions.
   /// It is used only for collecting the compiler statistics.
@@ -3654,6 +3654,10 @@ public:
     /// DelegatingSelf designates "self" on a struct, enum, or class
     /// in a delegating constructor (one that calls self.init).
     DelegatingSelf,
+
+    /// DelegatingSelfAllocated designates "self" in a delegating class
+    /// initializer where memory has already been allocated.
+    DelegatingSelfAllocated,
   };
 private:
   Kind ThisKind;
@@ -3682,6 +3686,9 @@ public:
   }
   bool isDelegatingSelf() const {
     return ThisKind == DelegatingSelf;
+  }
+  bool isDelegatingSelfAllocated() const {
+    return ThisKind == DelegatingSelfAllocated;
   }
 };
 
@@ -4037,18 +4044,14 @@ class ConvertEscapeToNoEscapeInst final
   friend SILBuilder;
 
   bool lifetimeGuaranteed;
-  bool isEscaped; // Even if we can analyze this
-                        // instruction the user might have
-                        // escaped it.
 
   ConvertEscapeToNoEscapeInst(SILDebugLocation DebugLoc, SILValue Operand,
                               ArrayRef<SILValue> TypeDependentOperands,
-                              SILType Ty, bool isEscapedByUser,
+                              SILType Ty,
                               bool isLifetimeGuaranteed)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, Ty),
-        lifetimeGuaranteed(isLifetimeGuaranteed),
-        isEscaped(isEscapedByUser) {
+        lifetimeGuaranteed(isLifetimeGuaranteed) {
     assert(!Operand->getType().castTo<SILFunctionType>()->isNoEscape());
     assert(Ty.castTo<SILFunctionType>()->isNoEscape());
   }
@@ -4056,17 +4059,11 @@ class ConvertEscapeToNoEscapeInst final
   static ConvertEscapeToNoEscapeInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
-         bool isEscapedByUser, bool lifetimeGuaranteed);
+         bool lifetimeGuaranteed);
 public:
   bool isLifetimeGuaranteed() const {
     return lifetimeGuaranteed;
   }
-
-  bool isEscapedByUser() const {
-    return isEscaped;
-  }
-
-  void setEscapedByUser(bool isEscaped = true) { this->isEscaped = isEscaped; }
 };
 
 /// ThinFunctionToPointerInst - Convert a thin function pointer to a

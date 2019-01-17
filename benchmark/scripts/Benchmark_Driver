@@ -55,6 +55,7 @@ class BenchmarkDriver(object):
         self.args = args
         self._subprocess = _subprocess or subprocess
         self.all_tests = []
+        self.test_number = {}
         self.tests = tests or self._get_tests()
         self.parser = parser or LogParser()
         self.results = {}
@@ -106,16 +107,17 @@ class BenchmarkDriver(object):
 
     def _get_tests(self):
         """Return a list of performance tests to run."""
-        index_name_pairs = [
+        number_name_pairs = [
             line.split('\t')[:2] for line in
             self._invoke(self._cmd_list_benchmarks).split('\n')[1:-1]
         ]
         # unzip list of pairs into 2 lists
-        indices, self.all_tests = map(list, zip(*index_name_pairs))
+        test_numbers, self.all_tests = map(list, zip(*number_name_pairs))
+        self.test_number = dict(zip(self.all_tests, test_numbers))
         if self.args.filters:
             return self._tests_matching_patterns()
         if self.args.benchmarks:
-            return self._tests_by_name_or_index(indices)
+            return self._tests_by_name_or_number(test_numbers)
         return self.all_tests
 
     def _tests_matching_patterns(self):
@@ -124,33 +126,44 @@ class BenchmarkDriver(object):
                                 for name in self.all_tests
                                 if pattern.match(name)])))
 
-    def _tests_by_name_or_index(self, indices):
+    def _tests_by_name_or_number(self, test_numbers):
         benchmarks = set(self.args.benchmarks)
-        index_to_name = dict(zip(indices, self.all_tests))
-        indexed_names = [index_to_name[i]
-                         for i in benchmarks.intersection(set(indices))]
-        return sorted(list(
-            benchmarks.intersection(set(self.all_tests)).union(indexed_names)))
+        number_to_name = dict(zip(test_numbers, self.all_tests))
+        tests_by_number = [number_to_name[i]
+                           for i in benchmarks.intersection(set(test_numbers))]
+        return sorted(list(benchmarks
+                           .intersection(set(self.all_tests))
+                           .union(tests_by_number)))
 
-    def run(self, test, num_samples=None, num_iters=None,
-            verbose=None, measure_memory=False, quantile=None):
+    def run(self, test=None, num_samples=None, num_iters=None,
+            sample_time=None, verbose=None, measure_memory=False,
+            quantile=None):
         """Execute benchmark and gather results."""
         num_samples = num_samples or 0
         num_iters = num_iters or 0  # automatically determine N to run for 1s
+        sample_time = sample_time or 0  # default is 1s
 
         cmd = self._cmd_run(
-            test, num_samples, num_iters, verbose, measure_memory, quantile)
+            test, num_samples, num_iters, sample_time,
+            verbose, measure_memory, quantile)
         output = self._invoke(cmd)
-        result = self.parser.results_from_string(output).items()[0][1]
-        return result
+        results = self.parser.results_from_string(output)
+        return results.items()[0][1] if test else results
 
-    def _cmd_run(self, test, num_samples, num_iters, verbose, measure_memory,
-                 quantile):
-        cmd = [self.test_harness, test]
+    def _cmd_run(self, test, num_samples, num_iters, sample_time,
+                 verbose, measure_memory, quantile):
+        cmd = [self.test_harness]
+        if test:
+            cmd.append(test)
+        else:
+            cmd.extend([self.test_number.get(name, name)
+                        for name in self.tests])
         if num_samples > 0:
             cmd.append('--num-samples={0}'.format(num_samples))
         if num_iters > 0:
             cmd.append('--num-iters={0}'.format(num_iters))
+        if sample_time > 0:
+            cmd.append('--sample-time={0}'.format(sample_time))
         if verbose:
             cmd.append('--verbose')
         if measure_memory:
@@ -198,7 +211,6 @@ class BenchmarkDriver(object):
         from this method. When `csv_console` is False, the console output
         format is justified columns.
         """
-
         format = (
             (lambda values: ','.join(values)) if csv_console else
             (lambda values: self.RESULT.format(*values)))  # justified columns
@@ -330,11 +342,15 @@ class BenchmarkDoctor(object):
         super(BenchmarkDoctor, self).__init__()
         self.driver = driver or BenchmarkDriver(args)
         self.results = {}
-        self.console_handler = logging.StreamHandler(sys.stdout)
-        self.console_handler.setLevel(logging.DEBUG if args.verbose else
-                                      logging.INFO)
-        self.console_handler.setFormatter(
-            LoggingReportFormatter(use_color=sys.stdout.isatty()))
+
+        if hasattr(args, 'markdown') and args.markdown:
+            self.console_handler = MarkdownReportHandler(sys.stdout)
+        else:
+            self.console_handler = logging.StreamHandler(sys.stdout)
+            self.console_handler.setFormatter(
+                LoggingReportFormatter(use_color=sys.stdout.isatty()))
+            self.console_handler.setLevel(logging.DEBUG if args.verbose else
+                                          logging.INFO)
         self.log.addHandler(self.console_handler)
         self.log.debug('Checking tests: %s', ', '.join(self.driver.tests))
         self.requirements = [
@@ -350,6 +366,7 @@ class BenchmarkDoctor(object):
         """Close log handlers on exit."""
         for handler in list(self.log.handlers):
             handler.close()
+        self.log.removeHandler(self.console_handler)
 
     benchmark_naming_convention_re = re.compile(r'[A-Z][a-zA-Z0-9\-.!?]+')
     camel_humps_re = re.compile(r'[a-z][A-Z]')
@@ -418,6 +435,19 @@ class BenchmarkDoctor(object):
                 "Decrease the workload of '%s' by a factor of %d (%d), to be "
                 "less than %d μs.", name, factor(2), factor(10), threshold)
 
+        threshold = 20
+        if runtime < threshold:
+            log = (BenchmarkDoctor.log_runtime.error if runtime == 0 else
+                   BenchmarkDoctor.log_runtime.warning)
+            log("'%s' execution took %d μs.", name, runtime)
+
+            BenchmarkDoctor.log_runtime.info(
+                "Ensure the workload of '%s' has a properly measurable size"
+                " (runtime > %d μs) and is not eliminated by the compiler (use"
+                " `blackHole` function if necessary)." if runtime == 0 else
+                "Increase the workload of '%s' to be more than %d μs.",
+                name, threshold)
+
     @staticmethod
     def _setup_overhead(measurements):
         select = BenchmarkDoctor._select
@@ -425,7 +455,8 @@ class BenchmarkDoctor(object):
                     [[result.samples.min for result in i_series]
                      for i_series in
                      [select(measurements, num_iters=i) for i in [1, 2]]]]
-        setup = int(round(2.0 * (ti1 - ti2)))
+        setup = (int(round(2.0 * (ti1 - ti2))) if ti2 > 20  # limit of accuracy
+                 else 0)
         ratio = (setup / ti1) if ti1 > 0 else 0
         return (setup, ratio)
 
@@ -703,9 +734,13 @@ def parse_args(args):
         'check',
         help='',
         parents=[shared_benchmarks_parser])
-    check_parser.add_argument(
+    check_group = check_parser.add_mutually_exclusive_group()
+    check_group.add_argument(
         '-v', '--verbose', action='store_true',
-        help='show more details during benchmark analysis',)
+        help='show more details during benchmark analysis')
+    check_group.add_argument(
+        '-md', '--markdown', action='store_true',
+        help='format report as Markdown table')
     check_parser.set_defaults(func=BenchmarkDoctor.run_check)
 
     compare_parser = subparsers.add_parser(

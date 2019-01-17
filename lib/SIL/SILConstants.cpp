@@ -61,6 +61,9 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_IntegerInline:
     os << "int: " << getIntegerValue() << "\n";
     return;
+  case RK_String:
+    os << "string: \"" << getStringValue() << "\"\n";
+    return;
   case RK_Aggregate: {
     ArrayRef<SymbolicValue> elements = getAggregateValue();
     switch (elements.size()) {
@@ -111,6 +114,8 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_Integer:
   case RK_IntegerInline:
     return Integer;
+  case RK_String:
+    return String;
   case RK_DirectAddress:
   case RK_DerivedAddress:
     return Address;
@@ -131,6 +136,8 @@ SymbolicValue::cloneInto(ASTContext &astContext) const {
   case RK_IntegerInline:
   case RK_Integer:
     return SymbolicValue::getInteger(getIntegerValue(), astContext);
+  case RK_String:
+    return SymbolicValue::getString(getStringValue(), astContext);
   case RK_Aggregate: {
     auto elts = getAggregateValue();
     SmallVector<SymbolicValue, 4> results;
@@ -213,6 +220,34 @@ unsigned SymbolicValue::getIntegerValueBitWidth() const {
   assert (representationKind == RK_IntegerInline ||
           representationKind == RK_Integer);
   return auxInfo.integerBitwidth;
+}
+
+//===----------------------------------------------------------------------===//
+// Strings
+//===----------------------------------------------------------------------===//
+
+// Returns a SymbolicValue representing a UTF-8 encoded string.
+SymbolicValue SymbolicValue::getString(StringRef string,
+                                       ASTContext &astContext) {
+  // TODO: Could have an inline representation for strings if thre was demand,
+  // just store a char[8] as the storage.
+
+  auto *resultPtr = astContext.Allocate<char>(string.size()).data();
+  std::uninitialized_copy(string.begin(), string.end(), resultPtr);
+
+  SymbolicValue result;
+  result.representationKind = RK_String;
+  result.value.string = resultPtr;
+  result.auxInfo.stringNumBytes = string.size();
+  return result;
+}
+
+// Returns the UTF-8 encoded string underlying a SymbolicValue.
+StringRef SymbolicValue::getStringValue() const {
+  assert(getKind() == String);
+
+  assert(representationKind == RK_String);
+  return StringRef(value.string, auxInfo.stringNumBytes);
 }
 
 //===----------------------------------------------------------------------===//
@@ -404,6 +439,14 @@ SymbolicValue::getAddressValue(SmallVectorImpl<unsigned> &accessPath) const {
   return dav->memoryObject;
 }
 
+/// Return just the memory object for an address value.
+SymbolicValueMemoryObject *SymbolicValue::getAddressValueMemoryObject() const {
+  if (representationKind == RK_DirectAddress)
+    return value.directAddress;
+  assert(representationKind == RK_DerivedAddress);
+  return value.derivedAddress->memoryObject;
+}
+
 //===----------------------------------------------------------------------===//
 // Higher level code
 //===----------------------------------------------------------------------===//
@@ -520,4 +563,125 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     diagnose(module.getASTContext(), sourceLoc, diag);
     emittedFirstNote = true;
   }
+}
+
+/// Returns the element of `aggregate` specified by the access path.
+///
+/// This is a helper for `SymbolicValueMemoryObject::getIndexedElement`. See
+/// there for more detailed documentation.
+static SymbolicValue getIndexedElement(SymbolicValue aggregate,
+                                       ArrayRef<unsigned> accessPath,
+                                       Type type) {
+  // We're done if we've run out of access path.
+  if (accessPath.empty())
+    return aggregate;
+
+  // Everything inside uninit memory is uninit memory.
+  if (aggregate.getKind() == SymbolicValue::UninitMemory)
+    return SymbolicValue::getUninitMemory();
+
+  assert(aggregate.getKind() == SymbolicValue::Aggregate &&
+         "the accessPath is invalid for this type");
+
+  unsigned elementNo = accessPath.front();
+
+  SymbolicValue elt = aggregate.getAggregateValue()[elementNo];
+  Type eltType;
+  if (auto *decl = type->getStructOrBoundGenericStruct()) {
+    auto it = decl->getStoredProperties().begin();
+    std::advance(it, elementNo);
+    eltType = (*it)->getType();
+  } else if (auto tuple = type->getAs<TupleType>()) {
+    assert(elementNo < tuple->getNumElements() && "invalid index");
+    eltType = tuple->getElement(elementNo).getType();
+  } else {
+    llvm_unreachable("the accessPath is invalid for this type");
+  }
+
+  return getIndexedElement(elt, accessPath.drop_front(), eltType);
+}
+
+/// Given that this memory object contains an aggregate value like
+/// {{1, 2}, 3}, and given an access path like [0,1], return the indexed
+/// element, e.g. "2" in this case.
+///
+/// Returns uninit memory if the access path points at or into uninit memory.
+///
+/// Precondition: The access path must be valid for this memory object's type.
+SymbolicValue
+SymbolicValueMemoryObject::getIndexedElement(ArrayRef<unsigned> accessPath) {
+  return ::getIndexedElement(value, accessPath, type);
+}
+
+/// Returns `aggregate` with the element specified by the access path set to
+/// `newElement`.
+///
+/// This is a helper for `SymbolicValueMemoryObject::setIndexedElement`. See
+/// there for more detailed documentation.
+static SymbolicValue setIndexedElement(SymbolicValue aggregate,
+                                       ArrayRef<unsigned> accessPath,
+                                       SymbolicValue newElement, Type type,
+                                       ASTContext &astCtx) {
+  // We're done if we've run out of access path.
+  if (accessPath.empty())
+    return newElement;
+
+  // If we have an uninit memory, then scalarize it into an aggregate to
+  // continue.  This happens when memory objects are initialized piecewise.
+  if (aggregate.getKind() == SymbolicValue::UninitMemory) {
+    unsigned numMembers;
+    // We need to have either a struct or a tuple type.
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      numMembers = std::distance(decl->getStoredProperties().begin(),
+                                 decl->getStoredProperties().end());
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      numMembers = tuple->getNumElements();
+    } else {
+      llvm_unreachable("the accessPath is invalid for this type");
+    }
+
+    SmallVector<SymbolicValue, 4> newElts(numMembers,
+                                          SymbolicValue::getUninitMemory());
+    aggregate = SymbolicValue::getAggregate(newElts, astCtx);
+  }
+
+  assert(aggregate.getKind() == SymbolicValue::Aggregate &&
+         "the accessPath is invalid for this type");
+
+  unsigned elementNo = accessPath.front();
+
+  ArrayRef<SymbolicValue> oldElts = aggregate.getAggregateValue();
+  Type eltType;
+  if (auto *decl = type->getStructOrBoundGenericStruct()) {
+    auto it = decl->getStoredProperties().begin();
+    std::advance(it, elementNo);
+    eltType = (*it)->getType();
+  } else if (auto tuple = type->getAs<TupleType>()) {
+    assert(elementNo < tuple->getNumElements() && "invalid index");
+    eltType = tuple->getElement(elementNo).getType();
+  } else {
+    llvm_unreachable("the accessPath is invalid for this type");
+  }
+
+  // Update the indexed element of the aggregate.
+  SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
+  newElts[elementNo] = setIndexedElement(newElts[elementNo],
+                                         accessPath.drop_front(), newElement,
+                                         eltType, astCtx);
+
+  aggregate = SymbolicValue::getAggregate(newElts, astCtx);
+
+  return aggregate;
+}
+
+/// Given that this memory object contains an aggregate value like
+/// {{1, 2}, 3}, given an access path like [0,1], and given a new element like
+/// "4", set the indexed element to the specified scalar, producing {{1, 4},
+/// 3} in this case.
+///
+/// Precondition: The access path must be valid for this memory object's type.
+void SymbolicValueMemoryObject::setIndexedElement(
+    ArrayRef<unsigned> accessPath, SymbolicValue newElement,
+    ASTContext &astCtx) {
+  value = ::setIndexedElement(value, accessPath, newElement, type, astCtx);
 }

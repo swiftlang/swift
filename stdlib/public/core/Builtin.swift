@@ -242,8 +242,6 @@ public func _unsafeUncheckedDowncast<T : AnyObject>(_ x: AnyObject, to type: T.T
   return Builtin.castReference(x)
 }
 
-import SwiftShims
-
 @inlinable
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
@@ -253,6 +251,18 @@ public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
     toAlignment: MemoryLayout<Optional<AnyObject>>.alignment)
   return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(x)) +
     storedPropertyOffset
+}
+
+/// Get the minimum alignment for manually allocated memory.
+///
+/// Memory allocated via UnsafeMutable[Raw][Buffer]Pointer must never pass
+/// an alignment less than this value to Builtin.allocRaw. This
+/// ensures that the memory can be deallocated without specifying the
+/// alignment.
+@inlinable
+@inline(__always)
+internal func _minAllocationAlignment() -> Int {
+  return _swift_MinAllocationAlignment
 }
 
 //===----------------------------------------------------------------------===//
@@ -657,9 +667,6 @@ func _getSuperclass(_ t: Any.Type) -> AnyClass? {
 internal func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
-
-@_silgen_name("_swift_reallocObject")
-internal func _reallocObject(_ object: UnsafeMutableRawPointer, _ newSizeInBytes: Int) -> UnsafeMutableRawPointer?
 
 /// Returns `true` if `object` is uniquely referenced.
 /// This provides sanity checks on top of the Builtin.

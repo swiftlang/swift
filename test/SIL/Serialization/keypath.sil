@@ -1,48 +1,48 @@
 
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name boxes
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name boxes
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name boxes | %FileCheck %s
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name keypaths
+// RUN: %target-sil-opt %t/tmp.sib -emit-sib -o %t/tmp.2.sib -module-name keypaths
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name keypaths | %FileCheck %s
 
 sil_stage canonical
 
 import Swift
 
-struct S: Hashable {
-  var x: Int
-  let y: String
-  var z: C
+public struct S: Hashable {
+  public var x: Int
+  public let y: String
+  public var z: C
 
-  func hash(into hasher: inout Hasher)
-  static func ==(x: S, y: S) -> Bool
+  public func hash(into hasher: inout Hasher)
+  public static func ==(x: S, y: S) -> Bool
 }
-class C: Hashable {
-  final var x: Int
-  final let y: String
-  final var z: S
+public class C: Hashable {
+  public final var x: Int
+  public final let y: String
+  public final var z: S
 
-  init()
-  var overridable: Int {
+  public init()
+  public var overridable: Int {
     get set
   }
 
-  func hash(into hasher: inout Hasher)
-  static func ==(x: C, y: C) -> Bool
+  public func hash(into hasher: inout Hasher)
+  public static func ==(x: C, y: C) -> Bool
 }
 
 protocol P {}
 protocol Q {}
 protocol R {}
 
-struct Gen<A: P, B: Q, C: R> {
-  var x: A
-  let y: B
-  var z: C
+public struct Gen<A: P, B: Q, C: R> {
+  public var x: A
+  public let y: B
+  public var z: C
 }
 
 public struct External<T> {
-  var ro: T
+  public var ro: T
 
   subscript<U: Hashable>(ro _: U) -> T { get }
 

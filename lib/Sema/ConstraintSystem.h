@@ -232,11 +232,6 @@ public:
     return getRawOptions() & TVO_PrefersSubtypeBinding;
   }
 
-  bool mustBeMaterializable() const {
-    return !(getRawOptions() & TVO_CanBindToInOut) &&
-           !(getRawOptions() & TVO_CanBindToLValue);
-  }
-
   /// Retrieve the corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *getGraphNode() const { return GraphNode; }
 
@@ -343,10 +338,16 @@ public:
     if (record)
       otherRep->getImpl().recordBinding(*record);
     otherRep->getImpl().ParentOrFixed = getTypeVariable();
-    if (!mustBeMaterializable() && otherRep->getImpl().mustBeMaterializable()) {
+
+    if (canBindToLValue() && !otherRep->getImpl().canBindToLValue()) {
       if (record)
         recordBinding(*record);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToLValue;
+    }
+
+    if (canBindToInOut() && !otherRep->getImpl().canBindToInOut()) {
+      if (record)
+        recordBinding(*record);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToInOut;
     }
   }
@@ -380,15 +381,13 @@ public:
     rep->getImpl().ParentOrFixed = type.getPointer();
   }
 
-  void setMustBeMaterializable(constraints::SavedTypeVariableBindings *record) {
+  void setCannotBindToLValue(constraints::SavedTypeVariableBindings *record) {
     auto rep = getRepresentative(record);
-    if (!rep->getImpl().mustBeMaterializable()) {
+    if (rep->getImpl().canBindToLValue()) {
       if (record)
         rep->getImpl().recordBinding(*record);
       rep->getImpl().getTypeVariable()->Bits.TypeVariableType.Options
         &= ~TVO_CanBindToLValue;
-      rep->getImpl().getTypeVariable()->Bits.TypeVariableType.Options
-        &= ~TVO_CanBindToInOut;
     }
   }
 
@@ -593,6 +592,9 @@ public:
   /// The list of fixes that need to be applied to the initial expression
   /// to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
+  /// The list of member references which couldn't be resolved,
+  /// and had to be assumed based on their use.
+  llvm::SmallVector<ConstraintLocator *, 4> MissingMembers;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -635,19 +637,6 @@ public:
                      ConstraintLocator *locator,
                      bool ignoreTopLevelInjection = false,
                      Optional<Pattern*> typeFromPattern = None) const;
-
-  /// Convert the given expression to a logic value.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce. The type of this expression
-  /// must conform to the LogicValue protocol.
-  ///
-  /// \param locator Locator used to describe the location of this expression.
-  ///
-  /// \returns the expression converted to a logic value (Builtin i1).
-  Expr *convertBooleanTypeToBuiltinI1(Expr *expr,
-                                      ConstraintLocator *locator) const;
 
   /// Convert the given optional-producing expression to a Bool
   /// indicating whether the optional has a value.
@@ -955,6 +944,7 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
+  friend class MissingMemberFailure;
 
   class SolverScope;
 
@@ -1051,6 +1041,8 @@ private:
 
   /// The set of fixes applied to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
+  /// The set of type variables representing types of missing members.
+  llvm::SmallSetVector<ConstraintLocator *, 4> MissingMembers;
 
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -1499,6 +1491,8 @@ public:
 
     unsigned numCheckedConformances;
 
+    unsigned numMissingMembers;
+
     /// The previous score.
     Score PreviousScore;
 
@@ -1789,6 +1783,8 @@ public:
 
     return !solverState || solverState->recordFixes;
   }
+
+  ArrayRef<ConstraintFix *> getFixes() const { return Fixes; }
 
   bool shouldSuppressDiagnostics() const {
     return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);
@@ -2117,11 +2113,6 @@ public:
   /// a complete solution from partial solutions.
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
-
-  /// Set the TVO_MustBeMaterializable bit on all type variables
-  /// necessary to ensure that the type in question is materializable in a
-  /// viable solution.
-  void setMustBeMaterializableRecursive(Type type);
   
   /// Determine if the type in question is an Array<T> and, if so, provide the
   /// element type of the array.

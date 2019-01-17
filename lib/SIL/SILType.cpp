@@ -175,11 +175,22 @@ bool SILType::isLoadableOrOpaque(SILModule &M) const {
   return isLoadable(M) || !SILModuleConventions(M).useLoweredAddresses();
 }
 
+bool SILType::isLoadableOrOpaque(SILFunction *inFunction) const {
+  SILModule &M = inFunction->getModule();
+  return isLoadable(inFunction) ||
+         !SILModuleConventions(M).useLoweredAddresses();
+}
+
 /// True if the type, or the referenced type of an address type, is
 /// address-only. For example, it could be a resilient struct or something of
 /// unknown size.
 bool SILType::isAddressOnly(SILModule &M) const {
   return M.getTypeLowering(*this).isAddressOnly();
+}
+
+bool SILType::isAddressOnly(SILFunction *inFunction) const {
+  return inFunction->getModule().getTypeLowering(*this,
+                        inFunction->getResilienceExpansion()).isAddressOnly();
 }
 
 SILType SILType::substGenericArgs(SILModule &M,

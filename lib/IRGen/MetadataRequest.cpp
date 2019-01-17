@@ -248,10 +248,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
                                       nullptr,
                                       symbolName);
 
-  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
-    llvm::GlobalValue::HiddenVisibility,
-    llvm::GlobalValue::DefaultStorageClass})
-  .to(var);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
   if (alignment)
     var->setAlignment(alignment);
   setTrueConstGlobal(var);

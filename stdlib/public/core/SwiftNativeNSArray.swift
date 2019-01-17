@@ -160,10 +160,10 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       to: Optional<AnyObject>.self)
   }
 
-  internal var _heapBufferBridged: _BridgingBufferStorage? {
+  internal var _heapBufferBridged: __BridgingBufferStorage? {
     if let ref =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-      return unsafeBitCast(ref, to: _BridgingBufferStorage.self)
+      return unsafeBitCast(ref, to: __BridgingBufferStorage.self)
     }
     return nil
   }
@@ -174,7 +174,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
     self._nativeStorage = _nativeStorage
   }
 
-  internal func _destroyBridgedStorage(_ hb: _BridgingBufferStorage?) {
+  internal func _destroyBridgedStorage(_ hb: __BridgingBufferStorage?) {
     if let bridgedStorage = hb {
       let buffer = _BridgingBuffer(bridgedStorage)
       let count = buffer.count
@@ -216,7 +216,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 
           // Another thread won the race.  Throw out our buffer.
           _destroyBridgedStorage(
-            unsafeDowncast(objects.storage!, to: _BridgingBufferStorage.self))
+            unsafeDowncast(objects.storage!, to: __BridgingBufferStorage.self))
         }
         continue // Try again
       }

@@ -380,7 +380,7 @@ protected:
     GenericArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(NameAliasType, SugarType, 1+1,
+  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+1,
     : NumPadBits,
 
     /// Whether we have a parent type.
@@ -1634,25 +1634,25 @@ public:
 
 /// A reference to a type alias that is somehow generic, along with the
 /// set of substitutions to apply to make the type concrete.
-class NameAliasType final
+class TypeAliasType final
   : public SugarType, public llvm::FoldingSetNode,
-    llvm::TrailingObjects<NameAliasType, Type, SubstitutionMap>
+    llvm::TrailingObjects<TypeAliasType, Type, SubstitutionMap>
 {
   TypeAliasDecl *typealias;
 
   friend class ASTContext;
   friend TrailingObjects;
 
-  NameAliasType(TypeAliasDecl *typealias, Type parent,
+  TypeAliasType(TypeAliasDecl *typealias, Type parent,
                 SubstitutionMap substitutions, Type underlying,
                 RecursiveTypeProperties properties);
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return Bits.NameAliasType.HasParent ? 1 : 0;
+    return Bits.TypeAliasType.HasParent ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
-    return Bits.NameAliasType.HasSubstitutionMap ? 1 : 0;
+    return Bits.TypeAliasType.HasSubstitutionMap ? 1 : 0;
   }
 
 public:
@@ -1661,7 +1661,7 @@ public:
     return getSubstitutionMap().getGenericSignature();
   }
 
-  static NameAliasType *get(TypeAliasDecl *typealias, Type parent,
+  static TypeAliasType *get(TypeAliasDecl *typealias, Type parent,
                             SubstitutionMap substitutions, Type underlying);
 
   /// Returns the declaration that declares this type.
@@ -1673,14 +1673,14 @@ public:
   /// Retrieve the parent of this type as written, e.g., the part that was
   /// written before ".", if provided.
   Type getParent() const {
-    return Bits.NameAliasType.HasParent ? *getTrailingObjects<Type>()
+    return Bits.TypeAliasType.HasParent ? *getTrailingObjects<Type>()
                                         : Type();
   }
 
   /// Retrieve the substitution map applied to the declaration's underlying
   /// to produce the described type.
   SubstitutionMap getSubstitutionMap() const {
-    if (!Bits.NameAliasType.HasSubstitutionMap)
+    if (!Bits.TypeAliasType.HasSubstitutionMap)
       return SubstitutionMap();
 
     return *getTrailingObjects<SubstitutionMap>();
@@ -1703,7 +1703,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::NameAlias;
+    return T->getKind() == TypeKind::TypeAlias;
   }
 };
 
@@ -3207,6 +3207,8 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
                                            result, info);
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
+
+  CanFunctionType substGenericArgs(SubstitutionMap subs) const;
 
   CanGenericSignature getGenericSignature() const {
     return CanGenericSignature(getPointer()->getGenericSignature());

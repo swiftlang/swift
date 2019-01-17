@@ -22,6 +22,8 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
+#include "swift/SyntaxParse/SyntaxTreeCreator.h"
+#include "swift/Syntax/SyntaxArena.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -113,12 +115,20 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB,
-                                bool FullParse) {
+                                bool FullParse,
+                                bool DisableDelayedParsing) {
   assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
          "cannot parse in full with the given parameters!");
 
+  std::shared_ptr<SyntaxTreeCreator> STreeCreator;
+  if (SF.shouldBuildSyntaxTree()) {
+    STreeCreator = std::make_shared<SyntaxTreeCreator>(
+                   SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
+  }
+
   SharedTimer timer("Parsing");
-  Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState);
+  Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
+           PersistentState, STreeCreator, DisableDelayedParsing);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
@@ -133,6 +143,11 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
     *Done = P.Tok.is(tok::eof);
   } while (FullParse && !*Done);
 
+  if (STreeCreator) {
+    auto rawNode = P.finalizeSyntaxTree();
+    STreeCreator->acceptSyntaxRoot(rawNode.getOpaqueNode(), SF);
+  }
+
   return FoundSideEffects;
 }
 
@@ -141,19 +156,22 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
                                 bool *Done,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
-                                DelayedParsingCallbacks *DelayedParseCB) {
+                                DelayedParsingCallbacks *DelayedParseCB,
+                                bool DisableDelayedParsing) {
   return parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
                                  PersistentState, DelayedParseCB,
-                                 /*FullParse=*/SF.shouldBuildSyntaxTree());
+                                 /*FullParse=*/SF.shouldBuildSyntaxTree(),
+                                 DisableDelayedParsing);
 }
 
 bool swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                                     PersistentParserState *PersistentState,
-                                    DelayedParsingCallbacks *DelayedParseCB) {
+                                    DelayedParsingCallbacks *DelayedParseCB,
+                                    bool DisableDelayedParsing) {
   bool Done = false;
   return parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
                                  PersistentState, DelayedParseCB,
-                                 /*FullParse=*/true);
+                                 /*FullParse=*/true, DisableDelayedParsing);
 }
 
 
@@ -991,7 +1009,12 @@ static bool parseDeclSILOptional(bool *isTransparent,
     else if (isGlobalInit && SP.P.Tok.getText() == "global_init")
       *isGlobalInit = true;
     else if (isWeakLinked && SP.P.Tok.getText() == "_weakLinked")
-      *isWeakLinked = true;
+      if (M.getASTContext().LangOpts.Target.isOSBinFormatCOFF())
+        SP.P.diagnose(SP.P.Tok, diag::attr_unsupported_on_target,
+                      SP.P.Tok.getText(),
+                      M.getASTContext().LangOpts.Target.str());
+      else
+        *isWeakLinked = true;
     else if (inlineStrategy && SP.P.Tok.getText() == "noinline")
       *inlineStrategy = NoInline;
     else if (optimizationMode && SP.P.Tok.getText() == "Onone")
@@ -1399,21 +1422,24 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         ParseState = 1;
       } else if (!ParseState &&
                  (accessorKind = getAccessorKind(Id.str())).hasValue()) {
-        auto storageDecl = dyn_cast<AbstractStorageDecl>(VD);
-        auto accessor = (storageDecl
-                           ? storageDecl->getAccessor(*accessorKind)
-                           : nullptr);
-        if (!accessor) {
+        // Drill down to the corresponding accessor for each declaration,
+        // compacting away decls that lack it.
+        size_t destI = 0;
+        for (size_t srcI = 0, e = values.size(); srcI != e; ++srcI) {
+          if (auto storage = dyn_cast<AbstractStorageDecl>(values[srcI]))
+            if (auto accessor = storage->getAccessor(*accessorKind))
+              values[destI++] = accessor;
+        }
+        values.resize(destI);
+
+        // Complain if none of the decls had a corresponding accessor.
+        if (destI == 0) {
           P.diagnose(IdLoc, diag::referenced_value_no_accessor, 0);
           return true;
         }
+
         Kind = SILDeclRef::Kind::Func;
-        VD = accessor;
-        // Update values for this accessor kind.
-        for (unsigned I = 0, E = values.size(); I < E; I++)
-          if (auto otherDecl = dyn_cast<AbstractStorageDecl>(values[I]))
-            if (auto otherAccessor = otherDecl->getAccessor(*accessorKind))
-              values[I] = otherAccessor;
+        VD = values[0];
         ParseState = 1;
       } else if (!ParseState && Id.str() == "allocator") {
         Kind = SILDeclRef::Kind::Allocator;
@@ -3117,20 +3143,15 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     Identifier ToToken;
     SourceLoc ToLoc;
     bool not_guaranteed = false;
-    bool escaped = false;
     bool without_actually_escaping = false;
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
-        if (attrName.equals("escaped"))
-          escaped = true;
-        else if (attrName.equals("not_guaranteed"))
+        if (attrName.equals("not_guaranteed"))
           not_guaranteed = true;
         else
           return true;
       }
-      if (parseSILOptional(escaped, *this, "escaped"))
-        return true;
     }
     if (parseTypedValueRef(Val, B)
         || parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
@@ -3175,8 +3196,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
           B.createConvertFunction(InstLoc, Val, Ty, without_actually_escaping);
       break;
     case SILInstructionKind::ConvertEscapeToNoEscapeInst:
-      ResultVal = B.createConvertEscapeToNoEscape(InstLoc, Val, Ty, escaped,
-                                                  !not_guaranteed);
+      ResultVal =
+          B.createConvertEscapeToNoEscape(InstLoc, Val, Ty, !not_guaranteed);
       break;
     case SILInstructionKind::AddressToPointerInst:
       ResultVal = B.createAddressToPointer(InstLoc, Val, Ty);
@@ -3385,10 +3406,12 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       Kind = MarkUninitializedInst::DerivedSelfOnly;
     else if (KindId.str() == "delegatingself")
       Kind = MarkUninitializedInst::DelegatingSelf;
+    else if (KindId.str() == "delegatingselfallocated")
+      Kind = MarkUninitializedInst::DelegatingSelfAllocated;
     else {
       P.diagnose(KindLoc, diag::expected_tok_in_sil_instr,
                  "var, rootself, crossmodulerootself, derivedself, "
-                 "derivedselfonly, or delegatingself");
+                 "derivedselfonly, delegatingself, or delegatingselfallocated");
       return true;
     }
 
@@ -6184,6 +6207,8 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
 
   if (!wt)
     wt = SILWitnessTable::create(M, *Linkage, theConformance);
+  else
+    wt->setLinkage(*Linkage);
   wt->convertToDefinition(witnessEntries, conditionalConformances,
                           isSerialized);
   BodyScope.reset();

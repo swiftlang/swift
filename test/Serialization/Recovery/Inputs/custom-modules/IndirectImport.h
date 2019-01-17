@@ -1,3 +1,3 @@
 #if !BAD
-# import <IndirectlyImported.h>
+#include <IndirectlyImported.h>
 #endif

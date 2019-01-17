@@ -47,6 +47,8 @@ extension SomeObject {
   @objc class var extensionClassProp : SomeObject.Type {
     return self
   }
+
+  @objc static var extensionStoredStaticProp: Int64 = 0
 }
 
 // <rdar://problem/16952186> Crash with @lazy in @objc class
@@ -77,14 +79,14 @@ class Class17127126 {
 }
 
 // CHECK-NEW: [[SHARED_NAME:@.*]] = private unnamed_addr constant [11 x i8] c"sharedProp\00"
-// CHECK-NEW: [[SHARED_ATTRS:@.*]] = private unnamed_addr constant [17 x i8] c"Tq,N,VsharedProp\00"
+// CHECK-NEW: [[SHARED_ATTRS:@.*]] = private unnamed_addr constant [5 x i8] c"Tq,N\00"
 
 // CHECK-NEW: @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
 // CHECK-NEW:   i32 1,
 // CHECK-NEW:   [1 x { i8*, i8* }] [{
 // CHECK-NEW:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SHARED_NAME]], i64 0, i64 0),
-// CHECK-NEW:     i8* getelementptr inbounds ([17 x i8], [17 x i8]* [[SHARED_ATTRS]], i64 0, i64 0)
+// CHECK-NEW:     i8* getelementptr inbounds ([5 x i8], [5 x i8]* [[SHARED_ATTRS]], i64 0, i64 0)
 // CHECK-NEW:   }]
 // CHECK-NEW: }, section "__DATA, __objc_const", align 8
 
@@ -209,14 +211,17 @@ class Class17127126 {
 
 // CHECK-NEW: [[EXTENSIONCLASSPROPERTY_NAME:@.*]] = private unnamed_addr constant [19 x i8] c"extensionClassProp\00"
 // CHECK-NEW: [[EXTENSIONCLASSPROPERTY_ATTRS:@.*]] = private unnamed_addr constant [7 x i8] c"T#,N,R\00"
+// CHECK-NEW: [[EXTENSIONSTATICPROPERTY_NAME:@.*]] = private unnamed_addr constant [26 x i8] c"extensionStoredStaticProp\00"
 
 // CHECK-NEW: @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
-// CHECK-NEW:   i32 1,
-// CHECK-NEW:   [1 x { i8*, i8* }] [{
+// CHECK-NEW:   i32 2,
+// CHECK-NEW:   [2 x { i8*, i8* }] [{
 // CHECK-NEW:     i8* getelementptr inbounds ([19 x i8], [19 x i8]* [[EXTENSIONCLASSPROPERTY_NAME]], i64 0, i64 0),
 // CHECK-NEW:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[EXTENSIONCLASSPROPERTY_ATTRS]], i64 0, i64 0)
-// CHECK-NEW:   }]
+// CHECK-NEW:   }, {
+// CHECK-NEW:	  i8* getelementptr inbounds ([26 x i8], [26 x i8]* [[EXTENSIONSTATICPROPERTY_NAME]], i64 0, i64 0),
+// CHECK-NEW:	  i8* getelementptr inbounds ([5 x i8], [5 x i8]* [[SHARED_ATTRS]], i64 0, i64 0) }]
 // CHECK-NEW: }, section "__DATA, __objc_const", align 8
 
 // CHECK: @"_CATEGORY__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.+}} } {

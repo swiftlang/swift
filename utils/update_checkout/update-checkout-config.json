@@ -41,7 +41,11 @@
         "libcxx": {
             "remote": { "id": "apple/swift-libcxx" } },
         "clang-tools-extra": {
-            "remote": { "id": "apple/swift-clang-tools-extra" } }
+            "remote": { "id": "apple/swift-clang-tools-extra" } },
+        "indexstore-db": {
+            "remote": { "id": "apple/indexstore-db" } },
+        "sourcekit-lsp": {
+            "remote": { "id": "apple/sourcekit-lsp" } }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
@@ -66,7 +70,9 @@
                 "ninja": "release",
                 "icu": "release-61-1",
                 "clang-tools-extra": "stable",
-                "libcxx": "stable"
+                "libcxx": "stable",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
             }
         },
         "next" : {
@@ -92,7 +98,9 @@
                 "ninja": "release",
                 "icu": "release-61-1",
                 "clang-tools-extra": "upstream-with-swift",
-                "libcxx": "upstream-with-swift"
+                "libcxx": "upstream-with-swift",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
             }
         },
         "swift-3.0-branch" : {
@@ -113,7 +121,9 @@
                 "swift-corelibs-libdispatch": "swift-3.0-branch",
                 "swift-integration-tests": "swift-3.0-branch",
                 "swift-xcode-playground-support": "swift-3.0-branch",
-                "ninja": "release"
+                "ninja": "release",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
             }
         },
         "swift-3.1-branch" : {
@@ -134,7 +144,9 @@
                 "swift-corelibs-libdispatch": "swift-3.1-branch",
                 "swift-integration-tests": "swift-3.1-branch",
                 "swift-xcode-playground-support": "swift-3.1-branch",
-                "ninja": "release"
+                "ninja": "release",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
             }
         },
         "swift-4.0-branch" : {
@@ -155,7 +167,9 @@
                 "swift-corelibs-libdispatch": "swift-4.0-branch",
                 "swift-integration-tests": "swift-4.0-branch",
                 "swift-xcode-playground-support": "swift-4.0-branch",
-                "ninja": "release"
+                "ninja": "release",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
             }
         },
         "swift-4.1-branch" : {
@@ -176,7 +190,9 @@
                 "swift-corelibs-libdispatch": "swift-4.1-branch",
                 "swift-integration-tests": "swift-4.1-branch",
                 "swift-xcode-playground-support": "swift-4.1-branch",
-                "ninja": "release"
+                "ninja": "release",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
             }
         },
         "swift-4.2-branch" : {
@@ -197,7 +213,9 @@
                 "swift-corelibs-libdispatch": "swift-4.2-branch",
                 "swift-integration-tests": "swift-4.2-branch",
                 "swift-xcode-playground-support": "swift-4.2-branch",
-                "ninja": "release"
+                "ninja": "release",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
             }
         },
         "swift-5.0-branch" : {
@@ -221,7 +239,9 @@
                 "ninja": "release",
                 "icu": "release-61-1",
                 "clang-tools-extra": "swift-5.0-branch",
-                "libcxx": "swift-5.0-branch"
+                "libcxx": "swift-5.0-branch",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
             }
         }
     }

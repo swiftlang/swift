@@ -125,6 +125,12 @@ Solution ConstraintSystem::finalize() {
   }
   solution.Fixes.append(Fixes.begin() + firstFixIndex, Fixes.end());
 
+  // Remember all of the missing member references encountered,
+  // that helps diagnostics to avoid emitting error for each
+  // member in the chain.
+  for (auto *member : MissingMembers)
+    solution.MissingMembers.push_back(member);
+
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
     // We shouldn't ever register disjunction choices multiple times,
@@ -232,6 +238,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
+
+  // Register any missing members encountered along this path.
+  MissingMembers.insert(solution.MissingMembers.begin(),
+                        solution.MissingMembers.end());
 }
 
 /// Restore the type variable bindings to what they were before
@@ -305,6 +315,13 @@ template<typename T>
 void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
   assert(newSize <= vec.size() && "Not a truncation!");
   vec.erase(vec.begin() + newSize, vec.end());
+}
+
+template<typename T, unsigned N>
+void truncate(llvm::SmallSetVector<T, N> &vec, unsigned newSize) {
+  assert(newSize <= vec.size() && "Not a truncation!");
+  for (unsigned i = 0, n = vec.size() - newSize; i != n; ++i)
+    vec.pop_back();
 }
 
 } // end anonymous namespace
@@ -409,6 +426,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numCheckedConformances = cs.CheckedConformances.size();
+  numMissingMembers = cs.MissingMembers.size();
   PreviousScore = cs.CurrentScore;
 
   cs.solverState->registerScope(this);
@@ -458,6 +476,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any conformances checked along the current path.
   truncate(cs.CheckedConformances, numCheckedConformances);
+
+  // Remove any missing members found along the current path.
+  truncate(cs.MissingMembers, numMissingMembers);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1089,6 +1110,8 @@ ConstraintSystem::solveImpl(Expr *&expr,
   if (auto generatedExpr = generateConstraints(expr))
     expr = generatedExpr;
   else {
+    if (listener)
+      listener->constraintGenerationFailed(expr);
     return SolutionKind::Error;
   }
 
@@ -1481,17 +1504,33 @@ void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
   if (LiteralProtocols.size() <= 1)
     return;
 
-  llvm::SmallVector<Type, 2> defaultTypes;
-  for (auto *protocol : LiteralProtocols)
-    defaultTypes.push_back(CS.TC.getDefaultType(protocol, CS.DC));
+  llvm::SmallVector<std::pair<ProtocolDecl *, Type>, 2> candidates;
+  llvm::SmallVector<ProtocolDecl *, 2> skippedProtocols;
 
-  auto result = 0;
-  for (unsigned long i = 1; i < LiteralProtocols.size(); ++i) {
+  for (auto *protocol : LiteralProtocols) {
+    if (auto defaultType = CS.TC.getDefaultType(protocol, CS.DC)) {
+      candidates.push_back({protocol, defaultType});
+      continue;
+    }
+
+    // Looks like argument expected to conform to something like
+    // `ExpressibleByNilLiteral` which doesn't have a default
+    // type and as a result can't participate in minimalization.
+    skippedProtocols.push_back(protocol);
+  }
+
+  if (candidates.size() <= 1)
+    return;
+
+  unsigned result = 0;
+  for (unsigned i = 1, n = candidates.size(); i != n; ++i) {
+    const auto &candidate = candidates[i];
+
     auto first =
-        CS.TC.conformsToProtocol(defaultTypes[i], LiteralProtocols[result],
+        CS.TC.conformsToProtocol(candidate.second, candidates[result].first,
                                  CS.DC, ConformanceCheckFlags::InExpression);
     auto second =
-        CS.TC.conformsToProtocol(defaultTypes[result], LiteralProtocols[i],
+        CS.TC.conformsToProtocol(candidates[result].second, candidate.first,
                                  CS.DC, ConformanceCheckFlags::InExpression);
     if ((first && second) || (!first && !second))
       return;
@@ -1500,9 +1539,9 @@ void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
       result = i;
   }
 
-  auto *protocol = LiteralProtocols[result];
   LiteralProtocols.clear();
-  LiteralProtocols.insert(protocol);
+  LiteralProtocols.insert(candidates[result].first);
+  LiteralProtocols.insert(skippedProtocols.begin(), skippedProtocols.end());
 }
 
 void ConstraintSystem::ArgumentInfoCollector::dump() const {

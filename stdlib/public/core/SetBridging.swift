@@ -38,8 +38,8 @@ extension _NativeSet { // Bridging
     // Temporary var for SOME type safety.
     let nsSet: _NSSetCore
 
-    if _storage === _RawSetStorage.empty || count == 0 {
-      nsSet = _RawSetStorage.empty
+    if _storage === __RawSetStorage.empty || count == 0 {
+      nsSet = __RawSetStorage.empty
     } else if _isBridgedVerbatimToObjectiveC(Element.self) {
       nsSet = unsafeDowncast(_storage, to: _SetStorage<Element>.self)
     } else {
@@ -59,7 +59,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
   : __SwiftNativeNSEnumerator, _NSEnumerator {
 
   @nonobjc internal var base: _NativeSet<Element>
-  @nonobjc internal var bridgedElements: _BridgingHashBuffer?
+  @nonobjc internal var bridgedElements: __BridgingHashBuffer?
   @nonobjc internal var nextBucket: _NativeSet<Element>.Bucket
   @nonobjc internal var endBucket: _NativeSet<Element>.Bucket
 
@@ -172,27 +172,27 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   /// The buffer for bridged Set elements, if present.
   @nonobjc
-  private var _bridgedElements: _BridgingHashBuffer? {
+  private var _bridgedElements: __BridgingHashBuffer? {
     guard let ref = _stdlib_atomicLoadARCRef(object: _bridgedElementsPtr) else {
       return nil
     }
-    return unsafeDowncast(ref, to: _BridgingHashBuffer.self)
+    return unsafeDowncast(ref, to: __BridgingHashBuffer.self)
   }
 
   /// Attach a buffer for bridged Set elements.
   @nonobjc
-  private func _initializeBridgedElements(_ storage: _BridgingHashBuffer) {
+  private func _initializeBridgedElements(_ storage: __BridgingHashBuffer) {
     _stdlib_atomicInitializeARCRef(
       object: _bridgedElementsPtr,
       desired: storage)
   }
 
   @nonobjc
-  internal func bridgeElements() -> _BridgingHashBuffer {
+  internal func bridgeElements() -> __BridgingHashBuffer {
     if let bridgedElements = _bridgedElements { return bridgedElements }
 
     // Allocate and initialize heap storage for bridged objects.
-    let bridged = _BridgingHashBuffer.allocate(
+    let bridged = __BridgingHashBuffer.allocate(
       owner: native._storage,
       hashTable: native.hashTable)
     for bucket in native.hashTable {
@@ -285,9 +285,13 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   }
 }
 
+// NOTE: older overlays called this struct _CocoaSet. The two
+// must coexist without conflicting ObjC class names from the nested
+// classes, so it was renamed. The old names must not be used in the new
+// runtime.
 @usableFromInline
 @_fixed_layout
-internal struct _CocoaSet {
+internal struct __CocoaSet {
   @usableFromInline
   internal let object: AnyObject
 
@@ -297,7 +301,7 @@ internal struct _CocoaSet {
   }
 }
 
-extension _CocoaSet {
+extension __CocoaSet {
   @usableFromInline
   @_effects(releasenone)
   internal func member(for index: Index) -> AnyObject {
@@ -311,14 +315,14 @@ extension _CocoaSet {
   }
 }
 
-extension _CocoaSet {
+extension __CocoaSet {
   @usableFromInline
-  internal func isEqual(to other: _CocoaSet) -> Bool {
+  internal func isEqual(to other: __CocoaSet) -> Bool {
     return _stdlib_NSObject_isEqual(self.object, other.object)
   }
 }
 
-extension _CocoaSet: _SetBuffer {
+extension __CocoaSet: _SetBuffer {
   @usableFromInline
   internal typealias Element = AnyObject
 
@@ -404,7 +408,7 @@ extension _CocoaSet: _SetBuffer {
   }
 }
 
-extension _CocoaSet {
+extension __CocoaSet {
   @_fixed_layout
   @usableFromInline
   internal struct Index {
@@ -426,7 +430,7 @@ extension _CocoaSet {
   }
 }
 
-extension _CocoaSet.Index {
+extension __CocoaSet.Index {
   // FIXME(cocoa-index): Try using an NSEnumerator to speed this up.
   internal class Storage {
     // Assumption: we rely on NSDictionary.getObjects when being
@@ -436,7 +440,7 @@ extension _CocoaSet.Index {
 
     /// A reference to the NSSet, which owns members in `allObjects`,
     /// or `allKeys`, for NSSet and NSDictionary respectively.
-    internal let base: _CocoaSet
+    internal let base: __CocoaSet
     // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but
     // make sure that we have a safety check for accessing `allKeys`.  Maybe
     // move both into the dictionary/set itself.
@@ -445,7 +449,7 @@ extension _CocoaSet.Index {
     internal var allKeys: _BridgingBuffer
 
     internal init(
-      _ base: __owned _CocoaSet,
+      _ base: __owned __CocoaSet,
       _ allKeys: __owned _BridgingBuffer
     ) {
       self.base = base
@@ -454,7 +458,7 @@ extension _CocoaSet.Index {
   }
 }
 
-extension _CocoaSet.Index {
+extension __CocoaSet.Index {
   @usableFromInline
   internal var handleBitPattern: UInt {
     @_effects(readonly)
@@ -464,7 +468,7 @@ extension _CocoaSet.Index {
   }
 }
 
-extension _CocoaSet.Index {
+extension __CocoaSet.Index {
   @usableFromInline // FIXME(cocoa-index): Make inlinable
   @nonobjc
   internal var element: AnyObject {
@@ -486,27 +490,27 @@ extension _CocoaSet.Index {
   }
 }
 
-extension _CocoaSet.Index: Equatable {
+extension __CocoaSet.Index: Equatable {
   @usableFromInline // FIXME(cocoa-index): Make inlinable
   @_effects(readonly)
-  internal static func == (lhs: _CocoaSet.Index, rhs: _CocoaSet.Index) -> Bool {
+  internal static func == (lhs: __CocoaSet.Index, rhs: __CocoaSet.Index) -> Bool {
     _precondition(lhs.storage.base.object === rhs.storage.base.object,
       "Comparing indexes from different sets")
     return lhs._offset == rhs._offset
   }
 }
 
-extension _CocoaSet.Index: Comparable {
+extension __CocoaSet.Index: Comparable {
   @usableFromInline // FIXME(cocoa-index): Make inlinable
   @_effects(readonly)
-  internal static func < (lhs: _CocoaSet.Index, rhs: _CocoaSet.Index) -> Bool {
+  internal static func < (lhs: __CocoaSet.Index, rhs: __CocoaSet.Index) -> Bool {
     _precondition(lhs.storage.base.object === rhs.storage.base.object,
       "Comparing indexes from different sets")
     return lhs._offset < rhs._offset
   }
 }
 
-extension _CocoaSet: Sequence {
+extension __CocoaSet: Sequence {
   @usableFromInline
   final internal class Iterator {
     // Cocoa Set iterator has to be a class, otherwise we cannot
@@ -522,7 +526,7 @@ extension _CocoaSet: Sequence {
     // `_fastEnumerationState`.  There's code below relying on this.
     internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
 
-    internal let base: _CocoaSet
+    internal let base: __CocoaSet
 
     internal var _fastEnumerationStatePtr:
       UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
@@ -543,7 +547,7 @@ extension _CocoaSet: Sequence {
     internal var itemIndex: Int = 0
     internal var itemCount: Int = 0
 
-    internal init(_ base: __owned _CocoaSet) {
+    internal init(_ base: __owned __CocoaSet) {
       self.base = base
     }
   }
@@ -554,7 +558,7 @@ extension _CocoaSet: Sequence {
   }
 }
 
-extension _CocoaSet.Iterator: IteratorProtocol {
+extension __CocoaSet.Iterator: IteratorProtocol {
   @usableFromInline
   internal typealias Element = AnyObject
 
@@ -618,7 +622,7 @@ extension Set {
       return Set(_native: _NativeSet(nativeStorage))
     }
 
-    if s === _RawSetStorage.empty {
+    if s === __RawSetStorage.empty {
       return Set()
     }
 

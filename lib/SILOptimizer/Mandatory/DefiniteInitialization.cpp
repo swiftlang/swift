@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "definite-init"
-#include "DIMemoryUseCollectorOwnership.h"
+#include "DIMemoryUseCollector.h"
 #include "MandatoryOptUtils.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -32,10 +32,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
-
-#ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOR_H
-#error "Included non ownership header?!"
-#endif
 
 using namespace swift;
 using namespace ownership;
@@ -838,7 +834,30 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
         break;
     }
     assert(valueMetatype);
-    auto metatypeArgument = load->getFunction()->getSelfMetadataArgument();
+    SILValue metatypeArgument = load->getFunction()->getSelfMetadataArgument();
+
+    // SILFunction parameter types never have a DynamicSelfType, since it only
+    // makes sense in the context of a given method's body. Since the
+    // value_metatype instruction might produce a DynamicSelfType we have to
+    // cast the metatype argument.
+    //
+    // FIXME: Semantically, we're "opening" the class metatype here to produce
+    // the "opened" DynamicSelfType. Ideally it would be modeled as an opened
+    // archetype associated with the original metatype or class instance value,
+    // instead of as a "global" type.
+    auto metatypeSelfType = metatypeArgument->getType()
+        .castTo<MetatypeType>().getInstanceType();
+    auto valueSelfType = valueMetatype->getType()
+        .castTo<MetatypeType>().getInstanceType();
+    if (metatypeSelfType != valueSelfType) {
+      assert(metatypeSelfType ==
+             cast<DynamicSelfType>(valueSelfType).getSelfType());
+
+      SILBuilderWithScope B(valueMetatype);
+      metatypeArgument = B.createUncheckedTrivialBitCast(
+          valueMetatype->getLoc(), metatypeArgument,
+          valueMetatype->getType());
+    }
     replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument,
                                      [](SILInstruction*) { });
   }
@@ -929,12 +948,13 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       // a diagnostic.
       if (!shouldEmitError(Use.Inst))
         continue;
-      
+
       std::string PropertyName;
       auto *VD = TheMemory.getPathStringToElement(i, PropertyName);
       diagnose(Module, Use.Inst->getLoc(),
-               diag::immutable_property_already_initialized, PropertyName);
-      
+               diag::immutable_property_already_initialized,
+               StringRef(PropertyName));
+
       if (auto *Var = dyn_cast<VarDecl>(VD)) {
         if (Var->getParentInitializer())
           diagnose(Module, SILLocation(VD),
@@ -1089,7 +1109,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
 
     std::string PropertyName;
     auto VD = TheMemory.getPathStringToElement(i, PropertyName);
-    
+
     // Try to produce a specific error message about the inout use.  If this is
     // a call to a method or a mutating property access, indicate that.
     // Otherwise, we produce a generic error.
@@ -1154,15 +1174,15 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
                  : diag::using_mutating_accessor_on_immutable_value,
                accessor->getStorage()->getBaseName(),
                isa<SubscriptDecl>(accessor->getStorage()),
-               PropertyName);
+               StringRef(PropertyName));
     } else if (FD && FD->isOperator()) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::mutating_method_called_on_immutable_value,
-               FD->getName(), /*operator*/ 1, PropertyName);
+               FD->getName(), /*operator*/ 1, StringRef(PropertyName));
     } else if (FD && isSelfParameter) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::mutating_method_called_on_immutable_value,
-               FD->getName(), /*method*/ 0, PropertyName);
+               FD->getName(), /*method*/ 0, StringRef(PropertyName));
     } else if (isAssignment) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::assignment_to_immutable_value, StringRef(PropertyName));
@@ -1930,13 +1950,12 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
     SILValue Metatype;
 
-    // A convenience initializer should never deal in partially allocated
-    // objects.
-    assert(!TheMemory.isDelegatingInit());
-
-    // In a designated initializer, we know the class of the thing
-    // we're cleaning up statically.
-    Metatype = B.createMetatype(Loc, SILMetatypeTy);
+    // In an inherited convenience initializer, we must use the dynamic
+    // type of the object since nothing is initialized yet.
+    if (TheMemory.isDelegatingInit())
+      Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
+    else
+      Metatype = B.createMetatype(Loc, SILMetatypeTy);
 
     // We've already destroyed any instance variables initialized by this
     // constructor, now destroy instance variables initialized by subclass
@@ -2821,7 +2840,7 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
 //                           Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static bool processMemoryObject(MarkUninitializedInst *I) {
+static void processMemoryObject(MarkUninitializedInst *I) {
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
@@ -2833,7 +2852,6 @@ static bool processMemoryObject(MarkUninitializedInst *I) {
                            /*TreatAddressToPointerAsInout*/ true);
 
   LifetimeChecker(MemInfo, UseInfo).doIt();
-  return true;
 }
 
 /// Check that all memory objects that require initialization before use are
@@ -2849,10 +2867,13 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
       SILInstruction *Inst = &*I;
 
       auto *MUI = dyn_cast<MarkUninitializedInst>(Inst);
-      if (!MUI || !processMemoryObject(MUI)) {
+      if (!MUI) {
         ++I;
         continue;
       }
+
+      // Then process the memory object.
+      processMemoryObject(MUI);
 
       // Move off of the MUI only after we have processed memory objects. The
       // lifetime checker may rewrite instructions, so it is important to not

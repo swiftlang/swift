@@ -316,8 +316,10 @@ public:
   mutable Lowering::TypeConverter Types;
 
   /// Look up the TypeLowering for a SILType.
-  const Lowering::TypeLowering &getTypeLowering(SILType t) {
-    return Types.getTypeLowering(t);
+  const Lowering::TypeLowering &
+  getTypeLowering(SILType t, ResilienceExpansion expansion =
+                               ResilienceExpansion::Minimal) {
+    return Types.getTypeLowering(t, expansion);
   }
 
   /// Invalidate cached entries in SIL Loader.
@@ -569,11 +571,6 @@ public:
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
-
-  // Given a protocol conformance, attempt to create a witness table declaration
-  // for it.
-  SILWitnessTable *
-  createWitnessTableDeclaration(ProtocolConformance *C, SILLinkage linkage);
 
   // Given a protocol, attempt to create a default witness table declaration
   // for it.

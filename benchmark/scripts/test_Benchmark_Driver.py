@@ -120,6 +120,20 @@ class Test_parse_args(unittest.TestCase):
         self.assertTrue(parse_args(['check', '-v']).verbose)
         self.assertTrue(parse_args(['check', '--verbose']).verbose)
 
+    def test_check_supports_mardown_output(self):
+        self.assertFalse(parse_args(['check']).markdown)
+        self.assertTrue(parse_args(['check', '-md']).markdown)
+        self.assertTrue(parse_args(['check', '--markdown']).markdown)
+
+    def test_check_flags_are_mutually_exclusive(self):
+        with captured_output() as (out, err):
+            self.assertRaises(SystemExit,
+                              parse_args, ['check', '-md', '-v'])
+        self.assert_contains(
+            ['error:', 'argument -v/--verbose: ' +
+             'not allowed with argument -md/--markdown'],
+            err.getvalue())
+
 
 class ArgsStub(object):
     def __init__(self):
@@ -167,7 +181,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
     def test_gets_list_of_precommit_benchmarks(self):
         self.subprocess_mock.expect(
             '/benchmarks/Benchmark_O --list --delim=\t'.split(' '),
-            '#\tTest\t[Tags]\n1\tBenchmark1\t[t1, t2]\n1\tBenchmark2\t[t3]\n')
+            '#\tTest\t[Tags]\n1\tBenchmark1\t[t1, t2]\n2\tBenchmark2\t[t3]\n')
         driver = BenchmarkDriver(
             self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
@@ -175,6 +189,8 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
                           ['Benchmark1', 'Benchmark2'])
         self.assertEquals(driver.all_tests,
                           ['Benchmark1', 'Benchmark2'])
+        self.assertEquals(driver.test_number['Benchmark1'], "1")
+        self.assertEquals(driver.test_number['Benchmark2'], "2")
 
     list_all_tests = (
         '/benchmarks/Benchmark_O --list --delim=\t --skip-tags='.split(' '),
@@ -267,14 +283,39 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b', '--num-iters=1'))
 
+    def test_run_benchmark_for_specified_time(self):
+        self.driver.run('b', sample_time=0.5)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b', '--sample-time=0.5'))
+
     def test_run_benchmark_in_verbose_mode(self):
         self.driver.run('b', verbose=True)
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b', '--verbose'))
 
+    def test_run_batch(self):
+        """Run all active tests in a single execution of the Benchmark_X.
+
+        Known test names are passed to the harness in a compressed form as test
+        numbers.
+        """
+        self.driver.tests = ['b1', 'bx']
+        self.driver.run()
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', '1', 'bx'))
+
     def test_parse_results_from_running_benchmarks(self):
-        self.driver.run('b')
+        """Parse measurements results using LogParser.
+
+        Individual test run returns the first PerformanceTestResult directly.
+        Batch run returns the dictionary of PerformanceTestResults.
+        """
+        r = self.driver.run('b')
         self.assertTrue(self.parser_stub.results_from_string_called)
+        self.assertEquals(r.name, 'b1')  # non-matching name, just 1st result
+        r = self.driver.run()
+        self.assertTrue(isinstance(r, dict))
+        self.assertEquals(r['b1'].name, 'b1')
 
     def test_measure_memory(self):
         self.driver.run('b', measure_memory=True)
@@ -497,7 +538,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
     def setUp(self):
         super(TestBenchmarkDoctor, self).setUp()
-        self.args = Stub(verbose=False)
+        self.args = Stub(verbose=False, markdown=False)
         self._doctor_log_handler.reset()
         self.logs = self._doctor_log_handler.messages
 
@@ -516,8 +557,9 @@ class TestBenchmarkDoctor(unittest.TestCase):
     def test_supports_verbose_output(self):
         driver = BenchmarkDriverMock(tests=['B1', 'B2'])
         driver.verbose = True
+        self.args.verbose = True
         with captured_output() as (out, _):
-            BenchmarkDoctor(Stub(verbose=True), driver)
+            BenchmarkDoctor(self.args, driver)
         self.assert_contains(['Checking tests: B1, B2'], out.getvalue())
 
     def test_uses_report_formatter(self):
@@ -527,6 +569,14 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assertTrue(isinstance(console_handler, logging.StreamHandler))
         self.assertTrue(isinstance(console_handler.formatter,
                                    LoggingReportFormatter))
+
+    def test_uses_optional_markdown_report_formatter(self):
+        self.args.markdown = True
+        with captured_output() as (_, _):
+            doc = BenchmarkDoctor(self.args, BenchmarkDriverMock(tests=['B1']))
+        self.assertTrue(doc)
+        console_handler = logging.getLogger('BenchmarkDoctor').handlers[1]
+        self.assertTrue(isinstance(console_handler, MarkdownReportHandler))
 
     def test_measure_10_independent_1s_benchmark_series(self):
         """Measurement strategy takes 5 i2 and 5 i1 series.
@@ -617,7 +667,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
             self.logs['info'])
 
     def test_benchmark_runtime_range(self):
-        """Optimized benchmark should run in less then 1000 μs.
+        """Optimized benchmark should have runtime between 20 μs and 1000 μs.
 
         Even on calm machine, benchmark with runtime of 2500 μs has 1:4 chance
         of being interrupted in the middle of measurement due to elapsed 10 ms
@@ -637,6 +687,8 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
         with captured_output() as (out, _):
             doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock([]))
+            doctor.analyze(measurements('Sylph', 0))
+            doctor.analyze(measurements('Unicorn', 3))
             doctor.analyze(measurements('Cheetah', 200))
             doctor.analyze(measurements('Hare', 1001))
             doctor.analyze(measurements('Tortoise', 500000))
@@ -647,6 +699,18 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
         self.assertIn('runtime: ', output)
         self.assertNotIn('Cheetah', output)
+        self.assert_contains(["'Sylph' execution took 0 μs."],
+                             self.logs['error'])
+        self.assert_contains(
+            ["Ensure the workload of 'Sylph' has a properly measurable size"
+             " (runtime > 20 μs) and is not eliminated by the compiler (use "
+             "`blackHole` function if necessary)."],
+            self.logs['info'])
+        self.assert_contains(["'Unicorn' execution took 3 μs."],
+                             self.logs['warning'])
+        self.assert_contains(
+            ["Increase the workload of 'Unicorn' to be more than 20 μs."],
+            self.logs['info'])
         self.assert_contains(["'Hare' execution took at least 1001 μs."],
                              self.logs['warning'])
         self.assert_contains(
@@ -678,11 +742,18 @@ class TestBenchmarkDoctor(unittest.TestCase):
                 'SO O i2a': _PTR(min=67), 'SO O i2b': _PTR(min=68)})
             doctor.analyze({'name': 'Zero', 'Zero O i1a': _PTR(min=0),
                             'Zero O i2a': _PTR(min=0)})
+            doctor.analyze({
+                'name': 'LOA',  # Limit of Accuracy
+                # Impossible to detect overhead:
+                # Even 1μs change in 20μs runtime is 5%.
+                'LOA O i1a': _PTR(min=21),
+                'LOA O i2a': _PTR(min=20)})
         output = out.getvalue()
 
         self.assertIn('runtime: ', output)
         self.assertNotIn('NoOverhead', output)
         self.assertNotIn('ZeroRuntime', output)
+        self.assertNotIn('LOA', output)
         self.assert_contains(
             ["'SO' has setup overhead of 4 μs (5.8%)."],
             self.logs['error'])

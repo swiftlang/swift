@@ -1655,16 +1655,24 @@ void Remangler::mangleProtocolConformance(Node *node) {
     mangle(GenSig);
 }
 
-void Remangler::mangleProtocolConformanceRef(Node *node) {
+void Remangler::mangleProtocolConformanceRefInTypeModule(Node *node) {
   manglePureProtocol(node->getChild(0));
-  if (node->getNumChildren() > 1)
-    mangleChildNode(node, 1);
   Buffer << "HP";
+}
+
+void Remangler::mangleProtocolConformanceRefInProtocolModule(Node *node) {
+  manglePureProtocol(node->getChild(0));
+  Buffer << "Hp";
+}
+
+void Remangler::mangleProtocolConformanceRefInOtherModule(Node *node) {
+  manglePureProtocol(node->getChild(0));
+  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleConcreteProtocolConformance(Node *node) {
   mangleType(node->getChild(0));
-  mangleProtocolConformanceRef(node->getChild(1));
+  mangle(node->getChild(1));
   if (node->getNumChildren() > 2)
     mangleAnyProtocolConformanceList(node->getChild(2));
   else

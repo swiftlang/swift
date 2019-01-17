@@ -432,7 +432,7 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
                              genericFn->getExtInfo());
   }
 
-  auto selfTy = dc->getDeclaredInterfaceType();
+  auto selfTy = dc->getSelfInterfaceType();
   auto selfParam = AnyFunctionType::Param(selfTy);
   if (sig)
     return GenericFunctionType::get(sig, {selfParam}, type);
@@ -853,7 +853,6 @@ Type TypeBase::getMetatypeInstanceType() {
   if (auto metaTy = getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
-  // For mutable value type methods, we need to dig through inout types.
   return this;
 }
 
@@ -1255,8 +1254,8 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Paren:
     llvm_unreachable("parenthesis are sugar, but not syntax sugar");
-  case TypeKind::NameAlias:
-    llvm_unreachable("bound name alias types always have an underlying type");
+  case TypeKind::TypeAlias:
+    llvm_unreachable("bound type alias types always have an underlying type");
   case TypeKind::ArraySlice:
     implDecl = Context->getArrayDecl();
     break;
@@ -1283,7 +1282,7 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   return UnderlyingType;
 }
 
-SmallVector<Type, 2> NameAliasType::getInnermostGenericArgs() const {
+SmallVector<Type, 2> TypeAliasType::getInnermostGenericArgs() const {
   SmallVector<Type, 2> result;
 
   // If the typealias is not generic, there are no generic arguments
@@ -2684,6 +2683,12 @@ GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
                            substFn->getResult(), getExtInfo());
 }
 
+CanFunctionType
+CanGenericFunctionType::substGenericArgs(SubstitutionMap subs) const {
+  return cast<FunctionType>(
+           getPointer()->substGenericArgs(subs)->getCanonicalType());
+}
+
 static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
                                  Type origBase,
                                  Type substBase,
@@ -2765,7 +2770,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     // using Type::subst() without changing output.
     if (options & SubstFlags::DesugarMemberTypes) {
       if (auto *aliasType =
-                   dyn_cast<NameAliasType>(witness.getPointer())) {
+                   dyn_cast<TypeAliasType>(witness.getPointer())) {
         if (!aliasType->is<ErrorType>())
           witness = aliasType->getSinglyDesugaredType();
       }
@@ -3574,8 +3579,8 @@ case TypeKind::Id:
     return DynamicSelfType::get(selfTy, selfTy->getASTContext());
   }
 
-  case TypeKind::NameAlias: {
-    auto alias = cast<NameAliasType>(base);
+  case TypeKind::TypeAlias: {
+    auto alias = cast<TypeAliasType>(base);
     Type oldUnderlyingType = Type(alias->getSinglyDesugaredType());
     Type newUnderlyingType = oldUnderlyingType.transformRec(fn);
     if (!newUnderlyingType) return Type();
@@ -3613,7 +3618,7 @@ case TypeKind::Id:
     if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
       return *this;
 
-    return NameAliasType::get(alias->getDecl(), newParentType, subMap,
+    return TypeAliasType::get(alias->getDecl(), newParentType, subMap,
                                    newUnderlyingType);
   }
 
@@ -3895,7 +3900,7 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
     return false;
 
   // A 'public' typealias can have an 'internal' type.
-  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+  if (auto *NAT = dyn_cast<TypeAliasType>(Ty.getPointer())) {
     auto *AliasDecl = NAT->getDecl();
     if (auto parent = NAT->getParent()) {
       if (parent.isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic))
@@ -4048,9 +4053,15 @@ void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
   Substitutions.profile(id);
 }
 
-static RecursiveTypeProperties getRecursivePropertiesOfMap(
-                                                      SubstitutionMap subMap) {
+static RecursiveTypeProperties getBoxRecursiveProperties(
+    SILLayout *Layout, SubstitutionMap subMap) {
   RecursiveTypeProperties props;
+  for (auto &field : Layout->getFields()) {
+    auto fieldProps = field.getLoweredType()->getRecursiveProperties();
+    fieldProps.removeHasTypeParameter();
+    fieldProps.removeHasDependentMember();
+    props |= fieldProps;
+  }
   for (auto replacementType : subMap.getReplacementTypes()) {
     if (replacementType) props |= replacementType->getRecursiveProperties();
   }
@@ -4059,7 +4070,8 @@ static RecursiveTypeProperties getRecursivePropertiesOfMap(
 
 SILBoxType::SILBoxType(ASTContext &C,
                        SILLayout *Layout, SubstitutionMap Substitutions)
-  : TypeBase(TypeKind::SILBox, &C, getRecursivePropertiesOfMap(Substitutions)),
+  : TypeBase(TypeKind::SILBox, &C,
+             getBoxRecursiveProperties(Layout, Substitutions)),
     Layout(Layout), Substitutions(Substitutions) {
   assert(Substitutions.isCanonical());
 }

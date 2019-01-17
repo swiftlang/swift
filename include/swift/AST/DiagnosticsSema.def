@@ -1391,6 +1391,14 @@ ERROR(pattern_binds_no_variables,none,
       "variables",
       (unsigned))
 
+WARNING(optional_ambiguous_case_ref,none,
+        "assuming you mean '%0.%2'; did you mean '%1.%2' instead?",
+        (StringRef, StringRef, StringRef))
+NOTE(optional_fixit_ambiguous_case_ref,none,
+     "explicitly specify 'Optional' to silence this warning", ())
+NOTE(type_fixit_optional_ambiguous_case_ref,none,
+     "use '%0.%1' instead", (StringRef, StringRef))
+
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
       "unstable name when archiving via 'NSCoding'",
@@ -1703,11 +1711,11 @@ ERROR(type_witness_not_accessible_type,none,
       "matches a requirement in protocol %3",
       (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
 ERROR(witness_not_usable_from_inline,none,
-      "%0 %1 must be declared '@usableFromInline' because "
+      "%0 %1 must be declared '@usableFromInline' "
       "because it matches a requirement in protocol %2",
       (DescriptiveDeclKind, DeclName, DeclName))
 WARNING(witness_not_usable_from_inline_warn,none,
-        "%0 %1 should be declared '@usableFromInline' because "
+        "%0 %1 should be declared '@usableFromInline' "
         "because it matches a requirement in protocol %2",
         (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(type_witness_objc_generic_parameter,none,
@@ -2766,6 +2774,10 @@ ERROR(type_of_expression_is_ambiguous,none,
 
 ERROR(specific_type_of_expression_is_ambiguous,none,
       "expression type %0 is ambiguous without more context", (Type))
+
+ERROR(failed_to_produce_diagnostic,Fatal,
+      "failed to produce diagnostic for expression; "
+      "please file a bug report with your project", ())
 
 
 ERROR(missing_protocol,none,
@@ -3886,6 +3898,10 @@ ERROR(dynamic_replacement_function_not_found, none,
      "replaced function %0 could not be found", (DeclName))
 ERROR(dynamic_replacement_accessor_not_found, none,
       "replaced accessor for %0 could not be found", (DeclName))
+ERROR(dynamic_replacement_accessor_ambiguous, none,
+      "replaced accessor for %0 occurs in multiple places", (DeclName))
+NOTE(dynamic_replacement_accessor_ambiguous_candidate, none,
+      "candidate accessor found in module %0", (DeclName))
 ERROR(dynamic_replacement_function_of_type_not_found, none,
       "replaced function %0 of type %1 could not be found", (DeclName, Type))
 NOTE(dynamic_replacement_found_function_of_type, none,
@@ -3932,9 +3948,9 @@ NOTE(availability_marked_unavailable, none,
      "%select{getter for |setter for |}0%1 has been explicitly marked "
      "unavailable here", (unsigned, DeclName))
 
-NOTE(availability_introduced_in_swift, none,
-     "%select{getter for |setter for |}0%1 was introduced in Swift %2",
-     (unsigned, DeclName, llvm::VersionTuple))
+NOTE(availability_introduced_in_version, none,
+     "%select{getter for |setter for |}0%1 was introduced in %2 %3",
+     (unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 NOTE(availability_obsoleted, none,
      "%select{getter for |setter for |}0%1 was obsoleted in %2 %3",
@@ -4099,6 +4115,9 @@ ERROR(inlinable_decl_not_public,
       "but %0 is %select{private|fileprivate|internal|%error|%error}1",
       (DeclBaseName, AccessLevel))
 
+ERROR(inlinable_resilient_deinit,
+      none, "deinitializer can only be '@inlinable' if the class is '@_fixed_layout'", ())
+
 //------------------------------------------------------------------------------
 // MARK: @_specialize diagnostics
 //------------------------------------------------------------------------------
@@ -4216,6 +4235,9 @@ NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
 
 WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
+WARNING(non_exhaustive_switch_unknown_only,none,
+        "switch covers known cases, but %0 may have additional unknown values"
+        "%select{|, possibly added in future versions}1", (Type, bool))
 
 WARNING(override_nsobject_hashvalue,none,
         "override of 'NSObject.hashValue' is deprecated; "

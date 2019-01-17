@@ -745,13 +745,8 @@ GenericSignature *GenericContext::getGenericSignature() const {
 
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
   // it.
-  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
-    const_cast<ProtocolDecl *>(PD)->createGenericParamsIfMissing();
-    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-    auto req =
-        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
-    return GenericSignature::get({self}, {req});
-  }
+  if (auto PD = dyn_cast<ProtocolDecl>(this))
+    return getGenericEnvironment()->getGenericSignature();
 
   return nullptr;
 }
@@ -764,6 +759,21 @@ GenericEnvironment *GenericContext::getGenericEnvironment() const {
   // If we only have a generic signature, build the generic environment.
   if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
     return getLazyGenericEnvironmentSlow();
+
+  // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
+  // it.
+  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    const_cast<ProtocolDecl *>(PD)->createGenericParamsIfMissing();
+    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+    auto req =
+        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
+    auto *genericSig = GenericSignature::get({self}, {req});
+
+    // Save it for next time.
+    const_cast<GenericContext *>(this)
+      ->setGenericEnvironment(genericSig->createGenericEnvironment());
+    return getGenericEnvironment();
+  }
 
   return nullptr;
 }
@@ -2540,9 +2550,37 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
-/// Return the access level of an internal or public declaration
-/// that's been testably imported.
-static AccessLevel getTestableOrPrivateImportsAccess(const ValueDecl *decl) {
+/// Returns \c true if this declaration is *not* intended to be used directly
+/// by application developers despite of the visibility.
+bool ValueDecl::shouldHideFromEditor() const {
+  // Hide private stdlib declarations.
+  if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
+      // ShowInInterfaceAttr is for decls to show in interface as exception but
+      // they are not intended to be used directly.
+      getAttrs().hasAttribute<ShowInInterfaceAttr>())
+    return true;
+
+  if (AvailableAttr::isUnavailable(this))
+    return true;
+
+  if (auto *ClangD = getClangDecl()) {
+    if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
+      return true;
+  }
+
+  if (!isUserAccessible())
+    return true;
+
+  // Hide editor placeholders.
+  if (getBaseName().isEditorPlaceholder())
+    return true;
+
+  return false;
+}
+
+/// Return maximally open access level which could be associated with the
+/// given declaration accounting for @testable importers.
+static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
     if (!cls->isFinal())
@@ -2568,6 +2606,11 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
                                            AccessLevel access,
                                            const DeclContext *useDC,
                                            bool treatUsableFromInlineAsPublic) {
+  // If access control is disabled in the current context, adjust
+  // access level of the current declaration to be as open as possible.
+  if (useDC && VD->getASTContext().isAccessControlDisabled())
+    return getMaximallyOpenAccessFor(VD);
+
   if (treatUsableFromInlineAsPublic &&
       access == AccessLevel::Internal &&
       VD->isUsableFromInline()) {
@@ -2580,7 +2623,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
     if (!useSF) return access;
     if (useSF->hasTestableOrPrivateImport(access, VD))
-      return getTestableOrPrivateImportsAccess(VD);
+      return getMaximallyOpenAccessFor(VD);
   }
 
   return access;
@@ -2608,16 +2651,16 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   case AccessLevel::Internal:
     if (getModuleContext()->isTestingEnabled() ||
         getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getTestableOrPrivateImportsAccess(this);
+      effectiveAccess = getMaximallyOpenAccessFor(this);
     break;
   case AccessLevel::FilePrivate:
     if (getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getTestableOrPrivateImportsAccess(this);
+      effectiveAccess = getMaximallyOpenAccessFor(this);
     break;
   case AccessLevel::Private:
     effectiveAccess = AccessLevel::FilePrivate;
     if (getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getTestableOrPrivateImportsAccess(this);
+      effectiveAccess = getMaximallyOpenAccessFor(this);
     break;
   }
 
@@ -2750,6 +2793,9 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC,
 static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
                                          const ValueDecl *VD,
                                          AccessLevel access) {
+  if (VD->getASTContext().isAccessControlDisabled())
+    return true;
+
   AccessScope accessScope =
       getAccessScopeForFormalAccess(VD, access, useDC,
                                     /*treatUsableFromInlineAsPublic*/false);
@@ -2768,7 +2814,12 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
 ///
 /// See ValueDecl::isAccessibleFrom for a description of \p forConformance.
 static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
-                        AccessLevel access, bool forConformance) {
+                        bool forConformance,
+                        llvm::function_ref<AccessLevel()> getAccessLevel) {
+  if (VD->getASTContext().isAccessControlDisabled())
+    return true;
+
+  auto access = getAccessLevel();
   auto *sourceDC = VD->getDeclContext();
 
   if (!forConformance) {
@@ -2805,9 +2856,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   case AccessLevel::FilePrivate:
     if (useDC->getModuleScopeContext() != sourceDC->getModuleScopeContext()) {
       auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
-      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
-        return true;
-      return false;
+      return useSF && useSF->hasTestableOrPrivateImport(access, VD);
     }
     return true;
   case AccessLevel::Internal: {
@@ -2816,10 +2865,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     if (useFile->getParentModule() == sourceModule)
       return true;
     auto *useSF = dyn_cast<SourceFile>(useFile);
-    if (!useSF) return false;
-    if (useSF->hasTestableOrPrivateImport(access, sourceModule))
-      return true;
-    return false;
+    return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Public:
   case AccessLevel::Open:
@@ -2830,8 +2876,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
                                  bool forConformance) const {
-  auto access = getFormalAccess();
-  bool result = checkAccess(useDC, this, access, forConformance);
+  bool result = checkAccess(useDC, this, forConformance,
+                            [&]() { return getFormalAccess(); });
 
   // For everything outside of protocols and operators, we should get the same
   // result using either implementation of checkAccess, because useDC must
@@ -2840,9 +2886,9 @@ bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
   // because we're finding internal operators within private types. Fortunately
   // we have a requirement that a member operator take the enclosing type as an
   // argument, so it won't ever match.
-  assert(getDeclContext()->getSelfProtocolDecl() ||
-         isOperator() ||
-         result == checkAccessUsingAccessScopes(useDC, this, access));
+  assert(getDeclContext()->getSelfProtocolDecl() || isOperator() ||
+         result ==
+             checkAccessUsingAccessScopes(useDC, this, getFormalAccess()));
 
   return result;
 }
@@ -2860,8 +2906,8 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
   if (isa<ParamDecl>(this))
     return true;
 
-  auto access = getSetterFormalAccess();
-  return checkAccess(DC, this, access, forConformance);
+  return checkAccess(DC, this, forConformance,
+                     [&]() { return getSetterFormalAccess(); });
 }
 
 void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
@@ -3235,7 +3281,7 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
     auto parentDC = getDeclContext();
     if (parentDC->isTypeContext())
       parent = parentDC->getDeclaredInterfaceType();
-    auto sugaredType = NameAliasType::get(this, parent, subs, underlying);
+    auto sugaredType = TypeAliasType::get(this, parent, subs, underlying);
     setInterfaceType(MetatypeType::get(sugaredType, ctx));
   }
 }
@@ -3927,7 +3973,10 @@ ClassDecl *ProtocolDecl::getSuperclassDecl() const {
 void ProtocolDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
-  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassDecl.setPointerAndInt(
+    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
+    true);
 }
 
 bool ProtocolDecl::walkInheritedProtocols(
@@ -5101,6 +5150,14 @@ ParamDecl::getDefaultValueStringRepresentation(
     auto existing = DefaultValueAndFlags.getPointer()->StringRepresentation;
     if (!existing.empty())
       return existing;
+
+    if (!getDefaultValue()) {
+      // TypeChecker::checkDefaultArguments() nulls out the default value
+      // if it fails to type check it. This only seems to happen with an
+      // invalid/incomplete parameter list that contains a parameter with an
+      // unresolved default value.
+      return "<<empty>>";
+    }
     return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
                                 scratch);
   }
@@ -6424,7 +6481,10 @@ ClassDecl *ClassDecl::getSuperclassDecl() const {
 void ClassDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
-  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassDecl.setPointerAndInt(
+    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
+    true);
 }
 
 ClangNode Decl::getClangNodeImpl() const {

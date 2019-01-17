@@ -758,6 +758,10 @@ public:
     bool IsError;
   };
 
+  /// Check whether current context has any errors associated with
+  /// ill-formed protocol conformances which haven't been produced yet.
+  bool hasDelayedConformanceErrors() const;
+
   /// Add a delayed diagnostic produced while type-checking a
   /// particular protocol conformance.
   void addDelayedConformanceDiag(NormalProtocolConformance *conformance,
@@ -930,6 +934,12 @@ public:
   /// check for isSwiftVersionAtLeast(5).
   bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
     return LangOpts.isSwiftVersionAtLeast(major, minor);
+  }
+
+  /// Check whether it's important to respect access control restrictions
+  /// in current context.
+  bool isAccessControlDisabled() const {
+    return !LangOpts.EnableAccessControl;
   }
 
 private:

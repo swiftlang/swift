@@ -65,12 +65,11 @@ void DebuggerClient::anchor() {}
 
 void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
                                             DeclVisibilityKind reason) {
-  if (D->getASTContext().LangOpts.EnableAccessControl) {
-    if (D->isInvalid())
-      return;
-    if (!D->isAccessibleFrom(DC))
-      return;
-  }
+  if (D->isInvalid())
+    return;
+  if (!D->isAccessibleFrom(DC))
+    return;
+
   ChainedConsumer.foundDecl(D, reason);
 }
 
@@ -1843,7 +1842,7 @@ static void configureLookup(const DeclContext *dc,
                             ReferencedNameTracker *&tracker,
                             bool &isLookupCascading) {
   auto &ctx = dc->getASTContext();
-  if (!ctx.LangOpts.EnableAccessControl)
+  if (ctx.isAccessControlDisabled())
     options |= NL_IgnoreAccessControl;
 
   // Find the dependency tracker we'll need for this lookup.
@@ -2515,7 +2514,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
 
 static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
   // If it's a typealias, return that.
-  if (auto aliasType = dyn_cast<NameAliasType>(type.getPointer()))
+  if (auto aliasType = dyn_cast<TypeAliasType>(type.getPointer()))
     return { 1, aliasType->getDecl() };
 
   // If there is a generic declaration, return it.

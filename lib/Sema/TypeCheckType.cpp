@@ -512,7 +512,7 @@ Type TypeChecker::resolveTypeInContext(
             parentDC = parentDC->getParent()) {
         if (auto *ext = dyn_cast<ExtensionDecl>(parentDC)) {
           auto extendedType = ext->getExtendedType();
-          if (auto *aliasType = dyn_cast<NameAliasType>(extendedType.getPointer())) {
+          if (auto *aliasType = dyn_cast<TypeAliasType>(extendedType.getPointer())) {
             if (aliasType->getDecl() == aliasDecl) {
               return resolution.mapTypeIntoContext(
                   aliasDecl->getDeclaredInterfaceType());
@@ -856,7 +856,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto subMap = SubstitutionMap::get(genericSig,
                                        QueryTypeSubstitutionMap{subs},
                                        LookUpConformance(dc));
-    resultType = NameAliasType::get(typealias, parentType,
+    resultType = TypeAliasType::get(typealias, parentType,
                                     subMap, resultType);
   }
 
@@ -1566,7 +1566,7 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
     // We lost the sugar to flip the isNoEscape bit.
     //
     // FIXME: It would be better to add a new AttributedType sugared type,
-    // which would wrap the NameAliasType or ParenType, and apply the
+    // which would wrap the TypeAliasType or ParenType, and apply the
     // isNoEscape bit when de-sugaring.
     // <https://bugs.swift.org/browse/SR-2520>
     return FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo);
@@ -3185,21 +3185,19 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 
   auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
   if (aliasDecl) {
+    if (aliasDecl->getGenericParams()) {
+      return UnboundGenericType::get(
+          aliasDecl, baseTy,
+          aliasDecl->getASTContext());
+    }
+
     // FIXME: If this is a protocol typealias and we haven't built the
     // protocol's generic environment yet, do so now, to ensure the
     // typealias's underlying type has fully resolved dependent
     // member types.
     if (auto *protoDecl = dyn_cast<ProtocolDecl>(aliasDecl->getDeclContext())) {
-      if (protoDecl->getGenericEnvironment() == nullptr) {
-        ASTContext &ctx = protoDecl->getASTContext();
-        ctx.getLazyResolver()->resolveProtocolEnvironment(protoDecl);
-      }
-    }
-
-    if (aliasDecl->getGenericParams()) {
-      return UnboundGenericType::get(
-          aliasDecl, baseTy,
-          aliasDecl->getASTContext());
+      ASTContext &ctx = protoDecl->getASTContext();
+      ctx.getLazyResolver()->resolveProtocolEnvironment(protoDecl);
     }
   }
 
@@ -3229,7 +3227,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   // If we're referring to a typealias within a generic context, build
   // a sugared alias type.
   if (aliasDecl && (!sugaredBaseTy || !sugaredBaseTy->isAnyExistentialType())) {
-    resultType = NameAliasType::get(aliasDecl, sugaredBaseTy, subs, resultType);
+    resultType = TypeAliasType::get(aliasDecl, sugaredBaseTy, subs, resultType);
   }
 
   return resultType;

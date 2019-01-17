@@ -3856,7 +3856,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   // If we had a typealias, form a sugared type.
   if (typealias) {
-    type = NameAliasType::get(typealias, parentType, subMap, type);
+    type = TypeAliasType::get(typealias, parentType, subMap, type);
   }
 
   return type;
@@ -4799,8 +4799,12 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   auto T1 = OrigT1->getRepresentative();
   auto T2 = OrigT2->getRepresentative();
 
-  // Pick representative based on the canonical ordering of the type parameters.
-  if (compareDependentTypes(depType2, depType1) < 0) {
+  // Decide which potential archetype is to be considered the representative.
+  // We prefer potential archetypes with lower nesting depths, because it
+  // prevents us from unnecessarily building deeply nested potential archetypes.
+  unsigned nestingDepth1 = T1->getNestingDepth();
+  unsigned nestingDepth2 = T2->getNestingDepth();
+  if (nestingDepth2 < nestingDepth1) {
     std::swap(T1, T2);
     std::swap(OrigT1, OrigT2);
     std::swap(equivClass, equivClass2);
@@ -5311,13 +5315,13 @@ public:
 
   Action walkToTypePost(Type ty) override {
     // Infer from generic typealiases.
-    if (auto NameAlias = dyn_cast<NameAliasType>(ty.getPointer())) {
-      auto decl = NameAlias->getDecl();
+    if (auto TypeAlias = dyn_cast<TypeAliasType>(ty.getPointer())) {
+      auto decl = TypeAlias->getDecl();
       auto genericSig = decl->getGenericSignature();
       if (!genericSig)
         return Action::Continue;
 
-      auto subMap = NameAlias->getSubstitutionMap();
+      auto subMap = TypeAlias->getSubstitutionMap();
       for (const auto &rawReq : genericSig->getRequirements()) {
         if (auto req = rawReq.subst(subMap))
           Builder.addRequirement(*req, source, nullptr);
@@ -6830,6 +6834,14 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 
           auto locA = (*a)->constraint.source->getLoc();
           auto locB = (*b)->constraint.source->getLoc();
+
+          // Put invalid locations after valid ones.
+          if (locA.isInvalid() || locB.isInvalid()) {
+            if (locA.isInvalid() != locB.isInvalid())
+              return locA.isValid() ? 1 : -1;
+
+            return 0;
+          }
 
           auto bufferA = sourceMgr.findBufferContainingLoc(locA);
           auto bufferB = sourceMgr.findBufferContainingLoc(locB);

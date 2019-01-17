@@ -1140,21 +1140,20 @@ getActualCtorInitializerKind(uint8_t raw) {
   return None;
 }
 
-/// Determine whether the two modules are re-exported to the same module.
-static bool reExportedToSameModule(const ModuleDecl *fromModule,
-                                   const ModuleDecl *toModule) {
+static bool isReExportedToModule(const ValueDecl *value,
+                                 const ModuleDecl *expectedModule) {
+  const DeclContext *valueDC = value->getDeclContext();
   auto fromClangModule
-    = dyn_cast<ClangModuleUnit>(fromModule->getFiles().front());
+      = dyn_cast<ClangModuleUnit>(valueDC->getModuleScopeContext());
   if (!fromClangModule)
     return false;
+  std::string exportedName = fromClangModule->getExportedModuleName();
 
   auto toClangModule
-  = dyn_cast<ClangModuleUnit>(toModule->getFiles().front());
-  if (!toClangModule)
-    return false;
-
-  return fromClangModule->getExportedModuleName() ==
-    toClangModule->getExportedModuleName();
+      = dyn_cast<ClangModuleUnit>(expectedModule->getFiles().front());
+  if (toClangModule)
+    return exportedName == toClangModule->getExportedModuleName();
+  return exportedName == expectedModule->getName().str();
 }
 
 /// Remove values from \p values that don't match the expected type or module.
@@ -1197,7 +1196,7 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
     // module to the original definition in a base module.
     if (expectedModule && !value->hasClangNode() &&
         value->getModuleContext() != expectedModule &&
-        !reExportedToSameModule(value->getModuleContext(), expectedModule))
+        !isReExportedToModule(value, expectedModule))
       return true;
 
     // If we're expecting a member within a constrained extension with a
@@ -1357,6 +1356,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       if (entry.Kind != llvm::BitstreamEntry::Record)
         return Identifier();
 
+      scratch.clear();
       unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
                                                     &blobData);
       switch (recordID) {
@@ -2465,6 +2465,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         bool isImplicit;
         bool isUnavailable;
         bool isDeprecated;
+        bool isPackageDescriptionVersionSpecific;
         DEF_VER_TUPLE_PIECES(Introduced);
         DEF_VER_TUPLE_PIECES(Deprecated);
         DEF_VER_TUPLE_PIECES(Obsoleted);
@@ -2472,6 +2473,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         // Decode the record, pulling the version tuple information.
         serialization::decls_block::AvailableDeclAttrLayout::readRecord(
             scratch, isImplicit, isUnavailable, isDeprecated,
+            isPackageDescriptionVersionSpecific,
             LIST_VER_TUPLE_PIECES(Introduced),
             LIST_VER_TUPLE_PIECES(Deprecated),
             LIST_VER_TUPLE_PIECES(Obsoleted),
@@ -2494,7 +2496,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                  (!Introduced.empty() ||
                   !Deprecated.empty() ||
                   !Obsoleted.empty()))
-          platformAgnostic =
+          platformAgnostic = isPackageDescriptionVersionSpecific ?
+            PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
             PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
         else
           platformAgnostic = PlatformAgnosticAvailabilityKind::None;
@@ -4295,7 +4298,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID underlyingTypeID;
     TypeID substitutedTypeID;
     SubstitutionMapID substitutionsID;
-    decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
+    decls_block::TypeAliasTypeLayout::readRecord(scratch, typealiasID,
                                                  parentTypeID,
                                                  underlyingTypeID,
                                                  substitutedTypeID,
@@ -4357,7 +4360,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     }
 
     auto parentType = parentTypeOrError.get();
-    typeOrOffset = NameAliasType::get(alias, parentType, subMap,
+    typeOrOffset = TypeAliasType::get(alias, parentType, subMap,
                                       substitutedType);
     break;
   }
@@ -4385,7 +4388,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
         // If the underlying type is itself a typealias, it might be another
         // compatibility alias, meaning we need to go around the loop again.
-        auto aliasTy = dyn_cast<NameAliasType>(underlyingTy);
+        auto aliasTy = dyn_cast<TypeAliasType>(underlyingTy);
         if (!aliasTy)
           break;
         alias = aliasTy->getDecl();

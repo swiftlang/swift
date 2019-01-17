@@ -119,9 +119,9 @@ struct AddrOnlyStructInitGeneric<T> {
 // CHECK:   return [[THUNK_PA]]
 // CHECK: } // end sil function '$ss017LoadableClassInitA0CyABs5KlassCcfCTcTd'
 
-// Canonical Thunk.
+// Reabstraction thunk.
 //
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$ss5KlassCs017LoadableClassInitB0CIegxo_AbDIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @owned LoadableClassInitLoadable) -> @owned LoadableClassInitLoadable {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$ss5KlassCs017LoadableClassInitB0CIegxo_AbDIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @owned LoadableClassInitLoadable) -> @owned LoadableClassInitLoadable {
 // CHECK: bb0([[CLASS:%.*]] : @guaranteed $Klass, [[PA:%.*]] : @guaranteed $@callee_guaranteed (@owned Klass) -> @owned LoadableClassInitLoadable):
 // CHECK:   [[CLASS_COPY:%.*]] = copy_value [[CLASS]]
 // CHECK:   [[RESULT:%.*]] = apply [[PA]]([[CLASS_COPY]])
@@ -153,9 +153,9 @@ func testLoadableClassInitLoadable() {
 // CHECK:   return [[THUNK_PA]]
 // CHECK: } // end sil function '$ss018LoadableStructInitA0VyABs5KlassCcfCTc'
 
-// Canonical Thunk.
+// Reabstraction thunk.
 //
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$ss5KlassCs018LoadableStructInitB0VIegxo_AbDIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @owned LoadableStructInitLoadable) -> @owned LoadableStructInitLoadable {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$ss5KlassCs018LoadableStructInitB0VIegxo_AbDIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @owned LoadableStructInitLoadable) -> @owned LoadableStructInitLoadable {
 // CHECK: bb0([[CLASS:%.*]] : @guaranteed $Klass, [[PA:%.*]] : @guaranteed $@callee_guaranteed (@owned Klass) -> @owned LoadableStructInitLoadable):
 // CHECK:   [[CLASS_COPY:%.*]] = copy_value [[CLASS]]
 // CHECK:   [[RESULT:%.*]] = apply [[PA]]([[CLASS_COPY]])
@@ -191,14 +191,14 @@ func testLoadableStructInitLoadable() {
 // CHECK:   return [[THUNK]]
 // CHECK: } // end sil function '$ss25AddrOnlyStructInitGenericVyAByxGxcfCTc'
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$sxs25AddrOnlyStructInitGenericVyxGIegir_xACIegnr_lTR : $@convention(thin) <T> (@in_guaranteed T, @guaranteed @callee_guaranteed (@in T) -> @out AddrOnlyStructInitGeneric<T>) -> @out AddrOnlyStructInitGeneric<T> {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxs25AddrOnlyStructInitGenericVyxGIegir_xACIegnr_lTR : $@convention(thin) <T> (@in_guaranteed T, @guaranteed @callee_guaranteed (@in T) -> @out AddrOnlyStructInitGeneric<T>) -> @out AddrOnlyStructInitGeneric<T> {
 // CHECK: bb0([[ARG0:%.*]] : $*AddrOnlyStructInitGeneric<T>, [[ARG1:%.*]] : $*T, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed (@in T) -> @out AddrOnlyStructInitGeneric<T>):
 // CHECK:   [[STACK:%.*]] = alloc_stack $T
 // CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK]] : $*T
 // CHECK:   apply [[ARG2]]([[ARG0]], [[STACK]]) : $@callee_guaranteed (@in T) -> @out AddrOnlyStructInitGeneric<T>
 // CHECK: } // end sil function '$sxs25AddrOnlyStructInitGenericVyxGIegir_xACIegnr_lTR'
 
-// CHECK_LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$ss5KlassCs25AddrOnlyStructInitGenericVyABGIegnr_AbEIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@in_guaranteed Klass) -> @out AddrOnlyStructInitGeneric<Klass>) -> @owned AddrOnlyStructInitGeneric<Klass> {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$ss5KlassCs25AddrOnlyStructInitGenericVyABGIegnr_AbEIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@in_guaranteed Klass) -> @out AddrOnlyStructInitGeneric<Klass>) -> @owned AddrOnlyStructInitGeneric<Klass> {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Klass, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Klass) -> @out AddrOnlyStructInitGeneric<Klass>):
 // CHECK:   [[STACK:%.*]] = alloc_stack $Klass
 // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
@@ -253,9 +253,9 @@ func testAddrOnlyStructInitGenericAddrOnly<T : ProtocolInitAddressOnly>(t: T) {
 // CHECK:   return [[CANONICAL_THUNK]]
 // CHECK: } // end sil function '$ss20ProtocolInitLoadableP1txs5KlassC_tcfCTc'
 
-// Canonical thunk
+// Reabstraction thunk.
 //
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$ss5KlassCxIegxr_ABxIeggr_s20ProtocolInitLoadableRzlTR : $@convention(thin) <Self where Self : ProtocolInitLoadable> (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @out Self) -> @out Self {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$ss5KlassCxIegxr_ABxIeggr_s20ProtocolInitLoadableRzlTR : $@convention(thin) <Self where Self : ProtocolInitLoadable> (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @out Self) -> @out Self {
 // CHECK: bb0([[ARG0:%.*]] : $*Self, [[ARG1:%.*]] : @guaranteed $Klass, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed (@owned Klass) -> @out Self):
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
 // CHECK:   apply [[ARG2]]([[ARG0]], [[ARG1_COPY]])

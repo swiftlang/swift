@@ -53,6 +53,7 @@ namespace swift {
   class IRGenOptions;
   class LangOptions;
   class ModuleDecl;
+  typedef void *OpaqueSyntaxNode;
   class Parser;
   class PersistentParserState;
   class SerializationOptions;
@@ -61,6 +62,7 @@ namespace swift {
   class SILParserTUState;
   class SourceFile;
   class SourceManager;
+  class SyntaxParseActions;
   class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
@@ -119,7 +121,8 @@ namespace swift {
   bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
                            SILParserState *SIL = nullptr,
                            PersistentParserState *PersistentState = nullptr,
-                           DelayedParsingCallbacks *DelayedParseCB = nullptr);
+                           DelayedParsingCallbacks *DelayedParseCB = nullptr,
+                           bool DisableDelayedParsing = false);
 
   /// Parse a single buffer into the given source file, until the full source
   /// contents are parsed.
@@ -127,7 +130,8 @@ namespace swift {
   /// \return true if the parser found code with side effects.
   bool parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                              PersistentParserState *PersistentState = nullptr,
-                             DelayedParsingCallbacks *DelayedParseCB = nullptr);
+                             DelayedParsingCallbacks *DelayedParseCB = nullptr,
+                               bool DisableDelayedParsing = false);
 
   /// Finish the parsing by going over the nodes that were delayed
   /// during the first parsing pass.
@@ -335,6 +339,7 @@ namespace swift {
   public:
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                const LangOptions &LangOpts, StringRef ModuleName,
+               std::shared_ptr<SyntaxParseActions> spActions = nullptr,
                SyntaxParsingCache *SyntaxCache = nullptr);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
@@ -342,7 +347,7 @@ namespace swift {
 
     ~ParserUnit();
 
-    void parse();
+    OpaqueSyntaxNode parse();
 
     Parser &getParser();
     SourceFile &getSourceFile();

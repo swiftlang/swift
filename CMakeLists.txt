@@ -898,14 +898,20 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   if(CMAKE_C_COMPILER_ID STREQUAL Clang AND
      CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.8
      OR LLVM_USE_SANITIZER)
-   set(SWIFT_LIBDISPATCH_C_COMPILER ${CMAKE_C_COMPILER})
-   set(SWIFT_LIBDISPATCH_CXX_COMPILER ${CMAKE_CXX_COMPILER})
- elseif(${CMAKE_SYSTEM_NAME} STREQUAL ${CMAKE_HOST_SYSTEM_NAME})
-   set(SWIFT_LIBDISPATCH_C_COMPILER ${PATH_TO_CLANG_BUILD}/bin/clang)
-   set(SWIFT_LIBDISPATCH_CXX_COMPILER ${PATH_TO_CLANG_BUILD}/bin/clang++)
- else()
-   message(SEND_ERROR "libdispatch requires a newer clang compiler (${CMAKE_C_COMPILER_VERSION} < 3.9)")
- endif()
+    set(SWIFT_LIBDISPATCH_C_COMPILER ${CMAKE_C_COMPILER})
+    set(SWIFT_LIBDISPATCH_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+  elseif(${CMAKE_SYSTEM_NAME} STREQUAL ${CMAKE_HOST_SYSTEM_NAME})
+    set(SWIFT_LIBDISPATCH_C_COMPILER ${PATH_TO_CLANG_BUILD}/bin/clang)
+    set(SWIFT_LIBDISPATCH_CXX_COMPILER ${PATH_TO_CLANG_BUILD}/bin/clang++)
+  else()
+    message(SEND_ERROR "libdispatch requires a newer clang compiler (${CMAKE_C_COMPILER_VERSION} < 3.9)")
+  endif()
+
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    set(SOURCEKIT_LIBDISPATCH_RUNTIME_DIR bin)
+  else()
+    set(SOURCEKIT_LIBDISPATCH_RUNTIME_DIR lib)
+  endif()
 
   include(ExternalProject)
   ExternalProject_Add(libdispatch
@@ -923,6 +929,7 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
                         -DCMAKE_LINKER=${CMAKE_LINKER}
                         -DCMAKE_RANLIB=${CMAKE_RANLIB}
                         -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+                        -DBUILD_SHARED_LIBS=YES
                         -DENABLE_SWIFT=NO
                         -DENABLE_TESTING=NO
                       INSTALL_COMMAND
@@ -933,9 +940,9 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
                       STEP_TARGETS
                         install
                       BUILD_BYPRODUCTS
-                        <INSTALL_DIR>/lib/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
+                        <INSTALL_DIR>/${SOURCEKIT_LIBDISPATCH_RUNTIME_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
                         <INSTALL_DIR>/lib/${CMAKE_IMPORT_LIBRARY_PREFIX}dispatch${CMAKE_IMPORT_LIBRARY_SUFFIX}
-                        <INSTALL_DIR>/lib/${CMAKE_SHARED_LIBRARY_PREFIX}BlocksRuntime${CMAKE_SHARED_LIBRARY_SUFFIX}
+                        <INSTALL_DIR>/${SOURCEKIT_LIBDISPATCH_RUNTIME_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}BlocksRuntime${CMAKE_SHARED_LIBRARY_SUFFIX}
                         <INSTALL_DIR>/lib/${CMAKE_IMPORT_LIBRARY_PREFIX}BlocksRuntime${CMAKE_IMPORT_LIBRARY_SUFFIX}
                       BUILD_ALWAYS
                         1)
@@ -951,7 +958,7 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   set_target_properties(dispatch
                         PROPERTIES
                           IMPORTED_LOCATION
-                            ${install_dir}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
+                            ${install_dir}/${SOURCEKIT_LIBDISPATCH_RUNTIME_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
                           IMPORTED_IMPLIB
                             ${install_dir}/lib/${CMAKE_IMPORT_LIBRARY_PREFIX}dispatch${CMAKE_IMPORT_LIBRARY_SUFFIX}
                           INTERFACE_INCLUDE_DIRECTORIES
@@ -961,7 +968,7 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   set_target_properties(BlocksRuntime
                         PROPERTIES
                           IMPORTED_LOCATION
-                            ${install_dir}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}BlocksRuntime${CMAKE_SHARED_LIBRARY_SUFFIX}
+                            ${install_dir}/${SOURCEKIT_LIBDISPATCH_RUNTIME_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}BlocksRuntime${CMAKE_SHARED_LIBRARY_SUFFIX}
                           IMPORTED_IMPLIB
                             ${install_dir}/lib/${CMAKE_IMPORT_LIBRARY_PREFIX}BlocksRuntime${CMAKE_IMPORT_LIBRARY_SUFFIX}
                           INTERFACE_INCLUDE_DIRECTORIES
@@ -984,15 +991,6 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
                         ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
 endif()
 
-#
-# Set up global CMake variables for API notes.
-#
-set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
-include("${SWIFT_API_NOTES_PATH}/CMakeLists.txt")
-if(NOT DEFINED SWIFT_API_NOTES_INPUTS)
-  message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
-endif()
-
 # Add all of the subdirectories, where we actually do work.
 
 ###############
@@ -1000,7 +998,7 @@ endif()
 ###############
 #
 # We have to include stdlib/ before tools/.
-# Do not move add_subdirectory(stdlib) after add_subdirectory(tools)!                                             
+# Do not move add_subdirectory(stdlib) after add_subdirectory(tools)!
 #
 # We must include stdlib/ before tools/ because stdlib/CMakeLists.txt
 # declares the swift-stdlib-* set of targets. These targets will then
@@ -1015,6 +1013,14 @@ endif()
 #
 # https://bugs.swift.org/browse/SR-5975
 add_subdirectory(stdlib)
+
+if(SWIFT_BUILD_SDK_OVERLAY)
+  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}"
+                 building_darwin_sdks)
+  if(building_darwin_sdks)
+    add_subdirectory(apinotes)
+  endif()
+endif()
 
 add_subdirectory(include)
 

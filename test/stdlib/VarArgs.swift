@@ -6,9 +6,16 @@ import Swift
 #if _runtime(_ObjC)
 import Darwin
 import CoreGraphics
-#else
+#elseif os(Linux) || os(FreeBSD) || os(Android) || os(Haiku) || os(PS4)
 import Glibc
 typealias CGFloat = Double
+#elseif os(Windows)
+import MSVCRT
+#if arch(x86_64) || arch(arm64)
+typealias CGFloat = Double
+#else
+typealias CGFloat = Float
+#endif
 #endif
 
 func my_printf(_ format: String, _ arguments: CVarArg...) {

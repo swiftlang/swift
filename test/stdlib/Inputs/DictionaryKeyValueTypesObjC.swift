@@ -33,7 +33,7 @@ func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(type(of: d)) as NSString
   return [
     "_SwiftDeferredNSDictionary",
-    "_EmptyDictionarySingleton",
+    "__EmptyDictionarySingleton",
     "_DictionaryStorage"].contains {
     className.range(of: $0).length > 0
   }

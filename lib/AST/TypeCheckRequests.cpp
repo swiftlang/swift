@@ -125,12 +125,12 @@ Optional<Type> SuperclassTypeRequest::getCachedResult() const {
   auto nominalDecl = std::get<0>(getStorage());
 
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    if (classDecl->LazySemanticInfo.Superclass.getInt())
-      return classDecl->LazySemanticInfo.Superclass.getPointer();
+    if (classDecl->LazySemanticInfo.SuperclassType.getInt())
+      return classDecl->LazySemanticInfo.SuperclassType.getPointer();
 
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
-    if (protocolDecl->LazySemanticInfo.Superclass.getInt())
-      return protocolDecl->LazySemanticInfo.Superclass.getPointer();
+    if (protocolDecl->LazySemanticInfo.SuperclassType.getInt())
+      return protocolDecl->LazySemanticInfo.SuperclassType.getPointer();
 
   return None;
 }
@@ -139,10 +139,10 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
   auto nominalDecl = std::get<0>(getStorage());
 
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    classDecl->LazySemanticInfo.Superclass.setPointerAndInt(value, true);
+    classDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
-    protocolDecl->LazySemanticInfo.Superclass.setPointerAndInt(value, true);
+    protocolDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 }
 
 //----------------------------------------------------------------------------//

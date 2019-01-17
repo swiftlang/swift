@@ -54,7 +54,7 @@ sil_property #ExternalGeneric.rw <T: Comparable> (
 // CHECK: @"$s19property_descriptor15ExternalGenericV10computedROxvpMV" =
 // -- 0x0108_0000 - computed, readonly, has arguments, identified by indirect
 // CHECK-SAME:  <{ <i32 0x0208_0002>,
-// CHECK-SAME:     @got.id_computed
+// CHECK-SAME:     @{{got.|__imp_}}id_computed
 // CHECK-SAME:     [[GET_COMPUTEDRO:@keypath_get[.0-9]*]]
 // CHECK-SAME:     [[GET_ARG_LAYOUT_COMPUTEDRO:@keypath_get_arg_layout[.0-9]*]]
 // -- default witness table
@@ -68,7 +68,7 @@ sil_property #ExternalGeneric.computedRO <T: Comparable> (
 // CHECK: @"$s19property_descriptor15ExternalGenericV10computedRWxvpMV" =
 // -- 0x01c8_0000 - computed, settable, mutating, has arguments, indirect id
 // CHECK-SAME:  <{ <i32 0x02c8_0002>, 
-// CHECK-SAME:     @got.id_computed
+// CHECK-SAME:     @{{got.|__imp_}}id_computed
 // CHECK-SAME:     [[GET_COMPUTEDRW:@keypath_get[.0-9]*]]
 // CHECK-SAME:     [[SET_COMPUTEDRW:@keypath_set[.0-9]*]]
 // CHECK-SAME:     [[GET_ARG_LAYOUT_COMPUTEDRW:@keypath_get_arg_layout[.0-9]*]]
@@ -83,7 +83,7 @@ sil_property #ExternalGeneric.computedRW <T: Comparable> (
 // CHECK: @"$s19property_descriptor15ExternalGenericVyxqd__cSHRd__luipMV" =
 // -- 0x01c8_0000 - computed, settable, mutating, has arguments, indirect id
 // CHECK-SAME:  <{ <i32 0x02c8_0002>, 
-// CHECK-SAME:     @got.id_computed
+// CHECK-SAME:     @{{got.|__imp_}}id_computed
 // CHECK-SAME:     [[GET_SUBSCRIPT:@keypath_get[.0-9]*]]
 // CHECK-SAME:     [[SET_SUBSCRIPT:@keypath_set[.0-9]*]]
 // CHECK-SAME:     [[GET_ARG_LAYOUT_SUBSCRIPT:@keypath_get_arg_layout[.0-9]*]]
