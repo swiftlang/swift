@@ -24,14 +24,14 @@ TensorADTests.testAllBackends("TestSimpleGrad") {
 
 TensorADTests.testAllBackends("+") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a + b }
-  expectTrue(([1], [1]) == gradient(at: [0], [0], in: f))
-  expectTrue(([1], [1]) == gradient(at: [1], [10], in: f))
+  expectTrue((Tensor(1), Tensor(1)) == gradient(at: Tensor(0), Tensor(0), in: f))
+  expectTrue(([1], [1]) == pullback(at: [1], [10], in: f)([1]))
 }
 
 TensorADTests.testAllBackends("-") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a - b }
-  expectTrue(([1], [-1]) == gradient(at: [0], [0], in: f))
-  expectTrue(([1], [-1]) == gradient(at: [1], [10], in: f))
+  expectTrue((Tensor(1), Tensor(-1)) == gradient(at: Tensor(0), Tensor(0), in: f))
+  expectTrue(([1], [-1]) == pullback(at: [1], [10], in: f)([1]))
 }
 
 TensorADTests.testAllBackends("*") {
@@ -47,14 +47,16 @@ TensorADTests.testAllBackends("/") {
 
 TensorADTests.testAllBackends("matmul") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in matmul(a, b) }
-  expectTrue(([[0]], [[0]]) == gradient(at: [[0]], [[0]], in: f))
-  expectTrue(([[10]], [[1]]) == gradient(at: [[1]], [[10]], in: f))
+  let v = Tensor<Float>(ones: [1, 1])
+  expectTrue(([[0]], [[0]]) == pullback(at: [[0]], [[0]], in: f)(v))
+  expectTrue(([[10]], [[1]]) == pullback(at: [[1]], [[10]], in: f)(v))
 }
 
 TensorADTests.testAllBackends("•") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a • b }
-  expectTrue(([[0]], [[0]]) == gradient(at: [[0]], [[0]], in: f))
-  expectTrue(([[10]], [[1]]) == gradient(at: [[1]], [[10]], in: f))
+  let v = Tensor<Float>(ones: [1, 1])
+  expectTrue(([[0]], [[0]]) == pullback(at: [[0]], [[0]], in: f)(v))
+  expectTrue(([[10]], [[1]]) == pullback(at: [[1]], [[10]], in: f)(v))
 }
 
 TensorADTests.testAllBackends("negate") {
@@ -90,21 +92,28 @@ TensorADTests.testAllBackends("mean") {
   expectTrue(meanGradAlongAxes(input) == expected)
 }
 
+TensorADTests.testAllBackends("reshaped") {
+  let shapeTensor = Tensor<Int32>([2, 2, 2])
+  let input = Tensor<Float>(ones: [2, 4])
+  let reshapedPullback = pullback(at: input) { (a: Tensor<Float>) in a.reshaped(toShape: shapeTensor) }
+  let reshaped = Tensor<Float>(ones: [2, 2, 2])
+  expectTrue(reshapedPullback(reshaped) == input)
+}
+
 TensorADTests.testAllBackends("transposed") {
   let input = Tensor<Float>(ones: [2, 3])
   let transposed = Tensor<Float>(ones: [3, 2])
   let transposedPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed() }
   let transposedPermutationsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: [1, 0]) }
-  let transposedVariadiicsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: 1, 0) }
+  let transposedVariadicsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: 1, 0) }
 
   expectTrue(transposedPullback(transposed) == input)
   expectTrue(transposedPermutationsPullback(transposed) == input)
-  expectTrue(transposedVariadiicsPullback(transposed)  == input)
+  expectTrue(transposedVariadicsPullback(transposed) == input)
 }
 
 TensorADTests.testAllBackends("relu") {
   let f = { (a: Tensor<Float>) in relu(a) }
-  print(gradient(at: [5, -5, 0], in: f))
   expectTrue([1, 0, 0] == gradient(at: [5, -5, 0], in: f))
 }
 
@@ -114,14 +123,18 @@ TensorADTests.testAllBackends("softmax") {
   expectTrue([[-0.25, 0.25], [0.75, -0.75]] == pb([[1, 2], [4, 1]]))
 }
 
+TensorADTests.testAllBackends("log_softmax") {
+  let pb = pullback(at: Tensor(ones: [3, 3])) { (a: Tensor<Float>) in logSoftmax(a) }
+  expectTrue(Tensor(shape: [3, 3], repeating: 5.9604645e-08) == pb(Tensor(ones: [3, 3])))
+}
+
 TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {
-  @differentiable(adjoint: adjointFoo)
+  @differentiable(vjp: vjpFoo)
   func foo(_ x: Tensor<Float>) -> Tensor<Float> {
       return Raw.identity(x)
   }
-  func adjointFoo(_ seed: Tensor<Float>, _ originalValue: Tensor<Float>,
-                  _ x: Tensor<Float>) -> Tensor<Float> {
-    return seed
+  func vjpFoo(_ x: Tensor<Float>) -> (Tensor<Float>, (Tensor<Float>) -> Tensor<Float>) {
+    return (foo(x), { v in v })
   }
   func body(_ x: Tensor<Float>) -> Tensor<Float> {
     return foo(foo(x))

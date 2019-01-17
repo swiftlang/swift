@@ -848,9 +848,7 @@ public:
 
   /// Parse the arguments inside the @differentiable attribute.
   bool parseDifferentiableAttributeArguments(
-      SmallVectorImpl<AutoDiffParameter> &params,
-      Optional<DifferentiableAttr::DeclNameWithLoc> &primalSpec,
-      Optional<DifferentiableAttr::DeclNameWithLoc> &adjointSpec,
+      SmallVectorImpl<ParsedAutoDiffParameter> &params,
       Optional<DifferentiableAttr::DeclNameWithLoc> &jvpSpec,
       Optional<DifferentiableAttr::DeclNameWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);

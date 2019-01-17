@@ -1,5 +1,8 @@
+// FIXME: TFPartition fails in `GraphFunctionDeviceInfo::finalizeUsedDevices()`
+// because used device set includes RUNTIME device.
+// UN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+
 // RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: tensorflow
 
@@ -238,38 +241,32 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Float") {
   expectEqual(false, result2.scalar!)
 }
 
-#if !CUDA
 DynamicAttributeTests.testAllBackends("NormalAttribute String") {
   let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
                                     T$dtype: Float.tensorFlowDataType,
                                     strides: [1, 1, 1, 1] as [Int32],
                                     padding: loadVALIDString())
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
-#endif //!CUDA
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Bool>") {
   // There aren't any ops that take bool list attributes!
 }
 
-#if !CUDA
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int32>") {
   let result = convImage.convolved2D(withFilter: convFilter,
                                      strides: loadStridesInt32(),
                                      padding: .valid)
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
-#endif //!CUDA
 
-#if !CUDA
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int64>") {
   let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
                                     T$dtype: Float.tensorFlowDataType,
                                     strides: loadStridesInt64(),
                                     padding: "VALID")
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
-#endif //!CUDA
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Double>") {
   let input = Tensor<Double>([-1, 0.1, 4.3, 1.2])

@@ -178,16 +178,14 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     // we will no longer need to see whether they are specified.
     if (!DA->getJVP()) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-          AutoDiffAssociatedFunctionKind::JVP,
-          /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
-          AFD->getASTContext());
+          AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+          DA->getParameterIndices(), AFD->getASTContext());
       addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
     }
     if (!DA->getVJP()) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-          AutoDiffAssociatedFunctionKind::VJP,
-          /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
-          AFD->getASTContext());
+          AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+          DA->getParameterIndices(), AFD->getASTContext());
       addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
     }
   }
@@ -259,16 +257,14 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     // we will no longer need to see whether they are specified.
     if (!DA->getJVP()) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-          AutoDiffAssociatedFunctionKind::JVP,
-          /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
-          VD->getASTContext());
+          AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+          DA->getParameterIndices(), VD->getASTContext());
       addSymbol(SILDeclRef(VD->getGetter()).asAutoDiffAssociatedFunction(id));
     }
     if (!DA->getVJP()) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-        AutoDiffAssociatedFunctionKind::VJP,
-        /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
-        VD->getASTContext());
+          AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+          DA->getParameterIndices(), VD->getASTContext());
       addSymbol(SILDeclRef(VD->getGetter()).asAutoDiffAssociatedFunction(id));
     }
   }

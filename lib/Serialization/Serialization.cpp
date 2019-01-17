@@ -887,7 +887,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
   // SWIFT_ENABLE_TENSORFLOW
-  BLOCK_RECORD(sil_block, SIL_REVERSE_DIFFERENTIABLE_ATTR);
+  BLOCK_RECORD(sil_block, SIL_DIFFERENTIABLE_ATTR);
   BLOCK_RECORD(sil_block, SIL_INST_GRAPH_OPERATION);
   BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION);
   BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION_EXTRACT);
@@ -2344,18 +2344,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     auto abbrCode = DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
     auto attr = cast<DifferentiableAttr>(DA);
 
-    IdentifierID primalName = 0;
-    DeclID primalRef = 0;
-    if (auto primal = attr->getPrimal()) {
-      primalName = addDeclBaseNameRef(primal->Name.getBaseName());
-      primalRef = addDeclRef(attr->getPrimalFunction());
-    }
-    IdentifierID adjointName = 0;
-    DeclID adjointRef = 0;
-    if (auto adjoint = attr->getAdjoint()) {
-      adjointName = addDeclBaseNameRef(adjoint->Name.getBaseName());
-      adjointRef = addDeclRef(attr->getAdjointFunction());
-    }
     IdentifierID jvpName = 0;
     DeclID jvpRef = 0;
     if (auto jvp = attr->getJVP()) {
@@ -2369,24 +2357,16 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
       vjpRef = addDeclRef(attr->getVJPFunction());
     }
 
-    SmallVector<uint32_t, 4> parameters;
-    for (auto param : attr->getParameters()) {
-      switch (param.getKind()) {
-      // The self parameter is uniquely identified by 0x01.
-      case AutoDiffParameter::Kind::Self:
-        parameters.push_back(1);
-        break;
-      // Index parameters are left-shifted by 1.
-      case AutoDiffParameter::Kind::Index:
-        parameters.push_back(param.getIndex() << 1);
-        break;
-      }
-    }
+    auto paramIndices = attr->getParameterIndices();
+    assert(paramIndices && "Checked parameter indices must be resolved");
+    SmallVector<bool, 4> indices;
+    for (unsigned i : swift::indices(paramIndices->parameters))
+      indices.push_back(paramIndices->parameters[i]);
 
     DifferentiableDeclAttrLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, attr->isImplicit(), primalName, primalRef,
-      adjointName, adjointRef, jvpName, jvpRef, vjpName, vjpRef, parameters);
-    // TODO: Serialize CheckedParameterIndices.
+      Out, ScratchRecord, abbrCode, attr->isImplicit(),
+      jvpName, jvpRef, vjpName, vjpRef, indices);
+
     writeGenericRequirements(attr->getRequirements(), DeclTypeAbbrCodes);
     return;
   }

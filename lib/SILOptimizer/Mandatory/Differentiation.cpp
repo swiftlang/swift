@@ -73,13 +73,25 @@ template <typename T> static inline void debugDump(T &v) {
 static void createEntryArguments(SILFunction *f) {
   auto *entry = f->getEntryBlock();
   auto conv = f->getConventions();
+  auto &ctx = f->getASTContext();
+  auto moduleDecl = f->getModule().getSwiftModule();
   assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
          "Entry already has arguments?!");
+  // Create a dummy argument declaration.
+  // Necessary to prevent crash during argument explosion optimization.
+  auto createDummyParamDecl = [&] {
+    return new (ctx)
+        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                  Identifier(), SourceLoc(), Identifier(), moduleDecl);
+  };
   for (auto indResultTy : conv.getIndirectSILResultTypes())
     entry->createFunctionArgument(
-        f->mapTypeIntoContext(indResultTy).getAddressType());
-  for (auto paramTy : conv.getParameterSILTypes())
-    entry->createFunctionArgument(f->mapTypeIntoContext(paramTy));
+        f->mapTypeIntoContext(indResultTy).getAddressType(),
+        createDummyParamDecl());
+  for (auto paramTy : conv.getParameterSILTypes()) {
+    entry->createFunctionArgument(f->mapTypeIntoContext(paramTy),
+                                  createDummyParamDecl());
+  }
 }
 
 /// Looks up a function in the current module. If it exists, returns it.
@@ -297,7 +309,7 @@ public:
     // has an associated `@differentiable` attribute.
     DifferentiableAttribute,
 
-    // Invoker by a `[differentiable]` attribute in SIL **without** being lined
+    // Invoker by a `[differentiable]` attribute in SIL **without** being linked
     // to a Swift AST attribute. This case has an associated `[differentiable]`
     // attribute.
     SILDifferentiableAttribute
@@ -785,9 +797,6 @@ private:
   SmallDenseMap<std::pair<SILFunction *, SILAutoDiffIndices>, unsigned>
       enqueuedTaskIndices;
 
-  /// The SIL loader owned by the module.
-  SerializedSILLoader *silLoader = module.getSILLoader();
-
   /// The VectorNumeric protocol in the standard library.
   ProtocolDecl *vectorNumericProtocol =
       astCtx.getProtocol(KnownProtocolKind::VectorNumeric);
@@ -895,11 +904,7 @@ private:
   SILDifferentiableAttr *createDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) const {
     assert(!lookUpDifferentiableAttr(original, indices));
-    auto *attr =
-        SILDifferentiableAttr::create(getModule(), indices,
-                                      /*primalName*/ StringRef(),
-                                      /*adjointName*/ StringRef(),
-                                      /*primitive*/ false);
+    auto *attr = SILDifferentiableAttr::create(getModule(), indices);
     original->addDifferentiableAttr(attr);
     return attr;
   }
@@ -910,6 +915,7 @@ private:
       SILFunction *original, const SILAutoDiffIndices &indices) {
     if (auto *attr = lookUpDifferentiableAttr(original, indices))
       return attr;
+    assert(original->isDefinition());
     return createDifferentiableAttr(original, indices);
   }
 
@@ -943,8 +949,7 @@ private:
       // new candidate.
       if (!indexSet.test(rdaIndexSet) && // all indexSet indices in rdaIndexSet
           (supersetParamIndices.empty() || // fewer parameters than before
-           rdaIndexSet.count() < supersetParamIndices.count()) &&
-          (indexSet == rdaIndexSet || rda->isAdjointPrimitive()))
+           rdaIndexSet.count() < supersetParamIndices.count()))
         supersetParamIndices = rda->getIndices().parameters;
     }
     auto existing = enqueuedTaskIndices.find(
@@ -967,16 +972,6 @@ public:
                               DifferentiationInvoker invoker) {
     // Make sure this pair of original and indices is unique.
     assert(!lookUpDifferentiationTask(original, indices));
-    // Make sure this function either has a body or has a
-    // `[differentiable]` attribute that is a superset of all the
-    if (original->isExternalDeclaration()) {
-      // If it's serialized, deserialize it.
-      assert(original->isSerialized() &&
-             "Differentiation task cannot be on a function without a body");
-      auto *deserializedFn = silLoader->lookupSILFunction(original);
-      assert(deserializedFn && "Cannot deserialize original function");
-      (void)deserializedFn;
-    }
     auto *attr = getOrCreateDifferentiableAttr(original, indices);
     std::unique_ptr<DifferentiationTask> task(
         new DifferentiationTask(*this, original, std::move(attr), invoker));
@@ -990,23 +985,9 @@ public:
   lookUpOrRegisterDifferentiationTask(SILFunction *original,
                                       const SILAutoDiffIndices &indices,
                                       DifferentiationInvoker invoker) {
-    // If `original` has no differentiable attributes, it may be the case that
-    // it has not been loaded yet. Load it, check for differentiable attributes,
-    // and register the attributes as tasks so that they can be looked up.
-    if (original->getDifferentiableAttrs().empty() &&
-        original->isExternalDeclaration()) {
-      auto loaded = module.loadFunction(original);
-      assert(loaded && "Cannot load original function");
-      (void)loaded;
-      for (auto *diffAttr : original->getDifferentiableAttrs()) {
-        registerDifferentiationTask(
-            original, diffAttr->getIndices(),
-            DifferentiationInvoker(diffAttr, original));
-      }
-    }
-
     if (auto *existingTask = lookUpMinimalDifferentiationTask(original, indices))
       return existingTask;
+    assert(original->isDefinition());
     return registerDifferentiationTask(original, indices, invoker);
   }
 
@@ -1038,7 +1019,11 @@ public:
 
 ADContext::ADContext(SILModuleTransform &transform)
     : transform(transform), module(*transform.getModule()),
-      passManager(*transform.getPassManager()) {}
+      passManager(*transform.getPassManager()) {
+  // Note: `getSILLoader` performs important initialization and is necessary to
+  // prevent test failures related to `lookUpFunctionInWitnessTable`.
+  (void)module.getSILLoader();
+}
 
 void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                               const DifferentiationTask *task,
@@ -1304,6 +1289,16 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
         else if (auto *cai = dyn_cast<CopyAddrInst>(&inst)) {
           if (isVaried(cai->getSrc(), i))
             recursivelySetVariedIfDifferentiable(cai->getDest(), i);
+        }
+        else if (auto *sei = dyn_cast<StructExtractInst>(&inst)) {
+          if (isVaried(sei->getOperand(), i)) {
+            auto hasNoDeriv = sei->getField()->getAttrs()
+                .hasAttribute<NoDerivativeAttr>();
+            if (!hasNoDeriv) {
+              for (auto result: inst.getResults())
+                setVariedIfDifferentiable(result, i);
+            }
+          }
         }
         // Handle everything else.
         else {
@@ -1668,7 +1663,7 @@ emitAssociatedFunctionReference(
     }
 
     // Check that the requirement indices are the same as the desired indices.
-    auto *requirementParameterIndices = diffAttr->getCheckedParameterIndices();
+    auto *requirementParameterIndices = diffAttr->getParameterIndices();
     auto loweredRequirementIndices = requirementParameterIndices->getLowered(
         requirementDecl->getInterfaceType()->castTo<AnyFunctionType>());
     SILAutoDiffIndices requirementIndices(/*source*/ 0,
@@ -1776,7 +1771,9 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
     pvStruct->getAttrs().add(
         new (astCtx) UsableFromInlineAttr(/*implicit*/ true));
   }
-  pvStruct->setGenericEnvironment(task->getOriginal()->getGenericEnvironment());
+  if (auto originalGenSig =
+          task->getOriginal()->getLoweredFunctionType()->getGenericSignature())
+    pvStruct->setGenericEnvironment(originalGenSig->createGenericEnvironment());
   file.addVisibleDecl(pvStruct);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
@@ -2248,7 +2245,7 @@ public:
 
 bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   LLVM_DEBUG(getADDebugStream() << "Performing primal synthesis for original"
-             << item.original->getName() << " and its corresponding adjoint "
+             << item.original->getName() << " and its corresponding primal "
              << item.target->getName() << '\n');
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
@@ -3630,14 +3627,14 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
                                          SILDifferentiableAttr *&&attr,
                                          DifferentiationInvoker invoker)
     : context(context), original(original), attr(attr), invoker(invoker) {
-  if (attr->hasPrimal())
-    primal = lookUpOrLinkFunction(attr->getPrimalName(), context.getModule());
-  if (attr->hasAdjoint())
-    adjoint = lookUpOrLinkFunction(attr->getAdjointName(), context.getModule());
-  if (attr->hasJVP())
+  if (attr->hasJVP()) {
     jvp = lookUpOrLinkFunction(attr->getJVPName(), context.getModule());
-  if (attr->hasVJP())
+    assert(jvp);
+  }
+  if (attr->hasVJP()) {
     vjp = lookUpOrLinkFunction(attr->getVJPName(), context.getModule());
+    assert(vjp);
+  }
 
   if (!jvp)
     createJVP();
@@ -3649,22 +3646,10 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
     return;
   }
 
-  if (adjoint) {
-    // If we already have an adjoint, then we don't need to synthesize the
-    // primal or the adjoint.
-    primalSynthesisState = FunctionSynthesisState::NotNeeded;
-    adjointSynthesisState = FunctionSynthesisState::NotNeeded;
-  } else {
-    assert(!attr->hasPrimal() &&
-           "[differentiable] attr without adjoint should not have primal");
-
-    // We don't have the primal or adjoint, so we need to synthesize them.
-    primalSynthesisState = FunctionSynthesisState::Needed;
-    adjointSynthesisState = FunctionSynthesisState::Needed;
-    createEmptyPrimal();
-    createEmptyAdjoint();
-  }
-
+  primalSynthesisState = FunctionSynthesisState::Needed;
+  adjointSynthesisState = FunctionSynthesisState::Needed;
+  createEmptyPrimal();
+  createEmptyAdjoint();
   createVJP();
 }
 
@@ -3672,14 +3657,15 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
 // a SILDifferentiableAttr. The expected generic signature is built from the
 // original generic signature and the attribute's requirements.
 static GenericSignature *
-getAutodiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr) {
-  auto original = attr->getOriginal();
-  auto originalGenEnv = original->getGenericEnvironment();
-  if (!originalGenEnv)
+getAutoDiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
+                                              SILFunction *original) {
+  auto originalGenSig =
+      original->getLoweredFunctionType()->getGenericSignature();
+  if (!originalGenSig)
     return nullptr;
   GenericSignatureBuilder builder(original->getASTContext());
   // Add original generic signature.
-  builder.addGenericSignature(originalGenEnv->getGenericSignature());
+  builder.addGenericSignature(originalGenSig);
   // Add where clause requirements.
   auto source =
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
@@ -3704,7 +3690,8 @@ void DifferentiationTask::createEmptyPrimal() {
                         .getIdentifier("AD__" + original->getName().str() +
                                        "__primal_" + indices.mangle())
                         .str();
-  auto *primalGenericSig = getAutodiffAssociatedFunctionGenericSignature(attr);
+  auto *primalGenericSig =
+      getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   StructDecl *primalValueStructDecl = context.createPrimalValueStruct(this);
   primalInfo = std::unique_ptr<PrimalInfo>(
       new PrimalInfo(primalValueStructDecl, module));
@@ -3737,8 +3724,6 @@ void DifferentiationTask::createEmptyPrimal() {
   primal->setUnqualifiedOwnership();
   LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
                                 << *primal << '\n');
-
-  attr->setPrimalName(primalName);
 }
 
 void DifferentiationTask::createEmptyAdjoint() {
@@ -3747,13 +3732,14 @@ void DifferentiationTask::createEmptyAdjoint() {
 
   auto &module = context.getModule();
   auto *original = getOriginal();
+  auto origTy = original->getLoweredFunctionType();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that the calls `module.Types.getTypeLowering()` below
-  // can understand the original function's generic parameter types.
+  // will know the original function's generic parameter types.
   Lowering::GenericContextScope genericContextScope(
-      module.Types, original->getLoweredFunctionType()->getGenericSignature());
+      module.Types, origTy->getGenericSignature());
 
   // Given a type, returns its formal SIL parameter info.
   auto getFormalParameterInfo = [&](CanType type) -> SILParameterInfo {
@@ -3789,7 +3775,6 @@ void DifferentiationTask::createEmptyAdjoint() {
   // parameters.
   SmallVector<SILParameterInfo, 8> adjParams;
   SmallVector<SILResultInfo, 8> adjResults;
-  auto origTy = original->getLoweredFunctionType();
   auto origParams = origTy->getParameters();
 
   // Add adjoint parameter for the seed.
@@ -3844,7 +3829,8 @@ void DifferentiationTask::createEmptyAdjoint() {
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__adjoint_" + getIndices().mangle())
                      .str();
-  auto *adjGenericSig = getAutodiffAssociatedFunctionGenericSignature(attr);
+  auto *adjGenericSig =
+      getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *adjGenericEnv = adjGenericSig
       ? adjGenericSig->createGenericEnvironment()
       : nullptr;
@@ -3867,18 +3853,25 @@ void DifferentiationTask::createEmptyAdjoint() {
   adjoint->setUnqualifiedOwnership();
   adjoint->setDebugScope(new (module)
                              SILDebugScope(original->getLocation(), adjoint));
-
-  attr->setAdjointName(adjName, /*primitive*/ false);
 }
 
 void DifferentiationTask::createJVP() {
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
 
+  // RAII that pushes the original function's generic signature to
+  // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+  // will know the original function's generic parameter types.
+  Lowering::GenericContextScope genericContextScope(
+      module.Types, originalTy->getGenericSignature());
+
   // === Create an empty JVP. ===
-  auto jvpName =
-      "AD__" + original->getName().str() + "__jvp_" + getIndices().mangle();
-  auto *jvpGenericSig = getAutodiffAssociatedFunctionGenericSignature(attr);
+  auto jvpName = original->getASTContext()
+                     .getIdentifier("AD__" + original->getName().str() +
+                                    "__jvp_" + getIndices().mangle())
+                     .str();
+  auto *jvpGenericSig =
+      getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *jvpGenericEnv = jvpGenericSig
       ? jvpGenericSig->createGenericEnvironment()
       : nullptr;
@@ -3889,28 +3882,19 @@ void DifferentiationTask::createJVP() {
       jvpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  jvp = fb.createFunction(original->getLinkage(), jvpName, jvpType,
-                          jvpGenericEnv, original->getLocation(),
-                          original->isBare(), IsNotTransparent,
-                          original->isSerialized());
+  auto linkage = getAutoDiffFunctionLinkage(original->getLinkage());
+  jvp = fb.createFunction(linkage, jvpName, jvpType, jvpGenericEnv,
+                          original->getLocation(), original->isBare(),
+                          IsNotTransparent, original->isSerialized());
   jvp->setUnqualifiedOwnership();
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
-  attr->setJVPName(jvp->getName());
+  attr->setJVPName(jvpName);
 
-  // Entry block arguments
+  // Create JVP entry BB and arguments.
   auto jvpConv = jvp->getConventions();
   auto *entry = jvp->createBasicBlock();
-  unsigned argumentIndex = 0;
-  for (auto indResultTy : jvpConv.getIndirectSILResultTypes())
-    entry->createFunctionArgument(
-        jvp->mapTypeIntoContext(indResultTy).getAddressType(),
-        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
-  for (auto paramTy : jvpConv.getParameterSILTypes())
-    entry->createFunctionArgument(
-        jvp->mapTypeIntoContext(paramTy),
-        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
-
-  // Return undef
+  createEntryArguments(jvp);
+  // Return undef.
   SILBuilder builder(entry);
   auto loc = jvp->getLocation();
   builder.createReturn(
@@ -3929,17 +3913,24 @@ void DifferentiationTask::createVJP() {
                           << "  primal type: "
                           << primal->getLoweredFunctionType() << "\n"
                           << "  adjoint type: "
-                          <<  adjoint->getLoweredFunctionType() << "\n");
+                          << adjoint->getLoweredFunctionType() << "\n");
 
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
+
+  // RAII that pushes the original function's generic signature to
+  // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+  // will know the original function's generic parameter types.
+  Lowering::GenericContextScope genericContextScope(
+      module.Types, originalTy->getGenericSignature());
 
   // === Create an empty VJP. ===
   auto vjpName = original->getASTContext()
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__vjp_" + getIndices().mangle())
                      .str();
-  auto *vjpGenericSig = getAutodiffAssociatedFunctionGenericSignature(attr);
+  auto *vjpGenericSig =
+      getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *vjpGenericEnv = vjpGenericSig
       ? vjpGenericSig->createGenericEnvironment()
       : nullptr;
@@ -4045,17 +4036,9 @@ void DifferentiationTask::createVJP() {
   }
 #endif
 
-  // Create the entry block with indirect results and parameters.
+  // Create VJP entry BB and arguments.
   auto *entry = vjp->createBasicBlock();
-  unsigned argumentIndex = 0;
-  for (auto indResultTy : vjpConv.getIndirectSILResultTypes())
-    entry->createFunctionArgument(
-        vjp->mapTypeIntoContext(indResultTy).getAddressType(),
-        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
-  for (auto paramTy : vjpConv.getParameterSILTypes())
-    entry->createFunctionArgument(
-        vjp->mapTypeIntoContext(paramTy),
-        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
+  createEntryArguments(vjp);
 
   SILBuilder builder(entry);
   auto loc = vjp->getLocation();
@@ -4090,9 +4073,13 @@ void DifferentiationTask::createVJP() {
 
   // Get and call the primal.
   auto *primalRef = builder.createFunctionRef(loc, primal);
+
+  auto vjpSubstMap = vjpGenericEnv
+    ? vjpGenericEnv->getForwardingSubstitutionMap()
+    : vjp->getForwardingSubstitutionMap();
+
   auto *primalApply = builder.createApply(
-      loc, primalRef, vjp->getForwardingSubstitutionMap(), primalArgs,
-      /*isNonThrowing*/ false);
+      loc, primalRef, vjpSubstMap, primalArgs, /*isNonThrowing*/ false);
 
   // Collect the primal's direct results.
   SmallVector<SILValue, 8> primalDirectResults;
@@ -4139,7 +4126,7 @@ void DifferentiationTask::createVJP() {
   // Get and partially apply the adjoint.
   auto *adjointRef = builder.createFunctionRef(loc, adjoint);
   auto *adjointPartialApply = builder.createPartialApply(
-      loc, adjointRef, vjp->getForwardingSubstitutionMap(), partialAdjointArgs,
+      loc, adjointRef, vjpSubstMap, partialAdjointArgs,
       ParameterConvention::Direct_Guaranteed);
 
   // === Clean up the stack allocations. ===
@@ -4258,13 +4245,8 @@ void Differentiation::run() {
     // If `f` has a `[differentiable]` attribute, it should become a
     // differentiation task.
     for (auto *diffAttr : f.getDifferentiableAttrs()) {
-      if (diffAttr->hasPrimal() == diffAttr->hasAdjoint()) {
-        diffAttrs.push_back({&f, diffAttr});
-        continue;
-      }
-      // If only primal or adjoint is specified, it's an incomplete attribute.
-      astCtx.Diags.diagnose(f.getLocation().getSourceLoc(),
-                            diag::autodiff_incomplete_differentiable_attr);
+      diffAttrs.push_back({&f, diffAttr});
+      continue;
     }
     for (SILBasicBlock &bb : f)
       for (SILInstruction &i : bb)

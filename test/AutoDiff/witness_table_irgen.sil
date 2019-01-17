@@ -22,7 +22,7 @@ struct AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type_
 }
 
 // DifferentiableConformance.f(_:)
-sil hidden [differentiable source 0 wrt 0 primal @AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__primal_src_0_wrt_0 adjoint @AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0 jvp @$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfF vjp @$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfF] @$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF : $@convention(method) (Float, DifferentiableConformance) -> Float {
+sil hidden [differentiable source 0 wrt 0 jvp @$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfF vjp @$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfF] @$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF : $@convention(method) (Float, DifferentiableConformance) -> Float {
 bb0(%0 : $Float, %1 : $DifferentiableConformance):
   return undef : $Float
 } // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF'

@@ -1302,21 +1302,18 @@ public:
 
 /// SWIFT_ENABLE_TENSORFLOW
 /// Attribute that marks a function differentiable and optionally specifies
-/// custom associated autodiff functions: 'primal', 'adjoint', 'jvp', and
-/// 'vjp'.
-///
-/// Note: 'primal' and 'adjoint' are legacy functions that we will keep around
-/// until we have fully switched to 'jvp' and 'vjp'.
+/// custom associated autodiff functions: 'jvp' and 'vjp'.
 ///
 /// Note: 'jvp' and 'vjp' are not fully supported yet. In particular, the core
 /// AD pass does not use them. We are incrementally adding support for them.
 ///
 /// For example:
-///   @differentiable(reverse, adjoint: foo(_:_:seed:) where T : FloatingPoint)
-///   @differentiable(reverse, wrt: (self, .0, .1), adjoint: bar(_:_:_:seed:))
+///   @differentiable(jvp: jvpFoo where T : FloatingPoint)
+///   @differentiable(wrt: (self, .0, .1), jvp: jvpFoo)
 class DifferentiableAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<DifferentiableAttr, AutoDiffParameter> {
+      private llvm::TrailingObjects<DifferentiableAttr,
+                                    ParsedAutoDiffParameter> {
 public:
   struct DeclNameWithLoc {
     DeclName Name;
@@ -1326,29 +1323,20 @@ private:
   friend TrailingObjects;
 
   /// The number of parameters specified in 'wrt:'.
-  unsigned NumParameters;
-  /// The primal function.
-  Optional<DeclNameWithLoc> Primal;
-  /// The adjoint function.
-  Optional<DeclNameWithLoc> Adjoint;
+  unsigned NumParsedParameters = 0;
   /// The JVP function.
   Optional<DeclNameWithLoc> JVP;
   /// The VJP function.
   Optional<DeclNameWithLoc> VJP;
-  /// The primal function (optional), to be resolved by the type checker if
-  /// specified.
-  FuncDecl *PrimalFunction = nullptr;
-  /// The adjoint function (optional), to be resolved by the type checker if
-  /// specified.
-  FuncDecl *AdjointFunction = nullptr;
   /// The JVP function (optional), to be resolved by the type checker if
   /// specified.
   FuncDecl *JVPFunction = nullptr;
   /// The VJP function (optional), to be resolved by the type checker if
   /// specified.
   FuncDecl *VJPFunction = nullptr;
-  /// Checked parameter indices, to be resolved by the type checker.
-  AutoDiffParameterIndices *CheckedParameterIndices = nullptr;
+  /// The differentiation parameters' indices, to be resolved by the type
+  /// checker.
+  AutoDiffParameterIndices *ParameterIndices = nullptr;
   /// The trailing where clause, if it exists.
   TrailingWhereClause *WhereClause = nullptr;
   /// The requirements for autodiff associated functions. Resolved by the type
@@ -1359,18 +1347,14 @@ private:
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
-                              ArrayRef<AutoDiffParameter> parameters,
-                              Optional<DeclNameWithLoc> primal,
-                              Optional<DeclNameWithLoc> adjoint,
+                              ArrayRef<ParsedAutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               TrailingWhereClause *clause);
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
-                              ArrayRef<AutoDiffParameter> parameters,
-                              Optional<DeclNameWithLoc> primal,
-                              Optional<DeclNameWithLoc> adjoint,
+                              AutoDiffParameterIndices *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               ArrayRef<Requirement> requirements);
@@ -1378,44 +1362,38 @@ private:
 public:
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    ArrayRef<AutoDiffParameter> parameters,
-                                    Optional<DeclNameWithLoc> primal,
-                                    Optional<DeclNameWithLoc> adjoint,
+                                    ArrayRef<ParsedAutoDiffParameter> params,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     TrailingWhereClause *clause);
 
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    ArrayRef<AutoDiffParameter> parameters,
-                                    Optional<DeclNameWithLoc> primal,
-                                    Optional<DeclNameWithLoc> adjoint,
+                                    AutoDiffParameterIndices *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     ArrayRef<Requirement> requirements);
 
-  Optional<DeclNameWithLoc> getPrimal() const { return Primal; }
-  Optional<DeclNameWithLoc> getAdjoint() const { return Adjoint; }
   Optional<DeclNameWithLoc> getJVP() const { return JVP; }
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
-  AutoDiffParameterIndices *getCheckedParameterIndices() const {
-    return CheckedParameterIndices;
+  AutoDiffParameterIndices *getParameterIndices() const {
+    return ParameterIndices;
   }
-  void setCheckedParameterIndices(AutoDiffParameterIndices *pi) {
-    CheckedParameterIndices = pi;
+  void setParameterIndices(AutoDiffParameterIndices *pi) {
+    ParameterIndices = pi;
   }
 
-  /// The differentiation parameters, i.e. the list of parameters specified in
-  /// 'wrt:'.
-  ArrayRef<AutoDiffParameter> getParameters() const {
-    return { getTrailingObjects<AutoDiffParameter>(), NumParameters };
+  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// specified in 'wrt:'.
+  ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
   }
-  MutableArrayRef<AutoDiffParameter> getParameters() {
-    return { getTrailingObjects<AutoDiffParameter>(), NumParameters };
+  MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
   }
-  size_t numTrailingObjects(OverloadToken<AutoDiffParameter>) const {
-    return NumParameters;
+  size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
+    return NumParsedParameters;
  }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
@@ -1424,10 +1402,6 @@ public:
   MutableArrayRef<Requirement> getRequirements() { return Requirements; }
   void setRequirements(ASTContext &context, ArrayRef<Requirement> requirements);
 
-  FuncDecl *getPrimalFunction() const { return PrimalFunction; }
-  void setPrimalFunction(FuncDecl *decl) { PrimalFunction = decl; }
-  FuncDecl *getAdjointFunction() const { return AdjointFunction; }
-  void setAdjointFunction(FuncDecl *decl) { AdjointFunction = decl; }
   FuncDecl *getJVPFunction() const { return JVPFunction; }
   void setJVPFunction(FuncDecl *decl) { JVPFunction = decl; }
   FuncDecl *getVJPFunction() const { return VJPFunction; }

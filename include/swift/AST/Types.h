@@ -3111,11 +3111,6 @@ public:
       LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr);
 
-  AnyFunctionType *getAutoDiffAdjointFunctionType(
-      AutoDiffParameterIndices *indices, const TupleType *primalResultTy,
-      LookupConformanceFn lookupConformance, bool isMethod,
-      GenericSignature *whereClauseGenericSignature = nullptr);
-
   /// \brief True if this type allows an implicit conversion from a function
   /// argument expression of type T to a function of type () -> T.
   bool isAutoClosure() const {

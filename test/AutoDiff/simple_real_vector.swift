@@ -17,12 +17,12 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
     self.y = scalar
   }
 
-  @differentiable(adjoint: fakeAdj)
+  @differentiable(vjp: fakeVJP)
   public static func + (lhs: Vector, rhs: Vector) -> Vector {
     abort()
   }
 
-  @differentiable(adjoint: fakeAdj)
+  @differentiable(vjp: fakeVJP)
   public static func - (lhs: Vector, rhs: Vector) -> Vector {
     abort()
   }
@@ -31,7 +31,7 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
     abort()
   }
 
-  public static func fakeAdj(seed: Vector, y: Vector, lhs: Vector, rhs: Vector) -> (Vector, Vector) {
+  public static func fakeVJP(lhs: Vector, rhs: Vector) -> (Vector, (Vector) -> (Vector, Vector)) {
     abort()
   }
 }

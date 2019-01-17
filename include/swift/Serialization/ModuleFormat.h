@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 461; // Last change: delete differentiation mode
+const uint16_t SWIFTMODULE_VERSION_MINOR = 462; // Last change: serialize differentiation indices
 
 using DeclIDField = BCFixed<31>;
 
@@ -1576,15 +1576,11 @@ namespace decls_block {
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
-    IdentifierIDField, // Primal name.
-    DeclIDField, // Primal function declaration.
-    IdentifierIDField, // Adjoint name.
-    DeclIDField, // Adjoint function declaration.
     IdentifierIDField, // JVP name.
     DeclIDField, // JVP function declaration.
     IdentifierIDField, // VJP name.
     DeclIDField, // VJP function declaration.
-    BCArray<BCFixed<32>> // Differentiation parameters.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \

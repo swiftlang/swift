@@ -4566,8 +4566,7 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   /// Verify the [differentiable] attribute.
-  void verifyDifferentiableAttr(SILFunction *F,
-                                       SILDifferentiableAttr &Attr) {
+  void verifyDifferentiableAttr(SILFunction *F, SILDifferentiableAttr &Attr) {
     std::function<unsigned(Type)> countParams;
     countParams = [&](Type type) -> unsigned {
       auto *fnTy = type->getAs<SILFunctionType>();
@@ -4582,6 +4581,10 @@ public:
     // Parameter indices must be specified.
     require(!Attr.getIndices().parameters.empty(),
             "Parameter indices cannot be empty");
+    // JVP and VJP must be specified in canonical SIL.
+    if (F->getModule().getStage() == SILStage::Canonical)
+      require(!Attr.getJVPName().empty() && !Attr.getVJPName().empty(),
+              "JVP and VJP must be specified in canonical SIL");
     // Verify if specified parameter indices are valid.
     auto numParams = countParams(F->getLoweredFunctionType());
     int lastIndex = -1;

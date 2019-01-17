@@ -2544,35 +2544,18 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Differentiable_DECL_ATTR: {
         bool isImplicit;
-        uint64_t primalNameId;
-        DeclID primalDeclId;
-        uint64_t adjointNameId;
-        DeclID adjointDeclId;
         uint64_t jvpNameId;
         DeclID jvpDeclId;
         uint64_t vjpNameId;
         DeclID vjpDeclId;
-        ArrayRef<uint64_t> paramValues;
+        ArrayRef<uint64_t> parameters;
         SmallVector<Requirement, 4> requirements;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, primalNameId, primalDeclId, adjointNameId,
-            adjointDeclId, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
-            paramValues);
+            scratch, isImplicit, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
+            parameters);
 
         using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
-        Optional<FuncSpecifier> primal;
-        FuncDecl *primalDecl = nullptr;
-        if (primalNameId != 0 && primalDeclId != 0) {
-          primal = { getIdentifier(primalNameId), DeclNameLoc() };
-          primalDecl = cast<FuncDecl>(getDecl(primalDeclId));
-        }
-        Optional<FuncSpecifier> adjoint;
-        FuncDecl *adjointDecl = nullptr;
-        if (adjointNameId != 0 && adjointDeclId != 0) {
-          adjoint = { getIdentifier(adjointNameId), DeclNameLoc() };
-          adjointDecl = cast<FuncDecl>(getDecl(adjointDeclId));
-        }
         Optional<FuncSpecifier> jvp;
         FuncDecl *jvpDecl = nullptr;
         if (jvpNameId != 0 && jvpDeclId != 0) {
@@ -2586,23 +2569,17 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
           vjpDecl = cast<FuncDecl>(getDecl(vjpDeclId));
         }
 
-        SmallVector<AutoDiffParameter, 4> parameters;
-        SourceLoc loc;
-        for (auto paramValue : paramValues) {
-          auto parameter = paramValue & 0x01
-            ? AutoDiffParameter::getSelfParameter(loc)
-            : AutoDiffParameter::getIndexParameter(loc, paramValue >> 1);
-          parameters.push_back(parameter);
-        }
-        // TODO: Deserialize CheckedParameterIndices.
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = AutoDiffParameterIndices::get(parametersBitVector, ctx);
+
         readGenericRequirements(requirements, DeclTypeCursor);
 
         auto diffAttr =
-          DifferentiableAttr::create(ctx, isImplicit, loc, SourceRange(),
-                                     parameters, primal, adjoint, jvp, vjp,
-                                     requirements);
-        diffAttr->setPrimalFunction(primalDecl);
-        diffAttr->setAdjointFunction(adjointDecl);
+            DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
+                                       SourceRange(), indices, jvp, vjp,
+                                       requirements);
         diffAttr->setJVPFunction(jvpDecl);
         diffAttr->setVJPFunction(vjpDecl);
         Attr = diffAttr;

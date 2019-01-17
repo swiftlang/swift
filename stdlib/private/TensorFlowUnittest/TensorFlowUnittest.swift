@@ -29,6 +29,15 @@ public func expectPointwiseNearlyEqual<T, C1, C2>(
   }
 }
 
+public func expectPointwiseNearlyEqual<T>(
+  _ lhs: ShapedArray<T>, _ rhs: ShapedArray<T>, byError error: T = 0.000001
+) where T : FloatingPoint & ExpressibleByFloatLiteral {
+  precondition(lhs.count == rhs.count, "Scalar count mismatch.")
+  for (l, r) in zip(lhs.scalars, rhs.scalars) {
+    expectNearlyEqual(l, r, byError: error)
+  }
+}
+
 // The following methods help keep the SIL code of our test cases simple.
 @inline(never)
 public func expectNearlyEqualWithScalarTensor<T : FloatingPoint & ExpressibleByFloatLiteral>(
