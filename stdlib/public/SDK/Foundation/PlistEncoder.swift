@@ -15,6 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 /// `PropertyListEncoder` facilitates the encoding of `Encodable` values into property lists.
+// NOTE: older overlays had Foundation.PropertyListEncoder as the ObjC
+// name. The two must coexist, so it was renamed. The old name must not
+// be used in the new runtime. _TtC10Foundation20_PropertyListEncoder
+// is the mangled name for Foundation._PropertyListEncoder.
+@_objcRuntimeName(_TtC10Foundation20_PropertyListEncoder)
 open class PropertyListEncoder {
 
     // MARK: - Options
@@ -80,7 +85,7 @@ open class PropertyListEncoder {
     /// - throws: `EncodingError.invalidValue` if a non-conforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
     /// - throws: An error if any value throws an error during encoding.
     internal func encodeToTopLevelContainer<Value : Encodable>(_ value: Value) throws -> Any {
-        let encoder = _PlistEncoder(options: self.options)
+        let encoder = __PlistEncoder(options: self.options)
         guard let topLevel = try encoder.box_(value) else {
             throw EncodingError.invalidValue(value,
                                              EncodingError.Context(codingPath: [],
@@ -91,9 +96,12 @@ open class PropertyListEncoder {
     }
 }
 
-// MARK: - _PlistEncoder
+// MARK: - __PlistEncoder
 
-fileprivate class _PlistEncoder : Encoder {
+// NOTE: older overlays called this class _PlistEncoder. The two must
+// coexist without a conflicting ObjC class name, so it was renamed.
+// The old name must not be used in the new runtime.
+fileprivate class __PlistEncoder : Encoder {
     // MARK: Properties
 
     /// The encoder's storage.
@@ -223,7 +231,7 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     // MARK: Properties
 
     /// A reference to the encoder we're writing to.
-    private let encoder: _PlistEncoder
+    private let encoder: __PlistEncoder
 
     /// A reference to the container we're writing to.
     private let container: NSMutableDictionary
@@ -234,7 +242,7 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     // MARK: - Initialization
 
     /// Initializes `self` with the given references.
-    fileprivate init(referencing encoder: _PlistEncoder, codingPath: [CodingKey], wrapping container: NSMutableDictionary) {
+    fileprivate init(referencing encoder: __PlistEncoder, codingPath: [CodingKey], wrapping container: NSMutableDictionary) {
         self.encoder = encoder
         self.codingPath = codingPath
         self.container = container
@@ -285,11 +293,11 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     }
 
     public mutating func superEncoder() -> Encoder {
-        return _PlistReferencingEncoder(referencing: self.encoder, at: _PlistKey.super, wrapping: self.container)
+        return __PlistReferencingEncoder(referencing: self.encoder, at: _PlistKey.super, wrapping: self.container)
     }
 
     public mutating func superEncoder(forKey key: Key) -> Encoder {
-        return _PlistReferencingEncoder(referencing: self.encoder, at: key, wrapping: self.container)
+        return __PlistReferencingEncoder(referencing: self.encoder, at: key, wrapping: self.container)
     }
 }
 
@@ -297,7 +305,7 @@ fileprivate struct _PlistUnkeyedEncodingContainer : UnkeyedEncodingContainer {
     // MARK: Properties
 
     /// A reference to the encoder we're writing to.
-    private let encoder: _PlistEncoder
+    private let encoder: __PlistEncoder
 
     /// A reference to the container we're writing to.
     private let container: NSMutableArray
@@ -313,7 +321,7 @@ fileprivate struct _PlistUnkeyedEncodingContainer : UnkeyedEncodingContainer {
     // MARK: - Initialization
 
     /// Initializes `self` with the given references.
-    fileprivate init(referencing encoder: _PlistEncoder, codingPath: [CodingKey], wrapping container: NSMutableArray) {
+    fileprivate init(referencing encoder: __PlistEncoder, codingPath: [CodingKey], wrapping container: NSMutableArray) {
         self.encoder = encoder
         self.codingPath = codingPath
         self.container = container
@@ -364,11 +372,11 @@ fileprivate struct _PlistUnkeyedEncodingContainer : UnkeyedEncodingContainer {
     }
 
     public mutating func superEncoder() -> Encoder {
-        return _PlistReferencingEncoder(referencing: self.encoder, at: self.container.count, wrapping: self.container)
+        return __PlistReferencingEncoder(referencing: self.encoder, at: self.container.count, wrapping: self.container)
     }
 }
 
-extension _PlistEncoder : SingleValueEncodingContainer {
+extension __PlistEncoder : SingleValueEncodingContainer {
     // MARK: - SingleValueEncodingContainer Methods
 
     private func assertCanEncodeNewValue() {
@@ -458,7 +466,7 @@ extension _PlistEncoder : SingleValueEncodingContainer {
 
 // MARK: - Concrete Value Representations
 
-extension _PlistEncoder {
+extension __PlistEncoder {
 
     /// Returns the given value boxed in a container appropriate for pushing onto the container stack.
     fileprivate func box(_ value: Bool)   -> NSObject { return NSNumber(value: value) }
@@ -489,7 +497,7 @@ extension _PlistEncoder {
             return (value as! NSData)
         }
 
-        // The value should request a container from the _PlistEncoder.
+        // The value should request a container from the __PlistEncoder.
         let depth = self.storage.count
         do {
             try value.encode(to: self)
@@ -511,11 +519,14 @@ extension _PlistEncoder {
     }
 }
 
-// MARK: - _PlistReferencingEncoder
+// MARK: - __PlistReferencingEncoder
 
-/// _PlistReferencingEncoder is a special subclass of _PlistEncoder which has its own storage, but references the contents of a different encoder.
+/// __PlistReferencingEncoder is a special subclass of __PlistEncoder which has its own storage, but references the contents of a different encoder.
 /// It's used in superEncoder(), which returns a new encoder for encoding a superclass -- the lifetime of the encoder should not escape the scope it's created in, but it doesn't necessarily know when it's done being used (to write to the original container).
-fileprivate class _PlistReferencingEncoder : _PlistEncoder {
+// NOTE: older overlays called this class _PlistReferencingEncoder.
+// The two must coexist without a conflicting ObjC class name, so it
+// was renamed. The old name must not be used in the new runtime.
+fileprivate class __PlistReferencingEncoder : __PlistEncoder {
     // MARK: Reference types.
 
     /// The type of container we're referencing.
@@ -530,7 +541,7 @@ fileprivate class _PlistReferencingEncoder : _PlistEncoder {
     // MARK: - Properties
 
     /// The encoder we're referencing.
-    private let encoder: _PlistEncoder
+    private let encoder: __PlistEncoder
 
     /// The container reference itself.
     private let reference: Reference
@@ -538,7 +549,7 @@ fileprivate class _PlistReferencingEncoder : _PlistEncoder {
     // MARK: - Initialization
 
     /// Initializes `self` by referencing the given array container in the given encoder.
-    fileprivate init(referencing encoder: _PlistEncoder, at index: Int, wrapping array: NSMutableArray) {
+    fileprivate init(referencing encoder: __PlistEncoder, at index: Int, wrapping array: NSMutableArray) {
         self.encoder = encoder
         self.reference = .array(array, index)
         super.init(options: encoder.options, codingPath: encoder.codingPath)
@@ -547,7 +558,7 @@ fileprivate class _PlistReferencingEncoder : _PlistEncoder {
     }
 
     /// Initializes `self` by referencing the given dictionary container in the given encoder.
-    fileprivate init(referencing encoder: _PlistEncoder, at key: CodingKey, wrapping dictionary: NSMutableDictionary) {
+    fileprivate init(referencing encoder: __PlistEncoder, at key: CodingKey, wrapping dictionary: NSMutableDictionary) {
         self.encoder = encoder
         self.reference = .dictionary(dictionary, key.stringValue)
         super.init(options: encoder.options, codingPath: encoder.codingPath)
@@ -590,6 +601,11 @@ fileprivate class _PlistReferencingEncoder : _PlistEncoder {
 //===----------------------------------------------------------------------===//
 
 /// `PropertyListDecoder` facilitates the decoding of property list values into semantic `Decodable` types.
+// NOTE: older overlays had Foundation.PropertyListDecoder as the ObjC
+// name. The two must coexist, so it was renamed. The old name must not
+// be used in the new runtime. _TtC10Foundation20_PropertyListDecoder
+// is the mangled name for Foundation._PropertyListDecoder.
+@_objcRuntimeName(_TtC10Foundation20_PropertyListDecoder)
 open class PropertyListDecoder {
     // MARK: Options
 
@@ -652,7 +668,7 @@ open class PropertyListDecoder {
     /// - throws: `DecodingError.dataCorrupted` if values requested from the payload are corrupted, or if the given data is not a valid property list.
     /// - throws: An error if any value throws an error during decoding.
     internal func decode<T : Decodable>(_ type: T.Type, fromTopLevel container: Any) throws -> T {
-        let decoder = _PlistDecoder(referencing: container, options: self.options)
+        let decoder = __PlistDecoder(referencing: container, options: self.options)
         guard let value = try decoder.unbox(container, as: type) else {
             throw DecodingError.valueNotFound(type, DecodingError.Context(codingPath: [], debugDescription: "The given data did not contain a top-level value."))
         }
@@ -661,9 +677,12 @@ open class PropertyListDecoder {
     }
 }
 
-// MARK: - _PlistDecoder
+// MARK: - __PlistDecoder
 
-fileprivate class _PlistDecoder : Decoder {
+// NOTE: older overlays called this class _PlistDecoder. The two must
+// coexist without a conflicting ObjC class name, so it was renamed.
+// The old name must not be used in the new runtime.
+fileprivate class __PlistDecoder : Decoder {
     // MARK: Properties
 
     /// The decoder's storage.
@@ -769,7 +788,7 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
     // MARK: Properties
 
     /// A reference to the decoder we're reading from.
-    private let decoder: _PlistDecoder
+    private let decoder: __PlistDecoder
 
     /// A reference to the container we're reading from.
     private let container: [String : Any]
@@ -780,7 +799,7 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
     // MARK: - Initialization
 
     /// Initializes `self` by referencing the given decoder and container.
-    fileprivate init(referencing decoder: _PlistDecoder, wrapping container: [String : Any]) {
+    fileprivate init(referencing decoder: __PlistDecoder, wrapping container: [String : Any]) {
         self.decoder = decoder
         self.container = container
         self.codingPath = decoder.codingPath
@@ -1072,7 +1091,7 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
         defer { self.decoder.codingPath.removeLast() }
 
         let value: Any = self.container[key.stringValue] ?? NSNull()
-        return _PlistDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
+        return __PlistDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
     }
 
     public func superDecoder() throws -> Decoder {
@@ -1088,7 +1107,7 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     // MARK: Properties
 
     /// A reference to the decoder we're reading from.
-    private let decoder: _PlistDecoder
+    private let decoder: __PlistDecoder
 
     /// A reference to the container we're reading from.
     private let container: [Any]
@@ -1102,7 +1121,7 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     // MARK: - Initialization
 
     /// Initializes `self` by referencing the given decoder and container.
-    fileprivate init(referencing decoder: _PlistDecoder, wrapping container: [Any]) {
+    fileprivate init(referencing decoder: __PlistDecoder, wrapping container: [Any]) {
         self.decoder = decoder
         self.container = container
         self.codingPath = decoder.codingPath
@@ -1434,11 +1453,11 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
 
         let value = self.container[self.currentIndex]
         self.currentIndex += 1
-        return _PlistDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
+        return __PlistDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
     }
 }
 
-extension _PlistDecoder : SingleValueDecodingContainer {
+extension __PlistDecoder : SingleValueDecodingContainer {
     // MARK: SingleValueDecodingContainer Methods
 
     private func expectNonNull<T>(_ type: T.Type) throws {
@@ -1533,7 +1552,7 @@ extension _PlistDecoder : SingleValueDecodingContainer {
 
 // MARK: - Concrete Value Representations
 
-extension _PlistDecoder {
+extension __PlistDecoder {
     /// Returns the given value unboxed from a container.
     fileprivate func unbox(_ value: Any, as type: Bool.Type) throws -> Bool? {
         if let string = value as? String, string == _plistNull { return nil }

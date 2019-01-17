@@ -174,7 +174,7 @@ public struct Set<Element: Hashable> {
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_cocoa: __owned _CocoaSet) {
+  internal init(_cocoa: __owned __CocoaSet) {
     _variant = _Variant(cocoa: _cocoa)
   }
 
@@ -190,7 +190,7 @@ public struct Set<Element: Hashable> {
   init(_immutableCocoaSet: __owned AnyObject) {
     _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
-    self.init(_cocoa: _CocoaSet(_immutableCocoaSet))
+    self.init(_cocoa: __CocoaSet(_immutableCocoaSet))
   }
 #endif
 }
@@ -1266,7 +1266,7 @@ extension Set {
     internal enum _Variant {
       case native(_HashTable.Index)
 #if _runtime(_ObjC)
-      case cocoa(_CocoaSet.Index)
+      case cocoa(__CocoaSet.Index)
 #endif
     }
 
@@ -1288,7 +1288,7 @@ extension Set {
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
-    internal init(_cocoa index: __owned _CocoaSet.Index) {
+    internal init(_cocoa index: __owned __CocoaSet.Index) {
       self.init(_variant: .cocoa(index))
     }
 #endif
@@ -1349,7 +1349,7 @@ extension Set.Index {
 
 #if _runtime(_ObjC)
   @usableFromInline
-  internal var _asCocoa: _CocoaSet.Index {
+  internal var _asCocoa: __CocoaSet.Index {
     @_transparent
     get {
       switch _variant {
@@ -1454,7 +1454,7 @@ extension Set {
     internal enum _Variant {
       case native(_NativeSet<Element>.Iterator)
 #if _runtime(_ObjC)
-      case cocoa(_CocoaSet.Iterator)
+      case cocoa(__CocoaSet.Iterator)
 #endif
     }
 
@@ -1473,7 +1473,7 @@ extension Set {
 
 #if _runtime(_ObjC)
     @usableFromInline
-    internal init(_cocoa: __owned _CocoaSet.Iterator) {
+    internal init(_cocoa: __owned __CocoaSet.Iterator) {
       self.init(_variant: .cocoa(_cocoa))
     }
 #endif
@@ -1529,7 +1529,7 @@ extension Set.Iterator {
 
 #if _runtime(_ObjC)
   @usableFromInline @_transparent
-  internal var _asCocoa: _CocoaSet.Iterator {
+  internal var _asCocoa: __CocoaSet.Iterator {
     get {
       switch _variant {
       case .native:

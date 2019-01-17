@@ -20,6 +20,11 @@ import _SwiftNetworkOverlayShims
 /// A connection handles establishment of any transport, security, or application-level protocols
 /// required to transmit and receive user data. Multiple protocol instances may be attempted during
 /// the establishment phase of the connection.
+// NOTE: older overlays had Network.NWConnection as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC7Network13_NWConnection is the
+// mangled name for Network._NWConnection.
+@_objcRuntimeName(_TtC7Network13_NWConnection)
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public final class NWConnection : CustomDebugStringConvertible {
 
@@ -297,6 +302,8 @@ public final class NWConnection : CustomDebugStringConvertible {
 	/// Content Context controls options for how data is sent, and access for metadata to send or receive.
 	/// All properties of Content Context are valid for sending. For received Content Context, only the protocolMetadata
 	/// values will be set.
+	// Set the ObjC name of this class to be nested in the customized ObjC name of NWConnection.
+	@_objcRuntimeName(_TtCC7Network13_NWConnection14ContentContext)
 	public class ContentContext {
         internal let nw: nw_content_context_t
 

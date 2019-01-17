@@ -29,7 +29,10 @@ private func _utfRangeToCFRange(_ inRange : ClosedRange<Unicode.Scalar>) -> CFRa
 
 // MARK: -
 
-fileprivate final class _CharacterSetStorage : Hashable {
+// NOTE: older overlays called this class _CharacterSetStorage.
+// The two must coexist without a conflicting ObjC class name, so it
+// was renamed. The old name must not be used in the new runtime.
+fileprivate final class __CharacterSetStorage : Hashable {
     fileprivate enum Backing {
         case immutable(CFCharacterSet)
         case mutable(CFMutableCharacterSet)
@@ -58,7 +61,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
         }
     }
     
-    fileprivate static func ==(lhs : _CharacterSetStorage, rhs : _CharacterSetStorage) -> Bool {
+    fileprivate static func ==(lhs : __CharacterSetStorage, rhs : __CharacterSetStorage) -> Bool {
         switch (lhs._backing, rhs._backing) {
         case (.immutable(let cs1), .immutable(let cs2)):
             return CFEqual(cs1, cs2)
@@ -73,12 +76,12 @@ fileprivate final class _CharacterSetStorage : Hashable {
     
     // MARK: -
     
-    fileprivate func mutableCopy() -> _CharacterSetStorage {
+    fileprivate func mutableCopy() -> __CharacterSetStorage {
         switch _backing {
         case .immutable(let cs):
-            return _CharacterSetStorage(mutableReference: CFCharacterSetCreateMutableCopy(nil, cs))
+            return __CharacterSetStorage(mutableReference: CFCharacterSetCreateMutableCopy(nil, cs))
         case .mutable(let cs):
-            return _CharacterSetStorage(mutableReference: CFCharacterSetCreateMutableCopy(nil, cs))
+            return __CharacterSetStorage(mutableReference: CFCharacterSetCreateMutableCopy(nil, cs))
         }
     }
 
@@ -223,7 +226,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
     
 
     // When the underlying collection does not have a method to return new CharacterSets with changes applied, so we will copy and apply here
-    private static func _apply(_ lhs : _CharacterSetStorage, _ rhs : _CharacterSetStorage, _ f : (CFMutableCharacterSet, CFCharacterSet) -> ()) -> CharacterSet {
+    private static func _apply(_ lhs : __CharacterSetStorage, _ rhs : __CharacterSetStorage, _ f : (CFMutableCharacterSet, CFCharacterSet) -> ()) -> CharacterSet {
         let copyOfMe : CFMutableCharacterSet
         switch lhs._backing {
         case .immutable(let cs):
@@ -239,10 +242,10 @@ fileprivate final class _CharacterSetStorage : Hashable {
             f(copyOfMe, cs)
         }
         
-        return CharacterSet(_uncopiedStorage: _CharacterSetStorage(mutableReference: copyOfMe))
+        return CharacterSet(_uncopiedStorage: __CharacterSetStorage(mutableReference: copyOfMe))
     }
     
-    private func _applyMutation(_ other : _CharacterSetStorage, _ f : (CFMutableCharacterSet, CFCharacterSet) -> ()) {
+    private func _applyMutation(_ other : __CharacterSetStorage, _ f : (CFMutableCharacterSet, CFCharacterSet) -> ()) {
         switch _backing {
         case .immutable(let cs):
             let r = CFCharacterSetCreateMutableCopy(nil, cs)!
@@ -267,47 +270,47 @@ fileprivate final class _CharacterSetStorage : Hashable {
     fileprivate var inverted : CharacterSet {
         switch _backing {
         case .immutable(let cs):
-            return CharacterSet(_uncopiedStorage: _CharacterSetStorage(immutableReference: CFCharacterSetCreateInvertedSet(nil, cs)))
+            return CharacterSet(_uncopiedStorage: __CharacterSetStorage(immutableReference: CFCharacterSetCreateInvertedSet(nil, cs)))
         case .mutable(let cs):
             // Even if input is mutable, the result is immutable
-            return CharacterSet(_uncopiedStorage: _CharacterSetStorage(immutableReference: CFCharacterSetCreateInvertedSet(nil, cs)))
+            return CharacterSet(_uncopiedStorage: __CharacterSetStorage(immutableReference: CFCharacterSetCreateInvertedSet(nil, cs)))
         }
     }
 
-    fileprivate func union(_ other: _CharacterSetStorage) -> CharacterSet {
-        return _CharacterSetStorage._apply(self, other, CFCharacterSetUnion)
+    fileprivate func union(_ other: __CharacterSetStorage) -> CharacterSet {
+        return __CharacterSetStorage._apply(self, other, CFCharacterSetUnion)
     }
     
-    fileprivate func formUnion(_ other: _CharacterSetStorage) {
+    fileprivate func formUnion(_ other: __CharacterSetStorage) {
         _applyMutation(other, CFCharacterSetUnion)
     }
     
-    fileprivate func intersection(_ other: _CharacterSetStorage) -> CharacterSet {
-        return _CharacterSetStorage._apply(self, other, CFCharacterSetIntersect)
+    fileprivate func intersection(_ other: __CharacterSetStorage) -> CharacterSet {
+        return __CharacterSetStorage._apply(self, other, CFCharacterSetIntersect)
     }
     
-    fileprivate func formIntersection(_ other: _CharacterSetStorage) {
+    fileprivate func formIntersection(_ other: __CharacterSetStorage) {
         _applyMutation(other, CFCharacterSetIntersect)
     }
     
-    fileprivate func subtracting(_ other: _CharacterSetStorage) -> CharacterSet {
+    fileprivate func subtracting(_ other: __CharacterSetStorage) -> CharacterSet {
         return intersection(other.inverted._storage)
     }
     
-    fileprivate func subtract(_ other: _CharacterSetStorage) {
+    fileprivate func subtract(_ other: __CharacterSetStorage) {
         _applyMutation(other.inverted._storage, CFCharacterSetIntersect)
     }
     
-    fileprivate func symmetricDifference(_ other: _CharacterSetStorage) -> CharacterSet {
+    fileprivate func symmetricDifference(_ other: __CharacterSetStorage) -> CharacterSet {
         return union(other).subtracting(intersection(other))
     }
     
-    fileprivate func formSymmetricDifference(_ other: _CharacterSetStorage) {
+    fileprivate func formSymmetricDifference(_ other: __CharacterSetStorage) {
         // This feels like cheating
         _backing = symmetricDifference(other)._storage._backing
     }
     
-    fileprivate func isSuperset(of other: _CharacterSetStorage) -> Bool {
+    fileprivate func isSuperset(of other: __CharacterSetStorage) -> Bool {
         switch _backing {
         case .immutable(let cs):
             switch other._backing {
@@ -363,35 +366,35 @@ fileprivate final class _CharacterSetStorage : Hashable {
 public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgebra {
     public typealias ReferenceType = NSCharacterSet
     
-    fileprivate var _storage : _CharacterSetStorage
+    fileprivate var _storage : __CharacterSetStorage
     
     // MARK: Init methods
     
     /// Initialize an empty instance.
     public init() {
         // It's unlikely that we are creating an empty character set with no intention to mutate it
-        _storage = _CharacterSetStorage(mutableReference: CFCharacterSetCreateMutable(nil))
+        _storage = __CharacterSetStorage(mutableReference: CFCharacterSetCreateMutable(nil))
     }
     
     /// Initialize with a range of integers.
     ///
     /// It is the caller's responsibility to ensure that the values represent valid `Unicode.Scalar` values, if that is what is desired.
     public init(charactersIn range: Range<Unicode.Scalar>) {
-        _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithCharactersInRange(nil, _utfRangeToCFRange(range)))
+        _storage = __CharacterSetStorage(immutableReference: CFCharacterSetCreateWithCharactersInRange(nil, _utfRangeToCFRange(range)))
     }
 
     /// Initialize with a closed range of integers.
     ///
     /// It is the caller's responsibility to ensure that the values represent valid `Unicode.Scalar` values, if that is what is desired.
     public init(charactersIn range: ClosedRange<Unicode.Scalar>) {
-        _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithCharactersInRange(nil, _utfRangeToCFRange(range)))
+        _storage = __CharacterSetStorage(immutableReference: CFCharacterSetCreateWithCharactersInRange(nil, _utfRangeToCFRange(range)))
     }
 
     /// Initialize with the characters in the given string.
     ///
     /// - parameter string: The string content to inspect for characters.
     public init(charactersIn string: __shared String) {
-        _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithCharactersInString(nil, string as CFString))
+        _storage = __CharacterSetStorage(immutableReference: CFCharacterSetCreateWithCharactersInString(nil, string as CFString))
     }
     
     /// Initialize with a bitmap representation.
@@ -399,7 +402,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     /// This method is useful for creating a character set object with data from a file or other external data source.
     /// - parameter data: The bitmap representation.
     public init(bitmapRepresentation data: __shared Data) {
-        _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithBitmapRepresentation(nil, data as CFData))
+        _storage = __CharacterSetStorage(immutableReference: CFCharacterSetCreateWithBitmapRepresentation(nil, data as CFData))
     }
     
     /// Initialize with the contents of a file.
@@ -409,26 +412,26 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     public init?(contentsOfFile file: __shared String) {
         do {
             let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
-            _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithBitmapRepresentation(nil, data as CFData))
+            _storage = __CharacterSetStorage(immutableReference: CFCharacterSetCreateWithBitmapRepresentation(nil, data as CFData))
         } catch {
             return nil
         }
     }
 
     fileprivate init(_bridged characterSet: __shared NSCharacterSet) {
-        _storage = _CharacterSetStorage(immutableReference: characterSet.copy() as! CFCharacterSet)
+        _storage = __CharacterSetStorage(immutableReference: characterSet.copy() as! CFCharacterSet)
     }
     
     fileprivate init(_uncopiedImmutableReference characterSet: CFCharacterSet) {
-        _storage = _CharacterSetStorage(immutableReference: characterSet)
+        _storage = __CharacterSetStorage(immutableReference: characterSet)
     }
 
-    fileprivate init(_uncopiedStorage : _CharacterSetStorage) {
+    fileprivate init(_uncopiedStorage : __CharacterSetStorage) {
         _storage = _uncopiedStorage
     }
 
     fileprivate init(_builtIn: __shared CFCharacterSetPredefinedSet) {
-        _storage = _CharacterSetStorage(immutableReference: CFCharacterSetGetPredefined(_builtIn))
+        _storage = __CharacterSetStorage(immutableReference: CFCharacterSetGetPredefined(_builtIn))
     }
     
     // MARK: Static functions
