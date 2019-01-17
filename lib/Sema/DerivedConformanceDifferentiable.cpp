@@ -117,11 +117,17 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
       validAllDiffableVarsDeclCount > 1)
     return false;
 
-  // All stored properties not marked with `@noDerivative` must conform to
-  // `Differentiable`.
+  // All stored properties not marked with `@noDerivative`:
+  // - Must conform to `Differentiable`.
+  // - Must not have any `let` stored properties with an initial value.
+  //   - This restriction may be lifted later with support for "true" memberwise
+  //     initializers that initialize all stored properties, including initial
+  //     value information.
   SmallVector<VarDecl *, 16> diffProperties;
   getStoredPropertiesForDifferentiation(structDecl, diffProperties);
   return llvm::all_of(diffProperties, [&](VarDecl *v) {
+    if (v->isLet() && v->hasInitialValue())
+      return false;
     if (!v->hasType())
       lazyResolver->resolveDeclSignature(v);
     if (!v->hasType())
