@@ -206,8 +206,9 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   static func _vjpAdd(
     lhs: Tensor, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    return (lhs + rhs, { [rhsShape = rhs.shapeTensor] v in
-      return (v.unbroadcast(like: lhs), v.unbroadcast(toShape: rhsShape))
+    return (lhs + rhs, {
+      [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
+      return (v.unbroadcast(toShape: lhsShape), v.unbroadcast(toShape: rhsShape))
     })
   }
 
@@ -215,9 +216,10 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   static func _vjpSubtract(
     lhs: Tensor, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    let value = lhs - rhs
-    return (value, { v in
-      return (v.unbroadcast(like: lhs), -v.unbroadcast(like: rhs))
+    return (lhs - rhs, {
+      [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
+      return (v.unbroadcast(toShape: lhsShape),
+              -v.unbroadcast(toShape: rhsShape))
     })
   }
 
@@ -225,9 +227,10 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   static func _vjpMultiply(
     lhs: Tensor, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    return (lhs * rhs, { v in
-      ((rhs * v).unbroadcast(like: lhs),
-       (lhs * v).unbroadcast(like: rhs))
+    return (lhs * rhs, {
+      [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
+      ((rhs * v).unbroadcast(toShape: lhsShape),
+       (lhs * v).unbroadcast(toShape: rhsShape))
     })
   }
 
@@ -235,9 +238,10 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   static func _vjpDivide(
     lhs: Tensor, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    return (lhs * rhs, { v in
-      ((v / rhs).unbroadcast(like: lhs),
-       ((-lhs) / rhs.squared() * v).unbroadcast(like: rhs))
+    return (lhs * rhs, {
+      [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
+      ((v / rhs).unbroadcast(toShape: lhsShape),
+       ((-lhs) / rhs.squared() * v).unbroadcast(toShape: rhsShape))
     })
   }
 }
