@@ -1165,7 +1165,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         Result = makeParserResult(
             Result,
             new (Context) DotSelfExpr(Result.get(), TokLoc, consumeToken()));
-        SyntaxContext->createNodeInPlace(SyntaxKind::DotSelfExpr);
+        SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
         continue;
       }
 
@@ -1635,7 +1635,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc,
                                     diag::expected_identifier_after_dot_expr);
     if (!Name) return nullptr;
-    SyntaxContext->createNodeInPlace(SyntaxKind::ImplicitMemberExpr);
+    SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
     // Check for a () suffix, which indicates a call when constructing
     // this member.  Note that this cannot be the start of a new line.
