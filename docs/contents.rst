@@ -1,4 +1,3 @@
-.. @raise litre.TestsAreMissing
 .. _contents:
 
 Contents
