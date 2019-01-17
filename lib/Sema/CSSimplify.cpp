@@ -3725,18 +3725,20 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // is either UR_InstanceMemberOnType or UR_TypeMemberOnInstance
 
       // If we do, then allow them
-      if (llvm::all_of(result.UnviableCandidates, [&](const std::pair<OverloadChoice,
-                           MemberLookupResult::UnviableReason> &e) {
+      if (llvm::all_of(
+              result.UnviableCandidates,
+              [&](const std::pair<OverloadChoice,
+                                  MemberLookupResult::UnviableReason> &e) {
                 return e.second == MemberLookupResult::UR_InstanceMemberOnType ||
                        e.second == MemberLookupResult::UR_TypeMemberOnInstance;
               })) {
 
-                auto *fix =
-                    AllowTypeOrInstanceMember::create(*this, baseTy, member, locator);
+        auto *fix =
+            AllowTypeOrInstanceMember::create(*this, baseTy, member, locator);
 
-                if (recordFix(fix))
-                  // The fix wasn't successful, so return an error
-                  return SolutionKind::Error;
+        if (recordFix(fix))
+          // The fix wasn't successful, so return an error
+          return SolutionKind::Error;
 
         // The fix was successful, so let's add the choices to the overload set
         // and return the solution as solved
@@ -3748,7 +3750,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
         addOverloadSet(memberTy, choices, useDC, locator);
         return SolutionKind::Solved;
-              }
+      }
     }
 
     if (baseObjTy->getOptionalObjectType()) {
@@ -3857,7 +3859,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     result = performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                                  /*includeInaccessibleMembers*/ true);
-    
+
     // FIXME(diagnostics): If there were no viable results, but there are
     // unviable ones, we'd have to introduce fix for each specific problem.
     if (!result.UnviableCandidates.empty())
