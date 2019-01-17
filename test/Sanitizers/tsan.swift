@@ -4,6 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: OS=tvos
+// UNSUPPORTED: CPU=powerpc64le
 
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
 // don't support TSan.

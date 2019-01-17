@@ -659,7 +659,7 @@ example21890157.property = "confusing"  // expected-error {{value of optional ty
 struct UnaryOp {}
 
 _ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an operand of type 'UnaryOp'}}
-// expected-note@-1 {{overloads for '-' exist with these partially matching parameter lists: (Double), (Float), (Float80)}}
+// expected-note@-1 {{overloads for '-' exist with these partially matching parameter lists: (Double), (Float)}}
 
 
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis

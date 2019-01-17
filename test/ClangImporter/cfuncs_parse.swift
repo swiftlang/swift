@@ -1,3 +1,4 @@
+// XFAIL: CPU=powerpc64le
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs %s
 
 import cfuncs
