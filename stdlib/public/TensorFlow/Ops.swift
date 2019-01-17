@@ -46,6 +46,7 @@ infix operator .>= : ComparisonPrecedence
 infix operator .> : ComparisonPrecedence
 infix operator .== : ComparisonPrecedence
 infix operator .!= : ComparisonPrecedence
+infix operator .=
 
 // TODO:
 // - Consider explicit broadcasting for elementwise binary ops when
@@ -1439,6 +1440,11 @@ public extension Tensor where Scalar : Numeric {
   @inlinable @inline(__always)
   func unbroadcast(to shape: TensorShape) -> Tensor {
     return unbroadcast(toShape: Tensor<Int32>(shape.dimensions))
+  }
+
+  @inlinable @inline(__always)
+  static func .= (lhs: inout Tensor, rhs: Tensor) {
+    lhs = rhs.broadcast(like: lhs)
   }
 }
 
