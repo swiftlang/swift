@@ -132,11 +132,24 @@ static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal,
   return sameScalarType;
 }
 
+// Returns true if given nominal type has a `let` stored with an initial value.
+static bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
+  return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
+    return v->isLet() && v->hasInitialValue();
+  });
+}
+
 bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
                                                      DeclContext *DC) {
   // Nominal type must be a struct. (Zero stored properties is okay.)
   auto *structDecl = dyn_cast<StructDecl>(nominal);
   if (!structDecl)
+    return false;
+  // Must not have any `let` stored properties with an initial value.
+  // - This restriction may be lifted later with support for "true" memberwise
+  //   initializers that initialize all stored properties, including initial
+  //   value information.
+  if (hasLetStoredPropertyWithInitialValue(nominal))
     return false;
   // All stored properties must conform to `AdditiveArithmetic`.
   auto &C = nominal->getASTContext();
@@ -156,6 +169,13 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
 
 bool DerivedConformance::canDeriveVectorNumeric(NominalTypeDecl *nominal,
                                                 DeclContext *DC) {
+  // Must not have any `let` stored properties with an initial value.
+  // - This restriction may be lifted later with support for "true" memberwise
+  //   initializers that initialize all stored properties, including initial
+  //   value information.
+  if (hasLetStoredPropertyWithInitialValue(nominal))
+    return false;
+  // Must be able to derive `Scalar` associated type.
   return bool(deriveVectorNumeric_Scalar(nominal, DC));
 }
 

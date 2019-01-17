@@ -7,6 +7,31 @@ struct Empty : Differentiable {}
 // Previously, this crashed due to duplicate memberwise initializer synthesis.
 struct EmptyAdditiveArithmetic : AdditiveArithmetic, Differentiable {}
 
+// Test structs whose stored properties all have an initial value.
+struct AllLetStoredPropertiesHaveInitialValue : Differentiable { // expected-error {{does not conform to protocol 'Differentiable'}}
+  let x = Float(1)
+  let y = Float(1)
+}
+struct AllVarStoredPropertiesHaveInitialValue : Differentiable {
+  var x = Float(1)
+  var y = Float(1)
+}
+// Test struct with both an empty constructor and memberwise initializer.
+struct AllMixedStoredPropertiesHaveInitialValue : Differentiable { // expected-error {{does not conform to protocol 'Differentiable'}}
+  let x = Float(1)
+  var y = Float(1)
+  // Memberwise initializer should be `init(y:)` since `x` is immutable.
+  static func testMemberwiseInitializer() {
+    _ = AllMixedStoredPropertiesHaveInitialValue(y: 1)
+  }
+}
+struct HasCustomConstructor: Differentiable {
+  var x = Float(1)
+  var y = Float(1)
+  // Custom constructor should not affect synthesis.
+  init(x: Float, y: Float, z: Bool) {}
+}
+
 struct Simple : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
@@ -88,7 +113,7 @@ testVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
 testVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
 
 // Test type with immutable, differentiable stored property.
-struct ImmutableStoredProperty : Differentiable {
+struct ImmutableStoredProperty : Differentiable { // expected-error {{does not conform to protocol 'Differentiable'}}
   var w: Float
   let fixedBias: Float = .pi
 }
