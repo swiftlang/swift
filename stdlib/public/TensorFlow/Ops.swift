@@ -1419,7 +1419,7 @@ public extension Tensor {
 }
 
 public extension Tensor where Scalar : Numeric {
-  @inlinable @inline(__always)
+  @inlinable
   func unbroadcast(toShape otherShape: Tensor<Int32>) -> Tensor {
     let rankDiff = (rankTensor - otherShape.scalarCountTensor).rankLifted()
     let ones: Tensor<Int32> = Raw.fill(dims: rankDiff, value: Tensor<Int32>(1))
@@ -1448,22 +1448,16 @@ public extension Tensor where Scalar : Numeric {
 
 public extension Tensor where Scalar : Numeric {
   /// Returns a padded tensor according to the specified padding sizes.
-  @inlinable @inline(__always)
+  @inlinable
   func padded(
-    forSizes sizes: @autoclosure () -> [(before: Int32, after: Int32)],
+    forSizes sizes: [(before: Int32, after: Int32)],
     with value: Scalar = 0
   ) -> Tensor {
-    let paddings: TensorHandle<Int32> = _TFHoistable {
-      let sizes = sizes()
-      return Tensor<Int32>(
-        shape: [Int32(sizes.count), 2],
-        scalars: sizes.flatMap { [$0.before, $0.after] }
-      ).handle
-    }
-    return Raw.padV2(
-      self,
-      paddings: Tensor<Int32>(handle: _TFToAcclerator(paddings)),
-      constantValues: Tensor(value))
+    let paddings = Tensor<Int32>(
+      shape: [Int32(sizes.count), 2],
+      scalars: sizes.flatMap { [$0.before, $0.after] }
+    )
+    return Raw.padV2(self, paddings: paddings, constantValues: Tensor(value))
   }
 }
 
@@ -1476,7 +1470,6 @@ public extension Tensor {
   /// - Parameter index: Index of the element tensor.
   @inlinable
   subscript(index: Int32) -> Tensor {
-    @inline(__always)
     get {
       // NOTE: Thought Gather exactly performs element indexing, it is an
       // allocating operation. Slice is used here instead even though the
@@ -1509,7 +1502,6 @@ public extension Tensor {
       let slice: Tensor = Raw.slice(self, begin: startIndices, size: boundSizes)
       return slice.squeezingShape(at: 0)
     }
-    @inline(__always)
     set {
       let left = self[0..<index]
       let right = self[index+1..<_TFGetScalarOrDie(shapeTensor[0].handle)]
@@ -1541,38 +1533,35 @@ public extension Tensor {
   /// - Parameter bounds: Contiguous range of indices.
   @inlinable
   subscript(bounds: Range<Int32>) -> Tensor {
-    @inline(__always)
-    get {
-      // NOTE: Though `tf.slice` and `tf.strided_slice` are not easy to use
-      // because they require slice bounds for every dimension, they should be
-      // used because the are non-allocating. Other slice implementations (like
-      // combining Gather and Range) perform allocation and should not be used
-      // even though they are easier to write.
+    // NOTE: Though `tf.slice` and `tf.strided_slice` are not easy to use
+    // because they require slice bounds for every dimension, they should be
+    // used because the are non-allocating. Other slice implementations (like
+    // combining Gather and Range) perform allocation and should not be used
+    // even though they are easier to write.
 
-      // Let (lo, hi) represent lower and upper bounds respectively.
-      // startIndices = [lo, 0, 0, ..., 0]
-      // boundSizes = [hi - lo, d1, d2, ..., dn] where di = shape[i]
-      // TODO: The horrendous mess of type-casting is necessary due to GPU ops
-      // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
-      // if possible.
-      let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
-      let remainingZeros: Tensor<Int32> = Raw.fill(
-        dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
-      let startIndices = lowerBound.concatenated(with: remainingZeros)
+    // Let (lo, hi) represent lower and upper bounds respectively.
+    // startIndices = [lo, 0, 0, ..., 0]
+    // boundSizes = [hi - lo, d1, d2, ..., dn] where di = shape[i]
+    // TODO: The horrendous mess of type-casting is necessary due to GPU ops
+    // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
+    // if possible.
+    let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
+    let remainingZeros: Tensor<Int32> = Raw.fill(
+      dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
+    let startIndices = lowerBound.concatenated(with: remainingZeros)
 
-      let boundSize = Tensor<Int32>(bounds.upperBound).rankLifted()
-        - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
-      let scatterIndices: Tensor<Int32> = [[0]]
-      let offset: Tensor<Int32> = Tensor<Int32>(
-        Raw.scatterNd(
-          indices: scatterIndices,
-          updates: Tensor<Float>(boundSize),
-          shape: rankTensor.rankLifted()
-        )
+    let boundSize = Tensor<Int32>(bounds.upperBound).rankLifted()
+      - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
+    let scatterIndices: Tensor<Int32> = [[0]]
+    let offset: Tensor<Int32> = Tensor<Int32>(
+      Raw.scatterNd(
+        indices: scatterIndices,
+        updates: Tensor<Float>(boundSize),
+        shape: rankTensor.rankLifted()
       )
-      let boundSizes: Tensor<Int32> = shapeTensor + offset
-      return Raw.slice(self, begin: startIndices, size: boundSizes)
-    }
+    )
+    let boundSizes: Tensor<Int32> = shapeTensor + offset
+    return Raw.slice(self, begin: startIndices, size: boundSizes)
   }
 
   // TODO(danielzheng): Add strided slices? (increment by something different
@@ -1614,7 +1603,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///   - scale: The scale, also known as gamma.
   ///   - epsilon: A small value added to the denominator for numerical
   ///     stability.
-  @inlinable @inline(__always)
+  @inlinable
   @differentiable(
     wrt: (self, .1, .2), vjp: _vjpBatchNormalized
     where Scalar : Differentiable, Scalar == Scalar.CotangentVector
@@ -1649,12 +1638,9 @@ public enum Padding {
 internal extension Padding {
   @inlinable
   var raw: Raw.Padding {
-    @inline(__always)
-    get {
-      switch self {
-      case .same: return .same
-      case .valid: return .valid
-      }
+    switch self {
+    case .same: return .same
+    case .valid: return .valid
     }
   }
 }

@@ -206,9 +206,8 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   static func _vjpAdd(
     lhs: Tensor, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    let value = lhs + rhs
-    return (value, { v in
-      return (v.unbroadcast(like: lhs), v.unbroadcast(like: rhs))
+    return (lhs + rhs, { [rhsShape = rhs.shapeTensor] v in
+      return (v.unbroadcast(like: lhs), v.unbroadcast(toShape: rhsShape))
     })
   }
 
@@ -301,13 +300,13 @@ extension Tensor where Scalar : Differentiable & FloatingPoint,
     lhs: Scalar, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Scalar, Tensor)) {
     return (lhs / rhs, { v in
-      ((v / rhs).sum().scalarized(), v * (0 - lhs) / rhs.squared())
+      ((v / rhs).sum().scalarized(), v * -lhs / rhs.squared())
     })
   }
 }
 
 @inlinable
-func _vjpMinMax<T : Differentiable & FloatingPoint>(
+func _vjpMinMaxHelper<T : Differentiable & FloatingPoint>(
   _ x: Tensor<T>, _ y: Tensor<T>, originalValue: Tensor<T>, vector: Tensor<T>
 ) -> (Tensor<T>, Tensor<T>) {
   let denom = 1 + Tensor<T>(x .== y)
@@ -321,7 +320,8 @@ func _vjpMax<T : Differentiable & FloatingPoint>(
   _ x: Tensor<T>, _ y: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> (Tensor<T>, Tensor<T>)) {
   let value = max(x, y)
-  return (value, { v in _vjpMinMax(x, y, originalValue: value, vector: v) })
+  return (value,
+    { v in _vjpMinMaxHelper(x, y, originalValue: value, vector: v) })
 }
 
 @inlinable
@@ -329,7 +329,8 @@ func _vjpMin<T : Differentiable & FloatingPoint>(
   _ x: Tensor<T>, _ y: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> (Tensor<T>, Tensor<T>)) {
   let value = min(x, y)
-  return (value, { v in _vjpMinMax(x, y, originalValue: value, vector: v) })
+  return (value,
+    { v in _vjpMinMaxHelper(x, y, originalValue: value, vector: v) })
 }
 
 @inlinable
@@ -540,28 +541,28 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
 extension Tensor where Scalar : Differentiable & FloatingPoint {
   @inlinable
   func _vjpMean() -> (Tensor, (Tensor) -> Tensor) {
-    return (mean(), {
-      $0.broadcast(like: self) / Tensor(self.scalarCountTensor)
+    return (mean(), { [shape = shapeTensor, count = scalarCountTensor] in
+      $0.broadcast(toShape: shape) / Tensor(count)
     })
   }
 
   @inlinable
   func _vjpSum() -> (Tensor, (Tensor) -> Tensor) {
-    return (sum(), { $0.broadcast(like: self) })
+    return (sum(), { [shape = shapeTensor] in $0.broadcast(toShape: shape) })
   }
 
   @inlinable
   func _vjpMean(squeezingAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
     let value = mean(squeezingAxes: axes)
-    return (value, {
-      $0.broadcast(like: self) / Tensor(self.scalarCountTensor)
+    return (value, { [shape = shapeTensor, count = scalarCountTensor] in
+      $0.broadcast(toShape: shape) / Tensor(count)
     })
   }
 
   @inlinable
   func _vjpSum(squeezingAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
     let value = sum(squeezingAxes: axes)
-    return (value, { $0.broadcast(like: self) })
+    return (value, { [shape = shapeTensor] in $0.broadcast(toShape: shape) })
   }
 }
 
