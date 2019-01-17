@@ -211,13 +211,13 @@ class TestPerformanceTestResult(unittest.TestCase):
         self.assertEqual(r.test_num, '1')
         self.assertEqual(r.name, 'Ackermann')
         self.assertEqual((r.num_samples, r.min, r.median, r.max),
-                          (3, 54383, 54512, 54601))
+                         (3, 54383, 54512, 54601))
         self.assertAlmostEquals(r.mean, 54498.67, places=2)
         self.assertAlmostEquals(r.sd, 109.61, places=2)
         self.assertEqual(r.samples.count, 3)
         self.assertEqual(r.samples.num_samples, 3)
         self.assertEqual([s.runtime for s in r.samples.all_samples],
-                          [54383, 54512, 54601])
+                         [54383, 54512, 54601])
 
         # #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
         log = '1,Ackermann,3,54529,54760,55807,266240'
@@ -227,7 +227,7 @@ class TestPerformanceTestResult(unittest.TestCase):
         log = '1,Ackermann,5,54570,54593,54644,57212,58304'
         r = PerformanceTestResult(log.split(','), quantiles=True, memory=False)
         self.assertEqual((r.num_samples, r.min, r.median, r.max),
-                          (5, 54570, 54644, 58304))
+                         (5, 54570, 54644, 58304))
         self.assertEqual((r.samples.q1, r.samples.q3), (54593, 57212))
         self.assertEqual(r.samples.count, 5)
         # #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
@@ -244,7 +244,7 @@ class TestPerformanceTestResult(unittest.TestCase):
         log = '202,DropWhileArray,2,265,,22'
         r = PerformanceTestResult(log.split(','), quantiles=True, delta=True)
         self.assertEqual((r.num_samples, r.min, r.median, r.max),
-                          (2, 265, 265, 287))
+                         (2, 265, 265, 287))
         self.assertEqual(r.samples.count, 2)
         self.assertEqual(r.samples.num_samples, 2)
 
@@ -267,7 +267,7 @@ class TestPerformanceTestResult(unittest.TestCase):
                                       quantiles=True, delta=True)
             self.assertEqual(r.samples.num_samples, num_samples)
             self.assertEqual([s.runtime for s in r.samples.all_samples],
-                              range(1, num_samples + 1))
+                             range(1, num_samples + 1))
 
         delta_encoded_quantiles = """
 1,,
@@ -334,16 +334,16 @@ class TestPerformanceTestResult(unittest.TestCase):
 
         r = results[0]
         self.assertEqual(as_tuple(r),
-                          (1, 12045, 12045, 12045, 0, 12045, None, None))
+                         (1, 12045, 12045, 12045, 0, 12045, None, None))
         r.merge(results[1])
         self.assertEqual(as_tuple(r),  # drops SD and median, +max_rss
-                          (2, 12045, 12325, 12185, None, None, 10510336, None))
+                         (2, 12045, 12325, 12185, None, None, 10510336, None))
         r.merge(results[2])
         self.assertEqual(as_tuple(r),  # picks smaller of the MAX_RSS, +setup
-                          (3, 11616, 12325, 11995.33, None, None, 10502144, 9))
+                         (3, 11616, 12325, 11995.33, None, None, 10502144, 9))
         r.merge(results[3])
         self.assertEqual(as_tuple(r),  # picks smaller of the setup values
-                          (4, 11616, 12325, 12064, None, None, 10498048, 7))
+                         (4, 11616, 12325, 12064, None, None, 10498048, 7))
 
 
 class TestResultComparison(unittest.TestCase):
@@ -482,12 +482,12 @@ Total performance tests executed: 1
             """#,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
 1,Ackermann,3,54383,54512,54601""")['Ackermann']
         self.assertEqual([s.runtime for s in r.samples.all_samples],
-                          [54383, 54512, 54601])
+                         [54383, 54512, 54601])
         r = LogParser.results_from_string(
             """#,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
 1,Ackermann,3,54529,54760,55807,266240""")['Ackermann']
         self.assertEqual([s.runtime for s in r.samples.all_samples],
-                          [54529, 54760, 55807])
+                         [54529, 54760, 55807])
         self.assertEqual(r.max_rss, 266240)
 
     def test_parse_delta_quantiles(self):
@@ -544,7 +544,7 @@ Totals,2"""
         )
         self.assertEqual(r.num_samples, r.samples.num_samples)
         self.assertEqual(results[0].samples.all_samples,
-                          [(0, 78, 11812), (1, 90, 13898), (2, 90, 11467)])
+                         [(0, 78, 11812), (1, 90, 13898), (2, 90, 11467)])
         self.assertEqual(r.yields, None)
 
         r = results[1]
@@ -555,7 +555,7 @@ Totals,2"""
         self.assertEqual(r.setup, 14444)
         self.assertEqual(r.num_samples, r.samples.num_samples)
         self.assertEqual(results[1].samples.all_samples,
-                          [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])
+                         [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])
         yielded = r.yields[0]
         self.assertEqual(yielded.before_sample, 1)
         self.assertEqual(yielded.after, 369918)
@@ -901,8 +901,8 @@ class Test_parse_args(unittest.TestCase):
     def test_output_argument(self):
         self.assertEqual(parse_args(self.required).output, None)
         self.assertEqual(parse_args(self.required +
-                                     ['--output', 'report.log']).output,
-                          'report.log')
+                                    ['--output', 'report.log']).output,
+                         'report.log')
 
     def test_changes_only_argument(self):
         self.assertFalse(parse_args(self.required).changes_only)

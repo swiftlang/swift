@@ -101,7 +101,7 @@ class Test_parse_args(unittest.TestCase):
     def test_independent_samples(self):
         self.assertEqual(parse_args(['run']).independent_samples, 1)
         self.assertEqual(parse_args(['run', '-i', '3']).independent_samples,
-                          3)
+                         3)
         with captured_output() as (out, err):
             self.assertRaises(SystemExit,
                               parse_args, ['run', '-i', '-3'])
@@ -186,9 +186,9 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
             self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
         self.assertEqual(driver.tests,
-                          ['Benchmark1', 'Benchmark2'])
+                         ['Benchmark1', 'Benchmark2'])
         self.assertEqual(driver.all_tests,
-                          ['Benchmark1', 'Benchmark2'])
+                         ['Benchmark1', 'Benchmark2'])
         self.assertEquals(driver.test_number['Benchmark1'], "1")
         self.assertEquals(driver.test_number['Benchmark2'], "2")
 
@@ -209,7 +209,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         self.subprocess_mock.assert_called_all_expected()
         self.assertEqual(driver.tests, ['Benchmark1', 'Benchmark3'])
         self.assertEqual(driver.all_tests,
-                          ['Benchmark1', 'Benchmark2', 'Benchmark3'])
+                         ['Benchmark1', 'Benchmark2', 'Benchmark3'])
 
     def test_filters_benchmarks_by_pattern(self):
         self.args.filters = '-f .+3'.split()
@@ -219,7 +219,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         self.subprocess_mock.assert_called_all_expected()
         self.assertEqual(driver.tests, ['Benchmark3'])
         self.assertEqual(driver.all_tests,
-                          ['Benchmark1', 'Benchmark2', 'Benchmark3'])
+                         ['Benchmark1', 'Benchmark2', 'Benchmark3'])
 
     def test_log_file(self):
         """When swift-repo is set, log is tied to Git branch and revision."""
@@ -231,7 +231,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
             Stub(output_dir='/path', tests='/bin/', optimization='Suffix',
                  swift_repo=None,), tests=['ignored'])
         self.assertEqual(driver.log_file,
-                          '/path/Benchmark_Suffix-' + now + '.log')
+                         '/path/Benchmark_Suffix-' + now + '.log')
 
         r = '/repo/'
         subprocess_mock = SubprocessMock(responses=[
@@ -244,7 +244,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
             Stub(output_dir='/log/', tests='', optimization='S', swift_repo=r),
             tests=['ignored'], _subprocess=subprocess_mock)
         self.assertEqual(driver.log_file,
-                          '/log/branch/Benchmark_S-' + now + '-short_hash.log')
+                         '/log/branch/Benchmark_S-' + now + '-short_hash.log')
         subprocess_mock.assert_called_all_expected()
 
 
@@ -377,7 +377,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         """Create log directory if it doesn't exist and write the log file."""
         def assert_log_written(out, log_file, content):
             self.assertEqual(out.getvalue(),
-                              'Logging results to: ' + log_file + '\n')
+                             'Logging results to: ' + log_file + '\n')
             with open(log_file, 'rU') as f:
                 text = f.read()
             self.assertEqual(text, "formatted output")
@@ -446,15 +446,15 @@ class TestLoggingReportFormatter(unittest.TestCase):
                 'levelname': level_name, 'msg': 'Hi!'})
         f = LoggingReportFormatter(use_color=True)
         self.assertEqual(f.format(record(logging.DEBUG, 'DEBUG')),
-                          '\x1b[1;39mcategory: Hi!\x1b[1;0m')
+                         '\x1b[1;39mcategory: Hi!\x1b[1;0m')
         self.assertEqual(f.format(record(logging.INFO, 'INFO')),
-                          '\x1b[1;32mcategory: Hi!\x1b[1;0m')
+                         '\x1b[1;32mcategory: Hi!\x1b[1;0m')
         self.assertEqual(f.format(record(logging.WARNING, 'WARNING')),
-                          '\x1b[1;33mcategory: Hi!\x1b[1;0m')
+                         '\x1b[1;33mcategory: Hi!\x1b[1;0m')
         self.assertEqual(f.format(record(logging.ERROR, 'ERROR')),
-                          '\x1b[1;31mcategory: Hi!\x1b[1;0m')
+                         '\x1b[1;31mcategory: Hi!\x1b[1;0m')
         self.assertEqual(f.format(record(logging.CRITICAL, 'CRITICAL')),
-                          '\x1b[1;35mcategory: Hi!\x1b[1;0m')
+                         '\x1b[1;35mcategory: Hi!\x1b[1;0m')
 
     def test_no_prefix_for_base_logging(self):
         lr = logging.makeLogRecord({
