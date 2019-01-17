@@ -74,7 +74,10 @@ public extension LocalizedError {
 /// Class that implements the informal protocol
 /// NSErrorRecoveryAttempting, which is used by NSError when it
 /// attempts recovery from an error.
-class _NSErrorRecoveryAttempter {
+// NOTE: older overlays called this class _NSErrorRecoveryAttempter.
+// The two must coexist without a conflicting ObjC class name, so it
+// was renamed. The old name must not be used in the new runtime.
+class __NSErrorRecoveryAttempter {
   @objc(attemptRecoveryFromError:optionIndex:delegate:didRecoverSelector:contextInfo:)
   func attemptRecovery(fromError nsError: NSError,
                        optionIndex recoveryOptionIndex: Int,
@@ -252,7 +255,7 @@ public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
 
           case NSRecoveryAttempterErrorKey:
             if error is RecoverableError {
-              return _NSErrorRecoveryAttempter()
+              return __NSErrorRecoveryAttempter()
             }
             return nil
 
@@ -308,7 +311,7 @@ public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
      let recoverableError = error as? RecoverableError {
     result[NSLocalizedRecoveryOptionsErrorKey] =
       recoverableError.recoveryOptions
-    result[NSRecoveryAttempterErrorKey] = _NSErrorRecoveryAttempter()
+    result[NSRecoveryAttempterErrorKey] = __NSErrorRecoveryAttempter()
   }
 
   return result as AnyObject

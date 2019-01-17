@@ -1,2 +1,47 @@
 Class __SwiftNativeNSString has been removed
+
+Class _DictionaryStorage has changed its super class from _RawDictionaryStorage to __RawDictionaryStorage
+Class _EmptyDictionarySingleton has been renamed to Class __EmptyDictionarySingleton
+Class _EmptyDictionarySingleton has changed its super class from _RawDictionaryStorage to __RawDictionaryStorage
+Class _EmptySetSingleton has been renamed to Class __EmptySetSingleton
+Class _EmptySetSingleton has changed its super class from _RawSetStorage to __RawSetStorage
+Class _RawDictionaryStorage has been renamed to Class __RawDictionaryStorage
+Class _RawSetStorage has been renamed to Class __RawSetStorage
+Class _SetStorage has changed its super class from _RawSetStorage to __RawSetStorage
+Constructor Dictionary._Variant.init(cocoa:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
+Constructor Dictionary.init(_cocoa:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
+Constructor Set._Variant.init(cocoa:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Constructor Set.init(_cocoa:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Constructor _CocoaDictionary.init(_:) has return type change from _CocoaDictionary to __CocoaDictionary
+Constructor _CocoaSet.init(_:) has return type change from _CocoaSet to __CocoaSet
+Constructor _NativeDictionary.init(_:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
+Constructor _NativeDictionary.init(_:) has parameter 0 type change from _RawDictionaryStorage to __RawDictionaryStorage
+Constructor _NativeDictionary.init(_:capacity:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
+Constructor _NativeSet.init(_:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Constructor _NativeSet.init(_:) has parameter 0 type change from _RawSetStorage to __RawSetStorage
+Constructor _NativeSet.init(_:capacity:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Func Set._Variant._migrateToNative(_:removing:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Func _CocoaDictionary.isEqual(to:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
+Func _CocoaSet.isEqual(to:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Func _DictionaryStorage.convert(_:capacity:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
+Func _DictionaryStorage.copy(original:) has parameter 0 type change from _RawDictionaryStorage to __RawDictionaryStorage
+Func _DictionaryStorage.resize(original:capacity:move:) has parameter 0 type change from _RawDictionaryStorage to __RawDictionaryStorage
+Func _NativeDictionary.isEqual(to:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
+Func _NativeSet.isEqual(to:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Func _SetStorage.convert(_:capacity:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Func _SetStorage.copy(original:) has parameter 0 type change from _RawSetStorage to __RawSetStorage
+Func _SetStorage.resize(original:capacity:move:) has parameter 0 type change from _RawSetStorage to __RawSetStorage
+Struct _CocoaDictionary has been renamed to Struct __CocoaDictionary
+Struct _CocoaSet has been renamed to Struct __CocoaSet
+Var Dictionary._Variant.asCocoa has declared type change from _CocoaDictionary to __CocoaDictionary
+Var Dictionary._Variant.object has declared type change from _BridgeStorage<_RawDictionaryStorage> to _BridgeStorage<__RawDictionaryStorage>
+Var Set._Variant.asCocoa has declared type change from _CocoaSet to __CocoaSet
+Var Set._Variant.object has declared type change from _BridgeStorage<_RawSetStorage> to _BridgeStorage<__RawSetStorage>
+Var _CocoaDictionary.Index.dictionary has declared type change from _CocoaDictionary to __CocoaDictionary
+Var _NativeDictionary._storage has declared type change from _RawDictionaryStorage to __RawDictionaryStorage
+Var _NativeSet._storage has declared type change from _RawSetStorage to __RawSetStorage
+Var _RawDictionaryStorage.empty has declared type change from _EmptyDictionarySingleton to __EmptyDictionarySingleton
+Var _RawSetStorage.empty has declared type change from _EmptySetSingleton to __EmptySetSingleton
+
 Func tryReallocateUniquelyReferenced(buffer:newMinimumCapacity:) has been removed
+
