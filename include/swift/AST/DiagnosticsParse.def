@@ -1482,14 +1482,11 @@ ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
 ERROR(attr_differentiable_expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after '%0'", (StringRef))
 ERROR(attr_differentiable_expected_label,none,
-      "expected a function specifier label, e.g. "
-      "'wrt:', 'primal:', 'adjoint:', 'jvp:', or 'vjp:'", ())
+      "expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'", ())
 
 // [differentiable ...] (sil-decl attr)
 ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,
       "expected '%0' in 'differentiable' attribute", (StringRef))
-ERROR(sil_attr_differentiable_expected_adjoint_identifier,PointsToFirstBadToken,
-      "expected the identifier of an adjoint function", ())
 ERROR(sil_attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected an comma-separated list of parameter indices, e.g. (0, 1)", ())
 ERROR(sil_attr_differentiable_expected_rsquare,PointsToFirstBadToken,

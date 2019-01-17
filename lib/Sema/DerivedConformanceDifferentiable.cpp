@@ -701,7 +701,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived, Identifier id
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
       auto *diffableAttr = DifferentiableAttr::create(
-          C, /*implicit*/ true, SourceLoc(), SourceLoc(), {}, None, None, None,
+          C, /*implicit*/ true, SourceLoc(), SourceLoc(), {}, None,
           None, nullptr);
       member->getAttrs().add(diffableAttr);
       auto *getterType =

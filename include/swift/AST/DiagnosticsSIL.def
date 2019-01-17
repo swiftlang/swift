@@ -364,12 +364,6 @@ ERROR(pound_assert_failure,none,
 // Automatic differentiation diagnostics
 ERROR(autodiff_internal_swift_not_imported,none,
       "AD internal error: the Swift module is not imported", ())
-ERROR(autodiff_incomplete_differentiable_attr,none,
-      "incomplete `differentiable` attribute; it should specify either "
-      "both primal and adjoint or nothing", ())
-ERROR(autodiff_cannot_synthesize_primal_yet,none,
-      "automatic differentiation cannot synthesize primals yet; define the "
-      "primal function using a '@differentiable' attribute", ())
 ERROR(autodiff_unsupported_type,none,
       "differentiating '%0' is not supported yet", (Type))
 ERROR(autodiff_function_not_differentiable,none,
@@ -390,10 +384,6 @@ NOTE(autodiff_control_flow_not_supported,none,
      "differentiating control flow is not supported yet", ())
 NOTE(autodiff_nested_not_supported,none,
      "nested differentiation is not supported yet", ())
-NOTE(autodiff_no_synthesized_primal_or_adjoint,none,
-     "function does not have primal or adjoint; define an adjoint (and "
-     "optionally, a primal) using a '@differentiable' attribute, or enable "
-     "'-differentiation-use-vjp' mode", ())
 
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "

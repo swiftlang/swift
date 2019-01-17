@@ -1168,24 +1168,6 @@ static bool parseDifferentiableAttr(
       P.parseIdentifier(id, LastLoc, diag::expected_sil_function_name);
   };
 
-  // Parse optional 'primal'.
-  Identifier PrimName;
-  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "primal") {
-    P.consumeToken();
-    if (parseFnName(PrimName)) return true;
-  }
-  // Parse optional 'adjoint'.
-  Identifier AdjName;
-  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "adjoint") {
-    P.consumeToken();
-    if (parseFnName(AdjName)) return true;
-  }
-  // Parse optional 'primitive'.
-  bool adjointIsPrimitive = false;
-  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "primitive") {
-    P.consumeToken();
-    adjointIsPrimitive = true;
-  }
   // Parse optional 'jvp'.
   Identifier JVPName;
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "jvp") {
@@ -1215,8 +1197,8 @@ static bool parseDifferentiableAttr(
   }
   // Create a SILDifferentiableAttr and we are done.
   auto *Attr = SILDifferentiableAttr::create(
-      SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str(),
-      adjointIsPrimitive, JVPName.str(), VJPName.str(), WhereClause);
+      SP.SILMod, {SourceIndex, ParamIndices}, JVPName.str(), VJPName.str(),
+      WhereClause);
   DAs.push_back(Attr);
   return false;
 }

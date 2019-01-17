@@ -837,8 +837,6 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 
   using DeclNameWithLoc = DifferentiableAttr::DeclNameWithLoc;
   SmallVector<ParsedAutoDiffParameter, 8> params;
-  Optional<DeclNameWithLoc> primalSpec;
-  Optional<DeclNameWithLoc> adjointSpec;
   Optional<DeclNameWithLoc> jvpSpec;
   Optional<DeclNameWithLoc> vjpSpec;
   TrailingWhereClause *whereClause = nullptr;
@@ -846,8 +844,8 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   // Parse '('.
   if (consumeIf(tok::l_paren, lParenLoc)) {
     // Parse @differentiable attribute arguments.
-    if (parseDifferentiableAttributeArguments(params, primalSpec, adjointSpec,
-                                              jvpSpec, vjpSpec, whereClause))
+    if (parseDifferentiableAttributeArguments(params, jvpSpec, vjpSpec,
+                                              whereClause))
       return makeParserError();
     // Parse ')'.
     if (!consumeIf(tok::r_paren, rParenLoc)) {
@@ -860,14 +858,11 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   return ParserResult<DifferentiableAttr>(
     DifferentiableAttr::create(Context, /*implicit*/ false, atLoc,
                                SourceRange(loc, rParenLoc),
-                               params, primalSpec, adjointSpec, jvpSpec,
-                               vjpSpec, whereClause));
+                               params, jvpSpec, vjpSpec, whereClause));
 }
 
 bool Parser::parseDifferentiableAttributeArguments(
     SmallVectorImpl<ParsedAutoDiffParameter> &params,
-    Optional<DifferentiableAttr::DeclNameWithLoc> &primalSpec,
-    Optional<DifferentiableAttr::DeclNameWithLoc> &adjointSpec,
     Optional<DifferentiableAttr::DeclNameWithLoc> &jvpSpec,
     Optional<DifferentiableAttr::DeclNameWithLoc> &vjpSpec,
     TrailingWhereClause *&whereClause) {
@@ -893,9 +888,7 @@ bool Parser::parseDifferentiableAttributeArguments(
       return true;
     }
     // Check that token after comma is a function specifier label.
-    if (!Tok.is(tok::identifier) || !(Tok.getText() == "primal" ||
-                                      Tok.getText() == "adjoint" ||
-                                      Tok.getText() == "jvp" ||
+    if (!Tok.is(tok::identifier) || !(Tok.getText() == "jvp" ||
                                       Tok.getText() == "vjp")) {
       diagnose(Tok, diag::attr_differentiable_expected_label);
       return true;
@@ -1012,32 +1005,6 @@ bool Parser::parseDifferentiableAttributeArguments(
 
   // Store whether to terminate parsing arguments.
   bool terminateParsingArgs = false;
-
-  // Parse 'primal: <func_name>' (optional).
-  if (Tok.is(tok::identifier) && Tok.getText() == "primal") {
-    SyntaxParsingContext PrimalContext(
-        SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    primalSpec = FuncSpec();
-    if (parseFuncSpec("primal", *primalSpec, terminateParsingArgs))
-      return errorAndSkipToEnd();
-    if (terminateParsingArgs)
-      return false;
-    if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
-  }
-  
-  // Parse 'adjoint: <func_name>' (optional).
-  if (Tok.is(tok::identifier) && Tok.getText() == "adjoint") {
-    SyntaxParsingContext AdjointContext(
-        SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    adjointSpec = FuncSpec();
-    if (parseFuncSpec("adjoint", *adjointSpec, terminateParsingArgs))
-      return errorAndSkipToEnd();
-    if (terminateParsingArgs)
-      return false;
-    if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
-  }
 
   // Parse 'jvp: <func_name>' (optional).
   if (Tok.is(tok::identifier) && Tok.getText() == "jvp") {

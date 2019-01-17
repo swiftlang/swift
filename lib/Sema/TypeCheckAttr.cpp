@@ -2109,17 +2109,12 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
 // SWIFT_ENABLE_TENSORFLOW
 static FuncDecl *resolveAutoDiffAssociatedFunction(
     TypeChecker &TC, DifferentiableAttr::DeclNameWithLoc specifier,
-    FuncDecl *original, bool isPrimal, Type expectedTy,
+    FuncDecl *original, Type expectedTy,
     std::function<bool(FuncDecl *)> isValid) {
   auto nameLoc = specifier.Loc.getBaseNameLoc();
   auto overloadDiagnostic = [&]() {
-    if (isPrimal) {
-      TC.diagnose(nameLoc, diag::differentiable_attr_primal_overload_not_found,
-                  specifier.Name, expectedTy);
-    } else {
-      TC.diagnose(nameLoc, diag::differentiable_attr_overload_not_found,
-                  specifier.Name, expectedTy);
-    }
+    TC.diagnose(nameLoc, diag::differentiable_attr_overload_not_found,
+                specifier.Name, expectedTy);
   };
   auto ambiguousDiagnostic = [&]() {
     TC.diagnose(nameLoc,
@@ -2264,30 +2259,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto originalParamTypes = map<SmallVector<TupleTypeElt, 8>>(
       originalParams.getArray(),
       [&](ParamDecl *decl) { return decl->getInterfaceType(); });
-  auto originalParamsTy = TupleType::get(originalParamTypes, ctx);
 
   // Start type-checking the arguments of the @differentiable attribute. This
-  // covers 'wrt:', 'primal:', 'adjoint:', and 'vjp:', all of which are
-  // optional.
-
-  // If the declaration has no definition (e.g. it is a protocol requirement),
-  // then you are not allowed to specify any associated functions.
-  if (!original->hasBody()) {
-    if (attr->getPrimal() || attr->getAdjoint()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::differentiable_attr_associated_function_protocol);
-      attr->setInvalid();
-      return;
-    }
-  }
-
-  // If primal exists but adjoint does not, this is an error.
-  if (attr->getPrimal() && !attr->getAdjoint()) {
-    TC.diagnose(attr->getPrimal()->Loc,
-                diag::differentiable_attr_has_primal_but_not_adjoint);
-    attr->setInvalid();
-    return;
-  }
+  // covers 'wrt:', 'jvp:', and 'vjp:', all of which are optional.
 
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
@@ -2376,62 +2350,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     whereClauseGenEnv = whereClauseGenSig->createGenericEnvironment();
     // Store the resolved requirements in the attribute.
     attr->setRequirements(ctx, whereClauseGenSig->getRequirements());
-  }
-
-  // Resolve the primal declaration, if it exists.
-  FuncDecl *primal = nullptr;
-  if (attr->getPrimal()) {
-    auto expectedPrimalParamTypes = originalParamsTy;
-    auto expectedPrimalResultTy = original->getResultInterfaceType();
-    if (whereClauseGenEnv) {
-      expectedPrimalParamTypes =
-          whereClauseGenEnv->mapTypeIntoContext(expectedPrimalParamTypes);
-      expectedPrimalResultTy =
-          whereClauseGenEnv->mapTypeIntoContext(expectedPrimalResultTy);
-    }
-    auto isValidPrimal = [&](FuncDecl *primalCandidate) {
-      // Returns true if the primal candidate:
-      // - has the same parameter types as the original function.
-      // - has the same generic signature as the original function.
-      // - returns a 2-tuple where the second element type is the original.
-      TC.validateDeclForNameLookup(primalCandidate);
-      auto primalParams = primalCandidate->getParameters();
-      auto primalParamTypes = map<SmallVector<TupleTypeElt, 8>>(
-          primalParams->getArray(),
-          [&](ParamDecl *decl) { return decl->getInterfaceType(); });
-      auto primalParamsTy = TupleType::get(primalParamTypes, ctx);
-      if (!primalParamsTy->isEqual(expectedPrimalParamTypes))
-        return false;
-      auto expectedCanGenSig = original->getGenericSignature()
-        ? original->getGenericSignature()->getCanonicalSignature()
-        : CanGenericSignature();
-      if (whereClauseGenSig)
-        expectedCanGenSig = whereClauseGenSig->getCanonicalSignature();
-      auto primalCanGenSig = primalCandidate->getGenericSignature()
-        ? primalCandidate->getGenericSignature()->getCanonicalSignature()
-        : CanGenericSignature();
-      if (primalCanGenSig != expectedCanGenSig)
-        return false;
-      auto resultTy = primalCandidate->getResultInterfaceType();
-      auto *resultTupleTy = resultTy->getAs<TupleType>();
-      if (!resultTupleTy ||
-          resultTupleTy->getNumElements() != 2 ||
-          !resultTupleTy->getElement(1).getType()->isEqual(expectedPrimalResultTy))
-        return false;
-      return true;
-    };
-
-    primal = resolveAutoDiffAssociatedFunction(TC, attr->getPrimal().getValue(),
-                                               original, /*isPrimal*/ true,
-                                               expectedPrimalParamTypes,
-                                               isValidPrimal);
-
-    if (!primal) {
-      attr->setInvalid();
-      return;
-    }
-    // Memorize the primal reference in the attribute.
-    attr->setPrimalFunction(primal);
   }
 
   // Validate the 'wrt:' parameters.
@@ -2639,35 +2557,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                                   candidateFnTy.getResult());
   };
 
-  // Resolve the adjoint declaration, if it exists.
-  if (attr->getAdjoint()) {
-    // Compute the expected adjoint function type.
-    TupleType *primalResultTy =
-        primal ? primal->getResultInterfaceType()->getAs<TupleType>() : nullptr;
-    AnyFunctionType *expectedAdjointFnTy =
-        originalFnTy->getAutoDiffAdjointFunctionType(
-            checkedWrtParamIndices, primalResultTy, lookupConformance,
-            isMethod, whereClauseGenSig);
-
-    auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
-      TC.validateDeclForNameLookup(adjointCandidate);
-      return checkFunctionSignature(
-          cast<AnyFunctionType>(expectedAdjointFnTy->getCanonicalType()),
-          adjointCandidate->getInterfaceType()->getCanonicalType());
-    };
-
-    FuncDecl *adjoint = resolveAutoDiffAssociatedFunction(
-        TC, attr->getAdjoint().getValue(), original, /*isPrimal*/ false,
-        expectedAdjointFnTy, isValidAdjoint);
-
-    if (!adjoint) {
-      attr->setInvalid();
-      return;
-    }
-    // Memorize the adjoint reference in the attribute.
-    attr->setAdjointFunction(adjoint);
-  }
-
   // Resolve the JVP declaration, if it exists.
   if (attr->getJVP()) {
     AnyFunctionType *expectedJVPFnTy =
@@ -2684,8 +2573,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     };
 
     FuncDecl *jvp = resolveAutoDiffAssociatedFunction(
-        TC, attr->getJVP().getValue(), original, /*isPrimal*/ false,
-        expectedJVPFnTy, isValidJVP);
+        TC, attr->getJVP().getValue(), original, expectedJVPFnTy, isValidJVP);
 
     if (!jvp) {
       attr->setInvalid();
@@ -2711,8 +2599,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     };
 
     FuncDecl *vjp = resolveAutoDiffAssociatedFunction(
-        TC, attr->getVJP().getValue(), original, /*isPrimal*/ false,
-        expectedVJPFnTy, isValidVJP);
+        TC, attr->getVJP().getValue(), original, expectedVJPFnTy, isValidVJP);
 
     if (!vjp) {
       attr->setInvalid();

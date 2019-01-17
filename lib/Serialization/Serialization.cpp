@@ -2344,18 +2344,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     auto abbrCode = DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
     auto attr = cast<DifferentiableAttr>(DA);
 
-    IdentifierID primalName = 0;
-    DeclID primalRef = 0;
-    if (auto primal = attr->getPrimal()) {
-      primalName = addDeclBaseNameRef(primal->Name.getBaseName());
-      primalRef = addDeclRef(attr->getPrimalFunction());
-    }
-    IdentifierID adjointName = 0;
-    DeclID adjointRef = 0;
-    if (auto adjoint = attr->getAdjoint()) {
-      adjointName = addDeclBaseNameRef(adjoint->Name.getBaseName());
-      adjointRef = addDeclRef(attr->getAdjointFunction());
-    }
     IdentifierID jvpName = 0;
     DeclID jvpRef = 0;
     if (auto jvp = attr->getJVP()) {
@@ -2376,8 +2364,8 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
       indices.push_back(paramIndices->parameters[i]);
 
     DifferentiableDeclAttrLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, attr->isImplicit(), primalName, primalRef,
-      adjointName, adjointRef, jvpName, jvpRef, vjpName, vjpRef, indices);
+      Out, ScratchRecord, abbrCode, attr->isImplicit(),
+      jvpName, jvpRef, vjpName, vjpRef, indices);
 
     writeGenericRequirements(attr->getRequirements(), DeclTypeAbbrCodes);
     return;

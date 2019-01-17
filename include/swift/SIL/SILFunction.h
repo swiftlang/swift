@@ -101,16 +101,7 @@ private:
 /// SWIFT_ENABLE_TENSORFLOW
 /// Differentiable attribute - @differentiable attribute lowered to SIL. This
 /// attribute is used by the automatic differentiation pass to find the autodiff
-/// functions associated with a function: 'primal', 'adjoint', 'jvp', and 'vjp'.
-///
-/// For 'primal' and 'adjoint', the attribute may specify:
-/// - neither,
-/// - just 'adjoint', or
-/// - both 'primal' and 'adjoint'.
-/// The core AD pass synthesizes the missing ones.
-///
-/// Note: 'primal' and 'adjoint' are legacy functions that we will keep around
-/// until we have fully switched to 'jvp' and 'vjp'.
+/// functions associated with a function: 'jvp' and 'vjp'.
 ///
 /// 'jvp' and 'vjp' are optional. We intend for the core AD pass to synthesize
 /// the missing ones.
@@ -119,8 +110,6 @@ private:
 /// AD pass does not use or synthesize them.
 ///
 /// Example:
-///   sil [differentiable primal @foo_primal adjoint @foo_adjoint] @foo
-///     : $(Float) -> Float { ... }
 ///   sil [differentiable jvp @foo_jvp vjp @foo_vjp] @foo
 ///     : $(Float) -> Float { ... }
 class SILDifferentiableAttr final {
@@ -129,10 +118,6 @@ class SILDifferentiableAttr final {
 private:
   /// The AD indices.
   SILAutoDiffIndices indices;
-  /// The primal and adjoint function names.
-  StringRef PrimalName, AdjointName;
-  /// Whether the adjoint is primitive.
-  bool AdjointIsPrimitive;
   /// The JVP and VJP function names.
   StringRef JVPName, VJPName;
   /// The trailing constraint clause.
@@ -149,17 +134,11 @@ private:
   }
 
   SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                        StringRef primalName,
-                        StringRef adjointName,
-                        bool adjointIsPrimitive,
                         StringRef jvpName,
                         StringRef vjpName,
                         TrailingWhereClause *whereClause);
 
   SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                        StringRef primalName,
-                        StringRef adjointName,
-                        bool adjointIsPrimitive,
                         StringRef jvpName,
                         StringRef vjpName,
                         ArrayRef<Requirement> requirements);
@@ -167,28 +146,13 @@ private:
 public:
   static SILDifferentiableAttr *create(
       SILModule &M, const SILAutoDiffIndices &indices,
-      StringRef primalName = StringRef(), StringRef adjointName = StringRef(),
-      bool adjointIsPrimitive = false, StringRef jvpName = StringRef(),
-      StringRef vjpName = StringRef(),
+      StringRef jvpName = StringRef(), StringRef vjpName = StringRef(),
       TrailingWhereClause *whereClause = nullptr);
 
   static SILDifferentiableAttr *create(
       SILModule &M, const SILAutoDiffIndices &indices,
-      ArrayRef<Requirement> requirements, StringRef primalName = StringRef(),
-      StringRef adjointName = StringRef(), bool adjointIsPrimitive = false,
-      StringRef jvpName = StringRef(), StringRef vjpName = StringRef());
-
-  bool hasPrimal() const { return !PrimalName.empty(); }
-  StringRef getPrimalName() const { assert(hasPrimal()); return PrimalName; }
-  void setPrimalName(StringRef name) { PrimalName = name; }
-
-  bool hasAdjoint() const { return !AdjointName.empty(); }
-  bool isAdjointPrimitive() const { return AdjointIsPrimitive; }
-  StringRef getAdjointName() const { assert(hasAdjoint()); return AdjointName; }
-  void setAdjointName(StringRef name, bool primitive) {
-    AdjointName = name;
-    AdjointIsPrimitive = primitive;
-  }
+      ArrayRef<Requirement> requirements, StringRef jvpName = StringRef(),
+      StringRef vjpName = StringRef());
 
   bool hasJVP() const { return !JVPName.empty(); }
   StringRef getJVPName() const { assert(hasJVP()); return JVPName; }
