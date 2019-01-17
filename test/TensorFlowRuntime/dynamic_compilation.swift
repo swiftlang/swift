@@ -1,5 +1,5 @@
-// TODO: Revert to %target-run-simple-swift once we fold dynamic compilation into -Onone.
-// RUN: %target-run-dynamic-compilation-swift
+// TODO: Revert to %target-run-gpe-swift once we fold dynamic compilation into -Onone.
+// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 
 import CTensorFlow

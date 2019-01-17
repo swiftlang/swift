@@ -49,6 +49,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "tensorflow/c/c_api.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
@@ -410,10 +412,6 @@ public:
   unsigned NumAnonVars = 0;
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// If we run across a graph_op, we compute the function's
-  /// GraphFunctionDeviceInfo and store it here.
-  llvm::Optional<GraphFunctionDeviceInfo> deviceInfo;
-
   AttributeTypeClassifier attributeTypeClassifier;
 
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
@@ -955,7 +953,6 @@ public:
   void visitBuiltinInst(BuiltinInst *i);
 
   // SWIFT_ENABLE_TENSORFLOW
-  void visitGradientInst(GradientInst *i);
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *i);
   void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i);
   void visitGraphOperationInst(GraphOperationInst *i);
@@ -1974,29 +1971,33 @@ static const char *inputListNumberAttr(StringRef opName, unsigned inputIdx) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Gradient is not valid in canonical SIL yet. For now, we print a runtime
-/// error.
-void IRGenSILFunction::visitGradientInst(GradientInst *i) {
-  const std::string errMessage =
-      "Compiler bug: gradient should have been canonicalized.";
-  abortOnGraphOp(*this, errMessage.c_str());
-  for (auto result : i->getResults()) {
-    ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
-    Explosion e;
-    for (auto &elt : schema)
-      e.add(llvm::UndefValue::get(elt.getScalarType()));
-    setLoweredExplosion(result, e);
-  }
-  return;
-}
-
 void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
-  llvm_unreachable("FIXME: handle this");
+  // The original function and associated functions can be thin or thick.
+  auto origExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origExp.claimAll());
+  for (auto &assocFnOp : i->getAssociatedFunctions())
+    e.add(getLoweredExplosion(assocFnOp.get()).claimAll());
+  setLoweredExplosion(i, e);
 }
 
 void IRGenSILFunction::
 visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
-  llvm_unreachable("FIXME: handle this");
+  unsigned structFieldOffset = 0;
+  if (i->getExtractee() != AutoDiffFunctionExtractee::Original)
+    structFieldOffset = 1 + autodiff::getOffsetForAutoDiffAssociatedFunction(
+      i->getDifferentiationOrder(), i->getAssociatedFunctionKind());
+  unsigned fieldSize = 1;
+  auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
+  if (fnRepr == SILFunctionTypeRepresentation::Thick) {
+    structFieldOffset *= 2;
+    fieldSize = 2;
+  }
+  auto adFnExp = getLoweredExplosion(i->getFunctionOperand());
+  Explosion e;
+  e.add(adFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)adFnExp.claimAll();
+  setLoweredExplosion(i, e);
 }
 
 // The code structure resembles
@@ -2043,12 +2044,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     setLoweredExplosion(i->getResults()[0], e);
     return;
   }
-
-  // If the deviceInfo is not computed yet, compute it here.
-  if (!deviceInfo)
-    deviceInfo = Optional<GraphFunctionDeviceInfo>(
-        GraphFunctionDeviceInfo::getForFunction(*CurSILFn,
-                                                /*removeConfigInst*/false));
 
   LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: "
                           << opInfo.getOperationName() << "\n");
@@ -2690,9 +2685,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         assert(0 && "dtype attr must have been processed!");
       }
 
-      if (attr.value.getKind() == SymbolicValue::String)
-        assert(0 && "TODO: support string typed tensor attr.");
-
       auto addScalar = [&](SymbolicValue value,
                            SmallVectorImpl<SymbolicValue> &elements) -> bool {
         value = value.lookThroughSingleElementAggregates();
@@ -2705,6 +2697,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       SmallVector<SymbolicValue, 4> elements;
       bool isFloat = false;
       SmallVector<int64_t, 4> shape;
+      llvm::Value *tensor = nullptr;
       // The scalar case is very simple, the shape of a scalar is 0d, and the
       // data type comes from an attr that should already be processed.
       auto attrValue = attr.value.lookThroughSingleElementAggregates();
@@ -2714,6 +2707,14 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         isFloat = (attrValue.getKind() == SymbolicValue::Float);
         if (addScalar(attrValue, elements))
           assert(0 && "Bad scalar value for tensor attr.");
+
+        if (attrValue.getKind() == SymbolicValue::String) {
+          auto str = attrValue.getStringValue();
+          auto strVal = IGM.getAddrOfGlobalString(str);
+          auto strLen = llvm::ConstantInt::get(IGM.Int32Ty, str.size());
+          auto *createTensorFn = IGM.getTFC_CreateScalarStringTensorFn();
+          tensor = Builder.CreateCall(createTensorFn, {strVal, strLen, status});
+        }
       } else {
         // Add all the elements to the elements list.
         CanType eltType;
@@ -2725,8 +2726,11 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         LLVM_DEBUG(llvm::dbgs()
                    << "The elt dtype of tensor-typed attr is " << eltType
                    << ", with tfDtype = " << tfDtype << ".\n");
-        // 1 means TF_FLOAT.
-        isFloat = tfDtype == 1;
+        isFloat = tfDtype == TF_FLOAT;
+
+        // String tensors are usually to represent metadata like file names in a
+        // dataset TF op, so scalar tensor support above should be sufficient.
+        assert(tfDtype != TF_STRING && "Only support scalar string tensors.");
 
         // Decode the shape attribute which must come next.
         auto shapeAttr = i->getAttribute(nextAttributeNumber++).value;
@@ -2738,45 +2742,49 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       // Create llvm values for elements and shape, and then call
       // swift_tfc_CreateIntTensor() or swift_tfc_CreateFloatTensor().
-      Address tensorEltVals;
-      createArrayAndSize<SymbolicValue>(
-          elements, isFloat ? IGM.FloatTy : IGM.Int64Ty, "tensorEltVals",
-          [&](SymbolicValue elt) {
-            return isFloat ? llvm::ConstantFP::get(
-                                 IGM.FloatTy,
-                                 (double)elt.getFloatValue().convertToFloat())
-                           : llvm::ConstantInt::get(IGM.Int64Ty,
-                                                    elt.getIntegerValue()
-                                                        .sextOrTrunc(64)
-                                                        .getLimitedValue());
-          },
-          tensorEltVals);
+      if (!tensor) {
+        Address tensorEltVals;
+        createArrayAndSize<SymbolicValue>(
+            elements, isFloat ? IGM.FloatTy : IGM.Int64Ty, "tensorEltVals",
+            [&](SymbolicValue elt) {
+              return isFloat ? llvm::ConstantFP::get(
+                                   IGM.FloatTy,
+                                   (double)elt.getFloatValue().convertToFloat())
+                             : llvm::ConstantInt::get(IGM.Int64Ty,
+                                                      elt.getIntegerValue()
+                                                          .sextOrTrunc(64)
+                                                          .getLimitedValue());
+            },
+            tensorEltVals);
 
-      // Create the LLVM values representing shape.
-      Address dimVals;
-      llvm::Value *numDims = createArrayAndSize<int64_t>(
-          shape, IGM.Int64Ty, "dimVals",
-          [&](int64_t elt) { return llvm::ConstantInt::get(IGM.Int64Ty, elt); },
-          dimVals);
+        // Create the LLVM values representing shape.
+        Address dimVals;
+        llvm::Value *numDims = createArrayAndSize<int64_t>(
+            shape, IGM.Int64Ty, "dimVals",
+            [&](int64_t elt) {
+              return llvm::ConstantInt::get(IGM.Int64Ty, elt);
+            },
+            dimVals);
 
-      auto dimValsUntyped =
-          Builder.CreateBitCast(dimVals.getAddress(), IGM.Int8PtrTy);
-      auto tensorEltValsUntyped =
-          Builder.CreateBitCast(tensorEltVals.getAddress(), IGM.Int8PtrTy);
-      llvm::Value *tensor = nullptr;
-      if (isFloat) {
-        auto *createTensorFn = IGM.getTFC_CreateFloatTensorFn();
-        tensor =
-            Builder.CreateCall(createTensorFn, {numDims, dimValsUntyped,
-                                                tensorEltValsUntyped, status});
-      } else {
-        auto *createTensorFn = IGM.getTFC_CreateIntTensorFn();
-        auto dtypeVal = llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr);
-        tensor = Builder.CreateCall(
-            createTensorFn,
-            {numDims, dimValsUntyped, tensorEltValsUntyped, dtypeVal, status});
+        auto dimValsUntyped =
+            Builder.CreateBitCast(dimVals.getAddress(), IGM.Int8PtrTy);
+        auto tensorEltValsUntyped =
+            Builder.CreateBitCast(tensorEltVals.getAddress(), IGM.Int8PtrTy);
+        if (isFloat) {
+          auto *createTensorFn = IGM.getTFC_CreateFloatTensorFn();
+          tensor = Builder.CreateCall(
+              createTensorFn,
+              {numDims, dimValsUntyped, tensorEltValsUntyped, status});
+        } else {
+          auto *createTensorFn = IGM.getTFC_CreateIntTensorFn();
+          auto dtypeVal = llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr);
+          tensor = Builder.CreateCall(createTensorFn,
+                                      {numDims, dimValsUntyped,
+                                       tensorEltValsUntyped, dtypeVal, status});
+        }
+        checkOk(status);
       }
-      checkOk(status);
+      assert(tensor != nullptr);
 
       // Set up the tensor-typed value attr as in:
       //   TFE_OpSetAttrTensor(op, "value", tensor, status);
@@ -2835,15 +2843,8 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   }
 
   // Set the device.
-  opDevice = deviceInfo->handleDevicePlacement(opInfo.getOperationName(),
-                                               opDevice, i->getAttributes());
-  assert(!opDevice.empty());
-  if (opDevice != TF_ALL_DEVICES) {
-    auto *setDeviceFn = IGM.getTFE_OpSetDeviceFn();
-    auto device = IGM.getAddrOfGlobalString(opDevice);
-    Builder.CreateCall(setDeviceFn, {op, device, status});
-    checkOk(status);
-  }
+  Builder.CreateCall(IGM.getTFC_OpSetDeviceFromScopeFn(), {op, status});
+  checkOk(status);
 
   // If we have any opaque TensorGroup results, then we need to do extra runtime
   // work to determine the number of TensorFlow outputs and to allocate space
@@ -3548,6 +3549,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   
   auto origCalleeType = site.getOrigCalleeType();
   auto substCalleeType = site.getSubstCalleeType();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  assert(!origCalleeType->isDifferentiable() && "Differentiable functions "
+         "should not reach here");
   
   auto args = site.getArguments();
   SILFunctionConventions origConv(origCalleeType, getSILModule());
@@ -5689,13 +5694,19 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
 
 void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     swift::ConvertEscapeToNoEscapeInst *i) {
-  // This instruction makes the context trivial.
+  // SWIFT_ENABLE_TENSORFLOW
+  // This instruction makes the context(s) trivial. A function contains multiple
+  // function pointers and contexts when it's differentiable.
   Explosion in = getLoweredExplosion(i->getOperand());
-  llvm::Value *fn = in.claimNext();
-  llvm::Value *ctx = in.claimNext();
   Explosion out;
-  out.add(fn);
-  out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+  // SWIFT_ENABLE_TENSORFLOW
+  for (unsigned index : range(in.size() / 2)) {
+    (void)index;
+    llvm::Value *fn = in.claimNext();
+    llvm::Value *ctx = in.claimNext();
+    out.add(fn);
+    out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+  }
   setLoweredExplosion(i, out);
 }
 

@@ -23,6 +23,9 @@ include("../../../cmake/modules/SwiftList.cmake")
 find_package(TensorFlow REQUIRED)
 message(STATUS "Building CTensorFlow.")
 
+if (TF_PATH_ADJUSTMENT)
+  include_directories(BEFORE "${TF_INCLUDE_DIR}/${TF_PATH_ADJUSTMENT}")
+endif()
 include_directories(BEFORE "${TF_INCLUDE_DIR}")
 
 # Get target SDKs.
@@ -53,20 +56,31 @@ foreach(sdk ${TARGET_SDKS})
 
     # Copy headers.
     macro(copy_tf_headers src dst)
+      if (TF_PATH_ADJUSTMENT)
+        set(copy_tf_headers_path_adjustment "${TF_PATH_ADJUSTMENT}/")
+      else()
+        set(copy_tf_headers_path_adjustment "")
+      endif()
       add_custom_command(
         OUTPUT "${output_dir}/${dst}"
         DEPENDS "${src}"
         COMMAND
           "${SWIFT_SOURCE_DIR}/utils/fix-tf-headers.sh"
           "${src}"
-          "${output_dir}/${dst}")
+          "${output_dir}/${dst}"
+          "${copy_tf_headers_path_adjustment}")
 
       list(APPEND outputs "${output_dir}/${dst}")
     endmacro(copy_tf_headers)
 
-    copy_tf_headers("${TF_INCLUDE_DIR}/tensorflow/c/c_api.h" c_api.h)
-    copy_tf_headers("${TF_INCLUDE_DIR}/tensorflow/c/c_api_experimental.h" c_api_experimental.h)
-    copy_tf_headers("${TF_INCLUDE_DIR}/tensorflow/c/eager/c_api.h" c_api_eager.h)
+    if (TF_PATH_ADJUSTMENT)
+      set(adjusted_tf_include_dir "${TF_INCLUDE_DIR}/${TF_PATH_ADJUSTMENT}")
+    else()
+      set(adjusted_tf_include_dir "${TF_INCLUDE_DIR}")
+    endif()
+    copy_tf_headers("${adjusted_tf_include_dir}/tensorflow/c/c_api.h" c_api.h)
+    copy_tf_headers("${adjusted_tf_include_dir}/tensorflow/c/c_api_experimental.h" c_api_experimental.h)
+    copy_tf_headers("${adjusted_tf_include_dir}/tensorflow/c/eager/c_api.h" c_api_eager.h)
     copy_tf_headers("${CMAKE_CURRENT_SOURCE_DIR}/ctensorflow_init.h" ctensorflow_init.h)
 
     # Put the output dir itself last so that it isn't considered the primary output.

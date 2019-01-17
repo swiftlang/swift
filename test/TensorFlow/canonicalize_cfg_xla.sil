@@ -49,8 +49,8 @@ bb2(%14 : $TensorCore<Builtin.Int64>, %15 : $TensorCore<Float>): // Preds: bb3 b
   %16 = graph_op "Add"(%14 : $TensorCore<Builtin.Int64>, %9 : $TensorCore<Builtin.Int64>) : $TensorCore<Builtin.Int64> // users: %23, %17
   %17 = graph_op "Equal"(%16 : $TensorCore<Builtin.Int64>, %5 : $TensorCore<Builtin.Int64>) : $TensorCore<Builtin.Int1> // user: %21
   %18 = graph_op "Add"(%15 : $TensorCore<Float>, %15 : $TensorCore<Float>) : $TensorCore<Float> // user: %19
-  %19 = graph_op "tensorflowSend"(%18 : $TensorCore<Float>) : $()
-  %20 = graph_op "tensorflowReceive"() : $TensorCore<Float> // users: %12, %23, %11, %11
+  %19 = graph_op "Identity"(%18 : $TensorCore<Float>) : $()
+  %20 = graph_op "Const"() : $TensorCore<Float> // users: %12, %23, %11, %11
   %21 = graph_op "tf_tensor_to_i1"(%17 : $TensorCore<Builtin.Int1>) : $Builtin.Int1 // user: %22
   cond_br %21, bb1, bb3                           // id: %22
 

@@ -1041,6 +1041,155 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(val);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
+    AutoDiffAssociatedFunctionKind kind, unsigned arity, unsigned order,
+    bool rethrows, SILGenFunction &SGF, SILLocation loc,
+    SubstitutionMap substitutions, Expr *argument, SGFContext C) {
+  // Get values of the original function and arguments.
+  auto *argTuple = cast<TupleExpr>(argument);
+  auto origFnVal =
+      SGF.emitRValueAsSingleValue(argTuple->getElement(0)).forward(SGF);
+  SmallVector<SILValue, 2> origFnArgVals;
+  for (auto *origFnArgExpr : argTuple->getElements().drop_front(1))
+    origFnArgVals.push_back(
+        SGF.emitRValueAsSingleValue(origFnArgExpr).forward(SGF));
+
+  // Get the associated function.
+  SILValue assocFn = SGF.B.createAutoDiffFunctionExtract(
+          loc, kind, /*differentiationOrder*/ 1, origFnVal);
+  auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
+
+  // We don't need to destroy the original function or retain the `assocFn`,
+  // because they are trivial (because they are @noescape).
+  assert(origFnVal->getType().isTrivial(SGF.SGM.M));
+  assert(assocFn->getType().isTrivial(SGF.SGM.M));
+  bool assocFnNeedsDestroy = false;
+
+  // Unwrap curry levels.
+  SmallVector<SILFunctionType *, 2> curryLevels;
+  SILFunctionType *currentLevel = assocFnType;
+  unsigned numParameters = 0;
+  while (currentLevel != nullptr) {
+    curryLevels.push_back(currentLevel);
+    numParameters += currentLevel->getNumParameters();
+    if (currentLevel->getNumResults() != 1)
+      break;
+    currentLevel =
+        currentLevel->getSingleResult().getType()->getAs<SILFunctionType>();
+  }
+  assert(numParameters == origFnArgVals.size());
+
+#ifndef NDEBUG
+  // Assert that all curry level arguments are not consumed, indicating that we
+  // have to destroy them ourselves.
+  for (auto *curryLevel : curryLevels)
+    for (auto &parameter : curryLevel->getParameters())
+      assert(!isConsumedParameter(parameter.getConvention()));
+#endif
+
+  // Destroys all the values.
+  auto destroyValues = [&](ArrayRef<SILValue> argumentValues) {
+    for (auto argumentValue : argumentValues) {
+      if (argumentValue->getType().isTrivial(SGF.SGM.M))
+        continue;
+
+      if (argumentValue->getType().isObject()) {
+        SGF.B.createDestroyValue(loc, argumentValue);
+        continue;
+      }
+
+      SGF.B.createDestroyAddr(loc, argumentValue);
+    }
+  };
+
+  // Apply all the curry levels except the last one, whose results we handle
+  // specially. We overwrite `assocFn` with the application results.
+  unsigned currentParameter = 0;
+  auto curryLevelsWithoutLast =
+      ArrayRef<SILFunctionType *>(curryLevels).drop_back(1);
+  for (auto *curryLevel : curryLevelsWithoutLast) {
+    auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
+        currentParameter, curryLevel->getNumParameters());
+    auto applyResult = SGF.B.createApply(
+        loc, assocFn, curryLevelArgVals, /*isNonThrowing*/ false);
+    currentParameter += curryLevel->getNumParameters();
+
+    if (assocFnNeedsDestroy)
+      SGF.B.createDestroyValue(loc, assocFn);
+    assocFn = applyResult;
+    destroyValues(curryLevelArgVals);
+
+    // Our new `assocFn` needs to be released because it's an owned result from
+    // a function call.
+    assert(curryLevel->getSingleResult().getConvention() ==
+           ResultConvention::Owned);
+    assocFnNeedsDestroy = true;
+  }
+
+  assert(curryLevels.back()->getNumResults() == 2);
+  assert(currentParameter + curryLevels.back()->getNumParameters() ==
+             origFnArgVals.size());
+
+  // Apply the last curry level, in the case where it has indirect results.
+  if (curryLevels.back()->hasIndirectFormalResults()) {
+    auto indResBuffer = SGF.getBufferForExprResult(
+        loc, curryLevels.back()->getAllResultsType(), C);
+    SmallVector<SILValue, 3> applyArgs;
+    applyArgs.push_back(SGF.B.createTupleElementAddr(loc, indResBuffer, 0));
+    auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
+        currentParameter);
+    for (auto origFnArgVal : curryLevelArgVals)
+      applyArgs.push_back(origFnArgVal);
+    auto differential = SGF.B.createApply(loc, assocFn, applyArgs,
+                                          /*isNonThrowing*/ false);
+
+    if (assocFnNeedsDestroy)
+      SGF.B.createDestroyValue(loc, assocFn);
+    assocFn = SILValue();
+    destroyValues(curryLevelArgVals);
+
+    SGF.B.createStore(loc, differential,
+                      SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
+                      StoreOwnershipQualifier::Init);
+    return SGF.manageBufferForExprResult(
+        indResBuffer, SGF.getTypeLowering(indResBuffer->getType()), C);
+  }
+
+  // Apply the last curry level, in the case where it only has direct results.
+  auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
+      currentParameter);
+  auto resultTuple = SGF.B.createApply(loc, assocFn, curryLevelArgVals,
+                                       /*isNonThrowing*/ false);
+
+  if (assocFnNeedsDestroy)
+    SGF.B.createDestroyValue(loc, assocFn);
+  assocFn = SILValue();
+  destroyValues(curryLevelArgVals);
+
+  return SGF.emitManagedRValueWithCleanup(resultTuple);
+}
+
+static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             SubstitutionMap substitutions,
+                                             Expr *argument, SGFContext C) {
+  auto *callExpr = loc.castToASTNode<CallExpr>();
+  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
+      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
+          ->getDecl());
+  auto builtinName = builtinDecl->getName().str();
+  AutoDiffAssociatedFunctionKind kind;
+  unsigned arity, order;
+  bool rethrows, isMethod;
+  auto successfullyParsed = autodiff::getBuiltinAutoDiffApplyConfig(
+      builtinName, kind, arity, order, rethrows, isMethod);
+  assert(successfullyParsed);
+  return emitBuiltinAutoDiffApplyAssociatedFunction(kind, arity, order,
+                                                    rethrows, SGF, loc,
+                                                    substitutions, argument, C);
+}
+
 Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.

@@ -457,11 +457,6 @@ namespace {
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
-    // SWIFT_ENABLE_TENSORFLOW
-    RValue visitGradientExpr(GradientExpr *E, SGFContext C);
-    RValue visitChainableGradientExpr(ChainableGradientExpr *E, SGFContext C);
-    RValue visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C);
-    RValue visitAdjointExpr(AdjointExpr *E, SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
@@ -505,6 +500,12 @@ namespace {
     RValue visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                         SGFContext C);
     RValue visitTapExpr(TapExpr *E, SGFContext C);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    RValue visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E, SGFContext C);
+    RValue visitAutoDiffFunctionExtractOriginalExpr(
+        AutoDiffFunctionExtractOriginalExpr *E, SGFContext C);
+    RValue visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -2500,76 +2501,6 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
   return visit(E->getSemanticExpr(), C);
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
-                               ReverseAutoDiffExpr *E,
-                               SILGradientOptions options = None) {
-  SILLocation loc(E);
-  auto *origExpr = E->getOriginalExpr();
-  auto origTy = origExpr->getType()->getAs<AnyFunctionType>();
-  ManagedValue origVal = RVE.visit(origExpr, C).getAsSingleValue(RVE.SGF, loc);
-  auto loweredParamIndices =
-      E->getCheckedParameterIndices()->getLowered(origTy);
-  SILAutoDiffConfig config(
-      {E->getResultIndex(), loweredParamIndices}, options);
-  auto gradInst =
-    RVE.SGF.B.createGradient(loc, origVal.forward(RVE.SGF), config);
-  ManagedValue v = RVE.SGF.emitManagedRValueWithCleanup(gradInst);
-  return RValue(RVE.SGF, E, v);
-}
-
-RValue RValueEmitter::
-visitGradientExpr(GradientExpr *E, SGFContext C) {
-  return emitGradientInst(*this, C, E);
-}
-
-RValue RValueEmitter::
-visitChainableGradientExpr(ChainableGradientExpr *E, SGFContext C) {
-  return emitGradientInst(*this, C, E, SILGradientFlags::Seedable);
-}
-
-RValue RValueEmitter::
-visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C) {
-  return emitGradientInst(*this, C, E, SILGradientFlags::PreservingResult);
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-RValue RValueEmitter::
-visitAdjointExpr(AdjointExpr *E, SGFContext C) {
-  ConcreteDeclRef adjointFunc = E->getAdjointFunction();
-  FuncDecl *adjointDecl = cast<FuncDecl>(adjointFunc.getDecl());
-  SILLocation loc(adjointDecl);
-  SILDeclRef adjointDeclRef(adjointDecl);
-
-  // If adjoint is an instance method, mark as curried.
-  if (adjointDecl->isInstanceMember()) {
-    adjointDeclRef = adjointDeclRef.asCurried();
-  }
-  auto adjointInfo = SGF.getConstantInfo(adjointDeclRef);
-
-  // Convert function ref to thick function type.
-  if (!adjointDecl->isStatic()) {
-    auto resultTy = E->getType()->getCanonicalType();
-    ManagedValue result =
-      SGF.emitClosureValue(loc, adjointDeclRef, resultTy,
-                           adjointFunc.getSubstitutions());
-    return RValue(SGF, loc, resultTy, result);
-  }
-  // Otherwise, apply metatype to static adjoint method.
-  SILValue ref = SGF.emitGlobalFunctionRef(loc, adjointDeclRef, adjointInfo);
-  auto subs = adjointFunc.getSubstitutions();
-  auto baseMeta = adjointInfo.SILFnType->substGenericArgs(SGF.SGM.M, subs)
-    ->getSelfParameter().getType();
-  auto metatype = SGF.B.createMetatype(loc, SGF.getLoweredType(baseMeta));
-  auto partialApplyTy = SGF.B.getPartialApplyResultType(
-    adjointInfo.getSILType(), 1, SGF.getModule(), subs,
-    ParameterConvention::Direct_Guaranteed);
-  auto apply = SGF.B.createPartialApply(loc, ref, ref->getType(),
-    subs, { metatype }, partialApplyTy);
-  ManagedValue adjointValue = SGF.emitManagedRValueWithCleanup(apply);
-  return RValue(SGF, E, adjointValue);
-}
-
 RValue RValueEmitter::
 visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   // SWIFT_ENABLE_TENSORFLOW
@@ -2840,7 +2771,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                              /*pseudogeneric*/ false,
                              // SWIFT_ENABLE_TENSORFLOW
                              /*noescape*/ false,
-                             FunctionType::Differentiability::None),
+                             /*differentiable*/ false),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
     params, {}, result, None, SGM.getASTContext());
@@ -2977,7 +2908,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                              /*pseudogeneric*/ false,
                              // SWIFT_ENABLE_TENSORFLOW
                              /*noescape*/ false,
-                             FunctionType::Differentiability::None),
+                             /*differentiable*/ false),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
     params, {}, {}, None, SGM.getASTContext());
@@ -3144,7 +3075,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                                /*pseudogeneric*/ false,
                                // SWIFT_ENABLE_TENSORFLOW
                                /*noescape*/ false,
-                               FunctionType::Differentiability::None),
+                               /*differentiable*/ false),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None, C);
@@ -3314,7 +3245,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                                /*pseudogeneric*/ false,
                                // SWIFT_ENABLE_TENSORFLOW
                                /*noescape*/ false,
-                               FunctionType::Differentiability::None),
+                               /*differentiable*/ false),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None, C);
@@ -5444,6 +5375,42 @@ RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
 
   auto Var = E->getVar();
   auto VarType = E->getType()->getCanonicalType();
+
+// SWIFT_ENABLE_TENSORFLOW
+RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
+                                                SGFContext C) {
+  std::function<unsigned(Type)> countParams;
+  countParams = [&](Type type) -> unsigned {
+    auto *fnTy = type->getAs<AnyFunctionType>();
+    if (!fnTy)
+      return 0;
+    return fnTy->getNumParams() + countParams(fnTy->getResult());
+  };
+
+  // TODO(rxwei): Use the parameter indices and order specified in E's function
+  // type.
+  auto orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto *diffFunc = SGF.B.createAutoDiffFunction(E,
+      SmallBitVector(countParams(E->getType()), true), 1, orig.forward(SGF));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
+}
+
+RValue RValueEmitter::visitAutoDiffFunctionExtractOriginalExpr(
+    AutoDiffFunctionExtractOriginalExpr *E, SGFContext C) {
+  auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto *orig = SGF.B.createAutoDiffFunctionExtractOriginal(
+      E, diffFunc.forward(SGF));
+  return RValue(SGF, E, ManagedValue::forUnmanaged(orig));
+}
+
+RValue RValueEmitter::visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C) {
+  SILValue condition;
+  {
+    FullExpr scope(SGF.Cleanups, CleanupLocation(E));
+    condition =
+        SGF.emitRValueAsSingleValue(E->getCondition()).getUnmanagedValue();
+  }
+>>>>>>> tensorflow
 
   Scope outerScope(SGF, CleanupLocation(E));
 

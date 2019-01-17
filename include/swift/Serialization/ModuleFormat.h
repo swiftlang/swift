@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 469; // Last change: add jvp and vjp to sil differentiable attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 469; // Last change: serialize differentiation indices
 
 using DeclIDField = BCFixed<31>;
 
@@ -202,19 +202,6 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Closure,
 };
 using SILFunctionTypeRepresentationField = BCFixed<4>;
-
-// SWIFT_ENABLE_TENSORFLOW
-// These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
-enum class FunctionTypeDifferentiability : uint8_t {
-  None = 0,
-  Forward,
-  Reverse,
-  Bidirectional,
-  Linear,
-  Constant,
-};
-using FunctionTypeDifferentiabilityField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -758,7 +745,7 @@ namespace decls_block {
     BCFixed<1>,  // noescape?
     // SWIFT_ENABLE_TENSORFLOW
     BCFixed<1>,  // throws?
-    FunctionTypeDifferentiabilityField // differentiability
+    BCFixed<1>   // differentiable?
     // trailed by parameters
   >;
 
@@ -821,8 +808,8 @@ namespace decls_block {
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
     // SWIFT_ENABLE_TENSORFLOW
-    GenericSignatureIDField, // generic signture
-    BCFixed<3>           // differentiability
+    BCFixed<1>,          // differentiable?
+    GenericSignatureIDField // generic signture
 
     // trailed by parameters
   >;
@@ -835,7 +822,7 @@ namespace decls_block {
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
     // SWIFT_ENABLE_TENSORFLOW
-    FunctionTypeDifferentiabilityField, // differentiability
+    BCFixed<1>,            // differentiable?
     BCFixed<1>,            // error result?
     BCFixed<30>,           // number of parameters
     BCFixed<30>,           // number of yields
@@ -1600,16 +1587,12 @@ namespace decls_block {
   // SWIFT_ENABLE_TENSORFLOW
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
-    BCFixed<1>, // Differentiation mode ('forward' or 'reverse').
-    IdentifierIDField, // Primal name.
-    DeclIDField, // Primal function declaration.
-    IdentifierIDField, // Adjoint name.
-    DeclIDField, // Adjoint function declaration.
+    BCFixed<1>, // Implicit flag.
     IdentifierIDField, // JVP name.
     DeclIDField, // JVP function declaration.
     IdentifierIDField, // VJP name.
     DeclIDField, // VJP function declaration.
-    BCArray<BCFixed<32>> // Differentiation parameters.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \

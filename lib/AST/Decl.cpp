@@ -3080,12 +3080,32 @@ bool NominalTypeDecl::isOptionalDecl() const {
 // SWIFT_ENABLE_TENSORFLOW
 void
 NominalTypeDecl::getAllTFParameters(SmallVectorImpl<VarDecl *> &result) const {
-  for (auto member : getMembers()) {
-    auto varDecl = dyn_cast<VarDecl>(member);
-    if (!varDecl) continue;
-    if (varDecl->getAttrs().hasAttribute<TFParameterAttr>())
-      result.push_back(varDecl);
+  for (auto member : getStoredProperties())
+    if (member->getAttrs().hasAttribute<TFParameterAttr>())
+      result.push_back(member);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() {
+  ConstructorDecl *memberwiseInitDecl = nullptr;
+  auto ctorDecls = lookupDirect(DeclBaseName::createConstructor());
+  for (auto decl : ctorDecls) {
+    auto ctorDecl = dyn_cast<ConstructorDecl>(decl);
+    if (!ctorDecl)
+      continue;
+    // Continue if:
+    // - Constructor is not a memberwise initializer.
+    // - Constructor is implicit and takes no arguments, and nominal has no
+    //   stored properties. This is ad-hoc and accepts empty struct
+    //   constructors generated via `TypeChecker::defineDefaultConstructor`.
+    if (!ctorDecl->isMemberwiseInitializer() &&
+        !(getStoredProperties().empty() && ctorDecl->isImplicit() &&
+          ctorDecl->getParameters()->size() == 0))
+      continue;
+    assert(!memberwiseInitDecl && "Memberwise initializer already found");
+    memberwiseInitDecl = ctorDecl;
   }
+  return memberwiseInitDecl;
 }
 
 Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {

@@ -93,7 +93,10 @@ static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
   auto *vd = thunk.getDecl();
 
   // Reference the next uncurrying level of the function.
-  SILDeclRef next = SILDeclRef(vd, thunk.kind);
+  // SWIFT_ENABLE_TENSORFLOW
+  SILDeclRef next = SILDeclRef(vd, thunk.kind, /*isCurried*/ false,
+                               /*isForeign*/ false,
+                               thunk.autoDiffAssociatedFunctionIdentifier);
   assert(!next.isCurried);
 
   // If the function is natively foreign, reference its foreign entry point.
@@ -206,6 +209,42 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
 
   SILGenFunction(*this, *f, SwiftModule).emitCurryThunk(constant);
   postEmitFunction(constant, f);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // If we emitted a curry thunk for a differentiable function, then also emit a
+  // curry thunk for its VJP and mark that as the VJP of the curry thunk.
+  auto *DA = fd->getAttrs().getAttribute<DifferentiableAttr>();
+  if (!DA)
+    return;
+
+  if (constant.autoDiffAssociatedFunctionIdentifier)
+    return;
+
+  SmallVector<SILDeclRef, 2> assocFnConstants;
+  for (auto kind : {AutoDiffAssociatedFunctionKind::JVP,
+                    AutoDiffAssociatedFunctionKind::VJP}) {
+    auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
+        kind, /*differentiationOrder*/ 1, DA->getParameterIndices(),
+        SwiftModule->getASTContext());
+    auto assocFnConstant =
+        constant.asAutoDiffAssociatedFunction(autoDiffFuncId);
+    emitCurryThunk(assocFnConstant);
+    assocFnConstants.push_back(assocFnConstant);
+  }
+
+  SmallVector<StringRef, 2> assocFnNames;
+  for (auto assocFnConstant : assocFnConstants)
+    assocFnNames.push_back(SwiftModule->getASTContext()
+                               .getIdentifier(assocFnConstant.mangle())
+                               .str());
+
+  auto loweredParamIndices = DA->getParameterIndices()->getLowered(
+      fd->getInterfaceType()->castTo<AnyFunctionType>());
+  auto *silDiffAttr = SILDifferentiableAttr::create(
+      M, SILAutoDiffIndices(/*source*/ 0, loweredParamIndices),
+      /*requirements*/ DA->getRequirements(), /*jvpName*/ assocFnNames[0],
+      /*vjpName*/ assocFnNames[1]);
+  f->addDifferentiableAttr(silDiffAttr);
 }
 
 void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {

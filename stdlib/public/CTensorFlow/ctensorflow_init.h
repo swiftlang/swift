@@ -37,6 +37,10 @@ void *swift_tfc_CreateIntTensor(int32_t num_dims, int64_t *dims, int64_t *vals,
 void *swift_tfc_CreateFloatTensor(int32_t num_dims, int64_t *dims, float *vals,
                                   TF_Status *status);
 
+// Similar to the above API, but creates a scalar string tensor.
+void *swift_tfc_CreateScalarStringTensor(char *val, int32_t valLen,
+                                         TF_Status *status);
+
 void swift_tfc_TFE_Execute(void *op, void **retvals, int32_t *num_retvals,
                            void *status);
 

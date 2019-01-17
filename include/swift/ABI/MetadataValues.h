@@ -772,17 +772,6 @@ enum class FunctionMetadataConvention: uint8_t {
   CFunctionPointer = 3,
 };
 
-// SWIFT_ENABLE_TENSORFLOW
-/// Differentiability values for function type metadata.
-enum class FunctionMetadataDifferentiability: uint8_t {
-  None = 0,
-  Forward = 1,
-  Reverse = 2,
-  Bidirectional = 3,
-  Linear = 4,
-  Constant = 5
-};
-
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
@@ -797,8 +786,7 @@ class TargetFunctionTypeFlags {
     ParamFlagsMask    = 0x02000000U,
     EscapingMask      = 0x04000000U,
     // SWIFT_ENABLE_TENSORFLOW
-    DifferentiabilityShift = 27U,
-    DifferentiabilityMask  = 0x38000000U
+    DifferentiableMask  = 0x08000000U
   };
   int_type Data;
   
@@ -837,9 +825,9 @@ public:
   
   // SWIFT_ENABLE_TENSORFLOW
   constexpr TargetFunctionTypeFlags<int_type>
-  withDifferentiability(FunctionMetadataDifferentiability diffability) const {
-    return TargetFunctionTypeFlags((Data & ~DifferentiabilityMask)
-                           | (int_type(diffability) << DifferentiabilityShift));
+  withDifferentiable(bool isDifferentiable) const {
+    return TargetFunctionTypeFlags<int_type>((Data & ~DifferentiableMask) |
+                                   (isDifferentiable ? DifferentiableMask : 0));
   }
 
   unsigned getNumParameters() const { return Data & NumParametersMask; }
@@ -857,9 +845,8 @@ public:
   }
   
   // SWIFT_ENABLE_TENSORFLOW
-  FunctionMetadataDifferentiability getDifferentiability() const {
-    return FunctionMetadataDifferentiability(
-        (Data & DifferentiabilityMask) >> DifferentiabilityShift);
+  bool isDifferentiable() const {
+    return bool (Data & DifferentiableMask);
   }
 
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }

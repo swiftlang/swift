@@ -7625,65 +7625,7 @@ class TryApplyInst final
          const GenericSpecializationInformation *SpecializationInfo);
 };
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// GradientInst - Represents the gradient of another SIL function.
-class GradientInst final
-  : public InstructionBase<SILInstructionKind::GradientInst,
-                           OwnershipForwardingSingleValueInst> {
-private:
-  friend SILBuilder;
-  /// The AD configuration.
-  SILAutoDiffConfig Config;
-  /// Space for 1 operand: the original function to be differentiated.
-  FixedOperandList<1> Operands;
-
-  GradientInst(SILModule &module, SILDebugLocation debugLoc, SILValue original,
-               const SILAutoDiffConfig &config);
-
-  /// A utility function for computing the SIL type of the gradient of a
-  /// function, given the specified differentiation configuration options.
-  static SILType getGradientSILType(
-      SILModule &module, SILValue original,
-      const SILAutoDiffConfig &config);
-
-public:
-  ~GradientInst() {};
-
-  static GradientInst *create(SILModule &M, SILDebugLocation debugLoc,
-                              SILValue original,
-                              const SILAutoDiffConfig &config);
-
-  SILValue getOriginal() const { return Operands[0].get(); }
-
-  CanSILFunctionType getOriginalType() const {
-    return getOriginal()->getType().getAs<SILFunctionType>();
-  }
-
-  const SILAutoDiffConfig &getConfig() const {
-    return Config;
-  }
-
-  const SILAutoDiffIndices &getIndices() const {
-    return Config.indices;
-  }
-
-  SILGradientOptions getOptions() const {
-    return Config.options;
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return Operands.asArray();
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return Operands.asArray();
-  }
-
-  static bool classof(const SILNode *N) {
-    return N->getKind() == SILNodeKind::GradientInst;
-  }
-};
-
+// SWIFT_ENABLE_TENSORFLOW
 /// `autodiff_function` - given a function and differentiation indices and its
 /// associated differentiation functions, create an `@autodiff` function that
 /// represents a bundle of these functions and configurations.
@@ -7761,29 +7703,51 @@ public:
 /// specified function.
 class AutoDiffFunctionExtractInst :
     public InstructionBase<SILInstructionKind::AutoDiffFunctionExtractInst,
-                           OwnershipForwardingSingleValueInst> {
+                           SingleValueInstruction> {
+public:
+  struct Extractee {
+    enum innerty : unsigned {
+      Original = 0,
+      JVP = 1,
+      VJP = 2
+    } rawValue;
+    Extractee() = default;
+    Extractee(innerty rawValue) : rawValue(rawValue) {}
+    Extractee(unsigned rawValue) : Extractee((innerty)rawValue) {}
+    Extractee(AutoDiffAssociatedFunctionKind kind);
+    explicit Extractee(StringRef name);
+    operator innerty() const { return rawValue; }
+
+    Optional<AutoDiffAssociatedFunctionKind>
+    getExtracteeAsAssociatedFunction() const;
+  };
+
 private:
-  /// The kind of the associated function to extract.
-  AutoDiffAssociatedFunctionKind associatedFunctionKind;
-  /// The differentiation order.
+  /// The extractee.
+  Extractee extractee;
+  /// The differentiation order. A zero value is only legal when the extractee
+  /// is the original function, and it is a private representation only.
   unsigned differentiationOrder;
   /// The list containing the `@autodiff` function operand.
   FixedOperandList<1> operands;
 
   static SILType
-  getAssociatedFunctionType(SILValue function,
-                            AutoDiffAssociatedFunctionKind kind,
-                            unsigned differentiationOrder,
-                            SILModule &module);
+  getExtracteeType(SILValue function, Extractee extractee,
+                   unsigned differentiationOrder, SILModule &module);
 
 public:
   explicit AutoDiffFunctionExtractInst(
-      SILModule &module, SILDebugLocation debugLoc,
-      AutoDiffAssociatedFunctionKind associatedFunctionKind,
+      SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
       unsigned differentiationOrder, SILValue theFunction);
 
+  Extractee getExtractee() const {
+    return extractee;
+  }
+
   AutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
-    return associatedFunctionKind;
+    auto kind = extractee.getExtracteeAsAssociatedFunction();
+    assert(kind);
+    return *kind;
   }
 
   SILValue getFunctionOperand() const {
@@ -7806,6 +7770,8 @@ public:
     return N->getKind() == SILNodeKind::AutoDiffFunctionExtractInst;
   }
 };
+
+typedef AutoDiffFunctionExtractInst::Extractee AutoDiffFunctionExtractee;
 
 // This is defined out of line to work around the fact that this depends on
 // PartialApplyInst being defined, but PartialApplyInst is a subclass of
@@ -8064,7 +8030,7 @@ public:
     return Attributes;
   }
 
-  Optional<SymbolicValue> getAttributeNamed(StringRef name);
+  Optional<SymbolicValue> getAttributeNamed(StringRef name) const;
 
   void setNoClustering(bool noClustering) { NoClustering = noClustering; }
   bool getNoClustering() const { return NoClustering; }

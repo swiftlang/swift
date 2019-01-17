@@ -35,6 +35,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   return fn;
 }
 
+
+// SWIFT_ENABLE_TENSORFLOW
 void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
                                                DeclAttributes &Attrs,
                                                SILModule &M,
@@ -93,6 +95,53 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       getOrCreateFunction(replacedDecl, declRef, NotForDefinition);
   assert(replacedFunc->getLoweredFunctionType() == F->getLoweredFunctionType());
   F->setDynamicallyReplacedFunction(replacedFunc);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Propagate @differentiable attributes.
+  // Don't propagate @differentiable to:
+  // - Non-getter accessors (setters, modifiers, etc).
+  // - Default argument generator functions.
+  // - Thunks. Those are currently handled in SILGenThunk.cpp.
+  auto *decl = constant.getDecl();
+  if ((!isa<AccessorDecl>(decl) || dyn_cast<AccessorDecl>(decl)->isGetter()) &&
+      constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
+      !constant.autoDiffAssociatedFunctionIdentifier &&
+      !constant.isThunk()) {
+    for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
+      auto *DA = cast<DifferentiableAttr>(A);
+      std::string jvpName, vjpName;
+      // Note: the following alternative implementations of `isSameModule` don't
+      // work under all scenarios:
+      // - `F->isDefinition()`
+      // - `forDefinition` (passed from `getOrCreateFunction`)
+      bool isSameModule = M.getSwiftModule() == decl->getModuleContext();
+      // Get JVP/VJP names. If the functions aren't specified, use the expected
+      // mangled name. Differentiation pass ensures that JVP and VJP exist.
+      if (auto *jvpFn = DA->getJVPFunction())
+        jvpName = SILDeclRef(jvpFn).mangle();
+      else if (!isSameModule)
+        jvpName = constant.asAutoDiffAssociatedFunction(
+            AutoDiffAssociatedFunctionIdentifier::get(
+                AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+                DA->getParameterIndices(), F->getASTContext())).mangle();
+      if (auto *vjpFn = DA->getVJPFunction())
+        vjpName = SILDeclRef(vjpFn).mangle();
+      else if (!isSameModule)
+        vjpName = constant.asAutoDiffAssociatedFunction(
+            AutoDiffAssociatedFunctionIdentifier::get(
+                AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+                DA->getParameterIndices(), F->getASTContext())).mangle();
+      // Get lowered argument indices.
+      auto paramIndices = DA->getParameterIndices();
+      auto loweredIndices = paramIndices->getLowered(
+          decl->getInterfaceType()->castTo<AnyFunctionType>());
+      SILAutoDiffIndices indices(/*source*/ 0, loweredIndices);
+      auto silDiffAttr = SILDifferentiableAttr::create(
+          M, indices, DA->getRequirements(), M.allocateCopy(jvpName),
+          M.allocateCopy(vjpName));
+      F->addDifferentiableAttr(silDiffAttr);
+    }
+  }
 }
 
 SILFunction *
@@ -159,9 +208,10 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
-      // Add attributes for e.g. computed properties.
-      addFunctionAttributes(F, storage->getAttrs(), mod);
+      // SWIFT_ENABLE_TENSORFLOW
+      addFunctionAttributes(F, constant, storage->getAttrs(), mod);
     }
+    // SWIFT_ENABLE_TENSORFLOW
     addFunctionAttributes(F, decl->getAttrs(), mod, constant);
   }
 

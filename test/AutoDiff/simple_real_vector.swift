@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 @_fixed_layout
 public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
@@ -7,14 +7,9 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
 
   public typealias TangentVector = Vector
   public typealias Scalar = Float
-  public typealias Shape = ()
 
   public static var zero: Vector {
     return Vector(0)
-  }
-
-  public init(repeating repeatedValue: Float, shape: ()) {
-    self.init(repeatedValue)
   }
 
   public init(_ scalar: Float) {
@@ -22,12 +17,12 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
     self.y = scalar
   }
 
-  @differentiable(reverse, adjoint: fakeAdj)
+  @differentiable(vjp: fakeVJP)
   public static func + (lhs: Vector, rhs: Vector) -> Vector {
     abort()
   }
 
-  @differentiable(reverse, adjoint: fakeAdj)
+  @differentiable(vjp: fakeVJP)
   public static func - (lhs: Vector, rhs: Vector) -> Vector {
     abort()
   }
@@ -36,7 +31,7 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
     abort()
   }
 
-  public static func fakeAdj(lhs: Vector, rhs: Vector, y: Vector, seed: Vector) -> (Vector, Vector) {
+  public static func fakeVJP(lhs: Vector, rhs: Vector) -> (Vector, (Vector) -> (Vector, Vector)) {
     abort()
   }
 }
@@ -45,18 +40,14 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
 @inline(never) func abort() -> Never { fatalError() }
 
 public func test1() -> Vector {
-  func foo(_ x: Vector) -> Vector {
-    return x + x
+  func foo(_ x: Vector) -> Float {
+    return (x + x).x
   }
-  return #gradient(foo)(Vector(10))
+  return gradient(at: Vector(10), in: foo)
 }
 
-// CHECK-LABEL: sil private @{{.*}}test1{{.*}}foo{{.*}}__grad_src_0_wrt_0 : $@convention(thin) (Vector) -> Vector {
-// CHECK:   [[BUILTIN_SCALAR_INIT_METHOD:%.*]] = witness_method $Int64, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1
-// CHECK:   apply [[BUILTIN_SCALAR_INIT_METHOD]]<Int64>({{%.*}}, {{%.*}}, {{%.*}})
-// CHECK:   [[SCALAR_INIT_METHOD:%.*]] = witness_method $Float, #ExpressibleByIntegerLiteral.init!allocator.1
-// CHECK:   apply [[SCALAR_INIT_METHOD]]<Float>({{%.*}}, {{%.*}}, {{%.*}})
-// CHECK:   [[VECTOR_INIT_METHOD:%.*]] = witness_method $Vector, #VectorNumeric.init!allocator.1
-// CHECK:   apply [[VECTOR_INIT_METHOD]]<Vector>(%1, %16, %15) : $@convention(witness_method: VectorNumeric) <τ_0_0 where τ_0_0 : VectorNumeric> (@in τ_0_0.Scalar, @thick τ_0_0.Type) -> @out τ_0_0
-// CHECK:   [[CAN_GRAD:%.*]] = function_ref @{{.*}}test1{{.*}}foo{{.*}}__grad_src_0_wrt_0_s_p : $@convention(thin) (Vector, Vector) -> (Vector, Vector)
-// CHECK:   apply [[CAN_GRAD]]({{.*}}, {{.*}})
+// CHECK-LABEL: @{{.*}}test1{{.*}}
+// CHECK: [[CLOSURE:%.*]] = function_ref @{{.*}}test1{{.*}}foo{{.*}} : $@convention(thin) (Vector) -> Float
+// CHECK: [[CLOSURE_THICK:%.*]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (Vector) -> Float to $@callee_guaranteed (Vector) -> Float
+// CHECK: [[CLOSURE_THICK_NOESC:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_THICK]] : $@callee_guaranteed (Vector) -> Float to $@noescape @callee_guaranteed (Vector) -> Float
+// CHECK: autodiff_function [wrt 0] [order 1] [[CLOSURE_THICK_NOESC]] : $@noescape @callee_guaranteed (Vector) -> Float

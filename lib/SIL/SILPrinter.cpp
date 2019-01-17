@@ -343,6 +343,23 @@ void SILDeclRef::print(raw_ostream &OS) const {
 
   if (isDirectReference)
     OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "direct";
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (autoDiffAssociatedFunctionIdentifier) {
+    auto *autoDiffFuncId = autoDiffAssociatedFunctionIdentifier;
+    OS << ((isDot || uncurryLevel != 0 || isForeign || isDirectReference)
+               ? '.' : '!');
+    switch (autoDiffFuncId->getKind()) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      OS << "jvp.";
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      OS << "vjp.";
+      break;
+    }
+    OS << autoDiffFuncId->getDifferentiationOrder() << "."
+       << autoDiffFuncId->getParameterIndices()->getString();
+  }
 }
 
 void SILDeclRef::dump() const {
@@ -1137,29 +1154,7 @@ public:
     *this << Ctx.getID(AI->getOperand());
   }
 
-  /// SWIFT_ENABLE_TENSORFLOW
-  void visitGradientInst(GradientInst *GI) {
-    auto &indices = GI->getIndices();
-    *this << "[source " << indices.source << "] ";
-    if (!indices.parameters.empty()) {
-      *this << "[wrt ";
-      interleave(indices.parameters.set_bits(), [&](unsigned idx) {
-        *this << idx;
-      }, [&]{
-        *this << ", ";
-      });
-      *this << "] ";
-    }
-    auto options = GI->getOptions();
-    if (options.contains(SILGradientFlags::Seedable))
-      *this << "[seedable] ";
-    if (options.contains(SILGradientFlags::PreservingResult))
-      *this << "[preserving_result] ";
-    if (options.contains(SILGradientFlags::Delayed))
-      *this << "[delayed] ";
-    *this << getIDAndType(GI->getOriginal());
-  }
-
+  // SWIFT_ENABLE_TENSORFLOW
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
     if (adfi->getParameterIndices().any()) {
       *this << "[wrt";
@@ -1182,16 +1177,22 @@ public:
 
   void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
     *this << '[';
-    switch (adfei->getAssociatedFunctionKind()) {
-    case swift::AutoDiffAssociatedFunctionKind::JVP:
+    switch (adfei->getExtractee()) {
+    case AutoDiffFunctionExtractee::Original:
+      *this << "original";
+      break;
+    case AutoDiffFunctionExtractee::JVP:
       *this << "jvp";
       break;
-    case swift::AutoDiffAssociatedFunctionKind::VJP:
+    case AutoDiffFunctionExtractee::VJP:
       *this << "vjp";
       break;
     }
-    *this << "] [order " << adfei->getDifferentiationOrder()
-          << "] " << getIDAndType(adfei->getFunctionOperand());
+    *this << "] ";
+    auto order = adfei->getDifferentiationOrder();
+    if (order > 0)
+      *this << "[order " << order << "] ";
+    *this << getIDAndType(adfei->getFunctionOperand());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -3225,18 +3226,39 @@ void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   interleave(indices.parameters.set_bits(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
-  if (!PrimalName.empty()) {
-    OS << " primal @" << PrimalName;
-  }
-  if (!AdjointName.empty()) {
-    OS << " adjoint @" << AdjointName;
-  }
-  if (AdjointIsPrimitive) OS << " primitive";
   if (!JVPName.empty()) {
     OS << " jvp @" << JVPName;
   }
   if (!VJPName.empty()) {
     OS << " vjp @" << VJPName;
+  }
+  if (!getRequirements().empty()) {
+    OS << " where ";
+    SILFunction *original = getOriginal();
+    assert(original);
+    auto genericEnv = original->getGenericEnvironment();
+    PrintOptions SubPrinter = PrintOptions::printSIL();
+    interleave(getRequirements(), [&](Requirement req) {
+      if (!genericEnv) {
+         req.print(OS, SubPrinter);
+         return;
+      }
+      // Use GenericEnvironment to produce user-friendly
+      // names instead of something like 't_0_0'.
+      auto FirstTy = genericEnv->getSugaredType(req.getFirstType());
+      if (req.getKind() != RequirementKind::Layout) {
+        auto SecondTy =
+        genericEnv->getSugaredType(req.getSecondType());
+        Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+        ReqWithDecls.print(OS, SubPrinter);
+      } else {
+        Requirement ReqWithDecls(req.getKind(), FirstTy,
+                                 req.getLayoutConstraint());
+        ReqWithDecls.print(OS, SubPrinter);
+      }
+    }, [&] {
+      OS << ", ";
+    });
   }
 }
 

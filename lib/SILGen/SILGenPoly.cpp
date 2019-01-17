@@ -3114,6 +3114,14 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                               getASTContext());
 }
 
+static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
+                                        SILLocation loc,
+                                        ManagedValue fn,
+                                        AbstractionPattern inputOrigType,
+                                        CanAnyFunctionType inputSubstType,
+                                        AbstractionPattern outputOrigType,
+                                        CanAnyFunctionType outputSubstType);
+
 /// Create a reabstraction thunk.
 static ManagedValue createThunk(SILGenFunction &SGF,
                                 SILLocation loc,
@@ -3125,6 +3133,14 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                 const TypeLowering &expectedTL) {
   auto sourceType = fn.getType().castTo<SILFunctionType>();
   auto expectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  assert(sourceType->isDifferentiable() == expectedType->isDifferentiable() &&
+         "thunks can't change differentiability");
+  if (sourceType->isDifferentiable()) {
+    return createAutoDiffThunk(SGF, loc, fn, inputOrigType, inputSubstType,
+                               outputOrigType, outputSubstType);
+  }
 
   // We can't do bridging here.
   assert(expectedType->getLanguage() ==
@@ -3182,6 +3198,106 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   assert(expectedType->isNoEscape());
   return SGF.B.createConvertEscapeToNoEscape(
       loc, thunkedFn, SILType::getPrimitiveObjectType(expectedType), false);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Create a reabstraction thunk for an @autodiff function.
+static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
+                                        SILLocation loc,
+                                        ManagedValue fn,
+                                        AbstractionPattern inputOrigType,
+                                        CanAnyFunctionType inputSubstType,
+                                        AbstractionPattern outputOrigType,
+                                        CanAnyFunctionType outputSubstType) {
+  // Applies a thunk to all the components by extracting them, applying thunks
+  // to all of them, and then putting them back together.
+
+  auto sourceType = fn.getType().castTo<SILFunctionType>();
+
+  // We're never going to pass `fn` into anything that consumes it, so get its
+  // value without disabling cleanup.
+  auto fnValue = fn.getValue();
+
+  auto withoutDifferentiableType = [](CanAnyFunctionType type)
+      -> CanAnyFunctionType {
+    return type.withExtInfo(type->getExtInfo().withDifferentiable(false));
+  };
+  auto withoutDifferentiablePattern = [](AbstractionPattern pattern)
+      -> AbstractionPattern {
+    auto patternType = cast<AnyFunctionType>(pattern.getType());
+    pattern.rewriteType(
+        pattern.getGenericSignature(),
+        patternType.withExtInfo(
+            patternType->getExtInfo().withDifferentiable(false)));
+    return pattern;
+  };
+
+  auto inputSubstTypeNotDiff = withoutDifferentiableType(inputSubstType);
+  auto inputOrigTypeNotDiff = withoutDifferentiablePattern(inputOrigType);
+  auto outputSubstTypeNotDiff = withoutDifferentiableType(outputSubstType);
+  auto outputOrigTypeNotDiff = withoutDifferentiablePattern(outputOrigType);
+  auto &expectedTLNotDiff = SGF.getTypeLowering(outputOrigTypeNotDiff,
+                                                outputSubstTypeNotDiff);
+  SILValue original = SGF.B.createAutoDiffFunctionExtractOriginal(loc, fnValue);
+  auto managedOriginal = original->getType().isTrivial(SGF.SGM.M)
+                             ? ManagedValue::forTrivialObjectRValue(original)
+                             : ManagedValue::forBorrowedObjectRValue(original);
+  ManagedValue originalThunk = createThunk(
+      SGF, loc, managedOriginal, inputOrigTypeNotDiff, inputSubstTypeNotDiff,
+      outputOrigTypeNotDiff, outputSubstTypeNotDiff, expectedTLNotDiff);
+
+  // TODO: Use parameter indices specified in the function type.
+  AutoDiffParameterIndicesBuilder parameterIndicesBuilder(
+      inputSubstType, /*setAllParams*/ true);
+  auto *parameterIndices =
+      parameterIndicesBuilder.build(inputSubstType->getASTContext());
+
+  auto getAssocFnTy =
+      [&](CanAnyFunctionType fnTy, AutoDiffAssociatedFunctionKind kind)
+          -> CanAnyFunctionType {
+        auto assocTy = fnTy->getAutoDiffAssociatedFunctionType(
+            parameterIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1,
+            kind, LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+        return cast<AnyFunctionType>(assocTy->getCanonicalType());
+      };
+  auto getAssocFnPattern =
+      [&](AbstractionPattern pattern, AutoDiffAssociatedFunctionKind kind)
+          -> AbstractionPattern {
+        return AbstractionPattern(
+            pattern.getGenericSignature(),
+            getAssocFnTy(cast<AnyFunctionType>(pattern.getType()), kind));
+      };
+  auto createAssocFnThunk = [&](AutoDiffAssociatedFunctionKind kind)
+      -> ManagedValue {
+    auto assocFnInputSubstType = getAssocFnTy(inputSubstTypeNotDiff, kind);
+    auto assocFnInputOrigType = getAssocFnPattern(inputOrigTypeNotDiff,
+                                                  kind);
+    auto assocFnOutputSubstType = getAssocFnTy(outputSubstTypeNotDiff, kind);
+    auto assocFnOutputOrigType = getAssocFnPattern(outputOrigTypeNotDiff,
+                                                   kind);
+    auto &assocFnExpectedTL = SGF.getTypeLowering(assocFnOutputOrigType,
+                                                  assocFnOutputSubstType);
+    auto assocFn = SGF.B.createAutoDiffFunctionExtract(
+        loc, kind,
+        /*differentiationOrder*/ 1, fnValue);
+    auto managedAssocFn = assocFn->getType().isTrivial(SGF.SGM.M)
+                              ? ManagedValue::forTrivialObjectRValue(assocFn)
+                              : ManagedValue::forBorrowedObjectRValue(assocFn);
+    return createThunk(SGF, loc, managedAssocFn, assocFnInputOrigType,
+                       assocFnInputSubstType, assocFnOutputOrigType,
+                       assocFnOutputSubstType, assocFnExpectedTL);
+  };
+
+  auto jvpThunk = createAssocFnThunk(AutoDiffAssociatedFunctionKind::JVP);
+  auto vjpThunk = createAssocFnThunk(AutoDiffAssociatedFunctionKind::VJP);
+
+  SILValue convertedBundle = SGF.B.createAutoDiffFunction(
+      loc, sourceType->getDifferentiationParameterIndices(),
+      /*differentiationOrder*/ 1,
+      originalThunk.ensurePlusOne(SGF, loc).forward(SGF),
+      {jvpThunk.ensurePlusOne(SGF, loc).forward(SGF),
+       vjpThunk.ensurePlusOne(SGF, loc).forward(SGF)});
+  return SGF.emitManagedRValueWithCleanup(convertedBundle);
 }
 
 static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
@@ -3647,10 +3763,28 @@ getWitnessFunctionRef(SILGenFunction &SGF,
                       SILLocation loc) {
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
+    // SWIFT_ENABLE_TENSORFLOW
+    if (auto *autoDiffFuncId = witness.autoDiffAssociatedFunctionIdentifier) {
+      auto originalFn = SGF.emitGlobalFunctionRef(
+          loc, witness.asAutoDiffOriginalFunction());
+      auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
+          witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
+      auto autoDiffFn = SGF.B.createAutoDiffFunction(
+          loc, loweredIndices, /*differentiationOrder*/ 1, originalFn);
+      return SGF.B.createAutoDiffFunctionExtract(
+          loc,
+          AutoDiffFunctionExtractInst::Extractee(autoDiffFuncId->getKind()),
+          /*differentiationOrder*/ 1, autoDiffFn);
+    }
+
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
+    // SWIFT_ENABLE_TENSORFLOW
+    assert(!witness.autoDiffAssociatedFunctionIdentifier);
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
   case WitnessDispatchKind::Class: {
+    // SWIFT_ENABLE_TENSORFLOW
+    assert(!witness.autoDiffAssociatedFunctionIdentifier);
     SILValue selfPtr = witnessParams.back().getValue();
     return SGF.emitClassMethodRef(loc, selfPtr, witness, witnessFTy);
   }

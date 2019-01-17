@@ -795,8 +795,8 @@ public extension Tensor {
   /// - Precondition: The number of scalars matches the new shape.
   @inlinable @inline(__always)
   @differentiable(
-    reverse, wrt: (self),
-    adjoint: _adjointReshaped(toShape:originalValue:seed:)
+    wrt: (self), vjp: _vjpReshaped(toShape:)
+    where Scalar : Differentiable & FloatingPoint
   )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
     return Raw.reshape(self, shape: newShape)
@@ -819,8 +819,8 @@ public extension Tensor {
   /// specified shape index.
   @inlinable @inline(__always)
   @differentiable(
-    reverse, wrt: (self),
-    adjoint: _adjointExpandingShape(at:originalValue:seed:)
+    wrt: (self), vjp: _vjpExpandingShape(at:)
+    where Scalar : Differentiable & FloatingPoint
   )
   func expandingShape(at shapeIndex: Int32) -> Tensor {
     return Raw.expandDims(self, dim: Tensor<Int32>(shapeIndex))
@@ -886,12 +886,12 @@ public extension TensorFlowScalar {
 extension Tensor : Equatable where Scalar : Equatable {
   @inlinable @inline(__always)
   public static func == (lhs: Tensor, rhs: Tensor) -> Bool {
-    return lhs.elementsEqual(rhs).all()
+    return (lhs .== rhs).all()
   }
 
   @inlinable @inline(__always)
   public static func != (lhs: Tensor, rhs: Tensor) -> Bool {
-    return lhs.elementsNotEqual(rhs).any()
+    return (lhs .== rhs).any()
   }
 }
 

@@ -156,10 +156,10 @@ namespace {
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
     void propagateSSAValues();
     void checkAttributesAndFormGraphOps();
-    void evaluateAttributesAndDoPacking(
-        GraphOperationInfo &opInfo,
-        DenseMap<SILValue, SymbolicValue> &constants,
-        GraphFunctionDeviceInfo &deviceInfo);
+    void
+    evaluateAttributesAndDoPacking(GraphOperationInst *origInst,
+                                   DenseMap<SILValue, SymbolicValue> &constants,
+                                   GraphFunctionDeviceInfo &deviceInfo);
     void cleanupDeadInstructions();
   };
 }  // end anonymous namespace
@@ -1394,7 +1394,12 @@ static SILValue explodeSILStructArgument(SILPhiArgument *arg) {
 
   // Ok, now that we've exploded the BB argument itself, we need to explode the
   // values passed in the predecessor blocks.
-  for (auto pi : argBB->getPredecessorBlocks()) {
+  //
+  // Collect all predecessor blocks before processing because we invalidate the
+  // iterator when we replace the branch at the end of the loop.
+  SmallPtrSet<SILBasicBlock *, 8> predBlocks(argBB->pred_begin(),
+                                             argBB->pred_end());
+  for (auto pi : predBlocks) {
     auto *br = cast<BranchInst>(pi->getTerminator());
     SmallVector<SILValue, 8> operands;
     for (unsigned i = 0, e = br->getNumOperands(); i != e; ++i)
@@ -1761,7 +1766,7 @@ static GraphOperationInst *tryToPromoteTensorFromScalars(
   B.setCurrentDebugScope(inst->getDebugScope());
   auto result =
       createConstTensor(scalarsElementType, scalars, shape, inst->getType(),
-                        inst->getLoc(), deviceInfo.primaryDeviceType, B);
+                        inst->getLoc(), deviceInfo.primaryDeviceId, B);
 
   // Replace the old instruction with the new one.
   inst->replaceAllUsesPairwiseWith(result);
@@ -1833,8 +1838,7 @@ transformTensorFromScalar(ApplyInst *apply,
     auto constant = createConstTensor(
         eltType, scalarValue,
         SymbolicValue::getArray({}, int32Ty, ctx.getAllocator()),
-        origResult->getType(), getUserSourceLocation(apply), DeviceType::ALL,
-        B);
+        origResult->getType(), getUserSourceLocation(apply), AllDeviceId, B);
     LLVM_DEBUG(llvm::dbgs()
                << "  The resulting const node is: " << *constant << "\n");
     origResult->replaceAllUsesWith(constant->getResult(0));
@@ -1931,7 +1935,7 @@ static GraphOperationInst *tryToPromoteTensorFromScalars1D(
   B.setCurrentDebugScope(inst->getDebugScope());
   auto result =
       createConstTensor(scalarElementType, scalars, shape, inst->getType(),
-                        inst->getLoc(), deviceInfo.primaryDeviceType, B);
+                        inst->getLoc(), deviceInfo.primaryDeviceId, B);
 
   // Replace the old instruction with the new one.
   inst->replaceAllUsesPairwiseWith(result);
@@ -1997,17 +2001,7 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
     // If this is a normal tensor operation, validate it and transform it into a
     // graphOp instruction.
     if (auto *graphOpInst = dyn_cast<GraphOperationInst>(inst)) {
-      GraphOperationInfo opInfo(graphOpInst);
-      // Do not translate this special inst into a graph op, since it will get
-      // removed at the beginning of the partition pass.
-      // TODO: remove this inst in the getForFunction() call above, once
-      // the partition pass is folded into deabstraction.
-      // FIXME: consider defining constexpr strings for these literals.
-      if (opInfo.getOperationName() == "tfc.configureTPU" ||
-          opInfo.getOperationName() == "tfc.configureGPU" ||
-          opInfo.getOperationName() == "tfc.configureCPU")
-        continue;
-      evaluateAttributesAndDoPacking(opInfo, constants, deviceInfo);
+      evaluateAttributesAndDoPacking(graphOpInst, constants, deviceInfo);
       // evaluateAttributesAndDoPacking deletes inst. So, continue as the rest
       // of the loop is irrelevant. (This also avoid memory errors.)
       continue;
@@ -2259,9 +2253,19 @@ static bool collectInnermostTensorFlowDTypes(
 /// This deletes the underlying inst in `opInfo` when a GraphOperation is
 /// created successfully.
 void TFDeabstraction::evaluateAttributesAndDoPacking(
-    GraphOperationInfo &opInfo, DenseMap<SILValue, SymbolicValue> &constants,
+    GraphOperationInst *origInst, DenseMap<SILValue, SymbolicValue> &constants,
     GraphFunctionDeviceInfo &deviceInfo) {
-  auto *origInst = opInfo.getInst();
+  GraphOperationInfo opInfo(origInst);
+  // Do not translate this special inst into a graph op, since it will get
+  // removed at the beginning of the partition pass.
+  // TODO: remove this inst in the getForFunction() call above, once
+  // the partition pass is folded into deabstraction.
+  // FIXME: consider defining constexpr strings for these literals.
+  if (opInfo.getOperationName() == "tfc.configureTPU" ||
+      opInfo.getOperationName() == "tfc.configureGPU" ||
+      opInfo.getOperationName() == "tfc.configureCPU")
+    return;
+
   auto &context = origInst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
   SILBuilder B(origInst);

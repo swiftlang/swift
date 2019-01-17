@@ -14,6 +14,9 @@ tvos: CloudKit.swiftinterface
 watchos: CloudKit.swiftinterface
 
 // SWIFT_ENABLE_TENSORFLOW
+linux-gnu: Python.swiftinterface
+macosx: Python.swiftinterface
+
 linux-gnu: TensorFlow.swiftinterface
 macosx: TensorFlow.swiftinterface
 

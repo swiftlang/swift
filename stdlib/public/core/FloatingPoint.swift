@@ -1824,20 +1824,13 @@ extension FloatingPoint {
   ///
   /// - Returns: The square root of the value.
   @_transparent
-  /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, wrt: (self), adjoint: _adjointSquareRoot)
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(wrt: (self), vjp: _vjpSquareRoot
+                  where Self : Differentiable, Self == Self.CotangentVector)
   public func squareRoot( ) -> Self {
     var lhs = self
     lhs.formSquareRoot( )
     return lhs
-  }
-
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// The adjoint of `squareRoot`. Returns the gradient of `squareRoot` with
-  /// respect to `self`.
-  @inlinable // FIXME(sil-serialize-all)
-  func _adjointSquareRoot(originalValue: Self, adjoint: Self) -> Self {
-    return 2 * self * adjoint
   }
 
   /// Returns the result of adding the product of the two given values to this
@@ -1855,22 +1848,12 @@ extension FloatingPoint {
   /// - Returns: The product of `lhs` and `rhs`, added to this value.
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, wrt: (self, .0, .1), adjoint: _adjointAddingProduct)
+  @differentiable(wrt: (self, .0, .1), vjp: _vjpAddingProduct
+                  where Self : Differentiable, Self == Self.CotangentVector)
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
     addend.addProduct(lhs, rhs)
     return addend
-  }
-
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// The adjoint of `addingProduct`. Returns the gradient of `addingProduct`
-  /// with respect to `self`, `lhs` and `rhs`.
-  @inlinable
-  func _adjointAddingProduct(
-    _ lhs: Self, _ rhs: Self,
-    originalValue: Self, adjoint: Self
-  ) -> (Self, Self, Self) {
-    return (1, rhs, lhs)
   }
 
   /// Returns the lesser of the two given values.
@@ -2039,6 +2022,27 @@ extension FloatingPoint {
     if isNormal { return sign == .minus ? .negativeNormal : .positiveNormal }
     if isSubnormal { return sign == .minus ? .negativeSubnormal : .positiveSubnormal }
     return sign == .minus ? .negativeZero : .positiveZero
+  }
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+extension FloatingPoint where Self : Differentiable,
+                              Self == Self.CotangentVector {
+  /// The vector-Jacobian product function of `addingProduct`. Returns the
+  /// original result and pullback of `addingProduct` with respect to `self`,
+  /// `lhs` and `rhs`.
+  @inlinable
+  func _vjpAddingProduct(
+    _ lhs: Self, _ rhs: Self
+  ) -> (Self, (Self) -> (Self, Self, Self)) {
+    return (addingProduct(lhs, rhs), { _ in (1, rhs, lhs) })
+  }
+
+  /// The vector-Jacobian product function of `squareRoot`. Returns the original
+  /// result and pullback of `squareRoot` with respect to `self`.
+  @inlinable // FIXME(sil-serialize-all)
+  func _vjpSquareRoot(_ x: Self) -> (Self, (Self) -> Self) {
+    return (x.squareRoot(), { v in 2 * self * v })
   }
 }
 

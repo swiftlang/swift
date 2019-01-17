@@ -1,16 +1,15 @@
 // This test file has various test cases to check that unrollng the loop body
 // preserves the loop nesting.  Note that we use -Onone to preserve the
 // structure of control flow for tests.
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Onone -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Onone -emit-sil %s -verify | %FileCheck %s
 
 import TensorFlow
 
-// expected-warning @+1 {{value implicitly copied to the host}}
 public func testLoopMovementFromOutside(_ breakIndex: Int32) -> Tensor<Int32> {
   var i: Int32 = 1
   var sum = Tensor<Int32>(0)
   let maxCount: Int32 = 100
-  while i <= maxCount { // expected-note {{value used here}}
+  while i <= maxCount {
     sum += i
     if i == breakIndex {
       var k: Int32 = 0
@@ -18,9 +17,8 @@ public func testLoopMovementFromOutside(_ breakIndex: Int32) -> Tensor<Int32> {
         sum += i
         k += 1
       }
-      // expected-warning @+1 {{value implicitly copied to the host}}
       sum += 1
-      break // expected-note {{value used here}}
+      break
     }
     i += 1
   }
@@ -59,7 +57,6 @@ public func testLoopMovementFromOutside(_ breakIndex: Int32) -> Tensor<Int32> {
 
 // This example checks that the loop structure is preserved when we unroll
 // the body of a loop during canonicalization.
-//expected-warning @+1 {{value implicitly copied to the host}}
 public func testLoopWithNestedLoopsRequiringUnrolling(
   _ breakIndex:Int32, _ repetitions: Int32) -> Tensor<Int32> {
 	var result = Tensor<Int32>(0)
@@ -70,7 +67,6 @@ public func testLoopWithNestedLoopsRequiringUnrolling(
 		// once.  This corresponds to the loop at depth 2 in the dump of loop info
 		// before canonicalization.
 		repeat {
-			// expected-warning @+1 {{value implicitly copied to the host}}
 			if i > breakIndex {
 				// + 1 so that this is not a simple assignment. 
 				// (Simple assignments won't trigger cloning.)
@@ -79,7 +75,6 @@ public func testLoopWithNestedLoopsRequiringUnrolling(
 			}
 			// Crazy way to do `k = i` so that we have a loop when we unroll the body.
 			var k = Tensor<Int32>(0)
-			// expected-warning @+1 {{value implicitly copied to the host}}
 			while k < i {
 				k += 1
 			}
@@ -87,11 +82,9 @@ public func testLoopWithNestedLoopsRequiringUnrolling(
 			// + k so that this is not a simple assignment. 
 			// (Simple assignments won't trigger cloning.)
 			result = i + k
-			// expected-warning @+1 {{value implicitly copied to the host}}
 		} while i <= 100
 		result += 3
 	}
-	// expected-note @+1 {{value used here}}
 	return result
 }
 
@@ -152,7 +145,6 @@ public func testLoopWithNestedLoopsRequiringUnrolling(
 
 // This example checks that the loop structure is preserved when we unroll
 // the body of a loop during canonicalization.
-//expected-warning @+1 {{value implicitly copied to the host}}
 public func testLoopWithDoublyNestedLoopsRequiringUnrolling(
 	_ breakIndex:Int32, _ repetitions: Int32) -> Tensor<Int32> {
 	var result = Tensor<Int32>(0)
@@ -163,7 +155,6 @@ public func testLoopWithDoublyNestedLoopsRequiringUnrolling(
 		// once.  This corresponds to the loop at depth 2 in the dump of loop info
 		// before canonicalization.
 		repeat {
-			// expected-warning @+1 {{value implicitly copied to the host}}
 			if i > breakIndex {
 				// + 1 so that this is not a simple assignment. 
 				// (Simple assignments won't trigger cloning.)
@@ -173,10 +164,8 @@ public func testLoopWithDoublyNestedLoopsRequiringUnrolling(
 
 			// Crazy way to do k = i^2 so that we have a doubly loop when we unroll.
 			var k = Tensor<Int32>(0)
-			// expected-warning @+1 {{value implicitly copied to the host}}
 			while k < i {
 				var w = Tensor<Int32>(0)
-				// expected-warning @+1 {{value implicitly copied to the host}}
 				while w < i {
 					w += 1
 				}
@@ -186,11 +175,9 @@ public func testLoopWithDoublyNestedLoopsRequiringUnrolling(
 			// + k so that this is not a simple assignment. 
 			// (Simple assignments won't trigger cloning.)
 			result = i + k
-			// expected-warning @+1 {{value implicitly copied to the host}}
 		} while i <= 100
 		result += 3
 	}
-	// expected-note @+1 {{value used here}}
 	return result
 }
 

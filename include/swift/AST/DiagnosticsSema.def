@@ -741,47 +741,6 @@ NOTE(object_literal_resolve_import,none,
 // TensorFlow op literal
 ERROR(invalid_tfop,none, "%0", (StringRef))
 
-// '#gradient(...)' expression for automatic differentiation
-ERROR(gradient_expr_function_not_differentiable,none,
-      "function '%0' is not differentiable", (Identifier))
-ERROR(gradient_expr_not_a_function,none,
-      "only functions can be differentiated, but this expression has type %0",
-      (Type))
-ERROR(gradient_expr_original_func_decl_unresolved,none,
-      "original function declaration could not be resolved", ())
-ERROR(gradient_expr_parameter_self_unsupported,none,
-      "the 'self' parameter is unsupported by #gradient", ())
-ERROR(gradient_expr_parameter_indices_not_ascending,none,
-      "parameter indices must be ascending", ())
-ERROR(gradient_expr_parameter_index_out_of_bounds,none,
-      "the parameter index is out of bounds for type %0, which has %1 "
-      "parameters", (Type, unsigned))
-ERROR(gradient_expr_parameter_not_value_type,none,
-      "gradient parameter has non-value type %0 and thus cannot be a "
-      "differentiation parameter", (Type))
-ERROR(gradient_expr_incompatible_contextual_type,none,
-      "cannot convert gradient expression to incompatible contextual type %0",
-      (Type))
-
-// '#adjoint(...)' expression for automatic differentiation
-ERROR(adjoint_expr_original_base_type_unresolved,none,
-      "could not resolve base type %0 of original function in #adjoint "
-      "expression", (TypeLoc))
-ERROR(adjoint_expr_original_not_func_decl,none,
-      "#adjoint expression can only be applied to function declarations, but %0"
-      "is not a function declaration", (DeclName))
-ERROR(adjoint_expr_original_func_decl_unresolved,none,
-      "original function declaration could not be resolved", ())
-ERROR(adjoint_expr_original_no_valid_differentiable_attr,none,
-      "the original function %0 does not declare a valid @differentiable "
-      "attribute", (DeclName))
-ERROR(adjoint_expr_original_overload_not_found,none,
-      "could not find original function %0 with valid @differentiable "
-      "attribute in #adjoint expression", (DeclName))
-ERROR(adjoint_expr_ambiguous_original_function_identifier,none,
-      "ambiguous or overloaded original function identifier %0 cannot be used "
-      "in #adjoint expression", (DeclName))
-
 ERROR(use_local_before_declaration,none,
       "use of local variable %0 before its declaration", (DeclName))
 ERROR(unsupported_existential_type,none,
@@ -2469,6 +2428,8 @@ ERROR(broken_encodable_requirement,none,
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
 // SWIFT_ENABLE_TENSORFLOW
+ERROR(broken_key_path_iterable_requirement,none,
+      "KeyPathIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_parameter_group_requirement,none,
       "ParameterGroup protocol is broken: unexpected requirement", ())
 ERROR(broken_parameterized_requirement,none,
@@ -2479,6 +2440,12 @@ ERROR(parameterized_no_parameters_struct,none,
 ERROR(parameterized_invalid_parameters_struct,none,
       "cannot automatically synthesize %0 because 'Parameters' struct is "
       "invalid", (Type))
+ERROR(broken_additive_arithmetic_requirement,none,
+      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
+ERROR(broken_vector_numeric_requirement,none,
+      "VectorNumeric protocol is broken: unexpected requirement", ())
+ERROR(broken_differentiable_requirement,none,
+      "Differentiable protocol is broken: unexpected requirement", ())
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2715,14 +2682,8 @@ ERROR(differentiable_attr_void_result,none,
 ERROR(differentiable_attr_associated_function_protocol,none,
       "cannot specify associated differentiation function on protocol "
       "requirement", ())
-ERROR(differentiable_attr_has_primal_but_not_adjoint,none,
-      "a corresponding adjoint must be specified when the primal is provided; "
-      "if you want this function to be automatically differentiated, do not "
-      "specify primal or adjoint", ())
 ERROR(differentiable_attr_wrt_nothing,none,
       "specify at least one parameter to differentiate with respect to", (DeclName))
-ERROR(differentiable_attr_primal_overload_not_found,none,
-      "%0 does not have expected parameters' type %1", (DeclName, Type))
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
 ERROR(differentiable_attr_wrt_self_must_be_first,none,
@@ -2744,8 +2705,6 @@ ERROR(differentiable_attr_specified_not_function,none,
 ERROR(differentiable_attr_ambiguous_function_identifier,none,
       "ambiguous or overloaded identifier %0 cannot be used in @differentiable "
       "attribute", (DeclName))
-ERROR(differentiable_attr_forward_mode_unsupported,none,
-      "forward-mode automatic differentiation is not supported yet", ())
 ERROR(differentiable_attr_invalid_access,none,
       "associated differentiation function %0 is required to either be public "
       "or @usableFromInline because the original function %1 is public or "
@@ -2756,6 +2715,16 @@ ERROR(differentiable_attr_wrt_not_differentiable,none,
 ERROR(differentiable_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
+ERROR(differentiable_attr_empty_where_clause,none,
+      "empty 'where' clause in @differentiable attribute", ())
+ERROR(differentiable_attr_nongeneric_trailing_where,none,
+      "trailing 'where' clause in @differentiable attribute of non-generic function %0", (DeclName))
+ERROR(differentiable_attr_only_generic_param_req,none,
+      "only requirements on generic parameters are supported by @differentiable attribute", ())
+ERROR(differentiable_attr_non_protocol_type_constraint_req,none,
+      "only conformances to protocol types are supported by @differentiable attribute", ())
+ERROR(differentiable_attr_unsupported_req_kind,none,
+      "layout requirement are not supported by @differentiable attribute", ())
 
 ERROR(compiler_evaluable_bad_context,none,
       "@compilerEvaluable functions not allowed here", ())
@@ -2790,6 +2759,11 @@ ERROR(tfparameter_attr_instance_stored_property_only,none,
       "only instance stored properties can be declared @%0", (StringRef))
 ERROR(tfparameter_attr_not_in_parameterized,none,
       "@%0 is allowed only in types that conform to 'Parameterized'", (StringRef))
+
+// @noDerivative attribute
+ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,
+      "@noDerivative is only allowed on stored properties in structure types "
+      "that declare a conformance to 'Differentiable'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
@@ -3709,12 +3683,6 @@ ERROR(unreferenced_generic_parameter,none,
 
 // SWIFT_ENABLE_TENSORFLOW
 // Function differentiability
-ERROR(autodiff_attr_invalid_differentiability,none,
-      "invalid differentiability '%0' in '@autodiff' attribute; expected 'forward', 'reverse', 'linear', 'constant', or 'bidirectional'", (StringRef))
-ERROR(autodiff_attr_order_cannot_be_zero,none,
-      "differentiation order cannot be zero; it should be at least first-order", ())
-ERROR(autodiff_attr_order_cannot_be_specified_in_mode,none,
-      "differentiation order cannot be specified in '%0' mode", (StringRef))
 ERROR(autodiff_attr_argument_not_differentiable,none,
       "argument is not differentiable, but the enclosing function type is marked '@autodiff'; did you want to add '@nondiff' to this argument?", ())
 ERROR(autodiff_attr_result_not_differentiable,none,

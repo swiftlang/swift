@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
 
 import TensorFlow
 
@@ -75,8 +75,8 @@ public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, T
 // Likewise, mean and max shouldn't cause send/receive errors.
 public func testMeanMax(x: Tensor<Float>) -> Float {
   let y = x.toAccelerator()
-  let a = y.mean()
-  let b = y.max()
+  let a = y.mean().scalarized()
+  let b = y.max().scalarized()
   return a+b
 }
 
@@ -96,12 +96,12 @@ public func randomUniformHoisting() -> Tensor<Float> {
   return (x+y+z).toHost()
 }
 
-// Here ".mean()" contains a tensor2scalar operation, and we then convert that
-// scalar back to a tensor.  This checks to make sure that tf-partition can pull
-// this whole mess in graph without leaving anything on the host that will cause
-// a send/receive.
+// Here ".mean().scalarized()" contains a tensor2scalar operation, and we then 
+// convert that scalar back to a tensor.  This checks to make sure that tf-partition 
+// can pull this whole mess in graph without leaving anything on the host that will 
+// cause a send/receive.
 public func tensorToScalarToTensor(a: Tensor<Int32>) -> Tensor<Int32> {
-  let scalar = a.toAccelerator().mean()
+  let scalar = a.toAccelerator().mean().scalarized()
   let b = Tensor(scalar)
   return (b+b).toHost()
 }

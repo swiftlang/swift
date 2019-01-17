@@ -1,0 +1,17 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil public @bar_vjp : $@convention(thin) (Float, Float) -> (Float, (Float) -> Float) {
+entry(%0: $Float, %1: $Float):
+  return undef: $(Float, (Float) -> Float)
+}
+
+// CHECK-LABEL: [differentiable source 0 wrt 0, 1 vjp @bar_vjp] @bar
+sil public [differentiable source 0 wrt 0, 1 vjp @bar_vjp] @bar : $@convention(thin) (Float, Float) -> Float {
+entry(%0: $Float, %1: $Float):
+  return undef: $Float
+}

@@ -97,6 +97,8 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   addDefiniteInitialization(P);
   P.addClosureLifetimeFixup();
   P.addOwnershipModelEliminator();
+  // SWIFT_ENABLE_TENSORFLOW
+  P.addDifferentiation();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
   P.addPredictableMemoryOptimizations();
@@ -113,7 +115,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addSplitNonCondBrCriticalEdges();
 
   // SWIFT_ENABLE_TENSORFLOW
-  P.addDifferentiation();
   P.addTFDeabstraction();
 }
 

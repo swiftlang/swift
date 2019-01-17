@@ -2302,75 +2302,6 @@ namespace {
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    Expr *handleReverseAutoDiffExpr(ReverseAutoDiffExpr *expr,
-                                    bool preservingOriginalResult) {
-      auto gradType = simplifyType(cs.getType(expr));
-      auto gradFnType = gradType->getAs<AnyFunctionType>();
-      assert(gradFnType &&
-             "Gradient expression should've been assigned a function type");
-      cs.setType(expr, gradType);
-      cs.cacheExprTypes(expr);
-      // Verify that differentiation parameters conform to VectorNumeric.
-      auto *originalExpr = expr->getOriginalExpr();
-      auto originalType = cs.getType(originalExpr)->getAs<AnyFunctionType>();
-      assert(originalType && "Original should have function type");
-      auto gradParams = gradFnType->getParams();
-      assert(gradFnType->getNumParams() == originalType->getNumParams() &&
-             "The gradient function should have same number of parameters as "
-             "original function");
-      SmallVector<Type, 8> diffParamTypes;
-      if (expr->getParameters().empty()) {
-        for (auto &gradParam : gradParams)
-          diffParamTypes.push_back(gradParam.getPlainType());
-      } else {
-        for (auto &param : expr->getParameters())
-          diffParamTypes.push_back(gradParams[param.index].getPlainType());
-      }
-      return expr;
-    }
-
-    Expr *visitGradientExpr(GradientExpr *expr) {
-      return handleReverseAutoDiffExpr(expr, /*preservingOriginalResult=*/false);
-    }
-    
-    Expr *visitChainableGradientExpr(ChainableGradientExpr *expr) {
-      llvm_unreachable("Unhandled");
-    }
-
-    Expr *visitValueAndGradientExpr(ValueAndGradientExpr *expr) {
-      return handleReverseAutoDiffExpr(expr, /*preservingOriginalResult=*/true);
-    }
-
-    // SWIFT_ENABLE_TENSORFLOW
-    Expr *visitAdjointExpr(AdjointExpr *expr) {
-      auto locator = cs.getConstraintLocator(expr);
-      auto adjointDeclRef = expr->getAdjointFunction();
-      auto adjointDecl = cast<FuncDecl>(adjointDeclRef.getDecl());
-
-      // If adjoint is within a type context (it is an instance/static method),
-      // use member locator.
-      if (adjointDecl->getInnermostTypeContext())
-        locator = cs.getConstraintLocator(expr, ConstraintLocator::Member);
-
-      // If adjoint has generic signature, calculate substitutions and update
-      // adjoint decl ref with them.
-      SubstitutionMap substitutions;
-      if (auto genSig = adjointDecl->getGenericSignature()) {
-        substitutions = solution.computeSubstitutions(genSig, locator);
-        expr->setAdjointFunction(
-          ConcreteDeclRef(adjointDecl, substitutions));
-      }
-
-      auto selected = solution.getOverloadChoice(locator);
-      auto simplifiedType = simplifyType(selected.openedFullType);
-      // For static methods, return result of curried method.
-      if (adjointDecl->isStatic())
-        simplifiedType = simplifiedType->castTo<AnyFunctionType>()->getResult();
-      cs.setType(expr, simplifiedType);
-      return expr;
-    }
-
-    // SWIFT_ENABLE_TENSORFLOW
     Expr *visitTFOp(ObjectLiteralExpr *expr) {
       auto &ctx = cs.TC.Context;
 
@@ -6833,12 +6764,19 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (auto fromFunc = fromType->getAs<FunctionType>()) {
       assert(toType->is<FunctionType>());
       // SWIFT_ENABLE_TENSORFLOW
+      auto fromEI = fromFunc->getExtInfo();
+      // Handle implicit conversion from @autodiff.
+      if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
+        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiable(false))
+                ->castTo<FunctionType>();
+        expr = cs.cacheType(new (tc.Context)
+            AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
+      }
       // If we have a ClosureExpr, then we can safely propagate tensorflow
       // convention to the closure expression.
       // NOTE: we also need to check if the closure captures any values.
       // However, capture information is not available at this point. Therefore,
       // the check currently happens in the SILGen phase.
-      auto fromEI = fromFunc->getExtInfo();
       if (toEI.getRepresentation() ==
               AnyFunctionType::Representation::TensorFlow &&
           fromEI.getRepresentation() !=
@@ -6881,8 +6819,24 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
 
-      return cs.cacheType(new (tc.Context)
-                              FunctionConversionExpr(expr, toType));
+      // SWIFT_ENABLE_TENSORFLOW
+      auto toEINoAdConversion =
+          toEI.withDifferentiable(fromEI.isDifferentiable());
+      auto toFuncNoADConversion = toFunc->withExtInfo(toEINoAdConversion);
+      expr = cs.cacheType(new (tc.Context)
+                              FunctionConversionExpr(expr,
+                                                     toFuncNoADConversion));
+
+      // Make the conversion to @autodiff happen after all other conversions,
+      // because some of the other conversions are not currently supported on
+      // @autodiff functions. (e.g. escape_to_noescape).
+      // After we do support those conversions, the order will no longer matter.
+      if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
+        expr = cs.cacheType(new (tc.Context)
+                            AutoDiffFunctionExpr(expr, toFunc));
+      }
+
+      return expr;
     }
   }
 
@@ -7538,7 +7492,17 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       return special;
     }
   }
-  
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (auto *fnTy = cs.getType(fn)->getAs<AnyFunctionType>()) {
+    if (fnTy->isDifferentiable()) {
+      auto fnTyNoDiff =
+          fnTy->withExtInfo(fnTy->getExtInfo().withDifferentiable(false));
+      fn = new (tc.Context) AutoDiffFunctionExtractOriginalExpr(fn, fnTyNoDiff);
+      cs.setType(fn, fnTyNoDiff);
+      cs.cacheExprTypes(fn);
+    }
+  }
 
   bool unwrapResult = false;
   if (auto *IUOFnTy = dyn_cast<ImplicitlyUnwrappedFunctionConversionExpr>(fn)) {

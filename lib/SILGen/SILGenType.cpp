@@ -325,8 +325,9 @@ public:
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(requirementRef.getDecl())) {
         return addMethodImplementation(requirementRef,
-                                       SILDeclRef(witness.getDecl(),
-                                                  requirementRef.kind),
+                                       // SWIFT_ENABLE_TENSORFLOW
+                                       requirementRef.withDecl(
+                                           witness.getDecl()),
                                        witness);
       }
 
@@ -346,8 +347,8 @@ public:
       return asDerived().addMissingMethod(requirementRef);
 
     return addMethodImplementation(requirementRef,
-                                   SILDeclRef(witnessAccessor,
-                                              SILDeclRef::Kind::Func),
+                                   // SWIFT_ENABLE_TENSORFLOW
+                                   requirementRef.withDecl(witnessAccessor),
                                    witness);
   }
 
@@ -669,6 +670,22 @@ SILFunction *SILGenModule::emitProtocolWitness(
       conformance.isConcrete() ? conformance.getConcrete() : nullptr;
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO: Proper mangling for autodiff witness thunks.
+  if (auto *autoDiffFuncId =
+          requirement.autoDiffAssociatedFunctionIdentifier) {
+    std::string kindString;
+    switch (autoDiffFuncId->getKind()) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      kindString = "jvp";
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      kindString = "vjp";
+      break;
+    }
+    nameBuffer = "AD__" + nameBuffer + "_" + kindString + "_" +
+                 autoDiffFuncId->getParameterIndices()->getString();
+  }
 
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all

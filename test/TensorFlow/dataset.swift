@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
 import TensorFlow
 
 // Creates a dataset, which produces one float scalar value in each get next
@@ -59,7 +59,7 @@ public func model() {
 
 // CHECK:      node {
 // CHECK-NEXT:   name: "{{.*}}model{{.*}}"
-// CHECK-NEXT:   op: "{{.*}}model{{.*}}.tf_CPU.device_partition"
+// CHECK-NEXT:   op: "{{.*}}model{{.*}}.tf_0_CPU.device_partition"
 // CHECK:      node {
 // CHECK-NEXT:  name: "tfc_output_0_{{.*}}model{{.*}}"
 

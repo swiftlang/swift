@@ -1,20 +1,20 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -verify %s | %FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Normal types
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("foo")
-@differentiable(reverse, adjoint: dfoo(_:_:partial:seed:))
+@differentiable(vjp: dfoo)
 public func foo(_ x: Float, _ y: Float) -> Float {
   return 1
 }
 
-// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 primal @foo adjoint @dfoo primitive] @foo
+// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 vjp @dfoo] @foo
 
 @_silgen_name("dfoo")
-public func dfoo(_ x: Float, _ y: Float, partial: Float, seed: Float) -> (Float, Float) {
-  return (1, 1)
+public func dfoo(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float, Float)) {
+  return (foo(x, y), { _ in (1, 1) })
 }
 
 // CHECK-LABEL: sil @dfoo
@@ -24,55 +24,25 @@ public func dfoo(_ x: Float, _ y: Float, partial: Float, seed: Float) -> (Float,
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("foo_indir_ret")
-@differentiable(reverse, adjoint: dfoo_indir_ret(_:_:_:_:))
-public func foo_indir_ret<T>(_ x: Float, _ y: T) -> T {
+@differentiable(vjp: dfoo_indir_ret)
+public func foo_indir_ret<T: Differentiable>(_ x: Float, _ y: T) -> T {
   return y
 }
 
-// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 primal @foo_indir_ret adjoint @dfoo_indir_ret primitive] @foo_indir_ret : $@convention(thin) <T> (Float, @in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 vjp @dfoo_indir_ret] @foo_indir_ret : $@convention(thin) <T where T : Differentiable> (Float, @in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $Float, %2 : @trivial $*T):
 
 @_silgen_name("dfoo_indir_ret")
-public func dfoo_indir_ret<T>(_ x: Float, _ y: T, _ partial: T, _ seed: T) -> (Float, T) {
-  return (x, y)
+public func dfoo_indir_ret<T: Differentiable>(_ x: Float, _ y: T) -> (T, (T.CotangentVector) -> (Float, T.CotangentVector)) {
+  return (y, { v in (x, v) })
 }
-
-// CHECK-LABEL: sil @dfoo_indir_ret : $@convention(thin) <T> (Float, @in_guaranteed T, @in_guaranteed T, @in_guaranteed T) -> (Float, @out T) {
-// CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $Float, %2 : @trivial $*T, %3 : @trivial $*T, %4 : @trivial $*T):
-
-//===----------------------------------------------------------------------===//
-// Flattened types
-//===----------------------------------------------------------------------===//
-
-@_silgen_name("foo_tuple")
-@differentiable(reverse, adjoint: dfoo_tuple(_:_:partial:seed:))
-public func foo_tuple(_ x: ((Float, (Float, Float)), Float, ((Float))), _ y: Float) -> Float {
-  return 1
-}
-
-// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1, 2, 3, 4, 5 primal @foo_tuple adjoint @dfoo_tuple primitive] @foo_tuple : $@convention(thin) (Float, Float, Float, Float, Float, Float) -> Float
-
-@_silgen_name("dfoo_tuple")
-public func dfoo_tuple(_ x: ((Float, (Float, Float)), Float, ((Float))), _ y: Float, partial: Float, seed: Float) -> (((Float, (Float, Float)), Float, ((Float))), Float) {
-  return (((1, (1, 1)), 1, ((1))), 1)
-}
-
-// CHECK-LABEL: sil @dfoo_tuple : $@convention(thin) (Float, Float, Float, Float, Float, Float, Float, Float) -> (Float, Float, Float, Float, Float, Float)
-
-@_silgen_name("no_prim_or_adj")
-@differentiable(reverse) // ok!
-public func no_prim_or_adj(_ x: Float) -> Float {
-  return x * x
-}
-
-// CHECK-LABEL: sil [differentiable source 0 wrt 0] @no_prim_or_adj : $@convention(thin) (Float) -> Float
 
 //===----------------------------------------------------------------------===//
 // JVP
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("hasjvp")
-@differentiable(reverse, jvp: dhasjvp)
+@differentiable(jvp: dhasjvp)
 public func hasjvp(_ x: Float, _ y: Float) -> Float {
   return 1
 }
@@ -90,13 +60,14 @@ public func dhasjvp(_ x: Float, _ y: Float) -> (Float, (Float, Float) -> Float) 
 // VJP
 //===----------------------------------------------------------------------===//
 
+@inlinable
 @_silgen_name("hasvjp")
-@differentiable(reverse, vjp: dhasvjp)
+@differentiable(vjp: dhasvjp)
 public func hasvjp(_ x: Float, _ y: Float) -> Float {
   return 1
 }
 
-// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 vjp @dhasvjp] @hasvjp
+// CHECK-LABEL: sil [serialized] [differentiable source 0 wrt 0, 1 vjp @dhasvjp] @hasvjp
 
 @_silgen_name("dhasvjp")
 public func dhasvjp(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float, Float)) {
@@ -104,3 +75,84 @@ public func dhasvjp(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float, Float)
 }
 
 // CHECK-LABEL: sil @dhasvjp
+
+//===----------------------------------------------------------------------===//
+// Stored property
+//===----------------------------------------------------------------------===//
+
+struct DiffStoredProp {
+  @differentiable(wrt: (self), jvp: storedPropJVP, vjp: storedPropVJP)
+  let storedProp: Float
+
+  @_silgen_name("storedPropJVP")
+  func storedPropJVP() -> (Float, (DiffStoredProp) -> Float) {
+    fatalError("unimplemented")
+  }
+
+  @_silgen_name("storedPropVJP")
+  func storedPropVJP() -> (Float, (Float) -> DiffStoredProp) {
+    fatalError("unimplemented")
+  }
+}
+
+extension DiffStoredProp : VectorNumeric {
+  static var zero: DiffStoredProp { fatalError("unimplemented") }
+  static func + (lhs: DiffStoredProp, rhs: DiffStoredProp) -> DiffStoredProp {
+    fatalError("unimplemented")
+  }
+  static func - (lhs: DiffStoredProp, rhs: DiffStoredProp) -> DiffStoredProp {
+    fatalError("unimplemented")
+  }
+  typealias Scalar = Float
+  static func * (lhs: Float, rhs: DiffStoredProp) -> DiffStoredProp {
+    fatalError("unimplemented")
+  }
+}
+
+extension DiffStoredProp : Differentiable {
+  typealias TangentVector = DiffStoredProp
+  typealias CotangentVector = DiffStoredProp
+}
+
+//===----------------------------------------------------------------------===//
+// Computed property
+//===----------------------------------------------------------------------===//
+
+struct DiffComputedProp {
+  @differentiable(wrt: (self), jvp: computedPropJVP, vjp: computedPropVJP)
+  var computedProp: Float {
+    return 0
+  }
+
+  @_silgen_name("computedPropJVP")
+  func computedPropJVP() -> (Float, (DiffComputedProp) -> Float) {
+    fatalError("unimplemented")
+  }
+
+  @_silgen_name("computedPropVJP")
+  func computedPropVJP() -> (Float, (Float) -> DiffComputedProp) {
+    fatalError("unimplemented")
+  }
+}
+
+extension DiffComputedProp : VectorNumeric {
+  static var zero: DiffComputedProp { fatalError("unimplemented") }
+  static func + (lhs: DiffComputedProp, rhs: DiffComputedProp) -> DiffComputedProp {
+    fatalError("unimplemented")
+  }
+  static func - (lhs: DiffComputedProp, rhs: DiffComputedProp) -> DiffComputedProp {
+    fatalError("unimplemented")
+  }
+  typealias Scalar = Float
+  static func * (lhs: Float, rhs: DiffComputedProp) -> DiffComputedProp {
+    fatalError("unimplemented")
+  }
+}
+
+extension DiffComputedProp : Differentiable {
+  typealias TangentVector = DiffComputedProp
+  typealias CotangentVector = DiffComputedProp
+}
+
+// CHECK-LABEL: DiffComputedProp.computedProp.getter
+// CHECK-NEXT: sil {{.*}} [differentiable source 0 wrt 0 jvp @computedPropJVP vjp @computedPropVJP]

@@ -12,7 +12,7 @@ RepeatedCallsTests.test("Repeat") {
   func mul4(_ x: Float) -> Float {
     return mul2(mul2(x))
   }
-  expectEqual(4, #gradient(mul4)(0))
+  expectEqual(4, gradient(at: 0, in: mul4))
 }
 
 runAllTests()

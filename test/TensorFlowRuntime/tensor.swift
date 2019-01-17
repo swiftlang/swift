@@ -1,5 +1,8 @@
-// RUN: %target-run-simple-swift
-// RUN: %target-run-dynamic-compilation-swift
+// FIXME: TFPartition fails in `GraphFunctionDeviceInfo::finalizeUsedDevices()`
+// because used device set includes RUNTIME device.
+// UN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+
+// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
@@ -238,7 +241,7 @@ TensorTests.testAllBackends("Concatenation") {
 TensorTests.test("EwiseComparison") {
   let x = Tensor<Float>([0, 1, 2])
   let y = Tensor<Float>([2, 1, 3])
-  expectEqual(x.elementsLess(y).scalars, [true, false, true])
+  expectEqual((x .< y).scalars, [true, false, true])
 }
 
 TensorTests.test("LexicographicalComparison") {
@@ -255,7 +258,7 @@ TensorTests.testAllBackends("ArgMax") {
   let scalarsArgmax = x.argmax()
   expectEqual(ShapedArray(shape: [3], scalars: [1, 1, 1]), argmax0.array)
   expectEqual(ShapedArray(shape: [2], scalars: [2, 2]), argmax1.array)
-  expectEqual(5, scalarsArgmax)
+  expectEqual(ShapedArray(shape: [], scalars: [5]), scalarsArgmax.array)
 }
 
 TensorTests.testAllBackends("CeilFloor") {
@@ -463,18 +466,6 @@ TensorTests.testAllBackends("ReshapeTensor") {
   expectEqual([1, 3, 1, 2, 1], result.shape)
 }
 
-// FIXME: This test crashes in dynamic compilation + GPU.
-#if !CUDA
-TensorTests.testAllBackends("BroadcastTensor") {
-  // 1 -> 2 x 3 x 4
-  let one = Tensor<Float>(1)
-  let target = Tensor<Float>(shape: [2, 3, 4], repeating: 0.0)
-  let broadcasted = one.broadcast(like: target)
-  expectEqual([2, 3, 4], broadcasted.shape)
-  expectEqual(Array(repeating: 1, count: 24), broadcasted.scalars)
-}
-#endif // !CUDA
-
 TensorTests.testAllBackends("Unbroadcast1") {
   let x = Tensor<Float>(shape: [2, 3, 4, 5], repeating: 1)
   let y = Tensor<Float>(shape: [4, 5], repeating: 1)
@@ -554,4 +545,10 @@ TensorTests.testAllBackends("ShapeGetter4", testShapeGetter4)
 
 // For now it is sufficient to run remote tests with test cases in this file
 // only. When creating new test files, consider simply calling runAllTests().
+#if CUDA
+// RemoteSession does not work for GPU because partitioning logic gets confused
+// with multiple devices.
+runAllTests()
+#else
 runAllTestsWithRemoteSession()
+#endif  // CUDA

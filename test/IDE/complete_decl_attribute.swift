@@ -91,7 +91,8 @@ struct S{}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions, 26 items
+// SWIFT_ENABLE_TENSORFLOW
+// KEYWORD_LAST:                  Begin completions, 27 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
@@ -119,4 +120,5 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // KEYWORD_LAST-NEXT:             Keyword/None:                       TensorFlowGraph[#Declaration Attribute#]; name=TensorFlowGraph
 // KEYWORD_LAST-NEXT:             Keyword/None:                       TFParameter[#Declaration Attribute#]; name=TFParameter
+// KEYWORD_LAST-NEXT:             Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
 // KEYWORD_LAST-NEXT:             End completions

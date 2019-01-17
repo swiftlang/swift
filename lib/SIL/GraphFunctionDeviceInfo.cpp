@@ -26,8 +26,23 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 
+#undef DEBUG_TYPE
+#define DEBUG_TYPE "tfdeviceinfo"
+
 using namespace swift;
 using namespace tf;
+
+// When true, ops in the generated graph functions need not have a device
+// attribute. In that case, the (single-device) graph function must be executed
+// as a DeviceType::RUNTIME function, where the device of that function call is
+// obtained from runtime.
+// TODO: When true, add support for compile-time device stack evaluation and
+// default device as set via compiler flag tf-target-gpu. More generally,
+// extend the "true" code path to subsume the "false" code path.
+llvm::cl::opt<bool>
+    TFUseDeviceStack("tf-use-device-stack", llvm::cl::init(false),
+                     llvm::cl::desc("When true, graph mode compilation "
+                                    "supports the withDevice() construct."));
 
 // Only DataType attributes are considered in this CanRunOnDevice property. All
 // others are currently not relevant for kernel selection.
@@ -159,7 +174,7 @@ GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
       recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
     }
   }
-  return GraphFunctionDeviceInfo(deviceType, isTPUInfeedEnabled);
+  return GraphFunctionDeviceInfo({deviceType, 0}, isTPUInfeedEnabled);
 }
 
 /// Whether this is an op that configures the function's device.
@@ -169,12 +184,61 @@ bool GraphFunctionDeviceInfo::isConfigOp(const GraphOperationInfo &opInfo) {
          opInfo.getOperationName() == "tfc.configureCPU";
 }
 
+void GraphFunctionDeviceInfo::finalizeUsedDevices() {
+  // In this edge case, all ops are placed on the ALL device (e.g. Const). In
+  // that case, usedDeviceIds should contain the RUNTIME device.
+  if (usedDeviceIds.empty()) {
+    primaryDeviceId = RuntimeDeviceId;
+    usedDeviceIds.insert(RuntimeDeviceId);
+    return;
+  }
+
+  // For device partitioning to work, the device set cannot include the RUNTIME
+  // device along with some other device(s). This is because we don't know what
+  // the RUNTIME device is at compile time, so we cannot create sends/recvs
+  // graph nodes.
+  bool multiDeviceWithRuntimeDevice =
+      (usedDeviceIds.size() > 1 && usedDeviceIds.count(RuntimeDeviceId));
+  assert(!multiDeviceWithRuntimeDevice &&
+         "Cannot yet handle a multi-device function involving the "
+         "RUNTIME device");
+  (void)multiDeviceWithRuntimeDevice;
+
+  // SIL functions can be processed in non-deterministic ordering, so the
+  // ordering of device ids being inserted into `deviceInfo` is not
+  // deterministic either.
+  // To make sure we produced deterministic SIL code (e.g. produce graph
+  // function for CPU, before GPU), which is useful at least for unit testing,
+  // we sort the device IDs.
+  auto sortDeviceIds = [](UsedDeviceSet &deviceSet) {
+    // `deviceSet` could be backed by a SmallVector instead of a tree-based
+    // container, so we need to sort its elements.
+    SmallVector<DeviceId, 8> deviceIds(deviceSet.begin(),
+                                       deviceSet.end());
+    assert(!deviceIds.empty());
+    llvm::array_pod_sort(deviceIds.begin(), deviceIds.end());
+    deviceSet.clear();
+    deviceSet.insert(deviceIds.begin(), deviceIds.end());
+  };
+  sortDeviceIds(usedDeviceIds);
+
+  if (!usedDeviceIds.count(primaryDeviceId)) {
+    // Example scenario: we set primary device to GPU via compiler flag, but the
+    // swift function being processed here has placed all ops on CPU. In that
+    // case, we want to set primary device to CPU.
+    //
+    // For now pick an arbitrary device as the primary. For optimized placement
+    // w.r.t the function args and return values, this might need tuning.
+    primaryDeviceId = *usedDeviceIds.begin();
+  }
+}
+
 std::string GraphFunctionDeviceInfo::handleDevicePlacement(
     StringRef opType, StringRef opDevice,
     llvm::ArrayRef<GraphOperationAttribute> attributes) {
-  DeviceType chosenDevice;
+  DeviceId chosenDevice;
   if (!opDevice.empty())
-    chosenDevice = getOpDeviceType(opDevice);
+    chosenDevice = getOpDeviceId(opDevice);
   else
     chosenDevice = chooseDevice(opType, attributes);
 
@@ -185,6 +249,11 @@ std::string GraphFunctionDeviceInfo::handleDevicePlacement(
 void GraphFunctionDeviceInfo::handleDevicePlacement(
     StringRef opType, StringRef opDevice, ASTContext &ctx,
     GraphOperationBuilder *opBuilder) {
+  // TODO: add compile-time device stack evaluation support.
+  // e.g. if this graph_op is contained within withDevice(.cpu, 1), place
+  // that op on CPU:1 at compile time.
+  if (TFUseDeviceStack)
+    return;
 
   auto deviceString =
       handleDevicePlacement(opType, opDevice, opBuilder->getAttributes());
@@ -198,18 +267,29 @@ void GraphFunctionDeviceInfo::handleDevicePlacement(
        SymbolicValue::getString(deviceString, ctx.getAllocator())});
 }
 
-DeviceType GraphFunctionDeviceInfo::chooseDevice(
+GraphFunctionDeviceInfo::GraphFunctionDeviceInfo(DeviceId primaryDeviceId,
+                                                 bool isTPUInfeedEnabled)
+    // When `TFUseDeviceStack` is true, set `primaryDeviceId` in
+    // finalizeUsedDevices()
+    : primaryDeviceId(TFUseDeviceStack ? InvalidDeviceId : primaryDeviceId),
+      isTPUInfeedEnabled(isTPUInfeedEnabled) {
+  assert(primaryDeviceId != AllDeviceId);
+  if (!TFUseDeviceStack)
+    usedDeviceIds.insert(primaryDeviceId);
+}
+
+DeviceId GraphFunctionDeviceInfo::chooseDevice(
     llvm::StringRef opType,
     llvm::ArrayRef<GraphOperationAttribute> attributes) const {
   if (opType == "tfc.RecvFromHost" || opType == "tfc.SendToHost")
-    return DeviceType::CPU;
+    return {DeviceType::CPU, 0};
 
   // TODO: A similar statement might be necessary for TPU.
-  if (primaryDeviceType == DeviceType::GPU) {
+  if (primaryDeviceId.type == DeviceType::GPU) {
     if (CanRunOnDevice(opType, attributes, "GPU")) {
-      return DeviceType::GPU;
+      return primaryDeviceId;
     }
-    return DeviceType::CPU;
+    return {DeviceType::CPU, 0};
   }
-  return primaryDeviceType;
+  return primaryDeviceId;
 }

@@ -1230,31 +1230,10 @@ public:
             "operand of end_apply must be a begin_apply");
   }
 
-  /// SWIFT_ENABLE_TENSORFLOW
-  void checkGradientInst(GradientInst *GI) {
-    CanSILFunctionType origFnTy = GI->getOriginalType();
-    require(origFnTy, "Original function value must have function type");
-    auto config = GI->getConfig();
-    require(config.getSourceIndex() < origFnTy->getNumResults(),
-            "Differentiation source index out of bounds");
-    llvm::SmallBitVector paramIndices = config.getParameterIndices();
-    require(!config.getParameterIndices().empty(),
-            "Parameter indices cannot be empty; they must be explicitly "
-            "specified");
-    // Verify differentiation parameters.
-    int lastIndex = -1;
-    for (auto index : paramIndices.set_bits()) {
-      require((int)index > lastIndex, "Parameter indices must be ascending");
-      auto paramTy = origFnTy->getParameters()[index].getType();
-      require(!(paramTy.isAnyClassReferenceType() ||
-                paramTy.isAnyExistentialType()),
-              "Cannot differentiate with respect to reference type or "
-              "existential type");
-    }
-  }
-
+  // SWIFT_ENABLE_TENSORFLOW
   void checkAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    // FIXME(rxwei): Complete verification.
+    require(adfi->getDifferentiationOrder() > 0,
+            "The differentiation order must be non-zero");
     auto origTy =
         adfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
@@ -1269,23 +1248,32 @@ public:
         require(!jvpType->isDifferentiable(),
                 "The JVP function must not be @autodiff");
         auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
-            adfi->getParameterIndices(), order,
-            AutoDiffAssociatedFunctionKind::JVP, F.getModule());
+            adfi->getParameterIndices(), /*resultIndex*/ 0, order,
+            AutoDiffAssociatedFunctionKind::JVP, F.getModule(),
+            LookUpConformanceInModule(F.getModule().getSwiftModule()));
         require(expectedJVPType == jvpType, "Unexpected JVP function type");
         auto vjpType = pair.second->getType().getAs<SILFunctionType>();
         require(vjpType, "The VJP function must have a function type");
         require(!vjpType->isDifferentiable(),
                 "The VJP function must not be @autodiff");
         auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
-            adfi->getParameterIndices(), order,
-            AutoDiffAssociatedFunctionKind::VJP, F.getModule());
+            adfi->getParameterIndices(), /*resultIndex*/ 0, order,
+            AutoDiffAssociatedFunctionKind::VJP, F.getModule(),
+            LookUpConformanceInModule(F.getModule().getSwiftModule()));
         require(expectedVJPType == vjpType, "Unexpected VJP function type");
       }
     }
   }
   
   void checkAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
-    // FIXME(rxwei): Complete verification.
+    if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original)
+      require(adfei->getDifferentiationOrder() == 0,
+              "Differentiation order should not have been set when the original"
+              " function is being extracted");
+    else
+      require(adfei->getDifferentiationOrder() > 0,
+              "Extraction of associated functions requires a differentiation "
+              "order");
     auto fnTy = adfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
     require(fnTy->isDifferentiable(),
@@ -4607,13 +4595,27 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   /// Verify the [differentiable] attribute.
-  void verifyDifferentiableAttr(SILFunction *F,
-                                       SILDifferentiableAttr &Attr) {
+  void verifyDifferentiableAttr(SILFunction *F, SILDifferentiableAttr &Attr) {
+    std::function<unsigned(Type)> countParams;
+    countParams = [&](Type type) -> unsigned {
+      auto *fnTy = type->getAs<SILFunctionType>();
+      if (!fnTy)
+        return 0;
+      if (fnTy->getNumResults() != 1)
+        return fnTy->getNumParameters();
+      return fnTy->getNumParameters() +
+             countParams(fnTy->getResults()[0].getType());
+    };
+
     // Parameter indices must be specified.
     require(!Attr.getIndices().parameters.empty(),
             "Parameter indices cannot be empty");
+    // JVP and VJP must be specified in canonical SIL.
+    if (F->getModule().getStage() == SILStage::Canonical)
+      require(!Attr.getJVPName().empty() && !Attr.getVJPName().empty(),
+              "JVP and VJP must be specified in canonical SIL");
     // Verify if specified parameter indices are valid.
-    auto numParams = F->getLoweredFunctionType()->getNumParameters();
+    auto numParams = countParams(F->getLoweredFunctionType());
     int lastIndex = -1;
     for (auto paramIdx : Attr.getIndices().parameters.set_bits()) {
       require(paramIdx < numParams, "Parameter index out of bounds.");

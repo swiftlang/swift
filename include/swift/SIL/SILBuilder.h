@@ -527,16 +527,10 @@ public:
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  GradientInst *createGradient(SILLocation loc, SILValue original,
-                               const SILAutoDiffConfig &config) {
-    return insert(GradientInst::create(getModule(), getSILDebugLocation(loc),
-                                       original, config));
-  }
-
   AutoDiffFunctionInst *createAutoDiffFunction(
       SILLocation loc, const llvm::SmallBitVector &parameterIndices,
       unsigned differentiationOrder, SILValue original,
-      ArrayRef<SILValue> associatedFunctions) {
+      ArrayRef<SILValue> associatedFunctions = {}) {
     return insert(AutoDiffFunctionInst::create(getModule(),
                                                getSILDebugLocation(loc),
                                                parameterIndices,
@@ -546,11 +540,19 @@ public:
   }
   
   AutoDiffFunctionExtractInst *createAutoDiffFunctionExtract(
-      SILLocation loc, AutoDiffAssociatedFunctionKind associatedFunctionKind,
+      SILLocation loc, AutoDiffFunctionExtractInst::Extractee extractee,
       unsigned differentiationOrder, SILValue theFunction) {
     return insert(new (getModule()) AutoDiffFunctionExtractInst(
-        getModule(), getSILDebugLocation(loc), associatedFunctionKind,
-        differentiationOrder, theFunction));
+        getModule(), getSILDebugLocation(loc), extractee, differentiationOrder,
+        theFunction));
+  }
+
+
+  AutoDiffFunctionExtractInst *createAutoDiffFunctionExtractOriginal(
+      SILLocation loc, SILValue theFunction) {
+    return insert(new (getModule()) AutoDiffFunctionExtractInst(
+        getModule(), getSILDebugLocation(loc),
+        AutoDiffFunctionExtractee::Original, 0, theFunction));
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,

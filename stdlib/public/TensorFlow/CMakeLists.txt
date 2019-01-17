@@ -21,8 +21,6 @@ endif()
 find_package(TensorFlow REQUIRED)
 message(STATUS "Building TensorFlow.")
 
-include_directories(BEFORE "${TF_INCLUDE_DIR}")
-
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
@@ -30,7 +28,6 @@ list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
 list(APPEND swift_stdlib_compile_flags "-swift-version" "4")
 list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
-list(APPEND swift_stdlib_compile_flags "-Xcc" "-I${TF_INCLUDE_DIR}")
 # FIXME(SR-7972): Some tests fail when TensorFlow is optimized.
 list(APPEND swift_stdlib_compile_flags "-Onone")
 
@@ -53,6 +50,7 @@ set(SOURCES
   TensorProtocol.swift
   TensorShape.swift
   Utilities.swift
+  Threading.swift
   # NumPy bridging for `ShapedArray` and `Tensor`.
   NumpyConversion.swift)
 

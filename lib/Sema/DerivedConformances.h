@@ -165,6 +165,22 @@ public:
   ValueDecl *deriveDecodable(ValueDecl *requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
+  /// Determine if a KeyPathIterable requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveKeyPathIterable(NominalTypeDecl *type);
+
+  /// Derive a KeyPathIterable requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveKeyPathIterable(ValueDecl *requirement);
+
+  /// Derive a KeyPathIterable type witness for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveKeyPathIterable(AssociatedTypeDecl *assocType);
+
+  // SWIFT_ENABLE_TENSORFLOW
   /// Derive a Parameterized requirement for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.
@@ -190,6 +206,51 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   Type deriveParameterGroup(AssociatedTypeDecl *assocType);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Determine if an AdditiveArithmetic requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveAdditiveArithmetic(NominalTypeDecl *type,
+                                          DeclContext *DC);
+
+  /// Derive an AdditiveArithmetic requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveAdditiveArithmetic(ValueDecl *requirement);
+
+  /// Determine if a VectorNumeric requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveVectorNumeric(NominalTypeDecl *type,
+                                     DeclContext *DC);
+
+  /// Derive a VectorNumeric requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveVectorNumeric(ValueDecl *requirement);
+
+  /// Derive a VectorNumeric type witness for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveVectorNumeric(AssociatedTypeDecl *assocType);
+
+  /// Determine if a Differentiable requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveDifferentiable(NominalTypeDecl *type,
+                                      DeclContext *DC);
+
+  /// Derive a Differentiable requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveDifferentiable(ValueDecl *requirement);
+
+  /// Derive a Differentiable type witness for a nominal type, if it has
+  /// parameters (stored properties marked with @TFParameter).
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveDifferentiable(AssociatedTypeDecl *assocType);
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>

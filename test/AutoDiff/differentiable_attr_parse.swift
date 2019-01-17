@@ -2,40 +2,45 @@
 
 /// Good
 
-@differentiable(reverse, adjoint: foo(_:_:)) // okay
+struct Foo {
+  @differentiable
+  var x: Float
+}
+
+@differentiable(vjp: foo(_:_:)) // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, adjoint: foo(_:_:) where T : FloatingPoint) // okay
+@differentiable(vjp: foo(_:_:) where T : FloatingPoint) // okay
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
 }
 
-@differentiable(reverse, wrt: (self, .0, .1), adjoint: foo(_:_:)) // okay
+@differentiable(wrt: (self, .0, .1), vjp: foo(_:_:)) // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, wrt: (self, .0, .1), primal: bar, adjoint: foo(_:_:)) // okay
+@differentiable(wrt: (self, .0, .1), jvp: bar, vjp: foo(_:_:)) // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse) // okay
+@differentiable // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
 @_transparent
-@differentiable(reverse) // okay
+@differentiable // okay
 @inlinable
 func playWellWithOtherAttrs(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
 @_transparent
-@differentiable(reverse, wrt: (self), adjoint: _adjointSquareRoot) // okay
+@differentiable(wrt: (self), vjp: _vjpSquareRoot) // okay
 public func squareRoot() -> Self {
   var lhs = self
   lhs.formSquareRoot()
@@ -44,32 +49,52 @@ public func squareRoot() -> Self {
 
 /// Bad
 
-@differentiable(primal: bar) // expected-error {{expected a differentiation mode ('forward' or 'reverse')}}
+@differentiable(3) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, 3) // expected-error {{expected a configuration, e.g. 'wrt:', 'primal:' or 'adjoint:'}}
+@differentiable(foo(_:_:)) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, foo(_:_:)) // expected-error {{expected a configuration, e.g. 'wrt:', 'primal:' or 'adjoint:'}}
+@differentiable(vjp: foo(_:_:), 3) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, wrt: (1), adjoint: foo(_:_:)) // expected-error {{expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'}}
+@differentiable(wrt: (.0), foo(_:_:)) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, adjoint: foo(_:_:) // expected-error {{expected ')' in 'differentiable' attribute}}
+@differentiable(wrt: (1), vjp: foo(_:_:)) // expected-error {{expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, adjoint: foo(_:_:) where T) // expected-error {{expected ':' or '==' to indicate a conformance or same-type requirement}}
+@differentiable(vjp: foo(_:_:) // expected-error {{expected ')' in 'differentiable' attribute}}
+func bar(_ x: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+@differentiable(vjp: foo(_:_:) where T) // expected-error {{expected ':' or '==' to indicate a conformance or same-type requirement}}
+func bar<T : Numeric>(_ x: T, _: T) -> T {
+    return 1 + x
+}
+
+@differentiable(,) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
+func bar(_ x: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+@differentiable(vjp: foo(_:_:),) // expected-error {{unexpected ',' separator}}
+func bar(_ x: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+@differentiable(vjp: foo(_:_:), where T) // expected-error {{unexpected ',' separator}}
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
 }

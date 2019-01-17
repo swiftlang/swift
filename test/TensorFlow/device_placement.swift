@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil -verify %s | %FileCheck %s
 
 import TensorFlow
 
@@ -30,13 +30,13 @@ public func explicitDeviceConfigGPU() {
 // Check that in the TF graph, both the function node itself, and ops in the
 // function, are placed on GPU.
 //
-// CHECK:      op: "{{.*}}explicitDeviceConfigGPU{{.*}}.tf_GPU.device_partition"
+// CHECK:      op: "{{.*}}explicitDeviceConfigGPU{{.*}}_0_GPU.device_partition"
 // CHECK-NEXT: device: "/job:localhost/replica:0/task:0/device:GPU:0"
 
 // CHECK:      library {
 // CHECK-NEXT:   function {
 // CHECK-NEXT:     signature {
-// CHECK-NEXT:       name: "{{.*}}explicitDeviceConfigGPU{{.*}}.tf_GPU.device_partition"
+// CHECK-NEXT:       name: "{{.*}}explicitDeviceConfigGPU{{.*}}_GPU.device_partition"
 // CHECK:          node_def {
 // CHECK:            op: "Const"
 // CHECK-NEXT:       device: "/job:localhost/replica:0/task:0/device:GPU:0"
@@ -77,7 +77,7 @@ public func explicitDevicePlacementGPU() {
 //
 // CHECK:      node {
 // CHECK-NEXT:   name: "tfc_func_{{.*}}explicitDevicePlacementGPU{{.*}}.tf"
-// CHECK-NEXT:   op: "{{.*}}explicitDevicePlacementGPU{{.*}}.tf_CPU.device_partition"
+// CHECK-NEXT:   op: "{{.*}}explicitDevicePlacementGPU{{.*}}_0_CPU.device_partition"
 // CHECK-NEXT:   device: "/job:localhost/replica:0/task:0/device:CPU:0"
 // CHECK:      node {
 // CHECK-NEXT:  name: "tfc_output_0_{{.*}}explicitDevicePlacementGPU{{.*}}.tf"
@@ -85,12 +85,12 @@ public func explicitDevicePlacementGPU() {
 // CHECK-NEXT:  input: "tfc_func_{{.*}}explicitDevicePlacementGPU{{.*}}.tf"
 // CHECK:      node {
 // CHECK-NEXT:   name: "tfc_func_{{.*}}explicitDevicePlacementGPU{{.*}}.tf_helper_0"
-// CHECK-NEXT:   op: "{{.*}}explicitDevicePlacementGPU{{.*}}.tf_GPU.device_partition"
+// CHECK-NEXT:   op: "{{.*}}explicitDevicePlacementGPU{{.*}}_GPU.device_partition"
 // CHECK-NEXT:   device: "/job:localhost/replica:0/task:0/device:GPU:0"
 // CHECK:      library {
 // CHECK:        function {
 // CHECK-NEXT:     signature {
-// CHECK:          name: "{{.*}}explicitDevicePlacementGPU{{.*}}.tf_CPU.device_partition"
+// CHECK:          name: "{{.*}}explicitDevicePlacementGPU{{.*}}_CPU.device_partition"
 // CHECK:          node_def {
 // CHECK:            op: "_Recv"
 // CHECK-NEXT:       device: "/job:localhost/replica:0/task:0/device:CPU:0"
@@ -145,7 +145,7 @@ public func explicitDevicePlacementAll() {
 // CHECK: graph_op "tfc.D2DTensorSend
 
 // These send/recv ops are threaded via control dependency.
-// CHECK:          name: "{{.*}}explicitDevicePlacementAll{{.*}}.tf_CPU.device_partition"
+// CHECK:          name: "{{.*}}explicitDevicePlacementAll{{.*}}.tf_0_CPU.device_partition"
 // CHECK:          node_def {
 // CHECK:            op: "_Recv"
 // CHECK-NEXT:       device: "/job:localhost/replica:0/task:0/device:CPU:0"

@@ -148,6 +148,31 @@ namespace {
                        ResilienceExpansion Expansion)
       : M(M), Sig(Sig), Expansion(Expansion) {}
 
+    // SWIFT_ENABLE_TENSORFLOW
+    RecursiveProperties getDifferentiableSILFunctionTypeRecursiveProperties(
+        CanSILFunctionType type) {
+      assert(type->isDifferentiable());
+      auto extInfo = type->getExtInfo();
+      auto nondiffExtInfo = extInfo.withDifferentiable(false);
+      auto origTy = type->getWithExtInfo(nondiffExtInfo);
+      // TODO: Use the parameter indices and diff order in the @autodiff
+      // function type.
+      auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(
+          SmallBitVector(type->getNumParameters(), true), /*resultIndex*/ 0,
+          /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP, M,
+          LookUpConformanceInModule(M.getSwiftModule()));
+      auto vjpTy = origTy->getAutoDiffAssociatedFunctionType(
+          SmallBitVector(type->getNumParameters(), true), /*resultIndex*/ 0,
+          /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP, M,
+          LookUpConformanceInModule(M.getSwiftModule()));
+
+      RecursiveProperties props;
+      props.addSubobject(classifyType(origTy, M, Sig, Expansion));
+      props.addSubobject(classifyType(jvpTy, M, Sig, Expansion));
+      props.addSubobject(classifyType(vjpTy, M, Sig, Expansion));
+      return props;
+    }
+
   public:
     // The subclass should implement:
     //   // Trivial, fixed-layout, and non-address-only.
@@ -212,6 +237,9 @@ namespace {
       switch (type->getRepresentation()) {
       case AnyFunctionType::Representation::Swift:
       case AnyFunctionType::Representation::Block:
+        // SWIFT_ENABLE_TENSORFLOW
+        // TODO: Are there cases where we have to lower this differently when it
+        // is @autodiff?
         return asImpl().handleReference(type);
 
       // SWIFT_ENABLE_TENSORFLOW
@@ -224,6 +252,10 @@ namespace {
     }
     
     RetTy visitSILFunctionType(CanSILFunctionType type) {
+      // SWIFT_ENABLE_TENSORFLOW
+      if (type->isDifferentiable())
+        return asImpl().visitDifferentiableSILFunctionType(type);
+
       // Only escaping closures are references.
       bool isSwiftEscaping = type->getExtInfo().isNoEscape() &&
                              type->getExtInfo().getRepresentation() ==
@@ -232,6 +264,13 @@ namespace {
         return asImpl().handleReference(type);
       // No escaping closures are trivial types.
       return asImpl().handleTrivial(type);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    RetTy visitDifferentiableSILFunctionType(CanSILFunctionType type) {
+      assert(type->isDifferentiable());
+      auto props = getDifferentiableSILFunctionTypeRecursiveProperties(type);
+      return asImpl().handleAggregateByProperties(type, props);
     }
 
     RetTy visitLValueType(CanLValueType type) {
@@ -824,6 +863,68 @@ namespace {
     }
   };
 
+  // SWIFT_ENABLE_TENSORFLOW
+  using DifferentiableSILFunctionTypeIndex =
+      std::pair<AutoDiffFunctionExtractee, unsigned>;
+  class DifferentiableSILFuncionTypeLowering final
+      : public LoadableAggTypeLowering<DifferentiableSILFuncionTypeLowering,
+                                       DifferentiableSILFunctionTypeIndex> {
+  public:
+    DifferentiableSILFuncionTypeLowering(CanType type)
+        : LoadableAggTypeLowering(type) {}
+
+    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
+                               SILValue tupleValue,
+                               DifferentiableSILFunctionTypeIndex index,
+                               const TypeLowering &eltLowering) const {
+      return B.createAutoDiffFunctionExtract(loc, index.first, index.second,
+                                             tupleValue);
+    }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const override {
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      // TODO: Retrieve the differentiation order when that is properly stored
+      // in the function type.
+      unsigned maxOrder = 1;
+      return B.createAutoDiffFunction(loc, paramIndices, maxOrder,
+                                      values.front(), values.drop_front());
+    }
+
+    void lowerChildren(SILModule &M,
+                       SmallVectorImpl<Child> &children) const override {
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      // TODO: Retrieve the differentiation order when that is properly stored
+      // in the function type.
+      auto maxOrder = 1;
+      auto numAssocFns = autodiff::getNumAutoDiffAssociatedFunctions(maxOrder);
+      children.reserve(numAssocFns + 1);
+      auto origFnTy = fnTy->getWithExtInfo(
+          fnTy->getExtInfo().withDifferentiable(false));
+      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      children.push_back(Child{
+        {AutoDiffFunctionExtractee::Original, 0},
+        M.Types.getTypeLowering(origFnTy)
+      });
+      for (auto order : range(1, maxOrder + 1)) {
+        for (AutoDiffAssociatedFunctionKind kind
+                 : {AutoDiffAssociatedFunctionKind::JVP,
+                    AutoDiffAssociatedFunctionKind::VJP}) {
+          auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
+              paramIndices, 0, order, kind, M,
+              LookUpConformanceInModule(M.getSwiftModule()));
+          auto silTy = SILType::getPrimitiveObjectType(assocFnTy);
+          children.push_back(Child{
+            {AutoDiffFunctionExtractee(kind), order},
+            M.Types.getTypeLowering(silTy)
+          });
+        }
+      }
+      assert(children.size() == numAssocFns + 1);
+    }
+  };
+
   /// A lowering for loadable but non-trivial tuple types.
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
@@ -1257,6 +1358,15 @@ namespace {
 
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    const TypeLowering *
+    visitDifferentiableSILFunctionType(CanSILFunctionType type) {
+      assert(type->isDifferentiable());
+      auto props = getDifferentiableSILFunctionTypeRecursiveProperties(type);
+      return handleAggregateByProperties<DifferentiableSILFuncionTypeLowering>(
+          type, props);
     }
 
     template <class LoadableLoweringClass>
@@ -1768,6 +1878,17 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
+  // SWIFT_ENABLE_TENSORFLOW
+  if (auto *autoDiffFuncId = c.autoDiffAssociatedFunctionIdentifier) {
+    auto originalFnTy =
+        makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
+    auto *fnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
+        autoDiffFuncId->getParameterIndices(), /*resultIndex*/ 0,
+        autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(),
+        LookUpConformanceInModule(M.getSwiftModule()));
+    return cast<AnyFunctionType>(fnTy->getCanonicalType());
+  }
+
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
 
   switch (c.kind) {

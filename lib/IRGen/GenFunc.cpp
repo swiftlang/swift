@@ -474,6 +474,10 @@ Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
 }
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
+  // SWIFT_ENABLE_TENSORFLOW
+  if (T->isDifferentiable())
+    return convertDifferentiableFunctionType(T);
+
   switch (T->getRepresentation()) {
   case SILFunctionType::Representation::Block:
     return new BlockTypeInfo(CanSILFunctionType(T),
@@ -504,7 +508,6 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
     // contexts into the pointer value, so let's not take any spare bits from
     // it.
     spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
-    
     if (T->isNoEscape()) {
       // @noescape thick functions are trivial types.
       return FuncTypeInfo::create(

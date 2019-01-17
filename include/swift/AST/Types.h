@@ -281,8 +281,8 @@ class alignas(1 << TypeAlignInBits) TypeBase {
 
 protected:
   // SWIFT_ENABLE_TENSORFLOW
-  enum { NumAFTExtInfoBits = 9 };
-  enum { NumSILExtInfoBits = 9 };
+  enum { NumAFTExtInfoBits = 8 };
+  enum { NumSILExtInfoBits = 7 };
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -1077,6 +1077,22 @@ public:
   /// Return whether this type is or can be substituted for a bridgeable
   /// object type.
   TypeTraitResult canBeClass();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Return the associated tangent or cotangent type. Return the null type if
+  /// there is no associated tangent/cotangent type.
+  ///
+  /// `kind` specifies whether to return the tangent or cotangent type.
+  ///
+  /// If the type conforms to `Differentiable`, then the associated
+  /// tangent/cotangent type is the associated `TangentVector`/`CotangentVector`
+  /// from the `Differentiable` requirement. If the type is a tuple, then the
+  /// associated tangent/cotangent type is the elementwise tangent/cotangent
+  /// type of its elements. If the type is a builtin float, then the associated
+  /// tangent/cotangent type is itself. Otherwise, there is no associated type.
+  Optional<VectorSpace>
+  getAutoDiffAssociatedVectorSpace(AutoDiffAssociatedVectorSpaceKind kind,
+                                   LookupConformanceFn lookupConformance);
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -2706,23 +2722,6 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-/// The differentiability of a function type.
-enum class FunctionTypeDifferentiability : uint8_t {
-  /// Non-differentiable.
-  None = 0,
-  /// Forward-mode differentiable.
-  Forward,
-  /// Reverse-mode differentiable.
-  Reverse,
-  /// Both forward-mode and reverse-mode differentiable.
-  Bidirectional,
-  /// Linear map.
-  Linear,
-  /// Constant function, whose derivatives are always zero.
-  Constant,
-};
-
 /// AnyFunctionType - A function type has zero or more input parameters and a
 /// single result. The result type may be a tuple. For example:
 ///   "(int) -> int" or "(a : int, b : int) -> (int, int)".
@@ -2736,8 +2735,6 @@ class AnyFunctionType : public TypeBase {
   
 public:
   using Representation = FunctionTypeRepresentation;
-  // SWIFT_ENABLE_TENSORFLOW
-  using Differentiability = FunctionTypeDifferentiability;
 
   class Param {
   public:
@@ -2897,9 +2894,8 @@ public:
       NoEscapeMask           = 1 << 4,
       ThrowsMask             = 1 << 5,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityOffset = 6,
-      DifferentiabilityMask  = 0b111 << DifferentiabilityOffset,
-      NumMaskBits            = 9
+      DifferentiableMask     = 1 << 7,
+      NumMaskBits            = 8
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -2912,8 +2908,6 @@ public:
     // Constructor with all defaults.
     ExtInfo() : Bits(0) {
       assert(getRepresentation() == Representation::Swift);
-      // SWIFT_ENABLE_TENSORFLOW
-      assert(getDifferentiability() == Differentiability::None);
     }
 
     // Constructor for polymorphic type.
@@ -2925,28 +2919,22 @@ public:
     ExtInfo(Representation Rep,
             bool IsNoEscape,
             // SWIFT_ENABLE_TENSORFLOW
-            bool Throws, Differentiability Diff)
+            bool Throws, bool IsDifferentiable)
       : ExtInfo(Rep, Throws) {
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
       // SWIFT_ENABLE_TENSORFLOW
-      Bits |=
-          (((unsigned)Diff << DifferentiabilityOffset) & DifferentiabilityMask);
+      Bits |= (IsDifferentiable ? DifferentiableMask : 0);
     }
 
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
     // SWIFT_ENABLE_TENSORFLOW
-    bool isDifferentiable() const { return Bits & DifferentiabilityMask; }
+    bool isDifferentiable() const { return Bits & DifferentiableMask; }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
       assert(rawRep <= unsigned(Representation::Last)
              && "unexpected SIL representation");
       return Representation(rawRep);
-    }
-    // SWIFT_ENABLE_TENSORFLOW
-    Differentiability getDifferentiability() const {
-      return Differentiability(
-          (Bits & DifferentiabilityMask) >> DifferentiabilityOffset);
     }
 
     bool hasSelfParam() const {
@@ -3011,9 +2999,11 @@ public:
     }
     // SWIFT_ENABLE_TENSORFLOW
     LLVM_NODISCARD
-    ExtInfo withDifferentiability(Differentiability diff) const {
-      return ExtInfo((Bits & ~DifferentiabilityMask) |
-                     (unsigned)diff << DifferentiabilityOffset);
+    ExtInfo withDifferentiable(bool isDifferentiable = true) const {
+      if (isDifferentiable)
+        return ExtInfo(Bits | DifferentiableMask);
+      else
+        return ExtInfo(Bits & ~DifferentiableMask);
     }
 
     unsigned getFuncAttrKey() const {
@@ -3099,18 +3089,17 @@ public:
     return getExtInfo().getRepresentation();
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// \brief Get the differentiability of the function type.
-  Differentiability getDifferentiability() const {
-    return getExtInfo().getDifferentiability();
-  }
-
+  /// Given `indices`, `differentiationOrder`, and `kind`, calculates the type
+  /// of the corresponding autodiff associated function.
+  ///
+  /// \note The original function type (`self`) need not be `@autodiff`, and the
+  /// resulting function will preserve all `ExtInfo` of the original function,
+  /// including `@autodiff`.
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
-      const AutoDiffParameterIndices &indices, unsigned differentiationOrder,
-      AutoDiffAssociatedFunctionKind kind);
-  AnyFunctionType *
-  getAutoDiffAdjointFunctionType(const AutoDiffParameterIndices &indices,
-                                 const TupleType *primalResultTy);
+      AutoDiffParameterIndices *indices, unsigned resultIndex,
+      unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
+      LookupConformanceFn lookupConformance,
+      GenericSignature *whereClauseGenericSignature = nullptr);
 
   /// \brief True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
@@ -3449,13 +3438,33 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// Determines whether a differentiable function type is differentiable with
+/// respect to this parameter.
+enum class SILParameterDifferentiability : unsigned {
+  /// The function type is differentiable with respect to this parameter, or
+  /// differentiability is not applicable because the function is not
+  /// differentiable.
+  DifferentiableOrNotApplicable,
+
+  /// The function type is not differentiable with respect to this parameter.
+  NotDifferentiable,
+};
+
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  SILParameterDifferentiability Differentiability : 1;
 public:
   SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
-  SILParameterInfo(CanType type, ParameterConvention conv)
-    : TypeAndConvention(type, conv) {
+  // SWIFT_ENABLE_TENSORFLOW
+  SILParameterInfo(
+      CanType type, ParameterConvention conv,
+      SILParameterDifferentiability differentiability =
+          SILParameterDifferentiability::DifferentiableOrNotApplicable)
+    : TypeAndConvention(type, conv), Differentiability(differentiability) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
@@ -3500,6 +3509,16 @@ public:
     return isGuaranteedParameter(getConvention());
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  SILParameterDifferentiability getDifferentiability() const {
+    return Differentiability;
+  }
+
+  SILParameterInfo getWithDifferentiability(
+      SILParameterDifferentiability differentiability) const {
+    return SILParameterInfo(getType(), getConvention(), differentiability);
+  }
+
   /// The SIL storage type determines the ABI for arguments based purely on the
   /// formal parameter conventions. The actual SIL type for the argument values
   /// may differ in canonical SIL. In particular, opaque values require indirect
@@ -3510,7 +3529,8 @@ public:
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithType(CanType type) const {
-    return SILParameterInfo(type, getConvention());
+    // SWIFT_ENABLE_TENSORFLOW
+    return SILParameterInfo(type, getConvention(), getDifferentiability());
   }
 
   /// Transform this SILParameterInfo by applying the user-provided
@@ -3526,6 +3546,8 @@ public:
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(getType().getPointer());
     id.AddInteger((unsigned)getConvention());
+    // SWIFT_ENABLE_TENSORFLOW
+    id.AddInteger((unsigned)getDifferentiability());
   }
 
   void dump() const;
@@ -3539,7 +3561,10 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    return getType() == rhs.getType() && getConvention() == rhs.getConvention();
+    // SWIFT_ENABLE_TENSORFLOW
+    return getType() == rhs.getType() &&
+           getConvention() == rhs.getConvention() &&
+           getDifferentiability() == rhs.getDifferentiability();
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);
@@ -3718,8 +3743,6 @@ class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
 public:
   using Language = SILFunctionLanguage;
   using Representation = SILFunctionTypeRepresentation;
-  // SWIFT_ENABLE_TENSORFLOW
-  using Differentiability = FunctionTypeDifferentiability;
 
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
@@ -3736,9 +3759,8 @@ public:
       PseudogenericMask  = 1 << 4,
       NoEscapeMask       = 1 << 5,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityOffset = 6,
-      DifferentiabilityMask = 0b111 << DifferentiabilityOffset,
-      NumMaskBits        = 9
+      DifferentiableMask = 1 << 6,
+      NumMaskBits        = 7
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -3754,12 +3776,12 @@ public:
     // Constructor for polymorphic type.
     // SWIFT_ENABLE_TENSORFLOW
     ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape,
-            Differentiability diff) {
+            bool isDifferentiable) {
       Bits = ((unsigned) rep) |
              (isPseudogeneric ? PseudogenericMask : 0) |
              // SWIFT_ENABLE_TENSORFLOW
              (isNoEscape ? NoEscapeMask : 0) |
-             ((unsigned)diff << DifferentiabilityOffset);
+             (isDifferentiable ? DifferentiableMask : 0);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
@@ -3770,12 +3792,7 @@ public:
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     
     // SWIFT_ENABLE_TENSORFLOW
-    bool isDifferentiable() const { return Bits & DifferentiabilityMask; }
-
-    Differentiability getDifferentiability() const {
-      return Differentiability(
-          (Bits & DifferentiabilityMask) >> DifferentiabilityOffset);
-    }
+    bool isDifferentiable() const { return Bits & DifferentiableMask; }
 
     /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
@@ -3843,9 +3860,11 @@ public:
         return ExtInfo(Bits & ~NoEscapeMask);
     }
     // SWIFT_ENABLE_TENSORFLOW
-    ExtInfo withDifferentiability(Differentiability diff) const {
-      return ExtInfo((Bits & ~DifferentiabilityMask) |
-                     (unsigned)diff << DifferentiabilityOffset);
+    ExtInfo withDifferentiable(bool isDifferentiable = true) const {
+      if (isDifferentiable)
+        return ExtInfo(Bits | DifferentiableMask);
+      else
+        return ExtInfo(Bits & ~DifferentiableMask);
     }
 
     unsigned getFuncAttrKey() const {
@@ -4128,18 +4147,23 @@ public:
 
   CanType getSelfInstanceType() const;
 
-  /// SWIFT_ENABLE_TENSORFLOW
-  CanSILFunctionType getGradientType(
-      const SILAutoDiffConfig &config, SILModule &M);
-
+  // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
       unsigned differentiationOrder, const SmallBitVector &parameterIndices);
 
   /// Returns the type of a differentiation function that is associated with
   /// a function of this type.
   CanSILFunctionType getAutoDiffAssociatedFunctionType(
-      const SmallBitVector &parameterIndices, unsigned differentiationOrder,
-      AutoDiffAssociatedFunctionKind kind, SILModule &module);
+      const SmallBitVector &parameterIndices, unsigned resultIndex,
+      unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
+      SILModule &module, LookupConformanceFn lookupConformance,
+      GenericSignature *whereClauseGenericSignature = nullptr);
+
+  /// Returns a bit vector that specifices which parameters you can
+  /// differentiate with respect to for this differentiable function type. (e.g.
+  /// which parameters are not @nondiff). The function type must be
+  /// differentiable.
+  SmallBitVector getDifferentiationParameterIndices() const;
 
   /// If this is a @convention(witness_method) function with a protocol
   /// constrained self parameter, return the protocol constraint for
@@ -4179,12 +4203,6 @@ public:
   /// \brief Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  /// \brief Get the differentiability of the function type.
-  Differentiability getDifferentiability() const {
-    return getExtInfo().getDifferentiability();
   }
 
   bool isPseudogeneric() const {

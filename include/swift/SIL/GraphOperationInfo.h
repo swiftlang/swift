@@ -158,7 +158,7 @@ public:
 
 private:
   /// The instruction being analyzed.
-  GraphOperationInst *inst;
+  const GraphOperationInst *inst;
 
   /// The TensorFlow op name, decoded from inst.
   StringRef OperationName;
@@ -168,10 +168,10 @@ private:
   llvm::SmallVector<StructuredArgument, 4> StructuredArguments;
 
 public:
-  explicit GraphOperationInfo(GraphOperationInst *inst);
+  explicit GraphOperationInfo(const GraphOperationInst *inst);
 
   /// Get the instruction being analyzed.
-  GraphOperationInst *getInst() const {
+  const GraphOperationInst *getInst() const {
     return inst;
   }
 

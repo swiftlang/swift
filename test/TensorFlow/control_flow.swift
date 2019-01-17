@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module -Xllvm -tf-dynamic-compilation=false | %FileCheck %s
 
 import TensorFlow
 
@@ -341,7 +341,6 @@ public func testCriticalEdges() {
 public func SR8443(n: Int32) {
   var i: Int32 = 0
   while i < n {
-    // expected-warning @+1 {{implicitly copied to the host}}
     let images = Tensor<Float>(0.0)
     _hostOp(images)
     i += 1
@@ -357,7 +356,7 @@ public func SR8443(n: Int32) {
 // CHECK-LABEL: --- TFPartition GraphDef Proto:
 // CHECK:   function {
 // CHECK:    signature {
-// CHECK:      name: "{{.*}}SR8443{{.*}}.tf_CPU.device_partition"
+// CHECK:      name: "{{.*}}SR8443{{.*}}_CPU.device_partition"
 // CHECK:    node_def {
 // CHECK:      name: "RunControlDependency"
 // CHECK:      op: "Identity"

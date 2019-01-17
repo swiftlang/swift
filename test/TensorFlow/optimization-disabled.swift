@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Onone -emit-sil -Xllvm -tf-module-level-graph=false -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Onone -emit-sil -Xllvm -tf-module-level-graph=false -verify %s | %FileCheck %s
 import TensorFlow
 
 public func testArrayValues() -> Tensor<Float> {
@@ -22,7 +22,7 @@ public func testSendsInALoopGPU() {
   var count = 1
 
   while count < maxCount {
-    a += a    // expected-warning  {{implicitly copied to the host}}
+    a += a
     // One send.
     _hostOp(a.toHost())
     count += 1

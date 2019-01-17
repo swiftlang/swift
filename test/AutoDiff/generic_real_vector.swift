@@ -7,11 +7,6 @@ public struct Vector<T> : VectorNumeric {
   public var y: T
 
   public typealias ScalarElement = T
-  public typealias Dimensionality = ()
-
-  public init(dimensionality: (), repeating repeatedValue: T) {
-    self.init(repeatedValue)
-  }
 
   public init(_ scalar: T) {
     self.x = scalar
@@ -22,20 +17,20 @@ public struct Vector<T> : VectorNumeric {
 // This exists to minimize generated SIL.
 @inline(never) func abort() -> Never { fatalError() }
 
-@differentiable(reverse, adjoint: fakeAdj)
+@differentiable(adjoint: fakeAdj)
 public func + <T>(lhs: Vector<T>, rhs: Vector<T>) -> Vector<T> {
   abort()
 }
-@differentiable(reverse, adjoint: fakeAdj)
+@differentiable(adjoint: fakeAdj)
 public func - <T>(lhs: Vector<T>, rhs: Vector<T>) -> Vector<T> {
   abort()
 }
-@differentiable(reverse, adjoint: fakeAdj)
+@differentiable(adjoint: fakeAdj)
 public func * <T>(lhs: Vector<T>, rhs: Vector<T>) -> Vector<T> {
   abort()
 }
 
-public func fakeAdj<T>(lhs: Vector<T>, rhs: Vector<T>, y: Vector<T>, seed: Vector<T>) -> (Vector<T>, Vector<T>) {
+public func fakeAdj<T>(seed: Vector<T>, y: Vector<T>, lhs: Vector<T>, rhs: Vector<T>) -> (Vector<T>, Vector<T>) {
   abort()
 }
 
@@ -43,5 +38,5 @@ public func test1() {
   func foo(_ x: Vector<Float>) -> Vector<Float> {
     return x + x
   }
-  _ = #gradient(foo)
+  _ = gradient(at: Vector(0), in: foo)
 }

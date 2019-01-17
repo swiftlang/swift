@@ -312,8 +312,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
     SmallString<128> swiftTensorFlowLibPath = SharedRuntimeLibPath;
     llvm::sys::path::append(swiftTensorFlowLibPath, "libswiftTensorFlow.so");
-    if (llvm::sys::fs::exists(swiftTensorFlowLibPath))
+    if (llvm::sys::fs::exists(swiftTensorFlowLibPath)) {
       Arguments.push_back("-lswiftTensorFlow");
+      Arguments.push_back("-ltensorflow");
+    }
   }
 
   // Explicitly pass the target to the linker

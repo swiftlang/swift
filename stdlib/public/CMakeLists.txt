@@ -59,9 +59,7 @@ if(SWIFT_BUILD_STDLIB)
 endif()
 
 # SWIFT_ENABLE_TENSORFLOW
-find_package(PythonLibs 2.7 EXACT)
-if(SWIFT_BUILD_STDLIB AND PYTHONLIBS_FOUND)
-  add_subdirectory(CPython)
+if(SWIFT_BUILD_STDLIB)
   add_subdirectory(Python)
 endif()
 

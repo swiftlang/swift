@@ -1,15 +1,14 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify -Xllvm -tf-module-level-graph=false %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil -verify -Xllvm -tf-module-level-graph=false %s | %FileCheck %s
 
 import TensorFlow
 
 public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
-  // expected-warning @-1 {{'a' implicitly copied to the accelerator}}
   var x = a
-  x += x  // expected-note {{value used here}}
+  x += x
 
-  x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
+  x -= x
 
-  _hostOp(x) // expected-note {{value used here}}
+  _hostOp(x)
   var y = b.toAccelerator()
   y += y
   _hostOp(y)
@@ -122,8 +121,8 @@ public func testExitBranch2(i: Int) {
     return
   }
 
-  x += x    // expected-warning {{value implicitly copied to the host}}
-  _hostOp(x)  // expected-note {{value used here}}
+  x += x
+  _hostOp(x)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch2{{.*}}
@@ -284,8 +283,8 @@ public func test_while1(maxCount: Int, arg1: Tensor<Float>, arg2: Tensor<Float>)
 // disprove away the optional check, so we'll need to send a bit back to the
 // host.
 public func scalar_manipulation(a : Float) -> Tensor<Float> {
-  let x = Tensor<Float>(a) + Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
-  let y = x.scalar! + 2.0 // expected-note {{value used here}}
+  let x = Tensor<Float>(a) + Tensor<Float>(1.0)
+  let y = x.scalar! + 2.0
   let z = Tensor<Float>(y)
   return z+z
 }
@@ -307,8 +306,7 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 
 
 public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
-  // expected-warning @-1 {{'x' implicitly copied to the accelerator}}
-  return Tensor<Int32>(x+x)  // expected-note {{value used here}}
+  return Tensor<Int32>(x+x)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testCast
@@ -318,12 +316,11 @@ public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
 // CHECK:   [[CAST:%.*]] = graph_op "Cast"([[ADD]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Int32>
 // CHECK:   return [[CAST]] : $TensorHandle<Int32>
 
-// expected-warning @+1 2 {{implicitly copied to the accelerator}}
 public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> Tensor<Float> {
   // Pack takes an input list, not multiple inputs.  Here we're checking that
   // we can pass in an array of Tensor's and an array of TensorHandle's.
-  let x: TensorHandle<Float> = #tfop("Pack", [a, a, a])  // expected-note {{value used here}}
-  let y: TensorHandle<Float> = #tfop("Pack", [b, b, b])  // expected-note {{value used here}}
+  let x: TensorHandle<Float> = #tfop("Pack", [a, a, a])
+  let y: TensorHandle<Float> = #tfop("Pack", [b, b, b])
   return (Tensor(handle: x)+Tensor(handle: y)).toHost()
 }
 
@@ -341,11 +338,11 @@ public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> 
 // This should produce exactly one live out value in the call to
 // _swift_tfc_FinishTensorComputation.
 public func liveOutTest(
-  a: Tensor<Float>, // expected-warning {{'a' implicitly copied to the accelerator, use .toAccelerator() to make transfer explicit}}
-  b: Tensor<Float>, // expected-warning {{'b' implicitly copied to the accelerator, use .toAccelerator() to make transfer explicit}}
-  c: Tensor<Float> // expected-warning {{'c' implicitly copied to the accelerator, use .toAccelerator() to make transfer explicit}}
+  a: Tensor<Float>,
+  b: Tensor<Float>,
+  c: Tensor<Float>
 ) -> Tensor<Float> {
-  return a+b+c // expected-note 3 {{value used here}}
+  return a+b+c
 }
 
 /*
@@ -461,8 +458,8 @@ public struct NonInlineMethodExample {
   var b = Tensor<Float>(2.0)
 
   @inline(never)
-  public mutating func mutatingMethod() {  // expected-warning {{'self' implicitly copied}}
-    a += b   // expected-note {{value used here}}
+  public mutating func mutatingMethod() {
+    a += b
     b += a
   }
 }

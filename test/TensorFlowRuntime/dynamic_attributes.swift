@@ -1,5 +1,8 @@
-// RUN: %target-run-simple-swift
-// RUN: %target-run-dynamic-compilation-swift
+// FIXME: TFPartition fails in `GraphFunctionDeviceInfo::finalizeUsedDevices()`
+// because used device set includes RUNTIME device.
+// UN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+
+// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: tensorflow
 
@@ -181,7 +184,7 @@ let convExpectedResult = ShapedArray<Float>(
 
 // ==== Actual Tests ====
 
-DynamicAttributeTests.test("NormalAttribute Bool") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Bool") {
   let input = Tensor<Int32>([[1, 2], [2, 1]])
   let reductionIndices = Tensor<Int32>(0)
 
@@ -198,7 +201,7 @@ DynamicAttributeTests.test("NormalAttribute Bool") {
   expectEqual(expectedResultKeepDimsFalse, resultKeepDimsFalse.array)
 }
 
-DynamicAttributeTests.test("NormalAttribute Int64") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Int64") {
   let input = Tensor<Int32>([1, 2, 3, 4, 5])
 
   let shuffled1 = Raw.randomShuffle(value: input, seed: loadInt64_1(),
@@ -212,7 +215,7 @@ DynamicAttributeTests.test("NormalAttribute Int64") {
   expectEqual(expectedResult2, shuffled2.array)
 }
 
-DynamicAttributeTests.test("NormalAttribute Double") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Double") {
   let x = Tensor<Double>(1)
   let y = Tensor<Double>(1.5)
 
@@ -223,7 +226,7 @@ DynamicAttributeTests.test("NormalAttribute Double") {
   expectEqual(false, result2.scalar!)
 }
 
-DynamicAttributeTests.test("NormalAttribute Float") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Float") {
   let x = Tensor<Float>(1)
   let y = Tensor<Float>(1.5)
 
@@ -238,41 +241,41 @@ DynamicAttributeTests.test("NormalAttribute Float") {
   expectEqual(false, result2.scalar!)
 }
 
-DynamicAttributeTests.test("NormalAttribute String") {
+DynamicAttributeTests.testAllBackends("NormalAttribute String") {
   let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
                                     T$dtype: Float.tensorFlowDataType,
                                     strides: [1, 1, 1, 1] as [Int32],
                                     padding: loadVALIDString())
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 
-DynamicAttributeTests.test("NormalAttribute Array<Bool>") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Array<Bool>") {
   // There aren't any ops that take bool list attributes!
 }
 
-DynamicAttributeTests.test("NormalAttribute Array<Int32>") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int32>") {
   let result = convImage.convolved2D(withFilter: convFilter,
                                      strides: loadStridesInt32(),
                                      padding: .valid)
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 
-DynamicAttributeTests.test("NormalAttribute Array<Int64>") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int64>") {
   let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
                                     T$dtype: Float.tensorFlowDataType,
                                     strides: loadStridesInt64(),
                                     padding: "VALID")
-  expectEqual(convExpectedResult, result.array)
+  expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 
-DynamicAttributeTests.test("NormalAttribute Array<Double>") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Array<Double>") {
   let input = Tensor<Double>([-1, 0.1, 4.3, 1.2])
   let result = Raw.bucketize(input, boundaries: loadBoundariesDouble())
   let expectedResult = ShapedArray<Int32>([0, 1, 4, 2])
   expectEqual(expectedResult, result.array)
 }
 
-DynamicAttributeTests.test("NormalAttribute Array<Float>") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Array<Float>") {
   let input = Tensor<Float>([-1, 0.1, 4.3, 1.2])
   let result: Tensor<Int32> = #tfop("Bucketize", input,
                                     T$dtype: Float.tensorFlowDataType,
@@ -305,7 +308,9 @@ func check(dataset: VariantHandle) {
   expectEqual(ShapedArray<Int32>([2, 2]), next.1.array)
 }
 
-DynamicAttributeTests.test("NormalAttribute Array<TensorShape>") {
+#if !CUDA
+// TensorSliceDataset not available on GPU.
+DynamicAttributeTests.testAllBackends("NormalAttribute Array<TensorShape>") {
   let elements1 = Tensor<Int32>([[1], [2]])
   let elements2 = Tensor<Int32>([[1, 1], [2, 2]])
   let dataset: VariantHandle = #tfop(
@@ -316,7 +321,7 @@ DynamicAttributeTests.test("NormalAttribute Array<TensorShape>") {
   check(dataset: dataset)
 }
 
-DynamicAttributeTests.test("NormalAttribute Array<TensorShape?>") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Array<TensorShape?>") {
   let elements1 = Tensor<Int32>([[1], [2]])
   let elements2 = Tensor<Int32>([[1, 1], [2, 2]])
   let dataset: VariantHandle = #tfop(
@@ -327,7 +332,7 @@ DynamicAttributeTests.test("NormalAttribute Array<TensorShape?>") {
   check(dataset: dataset)
 }
 
-DynamicAttributeTests.test("NormalAttribute Array<String>") {
+DynamicAttributeTests.testAllBackends("NormalAttribute Array<String>") {
   // "ParseSingleExample" is the easiest-to-test Op with a list(string) attr,
   // so we use "ParseSingleExample" for this test.
 
@@ -353,8 +358,9 @@ DynamicAttributeTests.test("NormalAttribute Array<String>") {
   expectEqual(ShapedArray<Float>([1]), parsedA.array)
   expectEqual(ShapedArray<Float>([2]), parsedB.array)
 }
+#endif // !CUDA
 
-DynamicAttributeTests.test("TFDataTypeAttribute TensorDataType") {
+DynamicAttributeTests.testAllBackends("TFDataTypeAttribute TensorDataType") {
   let t1 = Tensor<Int32>(-1)
   let t1Result: Tensor<Int32> = #tfop("Abs", t1, T$dtype: loadDtypeInt32())
   expectEqual(1, t1Result.scalar!)
@@ -364,7 +370,9 @@ DynamicAttributeTests.test("TFDataTypeAttribute TensorDataType") {
   expectEqual(2, t2Result.scalar!)
 }
 
-DynamicAttributeTests.test("TFDataTypeAttribute Array<TensorDataType>") {
+#if !CUDA
+// TensorSliceDataset not available on GPU.
+DynamicAttributeTests.testAllBackends("TFDataTypeAttribute Array<TensorDataType>") {
   let elements1 = Tensor<Int32>([[1], [2]])
   let elements2 = Tensor<Int32>([[1, 1], [2, 2]])
   let dataset: VariantHandle = #tfop(
@@ -374,15 +382,16 @@ DynamicAttributeTests.test("TFDataTypeAttribute Array<TensorDataType>") {
   )
   check(dataset: dataset)
 }
+#endif // !CUDA
 
-DynamicAttributeTests.test("ShapeAttribute TensorShape") {
+DynamicAttributeTests.testAllBackends("ShapeAttribute TensorShape") {
   let t = Tensor<Float>([5.0])
   let result: Tensor<Float> = #tfop("EnsureShape", t, shape$shape: loadShape(),
                                     T$dtype: Float.tensorFlowDataType)
   expectEqual(t, result)
 }
 
-DynamicAttributeTests.test("ShapeAttribute TensorShape? non-nil") {
+DynamicAttributeTests.testAllBackends("ShapeAttribute TensorShape? non-nil") {
   let t = Tensor<Float>([5.0])
   let result: Tensor<Float> = #tfop("EnsureShape", t,
                                     shape$shape: loadOptionalShape(),
@@ -390,12 +399,23 @@ DynamicAttributeTests.test("ShapeAttribute TensorShape? non-nil") {
   expectEqual(t, result)
 }
 
-DynamicAttributeTests.test("ShapeAttribute TensorShape? nil") {
+DynamicAttributeTests.testAllBackends("ShapeAttribute TensorShape? nil") {
   let t = Tensor<Float>([5.0])
   let result: Tensor<Float> = #tfop("EnsureShape", t,
                                     shape$shape: loadUnknownShape(),
                                     T$dtype: Float.tensorFlowDataType)
   expectEqual(t, result)
+}
+
+// A tensor typed attribute with a scalar string value  
+DynamicAttributeTests.testAllBackends("StringTensorAttribute SR-9555") {
+  func foo() {
+    _ = StringTensor("string")
+  }
+
+  withDevice(.cpu) {
+    foo()
+  }
 }
 
 runAllTests()

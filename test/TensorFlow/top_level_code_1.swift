@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -tf-promote-global-variables -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
-// RUN: %target-swift-frontend -Xllvm -tf-promote-global-variables -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-promote-global-variables -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-promote-global-variables -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
 import TensorFlow
 
 // This test is intended to verify that all of the operations end up in-graph:

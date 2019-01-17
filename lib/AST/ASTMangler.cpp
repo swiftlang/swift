@@ -199,6 +199,7 @@ std::string ASTMangler::mangleWitnessThunk(
                                      const ProtocolConformance *Conformance,
                                            const ValueDecl *Requirement) {
   beginMangling();
+
   // Concrete witness thunks get a special mangling.
   if (Conformance) {
     if (!isa<SelfProtocolConformance>(Conformance)) {

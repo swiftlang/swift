@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/ExternalStructs.swift -enable-resilience -emit-module -emit-module-path %t/ExternalStructs.swiftmodule
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -enable-resilience -I %t -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil -enable-resilience -I %t -verify %s | %FileCheck %s
 
 import TensorFlow
 import ExternalStructs
@@ -121,10 +121,8 @@ public func unpackAggregate_generic() {
 // Checks that unpacking reuses extraction instructions instead of making new
 // ones for each element of the input list.
 // TODO(SR-8680): After fixing tuples, make x a tuple, so that we also test tuple extract reuse.
-// expected-warning @+1 {{copied to the accelerator}}
 public func unpackAggregate_reuse(x: Tensor<Float>) {
-  // expected-error @+2 {{op named 'SomeOp7' is not registered in TensorFlow}}
-  // expected-note @+1 {{value used here}}
+  // expected-error @+1 {{op named 'SomeOp7' is not registered in TensorFlow}}
   let _: Tensor<Float> = #tfop("SomeOp7", [x, x])
 }
 

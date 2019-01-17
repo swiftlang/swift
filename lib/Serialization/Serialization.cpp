@@ -897,9 +897,10 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
   // SWIFT_ENABLE_TENSORFLOW
-  BLOCK_RECORD(sil_block, SIL_REVERSE_DIFFERENTIABLE_ATTR);
+  BLOCK_RECORD(sil_block, SIL_DIFFERENTIABLE_ATTR);
   BLOCK_RECORD(sil_block, SIL_INST_GRAPH_OPERATION);
-  BLOCK_RECORD(sil_block, SIL_INST_GRADIENT);
+  BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION);
+  BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION_EXTRACT);
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(X, #X, nameBuffer)
@@ -2350,23 +2351,26 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
+  case DAK_DynamicReplacement: {
+    auto abbrCode = DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];
+    auto theAttr = cast<DynamicReplacementAttr>(DA);
+    auto replacedFun = theAttr->getReplacedFunctionName();
+    SmallVector<IdentifierID, 4> pieces;
+    pieces.push_back(addDeclBaseNameRef(replacedFun.getBaseName()));
+    for (auto argName : replacedFun.getArgumentNames())
+      pieces.push_back(addDeclBaseNameRef(argName));
+    assert(theAttr->getReplacedFunction());
+    DynamicReplacementDeclAttrLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, false, /*implicit flag*/
+        addDeclRef(theAttr->getReplacedFunction()), pieces.size(), pieces);
+    return;
+  }
+
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable: {
     auto abbrCode = DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
     auto attr = cast<DifferentiableAttr>(DA);
 
-    IdentifierID primalName = 0;
-    DeclID primalRef = 0;
-    if (auto primal = attr->getPrimal()) {
-      primalName = addDeclBaseNameRef(primal->Name.getBaseName());
-      primalRef = addDeclRef(attr->getPrimalFunction());
-    }
-    IdentifierID adjointName = 0;
-    DeclID adjointRef = 0;
-    if (auto adjoint = attr->getAdjoint()) {
-      adjointName = addDeclBaseNameRef(adjoint->Name.getBaseName());
-      adjointRef = addDeclRef(attr->getAdjointFunction());
-    }
     IdentifierID jvpName = 0;
     DeclID jvpRef = 0;
     if (auto jvp = attr->getJVP()) {
@@ -2380,43 +2384,17 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
       vjpRef = addDeclRef(attr->getVJPFunction());
     }
 
-    SmallVector<uint32_t, 4> parameters;
-    for (auto param : attr->getParameters()) {
-      switch (param.getKind()) {
-      // The self parameter is uniquely identified by 0x01.
-      case AutoDiffParameter::Kind::Self:
-        parameters.push_back(1);
-        break;
-      // Index parameters are left-shifted by 1.
-      case AutoDiffParameter::Kind::Index:
-        parameters.push_back(param.getIndex() << 1);
-        break;
-      }
-    }
+    auto paramIndices = attr->getParameterIndices();
+    assert(paramIndices && "Checked parameter indices must be resolved");
+    SmallVector<bool, 4> indices;
+    for (unsigned i : swift::indices(paramIndices->parameters))
+      indices.push_back(paramIndices->parameters[i]);
 
     DifferentiableDeclAttrLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, (unsigned) attr->getMode(), primalName,
-      primalRef, adjointName, adjointRef, jvpName, jvpRef, vjpName, vjpRef,
-      parameters);
-    // TODO: Serialize CheckedParameterIndices.
-    // TODO: Serialize trailing where clause.
-    // Type-checking where clause should be done first (mimicking the
-    // @_specialize attribute).
-    break;
-  }
+      Out, ScratchRecord, abbrCode, attr->isImplicit(),
+      jvpName, jvpRef, vjpName, vjpRef, indices);
 
-  case DAK_DynamicReplacement: {
-    auto abbrCode = DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];
-    auto theAttr = cast<DynamicReplacementAttr>(DA);
-    auto replacedFun = theAttr->getReplacedFunctionName();
-    SmallVector<IdentifierID, 4> pieces;
-    pieces.push_back(addDeclBaseNameRef(replacedFun.getBaseName()));
-    for (auto argName : replacedFun.getArgumentNames())
-      pieces.push_back(addDeclBaseNameRef(argName));
-    assert(theAttr->getReplacedFunction());
-    DynamicReplacementDeclAttrLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, false, /*implicit flag*/
-        addDeclRef(theAttr->getReplacedFunction()), pieces.size(), pieces);
+    writeGenericRequirements(attr->getRequirements(), DeclTypeAbbrCodes);
     return;
   }
   }
@@ -3638,22 +3616,6 @@ static uint8_t getRawStableSILFunctionTypeRepresentation(
   llvm_unreachable("bad calling convention");
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-/// Translate from the AST function type differentiability enum to the
-/// Serialization enum values, which are guaranteed to be stable.
-static uint8_t getRawStableFunctionTypeDifferentiability(
-                           swift::FunctionType::Differentiability diffability) {
-  switch (diffability) {
-  SIMPLE_CASE(FunctionTypeDifferentiability, None)
-  SIMPLE_CASE(FunctionTypeDifferentiability, Forward)
-  SIMPLE_CASE(FunctionTypeDifferentiability, Reverse)
-  SIMPLE_CASE(FunctionTypeDifferentiability, Bidirectional)
-  SIMPLE_CASE(FunctionTypeDifferentiability, Linear)
-  SIMPLE_CASE(FunctionTypeDifferentiability, Constant)
-  }
-  llvm_unreachable("bad differentiability");
-}
-
 /// Translate from the AST coroutine-kind enum to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t getRawStableSILCoroutineKind(
@@ -3935,8 +3897,7 @@ void Serializer::writeType(Type ty) {
              fnTy->isNoEscape(),
              // SWIFT_ENABLE_TENSORFLOW
              fnTy->throws(),
-             getRawStableFunctionTypeDifferentiability(
-                 fnTy->getDifferentiability()));
+             fnTy->isDifferentiable());
     } else {
       assert(!fnTy->isNoEscape());
 
@@ -3947,8 +3908,8 @@ void Serializer::writeType(Type ty) {
               getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
               fnTy->throws(),
               // SWIFT_ENABLE_TENSORFLOW
-              addGenericSignatureRef(genericSig),
-       getRawStableFunctionTypeDifferentiability(fnTy->getDifferentiability()));
+              fnTy->isDifferentiable(),
+              addGenericSignatureRef(genericSig));
     }
 
     unsigned abbrCode = DeclTypeAbbrCodes[FunctionParamLayout::Code];
@@ -4025,17 +3986,13 @@ void Serializer::writeType(Type ty) {
     auto stableCalleeConvention =
       getRawStableParameterConvention(fnTy->getCalleeConvention());
 
-    // SWIFT_ENABLE_TENSORFLOW
-    auto stableDifferentiability =
-      getRawStableFunctionTypeDifferentiability(fnTy->getDifferentiability());
-
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
         Out, ScratchRecord, abbrCode,
         stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         // SWIFT_ENABLE_TENSORFLOW
-        stableDifferentiability, fnTy->hasErrorResult(),
+        fnTy->isDifferentiable(), fnTy->hasErrorResult(),
         fnTy->getParameters().size(), fnTy->getNumYields(),
         fnTy->getNumResults(), addGenericSignatureRef(sig), variableData);
 

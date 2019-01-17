@@ -857,10 +857,7 @@ public:
 
   /// Parse the arguments inside the @differentiable attribute.
   bool parseDifferentiableAttributeArguments(
-      AutoDiffMode &mode, SourceLoc &modeLoc,
-      SmallVectorImpl<AutoDiffParameter> &params,
-      Optional<DifferentiableAttr::DeclNameWithLoc> &primalSpec,
-      Optional<DifferentiableAttr::DeclNameWithLoc> &adjointSpec,
+      SmallVectorImpl<ParsedAutoDiffParameter> &params,
       Optional<DifferentiableAttr::DeclNameWithLoc> &jvpSpec,
       Optional<DifferentiableAttr::DeclNameWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
@@ -1251,9 +1248,6 @@ public:
   ParserResult<Expr> parseExprConfiguration();
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
-  /// SWIFT_ENABLE_TENSORFLOW
-  ParserResult<Expr> parseExprGradientBody(ExprKind kind);
-  ParserResult<Expr> parseExprAdjoint();
 
   StringRef copyAndStripUnderscores(StringRef text);
 

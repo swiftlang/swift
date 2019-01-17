@@ -162,7 +162,7 @@ static void derivedBody_allParametersGetter(AbstractFunctionDecl *getterDecl) {
 
   auto *parameterizedProto = C.getProtocol(KnownProtocolKind::Parameterized);
   auto allParametersReq =
-    getProtocolRequirement(parameterizedProto, C.Id_allParameters);
+      getProtocolRequirement(parameterizedProto, C.Id_allParameters);
 
   auto getUnderlyingParameter = [&](Expr *expr, VarDecl *param) -> Expr * {
     auto module = nominal->getModuleContext();
@@ -220,7 +220,7 @@ static void derivedBody_allParametersSetter(AbstractFunctionDecl *setterDecl) {
 
   auto *parameterizedProto = C.getProtocol(KnownProtocolKind::Parameterized);
   auto allParametersReq =
-    getProtocolRequirement(parameterizedProto, C.Id_allParameters);
+      getProtocolRequirement(parameterizedProto, C.Id_allParameters);
 
   // Returns the underlying parameter of a VarDecl `x`.
   // If `x` conforms to `Parameterized`, return `x.allParameters`.
@@ -238,12 +238,8 @@ static void derivedBody_allParametersSetter(AbstractFunctionDecl *setterDecl) {
 
   // Map `Parameters` struct members to their names for efficient lookup.
   llvm::DenseMap<Identifier, VarDecl *> parametersMembers;
-  for (auto member : parametersDecl->getMembers()) {
-    auto *varDecl = dyn_cast<VarDecl>(member);
-    if (!varDecl || varDecl->isStatic() || !varDecl->hasStorage())
-      continue;
-    parametersMembers[varDecl->getName()] = varDecl;
-  }
+  for (auto member : parametersDecl->getStoredProperties())
+    parametersMembers[member->getName()] = member;
 
   SmallVector<ASTNode, 2> assignNodes;
   SmallVector<VarDecl *, 8> tfParamDecls;
@@ -338,8 +334,13 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
-  auto *paramGroupProto = C.getProtocol(KnownProtocolKind::ParameterGroup);
-  auto paramGroupType = TypeLoc::withoutLoc(paramGroupProto->getDeclaredType());
+  auto *differentiableProto = C.getProtocol(KnownProtocolKind::Differentiable);
+  auto differentiableType =
+      TypeLoc::withoutLoc(differentiableProto->getDeclaredType());
+  auto *keyPathIterableProto =
+      C.getProtocol(KnownProtocolKind::KeyPathIterable);
+  auto keyPathIterableType =
+      TypeLoc::withoutLoc(keyPathIterableProto->getDeclaredType());
   auto *parametersDecl =
       new (C) StructDecl(SourceLoc(), C.Id_Parameters, SourceLoc(),
                          /*Inherited*/ {}, /*GenericParams*/ {}, parentDC);
@@ -378,12 +379,60 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   }
   parametersDecl->setValidationToChecked();
 
-  // Add conformance to the ParameterGroup protocol, if possible.
-  // The ParameterGroup protocol requirements will be derived.
-  if (DerivedConformance::canDeriveParameterGroup(parametersDecl)) {
-    TypeLoc inherited[1] = {paramGroupType};
-    parametersDecl->setInherited(C.AllocateCopy(inherited));
+  // Declare conformance to `VectorNumeric` (if possible), `Differentiable`
+  // `KeyPathIterable`, and `ParameterGroup` (if possible) protocols.
+  // Conformances will be derived.
+  // Note: `ParameterGroup` will eventually be deprecated in favor of
+  // `KeyPathIterable`, which is more general.
+  SmallVector<TypeLoc, 3> inherited{differentiableType, keyPathIterableType};
+
+  // Add vector space typealias declaration to the given nominal type with the
+  // given underlying type.
+  auto addVectorSpaceAliasDecl = [&](Identifier vectorSpaceId,
+                                     NominalTypeDecl *parent,
+                                     Type vectorSpaceType) {
+    auto aliasDecl = new (C) TypeAliasDecl(
+        SourceLoc(), SourceLoc(), vectorSpaceId, SourceLoc(), {}, parent);
+    aliasDecl->setImplicit();
+    aliasDecl->setUnderlyingType(vectorSpaceType);
+    if (auto env = parent->getGenericEnvironmentOfContext())
+      aliasDecl->setGenericEnvironment(env);
+    parent->addMember(aliasDecl);
+    aliasDecl->copyFormalAccessFrom(parent, /*sourceIsParentContext*/ true);
+    aliasDecl->setValidationToChecked();
+    // Add `@_fieldwiseProductSpace` attribute to typealias declaration.
+    // This enables differentiation wrt member accesses of the `Parameterized`
+    // struct.
+    aliasDecl->getAttrs().add(new (C)
+                                  FieldwiseProductSpaceAttr(/*Implicit*/ true));
+    TC.validateDecl(aliasDecl);
+    C.addSynthesizedDecl(aliasDecl);
+  };
+
+  auto parametersType =
+      parentDC->mapTypeIntoContext(parametersDecl->getDeclaredInterfaceType());
+  // If `Parameters` can derive `VectorNumeric`, then declare conformance to
+  // `VectorNumeric`. Also, add vector space typealiases for both `Parameters`
+  // and the parent nominal type.
+  if (DerivedConformance::canDeriveVectorNumeric(parametersDecl, parentDC)) {
+    auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
+    auto vectorNumericType =
+        TypeLoc::withoutLoc(vectorNumericProto->getDeclaredType());
+    inherited.push_back(vectorNumericType);
+    addVectorSpaceAliasDecl(C.Id_TangentVector, parametersDecl, parametersType);
+    addVectorSpaceAliasDecl(C.Id_CotangentVector, parametersDecl,
+                            parametersType);
+    addVectorSpaceAliasDecl(C.Id_TangentVector, nominal, parametersType);
+    addVectorSpaceAliasDecl(C.Id_CotangentVector, nominal, parametersType);
   }
+  if (DerivedConformance::canDeriveParameterGroup(parametersDecl)) {
+    auto *parameterGroupProto =
+        C.getProtocol(KnownProtocolKind::ParameterGroup);
+    auto parameterGroupType =
+        TypeLoc::withoutLoc(parameterGroupProto->getDeclaredType());
+    inherited.push_back(parameterGroupType);
+  }
+  parametersDecl->setInherited(C.AllocateCopy(inherited));
 
   // The implicit memberwise constructor must be explicitly created so that it
   // can called when synthesizing the `allParameters` getter. Normally, the
@@ -394,18 +443,13 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   C.addSynthesizedDecl(initDecl);
 
   // After memberwise initializer is synthesized, mark members as implicit.
-  for (auto member : parametersDecl->getMembers()) {
-    auto varDecl = dyn_cast<VarDecl>(member);
-    if (!varDecl || varDecl->isStatic() || !varDecl->hasStorage())
-      continue;
-    varDecl->setImplicit();
-  }
+  for (auto member : parametersDecl->getStoredProperties())
+    member->setImplicit();
 
   derived.addMembersToConformanceContext({parametersDecl});
   C.addSynthesizedDecl(parametersDecl);
 
-  auto parametersType = parametersDecl->getDeclaredInterfaceType();
-  return derived.getConformanceContext()->mapTypeIntoContext(parametersType);
+  return parametersType;
 }
 
 Type DerivedConformance::deriveParameterized(AssociatedTypeDecl *requirement) {

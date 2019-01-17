@@ -119,10 +119,27 @@ IDENTIFIER(withArguments)
 IDENTIFIER(withKeywordArguments)
 
 // SWIFT_ENABLE_TENSORFLOW
+IDENTIFIER(TensorFlow)
+// KeyPathIterable
+IDENTIFIER(AllKeyPaths)
+IDENTIFIER(allKeyPaths)
+IDENTIFIER(recursivelyAllKeyPaths)
+IDENTIFIER(allWritableKeyPaths)
+IDENTIFIER(recursivelyAllWritableKeyPaths)
+// AdditiveArithmetic, VectorNumeric
+IDENTIFIER(zero)
+IDENTIFIER(Scalar)
+// ParameterGroup, Parameterized
 IDENTIFIER(allParameters)
 IDENTIFIER(Parameter)
 IDENTIFIER(Parameters)
-IDENTIFIER(TensorFlow)
+// Differentiable
+IDENTIFIER(AllDifferentiableVariables)
+IDENTIFIER(CotangentVector)
+IDENTIFIER(TangentVector)
+IDENTIFIER(allDifferentiableVariables)
+IDENTIFIER(moved)
+IDENTIFIER(tangentVector)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")

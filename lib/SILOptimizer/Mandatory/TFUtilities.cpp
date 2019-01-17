@@ -28,6 +28,7 @@
 #include "llvm/Support/CommandLine.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "tensorflow/c/c_api.h"
+#include "tensorflow/c/c_api_experimental.h"
 #endif
 
 using namespace swift;
@@ -50,11 +51,11 @@ static llvm::cl::opt<bool> TFDumpIntermediatesToTmp(
 
 // The flag below is referenced in multiple translation units.
 namespace llvm {
-// This flag is used as a crutch to develop and test IRGen code that handles
-// graph_op insts.
-// TODO: Fold this flag into -Onone mode.
+// This (internal) flag is used to enable IRGen to generate code for op-by-op
+// dispatch and defaults to true.  When this flag is false, GPE is turned off
+// completely for non-tensorflow convention functions even in the -O mode.
 llvm::cl::opt<bool> TFDynamicCompilation(
-    "tf-dynamic-compilation", llvm::cl::init(false),
+    "tf-dynamic-compilation", llvm::cl::init(true),
     llvm::cl::desc(
         "When true, skip the partitioning and lowering pass, so that graph_op "
         "instructions flow to IRGen. This flag should not be turned on by end "
@@ -240,7 +241,7 @@ SILLocation tf::getUserSourceLocation(SILValue value) {
 /// Get the user's source location for the specified instruction.  Because it
 /// is an instruction, we can apply various heuristics to improve the
 /// precision of the returned location information.
-SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
+SILLocation tf::getUserSourceLocation(const SILInstruction *inst) {
   // If we have a struct extract from a type like Int, Float, or Tensor of an
   // internal type like Builtin.i64 or TensorHandle, look through it to the
   // higher level type, which will have better source location information.
@@ -258,6 +259,32 @@ SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
   return getUserSourceLocation(inst->getDebugLocation());
 }
 
+bool tf::isStatefulOp(const GraphOperationInst *graphOp) {
+  GraphOperationInfo decoder(graphOp);
+  StringRef tensorOpName = decoder.getOperationName();
+  // Is this a known stateful op used in partitioning?
+  if (tensorOpName.startswith("tfc.SendToHost") ||
+      tensorOpName.startswith("tfc.RecvFromHost") ||
+      tensorOpName.startswith("tfc.D2DTensorRecv") ||
+      tensorOpName.startswith("tfc.D2DTensorSend") ||
+      tensorOpName.startswith("tfc.TensorTransfer")) {
+    return true;
+  }
+  // Other ops only known to Swift for TensorFlow.
+  if (tensorOpName.startswith("tf_tensor_to_i1") ||
+      tensorOpName.startswith("tfc.")) {
+    return false;
+  }
+  // Is this a stateful TensorFlow op?
+  std::unique_ptr<TF_Status, decltype(&TF_DeleteStatus)> status(
+      TF_NewStatus(), TF_DeleteStatus);
+  int isStateful = TF_OpIsStateful(tensorOpName.str().c_str(), status.get());
+  TF_Code statusCode = TF_GetCode(status.get());
+  assert(statusCode == TF_OK &&
+         "Error checking if a TensorFlow op is stateful.");
+  return isStateful;
+}
+
 /// Create a "Const" tensor operation containing the specified scalars, with
 /// the specified shape and elementType (setting dtype).  The resultType is
 /// the TensorHandle type to produce, and targetDevice is the device set for
@@ -265,7 +292,7 @@ SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
 GraphOperationInst *
 tf::createConstTensor(Type elementType, SymbolicValue scalars,
                       SymbolicValue shape, SILType resultType, SILLocation loc,
-                      DeviceType targetDevice, SILBuilder &B) {
+                      DeviceId targetDevice, SILBuilder &B) {
   auto &context = B.getASTContext();
   auto &allocator = context.getAllocator();
 
@@ -312,10 +339,10 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
   ASTContext &context = builder.getASTContext();
   GraphOperationBuilder opBuilder("tf_tensor_to_i1");
   opBuilder.addArgument(value);
-  deviceInfo.handleDevicePlacement(
-      "tf_tensor_to_i1",
-      /*opDevice*/ getDeviceString(DeviceType::ALL),
-      builder.getModule().getASTContext(), &opBuilder);
+  deviceInfo.handleDevicePlacement("tf_tensor_to_i1",
+                                   /*opDevice*/ getDeviceString(AllDeviceId),
+                                   builder.getModule().getASTContext(),
+                                   &opBuilder);
   GraphOperationInst *condValue = opBuilder.build(
       builder, context, location,
       {SILType::getBuiltinIntegerType(1, context)});

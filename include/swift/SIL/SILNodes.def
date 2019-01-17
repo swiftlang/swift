@@ -642,8 +642,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   // SWIFT_ENABLE_TENSORFLOW
   // Automatic differentiation
-  SINGLE_VALUE_INST(GradientInst, gradient,
-                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(AutoDiffFunctionInst, autodiff_function,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(AutoDiffFunctionExtractInst, autodiff_function_extract,

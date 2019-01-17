@@ -566,24 +566,15 @@ func foo() {}
 #assert(true, "hello world")
 
 // SWIFT_ENABLE_TENSORFLOW
-@differentiable(reverse, adjoint: foo(_:_:))
+@differentiable(jvp: foo(_:_:))
 func bar(_ x: Float, _: Float) -> Float { return 1 }
 
-@differentiable(reverse, adjoint: foo(_:_:) where T : FloatingPoint)
+@differentiable(jvp: foo(_:_:) where T : FloatingPoint)
 func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
 
-@differentiable(reverse, wrt: (self, .0, .1), adjoint: foo(_:_:))
+@differentiable(wrt: (self, .0, .1), jvp: foo(_:_:))
 func bar(_ x: Float, _: Float) -> Float { return 1 }
 
-@differentiable(reverse, wrt: (self, .0, .1), primal: bar, adjoint: foo(_:_:) where T : FloatingPoint)
+@differentiable(wrt: (self, .0, .1), jvp: bar, vjp: foo(_:_:) where T : FloatingPoint)
 func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
 
-#gradient(foo)
-#gradient(foo, wrt: .0, .1)
-#chainableGradient(foo, wrt: .0, .1)
-#valueAndGradient(foo, wrt: .0, .1)
-
-#adjoint(+)
-#adjoint(foo(_:_:))
-#adjoint(A.B.foo(_:))
-#adjoint(Tensor<Float>.+)

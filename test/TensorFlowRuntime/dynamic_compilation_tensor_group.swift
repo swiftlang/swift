@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 
 import TensorFlow
@@ -78,12 +78,15 @@ extension EmptyExample : TensorGroup {
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {}
 }
 
+#if !CUDA
+// TensorSliceDataset is not available on GPU
 TensorGroupTest.testAllBackends("dataset, address-only") {
   let dataset = tensorSliceDataset(Example(x: Tensor([1, 2, 3]), y: Tensor([4, 5, 6])))
   let example: Example = first(dataset)
   expectEqual(1, example.x.scalar!)
   expectEqual(4, example.y.scalar!)
 }
+#endif  // CUDA
 
 TensorGroupTest.testAllBackends("input, address-only") {
   let example = Example(x: Tensor([1, 2]), y: Tensor([3, 4]))

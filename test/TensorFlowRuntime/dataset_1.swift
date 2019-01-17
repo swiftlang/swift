@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
@@ -95,7 +95,9 @@ public func model() {
   //                                    output_shapes: [nil as TensorShape?])
 }
 
+#if !CUDA
 DatasetTests.testAllBackends("Basic") {
+  // OneShotIterator is not supported on GPU.
   model()
 }
 
@@ -134,5 +136,6 @@ DatasetTests.testAllBackends("MultiValue") {
   expectEqual(2, Tensor(handle: next.0).scalarized())
   expectEqual(12, Tensor(handle: next.1).scalarized())
 }
+#endif
 
 runAllTests()

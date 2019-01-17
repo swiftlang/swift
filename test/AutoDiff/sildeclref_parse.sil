@@ -1,0 +1,30 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=sildeclref_parse | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=sildeclref_parse | %FileCheck %s
+
+import Swift
+
+protocol Proto {
+  @differentiable()
+  func f(_ x: Float, _ y: Float) -> Float
+}
+
+// CHECK-LABEL: sil hidden @generic
+sil hidden @generic : $@convention(thin) <T where T : Proto> (@in T) -> () {
+bb0(%0 : $*T):
+  // CHECK: witness_method $T, #Proto.f!1
+  %1 = witness_method $T, #Proto.f!1 : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+
+  // CHECK: witness_method $T, #Proto.f!1.jvp.1.SSS
+  %2 = witness_method $T, #Proto.f!1.jvp.1.SSS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+
+  // CHECK: witness_method $T, #Proto.f!1.jvp.1.UUS
+  %3 = witness_method $T, #Proto.f!1.jvp.1.UUS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+
+  // CHECK: witness_method $T, #Proto.f!1.vjp.1.SSS
+  %4 = witness_method $T, #Proto.f!1.vjp.1.SSS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+
+  // CHECK: witness_method $T, #Proto.f!1.vjp.1.UUS
+  %5 = witness_method $T, #Proto.f!1.vjp.1.UUS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+
+  %6 = tuple ()
+  return %6 : $()
+}

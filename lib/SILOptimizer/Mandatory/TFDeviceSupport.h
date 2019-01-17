@@ -37,23 +37,7 @@ struct GraphOperationInfo;
 
 StringRef getDeviceString(const GraphOperationInfo &graphOpInfo);
 
-DeviceType getDeviceType(const GraphOperationInfo &graphOpInfo);
-
-/// The returned string can be used to construct SIL function names.
-static inline std::string getDeviceShortName(DeviceType deviceType) {
-  switch (deviceType) {
-  case DeviceType::CPU:
-    return "CPU";
-  case DeviceType::GPU:
-    return "GPU";
-  case DeviceType::TPU:
-    return "TPU";
-  case DeviceType::ALL:
-    return "ALL";
-  case DeviceType::INVALID:
-    llvm_unreachable("Unsupported device type");
-  }
-}
+DeviceId getDeviceId(const GraphOperationInfo &graphOpInfo);
 
 /// Partitions an accelerator SIL function into a set of per-device SIL
 /// functions.
@@ -76,7 +60,7 @@ public:
   ///   a _Send() node to CPU.
   /// - The extracted function for CPU device has _Recv node from GPU to read
   ///   a, and adds its output with const tensor b to produce the sum result.
-  SILFunction *extractFunctionForDevice(DeviceType deviceType);
+  SILFunction *extractFunctionForDevice(DeviceId deviceId);
 };
 
 } // end namespace tf
