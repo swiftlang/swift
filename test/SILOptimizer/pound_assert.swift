@@ -530,3 +530,58 @@ public func weighPet(pet: Pet) -> Int {
 // expected-error @+1 {{assertion failed}}
 #assert(weighPet(pet: .cat(2)) == 3)
 #assert(weighPet(pet: .dog(9, 10)) == 19)
+
+// Test indirect enums.
+indirect enum IntExpr {
+  case int(_ value: Int)
+  case add(_ lhs: IntExpr, _ rhs: IntExpr)
+  case multiply(_ lhs: IntExpr, _ rhs: IntExpr)
+}
+
+func evaluate(intExpr: IntExpr) -> Int {
+  switch intExpr {
+  case .int(let value):
+    return value
+  case .add(let lhs, let rhs):
+    return evaluate(intExpr: lhs) + evaluate(intExpr: rhs)
+  case .multiply(let lhs, let rhs):
+    return evaluate(intExpr: lhs) * evaluate(intExpr: rhs)
+  }
+}
+
+// TODO: The constant evaluator can't handle indirect enums yet.
+// expected-error @+2 {{#assert condition not constant}}
+// expected-note @+1 {{could not fold operation}}
+#assert(evaluate(intExpr: .int(5)) == 5)
+// expected-error @+2 {{#assert condition not constant}}
+// expected-note @+1 {{could not fold operation}}
+#assert(evaluate(intExpr: .add(.int(5), .int(6))) == 11)
+// expected-error @+2 {{#assert condition not constant}}
+// expected-note @+1 {{could not fold operation}}
+#assert(evaluate(intExpr: .add(.multiply(.int(2), .int(2)), .int(3))) == 7)
+
+// Test address-only enums.
+protocol IntContainerProtocol {
+  var value: Int { get }
+}
+
+struct IntContainer : IntContainerProtocol {
+  let value: Int
+}
+
+enum AddressOnlyEnum<T: IntContainerProtocol> {
+  case double(_ value: T)
+  case triple(_ value: T)
+}
+
+func evaluate<T>(addressOnlyEnum: AddressOnlyEnum<T>) -> Int {
+  switch addressOnlyEnum {
+  case .double(let value):
+    return 2 * value.value
+  case .triple(let value):
+    return 3 * value.value
+  }
+}
+
+#assert(evaluate(addressOnlyEnum: .double(IntContainer(value: 1))) == 2)
+#assert(evaluate(addressOnlyEnum: .triple(IntContainer(value: 1))) == 3)
