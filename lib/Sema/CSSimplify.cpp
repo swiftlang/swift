@@ -3433,10 +3433,23 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
     if (decl->isInstanceMember()) {
-      if (((isa<FuncDecl>(decl) && !hasInstanceMethods) ||
-           (!isa<FuncDecl>(decl) && !hasInstanceMembers)) ||
-          (isMetatypeBase && !(functionRefKind == FunctionRefKind::Unapplied ||
-                               functionRefKind == FunctionRefKind::Compound))) {
+      // If this is a method and either base is not allowed to have any,
+      // or it's not going to be used as a value e.g. `let _ = X.foo`, report.
+      if (isa<FuncDecl>(decl)) {
+        auto isUnappliedOrCompoundRef = [](FunctionRefKind FRK) {
+          return FRK == FunctionRefKind::Unapplied ||
+                 FRK == FunctionRefKind::Compound;
+        };
+
+        if (!hasInstanceMethods ||
+            (isMetatypeBase && !isUnappliedOrCompoundRef(functionRefKind))) {
+          result.addUnviable(candidate,
+                             MemberLookupResult::UR_InstanceMemberOnType);
+          return;
+        }
+        // If this is a property and base type is not allowed to have any,
+        // report.
+      } else if (!hasInstanceMembers) {
         result.addUnviable(candidate,
                            MemberLookupResult::UR_InstanceMemberOnType);
         return;
@@ -3721,6 +3734,45 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (!MissingMembers.insert(locator))
       return SolutionKind::Error;
 
+    // FIXME(diagnostics): If there were no viable results, but there are
+    // unviable ones, we'd have to introduce fix for each specific problem.
+    if (!result.UnviableCandidates.empty()) {
+      // Check if we have unviable candidates whose reason for rejection
+      // is either UR_InstanceMemberOnType or UR_TypeMemberOnInstance
+
+      // If we do, then allow them
+      if (llvm::all_of(result.UnviableCandidates,
+                       [&](const std::pair<OverloadChoice,
+                           MemberLookupResult::UnviableReason> &e) {
+                return e.second == MemberLookupResult::UR_InstanceMemberOnType ||
+                       e.second == MemberLookupResult::UR_TypeMemberOnInstance;
+              })) {
+
+        auto *fix = AllowTypeOrInstanceMember::create(
+            *this, baseTy, member, getConstraintLocator(locator));
+
+        if (recordFix(fix)) {
+          // We couldn't record a fix, so bail out
+          return SolutionKind::Error;
+        }
+
+        // The fix was successful, so let's add it to the overload set
+        // and return the solution as solved
+        auto choices = SmallVector<OverloadChoice, 4>();
+
+        for (auto &pair : result.UnviableCandidates) {
+          choices.push_back(std::move(pair.first));
+        }
+
+        addOverloadSet(memberTy, choices, useDC, locator,
+                       result.getFavoredChoice(), {});
+        return SolutionKind::Solved;
+      }
+
+      // Handle other cases
+      // return SolutionKind::Error;
+    }
+
     if (baseObjTy->getOptionalObjectType()) {
       // If the base type was an optional, look through it.
 
@@ -3827,44 +3879,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     result = performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                                  /*includeInaccessibleMembers*/ true);
-
-    // FIXME(diagnostics): If there were no viable results, but there are
-    // unviable ones, we'd have to introduce fix for each specific problem.
-    if (!result.UnviableCandidates.empty()) {
-      // Check if we have unviable candidates whose reason for rejection
-      // is either UR_InstanceMemberOnType or UR_TypeMemberOnInstance
-      
-      // If we do, then allow them
-      if (llvm::all_of(result.UnviableCandidates,
-                       [&](const std::pair<OverloadChoice,
-                           MemberLookupResult::UnviableReason> &e) {
-        return e.second == MemberLookupResult::UR_InstanceMemberOnType ||
-               e.second == MemberLookupResult::UR_TypeMemberOnInstance;
-      })) {
-        
-        auto *fix = AllowTypeOrInstanceMember::create(*this, baseTy, member,
-                                                      getConstraintLocator(locator));
-        
-        if (recordFix(fix)) {
-          // We couldn't record a fix, so bail out
-          return SolutionKind::Error;
-        }
-        
-        // The fix was successful, so let's add it to the overload set
-        // and return the solution as solved
-        auto choices = SmallVector<OverloadChoice, 4>();
-        
-        for (auto &pair : result.UnviableCandidates) {
-          choices.push_back(std::move(pair.first));
-        }
-        
-        addOverloadSet(memberTy, choices, useDC, locator,
-                       result.getFavoredChoice(), {});
-        return SolutionKind::Solved;
-      }
-      
-      return SolutionKind::Error;
-    }
 
     // Since member with given base and name doesn't exist, let's try to
     // fake its presence based on use, that makes it possible to diagnose
