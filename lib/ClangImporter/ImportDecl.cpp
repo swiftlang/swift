@@ -8055,6 +8055,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   case clang::APValue::Array:
   case clang::APValue::ComplexFloat:
   case clang::APValue::ComplexInt:
+  case clang::APValue::FixedPoint:
   case clang::APValue::LValue:
   case clang::APValue::MemberPointer:
   case clang::APValue::Struct:
