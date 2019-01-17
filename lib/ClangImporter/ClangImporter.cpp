@@ -1165,6 +1165,14 @@ ClangImporter::Implementation::getNextIncludeLoc() {
   if (!DummyIncludeBuffer.isValid()) {
     clang::SourceLocation includeLoc =
         srcMgr.getLocForStartOfFile(srcMgr.getMainFileID());
+    // Picking the beginning of the main FileID as include location is also what
+    // the clang PCH mechanism is doing (see
+    // clang::ASTReader::getImportLocation()). Choose the next source location
+    // here to avoid having the exact same import location as the clang PCH.
+    // Otherwise, if we are using a PCH for bridging header, we'll have
+    // problems with source order comparisons of clang source locations not
+    // being deterministic.
+    includeLoc = includeLoc.getLocWithOffset(1);
     DummyIncludeBuffer = srcMgr.createFileID(
         llvm::make_unique<ZeroFilledMemoryBuffer>(
           256*1024, StringRef(moduleImportBufferName)),
