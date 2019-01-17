@@ -532,7 +532,7 @@ struct S : Q, Equatable {
   @_implements(P, x)
   var y: String
   @_implements(P, g())
-  func h() {}
+  func h() { _ = \.self }
 
   @available(*, deprecated: 1.2, message: "ABC")
   fileprivate(set) var x: String
