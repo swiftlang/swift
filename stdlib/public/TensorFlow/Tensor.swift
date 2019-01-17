@@ -715,6 +715,36 @@ public extension Tensor where Scalar : BinaryFloatingPoint,
     self.init(randomNormal: shape, mean: mean, stddev: stddev,
               generator: &ARC4RandomNumberGenerator.global)
   }
+
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a uniform distribution between -limit and limit, where limit is
+  /// sqrt(6 / (fanIn + fanOut))
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - generator: Random number generator to use.
+  ///
+  @inlinable
+  init<G: RandomNumberGenerator>(glorotUniform shape: TensorShape,
+                                 generator: inout G) {
+    let fanIn = shape[shape.count - 2]
+    let fanOut = shape[shape.count - 1]
+    let minusOneToOne = 2 * Tensor(
+        randomUniform: shape, generator: &generator) - 1
+    self = sqrt(Tensor(6 / Scalar(fanIn + fanOut))) * minusOneToOne
+  }
+
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a uniform distribution between -limit and limit, where limit is
+  /// sqrt(6 / (fanIn + fanOut)), using the default RNG
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///
+  @inlinable
+  init(glorotUniform shape: TensorShape) {
+    self.init(glorotUniform: shape,
+              generator: &ARC4RandomNumberGenerator.global)
   }
 }
 
