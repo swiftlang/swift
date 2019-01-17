@@ -3146,6 +3146,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ "$using_xcodebuild" == "FALSE" ]] ; then
                     with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} unittests/LLDBUnitTests
+                    with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} lldb-test-depends
                     with_pushd ${results_dir} \
                           call "${llvm_build_dir}/bin/llvm-lit" \
