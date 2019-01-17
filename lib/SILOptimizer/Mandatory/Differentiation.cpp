@@ -885,7 +885,6 @@ public:
   /// parameters as the function.
   StructDecl *createPrimalValueStruct(const DifferentiationTask *task);
 
-private:
   /// Finds the `[differentiable]` attribute on the specified original function
   /// corresponding to the specified parameter indices. Returns nullptr if it
   /// does not exist.
@@ -981,16 +980,6 @@ public:
     return differentiationTasks.back().get();
   }
 
-  DifferentiationTask *
-  lookUpOrRegisterDifferentiationTask(SILFunction *original,
-                                      const SILAutoDiffIndices &indices,
-                                      DifferentiationInvoker invoker) {
-    if (auto *existingTask = lookUpMinimalDifferentiationTask(original, indices))
-      return existingTask;
-    assert(original->isDefinition());
-    return registerDifferentiationTask(original, indices, invoker);
-  }
-
   template <typename... T, typename... U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
                               U &&... args) const {
@@ -1011,9 +1000,7 @@ public:
   /// emits an error at the outer task. Otherwise, emits an error directly.
   void emitNondifferentiabilityError(SILValue value,
                                      const DifferentiationTask *task,
-                                     Optional<Diag<>> diag = None) {
-    emitNondifferentiabilityError(value->getDefiningInstruction(), task, diag);
-  }
+                                     Optional<Diag<>> diag = None);
 };
 } // end anonymous namespace
 
@@ -1025,11 +1012,28 @@ ADContext::ADContext(SILModuleTransform &transform)
   (void)module.getSILLoader();
 }
 
+void ADContext::emitNondifferentiabilityError(SILValue value,
+                                              const DifferentiationTask *task,
+                                              Optional<Diag<>> diag) {
+  auto *inst = value->getDefiningInstruction();
+  if (!inst) {
+    diagnose(value.getLoc().getSourceLoc(),
+             diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+    return;
+  }
+  emitNondifferentiabilityError(inst, task, diag);
+}
+
 void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                               const DifferentiationTask *task,
                                               Optional<Diag<>> diag) {
   // Location of the instruction.
   auto opLoc = inst->getLoc().getSourceLoc();
+  if (!task) {
+    diagnose(opLoc,
+             diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+    return;
+  }
   auto invoker = task->getInvoker();
   LLVM_DEBUG({
     auto &s = getADDebugStream()
@@ -1587,17 +1591,19 @@ static WitnessMethodInst *findWitnessMethod(SILValue value) {
 /// the associated function and the actual indices that the associated function
 /// is with respect to.
 ///
-/// Returns `None` on failure.
+/// Returns `None` on failure, signifying that a diagnostic has been emitted.
 ///
 /// Creates new differentiation tasks, if necessary, using `invoker` as the
 /// invoker. Calls `taskCallback` for all newly-created tasks (but may also call
 /// `taskCallback` for already-existing tasks), so that the caller can make sure
 /// that the task actually gets executed.
+///
+/// FIXME: This is too complicated and needs to be rewritten.
 static Optional<std::pair<SILValue, SILAutoDiffIndices>>
-emitAssociatedFunctionReference(
-    ADContext &context, SILBuilder &builder, SILAutoDiffIndices desiredIndices,
-    AutoDiffAssociatedFunctionKind kind, SILValue original,
-    DifferentiationInvoker invoker,
+emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
+    const DifferentiationTask *parentTask, SILAutoDiffIndices desiredIndices,
+    AutoDiffAssociatedFunctionKind kind,
+    SILValue original, DifferentiationInvoker invoker,
     std::function<void(DifferentiationTask *)> taskCallback) {
 
   // If `original` is itself an `AutoDiffFunctionExtractInst` whose kind matches
@@ -1616,8 +1622,11 @@ emitAssociatedFunctionReference(
         auto autodiffFnType =
             adfei->getFunctionOperand()->getType().castTo<SILFunctionType>();
         if (autodiffFnType->getDifferentiationParameterIndices().test(
-                desiredIndices.parameters))
+                desiredIndices.parameters)) {
+          context.emitNondifferentiabilityError(original, parentTask,
+              diag::autodiff_function_subset_indices_not_differentiable);
           return None;
+        }
         SILAutoDiffIndices indices(0, desiredIndices.parameters);
         return std::make_pair(assocFn, indices);
       }
@@ -1631,8 +1640,18 @@ emitAssociatedFunctionReference(
   if (auto *originalFRI = findReferenceToVisibleFunction(original)) {
     auto loc = originalFRI->getLoc();
     auto *originalFn = originalFRI->getReferencedFunction();
-    auto *task = context.lookUpOrRegisterDifferentiationTask(
-        originalFn, desiredIndices, invoker);
+    auto *task =
+        context.lookUpMinimalDifferentiationTask(originalFn, desiredIndices);
+    if (!task) {
+      if (originalFn->isExternalDeclaration()) {
+        context.emitNondifferentiabilityError(original, parentTask,
+            diag::autodiff_external_nondifferentiable_function);
+        return None;
+      }
+      task = context.registerDifferentiationTask(
+          originalFn, desiredIndices, invoker);
+    }
+    assert(task);
     taskCallback(task);
     SILFunction *assocFn = nullptr;
     switch (kind) {
@@ -1656,9 +1675,8 @@ emitAssociatedFunctionReference(
     auto *diffAttr =
         requirementDecl->getAttrs().getAttribute<DifferentiableAttr>();
     if (!diffAttr) {
-      // TODO: If we move diagnostics into this function, then we can tell the
-      // user that differentiation failed because the requirement is not
-      // differentiable.
+      context.emitNondifferentiabilityError(original, parentTask,
+          diag::autodiff_protocol_member_not_differentiable);
       return None;
     }
 
@@ -1671,9 +1689,8 @@ emitAssociatedFunctionReference(
 
     if (desiredIndices.source != requirementIndices.source ||
         desiredIndices.parameters.test(requirementIndices.parameters)) {
-      // TODO: If we move diagnostics into this function, then we can tell the
-      // user that differentiation failed because the requirement isn't
-      // differentiable with respect to the right indices.
+      context.emitNondifferentiabilityError(original, parentTask,
+          diag::autodiff_protocol_member_subset_indices_not_differentiable);
       return None;
     }
 
@@ -1696,8 +1713,8 @@ emitAssociatedFunctionReference(
     return std::make_pair(convertedRef, requirementIndices);
   }
 
-  // TODO: If we move diagnostics into this function, then we can tell the
-  // user that differentiation failed because the function is opaque.
+  context.emitNondifferentiabilityError(original, parentTask,
+      diag::autodiff_opaque_function_not_differentiable);
   return None;
 }
 
@@ -2154,8 +2171,8 @@ public:
 
     // Emit the VJP.
     auto vjpAndVJPIndices = emitAssociatedFunctionReference(
-        context, getBuilder(), indices, AutoDiffAssociatedFunctionKind::VJP,
-        getMappedValue(ai->getCallee()),
+        context, getBuilder(), getDifferentiationTask(), indices,
+        AutoDiffAssociatedFunctionKind::VJP, getMappedValue(ai->getCallee()),
         /*invoker*/ {ai, synthesis.task}, [&](DifferentiationTask *newTask) {
           primalGen.schedulePrimalSynthesisIfNeeded(newTask);
         });
@@ -4201,8 +4218,8 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
     };
     auto invoker = getInvoker(adfi);
     auto assocFnAndIndices = emitAssociatedFunctionReference(
-        context, builder, desiredIndices, assocFnKind, origFnOperand,
-        invoker, [](DifferentiationTask *newTask) {});
+        context, builder, /*parentTask*/ nullptr, desiredIndices, assocFnKind,
+        origFnOperand, invoker, [](DifferentiationTask *newTask) {});
     if (!assocFnAndIndices) {
       // Show an error at the operator, highlight the argument, and show a note
       // at the definition site of the argument.
