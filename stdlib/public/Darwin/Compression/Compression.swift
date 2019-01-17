@@ -44,27 +44,24 @@ public enum Algorithm {
 /**
  Compression errors
  */
-public enum FilterError : Error {
-
+public enum FilterError: Error {
   /// Filter failed to initialize
-  case FilterInitError
+  case filterInitError
 
   /// Invalid data in a call to compression_stream_process
-  case FilterProcessError
+  case filterProcessError
 
   /// Non-empty write after an output filter has been finalized
-  case WriteToFinalizedFilter
+  case writeToFinalizedFilter
 
   /// Invalid count argument in a read() call
-  case ReadCountInvalid
-
+  case readCountInvalid
 }
 
 /**
  Compression filter direction of operation, compress/decompress
  */
 public enum FilterOperation {
-
   /// Compress raw data to a compressed payload
   case compress
 
@@ -77,7 +74,6 @@ public enum FilterOperation {
     case .decompress: return COMPRESSION_STREAM_DECODE
     }
   }
-
 }
 
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
@@ -89,29 +85,27 @@ extension compression_stream {
    - Parameter operation: direction of operation
    - Parameter algorithm: compression algorithm
 
-   - Throws: `FilterError.FilterInitError` if `algorithm` is not supported by the Compression stream API
+   - Throws: `FilterError.filterInitError` if `algorithm` is not supported by the Compression stream API
    */
-  init(operation: FilterOperation, algorithm: Algorithm) throws
-  {
+  init(operation: FilterOperation, algorithm: Algorithm) throws {
     self.init(dst_ptr: UnsafeMutablePointer<UInt8>.allocate(capacity:0),
               dst_size: 0,
               src_ptr: UnsafeMutablePointer<UInt8>.allocate(capacity:0),
               src_size: 0,
               state: nil)
     let status = compression_stream_init(&self, operation.rawValue, algorithm.rawValue)
-    guard status == COMPRESSION_STATUS_OK else { throw FilterError.FilterInitError }
+    guard status == COMPRESSION_STATUS_OK else { throw FilterError.filterInitError }
   }
 
 }
 
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public class OutputFilter {
-
-  private var _stream : compression_stream
-  private var _buf : UnsafeMutablePointer<UInt8>
-  private var _bufCapacity : Int
-  private var _writeFunc : (Data?) throws -> ()
-  private var _finalized : Bool = false
+  private var _stream: compression_stream
+  private var _buf: UnsafeMutablePointer<UInt8>
+  private let _bufCapacity: Int
+  private let _writeFunc: (Data?) throws -> ()
+  private var _finalized: Bool = false
 
   /**
    Initialize an output filter
@@ -124,11 +118,12 @@ public class OutputFilter {
 
    - Throws: `FilterError.StreamInitError` if stream initialization failed
    */
-  public init(_ operation: FilterOperation,
-              using algorithm : Algorithm,
-              bufferCapacity : Int = 65536,
-              writingTo writeFunc: @escaping (Data?) throws -> () ) throws
-  {
+  public init(
+    _ operation: FilterOperation,
+    using algorithm: Algorithm,
+    bufferCapacity: Int = 65536,
+    writingTo writeFunc: @escaping (Data?) throws -> ()
+  ) throws {
     _stream = try compression_stream(operation: operation, algorithm: algorithm)
     _buf = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferCapacity)
     _bufCapacity = bufferCapacity
@@ -145,16 +140,15 @@ public class OutputFilter {
    - Parameter data: data to process
 
    - Throws:
-   `FilterError.FilterProcessError` if an error occurs during processing
-   `FilterError.WriteToFinalizedFilter` if `data` is not empty/nil, and the filter is the finalized state
+   `FilterError.filterProcessError` if an error occurs during processing
+   `FilterError.writeToFinalizedFilter` if `data` is not empty/nil, and the filter is the finalized state
    */
-  public func write(_ data: Data?) throws
-  {
+  public func write(_ data: Data?) throws {
     // Finalize if data is empty/nil
     if data == nil || data!.isEmpty { try finalize() ; return }
 
     // Fail if already finalized
-    if _finalized { throw FilterError.WriteToFinalizedFilter }
+    if _finalized { throw FilterError.writeToFinalizedFilter }
 
     // Process all incoming data
     try data!.withUnsafeBytes { (src_ptr: UnsafePointer<UInt8>) in
@@ -173,8 +167,7 @@ public class OutputFilter {
 
    - Throws: `FilterError.StreamProcessError` if an error occurs during processing
    */
-  public func finalize() throws
-  {
+  public func finalize() throws {
     // Do nothing if already finalized
     if _finalized { return }
 
@@ -191,8 +184,7 @@ public class OutputFilter {
   }
 
   // Cleanup resources.  The filter is finalized now if it was not finalized yet.
-  deinit
-  {
+  deinit {
     // Finalize now if not done earlier
     try? finalize()
 
@@ -203,21 +195,19 @@ public class OutputFilter {
 
   // Call compression_stream_process with current src, and dst set to _buf, then write output to the closure
   // Return status
-  private func process(_ finalize: Bool) throws -> compression_status
-  {
+  private func process(_ finalize: Bool) throws -> compression_status {
     // Process current input, and write to buf
     _stream.dst_ptr = _buf
     _stream.dst_size = _bufCapacity
 
     let status = compression_stream_process(&_stream, (finalize ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0))
-    guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.FilterProcessError }
+    guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.filterProcessError }
 
     // Number of bytes written to buf
     let writtenBytes = _bufCapacity - _stream.dst_size
 
     // Write output
-    if writtenBytes > 0
-    {
+    if writtenBytes > 0 {
       let outData = Data(bytesNoCopy: _buf, count: writtenBytes, deallocator: .none)
       try _writeFunc(outData)
     }
@@ -229,13 +219,12 @@ public class OutputFilter {
 
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public class InputFilter {
-
-  private var _stream : compression_stream
-  private var _buf : Data? = nil // current input data
-  private var _bufCapacity : Int // size to read when refilling _buf
-  private var _readFunc : (Int) throws -> Data?
-  private var _eofReached : Bool = false // did we read end-of-file from the input?
-  private var _endReached : Bool = false // did we reach end-of-file from the decoder stream?
+  private var _stream: compression_stream
+  private var _buf: Data? = nil // current input data
+  private let _bufCapacity: Int // size to read when refilling _buf
+  private let _readFunc: (Int) throws -> Data?
+  private var _eofReached: Bool = false // did we read end-of-file from the input?
+  private var _endReached: Bool = false // did we reach end-of-file from the decoder stream?
 
   /**
    Initialize an input filter
@@ -246,13 +235,14 @@ public class InputFilter {
    - bufferCapacity: capacity of the internal data buffer
    - readFunc: called to read the input data
 
-   - Throws: `FilterError.FilterInitError` if filter initialization failed
+   - Throws: `FilterError.filterInitError` if filter initialization failed
    */
-  public init(_ operation: FilterOperation,
-              using algorithm : Algorithm,
-              bufferCapacity : Int = 65536,
-              readingFrom readFunc: @escaping (Int) throws -> Data?) throws
-  {
+  public init(
+    _ operation: FilterOperation,
+    using algorithm: Algorithm,
+    bufferCapacity: Int = 65536,
+    readingFrom readFunc: @escaping (Int) throws -> Data?
+  ) throws {
     _stream = try compression_stream(operation: operation, algorithm: algorithm)
     _bufCapacity = bufferCapacity
     _readFunc = readFunc
@@ -271,19 +261,18 @@ public class InputFilter {
    - Returns: a new Data object containing at most `count` output bytes, or nil if no more data is available
 
    - Throws:
-   `FilterError.FilterProcessError` if an error occurs during processing
-   `FilterError.ReadCountInvalid` if `count` <= 0
+   `FilterError.filterProcessError` if an error occurs during processing
+   `FilterError.readCountInvalid` if `count` <= 0
    */
-  public func readData(ofLength count: Int) throws -> Data?
-  {
+  public func readData(ofLength count: Int) throws -> Data? {
     // Sanity check
-    guard count > 0 else { throw FilterError.ReadCountInvalid }
+    guard count > 0 else { throw FilterError.readCountInvalid }
 
     // End reached, return early, nothing to do
     if _endReached { return nil }
 
     // Allocate result
-    var result = Data.init(count: count)
+    var result = Data(count: count)
 
     try result.withUnsafeMutableBytes { (dst_ptr: UnsafeMutablePointer<UInt8>) in
 
@@ -295,30 +284,27 @@ public class InputFilter {
 
         // Refill _buf if needed, and EOF was not yet read
         if _stream.src_size == 0 && !_eofReached {
-          try _buf = _readFunc(_bufCapacity) // may be nil
+          _buf = try _readFunc(_bufCapacity) // may be nil
           // Reset src_size to full _buf size
-          if _buf == nil || _buf!.count == 0 { _eofReached = true ; _stream.src_size = 0 }
-          else { _stream.src_size = _buf!.count }
+          if _buf?.count ?? 0 == 0 { _eofReached = true }
+          _stream.src_size = _buf?.count ?? 0
         }
 
         // Process some data
-        if _buf != nil {
-
-          let bufCount = _buf!.count
-          try _buf!.withUnsafeBytes { (src_ptr: UnsafePointer<UInt8>) in
+        if let buf = _buf {
+          try buf.withUnsafeBytes { (src_ptr: UnsafePointer<UInt8>) in
 
             // Next byte to read
-            _stream.src_ptr = src_ptr.advanced(by: bufCount - _stream.src_size)
+            _stream.src_ptr = src_ptr.advanced(by: buf.count - _stream.src_size)
 
             let status = compression_stream_process(&_stream, (_eofReached ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0))
-            guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.FilterProcessError }
+            guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.filterProcessError }
             if status == COMPRESSION_STATUS_END { _endReached = true }
           }
-
-        } else {
-
+        }
+        else {
           let status = compression_stream_process(&_stream, (_eofReached ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0))
-          guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.FilterProcessError }
+          guard status != COMPRESSION_STATUS_ERROR else { throw FilterError.filterProcessError }
           if status == COMPRESSION_STATUS_END { _endReached = true }
 
         }
@@ -332,8 +318,7 @@ public class InputFilter {
   }
 
   // Cleanup resources
-  deinit
-  {
+  deinit {
     compression_stream_destroy(&_stream)
   }
 
