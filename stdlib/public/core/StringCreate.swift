@@ -42,12 +42,10 @@ extension String {
     return storage.asString
   }
 
-  @usableFromInline
-  internal static func _tryFromUTF8(
-    _ input: UnsafeBufferPointer<UInt8>
-  ) -> String? {
+  public // SPI(Foundation)
+  static func _tryFromUTF8(_ input: UnsafeBufferPointer<UInt8>) -> String? {
     guard case .success(let extraInfo) = validateUTF8(input) else {
-        return nil
+      return nil
     }
 
     return String._uncheckedFromUTF8(input, isASCII: extraInfo.isASCII)
