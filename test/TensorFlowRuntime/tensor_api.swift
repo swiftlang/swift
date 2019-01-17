@@ -30,4 +30,14 @@ TensorNonTPUTests.testAllBackends("SliceUpdate") {
   expectEqual(ShapedArray(shape:[2, 3], repeating: false), t4.array)
 }
 
+TensorNonTPUTests.testAllBackends("BroadcastTensor") {
+  // 1 -> 2 x 3 x 4
+  let one = Tensor<Float>(1)
+  var target = Tensor<Float>(shape: [2, 3, 4], repeating: 0.0)
+  let broadcasted = one.broadcast(like: target)
+  expectEqual(Tensor(shape: [2, 3, 4], repeating: 1), broadcasted)
+  target .= Tensor(shape: [1, 3, 1], repeating: 1)
+  expectEqual(Tensor(shape: [2, 3, 4], repeating: 1), target)
+}
+
 runAllTests()

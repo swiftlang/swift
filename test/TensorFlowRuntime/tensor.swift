@@ -466,18 +466,6 @@ TensorTests.testAllBackends("ReshapeTensor") {
   expectEqual([1, 3, 1, 2, 1], result.shape)
 }
 
-// FIXME: This test crashes in dynamic compilation + GPU.
-#if !CUDA
-TensorTests.testAllBackends("BroadcastTensor") {
-  // 1 -> 2 x 3 x 4
-  let one = Tensor<Float>(1)
-  let target = Tensor<Float>(shape: [2, 3, 4], repeating: 0.0)
-  let broadcasted = one.broadcast(like: target)
-  expectEqual([2, 3, 4], broadcasted.shape)
-  expectEqual(Array(repeating: 1, count: 24), broadcasted.scalars)
-}
-#endif // !CUDA
-
 TensorTests.testAllBackends("Unbroadcast1") {
   let x = Tensor<Float>(shape: [2, 3, 4, 5], repeating: 1)
   let y = Tensor<Float>(shape: [4, 5], repeating: 1)
