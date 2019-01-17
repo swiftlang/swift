@@ -1,3 +1,4 @@
+// XFAIL: CPU=powerpc64le
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
 // FIXME: <rdar://problem/29281364> sil-opt -verify is broken
