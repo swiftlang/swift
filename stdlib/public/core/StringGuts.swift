@@ -309,6 +309,34 @@ extension _StringGuts {
   }
 }
 
+// SPI(TBD)
+extension _StringGuts {
+  @inlinable // Required for TBD
+  public // SPI(TBD)
+  var _isSmall: Bool { return isSmall }
+
+  // The code units that comprise a small string, in memory order (platform
+  // endianess), i.e. the first character is stored in the first address if in
+  // memory.
+  @inlinable // Required for TBD
+  public // SPI(TBD)
+  var _smallCodeUnits: (UInt64, UInt64) {
+    return asSmall.zeroTerminatedRawCodeUnits
+  }
+
+  @inlinable // Required for TBD
+  public // SPI(TBD)
+  var _isLargeZeroTerminatedContiguousUTF8: Bool {
+    return !isSmall && _object.isFastZeroTerminated
+  }
+
+  @inlinable // Required for TBD
+  public // SPI(TBD)
+  var _largeContiguousUTF8CodeUnits: UnsafeBufferPointer<UInt8> {
+    return _object.fastUTF8
+  }
+}
+
 @available(*, deprecated)
 public // SPI(corelibs-foundation)
 func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
