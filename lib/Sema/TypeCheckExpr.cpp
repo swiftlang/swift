@@ -672,30 +672,19 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   return type;
 }
 
+/// Returns the typeName to use for type lookup (or nullptr) and whether
+/// to do a local lookup.
 static std::pair<const char *, bool>
 getDefaultTypeNameAndPerformLocalLookup(const ProtocolDecl *protocol) {
   TypeChecker &tc = TypeChecker::createForContext(protocol->getASTContext());
-
-#define TYPE_NAME_CASE(KIND, NAME, PERFORM_LOCAL_LOOKUP)                       \
-  if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::KIND))        \
-    return std::make_pair(NAME, PERFORM_LOCAL_LOOKUP);
-
-  TYPE_NAME_CASE(ExpressibleByUnicodeScalarLiteral, "UnicodeScalarType", true)
-  TYPE_NAME_CASE(ExpressibleByExtendedGraphemeClusterLiteral,
-                 "ExtendedGraphemeClusterType", true)
-  TYPE_NAME_CASE(ExpressibleByStringLiteral, "StringLiteralType", true)
-  TYPE_NAME_CASE(ExpressibleByStringInterpolation, "StringLiteralType", true)
-  TYPE_NAME_CASE(ExpressibleByIntegerLiteral, "IntegerLiteralType", true)
-  TYPE_NAME_CASE(ExpressibleByFloatLiteral, "FloatLiteralType", true)
-  TYPE_NAME_CASE(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)
-  TYPE_NAME_CASE(ExpressibleByArrayLiteral, "Array", false)
-  TYPE_NAME_CASE(ExpressibleByDictionaryLiteral, "Dictionary", false)
-  TYPE_NAME_CASE(ExpressibleByColorLiteral, "_ColorLiteralType", true)
-  TYPE_NAME_CASE(ExpressibleByImageLiteral, "_ImageLiteralType", true)
-  TYPE_NAME_CASE(ExpressibleByFileReferenceLiteral, "_FileReferenceLiteralType",
-                 true)
-
-#undef DEFAULT_TYPE_NAME_CASE
+  
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
+\
+  if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))        \
+    return std::make_pair(typeName, performLocalLookup);
+  
+#include "swift/AST/KnownProtocols.def"
+#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
 
   return std::make_pair(nullptr, false);
 }
