@@ -1,4 +1,3 @@
-// UNSUPPORTED: CPU=powerpc64le
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s | %FileCheck %s --check-prefix=%target-cpu
 
 import Swift
