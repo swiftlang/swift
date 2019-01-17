@@ -1407,7 +1407,7 @@ FUNCTION(TFC_CreateScalarStringTensor, swift_tfc_CreateScalarStringTensor, C_CC,
          ARGS(Int8PtrTy, Int32Ty, Int8PtrTy),
          ATTRS(NoUnwind))
 
-FUNCTION(TFE_Execute, swift_tfc_TFE_Execute, C_CC,
+FUNCTION(TFC_EagerExecute, _swift_tfc_EagerExecute, C_CC,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrPtrTy, Int32PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))

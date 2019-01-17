@@ -157,6 +157,7 @@ public func driver() {
   // let tracedFn = trace(test2)
   // let tracedFn = trace(test3)
   // let tracedFn = trace(test4)
+  // tracedFn()
 
   // test 5: with device
   // let tracedFn = trace(test1)
@@ -176,12 +177,14 @@ public func driver() {
   //   return modelTracedFn(x)
   // }
   // _hostOp(y)  // Should be 2.0
-
+  // // let x = Tensor<Float>(1.0)
+  // // let y = Tensor<Float>(2.0)
+  // // let z = model2(x,y)
   // let model2TracedFn = trace(model2)
   // let z: Tensor<Float> = withDevice(.gpu) {
   //   return model2TracedFn(x, y)
   // }
-  // _hostOp(z)
+  // _hostOp(z)  // Should be 3.0
 
   // let tracedFn = trace(test7)
   // let z = tracedFn()
@@ -194,7 +197,7 @@ public func driver() {
   // TODO: cannot create m above here, because before traceFn() is called, we
   // are still in tracing mode according to the current impl.
   let newM = tracedFn(m)
-  _hostOp(newM)
+  _hostOp(newM) // should be (2.0, 3.0)
 }
 
 driver()
