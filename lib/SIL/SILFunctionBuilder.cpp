@@ -73,34 +73,12 @@ SILFunctionBuilder::addFunctionAttributes(SILFunction *F, SILDeclRef constant,
       !constant.isThunk()) {
     for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
       auto *DA = cast<DifferentiableAttr>(A);
-      // Either only adjoint is specified, or both primal and adjoint are
-      // spcified.
-      std::string primName, adjName, jvpName, vjpName;
-      // Note: always setting `hasPrimitiveAdjoint` to true is a hack.
-      // Eventually, `hasPrimitiveAdjoint` should be removed from the attribute.
-      bool hasPrimitiveAdjoint = true;
+      std::string jvpName, vjpName;
       // Note: the following alternative implementations of `isSameModule` don't
       // work under all scenarios:
       // - `F->isDefinition()`
       // - `forDefinition` (passed from `getOrCreateFunction`)
       bool isSameModule = M.getSwiftModule() == decl->getModuleContext();
-      // Get primal/adjoint names only for functions defined in the current
-      // module.
-      if (isSameModule) {
-        if (auto *primFn = DA->getPrimalFunction())
-          primName = SILDeclRef(primFn).mangle();
-        if (auto *adjFn = DA->getAdjointFunction()) {
-          // If the adjoint is specified but the primal is not, then we treat
-          // the original as the primal.
-          if (primName.empty())
-            primName = F->getName();
-          adjName = SILDeclRef(adjFn).mangle();
-          hasPrimitiveAdjoint = true;
-        } else {
-          assert(primName.empty() &&
-                 "Primal cannot be present if adjoint is not");
-        }
-      }
       // Get JVP/VJP names. If the functions aren't specified, use the expected
       // mangled name. Differentiation pass ensures that JVP and VJP exist.
       if (auto *jvpFn = DA->getJVPFunction())
@@ -123,10 +101,8 @@ SILFunctionBuilder::addFunctionAttributes(SILFunction *F, SILDeclRef constant,
           decl->getInterfaceType()->castTo<AnyFunctionType>());
       SILAutoDiffIndices indices(/*source*/ 0, loweredIndices);
       auto silDiffAttr = SILDifferentiableAttr::create(
-          M, indices, DA->getRequirements(),
-          M.allocateCopy(primName), M.allocateCopy(adjName),
-          /*primitive*/ hasPrimitiveAdjoint,
-          M.allocateCopy(jvpName), M.allocateCopy(vjpName));
+          M, indices, DA->getRequirements(), M.allocateCopy(jvpName),
+          M.allocateCopy(vjpName));
       F->addDifferentiableAttr(silDiffAttr);
     }
   }

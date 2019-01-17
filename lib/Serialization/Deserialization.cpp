@@ -2544,10 +2544,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Differentiable_DECL_ATTR: {
         bool isImplicit;
-        uint64_t primalNameId;
-        DeclID primalDeclId;
-        uint64_t adjointNameId;
-        DeclID adjointDeclId;
         uint64_t jvpNameId;
         DeclID jvpDeclId;
         uint64_t vjpNameId;
@@ -2556,23 +2552,10 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         SmallVector<Requirement, 4> requirements;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, primalNameId, primalDeclId, adjointNameId,
-            adjointDeclId, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
+            scratch, isImplicit, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
             parameters);
 
         using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
-        Optional<FuncSpecifier> primal;
-        FuncDecl *primalDecl = nullptr;
-        if (primalNameId != 0 && primalDeclId != 0) {
-          primal = { getIdentifier(primalNameId), DeclNameLoc() };
-          primalDecl = cast<FuncDecl>(getDecl(primalDeclId));
-        }
-        Optional<FuncSpecifier> adjoint;
-        FuncDecl *adjointDecl = nullptr;
-        if (adjointNameId != 0 && adjointDeclId != 0) {
-          adjoint = { getIdentifier(adjointNameId), DeclNameLoc() };
-          adjointDecl = cast<FuncDecl>(getDecl(adjointDeclId));
-        }
         Optional<FuncSpecifier> jvp;
         FuncDecl *jvpDecl = nullptr;
         if (jvpNameId != 0 && jvpDeclId != 0) {
@@ -2595,10 +2578,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
         auto diffAttr =
             DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
-                                       SourceRange(), indices, primal, adjoint,
-                                       jvp, vjp, requirements);
-        diffAttr->setPrimalFunction(primalDecl);
-        diffAttr->setAdjointFunction(adjointDecl);
+                                       SourceRange(), indices, jvp, vjp,
+                                       requirements);
         diffAttr->setJVPFunction(jvpDecl);
         diffAttr->setVJPFunction(vjpDecl);
         Attr = diffAttr;

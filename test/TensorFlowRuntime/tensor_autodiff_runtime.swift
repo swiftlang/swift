@@ -129,13 +129,12 @@ TensorADTests.testAllBackends("log_softmax") {
 }
 
 TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {
-  @differentiable(adjoint: adjointFoo)
+  @differentiable(vjp: vjpFoo)
   func foo(_ x: Tensor<Float>) -> Tensor<Float> {
       return Raw.identity(x)
   }
-  func adjointFoo(_ seed: Tensor<Float>, _ originalValue: Tensor<Float>,
-                  _ x: Tensor<Float>) -> Tensor<Float> {
-    return seed
+  func vjpFoo(_ x: Tensor<Float>) -> (Tensor<Float>, (Tensor<Float>) -> Tensor<Float>) {
+    return (foo(x), { v in v })
   }
   func body(_ x: Tensor<Float>) -> Tensor<Float> {
     return foo(foo(x))

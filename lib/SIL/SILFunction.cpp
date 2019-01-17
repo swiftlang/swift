@@ -59,27 +59,19 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
 /// SWIFT_ENABLE_TENSORFLOW
 SILDifferentiableAttr::
 SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                      StringRef primalName,
-                      StringRef adjointName,
-                      bool adjointIsPrimitive,
                       StringRef jvpName,
                       StringRef vjpName,
                       TrailingWhereClause *whereClause)
-  : indices(indices), PrimalName(primalName), AdjointName(adjointName),
-    AdjointIsPrimitive(adjointIsPrimitive), JVPName(jvpName), VJPName(vjpName),
+  : indices(indices), JVPName(jvpName), VJPName(vjpName),
     WhereClause(whereClause),
     NumRequirements(whereClause ? whereClause->getRequirements().size() : 0) {}
 
 SILDifferentiableAttr::
 SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                      StringRef primalName,
-                      StringRef adjointName,
-                      bool adjointIsPrimitive,
                       StringRef jvpName,
                       StringRef vjpName,
                       ArrayRef<Requirement> requirements)
-  : indices(indices), PrimalName(primalName), AdjointName(adjointName),
-    AdjointIsPrimitive(adjointIsPrimitive), JVPName(jvpName), VJPName(vjpName),
+  : indices(indices), JVPName(jvpName), VJPName(vjpName),
     NumRequirements(requirements.size()) {
   std::copy(requirements.begin(), requirements.end(), getRequirementsData());
 }
@@ -87,9 +79,6 @@ SILDifferentiableAttr(const SILAutoDiffIndices &indices,
 SILDifferentiableAttr *
 SILDifferentiableAttr::create(SILModule &M,
                               const SILAutoDiffIndices &indices,
-                              StringRef primalName,
-                              StringRef adjointName,
-                              bool adjointIsPrimitive,
                               StringRef jvpName,
                               StringRef vjpName,
                               TrailingWhereClause *whereClause) {
@@ -98,27 +87,20 @@ SILDifferentiableAttr::create(SILModule &M,
     size += whereClause->getRequirements().size() * sizeof(Requirement);
   void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
   return ::new (mem)
-      SILDifferentiableAttr(indices, primalName, adjointName,
-                            adjointIsPrimitive, jvpName, vjpName,
-                            whereClause);
+      SILDifferentiableAttr(indices, jvpName, vjpName, whereClause);
 }
 
 SILDifferentiableAttr *
 SILDifferentiableAttr::create(SILModule &M,
                               const SILAutoDiffIndices &indices,
                               ArrayRef<Requirement> requirements,
-                              StringRef primalName,
-                              StringRef adjointName,
-                              bool adjointIsPrimitive,
                               StringRef jvpName,
                               StringRef vjpName) {
   unsigned size = sizeof(SILDifferentiableAttr) +
       requirements.size() * sizeof(Requirement);
   void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
   return ::new (mem)
-      SILDifferentiableAttr(indices, primalName, adjointName,
-                            adjointIsPrimitive, jvpName, vjpName,
-                            requirements);
+      SILDifferentiableAttr(indices, jvpName, vjpName, requirements);
 }
 
 void SILDifferentiableAttr::setRequirements(

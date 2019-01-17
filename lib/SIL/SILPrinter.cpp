@@ -3194,13 +3194,6 @@ void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   interleave(indices.parameters.set_bits(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
-  if (!PrimalName.empty()) {
-    OS << " primal @" << PrimalName;
-  }
-  if (!AdjointName.empty()) {
-    OS << " adjoint @" << AdjointName;
-  }
-  if (AdjointIsPrimitive) OS << " primitive";
   if (!JVPName.empty()) {
     OS << " jvp @" << JVPName;
   }

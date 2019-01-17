@@ -644,9 +644,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     MF->readGenericRequirements(requirements, SILCursor);
 
     auto *attr = SILDifferentiableAttr::create(SILMod, indices, requirements,
-                                               /*primal*/ StringRef(),
-                                               /*adjoint*/ StringRef(),
-                                               /*adjointIsPrimitive*/ true,
                                                jvpName, vjpName);
     fn->addDifferentiableAttr(attr);
   }

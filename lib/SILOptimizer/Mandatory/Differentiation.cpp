@@ -904,11 +904,7 @@ private:
   SILDifferentiableAttr *createDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) const {
     assert(!lookUpDifferentiableAttr(original, indices));
-    auto *attr =
-        SILDifferentiableAttr::create(getModule(), indices,
-                                      /*primalName*/ StringRef(),
-                                      /*adjointName*/ StringRef(),
-                                      /*primitive*/ false);
+    auto *attr = SILDifferentiableAttr::create(getModule(), indices);
     original->addDifferentiableAttr(attr);
     return attr;
   }
@@ -953,8 +949,7 @@ private:
       // new candidate.
       if (!indexSet.test(rdaIndexSet) && // all indexSet indices in rdaIndexSet
           (supersetParamIndices.empty() || // fewer parameters than before
-           rdaIndexSet.count() < supersetParamIndices.count()) &&
-          (indexSet == rdaIndexSet || rda->isAdjointPrimitive()))
+           rdaIndexSet.count() < supersetParamIndices.count()))
         supersetParamIndices = rda->getIndices().parameters;
     }
     auto existing = enqueuedTaskIndices.find(
@@ -992,6 +987,7 @@ public:
                                       DifferentiationInvoker invoker) {
     if (auto *existingTask = lookUpMinimalDifferentiationTask(original, indices))
       return existingTask;
+    assert(original->isDefinition());
     return registerDifferentiationTask(original, indices, invoker);
   }
 
@@ -3631,14 +3627,6 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
                                          SILDifferentiableAttr *&&attr,
                                          DifferentiationInvoker invoker)
     : context(context), original(original), attr(attr), invoker(invoker) {
-  if (attr->hasPrimal()) {
-    primal = lookUpOrLinkFunction(attr->getPrimalName(), context.getModule());
-    assert(primal);
-  }
-  if (attr->hasAdjoint()) {
-    adjoint = lookUpOrLinkFunction(attr->getAdjointName(), context.getModule());
-    assert(adjoint);
-  }
   if (attr->hasJVP()) {
     jvp = lookUpOrLinkFunction(attr->getJVPName(), context.getModule());
     assert(jvp);
@@ -3658,22 +3646,10 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
     return;
   }
 
-  if (adjoint) {
-    // If we already have an adjoint, then we don't need to synthesize the
-    // primal or the adjoint.
-    primalSynthesisState = FunctionSynthesisState::NotNeeded;
-    adjointSynthesisState = FunctionSynthesisState::NotNeeded;
-  } else {
-    assert(!attr->hasPrimal() &&
-           "[differentiable] attr without adjoint should not have primal");
-
-    // We don't have the primal or adjoint, so we need to synthesize them.
-    primalSynthesisState = FunctionSynthesisState::Needed;
-    adjointSynthesisState = FunctionSynthesisState::Needed;
-    createEmptyPrimal();
-    createEmptyAdjoint();
-  }
-
+  primalSynthesisState = FunctionSynthesisState::Needed;
+  adjointSynthesisState = FunctionSynthesisState::Needed;
+  createEmptyPrimal();
+  createEmptyAdjoint();
   createVJP();
 }
 
@@ -3748,8 +3724,6 @@ void DifferentiationTask::createEmptyPrimal() {
   primal->setUnqualifiedOwnership();
   LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
                                 << *primal << '\n');
-
-  attr->setPrimalName(primalName);
 }
 
 void DifferentiationTask::createEmptyAdjoint() {
@@ -3879,8 +3853,6 @@ void DifferentiationTask::createEmptyAdjoint() {
   adjoint->setUnqualifiedOwnership();
   adjoint->setDebugScope(new (module)
                              SILDebugScope(original->getLocation(), adjoint));
-
-  attr->setAdjointName(adjName, /*primitive*/ false);
 }
 
 void DifferentiationTask::createJVP() {
@@ -4273,13 +4245,8 @@ void Differentiation::run() {
     // If `f` has a `[differentiable]` attribute, it should become a
     // differentiation task.
     for (auto *diffAttr : f.getDifferentiableAttrs()) {
-      if (diffAttr->hasPrimal() == diffAttr->hasAdjoint()) {
-        diffAttrs.push_back({&f, diffAttr});
-        continue;
-      }
-      // If only primal or adjoint is specified, it's an incomplete attribute.
-      astCtx.Diags.diagnose(f.getLocation().getSourceLoc(),
-                            diag::autodiff_incomplete_differentiable_attr);
+      diffAttrs.push_back({&f, diffAttr});
+      continue;
     }
     for (SILBasicBlock &bb : f)
       for (SILInstruction &i : bb)
