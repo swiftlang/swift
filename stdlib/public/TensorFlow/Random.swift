@@ -200,10 +200,10 @@ public final class BetaDistribution {
   /// algorithm, when both alpha and beta are greater than 1.
   ///
   /// - Parameters:
-  ///     - alpha: First Beta distribution shape parameter.
-  ///     - a: `min(alpha, beta)`.
-  ///     - b: `max(alpha, beta)`.
-  ///     - rng: Random number generator.
+  ///   - alpha: First Beta distribution shape parameter.
+  ///   - a: `min(alpha, beta)`.
+  ///   - b: `max(alpha, beta)`.
+  ///   - rng: Random number generator.
   ///
   /// - Returns: Sample obtained using Cheng's BB algorithm.
   private static func chengsAlgorithmBB<G: RandomNumberGenerator>(
@@ -283,7 +283,6 @@ public final class BetaDistribution {
           w = a * exp(v)
           break
         }
-
         if z >= k2 {
           continue
         }
