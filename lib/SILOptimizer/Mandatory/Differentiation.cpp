@@ -3910,10 +3910,10 @@ void DifferentiationTask::createJVP() {
       jvpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  jvp = fb.createFunction(original->getLinkage(), jvpName, jvpType,
-                          jvpGenericEnv, original->getLocation(),
-                          original->isBare(), IsNotTransparent,
-                          original->isSerialized());
+  auto linkage = getAutoDiffFunctionLinkage(original->getLinkage());
+  jvp = fb.createFunction(linkage, jvpName, jvpType, jvpGenericEnv,
+                          original->getLocation(), original->isBare(),
+                          IsNotTransparent, original->isSerialized());
   jvp->setUnqualifiedOwnership();
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
   attr->setJVPName(jvpName);
