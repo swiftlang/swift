@@ -3208,6 +3208,8 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
 
+  CanFunctionType substGenericArgs(SubstitutionMap subs) const;
+
   CanGenericSignature getGenericSignature() const {
     return CanGenericSignature(getPointer()->getGenericSignature());
   }
