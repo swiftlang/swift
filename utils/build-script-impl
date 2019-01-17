@@ -3145,7 +3145,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 # from this file as possible and just have a single call to lldb-dotest.
                 if [[ "$using_xcodebuild" == "FALSE" ]] ; then
                     with_pushd ${lldb_build_dir} \
-                     call ${NINJA_BIN} unittests/LLDBUnitTests
+                    call ${NINJA_BIN} unittests/LLDBUnitTests
+                    call ${NINJA_BIN} lldb-test-depends
                     with_pushd ${results_dir} \
                           call "${llvm_build_dir}/bin/llvm-lit" \
                                "${lldb_build_dir}/lit" \
