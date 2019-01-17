@@ -30,14 +30,18 @@ class DataSource {
 }
 
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
-func ofiltercompress_ifilterdecompress(_ contents: Data, using algo: Algorithm) throws -> Bool {
+func ofiltercompress_ifilterdecompress(
+  _ contents: Data, using algo: Algorithm
+) throws -> Bool {
 
   var payload = Data()
   var decompressed = Data()
 
   // Output filter compress
   let f = DataSource(contents)
-  let ofilter = try Compression.OutputFilter(.compress, using: algo) { (x:Data?) -> () in if x != nil { payload.append(x!) } }
+  let ofilter = try OutputFilter(.compress, using: algo) { (x: Data?) -> () in
+      if let x = x { payload.append(x) }
+  }
   while (true) {
     let i = f.readData(ofLength: 900)
     try ofilter.write(i) // will finalize when i is empty
@@ -46,38 +50,41 @@ func ofiltercompress_ifilterdecompress(_ contents: Data, using algo: Algorithm) 
 
   // Input filter decompress
   let g = DataSource(payload)
-  let ifilter = try InputFilter(.decompress, using: algo, readingFrom: { (x:Int) -> Data? in return g.readData(ofLength:x) } )
-  while (true) {
-    let i = try ifilter.readData(ofLength: 400)
-    if i == nil { break }
-    decompressed.append(i!)
+  let ifilter = try InputFilter(.decompress, using: algo) { (x: Int) -> Data? in
+    return g.readData(ofLength: x)
+  }
+  while let i = try ifilter.readData(ofLength: 400) {
+    decompressed.append(i)
   }
 
   print("ofilter | ifilter \(algo): \(contents.count) -> \(payload.count) -> \(decompressed.count)")
-  let pass = (contents == decompressed)
-  if !pass { print("FAIL") }
-
-  return pass
+  return contents == decompressed
 }
 
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
-func ifiltercompress_ofilterdecompress(_ contents: Data, using algo: Algorithm) throws -> Bool {
+func ifiltercompress_ofilterdecompress(
+  _ contents: Data, using algo: Algorithm
+) throws -> Bool {
 
   var payload = Data()
   var decompressed = Data()
 
   // Input filter compress
   let f = DataSource(contents)
-  let ifilter = try InputFilter(.compress, using: algo, readingFrom: { (x:Int) -> Data? in return f.readData(ofLength:x) } )
-  while (true) {
-    let i = try ifilter.readData(ofLength: 400)
-    if i == nil { break }
-    payload.append(i!)
+  let ifilter = try InputFilter(.compress, using: algo) {(x: Int) -> Data? in
+    return f.readData(ofLength:x)
+  }
+  while let i = try ifilter.readData(ofLength: 400) {
+    payload.append(i)
   }
 
   // Output filter decompress
   let g = DataSource(payload)
-  let ofilter = try OutputFilter(.decompress, using: algo) { (x:Data?) -> () in if x != nil { decompressed.append(x!) } }
+  let ofilter = try OutputFilter(.decompress, using: algo) {(x: Data?) -> () in
+    if let x = x {
+      decompressed.append(x)
+    }
+  }
   while (true) {
     let i = g.readData(ofLength: 900)
     try ofilter.write(i) // will finalize when i is empty
@@ -85,53 +92,57 @@ func ifiltercompress_ofilterdecompress(_ contents: Data, using algo: Algorithm) 
   }
 
   print("ifilter | ofilter \(algo): \(contents.count) -> \(payload.count) -> \(decompressed.count)")
-  let pass = (contents == decompressed)
-  if !pass { print("FAIL") }
 
-  return pass
+  return contents == decompressed
 }
 
-@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
-func test_all() throws -> Int { // return number of failed cases
-
-  var nfailed = 0
-  let allAlgos: [Algorithm] = [ .lz4, .zlib, .lzfse, .lzma ]
-
-  for len_blocks in [0,1,2,5,10,100] {
-
-    var testString = "";
-    for _ in 0 ..< len_blocks {
-      var s = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. "
+func randomString(withBlockLength n: Int) -> String {
+  var strings = [String]()
+  for _ in 0 ..< n {
+    var s = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. "
       // Change some random chars
       for _ in 1...10 {
         let pos = Int.random(in: 0 ..< s.count)
-        s = s.prefix(pos) + "#" + s.dropFirst(pos + 1)
+        let idx = s.index(s.startIndex, offsetBy: pos)
+        s = String(s[..<idx] + "#" + s[idx...])
       }
-      testString += s
-    }
-    let contents = testString.data(using: .utf8)!
-
-    for algo in allAlgos {
-
-      if !(try ofiltercompress_ifilterdecompress(contents, using: algo)) { nfailed += 1 }
-      if !(try ifiltercompress_ofilterdecompress(contents, using: algo)) { nfailed += 1 }
-
-    }
-
-  } // len_blocks
-
-  if nfailed > 0 { print("FAIL \(nfailed) tests") } else { print("PASS") }
-  return nfailed
+    strings.append(s)
+  }
+  return strings.joined(separator: "")
 }
 
 let tests = TestSuite("Compression")
 
-tests.test("Compression filters") {
-  var nfailed = 0
-  if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
-    do { nfailed = try test_all() } catch { print("exception caught"); nfailed = 1 }
+if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+
+  do {
+    for blockLength in [0, 1, 2, 5, 10, 100] {
+      let testString = randomString(withBlockLength: blockLength)
+      let contents = testString.data(using: .utf8)!
+
+      for algo in Algorithm.allCases {
+        tests.test("OutputFilter/Compress/InputFilter/Decompress/\(algo)/\(blockLength)") {
+          expectDoesNotThrow({
+            expectTrue(
+              try ofiltercompress_ifilterdecompress(contents, using: algo),
+              "Failing input: \(testString)"
+            )
+          })
+        }
+
+        tests.test("InputFilter/Compress/OutputFilter/Decompress/\(algo)/\(blockLength)") {
+          expectDoesNotThrow({
+            expectTrue(
+              try ifiltercompress_ofilterdecompress(contents, using: algo),
+              "Failing input: \(testString)"
+            )
+          })
+        }
+      }
+
+    } // blockLength
   }
-  expectEqual(nfailed,0)
+
 }
 
 runAllTests()
