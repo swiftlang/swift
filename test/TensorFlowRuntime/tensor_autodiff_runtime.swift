@@ -92,16 +92,24 @@ TensorADTests.testAllBackends("mean") {
   expectTrue(meanGradAlongAxes(input) == expected)
 }
 
+TensorADTests.testAllBackends("reshaped") {
+  let shapeTensor = Tensor<Int32>([2, 2, 2])
+  let input = Tensor<Float>(ones: [2, 4])
+  let reshapedPullback = pullback(at: input) { (a: Tensor<Float>) in a.reshaped(toShape: shapeTensor) }
+  let reshaped = Tensor<Float>(ones: [2, 2, 2])
+  expectTrue(reshapedPullback(reshaped) == input)
+}
+
 TensorADTests.testAllBackends("transposed") {
   let input = Tensor<Float>(ones: [2, 3])
   let transposed = Tensor<Float>(ones: [3, 2])
   let transposedPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed() }
   let transposedPermutationsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: [1, 0]) }
-  let transposedVariadiicsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: 1, 0) }
+  let transposedVariadicsPullback = pullback(at: input) { (a: Tensor<Float>) in a.transposed(withPermutations: 1, 0) }
 
   expectTrue(transposedPullback(transposed) == input)
   expectTrue(transposedPermutationsPullback(transposed) == input)
-  expectTrue(transposedVariadiicsPullback(transposed)  == input)
+  expectTrue(transposedVariadicsPullback(transposed) == input)
 }
 
 TensorADTests.testAllBackends("relu") {
