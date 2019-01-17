@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s
+// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types -sil-verify-all | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 
-sil_stage canonical
+sil_stage lowered
 import Builtin
 import Swift
 
@@ -26,6 +26,19 @@ public struct BigStruct {
 sil @testDestroyValue : $@convention(thin) (@owned BigStruct) -> ()  {
 entry(%x : $BigStruct):
   release_value %x : $BigStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil @capture : $@convention(thin) (@guaranteed BigStruct, Builtin.Int1) -> ()
+
+sil @test_partial_apply_stack : $@convention(thin) (@owned BigStruct, Builtin.Int1) -> () {
+entry(%x : $BigStruct, %i : $Builtin.Int1):
+  %f = function_ref @capture : $@convention(thin) (@guaranteed BigStruct, Builtin.Int1) -> ()
+  %p = partial_apply [callee_guaranteed] [on_stack] %f(%i) : $@convention(thin) (@guaranteed BigStruct, Builtin.Int1) -> ()
+  %m = mark_dependence %p : $@noescape @callee_guaranteed (@guaranteed BigStruct) -> () on %x : $BigStruct
+  %c = convert_function %m : $@noescape @callee_guaranteed (@guaranteed BigStruct) -> () to $@noescape @callee_guaranteed (@guaranteed BigStruct) -> (@error Error)
+  dealloc_stack %p : $@noescape @callee_guaranteed (@guaranteed BigStruct) -> ()
   %ret = tuple ()
   return %ret : $()
 }
