@@ -14,9 +14,7 @@ import Darwin
 import Foundation
 @_exported import Compression
 
-/**
- Compression algorithms, wraps the C API constants.
- */
+/// Compression algorithms, wraps the C API constants.
 public enum Algorithm: CaseIterable {
 
   /// LZFSE
@@ -41,9 +39,7 @@ public enum Algorithm: CaseIterable {
   }
 }
 
-/**
- Compression errors
- */
+/// Compression errors
 public enum FilterError: Error {
   /// Filter failed to initialize
   case filterInitError
@@ -55,9 +51,7 @@ public enum FilterError: Error {
   case writeToFinalizedFilter
 }
 
-/**
- Compression filter direction of operation, compress/decompress
- */
+/// Compression filter direction of operation, compress/decompress
 public enum FilterOperation {
   /// Compress raw data to a compressed payload
   case compress
@@ -76,15 +70,15 @@ public enum FilterOperation {
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension compression_stream {
 
-  /**
-   Initialize a compression_stream struct
-
-   - Parameter operation: direction of operation
-   - Parameter algorithm: compression algorithm
-
-   - Throws: `FilterError.filterInitError` if `algorithm` is not supported by the Compression stream API
-   */
-  init(operation: FilterOperation, algorithm: Algorithm) throws {
+  /// Initialize a compression_stream struct
+  ///
+  /// - Parameter operation: direction of operation
+  /// - Parameter algorithm: compression algorithm
+  ///
+  /// - Throws: `FilterError.filterInitError` if `algorithm` is not supported
+  ///           by the Compression stream API
+  ///
+  internal init(operation: FilterOperation, algorithm: Algorithm) throws {
     self.init(dst_ptr: UnsafeMutablePointer<UInt8>.allocate(capacity:0),
               dst_size: 0,
               src_ptr: UnsafeMutablePointer<UInt8>.allocate(capacity:0),
@@ -93,7 +87,6 @@ extension compression_stream {
     let status = compression_stream_init(&self, operation.rawValue, algorithm.rawValue)
     guard status == COMPRESSION_STATUS_OK else { throw FilterError.filterInitError }
   }
-
 }
 
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
@@ -104,17 +97,15 @@ public class OutputFilter {
   private let _writeFunc: (Data?) throws -> ()
   private var _finalized: Bool = false
 
-  /**
-   Initialize an output filter
-
-   - Parameters:
-   - operation: direction of operation
-   - algorithm: compression algorithm
-   - bufferCapacity: capacity of the internal data buffer
-   - writeFunc: called to write the processed data
-
-   - Throws: `FilterError.StreamInitError` if stream initialization failed
-   */
+  /// Initialize an output filter
+  ///
+  /// - Parameters:
+  /// - operation: direction of operation
+  /// - algorithm: compression algorithm
+  /// - bufferCapacity: capacity of the internal data buffer
+  /// - writeFunc: called to write the processed data
+  ///
+  /// - Throws: `FilterError.StreamInitError` if stream initialization failed
   public init(
     _ operation: FilterOperation,
     using algorithm: Algorithm,
@@ -127,19 +118,18 @@ public class OutputFilter {
     _writeFunc = writeFunc
   }
 
-  /**
-   Send data to output filter
-
-   Processed output will be sent to the output closure.
-   A call with empty/nil data is interpreted as finalize().
-   Writing non empty/nil data to a finalized stream is an error.
-
-   - Parameter data: data to process
-
-   - Throws:
-   `FilterError.filterProcessError` if an error occurs during processing
-   `FilterError.writeToFinalizedFilter` if `data` is not empty/nil, and the filter is the finalized state
-   */
+  /// Send data to output filter
+  ///
+  /// Processed output will be sent to the output closure.
+  /// A call with empty/nil data is interpreted as finalize().
+  /// Writing non empty/nil data to a finalized stream is an error.
+  ///
+  /// - Parameter data: data to process
+  ///
+  /// - Throws:
+  /// `FilterError.filterProcessError` if an error occurs during processing
+  /// `FilterError.writeToFinalizedFilter` if `data` is not empty/nil, and the
+  /// filter is the finalized state
   public func write(_ data: Data?) throws {
     // Finalize if data is empty/nil
     if data == nil || data!.isEmpty { try finalize() ; return }
@@ -155,15 +145,13 @@ public class OutputFilter {
     }
   }
 
-  /**
-   Finalize the stream, i.e. flush all data remaining in the stream
-
-   Processed output will be sent to the output closure.
-   When all output has been sent, the writingTo closure is called one last time with nil data.
-   Once the stream is finalized, writing non empty/nil data to the stream will throw an exception.
-
-   - Throws: `FilterError.StreamProcessError` if an error occurs during processing
-   */
+  /// Finalize the stream, i.e. flush all data remaining in the stream
+  ///
+  /// Processed output will be sent to the output closure.
+  /// When all output has been sent, the writingTo closure is called one last time with nil data.
+  /// Once the stream is finalized, writing non empty/nil data to the stream will throw an exception.
+  ///
+  /// - Throws: `FilterError.StreamProcessError` if an error occurs during processing
   public func finalize() throws {
     // Do nothing if already finalized
     if _finalized { return }
@@ -223,17 +211,15 @@ public class InputFilter {
   private var _eofReached: Bool = false // did we read end-of-file from the input?
   private var _endReached: Bool = false // did we reach end-of-file from the decoder stream?
 
-  /**
-   Initialize an input filter
-
-   - Parameters:
-   - operation: direction of operation
-   - algorithm: compression algorithm
-   - bufferCapacity: capacity of the internal data buffer
-   - readFunc: called to read the input data
-
-   - Throws: `FilterError.filterInitError` if filter initialization failed
-   */
+  /// Initialize an input filter
+  ///
+  /// - Parameters:
+  /// - operation: direction of operation
+  /// - algorithm: compression algorithm
+  /// - bufferCapacity: capacity of the internal data buffer
+  /// - readFunc: called to read the input data
+  ///
+  /// - Throws: `FilterError.filterInitError` if filter initialization failed
   public init(
     _ operation: FilterOperation,
     using algorithm: Algorithm,
@@ -245,21 +231,19 @@ public class InputFilter {
     _readFunc = readFunc
   }
 
-  /**
-   Read processed data from the filter
-
-   Input data, when needed, is obtained from the input closure
-   When the input closure returns a nil or empty Data object, the filter will be
-   finalized, and after all processed data has been read, readData will return nil
-   to signal end of input
-
-   - Parameter count: max number of bytes to read from the filter
-
-   - Returns: a new Data object containing at most `count` output bytes, or nil if no more data is available
-
-   - Throws:
-   `FilterError.filterProcessError` if an error occurs during processing
-   */
+  /// Read processed data from the filter
+  ///
+  /// Input data, when needed, is obtained from the input closure
+  /// When the input closure returns a nil or empty Data object, the filter will be
+  /// finalized, and after all processed data has been read, readData will return nil
+  /// to signal end of input
+  ///
+  /// - Parameter count: max number of bytes to read from the filter
+  ///
+  /// - Returns: a new Data object containing at most `count` output bytes, or nil if no more data is available
+  ///
+  /// - Throws:
+  /// `FilterError.filterProcessError` if an error occurs during processing
   public func readData(ofLength count: Int) throws -> Data? {
     // Sanity check
     precondition(count > 0, "number of bytes to read can't be 0")
