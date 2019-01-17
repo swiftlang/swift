@@ -99,3 +99,8 @@ public func dontCrash<In, Out>(test: Bool, body: @escaping ((In) -> Out, In) -> 
 public func to_stack_of_convert_function(p: UnsafeMutableRawPointer?) {
   _ = p.map(String.init(describing:))
 }
+
+
+public func no_dealloc_stack_before_unreachable(_ message: String, fileName: StaticString = #file, lineNumber: Int = #line) -> Never  {
+  Swift.fatalError(message, file: fileName, line: UInt(lineNumber))
+}

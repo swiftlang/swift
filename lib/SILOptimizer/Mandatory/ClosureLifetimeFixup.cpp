@@ -297,6 +297,9 @@ static bool tryRewriteToPartialApplyStack(
   // Insert destroys of arguments after the apply and the dealloc_stack.
   if (auto *Apply = dyn_cast<ApplyInst>(singleApplyUser)) {
     auto InsertPt = std::next(SILBasicBlock::iterator(Apply));
+    // Don't insert dealloc_stacks at unreachable.
+    if (isa<UnreachableInst>(*InsertPt))
+      return true;
     SILBuilderWithScope B3(InsertPt);
     B3.createDeallocStack(loc, newPA);
     insertDestroyOfCapturedArguments(newPA, B3);
@@ -684,6 +687,7 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
 
     bool checkStackNesting = false;
     bool modifiedCFG = false;
+
     if (fixupClosureLifetimes(*getFunction(), checkStackNesting)) {
       if (checkStackNesting){
         StackNesting SN;
