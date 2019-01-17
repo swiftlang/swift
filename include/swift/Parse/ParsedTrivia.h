@@ -50,6 +50,14 @@ public:
     return Len;
   }
 
+  bool operator==(const ParsedTriviaPiece &Other) const {
+    return Kind == Other.Kind && Length == Other.Length;
+  }
+
+  bool operator!=(const ParsedTriviaPiece &Other) const {
+    return !(*this == Other);
+  }
+
   static syntax::Trivia
   convertToSyntaxTrivia(ArrayRef<ParsedTriviaPiece> pieces, SourceLoc loc,
                         const SourceManager &SM, unsigned bufferID);
@@ -99,6 +107,24 @@ struct ParsedTrivia {
     } else {
       Pieces.back().extendLength(length);
     }
+  }
+
+  bool operator==(const ParsedTrivia &Other) const {
+    if (Pieces.size() != Other.size()) {
+      return false;
+    }
+
+    for (size_t i = 0; i < Pieces.size(); ++i) {
+      if (Pieces[i] != Other.Pieces[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  bool operator!=(const ParsedTrivia &Other) const {
+    return !(*this == Other);
   }
 
   syntax::Trivia convertToSyntaxTrivia(SourceLoc loc, const SourceManager &SM,
