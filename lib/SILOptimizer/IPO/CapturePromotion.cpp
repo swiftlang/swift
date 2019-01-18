@@ -1034,6 +1034,17 @@ static bool scanUsesForEscapesAndMutations(Operand *Op,
     return isPartialApplyNonEscapingUser(Op, PAI, State);
   }
 
+  // A mark_dependence user on a partial_apply is safe.
+  if (auto *MD = dyn_cast<MarkDependenceInst>(User)) {
+    if (MD->getBase() == Op->get()) {
+      auto parent = MD->getValue();
+      while ((MD = dyn_cast<MarkDependenceInst>(parent))) {
+        parent = MD->getValue();
+      }
+      return isa<PartialApplyInst>(parent);
+    }
+  }
+
   if (auto *PBI = dyn_cast<ProjectBoxInst>(User)) {
     // It is assumed in later code that we will only have 1 project_box. This
     // can be seen since there is no code for reasoning about multiple
@@ -1198,6 +1209,26 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
   return B.createProjectBox(Box->getLoc(), Box, 0);
 }
 
+/// Change the base in mark_dependence.
+static void
+mapMarkDependenceArguments(SingleValueInstruction *root,
+                           llvm::DenseMap<SILValue, SILValue> &map) {
+  for (auto *Use : root->getUses()) {
+    if (auto *MD = dyn_cast<MarkDependenceInst>(Use->getUser())) {
+      mapMarkDependenceArguments(MD, map);
+      auto iter = map.find(MD->getBase());
+      if (iter != map.end()) {
+        MD->setBase(iter->second);
+      }
+      // Remove mark_dependence on trivial values.
+      if (MD->getBase()->getType().isTrivial(MD->getModule())) {
+        MD->replaceAllUsesWith(MD->getValue());
+        MD->eraseFromParent();
+      }
+    }
+  }
+}
+
 /// Given a partial_apply instruction and a set of promotable indices,
 /// clone the closure with the promoted captures and replace the partial_apply
 /// with a partial_apply of the new closure, fixing up reference counting as
@@ -1236,6 +1267,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
   unsigned OpCount = PAI->getNumOperands() - PAI->getNumTypeDependentOperands();
   SmallVector<SILValue, 16> Args;
   auto NumIndirectResults = calleeConv.getNumIndirectSILResults();
+  llvm::DenseMap<SILValue, SILValue> capturedMap;
+  llvm::SmallSet<SILValue, 16> newCaptures;
   for (; OpNo != OpCount; ++OpNo) {
     unsigned Index = OpNo - 1 + FirstIndex;
     if (!PromotableIndices.count(Index)) {
@@ -1250,8 +1283,18 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
     SILValue Addr = getOrCreateProjectBoxHelper(Box);
 
     auto &typeLowering = M.getTypeLowering(Addr->getType());
-    Args.push_back(
-        typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake));
+    auto newCaptured =
+        typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake);
+    Args.push_back(newCaptured);
+
+    capturedMap[Box] = newCaptured;
+    newCaptures.insert(newCaptured);
+
+    // A partial_apply [stack] does not own the captured argument but we must
+    // destroy the projected object. We will do so after having created the new
+    // partial_apply below.
+    if (PAI->isOnStack())
+      continue;
 
     // Cleanup the captured argument.
     //
@@ -1268,7 +1311,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
   // Create a new partial apply with the new arguments.
   auto *NewPAI = B.createPartialApply(
       PAI->getLoc(), FnVal, PAI->getSubstitutionMap(), Args,
-      PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
+      PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      PAI->isOnStack());
   PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
   if (FRI->use_empty()) {
@@ -1276,6 +1320,21 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
     // TODO: If this is the last use of the closure, and if it has internal
     // linkage, we should remove it from the SILModule now.
   }
+
+  if (NewPAI->isOnStack()) {
+    // Insert destroy's of new captured arguments.
+    for (auto *Use : NewPAI->getUses()) {
+      if (auto *DS = dyn_cast<DeallocStackInst>(Use->getUser())) {
+        B.setInsertionPoint(std::next(SILBasicBlock::iterator(DS)));
+        insertDestroyOfCapturedArguments(NewPAI, B, [&](SILValue arg) -> bool {
+          return newCaptures.count(arg);
+        });
+      }
+    }
+    // Map the mark dependence arguments.
+    mapMarkDependenceArguments(NewPAI, capturedMap);
+  }
+
   return ClonedFn;
 }
 

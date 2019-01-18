@@ -4934,13 +4934,16 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
   auto PartialApplyConvention = ParameterConvention::Direct_Owned;
   bool IsNonThrowingApply = false;
+  bool IsNoEscape = false;
   StringRef AttrName;
-  
-  if (parseSILOptional(AttrName, *this)) {
+
+  while (parseSILOptional(AttrName, *this)) {
     if (AttrName.equals("nothrow"))
       IsNonThrowingApply = true;
     else if (AttrName.equals("callee_guaranteed"))
       PartialApplyConvention = ParameterConvention::Direct_Guaranteed;
+    else if (AttrName.equals("on_stack"))
+      IsNoEscape = true;
     else
       return true;
   }
@@ -5071,8 +5074,10 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = B.createPartialApply(InstLoc, FnVal, subs, Args,
-                                     PartialApplyConvention);
+    ResultVal = B.createPartialApply(
+        InstLoc, FnVal, subs, Args, PartialApplyConvention,
+        IsNoEscape ? PartialApplyInst::OnStackKind::OnStack
+                   : PartialApplyInst::OnStackKind::NotOnStack);
     break;
   }
   case SILInstructionKind::TryApplyInst: {

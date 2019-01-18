@@ -1254,7 +1254,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
 /// Emit a partial application thunk for a function pointer applied to a partial
 /// set of argument values.
-void irgen::emitFunctionPartialApplication(
+Optional<StackAddress> irgen::emitFunctionPartialApplication(
     IRGenFunction &IGF, SILFunction &SILFn, const FunctionPointer &fn,
     llvm::Value *fnContext, Explosion &args, ArrayRef<SILParameterInfo> params,
     SubstitutionMap subs, CanSILFunctionType origType,
@@ -1269,8 +1269,6 @@ void irgen::emitFunctionPartialApplication(
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
-
-  assert(!outType->isNoEscape());
 
   // Reserve space for polymorphic bindings.
   auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
@@ -1398,7 +1396,7 @@ void irgen::emitFunctionPartialApplication(
     llvm::Value *ctx = args.claimNext();
     ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
     out.add(ctx);
-    return;
+    return {};
   }
   
   Optional<FunctionPointer> staticFn;
@@ -1437,14 +1435,20 @@ void irgen::emitFunctionPartialApplication(
     llvm::Value *ctx = args.claimNext();
     if (isIndirectFormalParameter(*singleRefcountedConvention))
       ctx = IGF.Builder.CreateLoad(ctx, IGF.IGM.getPointerAlignment());
+
+    auto expectedClosureTy =
+        outType->isNoEscape() ? IGF.IGM.OpaquePtrTy : IGF.IGM.RefCountedPtrTy;
+
     // We might get a struct containing a pointer e.g type <{ %AClass* }>
-    if (ctx->getType() != IGF.IGM.RefCountedPtrTy)
-      ctx = IGF.coerceValue(ctx, IGF.IGM.RefCountedPtrTy, IGF.IGM.DataLayout);
+    if (ctx->getType() != expectedClosureTy)
+      ctx = IGF.coerceValue(ctx, expectedClosureTy, IGF.IGM.DataLayout);
     out.add(ctx);
-    return;
+    if (outType->isNoEscape())
+      return StackAddress();
+    return {};
   }
 
-  // Store the context arguments on the heap.
+  // Store the context arguments on the heap/stack.
   assert(argValTypes.size() == argTypeInfos.size()
          && argTypeInfos.size() == argConventions.size()
          && "argument info lists out of sync");
@@ -1457,13 +1461,26 @@ void irgen::emitFunctionPartialApplication(
                                                        layout);
 
   llvm::Value *data;
-  if (args.empty() && layout.isKnownEmpty()) {
-    data = IGF.IGM.RefCountedNull;
-  } else {
-    // Allocate a new object.
-    HeapNonFixedOffsets offsets(IGF, layout);
 
-    data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
+  Optional<StackAddress> stackAddr;
+
+  if (args.empty() && layout.isKnownEmpty()) {
+    if (outType->isNoEscape())
+      data = llvm::ConstantPointerNull::get(IGF.IGM.OpaquePtrTy);
+    else
+      data = IGF.IGM.RefCountedNull;
+  } else {
+
+    // Allocate a new object on the heap or stack.
+    HeapNonFixedOffsets offsets(IGF, layout);
+    if (outType->isNoEscape()) {
+      stackAddr = IGF.emitDynamicAlloca(
+          IGF.IGM.Int8Ty, layout.emitSize(IGF.IGM), Alignment(16));
+      stackAddr = stackAddr->withAddress(IGF.Builder.CreateBitCast(
+          stackAddr->getAddress(), IGF.IGM.OpaquePtrTy));
+      data = stackAddr->getAddress().getAddress();
+    } else
+      data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
     Address dataAddr = layout.emitCastTo(IGF, data);
     
     unsigned i = 0;
@@ -1531,6 +1548,7 @@ void irgen::emitFunctionPartialApplication(
   forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
   out.add(forwarder);
   out.add(data);
+  return stackAddr;
 }
 
 /// Emit the block copy helper for a block.

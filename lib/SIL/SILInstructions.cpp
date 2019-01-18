@@ -503,19 +503,19 @@ PartialApplyInst::PartialApplyInst(
     // PartialApplyInst
     // should derive the type of its result by partially applying the callee's
     // type.
-    : InstructionBase(Loc, Callee, SubstCalleeTy, Subs,
-                      Args, TypeDependentOperands, SpecializationInfo,
-                      ClosureType) {}
+    : InstructionBase(Loc, Callee, SubstCalleeTy, Subs, Args,
+                      TypeDependentOperands, SpecializationInfo, ClosureType) {}
 
 PartialApplyInst *PartialApplyInst::create(
     SILDebugLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
     SubstitutionMap Subs, ParameterConvention CalleeConvention, SILFunction &F,
     SILOpenedArchetypesState &OpenedArchetypes,
-    const GenericSpecializationInformation *SpecializationInfo) {
+    const GenericSpecializationInformation *SpecializationInfo,
+    OnStackKind onStack) {
   SILType SubstCalleeTy =
       Callee->getType().substGenericArgs(F.getModule(), Subs);
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
-      SubstCalleeTy, Args.size(), F.getModule(), {}, CalleeConvention);
+      SubstCalleeTy, Args.size(), F.getModule(), {}, CalleeConvention, onStack);
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,

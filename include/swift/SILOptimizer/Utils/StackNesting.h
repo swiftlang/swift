@@ -98,10 +98,10 @@ class StackNesting {
   ///
   /// Each stack location is allocated by a single allocation instruction.
   struct StackLoc {
-    StackLoc(AllocationInst *Alloc) : Alloc(Alloc) { }
+    StackLoc(SingleValueInstruction *Alloc) : Alloc(Alloc) { }
 
     /// Back-link to the allocation instruction.
-    AllocationInst *Alloc;
+    SingleValueInstruction *Alloc;
 
     /// Bit-set which represents all alive locations at this allocation.
     /// It obviously includes this location itself. And it includes all "outer"
