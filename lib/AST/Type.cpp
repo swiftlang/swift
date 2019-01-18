@@ -2484,7 +2484,7 @@ Type ReplaceOpaqueTypesWithUnderlyingTypes::operator()(
   
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substTy.substOpaqueTypesWithUnderlyingTypes(expansion);
+    return substTy.substOpaqueTypesWithUnderlyingTypes();
   }
   return substTy;
 }
@@ -2522,14 +2522,13 @@ ReplaceOpaqueTypesWithUnderlyingTypes::operator()(CanType maybeOpaqueType,
   
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substRef.substOpaqueTypesWithUnderlyingTypes(substTy, expansion);
+    return substRef.substOpaqueTypesWithUnderlyingTypes(substTy);
   }
   return substRef;
 }
 
-Type Type::substOpaqueTypesWithUnderlyingTypes(
-                                          ResilienceExpansion expansion) const {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(expansion);
+Type Type::substOpaqueTypesWithUnderlyingTypes() const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer;
   return subst(replacer, replacer,
                SubstFlags::SubstituteOpaqueArchetypes
                // TODO(opaque): Currently lowered types always get opaque types
