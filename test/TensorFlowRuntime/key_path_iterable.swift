@@ -6,7 +6,6 @@
 //
 // `KeyPathIterable` tests.
 
-import TensorFlow
 import StdlibUnittest
 
 var KeyPathIterableTests = TestSuite("KeyPathIterable")
@@ -37,7 +36,7 @@ struct ComplexNested : KeyPathIterable, Equatable {
   var dictionary: [String : Simple]
 }
 
-KeyPathIterableTests.test("Simple") {
+KeyPathIterableTests.test("StructSimple") {
   var x = Simple(w: 1, b: 2)
   expectEqual([\Simple.w, \Simple.b], x.allKeyPaths)
   expectEqual([\Simple.w, \Simple.b], x.allKeyPaths(to: Float.self))
@@ -54,7 +53,7 @@ KeyPathIterableTests.test("Simple") {
   expectEqual(Simple(w: 2, b: 4), x)
 }
 
-KeyPathIterableTests.test("Mixed") {
+KeyPathIterableTests.test("StructMixed") {
   var x = Mixed(string: "hello", float: .pi, int: 0)
   expectEqual([\Mixed.string, \Mixed.float, \Mixed.int], x.allKeyPaths)
   expectEqual([\Mixed.string, \Mixed.float, \Mixed.int], x.recursivelyAllKeyPaths)
@@ -80,7 +79,7 @@ KeyPathIterableTests.test("Mixed") {
   expectEqual(Mixed(string: "hello world", float: .pi, int: 0), x)
 }
 
-KeyPathIterableTests.test("SimpleNested") {
+KeyPathIterableTests.test("StructSimpleNested") {
   var x = Nested(simple: Simple(w: 1, b: 2),
                  mixed: Mixed(string: "foo", float: 3, int: 0))
 
@@ -117,7 +116,7 @@ KeyPathIterableTests.test("SimpleNested") {
   expectEqual(expected, x)
 }
 
-KeyPathIterableTests.test("ComplexNested") {
+KeyPathIterableTests.test("StructComplexNested") {
   var x = ComplexNested(float: 1, simple: Simple(w: 3, b: 4),
                         array: [Simple(w: 5, b: 6), Simple(w: 7, b: 8)],
                         dictionary: ["foo" : Simple(w: 1, b: 2),
@@ -170,6 +169,58 @@ KeyPathIterableTests.test("ComplexNested") {
                                array: [Simple(w: 5, b: 6), Simple(w: 7, b: 8)],
                                dictionary: ["foo" : Simple(w: 2, b: 3),
                                             "bar" : Simple(w: 4, b: 5)])
+  expectEqual(expected, x)
+}
+
+class BaseClass : KeyPathIterable, Equatable {
+  var x: Int
+  var y: Float
+  init(x: Int, y: Float) {
+    self.x = x
+    self.y = y
+  }
+  static func ==(lhs: BaseClass, rhs: BaseClass) -> Bool {
+    return lhs.x == rhs.x && lhs.y == rhs.y
+  }
+}
+// Subclasses inherit conformances from superclasses.
+// Thus, derived conformances are not triggered for `SubClass`.
+// This is unideal but known behavior.
+class SubClass : BaseClass {
+  var z: Int
+  init(z: Int) {
+    self.z = z
+    super.init(x: 1, y: 2)
+  }
+}
+
+KeyPathIterableTests.test("ClassSimple") {
+  var x = BaseClass(x: 1, y: 2)
+  expectEqual([\BaseClass.x, \BaseClass.y], x.allKeyPaths)
+  expectEqual([\BaseClass.x, \BaseClass.y], x.recursivelyAllKeyPaths)
+  expectEqual([\BaseClass.x], x.allKeyPaths(to: Int.self))
+  expectEqual([\BaseClass.y], x.allKeyPaths(to: Float.self))
+
+  for kp in x.recursivelyAllWritableKeyPaths(to: Float.self) {
+    x[keyPath: kp] += 1
+  }
+  let expected = BaseClass(x: 1, y: 3)
+  expectEqual(expected, x)
+}
+
+KeyPathIterableTests.test("ClassInheritance") {
+  var x = SubClass(z: 3)
+  expectEqual([\BaseClass.x, \BaseClass.y], x.allKeyPaths)
+  // FIXME: `recursivelyAllKeyPaths` currently crashes due to an
+  // "invalid unsafeDowncast" fatal error in key path implementation logic.
+  expectEqual([\BaseClass.x, \BaseClass.y], x.recursivelyAllKeyPaths)
+  expectEqual([\BaseClass.x], x.allKeyPaths(to: Int.self))
+  expectEqual([\BaseClass.y], x.allKeyPaths(to: Float.self))
+
+  for kp in x.recursivelyAllWritableKeyPaths(to: Float.self) {
+    x[keyPath: kp] += 1
+  }
+  let expected = SubClass(z: 3)
   expectEqual(expected, x)
 }
 

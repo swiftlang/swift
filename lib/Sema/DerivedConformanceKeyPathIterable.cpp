@@ -31,9 +31,8 @@
 using namespace swift;
 
 bool DerivedConformance::canDeriveKeyPathIterable(NominalTypeDecl *nominal) {
-  // Note: we could extend synthesis to support classes.
-  // Subclasses need to append `allKeyPaths` to `super.allKeyPaths`.
-  return isa<StructDecl>(nominal);
+  // Synthesis supports structs and classes.
+  return isa<StructDecl>(nominal) || isa<ClassDecl>(nominal);
 }
 
 // Compute `PartialKeyPathType<Nominal>`, bound to the given nominal

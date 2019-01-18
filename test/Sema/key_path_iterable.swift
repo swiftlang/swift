@@ -74,6 +74,15 @@ struct A<T> {
   }
 }
 
+// Test classes.
+class BaseClass : KeyPathIterable {
+  var x: Int
+  var y: Float
+}
+class SubClass : BaseClass {
+  var z: Int
+}
+
 // Test generic optimizer.
 
 // `pow` is defined in Darwin on `Float` and `Double`, but there doesn't exist
