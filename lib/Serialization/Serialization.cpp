@@ -475,6 +475,8 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
     return cast<AbstractFunctionDecl>(DC);
   case DeclContextKind::SubscriptDecl:
     return cast<SubscriptDecl>(DC);
+  case DeclContextKind::EnumElementDecl:
+    return cast<EnumElementDecl>(DC);
   }
 
   llvm_unreachable("Unhandled DeclContextKind in switch.");
@@ -1870,6 +1872,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::SerializedLocal:
+  case DeclContextKind::EnumElementDecl:
     llvm_unreachable("cannot cross-reference this context");
 
   case DeclContextKind::FileUnit:
@@ -2405,6 +2408,7 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
   case DeclContextKind::SubscriptDecl:
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::ExtensionDecl:
+  case DeclContextKind::EnumElementDecl:
     declOrDeclContextID = addDeclRef(getDeclForContext(DC));
     isDecl = true;
     break;

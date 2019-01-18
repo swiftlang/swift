@@ -1331,6 +1331,10 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
   case DeclContextKind::SubscriptDecl:
     printName(os, cast<SubscriptDecl>(dc)->getFullName());
     break;
+
+  case DeclContextKind::EnumElementDecl:
+    printName(os, cast<EnumElementDecl>(dc)->getFullName());
+    break;
   }
 }
 

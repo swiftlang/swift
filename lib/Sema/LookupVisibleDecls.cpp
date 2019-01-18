@@ -294,9 +294,9 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 
       // These cases are probably impossible here but can also just
       // be safely ignored.
-      case DeclKind::EnumElement:
       case DeclKind::Param:
       case DeclKind::Module:
+      case DeclKind::EnumElement:
         return;
 
       // For other kinds of values, check if we already reported a decl

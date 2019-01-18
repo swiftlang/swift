@@ -1508,6 +1508,11 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
     return appendEntity(fn);
   }
 
+  case DeclContextKind::EnumElementDecl: {
+    auto eed = cast<EnumElementDecl>(ctx);
+    return appendEntity(eed);
+  }
+
   case DeclContextKind::SubscriptDecl:
     // FIXME: We may need to do something here if subscripts contain any symbols
     // exposed with linkage names, or if/when they get generic parameters.
