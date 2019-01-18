@@ -444,6 +444,10 @@ void swift::simple_display(llvm::raw_ostream &out,
   x.dc->printContext(out);
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const KnownProtocolKind kind) {
+  out << getProtocolName(kind);
+}
+
 void DefaultTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   diags.diagnose(SourceLoc(), diag::circular_reference);
 }
@@ -460,7 +464,7 @@ SourceFile *DefaultTypeRequest::getSourceFile() const {
   return getDeclContext()->getParentSourceFile();
 }
 
-llvm::DenseMap<const char *, Type> *DefaultTypeRequest::getCache() const {
+std::array<Type, NumKnownProtocols> *DefaultTypeRequest::getCache() const {
   SourceFile *SF = getSourceFile();
   return !SF ? nullptr : &SF->defaultTypeRequestCache;
 }
@@ -469,13 +473,41 @@ Optional<Type> DefaultTypeRequest::getCachedResult() const {
   auto const *cache = getCache();
   if (!cache)
     return None;
-  auto const &iter = cache->find(getTypeName());
-  return iter == cache->end() ? None : Optional<Type>(iter->second);
+  return (*cache)[size_t(getKnownProtocolKind())];
 }
 
 void DefaultTypeRequest::cacheResult(Type value) const {
   auto *cache = getCache();
   if (!cache)
     return;
-  cache->insert(std::make_pair(getTypeName(), value));
+  (*cache)[size_t(getKnownProtocolKind())] = value;
+}
+
+
+const char *DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
+  switch (knownProtocolKind) {
+      
+    // clang-format off
+    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
+      case KnownProtocolKind::Id: return typeName;
+    # include "swift/AST/KnownProtocols.def"
+    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+    //clang-format on
+      
+    default: return nullptr;
+  }
+}
+
+bool DefaultTypeRequest::getPerformLocalLookup(const KnownProtocolKind knownProtocolKind) {
+  switch (knownProtocolKind) {
+      
+    // clang-format off
+    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
+      case KnownProtocolKind::Id: return performLocalLookup;
+    # include "swift/AST/KnownProtocols.def"
+    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+    //clang-format on
+      
+    default: return false;
+  }
 }

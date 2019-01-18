@@ -349,13 +349,14 @@ struct DeclContextWrapper {
   }
 };
 
+void simple_display(llvm::raw_ostream &out, const KnownProtocolKind);
 void simple_display(llvm::raw_ostream &out, const DeclContextWrapper &x);
 class TypeChecker;
 
 // Find the type in the cache or look it up
 class DefaultTypeRequest
     : public SimpleRequest<DefaultTypeRequest, CacheKind::SeparatelyCached,
-                           Type, const char *, bool, const DeclContextWrapper> {
+                           Type, KnownProtocolKind, const DeclContextWrapper> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -363,7 +364,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type> evaluate(Evaluator &eval, const char *, bool,
+  llvm::Expected<Type> evaluate(Evaluator &eval, KnownProtocolKind,
                                 const DeclContextWrapper) const;
 
 public:
@@ -377,14 +378,16 @@ public:
   void cacheResult(Type value) const;
 
 private:
-  const char *getTypeName() const { return std::get<0>(getStorage()); }
-  bool getPerformLocalLookup() const { return std::get<1>(getStorage()); }
+  KnownProtocolKind getKnownProtocolKind() const { return std::get<0>(getStorage()); }
   const DeclContext *getDeclContext() const {
-    return std::get<2>(getStorage()).dc;
+    return std::get<1>(getStorage()).dc;
   }
+                             
+  static const char *getTypeName(KnownProtocolKind);
+  static bool getPerformLocalLookup(KnownProtocolKind);
   TypeChecker &getTypeChecker() const;
   SourceFile *getSourceFile() const;
-  llvm::DenseMap<const char *, Type> *getCache() const;
+  std::array<Type, NumKnownProtocols> *getCache() const;
 };
 
 /// The zone number for the type checker.
