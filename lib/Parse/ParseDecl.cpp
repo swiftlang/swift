@@ -3498,27 +3498,9 @@ bool Parser::canDelayMemberDeclParsing() {
   // If explicitly disabled, respect the flag.
   if (!DelayBodyParsing)
     return false;
-  // There's no fundamental reasons that SIL cannnot be lasily parsed. We need
-  // to keep SILParserTUStateBase persistent to make it happen.
-  if (isInSILMode())
-    return false;
-  // Calculating interface hash requires tokens consumed in the original order.
-  if (SF.hasInterfaceHash())
-    return false;
-  if (SF.Kind == SourceFileKind::REPL)
-    return false;
-  // We always collect the entire syntax tree for IDE uses.
-  if (SF.shouldCollectToken())
-    return false;
-  if (SF.shouldBuildSyntaxTree())
-    return false;
-  // Recovering parser status later for #sourceLocaion is not-trivial and
+  // Recovering parser status later for #sourceLocation is not-trivial and
   // it may not worth it.
   if (InPoundLineEnvironment)
-    return false;
-  // The first code completion pass looks for code completion tokens extensively,
-  // so we cannot lazily parse members.
-  if (isCodeCompletionFirstPass())
     return false;
 
   // Skip until the matching right curly bracket; if we find a pound directive,
