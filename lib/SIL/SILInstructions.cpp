@@ -594,13 +594,14 @@ AutoDiffFunctionInst::AutoDiffFunctionInst(
     SILModule &module, SILDebugLocation debugLoc,
     const SmallBitVector &parameterIndices, unsigned differentiationOrder,
     SILValue originalFunction, ArrayRef<SILValue> associatedFunctions)
-    : InstructionBaseWithTrailingOperands(originalFunction, associatedFunctions,
-          debugLoc, getAutoDiffType(originalFunction, differentiationOrder,
-                                    parameterIndices), ValueOwnershipKind::Any),
+    : InstructionBaseWithTrailingOperands(
+          originalFunction, associatedFunctions, debugLoc,
+          getAutoDiffType(originalFunction, differentiationOrder,
+                          parameterIndices),
+          originalFunction.getOwnershipKind()),
       parameterIndices(parameterIndices),
       differentiationOrder(differentiationOrder),
-      numOperands(1 + associatedFunctions.size()) {
-}
+      numOperands(1 + associatedFunctions.size()) {}
 
 AutoDiffFunctionInst *AutoDiffFunctionInst::create(
     SILModule &module, SILDebugLocation debugLoc,
@@ -699,7 +700,7 @@ AutoDiffFunctionExtractInst::AutoDiffFunctionExtractInst(
     : InstructionBase(debugLoc,
                       getExtracteeType(theFunction, extractee,
                                        differentiationOrder, module),
-                      ValueOwnershipKind::Any),
+                      theFunction.getOwnershipKind()),
       extractee(extractee), differentiationOrder(differentiationOrder),
       operands(this, theFunction) {}
 
