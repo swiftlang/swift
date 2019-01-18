@@ -712,6 +712,85 @@ namespace {
         }
       }
 
+      /// Naive compacting of successive spaces that share a prefix.
+      ///
+      /// This turns DISJOINT((.a1, .b1), (.a1, .b2), (.a2, .b1)) into
+      /// DISJOINT((.a1, DISJOINT(.b1, .b2)), (.a2, .b1)).
+      Space compact() {
+        if (getKind() != SpaceKind::Disjunct)
+          return *this;
+
+        SmallVector<Space, 4> newSpaces;
+
+        auto startingPoint = getSpaces().begin();
+        while (startingPoint != getSpaces().end()) {
+          auto lastOfSet = std::adjacent_find(startingPoint,
+                                              getSpaces().end(),
+                                              [](const Space &left,
+                                                 const Space &right) -> bool {
+            switch (PairSwitch(left.getKind(), right.getKind())) {
+            PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
+              assert(left.getType()->isEqual(right.getType()) &&
+                     "mismatched constructor types");
+              if (left.getHead() != right.getHead())
+                return true;
+
+              auto leftSpaces = left.getSpaces().begin();
+              auto leftEnd = left.getSpaces().end();
+              auto rightSpaces = right.getSpaces().begin();
+
+              // Note: assumes the two spaces are the same length, based on
+              // checking the type and constructor label.
+              auto mismatchPair = std::mismatch(leftSpaces, leftEnd,
+                                                rightSpaces);
+              if (mismatchPair.first == leftEnd) {
+                // The two spaces are identical. Unlikely, but possible.
+                return false;
+              }
+              if (std::next(mismatchPair.first) == leftEnd) {
+                // The two spaces are identical in all but the last argument.
+                // That means it's part of the same set.
+                return false;
+              }
+              return true;
+            }
+            default:
+              return true;
+            }
+          });
+
+          auto afterSet = lastOfSet;
+          if (afterSet != getSpaces().end())
+            afterSet = std::next(lastOfSet);
+          SWIFT_DEFER { startingPoint = afterSet; };
+
+          if (afterSet == std::next(startingPoint)) {
+            newSpaces.push_back(*startingPoint);
+            continue;
+          }
+
+          SmallVector<Space, 4> varyingElemSpaces;
+          for (const Space &space : llvm::make_range(startingPoint, afterSet)) {
+            const Space *lastSubSpace = nullptr;
+            // FIXME: std::forward_list is working against us here.
+            for (const Space &subSpace : space.getSpaces())
+              lastSubSpace = &subSpace;
+            assert(lastSubSpace &&
+                   "should only get here when there's something to vary");
+            varyingElemSpaces.push_back(*lastSubSpace);
+          }
+
+          SmallVector<Space, 4> subSpaces(startingPoint->getSpaces().begin(),
+                                          startingPoint->getSpaces().end());
+          subSpaces.back() = Space::forDisjunct(varyingElemSpaces);
+
+          newSpaces.push_back(Space::forConstructor(startingPoint->getType(),
+                                                    startingPoint->getHead(),
+                                                    subSpaces));
+        }
+        return Space::forDisjunct(newSpaces);
+      }
+
       // Decompose a type into its component spaces.
       static void decompose(TypeChecker &TC, const DeclContext *DC, Type tp,
                             SmallVectorImpl<Space> &arr) {
@@ -947,7 +1026,7 @@ namespace {
       }
 
       Space totalSpace = Space::forType(subjectType, Identifier());
-      Space coveredSpace = Space::forDisjunct(spaces);
+      Space coveredSpace = Space::forDisjunct(spaces).compact();
 
       unsigned minusCount = 0;
       auto diff = totalSpace.minus(coveredSpace, TC, DC, &minusCount);
