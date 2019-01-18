@@ -568,9 +568,8 @@ public:
   }
                                
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    // The constraint class/protocols on the opaque interface, as well as
-    // the naming decl for the opaque type, need to be accessible.
-#warning "todo"
+    // TODO(opaque): The constraint class/protocols on the opaque interface, as
+    // well as the naming decl for the opaque type, need to be accessible.
   }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
@@ -1153,9 +1152,8 @@ public:
   }
 
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    // The constraint class/protocols on the opaque interface, as well as
-    // the naming decl for the opaque type, need to be accessible.
-#warning "todo"
+    // TODO(opaque): The constraint class/protocols on the opaque interface, as
+    // well as the naming decl for the opaque type, need to be accessible.
   }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
