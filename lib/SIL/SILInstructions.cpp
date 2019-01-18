@@ -2121,10 +2121,10 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
   
   // TODO: support resilient opaque types
   rootType = rootType
-    .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal)
+    .substOpaqueTypesWithUnderlyingTypes()
     ->getCanonicalType();
   valueType = valueType
-    .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal)
+    .substOpaqueTypesWithUnderlyingTypes()
     ->getCanonicalType();
 
   auto newPattern = KeyPathPattern::create(M, signature, rootType, valueType,

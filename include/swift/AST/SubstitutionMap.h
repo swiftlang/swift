@@ -174,8 +174,7 @@ public:
   
   /// Replace opaque types in the replacement types in the map with their
   /// underlying types. Does not change keys.
-  SubstitutionMap substOpaqueTypesWithUnderlyingTypes(
-                                           ResilienceExpansion expansion) const;
+  SubstitutionMap substOpaqueTypesWithUnderlyingTypes() const;
 
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap

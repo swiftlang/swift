@@ -141,9 +141,8 @@ ProtocolConformanceRef::subst(Type origType,
 }
 
 ProtocolConformanceRef
-ProtocolConformanceRef::substOpaqueTypesWithUnderlyingTypes(Type origType,
-                                          ResilienceExpansion expansion) const {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(expansion);
+ProtocolConformanceRef::substOpaqueTypesWithUnderlyingTypes(Type origType) const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer;
   return subst(origType, replacer, replacer,
                SubstFlags::SubstituteOpaqueArchetypes);
 }
