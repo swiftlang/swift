@@ -2830,8 +2830,9 @@ deallocation.
 If ``[take]`` is specified then the underlying weak reference is invalidated
 implying that the weak reference count of the loaded value is decremented. If
 ``[take]`` is not specified then the underlying weak reference count is not
-effected by this operation (i.e. it is a +0 weak ref count operation). In either
-case, the strong reference count will be incremented.
+affected by this operation (i.e. it is a +0 weak ref count operation). In either
+case, the strong reference count will be incremented before any changes to the
+weak reference count.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand heap object.  It need not be atomic with respect to ``store_weak``
@@ -2851,9 +2852,12 @@ Initializes or reassigns a weak reference.  The operand may be ``nil``.
 
 If ``[initialization]`` is given, the weak reference must currently either be
 uninitialized or destroyed.  If it is not given, the weak reference must
-currently be initialized and after the evaluation the value that was originally
-referenced by the weak reference will have its weak reference count decremented
-by 1.
+currently be initialized. After the evaluation:
+
+* The value that was originally referenced by the weak reference will have
+  its weak reference count decremented by 1.
+* If the optional is non-nil, the reference in the optional's strong reference count is not
+  affected.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
