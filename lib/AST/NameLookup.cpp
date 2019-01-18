@@ -594,6 +594,14 @@ SelfBoundsFromWhereClauseRequest::evaluate(
   auto *extDecl = decl.dyn_cast<ExtensionDecl *>();
 
   DeclContext *dc = protoDecl ? (DeclContext *)protoDecl : (DeclContext *)extDecl;
+
+  // A protocol or extension 'where' clause can reference associated types of
+  // the protocol itself, so we have to start unqualified lookup from 'dc'.
+  //
+  // However, the right hand side of a 'Self' conformance constraint must be
+  // resolved before unqualified lookup into 'dc' can work, so we make an
+  // exception here and begin lookup from the parent context instead.
+  auto *lookupDC = dc->getParent();
   auto requirements = protoDecl ? protoDecl->getTrailingWhereClause()
                                 : extDecl->getTrailingWhereClause();
 
@@ -623,7 +631,7 @@ SelfBoundsFromWhereClauseRequest::evaluate(
     // Resolve the right-hand side.
     DirectlyReferencedTypeDecls rhsDecls;
     if (auto typeRepr = req.getConstraintRepr()) {
-      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, dc);
+      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, lookupDC);
     } else if (Type type = req.getConstraint()) {
       rhsDecls = directReferencesForType(type);
     }

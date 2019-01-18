@@ -574,18 +574,9 @@ LookupResult TypeChecker::lookupConstructors(DeclContext *dc, Type type,
   return lookupMember(dc, type, DeclBaseName::createConstructor(), options);
 }
 
-enum : unsigned {
-  /// Never consider a candidate that's this distance away or worse.
-  UnreasonableCallEditDistance = 8,
-
-  /// Don't consider candidates that score worse than the given distance
-  /// from the best candidate.
-  MaxCallEditDistanceFromBestCandidate = 1
-};
-
-static unsigned getCallEditDistance(DeclName writtenName,
-                                    DeclName correctedName,
-                                    unsigned maxEditDistance) {
+unsigned TypeChecker::getCallEditDistance(DeclName writtenName,
+                                          DeclName correctedName,
+                                          unsigned maxEditDistance) {
   // TODO: consider arguments.
   // TODO: maybe ignore certain kinds of missing / present labels for the
   //   first argument label?

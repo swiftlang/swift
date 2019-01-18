@@ -3172,6 +3172,12 @@ ERROR(continue_outside_loop,none,
 ERROR(continue_not_in_this_stmt,none,
       "'continue' cannot be used with %0 statements", (StringRef))
 
+ERROR(unresolved_label,none,
+      "use of unresolved label %0", (Identifier))
+ERROR(unresolved_label_corrected,none,
+      "use of unresolved label %0; did you mean %1?",
+      (Identifier, Identifier))
+
 // Switch Stmt
 ERROR(no_match_operator,none,
       "no binary '~=' operator available for 'switch' statement", ())
