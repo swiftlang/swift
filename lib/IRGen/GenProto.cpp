@@ -1460,12 +1460,11 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
                                 ProtocolConformanceRef associatedConformance) {
   // Substitute out opaque types.
   auto substAssocType = associatedType
-    .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal)
+    .substOpaqueTypesWithUnderlyingTypes()
     ->getCanonicalType();
   if (substAssocType != associatedType) {
     auto substAssocConformance = associatedConformance
-      .substOpaqueTypesWithUnderlyingTypes(associatedType,
-                                           ResilienceExpansion::Minimal);
+      .substOpaqueTypesWithUnderlyingTypes(associatedType);
     
     associatedType = substAssocType;
     associatedConformance = substAssocConformance;

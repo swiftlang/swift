@@ -493,9 +493,9 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
 }
 
 SubstitutionMap
-SubstitutionMap::substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion exp)
+SubstitutionMap::substOpaqueTypesWithUnderlyingTypes()
 const {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(exp);
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer;
   return subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
