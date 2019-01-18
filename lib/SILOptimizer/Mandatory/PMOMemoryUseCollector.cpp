@@ -294,6 +294,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       auto Kind = ([&]() -> PMOUseKind {
         if (UI->getOperandNumber() == CopyAddrInst::Src)
           return PMOUseKind::Load;
+        if (PointeeType.isTrivial(CAI->getModule()))
+          return PMOUseKind::InitOrAssign;
         if (CAI->isInitializationOfDest())
           return PMOUseKind::Initialization;
         return PMOUseKind::Assign;
