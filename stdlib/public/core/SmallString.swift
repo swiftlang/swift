@@ -178,10 +178,10 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
     }
   }
 
-  @inlinable // FIXME(inline-always) was usableFromInline
+  @inlinable
   // testable
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
-    @inline(__always) get {
+    get {
       // TODO(String performance): In-vector-register operation
       return self.withUTF8 { utf8 in
         let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
