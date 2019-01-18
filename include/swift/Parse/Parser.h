@@ -165,7 +165,9 @@ public:
 
   DelayedParsingCallbacks *DelayedParseCB = nullptr;
 
-  bool isDelayedParsingEnabled() const { return DelayedParseCB != nullptr; }
+  bool isDelayedParsingEnabled() const {
+    return DelayBodyParsing || DelayedParseCB != nullptr;
+  }
 
   void setDelayedParsingCallbacks(DelayedParsingCallbacks *DelayedParseCB) {
     this->DelayedParseCB = DelayedParseCB;
@@ -207,8 +209,15 @@ public:
   /// Always empty if !SF.shouldBuildSyntaxTree().
   ParsedTrivia TrailingTrivia;
 
-  /// Whether we should disable delayed parsing.
-  bool DisableDelayedParsing;
+  /// Whether we should delay parsing nominal type and extension bodies,
+  /// and skip function bodies.
+  ///
+  /// This is false in primary files, since we want to type check all
+  /// declarations and function bodies.
+  ///
+  /// This is true for non-primary files, where declarations only need to be
+  /// lazily parsed and type checked.
+  bool DelayBodyParsing;
 
   /// The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
@@ -357,16 +366,16 @@ public:
          SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DisableDelayedParsing = false);
+         bool DelayBodyParsing = true);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DisableDelayedParsing = false);
+         bool DelayBodyParsing = true);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserTUStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DisableDelayedParsing = false);
+         bool DelayBodyParsing = true);
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }
@@ -798,6 +807,13 @@ public:
 
   void parseDeclListDelayed(IterableDeclContext *IDC);
 
+  bool canDelayMemberDeclParsing();
+
+  bool delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                            SourceLoc PosBeforeLB,
+                            ParseDeclOptions Options,
+                            IterableDeclContext *IDC);
+
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
                                             DeclAttributes &Attributes);
 
@@ -894,7 +910,7 @@ public:
                              llvm::function_ref<void(Decl*)> handler);
   bool parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                      Diag<> ErrorDiag, ParseDeclOptions Options,
-                     llvm::function_ref<void(Decl*)> handler);
+                     IterableDeclContext *IDC);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
@@ -1428,8 +1444,6 @@ public:
   parsePlatformVersionConstraintSpec();
   ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
   parsePlatformAgnosticVersionConstraintSpec();
-
-  bool canDelayMemberDeclParsing();
 };
 
 /// Describes a parsed declaration name.
