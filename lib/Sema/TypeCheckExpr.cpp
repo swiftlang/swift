@@ -659,8 +659,8 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
 static Optional<KnownProtocolKind>
 getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
   TypeChecker &tc = TypeChecker::createForContext(protocol->getASTContext());
-  
-  // clang-format off
+
+// clang-format off
   #define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)            \
     if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))        \
       return KnownProtocolKind::Id;
@@ -674,17 +674,15 @@ getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
     return evaluateOrDefault(
-                             Context.evaluator,
-                             DefaultTypeRequest{knownProtocolKindIfAny.getValue(), dc},
-                             nullptr);
+        Context.evaluator,
+        DefaultTypeRequest{knownProtocolKindIfAny.getValue(), dc}, nullptr);
   }
   return nullptr;
 }
 
-
-
 llvm::Expected<Type>
-swift::DefaultTypeRequest::evaluate(Evaluator &evaluator, KnownProtocolKind knownProtocolKind,
+swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
+                                    KnownProtocolKind knownProtocolKind,
                                     const DeclContextWrapper x) const {
   const char *const name = getTypeName(knownProtocolKind);
   if (!name)

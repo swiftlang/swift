@@ -444,7 +444,8 @@ void swift::simple_display(llvm::raw_ostream &out,
   x.dc->printContext(out);
 }
 
-void swift::simple_display(llvm::raw_ostream &out, const KnownProtocolKind kind) {
+void swift::simple_display(llvm::raw_ostream &out,
+                           const KnownProtocolKind kind) {
   out << getProtocolName(kind);
 }
 
@@ -483,11 +484,11 @@ void DefaultTypeRequest::cacheResult(Type value) const {
   (*cache)[size_t(getKnownProtocolKind())] = value;
 }
 
-
-const char *DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
+const char *
+DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
   switch (knownProtocolKind) {
-      
-    // clang-format off
+
+// clang-format off
     # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
       case KnownProtocolKind::Id: return typeName;
     # include "swift/AST/KnownProtocols.def"

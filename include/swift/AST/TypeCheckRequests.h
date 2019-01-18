@@ -378,11 +378,13 @@ public:
   void cacheResult(Type value) const;
 
 private:
-  KnownProtocolKind getKnownProtocolKind() const { return std::get<0>(getStorage()); }
+  KnownProtocolKind getKnownProtocolKind() const {
+    return std::get<0>(getStorage());
+  }
   const DeclContext *getDeclContext() const {
     return std::get<1>(getStorage()).dc;
   }
-                             
+
   static const char *getTypeName(KnownProtocolKind);
   static bool getPerformLocalLookup(KnownProtocolKind);
   TypeChecker &getTypeChecker() const;
