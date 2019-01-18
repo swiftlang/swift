@@ -1,9 +1,5 @@
 // RUN: %target-swift-frontend -typecheck -verify -enable-opaque-result-types %s
 
-// TODO: The syntax is only parsed, and opaque decls are synthesized for 
-// function decls, but the opaque types are not themselves formed, resolved,
-// or checked yet.
-
 protocol P {
   func paul()
   mutating func priscilla()
@@ -23,6 +19,12 @@ var computedFoo: __opaque P {  // FIXME expected-error{{'opaque' types are only 
   get { return 1 }
   set { _ = newValue + 1 }
 }
+struct SubscriptTest {
+  subscript(_ x: Int) -> __opaque P { // expected-error{{'opaque' types are only implemented}}
+    return x
+  }
+}
+
 func bar() -> __opaque P {
   return 1
 }
@@ -41,6 +43,18 @@ func zung() -> __opaque AnyObject {
 func zoop() -> __opaque Any {
   return D()
 }
+func zup() -> __opaque Any & P {
+  return D()
+}
+func zip() -> __opaque AnyObject & P {
+  return D()
+}
+func zorp() -> __opaque Any & C & P {
+  return D()
+}
+func zlop() -> __opaque C & AnyObject & P {
+  return D()
+}
 
 //let zingle = {() -> __opaque P in 1 } // FIXME ex/pected-error{{'opaque' types are only implemented}}
 
@@ -55,6 +69,15 @@ let blubble: () -> __opaque P = { 1 } // expected-error{{'opaque' types are only
 func blib() -> P & __opaque Q { return 1 } // expected-error{{'opaque' should appear at the beginning}}
 func blab() -> (P, __opaque Q) { return (1, 2) } // expected-error{{'opaque' types are only implemented}}
 func blob() -> (__opaque P) -> P { return { $0 } } // expected-error{{'opaque' types are only implemented}}
+func blorb<T: __opaque P>(_: T) { } // expected-error{{'opaque' types are only implemented}}
+func blub<T>() -> T where T == __opaque P { return 1 } // expected-error{{'opaque' types are only implemented}} expected-error{{cannot convert}}
+
+protocol OP: __opaque P {} // expected-error{{'opaque' types are only implemented}}
+
+func foo() -> __opaque P {
+  let x = (__opaque P).self // expected-error*{{}}
+  return 1
+}
 
 // Invalid constraints
 
