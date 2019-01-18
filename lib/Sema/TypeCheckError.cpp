@@ -155,6 +155,11 @@ public:
       }
     }
     
+    // Constructor delegation.
+    if (auto otherCtorDeclRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
+      return AbstractFunction(otherCtorDeclRef->getDecl());
+    }
+
     // Normal function references.
     if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
       ValueDecl *decl = declRef->getDecl();
