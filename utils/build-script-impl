@@ -103,6 +103,7 @@ KNOWN_SETTINGS=(
     installable-package         ""               "the path to the archive of the installation directory"
     test-installable-package    ""               "whether to run post-packaging tests on the produced package"
     reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
+    build-libparser-only        ""               "only build libSwiftSyntaxParser"
     skip-reconfigure            ""               "set to skip reconfigure"
     swift-primary-variant-sdk   ""               "default SDK for target binaries"
     swift-primary-variant-arch  ""               "default arch for target binaries"
@@ -1140,7 +1141,6 @@ function get_stdlib_targets_for_host() {
 # and architecture of each stdlib target -- currently it only captures the SDK.
 #
 # We turn these targets in to SWIFT_SDKS in `calculate_targets_for_host()`
-
     if [[ $(is_cross_tools_host $1) ]] ; then
         echo "$1"
     else
@@ -1824,6 +1824,16 @@ function set_swiftsyntax_build_command() {
         SWIFT_TEST="$(build_directory_bin ${LOCAL_HOST} swiftpm)/swift-test"
     fi
 
+    if [ "${BUILD_LIBPARSER_ONLY}" ]; then
+        # we don't have a compiler built so we have to use the one in the environment.
+        SWIFTC_BIN="$(xcrun_find_tool swiftc)"
+        # we don't have a swiftpm built so we have to use the one in the environment.
+        SWIFT_BUILD="$(xcrun_find_tool swift-build)"
+        SWIFT_TEST="$(xcrun_find_tool swift-test)"
+    else
+        SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+    fi
+
     swiftsyntax_build_command=("${SWIFTSYNTAX_SOURCE_DIR}/build-script.py")
     # Add --release if we have to build in release mode.
     if [[ $(is_cmake_release_build_type "${SWIFTSYNTAX_BUILD_TYPE}") ]] ; then
@@ -1836,7 +1846,7 @@ function set_swiftsyntax_build_command() {
         --build-dir="${build_dir}"
         --swift-build-exec="${SWIFT_BUILD}"
         --swift-test-exec="${SWIFT_TEST}"
-        --swiftc-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+        --swiftc-exec="${SWIFTC_BIN}"
         --syntax-parser-header-dir="${SWIFT_SOURCE_DIR}/include/swift-c/SyntaxParser"
         --syntax-parser-lib-dir="$(build_directory ${host} swift)/lib"
         --swift-syntax-test-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swift-syntax-test"
@@ -2388,7 +2398,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=("${build_targets[@]}"
                                    "${SWIFT_BENCHMARK_TARGETS[@]}")
                 fi
-
+                if [ "${BUILD_LIBPARSER_ONLY}" ]; then
+                    build_targets=(libSwiftSyntaxParser)
+                fi
                 skip_build=${SKIP_BUILD_SWIFT}
                 ;;
             lldb)

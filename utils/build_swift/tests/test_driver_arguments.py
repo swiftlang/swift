@@ -690,6 +690,12 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.test_tvos_host)
             self.assertFalse(namespace.test_watchos_host)
             self.assertFalse(namespace.test_android_host)
+            self.assertFalse(namespace.build_libparser_only)
+
+    def test_build_lib_swiftsyntaxparser_only(self):
+        with self.assertNotRaises(ParserError):
+            namespace = self.parse_default_args(['--build-libparser-only'])
+            self.assertTrue(namespace.build_libparser_only)
 
 
 if __name__ == '__main__':
