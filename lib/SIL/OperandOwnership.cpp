@@ -784,6 +784,10 @@ OperandOwnershipKindClassifier::visitTryApplyInst(TryApplyInst *i) {
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitPartialApplyInst(PartialApplyInst *i) {
+  // partial_apply [stack] does not take ownership of its operands.
+  if (i->isOnStack())
+    return Map::allLive();
+
   return Map::compatibilityMap(
        // All non-trivial types should be captured.
        ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated);

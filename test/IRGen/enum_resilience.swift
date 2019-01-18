@@ -252,7 +252,8 @@ public func reabstraction<T>(_ f: (Medium) -> T) {}
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience25resilientEnumPartialApplyyySi0c1_A06MediumOXEF"(i8*, %swift.opaque*)
 public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
-// CHECK:     [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject
+// CHECK:     [[STACKALLOC:%.*]] = alloca i8
+// CHECK:     [[CONTEXT:%.*]] = bitcast i8* [[STACKALLOC]] to %swift.opaque*
 // CHECK:     call swiftcc void @"$s15enum_resilience13reabstractionyyx010resilient_A06MediumOXElF"(i8* bitcast (void (%TSi*, %swift.opaque*, %swift.refcounted*)* @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA" to i8*), %swift.opaque* [[CONTEXT:%.*]], %swift.type* @"$sSiN")
   reabstraction(f)
 

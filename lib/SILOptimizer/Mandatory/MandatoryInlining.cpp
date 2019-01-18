@@ -373,6 +373,17 @@ static SILFunction *getCalleeFunction(
       return ThinToNoescapeCast->getOperand();
     }
 
+    // Ignore mark_dependence users. A partial_apply [stack] uses them to mark
+    // the dependence of the trivial closure context value on the captured
+    // arguments.
+    if (auto *MD = dyn_cast<MarkDependenceInst>(CalleeValue)) {
+      while (MD) {
+        CalleeValue = MD->getValue();
+        MD = dyn_cast<MarkDependenceInst>(CalleeValue);
+      }
+      return CalleeValue;
+    }
+
     auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeValue);
     if (!CFI)
       return CalleeValue;

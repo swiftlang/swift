@@ -1123,6 +1123,8 @@ public:
     case ParameterConvention::Indirect_InoutAliasable:
       llvm_unreachable("unexpected callee convention!");
     }
+    if (CI->isOnStack())
+      *this << "[on_stack] ";
     visitApplyInstBase(CI);
   }
 

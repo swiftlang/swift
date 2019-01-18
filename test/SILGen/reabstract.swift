@@ -37,13 +37,12 @@ func test0() {
 // MANDATORY-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [[T2]]
 // MANDATORY-NEXT: //{{.*}}reabstraction thunk
 // MANDATORY-NEXT: [[T3:%.*]] = function_ref [[THUNK:@.*]] :
-// MANDATORY-NEXT: [[T4:%.*]] = partial_apply [callee_guaranteed] [[T3]]([[CVT]])
-// MANDATORY-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [[T4]]
+// MANDATORY-NEXT: [[T4:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[T3]]([[CVT]])
 // MANDATORY-NEXT: strong_release [[T2]]
 // MANDATORY-NEXT: // function_ref
 // MANDATORY-NEXT: [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
-// MANDATORY-NEXT: apply [[T0]]<Int>([[CVT]])
-// MANDATORY-NEXT: strong_release [[T4]]
+// MANDATORY-NEXT: apply [[T0]]<Int>([[T4]])
+// MANDATORY-NEXT: dealloc_stack [[T4]] : $@noescape @callee_guaranteed (@in_guaranteed Int) -> @out Optional<Int>
 // MANDATORY-NEXT: strong_release [[T2]]
 // MANDATORY-NEXT: tuple ()
 // MANDATORY-NEXT: return

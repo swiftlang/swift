@@ -1184,3 +1184,23 @@ bb0:
   %3 = apply %2() : $@noescape () -> Builtin.Int32
   return %3 : $Builtin.Int32
 }
+
+// CHECK-LABEL: sil @test_guaranteed_on_stack_closure
+// CHECK:  strong_retain %0 : $C
+// CHECK:  [[F:%.*]] = function_ref @use_c : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:  apply [[F]](%0) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:  strong_release %0 : $C
+// CHECK-NOT:  strong_release
+// CHECK: return
+sil @test_guaranteed_on_stack_closure : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [on_stack] [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  %closure2 = mark_dependence %closure : $@noescape @callee_guaranteed () -> () on %0 : $C
+  apply %closure2() : $@noescape @callee_guaranteed () -> ()
+  strong_release %0: $C
+  dealloc_stack %closure : $@noescape @callee_guaranteed () -> ()
+  %tuple = tuple()
+  return %tuple : $()
+}
