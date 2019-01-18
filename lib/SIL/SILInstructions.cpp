@@ -694,15 +694,14 @@ getExtracteeType(SILValue function, Extractee extractee,
 }
 
 AutoDiffFunctionExtractInst::AutoDiffFunctionExtractInst(
-    SILModule &module, SILDebugLocation debugLoc,
-    Extractee extractee, unsigned differentiationOrder, SILValue theFunction)
+    SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
+    unsigned differentiationOrder, SILValue theFunction)
     : InstructionBase(debugLoc,
                       getExtracteeType(theFunction, extractee,
-                                       differentiationOrder, module)),
-      extractee(extractee),
-      differentiationOrder(differentiationOrder),
-      operands(this, theFunction) {
-}
+                                       differentiationOrder, module),
+                      ValueOwnershipKind::Any),
+      extractee(extractee), differentiationOrder(differentiationOrder),
+      operands(this, theFunction) {}
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
                                          SILDebugLocation DebugLoc,

@@ -505,7 +505,6 @@ namespace {
     RValue visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E, SGFContext C);
     RValue visitAutoDiffFunctionExtractOriginalExpr(
         AutoDiffFunctionExtractOriginalExpr *E, SGFContext C);
-    RValue visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -5367,15 +5366,6 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
   llvm_unreachable("unevaluated_instance expression can never be evaluated");
 }
 
-RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
-  // This implementation is not very robust; if TapExpr were to ever become
-  // user-accessible (as some sort of "with" statement), it should probably
-  // permit a full pattern binding, saving the unused parts and "re-structuring"
-  // them to return the modified value.
-
-  auto Var = E->getVar();
-  auto VarType = E->getType()->getCanonicalType();
-
 // SWIFT_ENABLE_TENSORFLOW
 RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
                                                 SGFContext C) {
@@ -5403,14 +5393,14 @@ RValue RValueEmitter::visitAutoDiffFunctionExtractOriginalExpr(
   return RValue(SGF, E, ManagedValue::forUnmanaged(orig));
 }
 
-RValue RValueEmitter::visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C) {
-  SILValue condition;
-  {
-    FullExpr scope(SGF.Cleanups, CleanupLocation(E));
-    condition =
-        SGF.emitRValueAsSingleValue(E->getCondition()).getUnmanagedValue();
-  }
->>>>>>> tensorflow
+RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
+  // This implementation is not very robust; if TapExpr were to ever become
+  // user-accessible (as some sort of "with" statement), it should probably
+  // permit a full pattern binding, saving the unused parts and "re-structuring"
+  // them to return the modified value.
+
+  auto Var = E->getVar();
+  auto VarType = E->getType()->getCanonicalType();
 
   Scope outerScope(SGF, CleanupLocation(E));
 

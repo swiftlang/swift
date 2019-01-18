@@ -7701,9 +7701,9 @@ public:
 /// `autodiff_function_extract` - given an `@autodiff` function representing a
 /// bundle of the original function and associated functions, extract the
 /// specified function.
-class AutoDiffFunctionExtractInst :
-    public InstructionBase<SILInstructionKind::AutoDiffFunctionExtractInst,
-                           SingleValueInstruction> {
+class AutoDiffFunctionExtractInst
+    : public InstructionBase<SILInstructionKind::AutoDiffFunctionExtractInst,
+                             OwnershipForwardingSingleValueInst> {
 public:
   struct Extractee {
     enum innerty : unsigned {

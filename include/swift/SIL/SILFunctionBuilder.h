@@ -61,12 +61,6 @@ class SILFunctionBuilder {
                                          IsThunk_t isThunk,
                                          IsDynamicallyReplaceable_t isDynamic);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // `addFunctionAttributes` edited because @differentiable attribute
-  // propagation requires access to original function declaration (via
-  // SILDeclRef).
-  void addFunctionAttributes(SILFunction *F, SILDeclRef constant,
-                             DeclAttributes &Attrs, SILModule &M);
 
 
   /// Return the declaration of a function, or create it if it doesn't exist.
@@ -104,6 +98,10 @@ class SILFunctionBuilder {
                  SILFunction *InsertBefore = nullptr,
                  const SILDebugScope *DebugScope = nullptr);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // `addFunctionAttributes` edited because @differentiable attribute
+  // propagation requires access to original function declaration (via
+  // SILDeclRef).
   void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
                              SILModule &M, SILDeclRef constant = SILDeclRef());
 };

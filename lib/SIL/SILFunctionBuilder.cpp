@@ -102,7 +102,6 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
   // - Non-getter accessors (setters, modifiers, etc).
   // - Default argument generator functions.
   // - Thunks. Those are currently handled in SILGenThunk.cpp.
-  auto *decl = constant.getDecl();
   if ((!isa<AccessorDecl>(decl) || dyn_cast<AccessorDecl>(decl)->isGetter()) &&
       constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
       !constant.autoDiffAssociatedFunctionIdentifier &&
@@ -209,7 +208,7 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
       // SWIFT_ENABLE_TENSORFLOW
-      addFunctionAttributes(F, constant, storage->getAttrs(), mod);
+      addFunctionAttributes(F, storage->getAttrs(), mod, constant);
     }
     // SWIFT_ENABLE_TENSORFLOW
     addFunctionAttributes(F, decl->getAttrs(), mod, constant);

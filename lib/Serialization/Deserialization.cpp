@@ -4481,8 +4481,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     uint8_t rawRepresentation;
 
     // SWIFT_ENABLE_TENSORFLOW
-    bool autoClosure = false, noescape = false, throws = false,
-         differentiable = false;
+    bool noescape = false, throws = false, differentiable = false;
     GenericSignature *genericSig = nullptr;
 
     if (recordID == decls_block::FUNCTION_TYPE) {
@@ -4510,7 +4509,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return nullptr;
     }
 
-    auto info = FunctionType::ExtInfo(*representation, autoClosure, noescape,
+    auto info = FunctionType::ExtInfo(*representation, noescape,
                                       // SWIFT_ENABLE_TENSORFLOW
                                       throws, differentiable);
 
