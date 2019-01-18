@@ -73,4 +73,11 @@ SimpleMathTests.test("CaptureGlobal") {
   expectEqual(30, gradient(at: 0, in: foo))
 }
 
+let foo: (Float) -> Float = { x in
+  return x * x
+}
+SimpleMathTests.test("GlobalLetFunction") {
+  expectEqual(2, gradient(at: 1, in: foo))
+}
+
 runAllTests()
