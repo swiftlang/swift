@@ -33,7 +33,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1006,11 +1005,7 @@ public:
 
 ADContext::ADContext(SILModuleTransform &transform)
     : transform(transform), module(*transform.getModule()),
-      passManager(*transform.getPassManager()) {
-  // Note: `getSILLoader` performs important initialization and is necessary to
-  // prevent test failures related to `lookUpFunctionInWitnessTable`.
-  (void)module.getSILLoader();
-}
+      passManager(*transform.getPassManager()) {}
 
 void ADContext::emitNondifferentiabilityError(SILValue value,
                                               const DifferentiationTask *task,
@@ -3301,8 +3296,6 @@ void AdjointEmitter::materializeZeroIndirect(CanType type,
   // %wm = witness_method ...
   auto *getter = builder.createWitnessMethod(loc, type, confRef,
                                              accessorDeclRef, methodType);
-  // Ensure that the witness table is linked.
-  (void)getModule().lookUpFunctionInWitnessTable(confRef, accessorDeclRef);
   // %metatype = metatype $T
   auto metatypeType = CanMetatypeType::get(type, MetatypeRepresentation::Thick);
   auto metatype = builder.createMetatype(
@@ -3594,8 +3587,6 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     // %0 = witness_method @+
     auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy,
                                                      confRef, declRef, silFnTy);
-    // Ensure the witness method is linked.
-    getModule().lookUpFunctionInWitnessTable(confRef, declRef);
     auto subMap =
         SubstitutionMap::getProtocolSubstitutions(proto, adjointASTTy, confRef);
     // %1 = metatype $T.Type
@@ -3639,37 +3630,6 @@ bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
 // DifferentiationTask
 //===----------------------------------------------------------------------===//
 
-DifferentiationTask::DifferentiationTask(ADContext &context,
-                                         SILFunction *original,
-                                         SILDifferentiableAttr *&&attr,
-                                         DifferentiationInvoker invoker)
-    : context(context), original(original), attr(attr), invoker(invoker) {
-  if (attr->hasJVP()) {
-    jvp = lookUpOrLinkFunction(attr->getJVPName(), context.getModule());
-    assert(jvp);
-  }
-  if (attr->hasVJP()) {
-    vjp = lookUpOrLinkFunction(attr->getVJPName(), context.getModule());
-    assert(vjp);
-  }
-
-  if (!jvp)
-    createJVP();
-
-  if (vjp) {
-    // If we already have the vjp, then we don't need to synthesize anything.
-    primalSynthesisState = FunctionSynthesisState::NotNeeded;
-    adjointSynthesisState = FunctionSynthesisState::NotNeeded;
-    return;
-  }
-
-  primalSynthesisState = FunctionSynthesisState::Needed;
-  adjointSynthesisState = FunctionSynthesisState::Needed;
-  createEmptyPrimal();
-  createEmptyAdjoint();
-  createVJP();
-}
-
 // Return the expected generic signature for autodiff associated functions given
 // a SILDifferentiableAttr. The expected generic signature is built from the
 // original generic signature and the attribute's requirements.
@@ -3693,6 +3653,76 @@ getAutoDiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
                                SourceLoc(), /*allowConcreteGenericParams=*/true)
                            ->getCanonicalSignature();
   return canGenericSig;
+}
+
+DifferentiationTask::DifferentiationTask(ADContext &context,
+                                         SILFunction *original,
+                                         SILDifferentiableAttr *&&attr,
+                                         DifferentiationInvoker invoker)
+    : context(context), original(original), attr(attr), invoker(invoker) {
+  auto &module = context.getModule();
+  auto originalTy = original->getLoweredFunctionType();
+  auto originalLoc = original->getLocation();
+  if (attr->hasJVP()) {
+    // If attribute specifies JVP name, try to look up JVP in current module.
+    // Otherwise, create an external reference.
+    jvp = module.lookUpFunction(attr->getJVPName());
+    if (!jvp) {
+      auto jvpName = attr->getJVPName();
+      auto *jvpGenericSig = getAutoDiffAssociatedFunctionGenericSignature(attr, original);
+      auto *jvpGenericEnv = jvpGenericSig
+          ? jvpGenericSig->createGenericEnvironment()
+          : nullptr;
+      auto jvpType = originalTy->getAutoDiffAssociatedFunctionType(
+          getIndices().parameters, getIndices().source, 1,
+          AutoDiffAssociatedFunctionKind::JVP, module,
+          LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
+      SILOptFunctionBuilder fb(context.getTransform());
+      jvp = fb.createFunction(SILLinkage::PublicExternal, jvpName, jvpType,
+                              jvpGenericEnv, originalLoc, original->isBare(),
+                              IsNotTransparent, original->isSerialized());
+      // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
+      jvp->setDebugScope(new (module) SILDebugScope(originalLoc, jvp));
+    }
+  }
+  if (attr->hasVJP()) {
+    // If attribute specifies VJP name, try to look up VJP in current module.
+    // Otherwise, create an external reference.
+    vjp = module.lookUpFunction(attr->getVJPName());
+    if (!vjp) {
+      auto vjpName = attr->getVJPName();
+      auto *vjpGenericSig = getAutoDiffAssociatedFunctionGenericSignature(attr, original);
+      auto *vjpGenericEnv = vjpGenericSig
+          ? vjpGenericSig->createGenericEnvironment()
+          : nullptr;
+      auto vjpType = originalTy->getAutoDiffAssociatedFunctionType(
+          getIndices().parameters, getIndices().source, 1,
+          AutoDiffAssociatedFunctionKind::VJP, module,
+          LookUpConformanceInModule(module.getSwiftModule()), vjpGenericSig);
+      SILOptFunctionBuilder fb(context.getTransform());
+      vjp = fb.createFunction(SILLinkage::PublicExternal, vjpName, vjpType,
+                              vjpGenericEnv, originalLoc, original->isBare(),
+                              IsNotTransparent, original->isSerialized());
+      // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
+      vjp->setDebugScope(new (module) SILDebugScope(originalLoc, vjp));
+    }
+  }
+
+  if (!jvp)
+    createJVP();
+
+  if (vjp) {
+    // If the VJP exists, then no synthesis is needed.
+    primalSynthesisState = FunctionSynthesisState::NotNeeded;
+    adjointSynthesisState = FunctionSynthesisState::NotNeeded;
+    return;
+  }
+
+  primalSynthesisState = FunctionSynthesisState::Needed;
+  adjointSynthesisState = FunctionSynthesisState::Needed;
+  createEmptyPrimal();
+  createEmptyAdjoint();
+  createVJP();
 }
 
 void DifferentiationTask::createEmptyPrimal() {
