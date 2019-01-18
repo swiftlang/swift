@@ -69,33 +69,6 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     return;
   auto *decl = constant.getDecl();
 
-  // Only emit replacements for the objc entry point of objc methods.
-  if (decl->isObjC() &&
-      F->getLoweredFunctionType()->getExtInfo().getRepresentation() !=
-          SILFunctionTypeRepresentation::ObjCMethod)
-    return;
-
-  auto *replacedFuncAttr = Attrs.getAttribute<DynamicReplacementAttr>();
-  if (!replacedFuncAttr)
-    return;
-
-  auto *replacedDecl = replacedFuncAttr->getReplacedFunction();
-  assert(replacedDecl);
-
-  if (decl->isObjC()) {
-    F->setObjCReplacement(replacedDecl);
-    return;
-  }
-
-  if (constant.isInitializerOrDestroyer())
-    return;
-
-  SILDeclRef declRef(replacedDecl, constant.kind, false);
-  auto *replacedFunc =
-      getOrCreateFunction(replacedDecl, declRef, NotForDefinition);
-  assert(replacedFunc->getLoweredFunctionType() == F->getLoweredFunctionType());
-  F->setDynamicallyReplacedFunction(replacedFunc);
-
   // SWIFT_ENABLE_TENSORFLOW
   // Propagate @differentiable attributes.
   // Don't propagate @differentiable to:
@@ -141,6 +114,34 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       F->addDifferentiableAttr(silDiffAttr);
     }
   }
+
+  // Only emit replacements for the objc entry point of objc methods.
+  if (decl->isObjC() &&
+      F->getLoweredFunctionType()->getExtInfo().getRepresentation() !=
+          SILFunctionTypeRepresentation::ObjCMethod)
+    return;
+
+  auto *replacedFuncAttr = Attrs.getAttribute<DynamicReplacementAttr>();
+  if (!replacedFuncAttr)
+    return;
+
+  auto *replacedDecl = replacedFuncAttr->getReplacedFunction();
+  assert(replacedDecl);
+
+  if (decl->isObjC()) {
+    F->setObjCReplacement(replacedDecl);
+    return;
+  }
+
+  if (constant.isInitializerOrDestroyer())
+    return;
+
+  SILDeclRef declRef(replacedDecl, constant.kind, false);
+  auto *replacedFunc =
+      getOrCreateFunction(replacedDecl, declRef, NotForDefinition);
+  assert(replacedFunc->getLoweredFunctionType() == F->getLoweredFunctionType());
+  F->setDynamicallyReplacedFunction(replacedFunc);
+
 }
 
 SILFunction *
