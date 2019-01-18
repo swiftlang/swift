@@ -126,6 +126,25 @@ public func differentiableFunction<T : Differentiable, R : Differentiable>(
   return original
 }
 
+/// Create a differentiable function from a vector-Jacobian products function.
+@inlinable
+public func differentiableFunction<T, U, R>(
+  from vjp: @escaping (T, U)
+           -> (value: R, pullback: (R.CotangentVector)
+             -> (T.CotangentVector, U.CotangentVector))
+) -> @autodiff (T, U) -> R
+  where T : Differentiable, U : Differentiable, R : Differentiable {
+  @differentiable(vjp: _vjp)
+  func original(_ x: T, _ y: U) -> R {
+    return vjp(x, y).value
+  }
+  func _vjp(_ x: T, _ y: U)
+    -> (R, (R.CotangentVector) -> (T.CotangentVector, U.CotangentVector)) {
+    return vjp(x, y)
+  }
+  return original
+}
+
 //===----------------------------------------------------------------------===//
 // Method-style differential operators
 //===----------------------------------------------------------------------===//
