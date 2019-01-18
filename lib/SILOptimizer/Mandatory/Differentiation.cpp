@@ -979,6 +979,14 @@ public:
     return differentiationTasks.back().get();
   }
 
+  /// Declare an external reference to an associated function of `original`,
+  /// given a `[differentiable]` attribute of `original` and the associated
+  /// function kind.
+  SILFunction *
+  declareExternalAssociatedFunction(SILFunction *original,
+                                    SILDifferentiableAttr *&&attr,
+                                    AutoDiffAssociatedFunctionKind kind);
+
   template <typename... T, typename... U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
                               U &&... args) const {
@@ -2256,7 +2264,7 @@ public:
 } // end anonymous namespace
 
 bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
-  LLVM_DEBUG(getADDebugStream() << "Performing primal synthesis for original"
+  LLVM_DEBUG(getADDebugStream() << "Performing primal synthesis for original "
              << item.original->getName() << " and its corresponding primal "
              << item.target->getName() << '\n');
   // FIXME: If the original function has multiple basic blocks, bail out since
@@ -3614,7 +3622,7 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
 }
 
 bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
-  LLVM_DEBUG(getADDebugStream() << "Performing adjoint synthesis for original"
+  LLVM_DEBUG(getADDebugStream() << "Performing adjoint synthesis for original "
              << item.original->getName() << " and its corresponding adjoint "
              << item.target->getName() << '\n');
   auto &passManager = context.getPassManager();
@@ -3655,57 +3663,62 @@ getAutoDiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
   return canGenericSig;
 }
 
+SILFunction *
+ADContext::declareExternalAssociatedFunction(
+    SILFunction *original, SILDifferentiableAttr *&&attr,
+    AutoDiffAssociatedFunctionKind kind) {
+  auto &module = getModule();
+  auto &indices = attr->getIndices();
+  auto originalTy = original->getLoweredFunctionType();
+  auto originalLoc = original->getLocation();
+  StringRef name;
+  switch (kind) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      name = attr->getJVPName();
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      name = attr->getVJPName();
+      break;
+  }
+  auto *assocGenSig =
+      getAutoDiffAssociatedFunctionGenericSignature(attr, original);
+  auto *assocGenEnv = assocGenSig
+      ? assocGenSig->createGenericEnvironment()
+      : nullptr;
+  auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
+      indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
+      module, LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
+  SILOptFunctionBuilder fb(getTransform());
+  // Create external function declaration.
+  auto *assocFn = fb.createFunction(SILLinkage::PublicExternal, name, assocFnTy,
+                          assocGenEnv, originalLoc, original->isBare(),
+                          IsNotTransparent, original->isSerialized());
+  // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
+  assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
+  return assocFn;
+}
+
 DifferentiationTask::DifferentiationTask(ADContext &context,
                                          SILFunction *original,
                                          SILDifferentiableAttr *&&attr,
                                          DifferentiationInvoker invoker)
     : context(context), original(original), attr(attr), invoker(invoker) {
   auto &module = context.getModule();
-  auto originalTy = original->getLoweredFunctionType();
-  auto originalLoc = original->getLocation();
   if (attr->hasJVP()) {
     // If attribute specifies JVP name, try to look up JVP in current module.
     // Otherwise, create an external reference.
     jvp = module.lookUpFunction(attr->getJVPName());
-    if (!jvp) {
-      auto jvpName = attr->getJVPName();
-      auto *jvpGenericSig = getAutoDiffAssociatedFunctionGenericSignature(attr, original);
-      auto *jvpGenericEnv = jvpGenericSig
-          ? jvpGenericSig->createGenericEnvironment()
-          : nullptr;
-      auto jvpType = originalTy->getAutoDiffAssociatedFunctionType(
-          getIndices().parameters, getIndices().source, 1,
-          AutoDiffAssociatedFunctionKind::JVP, module,
-          LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
-      SILOptFunctionBuilder fb(context.getTransform());
-      jvp = fb.createFunction(SILLinkage::PublicExternal, jvpName, jvpType,
-                              jvpGenericEnv, originalLoc, original->isBare(),
-                              IsNotTransparent, original->isSerialized());
-      // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
-      jvp->setDebugScope(new (module) SILDebugScope(originalLoc, jvp));
-    }
+    if (!jvp)
+      jvp = context.declareExternalAssociatedFunction(
+          original, std::move(attr), AutoDiffAssociatedFunctionKind::JVP);
   }
   if (attr->hasVJP()) {
     // If attribute specifies VJP name, try to look up VJP in current module.
     // Otherwise, create an external reference.
     vjp = module.lookUpFunction(attr->getVJPName());
-    if (!vjp) {
-      auto vjpName = attr->getVJPName();
-      auto *vjpGenericSig = getAutoDiffAssociatedFunctionGenericSignature(attr, original);
-      auto *vjpGenericEnv = vjpGenericSig
-          ? vjpGenericSig->createGenericEnvironment()
-          : nullptr;
-      auto vjpType = originalTy->getAutoDiffAssociatedFunctionType(
-          getIndices().parameters, getIndices().source, 1,
-          AutoDiffAssociatedFunctionKind::VJP, module,
-          LookUpConformanceInModule(module.getSwiftModule()), vjpGenericSig);
-      SILOptFunctionBuilder fb(context.getTransform());
-      vjp = fb.createFunction(SILLinkage::PublicExternal, vjpName, vjpType,
-                              vjpGenericEnv, originalLoc, original->isBare(),
-                              IsNotTransparent, original->isSerialized());
-      // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
-      vjp->setDebugScope(new (module) SILDebugScope(originalLoc, vjp));
-    }
+    if (!vjp)
+      vjp = context.declareExternalAssociatedFunction(
+          original, std::move(attr), AutoDiffAssociatedFunctionKind::VJP);
   }
 
   if (!jvp)
