@@ -1495,7 +1495,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
                                Type origSubstType,
                                ResilienceExpansion forExpansion) {
   CanType substType = origSubstType->getCanonicalType()
-    .substOpaqueTypesWithUnderlyingTypes(forExpansion)
+    .substOpaqueTypesWithUnderlyingTypes()
     ->getCanonicalType();
   auto key = getTypeKey(origType, substType);
   
