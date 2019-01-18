@@ -116,9 +116,6 @@ enum PMOUseKind {
   /// value.
   Assign,
 
-  /// The instruction is a store to a member of a larger struct value.
-  PartialStore,
-
   /// An indirect 'inout' parameter of an Apply instruction.
   InOutUse,
 
