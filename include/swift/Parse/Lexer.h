@@ -22,8 +22,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/LexerState.h"
 #include "swift/Parse/Token.h"
-#include "swift/Syntax/References.h"
-#include "swift/Syntax/Trivia.h"
+#include "swift/Parse/ParsedTrivia.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -118,13 +117,13 @@ class Lexer {
   ///
   /// This is only preserved if this Lexer was constructed with
   /// `TriviaRetentionMode::WithTrivia`.
-  syntax::Trivia LeadingTrivia;
+  ParsedTrivia LeadingTrivia;
 
   /// The current trailing trivia for the next token.
   ///
   /// This is only preserved if this Lexer was constructed with
   /// `TriviaRetentionMode::WithTrivia`.
-  syntax::Trivia TrailingTrivia;
+  ParsedTrivia TrailingTrivia;
   
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
@@ -185,8 +184,8 @@ public:
 
   /// Lex a token. If \c TriviaRetentionMode is \c WithTrivia, passed pointers
   /// to trivias are populated.
-  void lex(Token &Result, syntax::Trivia &LeadingTriviaResult,
-           syntax::Trivia &TrailingTriviaResult) {
+  void lex(Token &Result, ParsedTrivia &LeadingTriviaResult,
+           ParsedTrivia &TrailingTriviaResult) {
     Result = NextToken;
     if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
       LeadingTriviaResult = {LeadingTrivia};
@@ -197,7 +196,7 @@ public:
   }
 
   void lex(Token &Result) {
-    syntax::Trivia LeadingTrivia, TrailingTrivia;
+    ParsedTrivia LeadingTrivia, TrailingTrivia;
     lex(Result, LeadingTrivia, TrailingTrivia);
   }
 
@@ -229,7 +228,7 @@ public:
   /// After restoring the state, lexer will return this token and continue from
   /// there.
   State getStateForBeginningOfToken(const Token &Tok,
-                                    const syntax::Trivia &LeadingTrivia = {}) const {
+                                    const ParsedTrivia &LeadingTrivia = {}) const {
 
     // If the token has a comment attached to it, rewind to before the comment,
     // not just the start of the token.  This ensures that we will re-lex and
@@ -529,7 +528,7 @@ private:
   void lexOperatorIdentifier();
   void lexHexNumber();
   void lexNumber();
-  void lexTrivia(syntax::Trivia &T, bool IsForTrailingTrivia);
+  void lexTrivia(ParsedTrivia &T, bool IsForTrailingTrivia);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr, char StopQuote,

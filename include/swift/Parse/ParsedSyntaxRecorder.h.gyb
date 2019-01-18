@@ -46,7 +46,8 @@ private:
   static Parsed${node.name} record${node.syntax_kind}(${child_params},
                                               ParsedRawSyntaxRecorder &rec);
 public:
-  static Parsed${node.name} defer${node.syntax_kind}(${child_params});
+  static Parsed${node.name} defer${node.syntax_kind}(${child_params},
+                                              SyntaxParsingContext &SPCtx);
   static Parsed${node.name} make${node.syntax_kind}(${child_params},
                                               SyntaxParsingContext &SPCtx);
 %   elif node.is_syntax_collection():
@@ -57,7 +58,8 @@ private:
 
 public:
   static Parsed${node.name} defer${node.syntax_kind}(
-      ArrayRef<Parsed${node.collection_element_type}> elts);
+      ArrayRef<Parsed${node.collection_element_type}> elts,
+      SyntaxParsingContext &SPCtx);
   static Parsed${node.name} make${node.syntax_kind}(
       ArrayRef<Parsed${node.collection_element_type}> elts,
       SyntaxParsingContext &SPCtx);

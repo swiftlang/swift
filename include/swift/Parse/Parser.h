@@ -33,6 +33,7 @@
 #include "swift/Parse/ParserResult.h"
 #include "swift/Parse/SyntaxParserResult.h"
 #include "swift/Parse/SyntaxParsingContext.h"
+#include "swift/Syntax/References.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -200,11 +201,11 @@ public:
 
   /// leading trivias for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
-  syntax::Trivia LeadingTrivia;
+  ParsedTrivia LeadingTrivia;
 
   /// trailing trivias for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
-  syntax::Trivia TrailingTrivia;
+  ParsedTrivia TrailingTrivia;
 
   /// Whether we should disable delayed parsing.
   bool DisableDelayedParsing;
@@ -636,6 +637,9 @@ public:
 
   /// Add the given Decl to the current scope.
   void addToScope(ValueDecl *D) {
+    if (Context.LangOpts.EnableASTScopeLookup)
+      return;
+
     getScopeInfo().addToScope(D, *this);
   }
 

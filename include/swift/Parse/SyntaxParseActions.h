@@ -23,13 +23,12 @@
 namespace swift {
 
 class CharSourceRange;
+class ParsedTriviaPiece;
 class SourceLoc;
-class Token;
 enum class tok;
 
 namespace syntax {
   enum class SyntaxKind;
-  struct Trivia;
 }
 
 typedef void *OpaqueSyntaxNode;
@@ -40,10 +39,10 @@ class SyntaxParseActions {
 public:
   virtual ~SyntaxParseActions() = default;
 
-  virtual OpaqueSyntaxNode recordToken(const Token &tok,
-                                       const syntax::Trivia &leadingTrivia,
-                                       const syntax::Trivia &trailingTrivia,
-                                       CharSourceRange range) = 0;
+  virtual OpaqueSyntaxNode recordToken(tok tokenKind,
+                                    ArrayRef<ParsedTriviaPiece> leadingTrivia,
+                                    ArrayRef<ParsedTriviaPiece> trailingTrivia,
+                                    CharSourceRange range) = 0;
 
   /// Record a missing token. \c loc can be invalid or an approximate location
   /// of where the token would be if not missing.

@@ -18,6 +18,7 @@
 
 namespace swift {
   class RawSyntaxTokenCache;
+  class SourceManager;
   class SyntaxParsingCache;
   class SourceFile;
 
@@ -32,6 +33,8 @@ namespace syntax {
 /// It also handles caching re-usable RawSyntax objects and skipping parsed
 /// nodes via consulting a \c SyntaxParsingCache.
 class SyntaxTreeCreator: public SyntaxParseActions {
+  SourceManager &SM;
+  unsigned BufferID;
   RC<syntax::SyntaxArena> Arena;
 
   /// A cache of nodes that can be reused when creating the current syntax
@@ -43,16 +46,17 @@ class SyntaxTreeCreator: public SyntaxParseActions {
   std::unique_ptr<RawSyntaxTokenCache> TokenCache;
 
 public:
-  SyntaxTreeCreator(SyntaxParsingCache *syntaxCache,
+  SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
+                    SyntaxParsingCache *syntaxCache,
                     RC<syntax::SyntaxArena> arena);
   ~SyntaxTreeCreator();
 
   void acceptSyntaxRoot(OpaqueSyntaxNode root, SourceFile &SF);
 
 private:
-  OpaqueSyntaxNode recordToken(const Token &tok,
-                               const syntax::Trivia &leadingTrivia,
-                               const syntax::Trivia &trailingTrivia,
+  OpaqueSyntaxNode recordToken(tok tokenKind,
+                               ArrayRef<ParsedTriviaPiece> leadingTrivia,
+                               ArrayRef<ParsedTriviaPiece> trailingTrivia,
                                CharSourceRange range) override;
 
   OpaqueSyntaxNode recordMissingToken(tok tokenKind, SourceLoc loc) override;
