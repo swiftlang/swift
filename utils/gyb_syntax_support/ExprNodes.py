@@ -309,10 +309,10 @@ EXPR_NODES = [
                    is_optional=True),
          ]),
 
-    # dot-self-expr -> expr '.' 'self'
+    # dot-self-expr -> expr? '.' 'self'
     Node('DotSelfExpr', kind='Expr',
          children=[
-             Child('Expression', kind='Expr'),
+             Child('Expression', kind='Expr', is_optional=True),
              Child('Dot', kind='Token',
                    token_choices=[
                        'PeriodToken', 'PrefixPeriodToken'
