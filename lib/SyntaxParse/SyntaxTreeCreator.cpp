@@ -14,6 +14,7 @@
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/SyntaxVisitor.h"
 #include "swift/Syntax/Trivia.h"
+#include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Parse/Token.h"
 #include "swift/AST/ASTContext.h"
@@ -33,9 +34,11 @@ static RC<RawSyntax> transferOpaqueNode(OpaqueSyntaxNode opaqueN) {
   return raw;
 }
 
-SyntaxTreeCreator::SyntaxTreeCreator(SyntaxParsingCache *syntaxCache,
+SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
+                                     SyntaxParsingCache *syntaxCache,
                                      RC<syntax::SyntaxArena> arena)
-    : Arena(std::move(arena)),
+    : SM(SM), BufferID(bufferID),
+      Arena(std::move(arena)),
       SyntaxCache(syntaxCache),
       TokenCache(new RawSyntaxTokenCache()) {
 }
@@ -104,13 +107,30 @@ void SyntaxTreeCreator::acceptSyntaxRoot(OpaqueSyntaxNode rootN,
 }
 
 OpaqueSyntaxNode
-SyntaxTreeCreator::recordToken(const Token &tok,
-                               const syntax::Trivia &leadingTrivia,
-                               const syntax::Trivia &trailingTrivia,
+SyntaxTreeCreator::recordToken(tok tokenKind,
+                               ArrayRef<ParsedTriviaPiece> leadingTriviaPieces,
+                               ArrayRef<ParsedTriviaPiece> trailingTriviaPieces,
                                CharSourceRange range) {
-  auto ownedText = OwnedString::makeRefCounted(tok.getText());
-  auto raw = TokenCache->getToken(Arena, tok.getKind(), ownedText,
-                                  leadingTrivia.Pieces, trailingTrivia.Pieces);
+  size_t leadingTriviaLen =
+    ParsedTriviaPiece::getTotalLength(leadingTriviaPieces);
+  size_t trailingTriviaLen =
+    ParsedTriviaPiece::getTotalLength(trailingTriviaPieces);
+  SourceLoc tokLoc = range.getStart().getAdvancedLoc(leadingTriviaLen);
+  unsigned tokLength = range.getByteLength() -
+      leadingTriviaLen - trailingTriviaLen;
+  CharSourceRange tokRange = CharSourceRange{tokLoc, tokLength};
+  SourceLoc leadingTriviaLoc = range.getStart();
+  SourceLoc trailingTriviaLoc = tokLoc.getAdvancedLoc(tokLength);
+  Trivia syntaxLeadingTrivia =
+    ParsedTriviaPiece::convertToSyntaxTrivia(leadingTriviaPieces,
+                                             leadingTriviaLoc, SM, BufferID);
+  Trivia syntaxTrailingTrivia =
+    ParsedTriviaPiece::convertToSyntaxTrivia(trailingTriviaPieces,
+                                             trailingTriviaLoc, SM, BufferID);
+  StringRef tokenText = SM.extractText(tokRange, BufferID);
+  auto ownedText = OwnedString::makeRefCounted(tokenText);
+  auto raw = TokenCache->getToken(Arena, tokenKind, ownedText,
+                    syntaxLeadingTrivia.Pieces, syntaxTrailingTrivia.Pieces);
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();
   return opaqueN;

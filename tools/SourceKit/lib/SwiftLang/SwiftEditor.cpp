@@ -685,7 +685,7 @@ public:
     if (CompInv.getLangOptions().BuildSyntaxTree) {
       RC<SyntaxArena> syntaxArena{new syntax::SyntaxArena()};
       SynTreeCreator = std::make_shared<SyntaxTreeCreator>(
-          CompInv.getMainFileSyntaxParsingCache(), syntaxArena);
+          SM, BufferID, CompInv.getMainFileSyntaxParsingCache(), syntaxArena);
     }
 
     Parser.reset(
