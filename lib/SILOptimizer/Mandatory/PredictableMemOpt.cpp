@@ -983,6 +983,18 @@ bool AvailableValueDataflowContext::hasEscapedAt(SILInstruction *I) {
 //                          Allocation Optimization
 //===----------------------------------------------------------------------===//
 
+static SILType getMemoryType(AllocationInst *memory) {
+  // Compute the type of the memory object.
+  if (auto *abi = dyn_cast<AllocBoxInst>(memory)) {
+    assert(abi->getBoxType()->getLayout()->getFields().size() == 1 &&
+           "optimizing multi-field boxes not implemented");
+    return abi->getBoxType()->getFieldType(abi->getModule(), 0);
+  }
+
+  assert(isa<AllocStackInst>(memory));
+  return cast<AllocStackInst>(memory)->getElementType();
+}
+
 namespace {
 
 /// This performs load promotion and deletes synthesized allocations if all
@@ -1008,8 +1020,13 @@ class AllocOptimize {
   AvailableValueDataflowContext DataflowContext;
 
 public:
-  AllocOptimize(AllocationInst *TheMemory, SmallVectorImpl<PMOMemoryUse> &Uses,
-                SmallVectorImpl<SILInstruction *> &Releases);
+  AllocOptimize(AllocationInst *memory, SmallVectorImpl<PMOMemoryUse> &uses,
+                SmallVectorImpl<SILInstruction *> &releases)
+      : Module(memory->getModule()), TheMemory(memory),
+        MemoryType(getMemoryType(memory)),
+        NumMemorySubElements(getNumSubElements(MemoryType, Module)), Uses(uses),
+        Releases(releases),
+        DataflowContext(TheMemory, NumMemorySubElements, uses) {}
 
   bool optimizeMemoryAccesses();
   bool tryToRemoveDeadAllocation();
@@ -1024,26 +1041,6 @@ private:
 
 } // end anonymous namespace
 
-static SILType getMemoryType(AllocationInst *TheMemory) {
-  // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory)) {
-    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1 &&
-           "optimizing multi-field boxes not implemented");
-    return ABI->getBoxType()->getFieldType(ABI->getModule(), 0);
-  } else {
-    assert(isa<AllocStackInst>(TheMemory));
-    return cast<AllocStackInst>(TheMemory)->getElementType();
-  }
-}
-
-AllocOptimize::AllocOptimize(AllocationInst *InputMemory,
-                             SmallVectorImpl<PMOMemoryUse> &InputUses,
-                             SmallVectorImpl<SILInstruction *> &InputReleases)
-    : Module(InputMemory->getModule()), TheMemory(InputMemory),
-      MemoryType(getMemoryType(TheMemory)),
-      NumMemorySubElements(getNumSubElements(MemoryType, Module)),
-      Uses(InputUses), Releases(InputReleases),
-      DataflowContext(TheMemory, NumMemorySubElements, Uses) {}
 
 /// If we are able to optimize \p Inst, return the source address that
 /// instruction is loading from. If we can not optimize \p Inst, then just
