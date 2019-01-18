@@ -488,7 +488,7 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -513,6 +513,9 @@ protected:
 
     /// The stage of the circularity check for this protocol.
     Circularity : 2,
+
+    /// Whether we've computed the inherited protocols list yet.
+    InheritedProtocolsValid : 1,
 
     : NumPadBits,
 
@@ -3892,15 +3895,7 @@ private:
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
-  /// The generic signature representing exactly the new requirements introduced
-  /// by this protocol.
-  const Requirement *RequirementSignature = nullptr;
-
-  bool requiresClassSlow();
-
-  bool existentialConformsToSelfSlow();
-
-  bool existentialTypeSupportedSlow(LazyResolver *resolver);
+  ArrayRef<ProtocolDecl *> InheritedProtocols;
 
   struct {
     /// The superclass decl and a bit to indicate whether the
@@ -3911,6 +3906,18 @@ class ProtocolDecl final : public NominalTypeDecl {
     /// superclass was computed yet or not.
     llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
+
+  /// The generic signature representing exactly the new requirements introduced
+  /// by this protocol.
+  const Requirement *RequirementSignature = nullptr;
+
+  bool requiresClassSlow();
+
+  bool existentialConformsToSelfSlow();
+
+  bool existentialTypeSupportedSlow(LazyResolver *resolver);
+
+  ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
 
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
@@ -3924,7 +3931,12 @@ public:
   using Decl::getASTContext;
 
   /// Retrieve the set of protocols inherited from this protocol.
-  llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
+  ArrayRef<ProtocolDecl *> getInheritedProtocols() const {
+    if (Bits.ProtocolDecl.InheritedProtocolsValid)
+      return InheritedProtocols;
+
+    return const_cast<ProtocolDecl *>(this)->getInheritedProtocolsSlow();
+  }
 
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
