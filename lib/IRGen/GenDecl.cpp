@@ -770,6 +770,7 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::EnumElementDecl:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::SerializedLocal:

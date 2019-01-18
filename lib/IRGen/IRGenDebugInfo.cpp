@@ -465,6 +465,7 @@ private:
     case DeclContextKind::Initializer:
     case DeclContextKind::ExtensionDecl:
     case DeclContextKind::SubscriptDecl:
+    case DeclContextKind::EnumElementDecl:
     case DeclContextKind::TopLevelCodeDecl:
       return getOrCreateContext(DC->getParent());
 

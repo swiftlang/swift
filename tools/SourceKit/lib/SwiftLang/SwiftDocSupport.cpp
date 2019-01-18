@@ -413,6 +413,7 @@ static bool initDocEntityInfo(const Decl *D,
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
+    case DeclContextKind::EnumElementDecl:
     case DeclContextKind::Initializer:
     case DeclContextKind::SerializedLocal:
     case DeclContextKind::ExtensionDecl:
