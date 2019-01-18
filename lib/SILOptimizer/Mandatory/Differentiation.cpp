@@ -984,7 +984,7 @@ public:
   /// function kind.
   SILFunction *
   declareExternalAssociatedFunction(SILFunction *original,
-                                    SILDifferentiableAttr *&&attr,
+                                    SILDifferentiableAttr *attr,
                                     AutoDiffAssociatedFunctionKind kind);
 
   template <typename... T, typename... U>
@@ -3641,7 +3641,7 @@ bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
 // Return the expected generic signature for autodiff associated functions given
 // a SILDifferentiableAttr. The expected generic signature is built from the
 // original generic signature and the attribute's requirements.
-static GenericSignature *
+static CanGenericSignature
 getAutoDiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
                                               SILFunction *original) {
   auto originalGenSig =
@@ -3656,16 +3656,14 @@ getAutoDiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   for (auto &req : attr->getRequirements())
     builder.addRequirement(req, source, original->getModule().getSwiftModule());
-  auto canGenericSig = std::move(builder)
-                           .computeGenericSignature(
-                               SourceLoc(), /*allowConcreteGenericParams=*/true)
-                           ->getCanonicalSignature();
-  return canGenericSig;
+  return std::move(builder)
+      .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams=*/true)
+      ->getCanonicalSignature();
 }
 
 SILFunction *
 ADContext::declareExternalAssociatedFunction(
-    SILFunction *original, SILDifferentiableAttr *&&attr,
+    SILFunction *original, SILDifferentiableAttr *attr,
     AutoDiffAssociatedFunctionKind kind) {
   auto &module = getModule();
   auto &indices = attr->getIndices();
@@ -3680,19 +3678,17 @@ ADContext::declareExternalAssociatedFunction(
       name = attr->getVJPName();
       break;
   }
-  auto *assocGenSig =
+  auto assocGenSig =
       getAutoDiffAssociatedFunctionGenericSignature(attr, original);
-  auto *assocGenEnv = assocGenSig
-      ? assocGenSig->createGenericEnvironment()
-      : nullptr;
   auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
       module, LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
   SILOptFunctionBuilder fb(getTransform());
   // Create external function declaration.
-  auto *assocFn = fb.createFunction(SILLinkage::PublicExternal, name, assocFnTy,
-                          assocGenEnv, originalLoc, original->isBare(),
-                          IsNotTransparent, original->isSerialized());
+  auto *assocFn =
+      fb.createFunction(SILLinkage::PublicExternal, name, assocFnTy,
+                        /*GenericEnv*/ nullptr, originalLoc, original->isBare(),
+                        IsNotTransparent, original->isSerialized());
   // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
   assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
   return assocFn;
@@ -3710,7 +3706,7 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
     jvp = module.lookUpFunction(attr->getJVPName());
     if (!jvp)
       jvp = context.declareExternalAssociatedFunction(
-          original, std::move(attr), AutoDiffAssociatedFunctionKind::JVP);
+          original, attr, AutoDiffAssociatedFunctionKind::JVP);
   }
   if (attr->hasVJP()) {
     // If attribute specifies VJP name, try to look up VJP in current module.
@@ -3718,7 +3714,7 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
     vjp = module.lookUpFunction(attr->getVJPName());
     if (!vjp)
       vjp = context.declareExternalAssociatedFunction(
-          original, std::move(attr), AutoDiffAssociatedFunctionKind::VJP);
+          original, attr, AutoDiffAssociatedFunctionKind::VJP);
   }
 
   if (!jvp)
@@ -3750,7 +3746,7 @@ void DifferentiationTask::createEmptyPrimal() {
                         .getIdentifier("AD__" + original->getName().str() +
                                        "__primal_" + indices.mangle())
                         .str();
-  auto *primalGenericSig =
+  auto primalGenericSig =
       getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   StructDecl *primalValueStructDecl = context.createPrimalValueStruct(this);
   primalInfo = std::unique_ptr<PrimalInfo>(
@@ -3889,7 +3885,7 @@ void DifferentiationTask::createEmptyAdjoint() {
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__adjoint_" + getIndices().mangle())
                      .str();
-  auto *adjGenericSig =
+  auto adjGenericSig =
       getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *adjGenericEnv = adjGenericSig
       ? adjGenericSig->createGenericEnvironment()
@@ -3930,7 +3926,7 @@ void DifferentiationTask::createJVP() {
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__jvp_" + getIndices().mangle())
                      .str();
-  auto *jvpGenericSig =
+  auto jvpGenericSig =
       getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *jvpGenericEnv = jvpGenericSig
       ? jvpGenericSig->createGenericEnvironment()
@@ -3989,7 +3985,7 @@ void DifferentiationTask::createVJP() {
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__vjp_" + getIndices().mangle())
                      .str();
-  auto *vjpGenericSig =
+  auto vjpGenericSig =
       getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *vjpGenericEnv = vjpGenericSig
       ? vjpGenericSig->createGenericEnvironment()
