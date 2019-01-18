@@ -150,8 +150,83 @@ func test8(_ m: Model) -> Model {
   return Model(new_x, new_y)
 }
 
+/////////////////////////
+// Test 9 and 10: Do not use functional API; takes model and optimizer as inout
+// via TensorArrayProtocol, and also handles input data and result tensors
+// (e.g. can be metrics).
+////////////////////////
+
+typealias Data = Tensor<Float>
+
+typealias Result = Tensor<Float>
+
+extension Tensor : TensorArrayProtocolEnhanced {
+  public func createInstance(_owning inputs: [CTensorHandle]) -> Tensor {
+    assert(inputs.count == 1)
+    return Tensor(handle: TensorHandle<Scalar>(_owning: inputs[0]))
+  }
+}
+
+func test9(state: Tensor<Float>, data: Data) -> (Tensor<Float>, Result) {
+  let tmp = Tensor<Float>(1.0)
+  // for i in 0..<state.model.count {
+  //   tmp += state.model[i] * state.optimizer[i]
+  // }
+  // TODO: here we mutate state.model and optimizer
+  // To return some original part of state, need to extend code.
+  // return (state, tmp + data)
+  
+  // return (State(), tmp + data)
+  return (tmp, tmp + data)
+}
+
+typealias Model2 = [Tensor<Float>]
+
+typealias Optimizer = [Tensor<Float>]
+
+struct State : TensorArrayProtocolEnhanced {
+  var model: Model2 = [Tensor<Float>(1.0), Tensor<Float>(2.0)] // Model2()
+  var optimizer: Optimizer = [Tensor<Float>(1.0), Tensor<Float>(2.0)] // Optimizer()
+
+  public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
+    print("Calling State._unpackTensorHandles().")
+    var ptr = address
+    model._unpackTensorHandles(into: ptr)
+    ptr = ptr!.advanced(by: Int(model._tensorHandleCount))
+    optimizer._unpackTensorHandles(into: ptr)
+  }
+  public var _tensorHandleCount: Int32 {
+    return model._tensorHandleCount + optimizer._tensorHandleCount
+  }
+
+  func createInstance(_owning inputs: [CTensorHandle]) -> State {
+    assert(inputs.count == 4)
+    var abstractState = State()
+    abstractState.model = [Tensor(handle: TensorHandle<Float>(_owning: inputs[0])), Tensor(handle: TensorHandle<Float>(_owning: inputs[1]))]
+    abstractState.optimizer = [Tensor(handle: TensorHandle<Float>(_owning: inputs[2])), Tensor(handle: TensorHandle<Float>(_owning: inputs[3]))]
+    return abstractState
+  }
+}
+
+@inline(never)
+func test10(state: State, data: Data) -> (State, Result) {
+  print("Running test10()")
+  var tmp = Tensor<Float>(0.0)
+  for i in 0..<state.model.count {
+    tmp += state.model[i] * state.optimizer[i]
+  }
+
+  print("Creating return value()")
+  var newState = state
+  newState.model[0] = state.model[0] + state.model[1]
+  let ret = (newState, tmp + data)
+  return ret
+}
+
+
+
 public func driver() {
-  _RuntimeConfig.printsDebugLog = true
+  _RuntimeConfig.printsDebugLog = false
 
   // let tracedFn = trace(test1)
   // let tracedFn = trace(test2)
@@ -190,14 +265,31 @@ public func driver() {
   // let z = tracedFn()
   // _hostOp(z)
 
-  let m = TensorPair(createScalarTensor(1.0), createScalarTensor(2.0))
-  _hostOp(m)
+  // test 8
+  // let m = TensorPair(createScalarTensor(1.0), createScalarTensor(2.0))
+  // _hostOp(m)
 
-  let tracedFn = trace(test8)
-  // TODO: cannot create m above here, because before traceFn() is called, we
-  // are still in tracing mode according to the current impl.
-  let newM = tracedFn(m)
-  _hostOp(newM) // should be (2.0, 3.0)
+  // let tracedFn = trace(test8)
+  // // TODO: cannot create m above here, because before traceFn() is called, we
+  // // are still in tracing mode according to the current impl.
+  // let newM = tracedFn(m)
+  // _hostOp(newM) // should be (2.0, 3.0)
+
+  // test 9
+  // let state = createScalarTensor(2.0)
+  // let data = createScalarTensor(3.0) // Data(3.0)
+  // let tracedFn = trace(with: state, in: test9)
+  // let (newState, result) = tracedFn(state, data)
+  // _hostOp(newState) // should be 1.0
+  // _hostOp(result) // should be 4.0
+
+  // test 10
+  let state = State()
+  let data = createScalarTensor(3.0) // Data(3.0)
+  let tracedFn = trace(with: state, in: test10)
+  let (newState, result) = tracedFn(state, data)
+  _hostOp(newState) // should be State(model: [3.0, 2.0], optimizer: [1.0, 2.0])
+  _hostOp(result) // should be 8.0
 }
 
 driver()

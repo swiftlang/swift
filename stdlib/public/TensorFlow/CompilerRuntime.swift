@@ -720,26 +720,16 @@ public func trace(_ fn: (Tensor<Float>, Tensor<Float>) -> Tensor<Float>)
   }
 }
 
-
-public protocol TensorModel : TensorGroup {
-  // For concrete tensors, the returned handles are copied and owned by the caller.
-  // for abstract tensors, get those symbolic tensors.
-  // TODO: revisit.
-  func _getCTensorHandles() -> [CTensorHandle]
-
-  // The tensors in `input` are NOT owned by this instance.
-  // Only supports concrete tensors.
-  init(_copying input: [CTensorHandle])
-}
-
-public extension TensorModel {
+public extension TensorArrayProtocol {
   func _getCTensorHandles() -> [CTensorHandle] {
-    debugLog("Getting \(Self._tensorHandleCount) C handles.")
-    let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: Int(Self._tensorHandleCount))
+    debugLog("Getting \(self._tensorHandleCount) C handles.")
+    let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: Int(self._tensorHandleCount))
+    debugLog("Unpacking handles into buffer.")
     self._unpackTensorHandles(into: buffer)
     let status = TF_NewStatus()
+    debugLog("Copying buffer content to output handles.")
     var output: [CTensorHandle] = []
-    for idx in 0..<Self._tensorHandleCount {
+    for idx in 0..<self._tensorHandleCount {
       let address = buffer.advanced(by: Int(idx))
       let isConcrete = TFE_TensorHandleIsTensorBuffer(address.pointee) != 0
       debugLog(" Copying the \(idx)-th C handle \(address.pointee) with concrete=\(isConcrete).")
@@ -756,7 +746,20 @@ public extension TensorModel {
     TF_DeleteStatus(status)
     return output
   }
+}
 
+public protocol TensorModel : TensorGroup {
+  // For concrete tensors, the returned handles are copied and owned by the caller.
+  // for abstract tensors, get those symbolic tensors.
+  // TODO: revisit.
+  func _getCTensorHandles() -> [CTensorHandle]
+
+  // The tensors in `input` are NOT owned by this instance.
+  // Only supports concrete tensors.
+  init(_copying input: [CTensorHandle])
+}
+
+public extension TensorModel {
   init(_copying input: [CTensorHandle]) {
     assert(Self._tensorHandleCount == input.count)
     let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: input.count)
@@ -819,6 +822,68 @@ public func trace<T: TensorModel>(_ fn: (T) -> T)
 
     debugLog("Creating output model instance.")
     return T(_copying: returnValues)
+  }
+}
+
+public protocol TensorArrayProtocolEnhanced : TensorArrayProtocol {
+  func createInstance(_owning inputs: [CTensorHandle]) -> Self
+}
+
+// TODO: TensorModel here really only means TensorGroup
+public func trace<State : TensorArrayProtocolEnhanced, Data : TensorModel, Result : TensorModel>(
+  with state: State,
+  in fn: (State, Data) -> (State, Result)
+) -> (State, Data) -> (State, Result) {
+  debugLog("Tracing over a function based on TAP with \(state._tensorHandleCount) input state tensors and \(Data._typeList.count) input data tensors.")
+
+  // Verify that we are not already tracing.
+  // assert(_RuntimeConfig.traceState == .notTracing)
+
+  // Switch to tracing mode, allocating a TF_Function.
+  _RuntimeConfig.traceState = .tracing(S4TFTrace(inputValueCount: Int(state._tensorHandleCount) + Data._typeList.count))
+  // NOTE: Argument handling code goes here, defined in a section below.
+
+  let traceFn = _RuntimeConfig.traceState.getFunction!
+  let inputSymbolicTensors = traceFn.abstractInputs.map { 
+    TFE_NewTensorHandleFromTFOutput($0, TF_FLOAT)!
+  }
+  internalConsistencyCheck(inputSymbolicTensors.count == Int(state._tensorHandleCount) + Data._typeList.count)
+  let dummyState = state.createInstance(_owning: Array(inputSymbolicTensors.dropLast(Data._typeList.count)))
+  let dummyData = Data(_copying: Array(inputSymbolicTensors.dropFirst(Int(state._tensorHandleCount))))
+  // The output will contain a list of abstract tensors
+  let (outputAbstractState, outputAbstractResult) = fn(dummyState, dummyData)
+
+  // Run the body, this builds the trace, adding ops to currentTrace.
+
+  // // The result is a closure that captures 'fn' and captures and executes
+  // // the tracedFn.
+  return { (oldState: State, data: Data) -> (State, Result) in
+    debugLog("Running trace function over state \(oldState) and data \(data).")
+
+    // TAP means tensor array protocol.
+    let opType = "MyTraceFn_TAP"
+
+    // Ok, we are done tracing.
+
+    // TODO: see if we should add a protocol method that returns a flat list of Tensors from a TensorGroup instance.
+    debugLog("Getting input state tensor handles.")
+    let inputStateTensorHandles =  oldState._getCTensorHandles()
+    var inputTensors = inputStateTensorHandles.map { Tensor<Float>(handle: TensorHandle(_owning: $0)) }
+    debugLog("Getting input data tensor handles.")
+    let inputDataTensorHandles =  data._getCTensorHandles()
+    inputTensors.append(contentsOf: inputDataTensorHandles.map { Tensor<Float>(handle: TensorHandle(_owning: $0)) })
+
+    debugLog("Assembling output tensor handles.")
+    let outputAbstractTensorHandles = outputAbstractState._getCTensorHandles() + outputAbstractResult._getCTensorHandles()
+    let returnValues = finalizeAndExecuteTraceFn(fnName: opType,
+                                                 inputs: inputTensors,
+                                                 outputs: outputAbstractTensorHandles)
+
+    debugLog("Creating output model instance.")
+    let newState = state.createInstance(_owning: Array(returnValues.dropLast(Data._typeList.count)))
+    let resultTensors: [CTensorHandle] = Array(returnValues.dropFirst(Int(state._tensorHandleCount)))
+    let result = Result(_copying: resultTensors)
+    return(newState, result)
   }
 }
 

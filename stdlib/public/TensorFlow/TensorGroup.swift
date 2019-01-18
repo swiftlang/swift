@@ -202,6 +202,7 @@ extension StringTensor : TensorGroup {
 
 extension Array : TensorArrayProtocol where Element : TensorArrayProtocol {
   public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
+    debugLog("Calling Array._unpackTensorHandles().")
     var ptr = address
     for elem in self {
       elem._unpackTensorHandles(into: ptr)
