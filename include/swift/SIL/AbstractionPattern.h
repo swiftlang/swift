@@ -298,7 +298,8 @@ class AbstractionPattern {
                      Kind kind = Kind::Type) {
     assert(signature || !origType->hasTypeParameter());
     TheKind = unsigned(kind);
-    // If origType is already
+    // If origType is already a lowered type, it won't currently ever contain
+    // unsubstituted opaque types.
     if (isa<SILFunctionType>(origType))
       OrigType = origType;
     else

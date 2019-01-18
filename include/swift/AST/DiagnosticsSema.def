@@ -1505,8 +1505,8 @@ ERROR(noreturn_not_supported,none,
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
-      "an 'opaque' type must specify only 'Any', protocols, and/or a "
-      "base class", ())
+      "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
+      "and/or a base class", ())
 
 // Extensions
 ERROR(non_nominal_extension,none,
@@ -3533,7 +3533,7 @@ ERROR(unreferenced_generic_parameter,none,
 
 // Opaque types
 ERROR(unsupported_opaque_type,none,
-      "'opaque' types are only implemented for the declared type of properties or the return type of functions", ())
+      "'opaque' types are only implemented for the declared type of properties and subscripts and the return type of functions", ())
 
 // SIL
 ERROR(opened_non_protocol,none,

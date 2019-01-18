@@ -4046,7 +4046,7 @@ public:
   }
   
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
-#warning "todo"
+    // TODO(opaque): present opaque types with user-facing syntax
     Printer << "(__opaque " << T->getOpaqueDecl()->getNamingDecl()->printRef();
     if (!T->getSubstitutions().empty()) {
       Printer << '<';
