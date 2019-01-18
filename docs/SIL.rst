@@ -2856,8 +2856,9 @@ currently be initialized. After the evaluation:
 
 * The value that was originally referenced by the weak reference will have
   its weak reference count decremented by 1.
-* If the optional is non-nil, the reference in the optional's strong reference count is not
-  affected.
+* If the optionally typed operand is non-nil, the strong reference wrapped in
+  the optional has its weak reference count incremented by 1. In contrast, the reference's
+  strong reference count is not touched.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
