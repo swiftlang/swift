@@ -24,6 +24,20 @@
 using namespace swift;
 using namespace swift::syntax;
 
+TriviaPiece TriviaPiece::fromText(TriviaKind kind, StringRef text) {
+  switch (kind) {
+% for trivia in TRIVIAS:
+  case TriviaKind::${trivia.name}:
+% if trivia.is_collection():
+    assert(text.size() % ${trivia.characters_len()} == 0);
+    return TriviaPiece(kind, text.size()/${trivia.characters_len()});
+% else:
+    return TriviaPiece(kind, OwnedString::makeRefCounted(text));
+% end
+% end
+  }
+}
+
 void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   for (decltype(Count) i = 0; i < Indent; ++i)
     OS << ' ';
@@ -44,7 +58,7 @@ void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
-bool TriviaPiece::isComment() const {
+bool syntax::isCommentTriviaKind(TriviaKind Kind) {
   switch (Kind) {
 % for trivia in TRIVIAS:
   case TriviaKind::${trivia.name}:

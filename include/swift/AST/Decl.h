@@ -3562,11 +3562,16 @@ class ClassDecl final : public NominalTypeDecl {
   void createObjCMethodLookup();
 
   struct {
+    /// The superclass decl and a bit to indicate whether the
+    /// superclass was computed yet or not.
+    llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
+
     /// The superclass type and a bit to indicate whether the
     /// superclass was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> Superclass;
+    llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
+  friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
 
@@ -3899,11 +3904,16 @@ class ProtocolDecl final : public NominalTypeDecl {
   bool existentialTypeSupportedSlow(LazyResolver *resolver);
 
   struct {
+    /// The superclass decl and a bit to indicate whether the
+    /// superclass was computed yet or not.
+    llvm::PointerIntPair<ClassDecl *, 1, bool> SuperclassDecl;
+
     /// The superclass type and a bit to indicate whether the
     /// superclass was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> Superclass;
+    llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
+  friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
 
@@ -5875,7 +5885,7 @@ public:
 /// enum. EnumElementDecls are represented in the AST as members of their
 /// parent EnumDecl, although syntactically they are subordinate to the
 /// EnumCaseDecl.
-class EnumElementDecl : public ValueDecl {
+class EnumElementDecl : public DeclContext, public ValueDecl {
   /// This is the type specified with the enum element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
@@ -5895,7 +5905,8 @@ public:
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC)
-  : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
+  : DeclContext(DeclContextKind::EnumElementDecl, DC),
+    ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
     Params(Params),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
@@ -5963,14 +5974,23 @@ public:
     return getParameterList() != nullptr;
   }
 
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::EnumElement;
-  }
-
   /// True if the case is marked 'indirect'.
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
   }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::EnumElement;
+  }
+
+  static bool classof(const DeclContext *DC) {
+    if (auto D = DC->getAsDecl())
+      return classof(D);
+    return false;
+  }
+
+  using DeclContext::operator new;
+  using Decl::getASTContext;
 };
   
 inline SourceRange EnumCaseDecl::getSourceRange() const {

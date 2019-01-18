@@ -404,6 +404,7 @@ class BuildScriptInvocation(object):
         if not args.test_watchos_host:
             self.platforms_to_skip_test_host.add(
                 StdlibDeploymentTarget.AppleWatch)
+        self.build_libparser_only = args.build_libparser_only
 
     def initialize_runtime_environment(self):
         """Change the program environment for building."""
@@ -697,7 +698,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-optimized"]
         if not args.test_optimize_for_size:
             impl_args += ["--skip-test-optimize-for-size"]
-
+        if args.build_libparser_only:
+            impl_args += ["--build-libparser-only"]
         if args.android:
             impl_args += [
                 "--android-arch", args.android_arch,

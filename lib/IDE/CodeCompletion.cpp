@@ -1437,6 +1437,7 @@ static bool isTopLevelContext(const DeclContext *DC) {
       return true;
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
+    case DeclContextKind::EnumElementDecl:
       return false;
     default:
       continue;

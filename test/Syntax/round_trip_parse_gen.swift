@@ -52,6 +52,7 @@ class C {
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
     foo(nil, nil, nil)
     _ = type(of: a).self
+    _ = a.`self`
     _ = A -> B.C<Int>
     _ = [(A) throws -> B]()
   }
@@ -532,7 +533,7 @@ struct S : Q, Equatable {
   @_implements(P, x)
   var y: String
   @_implements(P, g())
-  func h() {}
+  func h() { _ = \.self }
 
   @available(*, deprecated: 1.2, message: "ABC")
   fileprivate(set) var x: String

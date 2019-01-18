@@ -212,6 +212,12 @@ void releasePartialApplyCapturedArg(
     SILBuilder &Builder, SILLocation Loc, SILValue Arg, SILParameterInfo PInfo,
     InstModCallbacks Callbacks = InstModCallbacks());
 
+/// Insert destroys of captured arguments of partial_apply [stack].
+void insertDestroyOfCapturedArguments(
+    PartialApplyInst *PAI, SILBuilder &B,
+    llvm::function_ref<bool(SILValue)> shouldInsertDestroy =
+        [](SILValue arg) -> bool { return true; });
+
 /// This computes the lifetime of a single SILValue.
 ///
 /// This does not compute a set of jointly postdominating use points. Instead it

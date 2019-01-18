@@ -878,6 +878,7 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
                 getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
                 Inst->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+                Inst->isOnStack(),
                 GenericSpecializationInformation::create(Inst, getBuilder())));
 }
 

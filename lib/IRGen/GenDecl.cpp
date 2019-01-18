@@ -771,6 +771,7 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::EnumElementDecl:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::SerializedLocal:
@@ -984,7 +985,7 @@ static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
   return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
 }
 
-void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
+void IRGenerator::emitGlobalTopLevel() {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
@@ -995,10 +996,14 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
   }
 
   // Ensure that relative symbols are collocated in the same LLVM module.
-  for (SILWitnessTable &wt : PrimaryIGM->getSILModule().getWitnessTableList()) {
+  for (auto &wt : PrimaryIGM->getSILModule().getWitnessTableList()) {
     CurrentIGMPtr IGM = getGenModule(wt.getDeclContext());
-    if (emitForParallelEmission)
-      IGM->ensureRelativeSymbolCollocation(wt);
+    ensureRelativeSymbolCollocation(wt);
+  }
+
+  for (auto &wt : PrimaryIGM->getSILModule().getDefaultWitnessTableList()) {
+    CurrentIGMPtr IGM = getGenModule(wt.getProtocol()->getDeclContext());
+    ensureRelativeSymbolCollocation(wt);
   }
 
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
@@ -1903,6 +1908,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     /// Add a zero initializer.
     if (forDefinition)
       gvar->setInitializer(llvm::Constant::getNullValue(storageTypeWithContainer));
+    else
+      gvar->setComdat(nullptr);
   }
   llvm::Constant *addr = gvar;
   if (var->isInitializedObject()) {
@@ -2184,8 +2191,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   // associated with it.  The combination of the two allows us to identify the
   // @_silgen_name functions.  These are locally defined function thunks used in
   // the standard library.  Do not give them DLLImport DLL Storage.
-  if (useDllStorage() && f->hasCReferences() && !forDefinition)
-    fn->setDLLStorageClass(llvm::GlobalValue::DefaultStorageClass);
+  if (!forDefinition) {
+    fn->setComdat(nullptr);
+    if (f->hasCReferences())
+      fn->setDLLStorageClass(llvm::GlobalValue::DefaultStorageClass);
+  }
 
   // If we have an order number for this function, set it up as appropriate.
   if (hasOrderNumber) {

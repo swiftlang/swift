@@ -108,11 +108,11 @@ class OptBugReducerTestCase(unittest.TestCase):
         output_file_re = re.compile(r'\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 1)
+        self.assertEqual(sum(output_matches), 1)
         # Make sure our final output command does not have -emit-sib in
         # the output. We want users to get sil output when they type in
         # the relevant command.
-        self.assertEquals([], [o for o in output if '-emit-sib' in o])
+        self.assertEqual([], [o for o in output if '-emit-sib' in o])
 
     def test_suffix_in_need_of_prefix(self):
         name = 'testsuffixinneedofprefix'
@@ -137,11 +137,11 @@ class OptBugReducerTestCase(unittest.TestCase):
         output_file_re = re.compile(r'\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 1)
+        self.assertEqual(sum(output_matches), 1)
         # Make sure our final output command does not have -emit-sib in the
         # output. We want users to get sil output when they type in the
         # relevant command.
-        self.assertEquals([], [o for o in output if '-emit-sib' in o])
+        self.assertEqual([], [o for o in output if '-emit-sib' in o])
 
     def test_reduce_function(self):
         name = 'testreducefunction'
@@ -170,11 +170,11 @@ class OptBugReducerTestCase(unittest.TestCase):
         output_file_re = re.compile(r'\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 1)
+        self.assertEqual(sum(output_matches), 1)
         # Make sure our final output command does not have -emit-sib in the
         # output. We want users to get sil output when they type in the
         # relevant command.
-        self.assertEquals([], [o for o in output if '-emit-sib' in o])
+        self.assertEqual([], [o for o in output if '-emit-sib' in o])
 
 
 if __name__ == '__main__':

@@ -374,6 +374,7 @@ class IRGenSILFunction :
 {
 public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
+  llvm::DenseMap<SILValue, StackAddress> LoweredPartialApplyAllocations;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
 
   /// All alloc_ref instructions which allocate the object on the stack.
@@ -2527,11 +2528,16 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
 
   // Create the thunk and function value.
   Explosion function;
-  emitFunctionPartialApplication(
+  auto closureStackAddr = emitFunctionPartialApplication(
       *this, *CurSILFn, calleeFn, innerContext, llArgs, params,
       i->getSubstitutionMap(), origCalleeTy, i->getSubstCalleeType(),
       i->getType().castTo<SILFunctionType>(), function, false);
   setLoweredExplosion(v, function);
+
+  if (closureStackAddr) {
+    assert(i->isOnStack());
+    LoweredPartialApplyAllocations[v] = *closureStackAddr;
+  }
 }
 
 void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
@@ -4074,6 +4080,13 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
+  if (auto *closure = dyn_cast<PartialApplyInst>(i->getOperand())) {
+    assert(closure->isOnStack());
+    auto stackAddr = LoweredPartialApplyAllocations[i->getOperand()];
+    emitDeallocateDynamicAlloca(stackAddr);
+    return;
+  }
+
   auto allocatedType = i->getOperand()->getType();
   const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
   StackAddress stackAddr = getLoweredStackAddress(i->getOperand());

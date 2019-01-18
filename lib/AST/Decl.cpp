@@ -3547,7 +3547,6 @@ void ClassDecl::addImplicitDestructor() {
   // Create an empty body for the destructor.
   DD->setBody(BraceStmt::create(ctx, getLoc(), { }, getLoc(), true));
   addMember(DD);
-  setHasDestructor();
 
   // Propagate access control and versioned-ness.
   DD->copyFormalAccessFrom(this, /*sourceIsParentContext*/true);
@@ -3973,7 +3972,10 @@ ClassDecl *ProtocolDecl::getSuperclassDecl() const {
 void ProtocolDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
-  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassDecl.setPointerAndInt(
+    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
+    true);
 }
 
 bool ProtocolDecl::walkInheritedProtocols(
@@ -6478,7 +6480,10 @@ ClassDecl *ClassDecl::getSuperclassDecl() const {
 void ClassDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
-  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassDecl.setPointerAndInt(
+    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
+    true);
 }
 
 ClangNode Decl::getClangNodeImpl() const {

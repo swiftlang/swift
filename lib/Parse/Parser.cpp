@@ -73,7 +73,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
   }
 
   Token Tok;
-  syntax::Trivia LeadingTrivia, TrailingTrivia;
+  ParsedTrivia LeadingTrivia, TrailingTrivia;
   do {
     L.lex(Tok, LeadingTrivia, TrailingTrivia);
 
@@ -83,7 +83,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
     if (F != ResetTokens.end()) {
       assert(F->isNot(tok::string_literal));
 
-      DestFunc(*F, syntax::Trivia(), syntax::Trivia());
+      DestFunc(*F, ParsedTrivia(), ParsedTrivia());
 
       auto NewState = L.getStateForBeginningOfTokenLoc(
           F->getLoc().getAdvancedLoc(F->getLength()));
@@ -95,7 +95,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
       std::vector<Token> StrTokens;
       getStringPartTokens(Tok, LangOpts, SM, BufferID, StrTokens);
       for (auto &StrTok : StrTokens) {
-        DestFunc(StrTok, syntax::Trivia(), syntax::Trivia());
+        DestFunc(StrTok, ParsedTrivia(), ParsedTrivia());
       }
     } else {
       DestFunc(Tok, LeadingTrivia, TrailingTrivia);
@@ -139,7 +139,8 @@ private:
     SourceFile &SF = *AFD->getDeclContext()->getParentSourceFile();
     SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
     unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
-    Parser TheParser(BufferID, SF, nullptr, &ParserState);
+    Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
+                     /*DelayBodyParsing=*/false);
     TheParser.SyntaxContext->disable();
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
     if (CodeCompletionFactory) {
@@ -165,7 +166,8 @@ static void parseDelayedDecl(
   SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
   unsigned BufferID =
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
-  Parser TheParser(BufferID, SF, nullptr, &ParserState);
+  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
+                   /*DelayBodyParsing=*/false);
 
   // Disable libSyntax creation in the delayed parsing.
   TheParser.SyntaxContext->disable();
@@ -292,8 +294,8 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
                         : CommentRetentionMode::AttachToNextToken,
            TriviaRetentionMode::WithoutTrivia, TokenizeInterpolatedString,
            SplitTokens,
-           [&](const Token &Tok, const Trivia &LeadingTrivia,
-               const Trivia &TrailingTrivia) { Tokens.push_back(Tok); });
+           [&](const Token &Tok, const ParsedTrivia &LeadingTrivia,
+               const ParsedTrivia &TrailingTrivia) { Tokens.push_back(Tok); });
 
   assert(Tokens.back().is(tok::eof));
   Tokens.pop_back(); // Remove EOF.
@@ -314,12 +316,22 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
       CommentRetentionMode::AttachToNextToken, TriviaRetentionMode::WithTrivia,
       /*TokenizeInterpolatedString=*/false,
       /*SplitTokens=*/ArrayRef<Token>(),
-      [&](const Token &Tok, const Trivia &LeadingTrivia,
-          const Trivia &TrailingTrivia) {
+      [&](const Token &Tok, const ParsedTrivia &LeadingTrivia,
+          const ParsedTrivia &TrailingTrivia) {
+        CharSourceRange TokRange = Tok.getRangeWithoutBackticks();
+        SourceLoc LeadingTriviaLoc =
+          TokRange.getStart().getAdvancedLoc(-LeadingTrivia.getLength());
+        SourceLoc TrailingTriviaLoc =
+          TokRange.getStart().getAdvancedLoc(TokRange.getByteLength());
+        Trivia syntaxLeadingTrivia =
+          LeadingTrivia.convertToSyntaxTrivia(LeadingTriviaLoc, SM, BufferID);
+        Trivia syntaxTrailingTrivia =
+          TrailingTrivia.convertToSyntaxTrivia(TrailingTriviaLoc, SM, BufferID);
         auto Text = OwnedString::makeRefCounted(Tok.getText());
         auto ThisToken =
-            RawSyntax::make(Tok.getKind(), Text, LeadingTrivia.Pieces,
-                            TrailingTrivia.Pieces, SourcePresence::Present);
+            RawSyntax::make(Tok.getKind(), Text, syntaxLeadingTrivia.Pieces,
+                            syntaxTrailingTrivia.Pieces,
+                            SourcePresence::Present);
 
         auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
         Tokens.push_back({ThisToken, ThisTokenPos.getValue()});
@@ -336,15 +348,15 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DisableDelayedParsing)
+               bool DelayBodyParsing)
     : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState,
-             std::move(SPActions), DisableDelayedParsing) {}
+             std::move(SPActions), DelayBodyParsing) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DisableDelayedParsing)
+               bool DelayBodyParsing)
     : Parser(
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
@@ -359,7 +371,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
               SF.shouldBuildSyntaxTree()
                   ? TriviaRetentionMode::WithTrivia
                   : TriviaRetentionMode::WithoutTrivia)),
-          SF, SIL, PersistentState, std::move(SPActions), DisableDelayedParsing) {}
+          SF, SIL, PersistentState, std::move(SPActions), DelayBodyParsing) {}
 
 namespace {
 
@@ -480,7 +492,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions,
-               bool DisableDelayedParsing)
+               bool DelayBodyParsing)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
     SF(SF),
@@ -488,7 +500,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     SIL(SIL),
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
-    DisableDelayedParsing(DisableDelayedParsing),
+    DelayBodyParsing(DelayBodyParsing),
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
@@ -580,7 +592,7 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
 void Parser::markSplitToken(tok Kind, StringRef Txt) {
   SplitTokens.emplace_back();
   SplitTokens.back().setToken(Kind, Txt);
-  Trivia EmptyTrivia;
+  ParsedTrivia EmptyTrivia;
   SyntaxContext->addToken(SplitTokens.back(), LeadingTrivia, EmptyTrivia);
   TokReceiver->receive(SplitTokens.back());
 }
@@ -746,7 +758,7 @@ bool Parser::loadCurrentSyntaxNodeFromCache() {
   }
   unsigned LexerOffset =
       SourceMgr.getLocOffsetInBuffer(Tok.getLoc(), L->getBufferID());
-  unsigned LeadingTriviaLen = LeadingTrivia.getTextLength();
+  unsigned LeadingTriviaLen = LeadingTrivia.getLength();
   unsigned LeadingTriviaOffset = LexerOffset - LeadingTriviaLen;
   SourceLoc LeadingTriviaLoc = Tok.getLoc().getAdvancedLoc(-LeadingTriviaLen);
   if (auto TextLength = SyntaxContext->lookupNode(LeadingTriviaOffset,
@@ -1095,7 +1107,8 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
-                                  /*PersistentState=*/nullptr, Impl.SPActions));
+                                  /*PersistentState=*/nullptr, Impl.SPActions,
+                                  /*DelayBodyParsing=*/false));
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
@@ -1112,7 +1125,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
                       TriviaRetentionMode::WithoutTrivia,
                       Offset, EndOffset));
   Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,
-    /*PersistentState=*/nullptr, Impl.SPActions));
+    /*PersistentState=*/nullptr, Impl.SPActions, /*DelayBodyParsing=*/false));
 }
 
 ParserUnit::~ParserUnit() {

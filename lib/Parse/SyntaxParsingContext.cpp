@@ -23,7 +23,6 @@
 #include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/Trivia.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -67,7 +66,7 @@ SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
                                         ArrayRef<ParsedRawSyntaxNode> Parts) {
   assert(isUnknownKind(Kind));
   if (IsBacktracking)
-    return ParsedRawSyntaxNode::makeDeferred(Kind, Parts);
+    return ParsedRawSyntaxNode::makeDeferred(Kind, Parts, *this);
   else
     return getRecorder().recordRawSyntax(Kind, Parts);
 }
@@ -81,7 +80,7 @@ SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
   auto &rec = getRecorder();
   auto formNode = [&](SyntaxKind kind, ArrayRef<ParsedRawSyntaxNode> layout) {
     if (nodeCreateK == SyntaxNodeCreationKind::Deferred || IsBacktracking) {
-      rawNode = ParsedRawSyntaxNode::makeDeferred(kind, layout);
+      rawNode = ParsedRawSyntaxNode::makeDeferred(kind, layout, *this);
     } else {
       rawNode = rec.recordRawSyntax(kind, layout);
     }
@@ -171,14 +170,16 @@ ParsedTokenSyntax SyntaxParsingContext::popToken() {
 }
 
 /// Add Token with Trivia to the parts.
-void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
-                                    Trivia &TrailingTrivia) {
+void SyntaxParsingContext::addToken(Token &Tok,
+                                    const ParsedTrivia &LeadingTrivia,
+                                    const ParsedTrivia &TrailingTrivia) {
   if (!Enabled)
     return;
 
   ParsedRawSyntaxNode raw;
   if (IsBacktracking)
-    raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia);
+    raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia,
+                                            *this);
   else
     raw = getRecorder().recordToken(Tok, LeadingTrivia, TrailingTrivia);
   addRawSyntax(std::move(raw));
@@ -229,8 +230,6 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind,
   case SyntaxKind::IdentifierExpr:
   case SyntaxKind::SpecializeExpr:
   case SyntaxKind::MemberAccessExpr:
-  case SyntaxKind::DotSelfExpr:
-  case SyntaxKind::ImplicitMemberExpr:
   case SyntaxKind::SimpleTypeIdentifier:
   case SyntaxKind::MemberTypeIdentifier:
   case SyntaxKind::FunctionCallExpr:

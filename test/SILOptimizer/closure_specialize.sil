@@ -808,3 +808,23 @@ bb3:
   release_value %2 : $@callee_guaranteed () -> Int
   return %value : $Int
 }
+// CHECK-LABEL: sil @reabstractionTest_on_stack
+// CHECK: bb0([[A:%.*]] : $Int):
+// CHECK:  [[R:%.*]] = alloc_stack $Int
+// CHECK:  [[F:%.*]] = function_ref @$s25testClosureThunkNoEscape20aB14ConvertHelper2SiTf1nc_n
+// CHECK: apply [[F]]([[R]], [[A]])
+sil @reabstractionTest_on_stack : $(Int) -> () {
+bb0(%0 : $Int):
+  %48 = alloc_stack $Int
+  %49 = function_ref @testClosureConvertHelper2 : $@convention(thin) (Int) -> Int
+  %50 = partial_apply [callee_guaranteed] [on_stack] %49(%0) : $@convention(thin) (Int) -> Int
+  %52 = function_ref @reabstractionThunk : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
+  %53 = partial_apply [callee_guaranteed] [on_stack] %52(%50) : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
+  %55 = function_ref @testClosureThunkNoEscape2 : $@convention(thin) (@noescape @callee_guaranteed () -> @out Int) -> @out Int
+  apply %55(%48, %53) : $@convention(thin) (@noescape @callee_guaranteed () -> @out Int) -> @out Int
+  dealloc_stack %53 : $@noescape @callee_guaranteed () -> @out Int
+  dealloc_stack %50 : $@noescape @callee_guaranteed () -> Int
+  dealloc_stack %48 : $*Int
+  %empty = tuple ()
+  return %empty : $()
+}

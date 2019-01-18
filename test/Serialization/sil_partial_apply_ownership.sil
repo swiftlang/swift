@@ -62,3 +62,17 @@ entry:
   %t = tuple ()
   return %t : $()
 }
+
+// CHECK-LABEL: sil @partial_apply_on_stack
+// CHECK:  partial_apply [callee_guaranteed] [on_stack] %{{.*}} : $@convention(thin) (Builtin.Int64) -> ()
+sil @partial_apply_on_stack : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @subject : $@convention(thin) (Builtin.Int64) -> ()
+  %z = integer_literal $Builtin.Int64, 0
+  %c = partial_apply [callee_guaranteed] [on_stack] %f(%z) : $@convention(thin) (Builtin.Int64) -> ()
+  %f2 = function_ref @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  apply %f2(%c) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %c : $@noescape @callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}

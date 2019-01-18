@@ -3195,6 +3195,7 @@ int main(int argc, char *argv[]) {
     PrintOpts = PrintOptions::printDocInterface();
   } else {
     PrintOpts = PrintOptions::printEverything();
+    PrintOpts.FullyQualifiedTypes = options::FullyQualifiedTypes;
     PrintOpts.FullyQualifiedTypesIfAmbiguous =
       options::FullyQualifiedTypesIfAmbiguous;
     PrintOpts.SynthesizeSugarOnTypes = options::SynthesizeSugarOnTypes;

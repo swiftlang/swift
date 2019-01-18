@@ -1165,7 +1165,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         Result = makeParserResult(
             Result,
             new (Context) DotSelfExpr(Result.get(), TokLoc, consumeToken()));
-        SyntaxContext->createNodeInPlace(SyntaxKind::DotSelfExpr);
+        SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
         continue;
       }
 
@@ -1560,7 +1560,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
             ParsedSyntaxRecorder::makeIdentifierPattern(
                                     SyntaxContext->popToken(), *SyntaxContext);
         ParsedExprSyntax ExprNode =
-            ParsedSyntaxRecorder::deferUnresolvedPatternExpr(PatternNode);
+            ParsedSyntaxRecorder::deferUnresolvedPatternExpr(PatternNode,
+                                                             *SyntaxContext);
         SyntaxContext->addSyntax(ExprNode);
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
@@ -1635,7 +1636,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc,
                                     diag::expected_identifier_after_dot_expr);
     if (!Name) return nullptr;
-    SyntaxContext->createNodeInPlace(SyntaxKind::ImplicitMemberExpr);
+    SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
     // Check for a () suffix, which indicates a call when constructing
     // this member.  Note that this cannot be the start of a new line.
@@ -1801,7 +1802,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                     unsigned &InterpolationCount) {
   SourceLoc Loc = EntireTok.getLoc();
   ParserStatus Status;
-  Trivia EmptyTrivia;
+  ParsedTrivia EmptyTrivia;
   bool First = true;
 
   DeclName appendLiteral(Context, Context.Id_appendLiteral, { Identifier() });
@@ -2027,8 +2028,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // Make unknown tokens to represent the open and close quote.
   Token OpenQuote(QuoteKind, OpenQuoteStr);
   Token CloseQuote(QuoteKind, CloseQuoteStr);
-  Trivia EmptyTrivia;
-  Trivia EntireTrailingTrivia = TrailingTrivia;
+  ParsedTrivia EmptyTrivia;
+  ParsedTrivia EntireTrailingTrivia = TrailingTrivia;
 
   // Add the open quote to the context; the quote should have the leading trivia
   // of the entire string token and a void trailing trivia.
@@ -2040,8 +2041,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // We are going to mess with Tok to do reparsing for interpolated literals,
   // don't lose our 'next' token.
   llvm::SaveAndRestore<Token> SavedTok(Tok);
-  llvm::SaveAndRestore<Trivia> SavedLeadingTrivia(LeadingTrivia);
-  llvm::SaveAndRestore<Trivia> SavedTrailingTrivia(TrailingTrivia);
+  llvm::SaveAndRestore<ParsedTrivia> SavedLeadingTrivia(LeadingTrivia);
+  llvm::SaveAndRestore<ParsedTrivia> SavedTrailingTrivia(TrailingTrivia);
 
   // We're not in a place where an interpolation would be valid.
   if (!CurLocalContext) {

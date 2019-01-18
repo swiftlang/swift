@@ -327,10 +327,12 @@ public:
   // Type remapping
   //===--------------------------------------------------------------------===//
 
-  static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
-                                         SILModule &M,
-                                         SubstitutionMap subs,
-                                         ParameterConvention calleeConvention);
+  static SILType
+  getPartialApplyResultType(SILType Ty, unsigned ArgCount, SILModule &M,
+                            SubstitutionMap subs,
+                            ParameterConvention calleeConvention,
+                            PartialApplyInst::OnStackKind onStack =
+                                PartialApplyInst::OnStackKind::NotOnStack);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation
@@ -476,10 +478,12 @@ public:
   PartialApplyInst *createPartialApply(
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
+      PartialApplyInst::OnStackKind OnStack =
+          PartialApplyInst::OnStackKind::NotOnStack,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention, *F,
-        C.OpenedArchetypes, SpecializationInfo));
+        C.OpenedArchetypes, SpecializationInfo, OnStack));
   }
 
   BeginApplyInst *createBeginApply(

@@ -1023,8 +1023,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_INST_APPLY: {
     unsigned IsPartial;
-    SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs,
-                                   TyID, TyID2, ValID, ListOfValues);
+    SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs, TyID, TyID2,
+                                   ValID, ListOfValues);
     switch (IsPartial) {
     case SIL_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
@@ -1416,11 +1416,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
       Args.push_back(getLocalValue(
           ListOfValues[I], fnConv.getSILArgumentType(I + unappliedArgs)));
-
+    auto onStack = closureTy.castTo<SILFunctionType>()->isNoEscape()
+                       ? PartialApplyInst::OnStackKind::OnStack
+                       : PartialApplyInst::OnStackKind::NotOnStack;
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args,
-        closureTy.castTo<SILFunctionType>()->getCalleeConvention());
+        closureTy.castTo<SILFunctionType>()->getCalleeConvention(), onStack);
     break;
   }
   case SILInstructionKind::BuiltinInst: {

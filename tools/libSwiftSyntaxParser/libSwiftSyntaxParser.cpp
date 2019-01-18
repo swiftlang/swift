@@ -88,14 +88,14 @@ private:
   }
 
   static void makeCTrivia(SmallVectorImpl<CTriviaPiece> &c_trivia,
-                          const Trivia &trivia) {
+                          ArrayRef<ParsedTriviaPiece> trivia) {
     for (const auto &piece : trivia) {
       CTriviaPiece c_piece;
       auto numValue =
         WrapperTypeTraits<TriviaKind>::numericValue(piece.getKind());
       c_piece.kind = numValue;
       assert(c_piece.kind == numValue && "trivia kind value is too large");
-      c_piece.length = piece.getTextLength();
+      c_piece.length = piece.getLength();
       c_trivia.push_back(c_piece);
     }
   }
@@ -131,15 +131,15 @@ private:
     node.present = true;
   }
 
-  OpaqueSyntaxNode recordToken(const Token &tok,
-                               const Trivia &leadingTrivia,
-                               const Trivia &trailingTrivia,
+  OpaqueSyntaxNode recordToken(tok tokenKind,
+                               ArrayRef<ParsedTriviaPiece> leadingTrivia,
+                               ArrayRef<ParsedTriviaPiece> trailingTrivia,
                                CharSourceRange range) override {
     SmallVector<CTriviaPiece, 8> c_leadingTrivia, c_trailingTrivia;
     makeCTrivia(c_leadingTrivia, leadingTrivia);
     makeCTrivia(c_trailingTrivia, trailingTrivia);
     CRawSyntaxNode node;
-    makeCRawToken(node, tok.getKind(), c_leadingTrivia, c_trailingTrivia,
+    makeCRawToken(node, tokenKind, c_leadingTrivia, c_trailingTrivia,
                   range);
     return getNodeHandler()(&node);
   }
@@ -187,6 +187,8 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
   LangOptions langOpts;
   langOpts.BuildSyntaxTree = true;
   langOpts.CollectParsedToken = false;
+  // Disable name lookups during parsing.
+  langOpts.EnableASTScopeLookup = true;
 
   auto parseActions =
     std::make_shared<CLibParseActions>(*this, SM, bufID);

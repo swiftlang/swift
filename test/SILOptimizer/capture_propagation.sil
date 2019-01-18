@@ -470,3 +470,40 @@ bb0:
   %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
   return %2 : $@callee_owned (Int32, Int32) -> Bool
 }
+
+sil shared @test_capture_propagation2_callee_on_stack : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : $@noescape @callee_guaranteed () -> ()):
+  apply %0() : $@noescape @callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil shared @test_capture_propagation2_thunk_on_stack : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : $*Builtin.Word, %4 : $@noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()):
+  apply %4(%0, %1, %2, %3) : $@noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK: sil @test_capture_propagation2_caller_on_stack
+// CHECK:  [[F:%.*]] = function_ref @test_capture_propagation2_callee_on_stack : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:  [[F2:%.*]] = function_ref @$s40test_capture_propagation2_thunk_on_stack4_12353globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token808_TFtest_b1_C8_closureTf3pi0pd0psbpgpf_n : $@convention(thin) @noescape () -> ()
+// CHECK:  [[CL:%.*]] = thin_to_thick_function [[F2]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK:  apply [[F]]([[CL]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:  return
+
+sil @test_capture_propagation2_caller_on_stack : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = float_literal $Builtin.FPIEEE32, 0
+  %2 = string_literal utf8 "123"
+  %3 = global_addr @globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8 : $*Builtin.Word
+  %4 = function_ref @_TFtest_capture_propagation2_closure : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %5 = thin_to_thick_function %4 : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> () to $@noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %6 = function_ref @test_capture_propagation2_callee_on_stack : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %7 = function_ref @test_capture_propagation2_thunk_on_stack : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> ()
+  %8 = partial_apply [callee_guaranteed] [on_stack] %7(%0, %1, %2, %3, %5) : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> ()
+  apply %6(%8) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %8 : $@noescape @callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

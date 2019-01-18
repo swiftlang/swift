@@ -19,6 +19,7 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.9" CACHE STRING "")
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "7.0" CACHE STRING "")
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "9.0" CACHE STRING "")
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING "")
+set(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES TRUE)
 
 set(SWIFT_SOURCE_DIR "${SWIFT_SOURCE_ROOT}/src/swift" CACHE PATH "")
 set(SWIFT_PATH_TO_LLVM_SOURCE "${SWIFT_SOURCE_ROOT}/src/llvm" CACHE PATH "")
@@ -61,6 +62,7 @@ precondition(TOOLCHAIN_DIR)
 # Some overlays include the runtime's headers,
 # and some of those headers are generated at build time.
 add_subdirectory("${SWIFT_SOURCE_DIR}/include" "swift/include")
+add_subdirectory("${SWIFT_SOURCE_DIR}/apinotes" "swift/apinotes")
 
 # Without this line, installing components is broken. This needs refactoring.
 swift_configure_components()

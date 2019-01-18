@@ -116,19 +116,32 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB,
                                 bool FullParse,
-                                bool DisableDelayedParsing) {
+                                bool DelayBodyParsing) {
   assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
          "cannot parse in full with the given parameters!");
 
   std::shared_ptr<SyntaxTreeCreator> STreeCreator;
   if (SF.shouldBuildSyntaxTree()) {
     STreeCreator = std::make_shared<SyntaxTreeCreator>(
-                   SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
+        SF.getASTContext().SourceMgr, BufferID,
+        SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
   }
+
+  // Not supported right now.
+  if (SF.Kind == SourceFileKind::REPL)
+    DelayBodyParsing = false;
+  if (SF.hasInterfaceHash())
+    DelayBodyParsing = false;
+  if (SF.shouldCollectToken())
+    DelayBodyParsing = false;
+  if (SF.shouldBuildSyntaxTree())
+    DelayBodyParsing = false;
+  if (SIL)
+    DelayBodyParsing = false;
 
   SharedTimer timer("Parsing");
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
-           PersistentState, STreeCreator, DisableDelayedParsing);
+           PersistentState, STreeCreator, DelayBodyParsing);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
@@ -157,21 +170,21 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB,
-                                bool DisableDelayedParsing) {
+                                bool DelayBodyParsing) {
   return parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
                                  PersistentState, DelayedParseCB,
                                  /*FullParse=*/SF.shouldBuildSyntaxTree(),
-                                 DisableDelayedParsing);
+                                 DelayBodyParsing);
 }
 
 bool swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                                     PersistentParserState *PersistentState,
                                     DelayedParsingCallbacks *DelayedParseCB,
-                                    bool DisableDelayedParsing) {
+                                    bool DelayBodyParsing) {
   bool Done = false;
   return parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
                                  PersistentState, DelayedParseCB,
-                                 /*FullParse=*/true, DisableDelayedParsing);
+                                 /*FullParse=*/true, DelayBodyParsing);
 }
 
 
@@ -4921,13 +4934,16 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
   auto PartialApplyConvention = ParameterConvention::Direct_Owned;
   bool IsNonThrowingApply = false;
+  bool IsNoEscape = false;
   StringRef AttrName;
-  
-  if (parseSILOptional(AttrName, *this)) {
+
+  while (parseSILOptional(AttrName, *this)) {
     if (AttrName.equals("nothrow"))
       IsNonThrowingApply = true;
     else if (AttrName.equals("callee_guaranteed"))
       PartialApplyConvention = ParameterConvention::Direct_Guaranteed;
+    else if (AttrName.equals("on_stack"))
+      IsNoEscape = true;
     else
       return true;
   }
@@ -5058,8 +5074,10 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = B.createPartialApply(InstLoc, FnVal, subs, Args,
-                                     PartialApplyConvention);
+    ResultVal = B.createPartialApply(
+        InstLoc, FnVal, subs, Args, PartialApplyConvention,
+        IsNoEscape ? PartialApplyInst::OnStackKind::OnStack
+                   : PartialApplyInst::OnStackKind::NotOnStack);
     break;
   }
   case SILInstructionKind::TryApplyInst: {

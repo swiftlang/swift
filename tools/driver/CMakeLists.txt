@@ -1,5 +1,4 @@
 add_swift_host_tool(swift
-  api_notes.cpp
   driver.cpp
   autolink_extract_main.cpp
   modulewrap_main.cpp
