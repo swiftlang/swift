@@ -5131,7 +5131,7 @@ CanSILBoxType SILBoxType::get(ASTContext &C,
                               SubstitutionMap Substitutions) {
   // TODO: Support resilient opaque types.
   Substitutions = Substitutions
-    .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal);
+    .substOpaqueTypesWithUnderlyingTypes();
   // Canonicalize substitutions.
   Substitutions = Substitutions.getCanonical();
 

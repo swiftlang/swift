@@ -882,7 +882,7 @@ void ASTMangler::appendType(Type type) {
         return appendType(ErrorType::get(opaqueTy->getASTContext()));
       }
       auto underlyingType =
-        type.substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal);
+        type.substOpaqueTypesWithUnderlyingTypes();
       assert(!underlyingType->isEqual(type));
       return appendType(underlyingType->getCanonicalType());
     }

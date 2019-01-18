@@ -304,7 +304,7 @@ class AbstractionPattern {
       OrigType = origType;
     else
       OrigType = origType
-        .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal)
+        .substOpaqueTypesWithUnderlyingTypes()
         ->getCanonicalType();
     GenericSig = CanGenericSignature();
     if (OrigType->hasTypeParameter())

@@ -1424,7 +1424,7 @@ const TypeLowering &
 TypeConverter::getTypeLowering(AbstractionPattern origType,
                                Type origSubstType) {
   CanType substType = origSubstType
-    .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal)
+    .substOpaqueTypesWithUnderlyingTypes()
     ->getCanonicalType();
   auto key = getTypeKey(origType, substType);
   

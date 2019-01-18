@@ -4848,11 +4848,8 @@ END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 /// archetypes with underlying types visible at a given resilience expansion
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
-  ResilienceExpansion expansion;
-
 public:
-  ReplaceOpaqueTypesWithUnderlyingTypes(ResilienceExpansion expansion)
-    : expansion(expansion) {}
+  ReplaceOpaqueTypesWithUnderlyingTypes() {}
   
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;

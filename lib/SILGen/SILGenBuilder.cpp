@@ -94,28 +94,27 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
 /// conformances.
 static void lookThroughOpaqueTypes(CanType &concreteType) {
   concreteType = concreteType
-    .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal)
+    .substOpaqueTypesWithUnderlyingTypes()
     ->getCanonicalType();
 }
 
 static void lookThroughOpaqueTypes(CanType &concreteType,
                                    ProtocolConformanceRef &conformance) {
   auto underlyingConcreteType = concreteType
-    .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal)
+    .substOpaqueTypesWithUnderlyingTypes()
     ->getCanonicalType();
   
   if (underlyingConcreteType == concreteType)
     return;
   
-  conformance = conformance.substOpaqueTypesWithUnderlyingTypes(concreteType,
-                                                  ResilienceExpansion::Minimal);
+  conformance = conformance.substOpaqueTypesWithUnderlyingTypes(concreteType);
   concreteType = underlyingConcreteType;
 }
 
 static void lookThroughOpaqueTypes(CanType &concreteType,
                                ArrayRef<ProtocolConformanceRef> &conformances) {
   auto underlyingConcreteType = concreteType
-    .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal)
+    .substOpaqueTypesWithUnderlyingTypes()
     ->getCanonicalType();
   
   if (underlyingConcreteType == concreteType)
@@ -125,8 +124,7 @@ static void lookThroughOpaqueTypes(CanType &concreteType,
   bool didChangeConformances = false;
   for (auto conformance : conformances) {
     auto underlyingConformance = conformance
-      .substOpaqueTypesWithUnderlyingTypes(concreteType,
-                                          ResilienceExpansion::Minimal);
+      .substOpaqueTypesWithUnderlyingTypes(concreteType);
     didChangeConformances |= underlyingConformance != conformance;
     underlyingConformances.push_back(underlyingConformance);
   }
@@ -138,7 +136,7 @@ static void lookThroughOpaqueTypes(CanType &concreteType,
 }
 
 static void lookThroughOpaqueTypes(SubstitutionMap &subs) {
-  subs = subs.substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal);
+  subs = subs.substOpaqueTypesWithUnderlyingTypes();
 }
 
 ApplyInst *SILGenBuilder::createApply(SILLocation loc, SILValue fn,
