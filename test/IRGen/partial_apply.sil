@@ -604,7 +604,7 @@ bb0(%0 : $*A2<A3>):
 
 sil @capture_class : $@convention(thin) (@guaranteed A3) -> ()
 
-// CHECK: define swiftcc i8* @partial_apply_stack_in_coroutine(i8* {{.*}}, %T13partial_apply2A3C*)
+// CHECK-LABEL: define swiftcc{{.*}} i8* @partial_apply_stack_in_coroutine(i8* {{.*}}, %T13partial_apply2A3C*)
 // CHECK: entry:
 // CHECK:   [[CLOSURE_CONTEXT:%.*]] = bitcast %T13partial_apply2A3C* %1 to %swift.opaque*
 // CHECK:   [[CONTEXT:%.*]] = bitcast %swift.opaque* [[CLOSURE_CONTEXT]] to %swift.refcounted*
