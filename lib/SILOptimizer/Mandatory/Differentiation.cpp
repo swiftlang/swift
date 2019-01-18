@@ -3689,10 +3689,10 @@ ADContext::declareExternalAssociatedFunction(
       module, LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
   SILOptFunctionBuilder fb(getTransform());
   // Create external function declaration.
-  auto *assocFn =
-      fb.createFunction(SILLinkage::PublicExternal, name, assocFnTy,
-                        /*GenericEnv*/ nullptr, originalLoc, original->isBare(),
-                        IsNotTransparent, original->isSerialized());
+  auto *assocFn = fb.createFunction(
+      SILLinkage::PublicExternal, name, assocFnTy,
+      /*GenericEnv*/ nullptr, originalLoc, original->isBare(), IsNotTransparent,
+      original->isSerialized(), original->isDynamicallyReplaceable());
   // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
   assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
   return assocFn;
