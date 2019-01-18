@@ -21,6 +21,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
@@ -573,6 +575,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     };
 
     // Print differentiation parameters, if any.
+    auto originalParamNames = map<SmallVector<Identifier, 8>>(
+        original->getParameters()->getArray(),
+        [&](ParamDecl *decl) { return decl->getName(); });
+
     if (auto indices = attr->getParameterIndices()) {
       printCommaIfNecessary();
       Printer << "wrt: (";
@@ -580,7 +586,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         if (isProperty || (isMethod && index == indices->parameters.size() - 1))
           Printer << "self";
         else
-          Printer << "." << index;
+          Printer << originalParamNames[index].str();
       }, [&] { Printer << ", "; });
       Printer << ")";
     } else if (!parsedParams.empty()) {
@@ -588,8 +594,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "wrt: (";
       interleave(parsedParams, [&](const ParsedAutoDiffParameter &param) {
         switch (param.getKind()) {
-        case ParsedAutoDiffParameter::Kind::Index:
-          Printer << '.' << param.getIndex();
+        case ParsedAutoDiffParameter::Kind::Named:
+          Printer << '.' << param.getName();
           break;
         case ParsedAutoDiffParameter::Kind::Self:
           Printer << "self";

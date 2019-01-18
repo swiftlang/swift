@@ -22,7 +22,7 @@ func jvpSimpleJVP(x: Float) -> (Float, ((Float) -> Float)) {
   return (x, { v in v })
 }
 
-@differentiable(wrt: (.1), jvp: jvpWrtSubsetJVP)
+@differentiable(wrt: (y), jvp: jvpWrtSubsetJVP)
 func jvpWrtSubset(x: Float, y: Float) -> Float {
   return x + y
 }
@@ -123,7 +123,7 @@ extension JVPStruct {
 }
 
 extension JVPStruct {
-  @differentiable(wrt: (self, .0), jvp: wrtAllJVP)
+  @differentiable(wrt: (self, x), jvp: wrtAllJVP)
   func wrtAll(x: Float) -> Float {
     return x + p
   }
@@ -179,7 +179,7 @@ func vjpSimpleVJP(x: Float) -> (Float, ((Float) -> Float)) {
   return (x, { v in v })
 }
 
-@differentiable(wrt: (.1), vjp: vjpWrtSubsetVJP)
+@differentiable(wrt: (y), vjp: vjpWrtSubsetVJP)
 func vjpWrtSubset(x: Float, y: Float) -> Float {
   return x + y
 }
@@ -280,7 +280,7 @@ extension VJPStruct {
 }
 
 extension VJPStruct {
-  @differentiable(wrt: (self, .0), vjp: wrtAllVJP)
+  @differentiable(wrt: (self, x), vjp: wrtAllVJP)
   func wrtAll(x: Float) -> Float {
     return x + p
   }

@@ -17,13 +17,13 @@ func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
 }
 
-@differentiable(wrt: (self, .0, .1), vjp: foo(_:_:)) // okay
-func bar(_ x: Float, _: Float) -> Float {
+@differentiable(wrt: (self, x, y), vjp: foo(_:_:)) // okay
+func bar(_ x: Float, _ y: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(wrt: (self, .0, .1), jvp: bar, vjp: foo(_:_:)) // okay
-func bar(_ x: Float, _: Float) -> Float {
+@differentiable(wrt: (self, x, y), jvp: bar, vjp: foo(_:_:)) // okay
+func bar(_ x: Float, _ y: Float) -> Float {
   return 1 + x
 }
 
@@ -64,12 +64,12 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(wrt: (.0), foo(_:_:)) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
+@differentiable(wrt: (x), foo(_:_:)) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(wrt: (1), vjp: foo(_:_:)) // expected-error {{expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'}}
+@differentiable(wrt: (1), vjp: foo(_:_:)) // expected-error {{expected a parameter, which can be a function parameter name or 'self'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }

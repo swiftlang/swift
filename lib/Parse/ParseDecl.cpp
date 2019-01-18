@@ -932,16 +932,13 @@ bool Parser::parseDifferentiableAttributeArguments(
           SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParam);
       SourceLoc paramLoc;
       switch (Tok.getKind()) {
-      case tok::period_prefix: {
-        SyntaxParsingContext IndexParamContext(
-            SyntaxContext, SyntaxKind::DifferentiationIndexParam);
-        consumeToken(tok::period_prefix);
-        unsigned index;
-        if (parseUnsignedInteger(index, paramLoc,
-                                 diag::attr_differentiable_expected_parameter))
+      case tok::identifier: {
+        Identifier paramName;
+        if (parseIdentifier(paramName, paramLoc,
+                            diag::attr_differentiable_expected_parameter))
           return true;
-        params.push_back(
-          ParsedAutoDiffParameter::getIndexParameter(paramLoc, index));
+        params.push_back(ParsedAutoDiffParameter::getNamedParameter(
+            paramLoc, paramName));
         break;
       }
       case tok::kw_self: {

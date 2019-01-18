@@ -2260,6 +2260,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       originalParams.getArray(),
       [&](ParamDecl *decl) { return decl->getInterfaceType(); });
 
+  auto originalParamNames = map<SmallVector<Identifier, 8>>(
+      originalParams.getArray(),
+      [&](ParamDecl *decl) { return decl->getName(); });
+
   // Start type-checking the arguments of the @differentiable attribute. This
   // covers 'wrt:', 'jvp:', and 'vjp:', all of which are optional.
 
@@ -2380,8 +2384,17 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     for (unsigned i : indices(parsedWrtParams)) {
       auto paramLoc = parsedWrtParams[i].getLoc();
       switch (parsedWrtParams[i].getKind()) {
-      case ParsedAutoDiffParameter::Kind::Index: {
-        unsigned index = parsedWrtParams[i].getIndex();
+      case ParsedAutoDiffParameter::Kind::Named: {
+        auto nameIter = std::find(originalParamNames.begin(),
+                                  originalParamNames.end(),
+                                  parsedWrtParams[i].getName());
+        if (nameIter == originalParamNames.end()) {
+          TC.diagnose(paramLoc,
+                      diag::differentiable_attr_wrt_index_out_of_bounds);
+          return;
+        }
+        // Parameter indices should be in increasing order.
+        unsigned index = std::distance(originalParamNames.begin(), nameIter);
         if ((int)index <= lastIndex) {
           TC.diagnose(paramLoc,
                       diag::differentiable_attr_wrt_indices_must_be_ascending);

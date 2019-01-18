@@ -1611,7 +1611,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///     stability.
   @inlinable
   @differentiable(
-    wrt: (self, .1, .2), vjp: _vjpBatchNormalized
+    wrt: (self, offset, scale), vjp: _vjpBatchNormalized
     where Scalar : Differentiable, Scalar == Scalar.CotangentVector
   )
   func batchNormalized(
@@ -1664,7 +1664,7 @@ public extension Tensor where Scalar : FloatingPoint {
   /// - Precondition: `filter` must have rank 4.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self, .0), vjp: _vjpConvolved2D(filter:strides:padding:)
+    wrt: (self, filter), vjp: _vjpConvolved2D(filter:strides:padding:)
     where Scalar : Differentiable
   )
   func convolved2D(

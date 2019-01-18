@@ -188,7 +188,7 @@ ATTRIBUTE_NODES = [
          element='DifferentiableAttributeDiffParam'),
 
     # differentiable-attr-diff-param ->
-    #     ('self' | differentiation-index-parameter) ','?
+    #     ('self' | identifer) ','?
     Node('DifferentiableAttributeDiffParam', kind='Syntax',
          description='''
          A differentiation parameter: either the "self" identifier or a period \
@@ -199,20 +199,9 @@ ATTRIBUTE_NODES = [
              Child('Parameter', kind='Syntax',
                    node_choices=[
                        Child('Self', kind='SelfToken'),
-                       Child('Index', kind='DifferentiationIndexParam'),
+                       Child('Name', kind='IdentifierToken'),
                    ]),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
-         ]),
-
-    # differentiation-index-param -> '.' integer-literal
-    Node('DifferentiationIndexParam', kind='Syntax',
-         description='''
-         A differentiation index parameter: a period followed by an unsigned \
-         integer (e.g. `.0`)
-         ''',
-         children=[
-             Child('PrefixPeriod', kind='PrefixPeriodToken'),
-             Child('IntegerLiteral', kind='IntegerLiteralToken'),
          ]),
 
     # differentiation-func-specifier ->

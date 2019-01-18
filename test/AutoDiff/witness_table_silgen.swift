@@ -4,10 +4,10 @@ protocol Proto : Differentiable {
   @differentiable()
   func function1(_ x: Float, _ y: Float) -> Float
 
-  @differentiable(wrt: (self, .0, .1))
+  @differentiable(wrt: (self, x, y))
   func function2(_ x: Float, _ y: Float) -> Float
 
-  @differentiable(wrt: (.1))
+  @differentiable(wrt: (y))
   func function3(_ x: Float, _ y: Float) -> Float
 }
 

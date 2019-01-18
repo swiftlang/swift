@@ -1845,7 +1845,7 @@ extension FloatingPoint {
   /// - Returns: The product of `lhs` and `rhs`, added to this value.
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(wrt: (self, .0, .1), vjp: _vjpAddingProduct
+  @differentiable(wrt: (self, lhs, rhs), vjp: _vjpAddingProduct
                   where Self : Differentiable, Self == Self.CotangentVector)
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
