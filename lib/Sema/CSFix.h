@@ -114,13 +114,20 @@ class ConstraintFix {
   FixKind Kind;
   ConstraintLocator *Locator;
 
+  /// Determines whether this fix is simplify a warning which doesn't
+  /// require immediate source changes.
+  bool IsWarning;
+
 public:
-  ConstraintFix(ConstraintSystem &cs, FixKind kind, ConstraintLocator *locator)
-      : CS(cs), Kind(kind), Locator(locator) {}
+  ConstraintFix(ConstraintSystem &cs, FixKind kind, ConstraintLocator *locator,
+                bool warning = false)
+      : CS(cs), Kind(kind), Locator(locator), IsWarning(warning) {}
 
   virtual ~ConstraintFix();
 
   FixKind getKind() const { return Kind; }
+
+  bool isWarning() const { return IsWarning; }
 
   virtual std::string getName() const = 0;
 
