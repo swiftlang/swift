@@ -2827,6 +2827,13 @@ which must be an initialized weak reference.  The result is value of type
 ``$Optional<T>``, except that it is ``null`` if the heap object has begun
 deallocation.
 
+If ``[take]`` is specified then the underlying weak reference is invalidated
+implying that the weak reference count of the loaded value is decremented. If
+``[take]`` is not specified then the underlying weak reference count is not
+affected by this operation (i.e. it is a +0 weak ref count operation). In either
+case, the strong reference count will be incremented before any changes to the
+weak reference count.
+
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand heap object.  It need not be atomic with respect to ``store_weak``
 operations on the same address.
@@ -2845,7 +2852,13 @@ Initializes or reassigns a weak reference.  The operand may be ``nil``.
 
 If ``[initialization]`` is given, the weak reference must currently either be
 uninitialized or destroyed.  If it is not given, the weak reference must
-currently be initialized.
+currently be initialized. After the evaluation:
+
+* The value that was originally referenced by the weak reference will have
+  its weak reference count decremented by 1.
+* If the optionally typed operand is non-nil, the strong reference wrapped in
+  the optional has its weak reference count incremented by 1. In contrast, the reference's
+  strong reference count is not touched.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
