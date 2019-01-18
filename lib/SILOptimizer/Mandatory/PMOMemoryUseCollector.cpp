@@ -238,13 +238,6 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       continue;
     }
 
-#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
-  if (isa<Load##Name##Inst>(User)) {                                           \
-    Uses.emplace_back(User, PMOUseKind::Load);                                 \
-    continue;                                                                  \
-  }
-#include "swift/AST/ReferenceStorage.def"
-
     // Stores *to* the allocation are writes.
     if (isa<StoreInst>(User) && UI->getOperandNumber() == 1) {
       if (PointeeType.is<TupleType>()) {
@@ -262,20 +255,6 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       Uses.emplace_back(User, Kind);
       continue;
     }
-
-#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
-  if (auto *SI = dyn_cast<Store##Name##Inst>(User)) {                          \
-    if (UI->getOperandNumber() == 1) {                                         \
-      PMOUseKind Kind;                                                         \
-      if (SI->isInitializationOfDest())                                        \
-        Kind = PMOUseKind::Initialization;                                     \
-      else                                                                     \
-        Kind = PMOUseKind::Assign;                                             \
-      Uses.emplace_back(User, Kind);                                           \
-      continue;                                                                \
-    }                                                                          \
-  }
-#include "swift/AST/ReferenceStorage.def"
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't
