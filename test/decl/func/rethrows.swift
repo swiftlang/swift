@@ -584,3 +584,22 @@ func suchThat<A>(_ x: Box<A>) -> (@escaping (A) -> A) -> Box<A> {
 }
 
 Box(unbox: 1) |> suchThat <| { $0 + 1 } // expected-warning {{result of operator '<|' is unused}}
+
+// Constructor delegation -vs- rethrows
+class RethrowingConstructor {
+  init(_ block: () throws -> ()) rethrows {
+    try block()
+  }
+
+  convenience init(bar: Int) {
+    self.init {
+      print("Foo!")
+    }
+  }
+
+  convenience init(baz: Int) throws {
+    try self.init {
+      try throwingFunc()
+    }
+  }
+}
