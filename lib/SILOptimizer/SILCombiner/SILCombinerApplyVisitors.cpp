@@ -80,7 +80,9 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
                                                PAI->getType());
 
     // Remove dealloc_stack of partial_apply [stack].
-    for (auto *Use : PAI->getUses())
+    // Iterating while delete use a copy.
+    SmallVector<Operand *, 8> Uses(PAI->getUses());
+    for (auto *Use : Uses)
       if (auto *dealloc = dyn_cast<DeallocStackInst>(Use->getUser()))
         eraseInstFromFunction(*dealloc);
     auto *thinToThick = Builder.createThinToThickFunction(
