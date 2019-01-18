@@ -855,10 +855,14 @@ public:
   void clearTask(DifferentiationTask *task) {
     LLVM_DEBUG(getADDebugStream() << "Clearing differentiation task for "
                << task->original->getName() << '\n');
-    transform.notifyWillDeleteFunction(task->primal);
-    module.eraseFunction(task->primal);
-    transform.notifyWillDeleteFunction(task->adjoint);
-    module.eraseFunction(task->adjoint);
+    if (task->primal) {
+      transform.notifyWillDeleteFunction(task->primal);
+      module.eraseFunction(task->primal);
+    }
+    if (task->adjoint) {
+      transform.notifyWillDeleteFunction(task->adjoint);
+      module.eraseFunction(task->adjoint);
+    }
     transform.notifyWillDeleteFunction(task->jvp);
     module.eraseFunction(task->jvp);
     transform.notifyWillDeleteFunction(task->vjp);
@@ -2317,8 +2321,8 @@ bool PrimalGen::run() {
     auto synthesis = worklist.back();
     worklist.pop_back();
     if (performSynthesis(synthesis)) {
-      context.clearTask(synthesis.task);
       errorOccurred = true;
+      continue;
     }
     synthesis.task->getPrimalInfo()->computePrimalValueStructType();
     synthesis.task->setPrimalSynthesisState(FunctionSynthesisState::Done);
@@ -2376,8 +2380,8 @@ bool AdjointGen::run() {
     auto synthesis = worklist.back();
     worklist.pop_back();
     if (performSynthesis(synthesis)) {
-      context.clearTask(synthesis.task);
       errorOccurred = true;
+      continue;
     }
     synthesis.task->setAdjointSynthesisState(FunctionSynthesisState::Done);
   }
@@ -4338,22 +4342,33 @@ void Differentiation::run() {
   for (auto *adfi : autodiffInsts)
     errorProcessingAutoDiffInsts |= processAutoDiffFunctionInst(adfi, context);
 
+  auto cleanUp = [&]() {
+    for (auto &task : context.getDifferentiationTasks())
+      context.clearTask(task.get());
+  };
+
   // Run primal generation for newly created differentiation tasks. If any error
   // occurs, back out.
   PrimalGen primalGen(context);
-  if (primalGen.run())
+  if (primalGen.run()) {
+    cleanUp();
     return;
+  }
 
   // Run adjoint generation for differentiation tasks. If any error occurs, back
   // out.
   AdjointGen adjointGen(context);
-  if (adjointGen.run())
+  if (adjointGen.run()) {
+    cleanUp();
     return;
+  }
 
   // If there was any error that occurred during `autodiff_function` instruction
   // processing, back out.
-  if (errorProcessingAutoDiffInsts)
+  if (errorProcessingAutoDiffInsts) {
+    cleanUp();
     return;
+  }
 
   LLVM_DEBUG(getADDebugStream() << "All differentiation finished\n");
 }
