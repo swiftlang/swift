@@ -2113,8 +2113,7 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
         // Only try to insert a converting construction if the protocol is a
         // literal protocol and not some other known protocol.
         switch (kind) {
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _, _ignored1,          \
-                                                  _ignored2)                   \
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _, __, ___)            \
   case KnownProtocolKind::name:                                                \
     break;
 #define PROTOCOL_WITH_NAME(name, _) \
