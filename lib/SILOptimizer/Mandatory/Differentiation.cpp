@@ -33,7 +33,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
@@ -856,10 +855,14 @@ public:
   void clearTask(DifferentiationTask *task) {
     LLVM_DEBUG(getADDebugStream() << "Clearing differentiation task for "
                << task->original->getName() << '\n');
-    transform.notifyWillDeleteFunction(task->primal);
-    module.eraseFunction(task->primal);
-    transform.notifyWillDeleteFunction(task->adjoint);
-    module.eraseFunction(task->adjoint);
+    if (task->primal) {
+      transform.notifyWillDeleteFunction(task->primal);
+      module.eraseFunction(task->primal);
+    }
+    if (task->adjoint) {
+      transform.notifyWillDeleteFunction(task->adjoint);
+      module.eraseFunction(task->adjoint);
+    }
     transform.notifyWillDeleteFunction(task->jvp);
     module.eraseFunction(task->jvp);
     transform.notifyWillDeleteFunction(task->vjp);
@@ -980,6 +983,14 @@ public:
     return differentiationTasks.back().get();
   }
 
+  /// Declare an external reference to an associated function of `original`,
+  /// given a `[differentiable]` attribute of `original` and the associated
+  /// function kind.
+  SILFunction *
+  declareExternalAssociatedFunction(SILFunction *original,
+                                    SILDifferentiableAttr *attr,
+                                    AutoDiffAssociatedFunctionKind kind);
+
   template <typename... T, typename... U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
                               U &&... args) const {
@@ -1006,11 +1017,7 @@ public:
 
 ADContext::ADContext(SILModuleTransform &transform)
     : transform(transform), module(*transform.getModule()),
-      passManager(*transform.getPassManager()) {
-  // Note: `getSILLoader` performs important initialization and is necessary to
-  // prevent test failures related to `lookUpFunctionInWitnessTable`.
-  (void)module.getSILLoader();
-}
+      passManager(*transform.getPassManager()) {}
 
 void ADContext::emitNondifferentiabilityError(SILValue value,
                                               const DifferentiationTask *task,
@@ -2261,7 +2268,7 @@ public:
 } // end anonymous namespace
 
 bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
-  LLVM_DEBUG(getADDebugStream() << "Performing primal synthesis for original"
+  LLVM_DEBUG(getADDebugStream() << "Performing primal synthesis for original "
              << item.original->getName() << " and its corresponding primal "
              << item.target->getName() << '\n');
   // FIXME: If the original function has multiple basic blocks, bail out since
@@ -2314,8 +2321,8 @@ bool PrimalGen::run() {
     auto synthesis = worklist.back();
     worklist.pop_back();
     if (performSynthesis(synthesis)) {
-      context.clearTask(synthesis.task);
       errorOccurred = true;
+      continue;
     }
     synthesis.task->getPrimalInfo()->computePrimalValueStructType();
     synthesis.task->setPrimalSynthesisState(FunctionSynthesisState::Done);
@@ -2373,8 +2380,8 @@ bool AdjointGen::run() {
     auto synthesis = worklist.back();
     worklist.pop_back();
     if (performSynthesis(synthesis)) {
-      context.clearTask(synthesis.task);
       errorOccurred = true;
+      continue;
     }
     synthesis.task->setAdjointSynthesisState(FunctionSynthesisState::Done);
   }
@@ -3301,8 +3308,6 @@ void AdjointEmitter::materializeZeroIndirect(CanType type,
   // %wm = witness_method ...
   auto *getter = builder.createWitnessMethod(loc, type, confRef,
                                              accessorDeclRef, methodType);
-  // Ensure that the witness table is linked.
-  (void)getModule().lookUpFunctionInWitnessTable(confRef, accessorDeclRef);
   // %metatype = metatype $T
   auto metatypeType = CanMetatypeType::get(type, MetatypeRepresentation::Thick);
   auto metatype = builder.createMetatype(
@@ -3594,8 +3599,6 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     // %0 = witness_method @+
     auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy,
                                                      confRef, declRef, silFnTy);
-    // Ensure the witness method is linked.
-    getModule().lookUpFunctionInWitnessTable(confRef, declRef);
     auto subMap =
         SubstitutionMap::getProtocolSubstitutions(proto, adjointASTTy, confRef);
     // %1 = metatype $T.Type
@@ -3623,7 +3626,7 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
 }
 
 bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
-  LLVM_DEBUG(getADDebugStream() << "Performing adjoint synthesis for original"
+  LLVM_DEBUG(getADDebugStream() << "Performing adjoint synthesis for original "
              << item.original->getName() << " and its corresponding adjoint "
              << item.target->getName() << '\n');
   auto &passManager = context.getPassManager();
@@ -3639,41 +3642,10 @@ bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
 // DifferentiationTask
 //===----------------------------------------------------------------------===//
 
-DifferentiationTask::DifferentiationTask(ADContext &context,
-                                         SILFunction *original,
-                                         SILDifferentiableAttr *&&attr,
-                                         DifferentiationInvoker invoker)
-    : context(context), original(original), attr(attr), invoker(invoker) {
-  if (attr->hasJVP()) {
-    jvp = lookUpOrLinkFunction(attr->getJVPName(), context.getModule());
-    assert(jvp);
-  }
-  if (attr->hasVJP()) {
-    vjp = lookUpOrLinkFunction(attr->getVJPName(), context.getModule());
-    assert(vjp);
-  }
-
-  if (!jvp)
-    createJVP();
-
-  if (vjp) {
-    // If we already have the vjp, then we don't need to synthesize anything.
-    primalSynthesisState = FunctionSynthesisState::NotNeeded;
-    adjointSynthesisState = FunctionSynthesisState::NotNeeded;
-    return;
-  }
-
-  primalSynthesisState = FunctionSynthesisState::Needed;
-  adjointSynthesisState = FunctionSynthesisState::Needed;
-  createEmptyPrimal();
-  createEmptyAdjoint();
-  createVJP();
-}
-
 // Return the expected generic signature for autodiff associated functions given
 // a SILDifferentiableAttr. The expected generic signature is built from the
 // original generic signature and the attribute's requirements.
-static GenericSignature *
+static CanGenericSignature
 getAutoDiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
                                               SILFunction *original) {
   auto originalGenSig =
@@ -3688,11 +3660,82 @@ getAutoDiffAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   for (auto &req : attr->getRequirements())
     builder.addRequirement(req, source, original->getModule().getSwiftModule());
-  auto canGenericSig = std::move(builder)
-                           .computeGenericSignature(
-                               SourceLoc(), /*allowConcreteGenericParams=*/true)
-                           ->getCanonicalSignature();
-  return canGenericSig;
+  return std::move(builder)
+      .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams=*/true)
+      ->getCanonicalSignature();
+}
+
+SILFunction *
+ADContext::declareExternalAssociatedFunction(
+    SILFunction *original, SILDifferentiableAttr *attr,
+    AutoDiffAssociatedFunctionKind kind) {
+  auto &module = getModule();
+  auto &indices = attr->getIndices();
+  auto originalTy = original->getLoweredFunctionType();
+  auto originalLoc = original->getLocation();
+  StringRef name;
+  switch (kind) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      name = attr->getJVPName();
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      name = attr->getVJPName();
+      break;
+  }
+  auto assocGenSig =
+      getAutoDiffAssociatedFunctionGenericSignature(attr, original);
+  auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
+      indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
+      module, LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
+  SILOptFunctionBuilder fb(getTransform());
+  // Create external function declaration.
+  auto *assocFn =
+      fb.createFunction(SILLinkage::PublicExternal, name, assocFnTy,
+                        /*GenericEnv*/ nullptr, originalLoc, original->isBare(),
+                        IsNotTransparent, original->isSerialized());
+  // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
+  assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
+  return assocFn;
+}
+
+DifferentiationTask::DifferentiationTask(ADContext &context,
+                                         SILFunction *original,
+                                         SILDifferentiableAttr *&&attr,
+                                         DifferentiationInvoker invoker)
+    : context(context), original(original), attr(attr), invoker(invoker) {
+  auto &module = context.getModule();
+  if (attr->hasJVP()) {
+    // If attribute specifies JVP name, try to look up JVP in current module.
+    // Otherwise, create an external reference.
+    jvp = module.lookUpFunction(attr->getJVPName());
+    if (!jvp)
+      jvp = context.declareExternalAssociatedFunction(
+          original, attr, AutoDiffAssociatedFunctionKind::JVP);
+  }
+  if (attr->hasVJP()) {
+    // If attribute specifies VJP name, try to look up VJP in current module.
+    // Otherwise, create an external reference.
+    vjp = module.lookUpFunction(attr->getVJPName());
+    if (!vjp)
+      vjp = context.declareExternalAssociatedFunction(
+          original, attr, AutoDiffAssociatedFunctionKind::VJP);
+  }
+
+  if (!jvp)
+    createJVP();
+
+  if (vjp) {
+    // If the VJP exists, then no synthesis is needed.
+    primalSynthesisState = FunctionSynthesisState::NotNeeded;
+    adjointSynthesisState = FunctionSynthesisState::NotNeeded;
+    return;
+  }
+
+  primalSynthesisState = FunctionSynthesisState::Needed;
+  adjointSynthesisState = FunctionSynthesisState::Needed;
+  createEmptyPrimal();
+  createEmptyAdjoint();
+  createVJP();
 }
 
 void DifferentiationTask::createEmptyPrimal() {
@@ -3707,7 +3750,7 @@ void DifferentiationTask::createEmptyPrimal() {
                         .getIdentifier("AD__" + original->getName().str() +
                                        "__primal_" + indices.mangle())
                         .str();
-  auto *primalGenericSig =
+  auto primalGenericSig =
       getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   StructDecl *primalValueStructDecl = context.createPrimalValueStruct(this);
   primalInfo = std::unique_ptr<PrimalInfo>(
@@ -3846,7 +3889,7 @@ void DifferentiationTask::createEmptyAdjoint() {
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__adjoint_" + getIndices().mangle())
                      .str();
-  auto *adjGenericSig =
+  auto adjGenericSig =
       getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *adjGenericEnv = adjGenericSig
       ? adjGenericSig->createGenericEnvironment()
@@ -3887,7 +3930,7 @@ void DifferentiationTask::createJVP() {
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__jvp_" + getIndices().mangle())
                      .str();
-  auto *jvpGenericSig =
+  auto jvpGenericSig =
       getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *jvpGenericEnv = jvpGenericSig
       ? jvpGenericSig->createGenericEnvironment()
@@ -3946,7 +3989,7 @@ void DifferentiationTask::createVJP() {
                      .getIdentifier("AD__" + original->getName().str() +
                                     "__vjp_" + getIndices().mangle())
                      .str();
-  auto *vjpGenericSig =
+  auto vjpGenericSig =
       getAutoDiffAssociatedFunctionGenericSignature(attr, original);
   auto *vjpGenericEnv = vjpGenericSig
       ? vjpGenericSig->createGenericEnvironment()
@@ -4299,22 +4342,33 @@ void Differentiation::run() {
   for (auto *adfi : autodiffInsts)
     errorProcessingAutoDiffInsts |= processAutoDiffFunctionInst(adfi, context);
 
+  auto cleanUp = [&]() {
+    for (auto &task : context.getDifferentiationTasks())
+      context.clearTask(task.get());
+  };
+
   // Run primal generation for newly created differentiation tasks. If any error
   // occurs, back out.
   PrimalGen primalGen(context);
-  if (primalGen.run())
+  if (primalGen.run()) {
+    cleanUp();
     return;
+  }
 
   // Run adjoint generation for differentiation tasks. If any error occurs, back
   // out.
   AdjointGen adjointGen(context);
-  if (adjointGen.run())
+  if (adjointGen.run()) {
+    cleanUp();
     return;
+  }
 
   // If there was any error that occurred during `autodiff_function` instruction
   // processing, back out.
-  if (errorProcessingAutoDiffInsts)
+  if (errorProcessingAutoDiffInsts) {
+    cleanUp();
     return;
+  }
 
   LLVM_DEBUG(getADDebugStream() << "All differentiation finished\n");
 }
