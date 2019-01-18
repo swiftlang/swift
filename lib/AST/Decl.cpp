@@ -3297,9 +3297,7 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
     ASTContext &ctx = getASTContext();
 
     auto *genericSig = getGenericSignature();
-    auto subs = SubstitutionMap::get(
-        genericSig, [&](SubstitutableType *type) -> Type { return type; },
-        MakeAbstractConformanceForGenericType());
+    auto subs = genericSig->getIdentitySubstitutionMap();
 
     Type parent;
     auto parentDC = getDeclContext();
@@ -5773,7 +5771,6 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
   if (auto fn = dyn_cast<FuncDecl>(this)) {
     resultTy = fn->getBodyResultTypeLoc().getType();
     if (!resultTy) {
-      
       resultTy = TupleType::getEmpty(ctx);
     }
 
