@@ -1011,7 +1011,8 @@ public:
   AllocOptimize(AllocationInst *TheMemory, SmallVectorImpl<PMOMemoryUse> &Uses,
                 SmallVectorImpl<SILInstruction *> &Releases);
 
-  bool doIt();
+  bool optimizeMemoryAccesses();
+  bool tryToRemoveDeadAllocation();
 
 private:
   bool promoteLoad(SILInstruction *Inst);
@@ -1019,8 +1020,6 @@ private:
                           MutableArrayRef<AvailableValue> Values);
   bool canPromoteDestroyAddr(DestroyAddrInst *DAI,
                              SmallVectorImpl<AvailableValue> &AvailableValues);
-
-  bool tryToRemoveDeadAllocation();
 };
 
 } // end anonymous namespace
@@ -1376,79 +1375,135 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
   return true;
 }
 
-/// doIt - returns true on error.
-bool AllocOptimize::doIt() {
-  bool Changed = false;
-
-  // Don't try to optimize incomplete aggregates.
-  if (MemoryType.aggregateHasUnreferenceableStorage())
-    return false;
+bool AllocOptimize::optimizeMemoryAccesses() {
+  bool changed = false;
 
   // If we've successfully checked all of the definitive initialization
   // requirements, try to promote loads.  This can explode copy_addrs, so the
   // use list may change size.
   for (unsigned i = 0; i != Uses.size(); ++i) {
-    auto &Use = Uses[i];
+    auto &use = Uses[i];
     // Ignore entries for instructions that got expanded along the way.
-    if (Use.Inst && Use.Kind == PMOUseKind::Load) {
-      if (promoteLoad(Use.Inst)) {
+    if (use.Inst && use.Kind == PMOUseKind::Load) {
+      if (promoteLoad(use.Inst)) {
         Uses[i].Inst = nullptr;  // remove entry if load got deleted.
-        Changed = true;
+        changed = true;
       }
     }
   }
-  
-  // If this is an allocation, try to remove it completely.
-  Changed |= tryToRemoveDeadAllocation();
 
-  return Changed;
+  return changed;
 }
 
-static bool optimizeMemoryAllocations(SILFunction &Fn) {
-  bool Changed = false;
-  for (auto &BB : Fn) {
-    auto I = BB.begin(), E = BB.end();
-    while (I != E) {
-      SILInstruction *Inst = &*I;
-      if (!isa<AllocBoxInst>(Inst) && !isa<AllocStackInst>(Inst)) {
-        ++I;
+//===----------------------------------------------------------------------===//
+//                           Top Level Entrypoints
+//===----------------------------------------------------------------------===//
+
+static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
+  if (!isa<AllocBoxInst>(i) && !isa<AllocStackInst>(i)) {
+    return nullptr;
+  }
+
+  auto *alloc = cast<AllocationInst>(i);
+
+  // If our aggregate has unreferencable storage, we can't optimize. Return
+  // nullptr.
+  if (getMemoryType(alloc).aggregateHasUnreferenceableStorage())
+    return nullptr;
+
+  // Otherwise we are good to go. Lets try to optimize this memory!
+  return alloc;
+}
+
+static bool optimizeMemoryAccesses(SILFunction &fn) {
+  bool changed = false;
+  for (auto &bb : fn) {
+    auto i = bb.begin(), e = bb.end();
+    while (i != e) {
+      // First see if i is an allocation that we can optimize. If not, skip it.
+      AllocationInst *alloc = getOptimizableAllocation(&*i);
+      if (!alloc) {
+        ++i;
         continue;
       }
-      auto Alloc = cast<AllocationInst>(Inst);
 
-      LLVM_DEBUG(llvm::dbgs() << "*** PMO Optimize looking at: " << *Alloc
-                              << "\n");
-      PMOMemoryObjectInfo MemInfo(Alloc);
+      LLVM_DEBUG(llvm::dbgs() << "*** PMO Optimize Memory Accesses looking at: "
+                              << *alloc << "\n");
+      PMOMemoryObjectInfo memInfo(alloc);
 
       // Set up the datastructure used to collect the uses of the allocation.
-      SmallVector<PMOMemoryUse, 16> Uses;
-      SmallVector<SILInstruction*, 4> Releases;
+      SmallVector<PMOMemoryUse, 16> uses;
+      SmallVector<SILInstruction *, 4> destroys;
 
       // Walk the use list of the pointer, collecting them. If we are not able
       // to optimize, skip this value. *NOTE* We may still scalarize values
       // inside the value.
-      if (!collectPMOElementUsesFrom(MemInfo, Uses, Releases)) {
-        ++I;
+      if (!collectPMOElementUsesFrom(memInfo, uses, destroys)) {
+        ++i;
         continue;
       }
 
-      Changed |= AllocOptimize(Alloc, Uses, Releases).doIt();
-      
-      // Carefully move iterator to avoid invalidation problems.
-      ++I;
-      if (Alloc->use_empty()) {
-        Alloc->eraseFromParent();
+      AllocOptimize allocOptimize(alloc, uses, destroys);
+      changed |= allocOptimize.optimizeMemoryAccesses();
+
+      // Move onto the next instruction. We know this is safe since we do not
+      // eliminate allocations here.
+      ++i;
+    }
+  }
+
+  return changed;
+}
+
+static bool eliminateDeadAllocations(SILFunction &fn) {
+  bool changed = false;
+  for (auto &bb : fn) {
+    auto i = bb.begin(), e = bb.end();
+    while (i != e) {
+      // First see if i is an allocation that we can optimize. If not, skip it.
+      AllocationInst *alloc = getOptimizableAllocation(&*i);
+      if (!alloc) {
+        ++i;
+        continue;
+      }
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "*** PMO Dead Allocation Elimination looking at: " << *alloc
+                 << "\n");
+      PMOMemoryObjectInfo memInfo(alloc);
+
+      // Set up the datastructure used to collect the uses of the allocation.
+      SmallVector<PMOMemoryUse, 16> uses;
+      SmallVector<SILInstruction *, 4> destroys;
+
+      // Walk the use list of the pointer, collecting them. If we are not able
+      // to optimize, skip this value. *NOTE* We may still scalarize values
+      // inside the value.
+      if (!collectPMOElementUsesFrom(memInfo, uses, destroys)) {
+        ++i;
+        continue;
+      }
+
+      AllocOptimize allocOptimize(alloc, uses, destroys);
+      changed |= allocOptimize.tryToRemoveDeadAllocation();
+
+      // Move onto the next instruction. We know this is safe since we do not
+      // eliminate allocations here.
+      ++i;
+      if (alloc->use_empty()) {
+        alloc->eraseFromParent();
         ++NumAllocRemoved;
-        Changed = true;
+        changed = true;
       }
     }
   }
-  return Changed;
+
+  return changed;
 }
 
 namespace {
 
-class PredictableMemoryOptimizations : public SILFunctionTransform {
+class PredictableMemoryAccessOptimizations : public SILFunctionTransform {
   /// The entry point to the transformation.
   ///
   /// FIXME: This pass should not need to rerun on deserialized
@@ -1457,14 +1512,25 @@ class PredictableMemoryOptimizations : public SILFunctionTransform {
   /// either indicates that this pass missing some opportunities the first time,
   /// or has a pass order dependency on other early passes.
   void run() override {
-    if (optimizeMemoryAllocations(*getFunction()))
+    // TODO: Can we invalidate here just instructions?
+    if (optimizeMemoryAccesses(*getFunction()))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+  }
+};
+
+class PredictableDeadAllocationElimination : public SILFunctionTransform {
+  void run() override {
+    if (eliminateDeadAllocations(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 };
 
 } // end anonymous namespace
 
+SILTransform *swift::createPredictableMemoryAccessOptimizations() {
+  return new PredictableMemoryAccessOptimizations();
+}
 
-SILTransform *swift::createPredictableMemoryOptimizations() {
-  return new PredictableMemoryOptimizations();
+SILTransform *swift::createPredictableDeadAllocationElimination() {
+  return new PredictableDeadAllocationElimination();
 }

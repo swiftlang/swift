@@ -106,12 +106,20 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
-  P.addPredictableMemoryOptimizations();
+
+  // Promote loads as necessary to ensure we have enough SSA formation to emit
+  // SSA based diagnostics.
+  P.addPredictableMemoryAccessOptimizations();
 
   // Diagnostic ConstantPropagation must be rerun on deserialized functions
   // because it is sensitive to the assert configuration.
   // Consequently, certain optimization passes beyond this point will also rerun.
   P.addDiagnosticConstantPropagation();
+
+  // Now that we have emitted constant propagation diagnostics, try to eliminate
+  // dead allocations.
+  P.addPredictableDeadAllocationElimination();
+
   P.addGuaranteedARCOpts();
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
