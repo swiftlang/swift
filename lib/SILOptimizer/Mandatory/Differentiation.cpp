@@ -1651,12 +1651,23 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
         context.lookUpMinimalDifferentiationTask(originalFn, desiredIndices);
     if (!task) {
       if (originalFn->isExternalDeclaration()) {
-        context.emitNondifferentiabilityError(original, parentTask,
-            diag::autodiff_external_nondifferentiable_function);
-        return None;
+        llvm::StringRef module_name =
+            original->getModule()->getSwiftModule()->getNameStr();
+        // For lldb repl, we should attempt to load the function
+        // as this may be defined in a different cell.
+        if (module_name.startswith("__lldb_expr_")) {
+          original->getModule()->loadFunction(originalFn);
+        }
+        // If we still don't have the definition, generate an error message.
+        if (!originalFn->isDefinition()) {
+          context.emitNondifferentiabilityError(
+              original, parentTask,
+              diag::autodiff_external_nondifferentiable_function);
+          return None;
+        }
       }
-      task = context.registerDifferentiationTask(
-          originalFn, desiredIndices, invoker);
+      task = context.registerDifferentiationTask(originalFn, desiredIndices,
+                                                 invoker);
     }
     assert(task);
     taskCallback(task);
