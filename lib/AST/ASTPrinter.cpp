@@ -178,7 +178,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.PrintAccess = true;
 
   result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl,
-                            DAK_SetterAccess};
+                            DAK_SetterAccess, DAK_Lazy};
 
   return result;
 }
