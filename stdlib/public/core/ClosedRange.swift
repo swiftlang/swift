@@ -433,6 +433,7 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
   /// An equivalent range must be representable as a closed range.
   /// For example, passing an empty range as `other` triggers a runtime error,
   /// because an empty range cannot be represented by a closed range instance.
+  @inlinable
   public init(_ other: Range<Bound>) {
     _precondition(!other.isEmpty, "Can't form an empty closed range")
     let upperBound = other.upperBound.advanced(by: -1)
