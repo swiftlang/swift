@@ -297,7 +297,8 @@ void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
                                                  OrigPAI->getType());
   OrigPAI->replaceAllUsesWith(T2TF);
   // Remove any dealloc_stack users.
-  for (auto *Use : T2TF->getUses())
+  SmallVector<Operand*, 16> Uses(T2TF->getUses());
+  for (auto *Use : Uses)
     if (auto *DS = dyn_cast<DeallocStackInst>(Use->getUser()))
       DS->eraseFromParent();
   recursivelyDeleteTriviallyDeadInstructions(OrigPAI, true);
