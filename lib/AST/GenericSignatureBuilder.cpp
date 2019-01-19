@@ -4629,8 +4629,24 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                         ->getDependentType(getGenericParams());
 
       Impl->HadAnyError = true;
-      Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
-                     subjectType, constraintType);
+      
+      bool shouldOfferFixit = false;
+      if (auto decl = subjectType->getAs<GenericTypeParamType>()) {
+        shouldOfferFixit = cast<ExtensionDecl>(decl->getDecl()
+                                                   ->getDeclContext());
+      }
+      
+      if (shouldOfferFixit) {
+        Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
+                       subjectType, constraintType);
+        Diags.diagnose(source.getLoc(),
+                       diag::requires_conformance_nonprotocol_fixit,
+                       subjectType.getString(), constraintType.getString())
+             .fixItReplace(source.getLoc(), " == ");
+      } else {
+        Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
+                       subjectType, constraintType);
+      }
     }
 
     return ConstraintResult::Conflicting;
