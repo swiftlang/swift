@@ -68,6 +68,12 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
+static bool isInLLDBREPL(SILModule &module) {
+  llvm::StringRef module_name = module.getSwiftModule()->getNameStr();
+  // TODO(SR-9704): Use a more prinicpled way to do this check.
+  return module_name.startswith("__lldb_expr_");
+}
+
 /// Creates arguments in the entry block based on the function type.
 static void createEntryArguments(SILFunction *f) {
   auto *entry = f->getEntryBlock();
@@ -1651,12 +1657,21 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
         context.lookUpMinimalDifferentiationTask(originalFn, desiredIndices);
     if (!task) {
       if (originalFn->isExternalDeclaration()) {
-        context.emitNondifferentiabilityError(original, parentTask,
-            diag::autodiff_external_nondifferentiable_function);
-        return None;
+        // For lldb repl, we should attempt to load the function as
+        // this may be defined in a different cell.
+        if (isInLLDBREPL(*original->getModule())) {
+          original->getModule()->loadFunction(originalFn);
+        }
+        // If we still don't have the definition, generate an error message.
+        if (!originalFn->isDefinition()) {
+          context.emitNondifferentiabilityError(
+              original, parentTask,
+              diag::autodiff_external_nondifferentiable_function);
+          return None;
+        }
       }
-      task = context.registerDifferentiationTask(
-          originalFn, desiredIndices, invoker);
+      task = context.registerDifferentiationTask(originalFn, desiredIndices,
+                                                 invoker);
     }
     assert(task);
     taskCallback(task);
