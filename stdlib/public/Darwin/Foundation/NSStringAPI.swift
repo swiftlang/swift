@@ -206,22 +206,22 @@ extension String {
   /// - Parameters:
   ///   - bytes: A sequence of bytes to interpret using `encoding`.
   ///   - encoding: The ecoding to use to interpret `bytes`.
-  public init?<S: Sequence>(bytes: __shared S, encoding: Encoding)
-  where S.Iterator.Element == UInt8 {
-    let byteArray = Array(bytes)
-    if encoding == .utf8,
-       let str = byteArray.withUnsafeBufferPointer({ String._tryFromUTF8($0) })
-    {
+  public init? <S: Sequence>(bytes: __shared S, encoding: Encoding)
+    where S.Iterator.Element == UInt8 {
+      func _makeString(buffer: UnsafeBufferPointer<UInt8>) -> String? {
+        guard let address = buffer.baseAddress else { return nil }
+        if encoding == .utf8, let str = String._tryFromUTF8(buffer) { 
+          return str 
+        }
+        return NSString(bytes: address, length: buffer.count,
+                        encoding: encoding.rawValue)
+                .map(String._unconditionallyBridgeFromObjectiveC)
+      }
+      guard let str = bytes.withContiguousStorageIfAvailable(_makeString) 
+                   ?? Array(bytes).withUnsafeBufferPointer(_makeString) else {
+        return nil
+      }
       self = str
-      return
-    }
-
-    if let ns = NSString(
-      bytes: byteArray, length: byteArray.count, encoding: encoding.rawValue) {
-      self = String._unconditionallyBridgeFromObjectiveC(ns)
-    } else {
-      return nil
-    }
   }
 
   // - (instancetype)

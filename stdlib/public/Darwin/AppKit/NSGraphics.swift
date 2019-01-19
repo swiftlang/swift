@@ -65,13 +65,14 @@ extension Sequence where Iterator.Element == NSRect {
     NSGraphicsContext.current?.compositingOperation ?? .sourceOver) {
     precondition(NSGraphicsContext.current != nil,
                  "There must be a set current NSGraphicsContext")
-    let rects = Array(self)
-    let count = rects.count
-    guard count > 0 else { return }
-    rects.withUnsafeBufferPointer { rectBufferPointer in
-      guard let rectArray = rectBufferPointer.baseAddress else { return }
-      __NSRectFillListUsingOperation(rectArray, count, operation)
+    func _fill(buffer: UnsafeBufferPointer<NSRect>) {
+      guard let bufferAddress = buffer.baseAddress, !buffer.isEmpty else {
+        return
+      }
+      __NSRectFillListUsingOperation(bufferAddress, buffer.count, operation)
     }
+    withContiguousStorageIfAvailable(_fill)
+    ?? Array(self).withUnsafeBufferPointer(_fill)
   }
     
   /// Modifies the current graphics context clipping path by intersecting it
@@ -83,13 +84,14 @@ extension Sequence where Iterator.Element == NSRect {
   public func clip() {
     precondition(NSGraphicsContext.current != nil,
                  "There must be a set current NSGraphicsContext")
-    let rects = Array(self)
-    let count = rects.count
-    guard count > 0 else { return }
-    rects.withUnsafeBufferPointer { rectBufferPointer in
-      guard let rectArray = rectBufferPointer.baseAddress else { return }
-      __NSRectClipList(rectArray, count)
+    func _clip(buffer: UnsafeBufferPointer<NSRect>) {
+      guard let bufferAddress = buffer.baseAddress, !buffer.isEmpty else {
+				return
+      }
+      __NSRectClipList(bufferAddress, buffer.count)
     }
+    withContiguousStorageIfAvailable(_clip)
+    ?? Array(self).withUnsafeBufferPointer(_clip)
   }
 }
 
