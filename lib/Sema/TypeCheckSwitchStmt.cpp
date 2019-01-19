@@ -506,12 +506,35 @@ namespace {
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::UnknownCase): {
           SmallVector<Space, 4> smallSpaces;
           for (auto s : this->getSpaces()) {
-            if (auto diff = s.minus(other, TC, DC, minusCount))
-              smallSpaces.push_back(*diff);
-            else
+            auto diff = s.minus(other, TC, DC, minusCount);
+            if (!diff)
               return None;
+            if (diff->getKind() == SpaceKind::Disjunct) {
+              smallSpaces.append(diff->getSpaces().begin(),
+                                 diff->getSpaces().end());
+            } else {
+              smallSpaces.push_back(*diff);
+            }
           }
-          return Space::forDisjunct(smallSpaces);
+
+          // Remove any of the later spaces that are contained entirely in an
+          // earlier one. Since we're not sorting by size, this isn't
+          // guaranteed to give us a minimal set, but it'll still reduce the
+          // general (A, B, C) - ((.a1, .b1, .c1) | (.a1, .b1, .c2)) problem.
+          // This is a quadratic operation but it saves us a LOT of work
+          // overall.
+          SmallVector<Space, 4> usefulSmallSpaces;
+          for (const Space &space : smallSpaces) {
+            bool alreadyHandled = llvm::any_of(usefulSmallSpaces,
+                                               [&](const Space &previousSpace) {
+              return space.isSubspace(previousSpace, TC, DC);
+            });
+            if (alreadyHandled)
+              continue;
+            usefulSmallSpaces.push_back(space);
+          }
+
+          return Space::forDisjunct(usefulSmallSpaces);
         }
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Type):
           return Space();
