@@ -483,6 +483,10 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
   if (isFinal && parentDC->getSelfClassDecl() &&
       !setterDecl->isFinal())
     setterDecl->getAttrs().add(new (C) FinalAttr(/*Implicit*/ true));
+
+  // Compute the interface type of the setter.
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    setterDecl->setGenericEnvironment(env);
   setterDecl->computeType();
   setterDecl->copyFormalAccessFrom(property);
   setterDecl->setValidationToChecked();

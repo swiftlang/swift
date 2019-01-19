@@ -163,6 +163,11 @@ func testKeyPathIterable(x: TestKeyPathIterable) {
   _ = x.allDifferentiableVariables.allKeyPaths
 }
 
+// Test type with generic environment.
+struct HasGenericEnvironment<Scalar : FloatingPoint & Differentiable> : Differentiable {
+  var x: Float
+}
+
 /*
 // Test type with generic members that conform to `Differentiable`.
 // Since it's not the case that
