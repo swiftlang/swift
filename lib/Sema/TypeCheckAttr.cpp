@@ -2260,10 +2260,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       originalParams.getArray(),
       [&](ParamDecl *decl) { return decl->getInterfaceType(); });
 
-  auto originalParamNames = map<SmallVector<Identifier, 8>>(
-      originalParams.getArray(),
-      [&](ParamDecl *decl) { return decl->getName(); });
-
   // Start type-checking the arguments of the @differentiable attribute. This
   // covers 'wrt:', 'jvp:', and 'vjp:', all of which are optional.
 
@@ -2385,25 +2381,21 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       auto paramLoc = parsedWrtParams[i].getLoc();
       switch (parsedWrtParams[i].getKind()) {
       case ParsedAutoDiffParameter::Kind::Named: {
-        auto nameIter = std::find(originalParamNames.begin(),
-                                  originalParamNames.end(),
-                                  parsedWrtParams[i].getName());
-        if (nameIter == originalParamNames.end()) {
-          TC.diagnose(paramLoc,
-                      diag::differentiable_attr_wrt_index_out_of_bounds);
+        auto nameIter =
+            llvm::find_if(originalParams.getArray(), [&](ParamDecl *param) {
+              return param->getName() == parsedWrtParams[i].getName();
+            });
+        // Parameter name must exist.
+        if (nameIter == originalParams.end()) {
+          TC.diagnose(paramLoc, diag::differentiable_attr_wrt_name_unknown,
+                      parsedWrtParams[i].getName());
           return;
         }
-        // Parameter indices should be in increasing order.
-        unsigned index = std::distance(originalParamNames.begin(), nameIter);
+        // Parameter names must be specified in the original order.
+        unsigned index = std::distance(originalParams.begin(), nameIter);
         if ((int)index <= lastIndex) {
           TC.diagnose(paramLoc,
-                      diag::differentiable_attr_wrt_indices_must_be_ascending);
-          return;
-        }
-        // Parameter index cannot exceed bounds.
-        if (index >= originalParams.size()) {
-          TC.diagnose(paramLoc,
-                      diag::differentiable_attr_wrt_index_out_of_bounds);
+                      diag::differentiable_attr_wrt_names_not_original_order);
           return;
         }
         autoDiffParameterIndicesBuilder.setParameter(index);

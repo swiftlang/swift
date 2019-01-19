@@ -575,10 +575,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     };
 
     // Print differentiation parameters, if any.
-    auto originalParamNames = map<SmallVector<Identifier, 8>>(
-        original->getParameters()->getArray(),
-        [&](ParamDecl *decl) { return decl->getName(); });
-
     if (auto indices = attr->getParameterIndices()) {
       printCommaIfNecessary();
       Printer << "wrt: (";
@@ -586,7 +582,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         if (isProperty || (isMethod && index == indices->parameters.size() - 1))
           Printer << "self";
         else
-          Printer << originalParamNames[index].str();
+          Printer << original->getParameters()->get(index)->getName().str();
       }, [&] { Printer << ", "; });
       Printer << ")";
     } else if (!parsedParams.empty()) {

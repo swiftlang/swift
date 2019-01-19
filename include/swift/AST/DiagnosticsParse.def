@@ -1471,12 +1471,6 @@ ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter name or 'self'", ())
-ERROR(attr_differentiable_parameter_index_must_be_positive_integer,PointsToFirstBadToken,
-      "parameter index must be a positive integer", ())
-ERROR(attr_differentiable_nondifferentiable_function,none,
-      "function '%0' is not differentiable", (StringRef))
-ERROR(attr_differentiable_duplicate_config_option,PointsToFirstBadToken,
-      "duplicated gradient configuration option '%0'", (StringRef))
 ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@differentiable' attribute", (StringRef))
 ERROR(attr_differentiable_expected_colon_after_label,PointsToFirstBadToken,

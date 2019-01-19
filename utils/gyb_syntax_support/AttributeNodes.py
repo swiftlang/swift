@@ -205,17 +205,17 @@ ATTRIBUTE_NODES = [
          ]),
 
     # differentiation-func-specifier ->
-    #     ('primal' | 'adjoint' | 'jvp' | 'vjp') ':' decl-name ','?
+    #     ('jvp' | 'vjp') ':' decl-name ','?
     # decl-name -> (identifier | operator) decl-name-arguments?
     Node('DifferentiableAttributeFuncSpecifier', kind='Syntax',
          description='''
          A function specifier, consisting of an identifier, colon, and a \
-         function declaration name (e.g. `vjp: foo(_:_:)`.
+         function declaration name (e.g. `vjp: foo(_:_:)`).
          ''',
          traits=['WithTrailingComma'],
          children=[
              Child('Label', kind='IdentifierToken',
-                   text_choices=['primal', 'adjoint', 'jvp', 'vjp']),
+                   text_choices=['jvp', 'vjp']),
              Child('Colon', kind='ColonToken'),
              Child('DeclBaseName', kind='Syntax', description='''
                    The base name of the referenced function.

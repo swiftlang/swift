@@ -40,6 +40,18 @@ func jvp2ParamsJVP(x: Float, y: Float) -> (Float, (Float, Float) -> Float) {
   return (x + y, { (a, b) in a + b })
 }
 
+// expected-error @+1 {{unknown parameter name 'y'}}
+@differentiable(wrt: (y))
+func jvpUnknownParam(x: Float) -> Float {
+  return x
+}
+
+// expected-error @+1 {{parameter names must be specified in original order}}
+@differentiable(wrt: (y, x))
+func jvpParamOrderNotIncreasing(x: Float, y: Float) -> Float {
+  return x * y
+}
+
 // expected-error @+1 {{'jvpWrongTypeJVP' does not have expected type '(Float) -> (Float, (Float.TangentVector) -> Float.TangentVector)' (aka '(Float) -> (Float, (Float) -> Float)'}}
 @differentiable(jvp: jvpWrongTypeJVP)
 func jvpWrongType(x: Float) -> Float {
