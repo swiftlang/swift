@@ -923,26 +923,31 @@ namespace {
 
           Space projection = projectPattern(TC, caseItem.getPattern());
 
-          if (!projection.isEmpty() &&
-              projection.isSubspace(Space::forDisjunct(spaces), TC, DC)) {
+          bool isRedundant = !projection.isEmpty() &&
+                             llvm::any_of(spaces, [&](const Space &handled) {
+            return projection.isSubspace(handled, TC, DC);
+          });
+          if (isRedundant) {
             TC.diagnose(caseItem.getStartLoc(),
                           diag::redundant_particular_case)
               .highlight(caseItem.getSourceRange());
             continue;
-          } else {
-            Expr *cachedExpr = nullptr;
-            if (checkRedundantLiteral(caseItem.getPattern(), cachedExpr)) {
-              assert(cachedExpr && "Cache found hit but no expr?");
-              TC.diagnose(caseItem.getStartLoc(),
-                          diag::redundant_particular_literal_case)
-                .highlight(caseItem.getSourceRange());
-              TC.diagnose(cachedExpr->getLoc(),
-                          diag::redundant_particular_literal_case_here)
-                .highlight(cachedExpr->getSourceRange());
-              continue;
-            }
           }
-          spaces.push_back(projection);
+
+          Expr *cachedExpr = nullptr;
+          if (checkRedundantLiteral(caseItem.getPattern(), cachedExpr)) {
+            assert(cachedExpr && "Cache found hit but no expr?");
+            TC.diagnose(caseItem.getStartLoc(),
+                        diag::redundant_particular_literal_case)
+              .highlight(caseItem.getSourceRange());
+            TC.diagnose(cachedExpr->getLoc(),
+                        diag::redundant_particular_literal_case_here)
+              .highlight(cachedExpr->getSourceRange());
+            continue;
+          }
+
+          if (!projection.isEmpty())
+            spaces.push_back(projection);
         }
       }
 
