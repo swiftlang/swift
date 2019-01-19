@@ -930,6 +930,8 @@ DeclContextKind DeclContext::getContextKind() const {
   llvm_unreachable("Unhandled DeclContext ASTHierarchy");
 }
 
+
+
 #define DECL(Id, Parent) \
   static_assert(!std::is_base_of<DeclContext, Id##Decl>::value, \
                 "Non-context Decl node has context?");

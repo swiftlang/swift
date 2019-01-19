@@ -322,41 +322,13 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Needed to use a DeclContext* as a request parameter.
-/// Without this wrapper, compilation fails missing simple_display for
-/// DeclContext* Defining said simple_display results in ambiguitites when
-/// simple_display is called for some Decl subclass pointers.
-
-struct DeclContextWrapper {
-  const DeclContext *dc;
-
-  DeclContextWrapper(const DeclContext *dc) : dc(dc) {}
-
-  SourceLoc getLoc() const { return SourceLoc(); }
-
-  friend hash_code hash_value(const DeclContextWrapper &x) {
-    return hash_value(x.dc);
-  }
-
-  friend bool operator==(const DeclContextWrapper &lhs,
-                         const DeclContextWrapper &rhs) {
-    return lhs.dc == rhs.dc;
-  }
-
-  friend bool operator!=(const DeclContextWrapper &lhs,
-                         const DeclContextWrapper &rhs) {
-    return !(lhs == rhs);
-  }
-};
-
 void simple_display(llvm::raw_ostream &out, const KnownProtocolKind);
-void simple_display(llvm::raw_ostream &out, const DeclContextWrapper &x);
 class TypeChecker;
 
 // Find the type in the cache or look it up
 class DefaultTypeRequest
     : public SimpleRequest<DefaultTypeRequest, CacheKind::SeparatelyCached,
-                           Type, KnownProtocolKind, const DeclContextWrapper> {
+                           Type, KnownProtocolKind, const DeclContext*> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -365,7 +337,7 @@ private:
 
   // Evaluation.
   llvm::Expected<Type> evaluate(Evaluator &eval, KnownProtocolKind,
-                                const DeclContextWrapper) const;
+                                const DeclContext*) const;
 
 public:
   // Cycle handling
@@ -382,7 +354,7 @@ private:
     return std::get<0>(getStorage());
   }
   const DeclContext *getDeclContext() const {
-    return std::get<1>(getStorage()).dc;
+    return std::get<1>(getStorage());
   }
 
   static const char *getTypeName(KnownProtocolKind);

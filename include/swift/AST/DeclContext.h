@@ -29,6 +29,9 @@
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include <type_traits>
 
 namespace llvm {
   class raw_ostream;
@@ -775,6 +778,28 @@ private:
   void addMemberSilently(Decl *member, Decl *hint = nullptr) const;
 };
   
+ 
+  /// Define simple_display for DeclContexts but not for subclasses in order to
+  /// avoid ambiguities with Decl* arguments.
+  template<typename ParamT,
+  typename = std::enable_if<
+     std::is_same< ParamT,  DeclContext >::value
+    >
+  >
+  void simple_display(llvm::raw_ostream &out, const ParamT* dc ) {
+    if (std::is_same<ParamT, DeclContext>::value) {
+      const DeclContext* dcc = (const DeclContext*)dc;
+      if (!dcc) {
+        out << "(null)";
+        return;
+      }
+    dcc->printContext(out);
+    }
+  }
+ 
+  
+
+
 } // end namespace swift
 
 namespace llvm {
@@ -792,5 +817,7 @@ namespace llvm {
     }
   };
 }
+  
+ 
 
 #endif

@@ -436,15 +436,6 @@ void USRGenerationRequest::noteCycleStep(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const DeclContextWrapper &x) {
-  if (!x.dc) {
-    out << "(null)";
-    return;
-  }
-  x.dc->printContext(out);
-}
-
-void swift::simple_display(llvm::raw_ostream &out,
                            const KnownProtocolKind kind) {
   out << getProtocolName(kind);
 }
