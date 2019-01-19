@@ -1867,6 +1867,7 @@ namespace {
       llvm::raw_svector_ostream outs(out);
 
       auto propTy = prop->getValueInterfaceType();
+      auto propDC = prop->getDeclContext();
 
       // Emit the type encoding for the property.
       outs << 'T';
@@ -1884,13 +1885,13 @@ namespace {
       if (prop->getAttrs().hasAttribute<NSManagedAttr>())
         outs << ",D";
       
-      auto isObject = prop->getDeclContext()->mapTypeIntoContext(propTy)
+      auto isObject = propDC->mapTypeIntoContext(propTy)
           ->hasRetainablePointerRepresentation();
       auto hasObjectEncoding = typeEnc[0] == '@';
       
       // Determine the assignment semantics.
       // Get-only properties are (readonly).
-      if (!prop->isSettable(prop->getDeclContext()))
+      if (!prop->isSettable(propDC))
         outs << ",R";
       // Weak and Unowned properties are (weak).
       else if (prop->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
@@ -1908,9 +1909,12 @@ namespace {
       else
         (void)0;
       
-      // If the property is an instance property and has storage, emit the ivar
-      // name last.
-      if (!prop->isStatic() && prop->hasStorage())
+      // If the property is an instance property and has storage, and meanwhile
+      // its type is trivially representable in ObjC, emit the ivar name last.
+      bool isTriviallyRepresentable =
+          propTy->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC,
+                                             propDC);
+      if (!prop->isStatic() && prop->hasStorage() && isTriviallyRepresentable)
         outs << ",V" << prop->getName();
     }
 
