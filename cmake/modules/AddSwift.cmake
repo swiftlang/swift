@@ -1849,12 +1849,6 @@ function(add_swift_target_library name)
         set(swiftlib_swift_compile_private_frameworks_flag "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
       endif()
 
-      if("${sdk}" STREQUAL WINDOWS)
-        if(arch STREQUAL x86_64)
-          set(swiftlib_swift_compile_flags_arch -Xcc -D_AMD64_)
-        endif()
-      endif()
-
       # Add this library variant.
       _add_swift_library_single(
         ${VARIANT_NAME}
