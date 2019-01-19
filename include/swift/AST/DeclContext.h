@@ -782,15 +782,15 @@ private:
 /// avoid ambiguities with Decl* arguments.
 template <typename ParamT,
           typename = std::enable_if<std::is_same<ParamT, DeclContext>::value>>
-void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
-  if (std::is_same<ParamT, DeclContext>::value) {
-    const DeclContext *dcc = (const DeclContext *)dc;
-    if (!dcc) {
-      out << "(null)";
-      return;
-    }
-    dcc->printContext(out);
+void simple_display(llvm::raw_ostream &out, const ParamT *x) {
+  if (!std::is_same<ParamT, DeclContext>::value)
+    llvm_unreachable("Template should only be defined for DeclConsts.");
+  const DeclContext *dc = (const DeclContext *)x;
+  if (!dc) {
+    out << "(null)";
+    return;
   }
+  dc->printContext(out);
 }
 
 } // end namespace swift
