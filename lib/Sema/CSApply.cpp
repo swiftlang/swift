@@ -7808,23 +7808,31 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
     if (fixes == fixesPerExpr.end())
       return false;
 
-    bool diagnosed = false;
-    for (const auto *fix : fixes->second)
-      diagnosed |= fix->diagnose(E);
-    return diagnosed;
+    bool diagnosedError = false;
+    for (const auto *fix : fixes->second) {
+      auto diagnosed = fix->diagnose(E);
+
+      if (fix->isWarning()) {
+        assert(diagnosed && "warnings should always be diagnosed");
+        (void)diagnosed;
+      } else {
+        diagnosedError |= diagnosed;
+      }
+    }
+    return diagnosedError;
   };
 
-  bool diagnosed = false;
+  bool diagnosedError = false;
   E->forEachChildExpr([&](Expr *subExpr) -> Expr * {
     // Diagnose root expression at the end to
     // preserve ordering.
     if (subExpr != E)
-      diagnosed |= diagnoseExprFailures(subExpr);
+      diagnosedError |= diagnoseExprFailures(subExpr);
     return subExpr;
   });
 
-  diagnosed |= diagnoseExprFailures(E);
-  return diagnosed;
+  diagnosedError |= diagnoseExprFailures(E);
+  return diagnosedError;
 }
 
 /// Apply a given solution to the expression, producing a fully
@@ -7839,15 +7847,21 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     if (shouldSuppressDiagnostics())
       return nullptr;
 
-    // If we can diagnose the problem with the fixits that we've pre-assumed,
-    // do so now.
-    if (applySolutionFixes(expr, solution))
-      return nullptr;
+    bool diagnosedErrorsViaFixes = applySolutionFixes(expr, solution);
+    // If all of the available fixes would result in a warning,
+    // we can go ahead and apply this solution to AST.
+    if (!llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
+          return fix->isWarning();
+        })) {
+      // If we already diagnosed any errors via fixes, that's it.
+      if (diagnosedErrorsViaFixes)
+        return nullptr;
 
-    // If we didn't manage to diagnose anything well, so fall back to
-    // diagnosing mining the system to construct a reasonable error message.
-    diagnoseFailureForExpr(expr);
-    return nullptr;
+      // If we didn't manage to diagnose anything well, so fall back to
+      // diagnosing mining the system to construct a reasonable error message.
+      diagnoseFailureForExpr(expr);
+      return nullptr;
+    }
   }
 
   // Mark any normal conformances used in this solution as "used".
