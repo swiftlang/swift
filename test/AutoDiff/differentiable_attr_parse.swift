@@ -32,6 +32,16 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
+@differentiable(wrt: x) // okay
+func bar(_ x: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+@differentiable(wrt: self) // okay
+func bar(_ x: Float, _: Float) -> Float {
+  return 1 + x
+}
+
 @_transparent
 @differentiable // okay
 @inlinable
@@ -71,6 +81,11 @@ func bar(_ x: Float, _: Float) -> Float {
 
 @differentiable(wrt: (1), vjp: foo(_:_:)) // expected-error {{expected a parameter, which can be a function parameter name or 'self'}}
 func bar(_ x: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+@differentiable(wrt: x, y) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
+func bar(_ x: Float, _ y: Float) -> Float {
   return 1 + x
 }
 

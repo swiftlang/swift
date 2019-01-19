@@ -22,8 +22,13 @@ func jvpSimpleJVP(x: Float) -> (Float, ((Float) -> Float)) {
   return (x, { v in v })
 }
 
+@differentiable(wrt: y, jvp: jvpWrtSubsetJVP)
+func jvpWrtSubset1(x: Float, y: Float) -> Float {
+  return x + y
+}
+
 @differentiable(wrt: (y), jvp: jvpWrtSubsetJVP)
-func jvpWrtSubset(x: Float, y: Float) -> Float {
+func jvpWrtSubset2(x: Float, y: Float) -> Float {
   return x + y
 }
 
