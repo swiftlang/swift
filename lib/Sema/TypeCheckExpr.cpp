@@ -683,7 +683,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
 llvm::Expected<Type>
 swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
                                     KnownProtocolKind knownProtocolKind,
-                                    const DeclContext* dc) const {
+                                    const DeclContext *dc) const {
   const char *const name = getTypeName(knownProtocolKind);
   if (!name)
     return nullptr;

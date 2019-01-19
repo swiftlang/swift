@@ -328,7 +328,7 @@ class TypeChecker;
 // Find the type in the cache or look it up
 class DefaultTypeRequest
     : public SimpleRequest<DefaultTypeRequest, CacheKind::SeparatelyCached,
-                           Type, KnownProtocolKind, const DeclContext*> {
+                           Type, KnownProtocolKind, const DeclContext *> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -337,7 +337,7 @@ private:
 
   // Evaluation.
   llvm::Expected<Type> evaluate(Evaluator &eval, KnownProtocolKind,
-                                const DeclContext*) const;
+                                const DeclContext *) const;
 
 public:
   // Cycle handling

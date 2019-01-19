@@ -24,8 +24,8 @@
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -777,28 +777,21 @@ private:
   /// member is an invisible addition.
   void addMemberSilently(Decl *member, Decl *hint = nullptr) const;
 };
-  
- 
-  /// Define simple_display for DeclContexts but not for subclasses in order to
-  /// avoid ambiguities with Decl* arguments.
-  template<typename ParamT,
-  typename = std::enable_if<
-     std::is_same< ParamT,  DeclContext >::value
-    >
-  >
-  void simple_display(llvm::raw_ostream &out, const ParamT* dc ) {
-    if (std::is_same<ParamT, DeclContext>::value) {
-      const DeclContext* dcc = (const DeclContext*)dc;
-      if (!dcc) {
-        out << "(null)";
-        return;
-      }
-    dcc->printContext(out);
-    }
-  }
- 
-  
 
+/// Define simple_display for DeclContexts but not for subclasses in order to
+/// avoid ambiguities with Decl* arguments.
+template <typename ParamT,
+          typename = std::enable_if<std::is_same<ParamT, DeclContext>::value>>
+void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
+  if (std::is_same<ParamT, DeclContext>::value) {
+    const DeclContext *dcc = (const DeclContext *)dc;
+    if (!dcc) {
+      out << "(null)";
+      return;
+    }
+    dcc->printContext(out);
+  }
+}
 
 } // end namespace swift
 
@@ -817,7 +810,5 @@ namespace llvm {
     }
   };
 }
-  
- 
 
 #endif
