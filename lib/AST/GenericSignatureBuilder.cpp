@@ -4632,8 +4632,8 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       
       bool shouldOfferFixit = false;
       if (auto GTPT = subjectType->getAs<GenericTypeParamType>()) {
-        shouldOfferFixit = dyn_cast<ExtensionDecl>(GTPT->getDecl()
-                                                       ->getDeclContext());
+        shouldOfferFixit = isa<ExtensionDecl>(GTPT->getDecl()
+                                                  ->getDeclContext());
       }
       
       if (shouldOfferFixit) {
