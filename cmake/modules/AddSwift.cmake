@@ -2195,83 +2195,6 @@ function(_add_swift_executable_single name)
       PROPERTIES FOLDER "Swift executables")
 endfunction()
 
-# Add an executable for the host machine.
-#
-# Usage:
-#   add_swift_executable(name
-#     [DEPENDS dep1 ...]
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]
-#     [FILE_DEPENDS target1 ...]
-#     [LINK_LIBRARIES target1 ...]
-#     [EXCLUDE_FROM_ALL]
-#     [DONT_STRIP_NON_MAIN_SYMBOLS]
-#     [DISABLE_ASLR]
-#     source1 [source2 source3 ...])
-#
-#   name
-#     Name of the executable (e.g., swift).
-#
-#   LIBRARIES
-#     Libraries this executable depends on, without variant suffixes.
-#
-#   LLVM_COMPONENT_DEPENDS
-#     LLVM components this executable depends on.
-#
-#   FILE_DEPENDS
-#     Additional files this executable depends on.
-#
-#   LINK_LIBRARIES
-#     Libraries to link with.
-#
-#   EXCLUDE_FROM_ALL
-#     Whether to exclude this executable from the ALL_BUILD target.
-#
-#   DONT_STRIP_NON_MAIN_SYMBOLS
-#     Should we not strip non main symbols.
-#
-#   DISABLE_ASLR
-#     Should we compile with -Wl,-no_pie so that ASLR is disabled?
-#
-#   source1 ...
-#     Sources to add into this executable.
-#
-# Note:
-#   Host executables are not given a variant suffix. To build an executable for
-#   each SDK and ARCH variant, use add_swift_target_executable.
-function(add_swift_executable name)
-  # Parse the arguments we were given.
-  cmake_parse_arguments(SWIFTEXE
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
-    ""
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;COMPILE_FLAGS"
-    ${ARGN})
-
-  translate_flag(${SWIFTEXE_EXCLUDE_FROM_ALL}
-      "EXCLUDE_FROM_ALL"
-      SWIFTEXE_EXCLUDE_FROM_ALL_FLAG)
-  translate_flag(${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS}
-      "DONT_STRIP_NON_MAIN_SYMBOLS"
-      SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG)
-  translate_flag(${SWIFTEXE_DISABLE_ASLR}
-      "DISABLE_ASLR"
-      SWIFTEXE_DISABLE_ASLR_FLAG)
-
-  set(SWIFTEXE_SOURCES ${SWIFTEXE_UNPARSED_ARGUMENTS})
-
-  _add_swift_executable_single(
-      ${name}
-      ${SWIFTEXE_SOURCES}
-      DEPENDS ${SWIFTEXE_DEPENDS}
-      LLVM_COMPONENT_DEPENDS ${SWIFTEXE_LLVM_COMPONENT_DEPENDS}
-      LINK_LIBRARIES ${SWIFTEXE_LINK_LIBRARIES}
-      SDK ${SWIFT_HOST_VARIANT_SDK}
-      ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-      COMPILE_FLAGS ${SWIFTEXE_COMPILE_FLAGS}
-      ${SWIFTEXE_EXCLUDE_FROM_ALL_FLAG}
-      ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
-      ${SWIFTEXE_DISABLE_ASLR_FLAG})
-endfunction()
-
 macro(add_swift_tool_subdirectory name)
   add_llvm_subdirectory(SWIFT TOOL ${name})
 endmacro()
@@ -2295,7 +2218,9 @@ function(add_swift_host_tool executable)
                MESSAGE "Swift Component is required to add a host tool")
 
   # Create the executable rule.
-  add_swift_executable(${executable}
+  _add_swift_executable_single(${executable}
+    SDK ${SWIFT_HOST_VARIANT_SDK}
+    ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     ${ASHT_UNPARSED_ARGUMENTS})
 
   swift_install_in_component(${ASHT_SWIFT_COMPONENT}
