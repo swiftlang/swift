@@ -34,7 +34,7 @@
 
 #import "Classes.h"
 
-void check(Class c) {
+void checkClass(Class c) {
   assert(c);
 
   size_t expectedSize = [c totalSize];
@@ -71,8 +71,8 @@ int main(int argc, const char * const argv[]) {
 
   @autoreleasepool {
     NSLog(@"%zd", class_getInstanceSize([OneWordSuperclass class]));
-    check([StaticClass class]);
-    check(objc_getClass("Classes.DynamicClass"));
-    check(objc_getClass("Classes.PureSwiftClass"));
+    checkClass([StaticClass class]);
+    checkClass(objc_getClass("Classes.DynamicClass"));
+    checkClass(objc_getClass("Classes.PureSwiftClass"));
   }
 }
