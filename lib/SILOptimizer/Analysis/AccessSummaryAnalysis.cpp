@@ -32,7 +32,7 @@ void AccessSummaryAnalysis::processFunction(FunctionInfo *info,
     FunctionSummary &functionSummary = info->getSummary();
     ArgumentSummary &argSummary =
         functionSummary.getAccessForArgument(index);
-    index++;
+    ++index;
 
     auto *functionArg = cast<SILFunctionArgument>(arg);
     // Only summarize @inout_aliasable arguments.
@@ -423,7 +423,7 @@ AccessSummaryAnalysis::ArgumentSummary::getDescription(SILType BaseType,
       os << ", ";
     }
     os << subAccess.getDescription(BaseType, M);
-    index++;
+    ++index;
   }
   os << "]";
 
@@ -594,7 +594,7 @@ static unsigned subPathLength(const IndexTrieNode *subPath) {
 
   const IndexTrieNode *iter = subPath;
   while (iter) {
-    length++;
+    ++length;
     iter = iter->getParent();
   }
 
@@ -628,7 +628,7 @@ void AccessSummaryAnalysis::FunctionSummary::print(raw_ostream &os,
   unsigned argCount = getArgumentCount();
   os << "(";
 
-  for (unsigned i = 0; i < argCount; i++) {
+  for (unsigned i = 0; i < argCount; ++i) {
     if (i > 0) {
       os << ",  ";
     }
