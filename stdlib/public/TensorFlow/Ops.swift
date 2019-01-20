@@ -634,7 +634,7 @@ public extension Tensor {
   /// order.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpTransposed(withPermutations:)
+    wrt: self, vjp: _vjpTransposed(withPermutations:)
     where Scalar : Differentiable & FloatingPoint
   )
   func transposed(
@@ -647,7 +647,7 @@ public extension Tensor {
   /// order.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpTransposed(withPermutations:)
+    wrt: self, vjp: _vjpTransposed(withPermutations:)
     where Scalar : Differentiable & FloatingPoint
   )
   func transposed(withPermutations permutations: [Int32]) -> Tensor {
@@ -658,7 +658,7 @@ public extension Tensor {
   /// order.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpTransposed(withPermutations:)
+    wrt: self, vjp: _vjpTransposed(withPermutations:)
     where Scalar : Differentiable & FloatingPoint
   )
   func transposed(withPermutations permutations: Int32...) -> Tensor {
@@ -668,7 +668,7 @@ public extension Tensor {
   /// Returns a transposed tensor, with dimensions permuted in reverse order.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpTransposed()
+    wrt: self, vjp: _vjpTransposed()
     where Scalar : Differentiable & FloatingPoint
   )
   func transposed() -> Tensor {
@@ -946,7 +946,7 @@ public func min<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
 public extension Tensor where Scalar : Numeric {
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpSquared()
+    wrt: self, vjp: _vjpSquared()
     where Scalar : Differentiable & FloatingPoint
   )
   func squared() -> Tensor {
@@ -1191,7 +1191,7 @@ public extension Tensor where Scalar : Numeric {
   // NOTE: This overload is necessary, otherwise `mean()` would refer
   // to the variadic method `mean(squeezingAxes:)` with zero indices.
   @differentiable(
-    wrt: (self), vjp: _vjpMean()
+    wrt: self, vjp: _vjpMean()
     where Scalar : Differentiable & FloatingPoint
   )
   @inlinable @inline(__always)
@@ -1204,7 +1204,7 @@ public extension Tensor where Scalar : Numeric {
   // to the variadic method `sum(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpSum()
+    wrt: self, vjp: _vjpSum()
     where Scalar : Differentiable & FloatingPoint
   )
   func sum() -> Tensor {
@@ -1226,7 +1226,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpMean(squeezingAxes:)
+    wrt: self, vjp: _vjpMean(squeezingAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
   func mean(squeezingAxes axes: [Int32]) -> Tensor {
@@ -1240,7 +1240,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpMean(squeezingAxes:)
+    wrt: self, vjp: _vjpMean(squeezingAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
   func mean(squeezingAxes axes: Int32...) -> Tensor {
@@ -1253,7 +1253,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpSum(squeezingAxes:)
+    wrt: self, vjp: _vjpSum(squeezingAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
   func sum(squeezingAxes axes: [Int32]) -> Tensor {
@@ -1266,7 +1266,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpSum(squeezingAxes:)
+    wrt: self, vjp: _vjpSum(squeezingAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
   func sum(squeezingAxes axes: Int32...) -> Tensor {
@@ -1298,7 +1298,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpMean(squeezingAxes:)
+    wrt: self, vjp: _vjpMean(squeezingAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
   func mean(alongAxes axes: [Int32]) -> Tensor {
@@ -1311,7 +1311,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpMean(squeezingAxes:)
+    wrt: self, vjp: _vjpMean(squeezingAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
   func mean(alongAxes axes: Int32...) -> Tensor {
@@ -1324,7 +1324,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpSum(squeezingAxes:)
+    wrt: self, vjp: _vjpSum(squeezingAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
   func sum(alongAxes axes: [Int32]) -> Tensor {
@@ -1337,7 +1337,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpSum(squeezingAxes:)
+    wrt: self, vjp: _vjpSum(squeezingAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
   func sum(alongAxes axes: Int32...) -> Tensor {
@@ -1689,7 +1689,7 @@ public extension Tensor where Scalar : FloatingPoint {
   ///   - padding: The padding for the operation.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpMaxPooled(kernelSize:strides:padding:)
+    wrt: self, vjp: _vjpMaxPooled(kernelSize:strides:padding:)
     where Scalar : Differentiable
   )
   func maxPooled(
@@ -1714,7 +1714,7 @@ public extension Tensor where Scalar : FloatingPoint {
   ///   - padding: The padding for the operation.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpAveragePooled(kernelSize:strides:padding:)
+    wrt: self, vjp: _vjpAveragePooled(kernelSize:strides:padding:)
     where Scalar : Differentiable
   )
   func averagePooled(

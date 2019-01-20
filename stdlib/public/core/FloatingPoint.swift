@@ -1822,7 +1822,7 @@ extension FloatingPoint {
   /// - Returns: The square root of the value.
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
-  @differentiable(wrt: (self), vjp: _vjpSquareRoot
+  @differentiable(wrt: self, vjp: _vjpSquareRoot
                   where Self : Differentiable, Self == Self.CotangentVector)
   public func squareRoot( ) -> Self {
     var lhs = self

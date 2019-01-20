@@ -911,8 +911,8 @@ bool Parser::parseDifferentiableAttributeArguments(
     return errorAndSkipToEnd();
   }
   if (Tok.is(tok::identifier) && Tok.getText() == "wrt") {
-    SyntaxParsingContext DiffParamsContext(
-        SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParams);
+    SyntaxParsingContext DiffParamsClauseContext(
+        SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParamsClause);
     consumeToken(tok::identifier);
     if (!consumeIf(tok::colon)) {
       diagnose(Tok, diag::attr_differentiable_expected_colon_after_label,
@@ -952,8 +952,10 @@ bool Parser::parseDifferentiableAttributeArguments(
     };
 
     // Parse opening '(' of the parameter list.
-    SourceLoc leftLoc;
-    if (consumeIf(tok::l_paren, leftLoc)) {
+    if (Tok.is(tok::l_paren)) {
+      SyntaxParsingContext DiffParamsContext(
+          SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParams);
+      consumeToken(tok::l_paren);
       // Parse first parameter. At least one is required.
       if (parseParam())
         return errorAndSkipToEnd(2);

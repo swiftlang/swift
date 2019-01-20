@@ -6,13 +6,13 @@ import StdlibUnittest
 var SimpleModelTests = TestSuite("SimpleModel")
 
 struct DenseLayer : Equatable {
-  @differentiable(wrt: (self), vjp: vjpW)
+  @differentiable(wrt: self, vjp: vjpW)
   let w: Float
   func vjpW() -> (Float, (Float) -> DenseLayer) {
     return (w, { dw in DenseLayer(w: dw, b: 0) } )
   }
 
-  @differentiable(wrt: (self), vjp: vjpB)
+  @differentiable(wrt: self, vjp: vjpB)
   let b: Float
   func vjpB() -> (Float, (Float) -> DenseLayer) {
     return (b, { db in DenseLayer(w: 0, b: db) } )
@@ -47,19 +47,19 @@ extension DenseLayer {
 }
 
 struct Model : Equatable {
-  @differentiable(wrt: (self), vjp: vjpL1)
+  @differentiable(wrt: self, vjp: vjpL1)
   let l1: DenseLayer
   func vjpL1() -> (DenseLayer, (DenseLayer) -> Model) {
     return (l1, { dl1 in Model(l1: dl1, l2: DenseLayer.zero, l3: DenseLayer.zero) } )
   }
 
-  @differentiable(wrt: (self), vjp: vjpL2)
+  @differentiable(wrt: self, vjp: vjpL2)
   let l2: DenseLayer
   func vjpL2() -> (DenseLayer, (DenseLayer) -> Model) {
     return (l2, { dl2 in Model(l1: DenseLayer.zero, l2: dl2, l3: DenseLayer.zero) } )
   }
 
-  @differentiable(wrt: (self), vjp: vjpL3)
+  @differentiable(wrt: self, vjp: vjpL3)
   let l3: DenseLayer
   func vjpL3() -> (DenseLayer, (DenseLayer) -> Model) {
     return (l3, { dl3 in Model(l1: DenseLayer.zero, l2: DenseLayer.zero, l3: dl3) } )

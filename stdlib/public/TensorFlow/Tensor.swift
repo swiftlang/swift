@@ -795,7 +795,7 @@ public extension Tensor {
   /// - Precondition: The number of scalars matches the new shape.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpReshaped(toShape:)
+    wrt: self, vjp: _vjpReshaped(toShape:)
     where Scalar : Differentiable & FloatingPoint
   )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
@@ -819,7 +819,7 @@ public extension Tensor {
   /// specified shape index.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: (self), vjp: _vjpExpandingShape(at:)
+    wrt: self, vjp: _vjpExpandingShape(at:)
     where Scalar : Differentiable & FloatingPoint
   )
   func expandingShape(at shapeIndex: Int32) -> Tensor {

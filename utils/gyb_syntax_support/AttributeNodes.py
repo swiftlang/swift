@@ -151,7 +151,7 @@ ATTRIBUTE_NODES = [
          differentiation parameter list and associated functions.
          ''',
          children=[
-             Child('DiffParams', kind='DifferentiableAttributeDiffParams',
+             Child('DiffParams', kind='DifferentiableAttributeDiffParamsClause',
                    is_optional=True),
              Child('MaybePrimal', kind='DifferentiableAttributeFuncSpecifier',
                    is_optional=True),
@@ -164,10 +164,12 @@ ATTRIBUTE_NODES = [
              Child('WhereClause', kind='GenericWhereClause', is_optional=True),
          ]),
 
-    # differentiable-attr-parameters ->
-    #     'wrt' ':' '(' differentiation-parameter-list ')' ','?
-    Node('DifferentiableAttributeDiffParams', kind='Syntax',
-         description='The parameters to differentiate with respect to.',
+    # differentiable-attr-parameters-clause ->
+    #     'wrt' ':'
+    #     (differentiable-attr-diff-params | differentiable-attr-diff-param)
+    #     ','?
+    Node('DifferentiableAttributeDiffParamsClause', kind='Syntax',
+         description='The clause containing the differentiation parameters.',
          traits=['WithTrailingComma'],
          children=[
              Child('WrtLabel', kind='IdentifierToken',
@@ -175,11 +177,25 @@ ATTRIBUTE_NODES = [
              Child('Colon', kind='ColonToken', description='''
                    The colon separating "wrt" and the parameter list.
                    '''),
+             Child('Parameters', kind='Syntax',
+                   node_choices=[
+                       Child('Parameter',
+                             kind='DifferentiableAttributeDiffParam'),
+                       Child('ParameterList',
+                             kind='DifferentiableAttributeDiffParams'),
+                   ]),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    # differentiable-attr-diff-params ->
+    #     '(' differentiable-attr-diff-param-list ')'
+    Node('DifferentiableAttributeDiffParams', kind='Syntax',
+         description='The differentiation parameters.',
+         children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('DiffParams', kind='DifferentiableAttributeDiffParamList',
                    description='The parameters for differentiation.'),
              Child('RightParen', kind='RightParenToken'),
-             Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
     # differentiable-attr-diff-param-list ->
@@ -191,8 +207,8 @@ ATTRIBUTE_NODES = [
     #     ('self' | identifer) ','?
     Node('DifferentiableAttributeDiffParam', kind='Syntax',
          description='''
-         A differentiation parameter: either the "self" identifier or a period \
-         followed by an unsigned integer (e.g. `.0`).
+         A differentiation parameter: either the "self" identifier or a \
+         function parameter name.
          ''',
          traits=['WithTrailingComma'],
          children=[
