@@ -129,6 +129,4 @@ DISTCC_FLAG="${DISTCC_FLAG}"
         darwin_toolchain_display_name_short="${DISPLAY_NAME_SHORT}" \
         darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
         darwin_toolchain_version="${DARWIN_TOOLCHAIN_VERSION}" \
-        darwin_toolchain_alias="Local" \
-	--tensorflow-host-include-dir=/google/src/cloud/bgogul/tensorflow/google3 \
-	--tensorflow-host-lib-dir=/google/src/cloud/bgogul/tensorflow/google3/blaze-bin/third_party/tensorflow
+        darwin_toolchain_alias="Local"
