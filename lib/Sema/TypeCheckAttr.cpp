@@ -2380,17 +2380,22 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     for (unsigned i : indices(parsedWrtParams)) {
       auto paramLoc = parsedWrtParams[i].getLoc();
       switch (parsedWrtParams[i].getKind()) {
-      case ParsedAutoDiffParameter::Kind::Index: {
-        unsigned index = parsedWrtParams[i].getIndex();
-        if ((int)index <= lastIndex) {
-          TC.diagnose(paramLoc,
-                      diag::differentiable_attr_wrt_indices_must_be_ascending);
+      case ParsedAutoDiffParameter::Kind::Named: {
+        auto nameIter =
+            llvm::find_if(originalParams.getArray(), [&](ParamDecl *param) {
+              return param->getName() == parsedWrtParams[i].getName();
+            });
+        // Parameter name must exist.
+        if (nameIter == originalParams.end()) {
+          TC.diagnose(paramLoc, diag::differentiable_attr_wrt_name_unknown,
+                      parsedWrtParams[i].getName());
           return;
         }
-        // Parameter index cannot exceed bounds.
-        if (index >= originalParams.size()) {
+        // Parameter names must be specified in the original order.
+        unsigned index = std::distance(originalParams.begin(), nameIter);
+        if ((int)index <= lastIndex) {
           TC.diagnose(paramLoc,
-                      diag::differentiable_attr_wrt_index_out_of_bounds);
+                      diag::differentiable_attr_wrt_names_not_original_order);
           return;
         }
         autoDiffParameterIndicesBuilder.setParameter(index);

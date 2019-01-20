@@ -5,7 +5,7 @@ import StdlibUnittest
 
 var SupersetVJPTests = TestSuite("SupersetVJP")
 
-@differentiable(wrt: (.0, .1), vjp: dmulxy)
+@differentiable(wrt: (x, y), vjp: dmulxy)
 func mulxy(_ x: Float, _ y: Float) -> Float {
   // use control flow to prevent AD; NB fix when control flow is supported
   if x > 1000 {

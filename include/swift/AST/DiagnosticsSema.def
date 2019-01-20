@@ -2665,10 +2665,10 @@ ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
 ERROR(differentiable_attr_wrt_self_must_be_first,none,
       "'self' parameter must come first in the parameter list", ())
-ERROR(differentiable_attr_wrt_indices_must_be_ascending,none,
-      "parameter indices must be ascending", ())
-ERROR(differentiable_attr_wrt_index_out_of_bounds,none,
-      "parameter index out of bounds", ())
+ERROR(differentiable_attr_wrt_names_not_original_order,none,
+      "parameter names must be specified in original order", ())
+ERROR(differentiable_attr_wrt_name_unknown,none,
+      "unknown parameter name %0", (Identifier))
 ERROR(differentiable_attr_wrt_self_instance_method_only,none,
       "'self' parameter is only applicable to instance methods", ())
 ERROR(differentiable_attr_cannot_diff_wrt_objects_or_existentials,none,

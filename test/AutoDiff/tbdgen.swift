@@ -10,13 +10,13 @@
 // UN: diff -u %t/typecheck.tbd %t/emit-ir.tbd
 
 @differentiable() public func publicDiffable(_ x: Float, _ y: Float) -> Float { return x }
-@differentiable(wrt: (.0)) public func publicDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable(wrt: (x)) public func publicDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
 @differentiable() internal func internalDiffable(_ x: Float, _ y: Float) -> Float { return x }
-@differentiable(wrt: (.0)) internal func internalDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable(wrt: (x)) internal func internalDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
 @differentiable() private func privateDiffable(_ x: Float, _ y: Float) -> Float { return x }
-@differentiable(wrt: (.0)) private func privateDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable(wrt: (x)) private func privateDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
 extension Float {
   // This should generate public symbols for both JVP and VJP.

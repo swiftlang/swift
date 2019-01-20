@@ -617,7 +617,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   /// TensorFlow builtin conv2d gradient helper for the input.
   @inlinable
   @differentiable(
-    wrt: (.1, .2),
+    wrt: (filter, backpropOutput),
     vjp: _vjpTFConv2DBackpropInput(_:_:_:_:_:)
   )
   func _TFConv2DBackpropInput(
@@ -638,7 +638,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   /// TensorFlow builtin conv2d gradient helper for the filter.
   @inlinable
   @differentiable(
-    wrt: (.0, .2),
+    wrt: (input, backpropOutput),
     vjp: _vjpTFConv2DBackpropFilter(_:_:_:_:_:)
   )
   func _TFConv2DBackpropFilter(

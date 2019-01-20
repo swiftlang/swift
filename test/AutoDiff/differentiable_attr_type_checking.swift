@@ -22,8 +22,13 @@ func jvpSimpleJVP(x: Float) -> (Float, ((Float) -> Float)) {
   return (x, { v in v })
 }
 
-@differentiable(wrt: (.1), jvp: jvpWrtSubsetJVP)
-func jvpWrtSubset(x: Float, y: Float) -> Float {
+@differentiable(wrt: y, jvp: jvpWrtSubsetJVP)
+func jvpWrtSubset1(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: (y), jvp: jvpWrtSubsetJVP)
+func jvpWrtSubset2(x: Float, y: Float) -> Float {
   return x + y
 }
 
@@ -38,6 +43,18 @@ func jvp2Params(x: Float, y: Float) -> Float {
 
 func jvp2ParamsJVP(x: Float, y: Float) -> (Float, (Float, Float) -> Float) {
   return (x + y, { (a, b) in a + b })
+}
+
+// expected-error @+1 {{unknown parameter name 'y'}}
+@differentiable(wrt: (y))
+func jvpUnknownParam(x: Float) -> Float {
+  return x
+}
+
+// expected-error @+1 {{parameter names must be specified in original order}}
+@differentiable(wrt: (y, x))
+func jvpParamOrderNotIncreasing(x: Float, y: Float) -> Float {
+  return x * y
 }
 
 // expected-error @+1 {{'jvpWrongTypeJVP' does not have expected type '(Float) -> (Float, (Float.TangentVector) -> Float.TangentVector)' (aka '(Float) -> (Float, (Float) -> Float)'}}
@@ -123,7 +140,7 @@ extension JVPStruct {
 }
 
 extension JVPStruct {
-  @differentiable(wrt: (self, .0), jvp: wrtAllJVP)
+  @differentiable(wrt: (self, x), jvp: wrtAllJVP)
   func wrtAll(x: Float) -> Float {
     return x + p
   }
@@ -179,7 +196,7 @@ func vjpSimpleVJP(x: Float) -> (Float, ((Float) -> Float)) {
   return (x, { v in v })
 }
 
-@differentiable(wrt: (.1), vjp: vjpWrtSubsetVJP)
+@differentiable(wrt: (y), vjp: vjpWrtSubsetVJP)
 func vjpWrtSubset(x: Float, y: Float) -> Float {
   return x + y
 }
@@ -280,7 +297,7 @@ extension VJPStruct {
 }
 
 extension VJPStruct {
-  @differentiable(wrt: (self, .0), vjp: wrtAllVJP)
+  @differentiable(wrt: (self, x), vjp: wrtAllVJP)
   func wrtAll(x: Float) -> Float {
     return x + p
   }

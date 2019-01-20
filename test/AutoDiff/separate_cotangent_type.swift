@@ -11,9 +11,9 @@ import Glibc
 var SeparateCotangentTypeTests = TestSuite("SeparateCotangentType")
 
 struct DifferentiableSubset : Differentiable {
-  @differentiable(wrt: (self))
+  @differentiable(wrt: self)
   var w: Float
-  @differentiable(wrt: (self))
+  @differentiable(wrt: self)
   var b: Float
   @noDerivative var flag: Bool
 

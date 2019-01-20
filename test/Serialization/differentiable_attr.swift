@@ -12,7 +12,7 @@ func jvpSimple(x: Float) -> Float {
   return x
 }
 
-// CHECK-DAG: @differentiable(wrt: (.0), jvp: jvpSimpleJVP)
+// CHECK-DAG: @differentiable(wrt: (x), jvp: jvpSimpleJVP)
 // CHECK-DAG: func jvpSimpleJVP(x: Float) -> (Float, (Float) -> Float)
 func jvpSimpleJVP(x: Float) -> (Float, (Float) -> Float) {
   return (x, { v in v })
@@ -23,13 +23,13 @@ func vjpSimple(x: Float) -> Float {
   return x
 }
 
-// CHECK-DAG: @differentiable(wrt: (.0), vjp: vjpSimpleVJP)
+// CHECK-DAG: @differentiable(wrt: (x), vjp: vjpSimpleVJP)
 // CHECK-DAG: func vjpSimpleVJP(x: Float) -> (Float, (Float) -> Float)
 func vjpSimpleVJP(x: Float) -> (Float, (Float) -> Float) {
   return (x, { v in v })
 }
 
-// CHECK-DAG: @differentiable(wrt: (.0), vjp: vjpTestWhereClause where T : Differentiable, T : Numeric)
+// CHECK-DAG: @differentiable(wrt: (x), vjp: vjpTestWhereClause where T : Differentiable, T : Numeric)
 // CHECK-DAG: func testWhereClause<T>(x: T) -> T where T : Numeric
 @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
 func testWhereClause<T : Numeric>(x: T) -> T {
@@ -59,7 +59,7 @@ extension P where Self : Differentiable {
 // NOTE: The failing tests involve where clauses with member type constraints.
 // They pass type-checking but crash during serialization.
 
-// CHECK-DAG: @differentiable(wrt: (.0), vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T : Numeric, T == T.CotangentVector)
+// CHECK-DAG: @differentiable(wrt: (x), vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T : Numeric, T == T.CotangentVector)
 // CHECK-DAG: func testWhereClauseMemberTypeConstraint<T>(x: T) -> T where T : Numeric
 @differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T == T.CotangentVector)
 func testWhereClauseMemberTypeConstraint<T : Numeric>(x: T) -> T {
