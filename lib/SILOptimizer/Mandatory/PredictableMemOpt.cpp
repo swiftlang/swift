@@ -1287,6 +1287,9 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
 
     switch (u.Kind) {
     case PMOUseKind::Assign:
+      // Until we can promote the value being destroyed by the assign, we can
+      // not remove deallocations with such assigns.
+      return false;
     case PMOUseKind::InitOrAssign:
       break;    // These don't prevent removal.
     case PMOUseKind::Initialization:
