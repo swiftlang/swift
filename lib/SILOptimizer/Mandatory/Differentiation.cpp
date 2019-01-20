@@ -1175,12 +1175,14 @@ private:
   /// Perform analysis and populate sets.
   void analyze(DominanceInfo *di, PostDominanceInfo *pdi);
 
-  void setVariedIfDifferentiable(SILValue value,
+  bool setVariedIfDifferentiable(SILValue value,
                                  unsigned independentVariableIndex);
-  void setUsefulIfDifferentiable(SILValue value,
+  bool setUsefulIfDifferentiable(SILValue value,
                                  unsigned dependentVariableIndex);
   void recursivelySetVariedIfDifferentiable(SILValue value,
                                             unsigned independentVariableIndex);
+  void propagateUsefulThroughBuffer(SILValue value,
+                                    unsigned dependentVariableIndex);
 
 public:
   explicit DifferentiableActivityInfo(SILFunction &f,
@@ -1284,12 +1286,16 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
         // Handle `struct_extract`.
         else if (auto *sei = dyn_cast<StructExtractInst>(&inst)) {
           if (isVaried(sei->getOperand(), i)) {
+            // If `@noDerivative` exists on the field while the struct is
+            // `@_fieldwiseDifferentiable`, this field is not in the set of
+            // differentiable variables that we want to track the variedness of.
             auto hasNoDeriv = sei->getField()->getAttrs()
                 .hasAttribute<NoDerivativeAttr>();
-            if (!hasNoDeriv) {
+            auto structIsFieldwiseDiffable = sei->getStructDecl()->getAttrs()
+                .hasAttribute<FieldwiseDifferentiableAttr>();
+            if (!(hasNoDeriv && structIsFieldwiseDiffable))
               for (auto result: inst.getResults())
                 setVariedIfDifferentiable(result, i);
-            }
           }
         }
         // Handle everything else.
@@ -1333,17 +1339,13 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
           if (isUseful(si->getDest(), i))
             setUsefulIfDifferentiable(si->getSrc(), i);
         }
-        // Handle side-effecting operations.
-        // All address operands are useful if any result is useful.
-        else if (inst.mayHaveSideEffects()) {
-          for (auto result : inst.getResults()) {
-            if (isUseful(result, i)) {
-              for (auto &op : inst.getAllOperands())
-                if (op.get()->getType().isAddress())
-                  setUsefulIfDifferentiable(op.get(), i);
-              break;
-            }
-          }
+        // Handle reads.
+        else if (inst.mayReadFromMemory()) {
+          if (llvm::any_of(inst.getResults(),
+                           [&](SILValue res) { return isUseful(res, i); }))
+            for (auto &op : inst.getAllOperands())
+              if (op.get()->getType().isAddress())
+                propagateUsefulThroughBuffer(op.get(), i);
         }
         // Handle everything else.
         else {
@@ -1358,26 +1360,52 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
   }
 }
 
-void DifferentiableActivityInfo::setVariedIfDifferentiable(
+bool DifferentiableActivityInfo::setVariedIfDifferentiable(
     SILValue value, unsigned independentVariableIndex) {
   if (!value->getType().isDifferentiable(function.getModule()))
-    return;
+    return false;
   variedValueSets[independentVariableIndex].insert(value);
+  return true;
 }
 
-void DifferentiableActivityInfo::setUsefulIfDifferentiable(
+bool DifferentiableActivityInfo::setUsefulIfDifferentiable(
     SILValue value, unsigned dependentVariableIndex) {
   if (!value->getType().isDifferentiable(function.getModule()))
-    return;
+    return false;
   usefulValueSets[dependentVariableIndex].insert(value);
+  return true;
 }
 
 void DifferentiableActivityInfo::recursivelySetVariedIfDifferentiable(
     SILValue value, unsigned independentVariableIndex) {
-  setVariedIfDifferentiable(value, independentVariableIndex);
+  if (!setVariedIfDifferentiable(value, independentVariableIndex))
+    return;
   if (auto *inst = value->getDefiningInstruction())
     for (auto &op : inst->getAllOperands())
       recursivelySetVariedIfDifferentiable(op.get(), independentVariableIndex);
+}
+
+void DifferentiableActivityInfo::propagateUsefulThroughBuffer(
+    SILValue value, unsigned dependentVariableIndex) {
+  assert(value->getType().isAddress());
+  if (!setUsefulIfDifferentiable(value, dependentVariableIndex))
+    return;
+  if (auto *inst = value->getDefiningInstruction())
+    for (auto &operand : inst->getAllOperands())
+      if (operand.get()->getType().isAddress())
+        propagateUsefulThroughBuffer(operand.get(), dependentVariableIndex);
+  auto isProjectingMemory = [](SILInstruction *inst) -> bool {
+    bool hasAddrResults = llvm::any_of(inst->getResults(),
+        [&](SILValue res) { return res->getType().isAddress(); });
+    bool hasAddrOperands = llvm::any_of(inst->getAllOperands(),
+        [&](Operand &op) { return op.get()->getType().isAddress(); });
+    return hasAddrResults && hasAddrOperands;
+  };
+  for (auto use : value->getUses())
+    if (isProjectingMemory(use->getUser()))
+      for (auto res : use->getUser()->getResults())
+        if (res->getType().isAddress())
+          setUsefulIfDifferentiable(res, dependentVariableIndex);
 }
 
 bool DifferentiableActivityInfo::isVaried(
