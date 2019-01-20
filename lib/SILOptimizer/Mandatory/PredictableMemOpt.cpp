@@ -930,6 +930,12 @@ void AvailableValueDataflowContext::explodeCopyAddr(CopyAddrInst *CAI) {
       // something else), track it as an access.
       if (StoreUse.isValid()) {
         StoreUse.Inst = NewInst;
+        // If our store use by the copy_addr is an assign, then we know that
+        // before we store the new value, we loaded the old value implying that
+        // our store is technically initializing memory when it occurs. So
+        // change the kind to Initialization.
+        if (StoreUse.Kind == Assign)
+          StoreUse.Kind = Initialization;
         NonLoadUses[NewInst] = Uses.size();
         Uses.push_back(StoreUse);
       }
