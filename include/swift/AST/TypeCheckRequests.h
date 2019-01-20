@@ -345,7 +345,7 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Caching
-  bool isCached() const { return true; }
+  bool isCached() const { return getCache() != nullptr; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 

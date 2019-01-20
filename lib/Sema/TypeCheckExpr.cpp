@@ -673,9 +673,10 @@ getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
-    return evaluateOrDefault(
+    Type t = evaluateOrDefault(
         Context.evaluator,
         DefaultTypeRequest{knownProtocolKindIfAny.getValue(), dc}, nullptr);
+    return t;
   }
   return nullptr;
 }

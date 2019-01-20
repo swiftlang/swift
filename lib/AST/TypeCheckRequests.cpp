@@ -465,7 +465,8 @@ Optional<Type> DefaultTypeRequest::getCachedResult() const {
   auto const *cache = getCache();
   if (!cache)
     return None;
-  return (*cache)[size_t(getKnownProtocolKind())];
+  Type t = (*cache)[size_t(getKnownProtocolKind())];
+  return t ? Optional<Type>(t) : None;
 }
 
 void DefaultTypeRequest::cacheResult(Type value) const {
