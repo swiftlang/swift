@@ -212,8 +212,9 @@ Type TypeResolution::resolveDependentMemberType(
     return DependentMemberType::get(baseTy, assocType);
   }
 
-  // Otherwise, the nested type comes from a concrete type. Substitute the
-  // base type into it.
+  // Otherwise, the nested type comes from a concrete type,
+  // or it's a typealias declared in protocol or protocol extension.
+  // Substitute the base type into it.
   auto concrete = ref->getBoundDecl();
   auto lazyResolver = ctx.getLazyResolver();
   if (lazyResolver)
@@ -221,14 +222,26 @@ Type TypeResolution::resolveDependentMemberType(
   if (!concrete->hasInterfaceType())
     return ErrorType::get(ctx);
 
-  if (concrete->getDeclContext()->getSelfClassDecl()) {
-    // We found a member of a class from a protocol or protocol
-    // extension.
-    //
-    // Get the superclass of the 'Self' type parameter.
-    baseTy = (baseEquivClass->concreteType
-              ? baseEquivClass->concreteType
-              : baseEquivClass->superclass);
+  // Make sure that base type didn't get replaced along the way.
+  assert(baseTy->isTypeParameter());
+
+  // There are two situations possible here:
+  //
+  // 1. Member comes from the protocol, which means that it has been
+  //    found through a conformance constraint placed on base e.g. `T: P`.
+  //    In this case member is a `typealias` declaration located in
+  //    protocol or protocol extension.
+  //
+  // 2. Member comes from struct/enum/class type, which means that it
+  //    has been found through same-type constraint on base e.g. `T == Q`.
+  //
+  // If this is situation #2 we need to make sure to switch base to
+  // a concrete type (according to equivalence class) otherwise we'd
+  // end up using incorrect generic signature while attempting to form
+  // a substituted type for the member we found.
+  if (!concrete->getDeclContext()->getSelfProtocolDecl()) {
+    baseTy = baseEquivClass->concreteType ? baseEquivClass->concreteType
+                                          : baseEquivClass->superclass;
     assert(baseTy);
   }
 
