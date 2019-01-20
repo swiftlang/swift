@@ -24,6 +24,7 @@ func apply() {
 // CHECK-AST-NEXT:           (declref_expr type='@autodiff (Float) -> (Float)'
 // CHECK-AST-LABEL:  (func_decl {{.*}} "apply()"
 // CHECK-AST:          (autodiff_function implicit type='@autodiff (Float) -> (Float)'
+// CHECK-AST-NEXT:         range=
 // CHECK-AST-NEXT:       (function_conversion_expr implicit type='(Float) -> (Float)'
 // CHECK-AST-NEXT:         (declref_expr type='(Float) -> Float'
 

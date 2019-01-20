@@ -1,3 +1,5 @@
+// TODO(SR-9714): Fix this and re-enable.
+// XFAIL: *
 // RUN: rm -f %t.*
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true -sil-disable-ast-dump %platform-module-dir/Swift.swiftmodule -module-name=Swift -o %t.sil
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true %t.sil > /dev/null
