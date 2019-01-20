@@ -52,7 +52,7 @@
 /// \param typeName supplies the name used for type lookup,
 /// \param performLocalLookup specifies whether to first look in the local context.
 #define EXPRESSIBLE_BY_LITERAL_PROTOCOL_(name, typeName, performLocalLookup) \
-    EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name, "_" #typeName, performLocalLookup)
+    EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name, typeName, performLocalLookup)
 
 #define BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(name) \
     BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name)
@@ -92,9 +92,9 @@ EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringLiteral, "StringLiteralType",
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByNilLiteral, nullptr, false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "UnicodeScalarType", true)
 
-EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByColorLiteral, "ColorLiteralType", true)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral, "ImageLiteralType", true)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByFileReferenceLiteral, "FileReferenceLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByColorLiteral, "_ColorLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral, "_ImageLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByFileReferenceLiteral, "_FileReferenceLiteralType", true)
 
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinBooleanLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinExtendedGraphemeClusterLiteral)
