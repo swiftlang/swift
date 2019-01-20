@@ -644,5 +644,4 @@ struct SR_7984<Bar> {
   func doSomething() {}
 }
 
-extension SR_7984 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} 
-// expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{28-29= == }}
+extension SR_7984 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{28-29= ==}}
