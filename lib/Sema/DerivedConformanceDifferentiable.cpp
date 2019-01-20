@@ -598,7 +598,8 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
 // `AllDifferentiableVariables` struct for a nominal type, if it exists.
 // If not, synthesize the struct.
 static StructDecl *
-getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived, Identifier id) {
+getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
+                                      Identifier id) {
   auto &TC = derived.TC;
   auto parentDC = derived.getConformanceContext();
   auto nominal = derived.Nominal;
@@ -666,10 +667,10 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived, Identifier id
   auto *structDecl = new (C) StructDecl(SourceLoc(), id, SourceLoc(),
                                         /*Inherited*/ C.AllocateCopy(inherited),
                                         /*GenericParams*/ {}, parentDC);
+  structDecl->getAttrs().add(
+      new (C) FieldwiseDifferentiableAttr(/*implicit*/ true));
   structDecl->setImplicit();
   structDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  structDecl->getAttrs().add(new (C)
-                                 FieldwiseProductSpaceAttr(/*Implicit*/ true));
 
   // Add members to associated struct.
   for (auto *member : diffProperties) {
@@ -754,8 +755,6 @@ static void addAssociatedTypeAliasDecl(Identifier name,
       TypeAliasDecl(SourceLoc(), SourceLoc(), name, SourceLoc(), {}, source);
   aliasDecl->setUnderlyingType(target->getDeclaredInterfaceType());
   aliasDecl->setImplicit();
-  aliasDecl->getAttrs().add(new (C)
-                                FieldwiseProductSpaceAttr(/*Implicit*/ true));
   if (auto env = source->getGenericEnvironmentOfContext())
     aliasDecl->setGenericEnvironment(env);
   source->addMember(aliasDecl);
@@ -855,6 +854,11 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   auto nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
+  // Since associated types will be derived, we make this struct a fieldwise
+  // differentiable type.
+  nominal->getAttrs().add(
+      new (C) FieldwiseDifferentiableAttr(/*implicit*/ true));
+
   // Get all stored properties for differentation.
   SmallVector<VarDecl *, 16> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, diffProperties);
@@ -892,8 +896,6 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
                                             SourceLoc(), {}, nominal);
     aliasDecl->setUnderlyingType(selfType);
     aliasDecl->setImplicit();
-    aliasDecl->getAttrs().add(
-        new (C) FieldwiseProductSpaceAttr(/*implicit*/ true));
     nominal->addMember(aliasDecl);
     aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
     aliasDecl->setValidationToChecked();

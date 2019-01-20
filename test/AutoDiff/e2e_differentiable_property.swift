@@ -73,14 +73,13 @@ E2EDifferentiablePropertyTests.test("stored property") {
   expectEqual(expectedGrad, actualGrad)
 }
 
+@_fieldwiseDifferentiable
 struct ProductSpaceSelfTangent : VectorNumeric {
   let x, y: Float
 }
 
 extension ProductSpaceSelfTangent : Differentiable {
-  @_fieldwiseProductSpace
   typealias TangentVector = ProductSpaceSelfTangent
-  @_fieldwiseProductSpace
   typealias CotangentVector = ProductSpaceSelfTangent
 }
 
@@ -101,14 +100,13 @@ extension ProductSpaceOtherTangentTangentSpace : Differentiable {
   typealias CotangentVector = ProductSpaceOtherTangentTangentSpace
 }
 
+@_fieldwiseDifferentiable
 struct ProductSpaceOtherTangent {
   let x, y: Float
 }
 
 extension ProductSpaceOtherTangent : Differentiable {
-  @_fieldwiseProductSpace
   typealias TangentVector = ProductSpaceOtherTangentTangentSpace
-  @_fieldwiseProductSpace
   typealias CotangentVector = ProductSpaceOtherTangentTangentSpace
   func moved(along: ProductSpaceOtherTangentTangentSpace) -> ProductSpaceOtherTangent {
     return ProductSpaceOtherTangent(x: x + along.x, y: y + along.y)

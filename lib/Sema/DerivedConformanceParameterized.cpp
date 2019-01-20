@@ -400,11 +400,6 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
     parent->addMember(aliasDecl);
     aliasDecl->copyFormalAccessFrom(parent, /*sourceIsParentContext*/ true);
     aliasDecl->setValidationToChecked();
-    // Add `@_fieldwiseProductSpace` attribute to typealias declaration.
-    // This enables differentiation wrt member accesses of the `Parameterized`
-    // struct.
-    aliasDecl->getAttrs().add(new (C)
-                                  FieldwiseProductSpaceAttr(/*Implicit*/ true));
     TC.validateDecl(aliasDecl);
     C.addSynthesizedDecl(aliasDecl);
   };

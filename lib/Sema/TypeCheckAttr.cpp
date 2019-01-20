@@ -126,7 +126,7 @@ public:
   IGNORED_ATTR(CompilerEvaluable)
   IGNORED_ATTR(TensorFlowGraph)
   IGNORED_ATTR(TFParameter)
-  IGNORED_ATTR(FieldwiseProductSpace)
+  IGNORED_ATTR(FieldwiseDifferentiable)
   IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
 
@@ -886,7 +886,7 @@ public:
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
   void visitTFParameterAttr(TFParameterAttr *attr);
-  void visitFieldwiseProductSpaceAttr(FieldwiseProductSpaceAttr *attr);
+  void visitFieldwiseDifferentiableAttr(FieldwiseDifferentiableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
 };
 } // end anonymous namespace
@@ -2749,20 +2749,22 @@ void AttributeChecker::visitTFParameterAttr(TFParameterAttr *attr) {
   }
 }
 
-void AttributeChecker::visitFieldwiseProductSpaceAttr(
-    FieldwiseProductSpaceAttr *attr) {
-  // If we make this attribute user-facing, we'll need to do various checks.
-  //   - check that this attribute is on a
-  //     Tangent/Cotangent/AllDifferentiableVariables type alias
-  //   - check that we can access the raw fields of the
-  //     Tangent/Cotangent/AllDifferentiableVariables structs from
-  //     this module (e.g. the Tangent can't be a public resilient struct
-  //     defined in a different module).
-  //   - check that the stored properties of the
-  //     Tangent/Cotangent/AllDifferentiableVariables match
-  //
-  // If we don't make this attribute user-facing, we can avoid doing checks
-  // here: the assertions in Differentiation.cpp suffice.
+void AttributeChecker::visitFieldwiseDifferentiableAttr(
+    FieldwiseDifferentiableAttr *attr) {
+  auto *structDecl = dyn_cast<StructDecl>(D);
+  if (!structDecl) {
+    diagnoseAndRemoveAttr(attr,
+        diag::fieldwise_differentiable_only_on_differentiable_structs);
+    return;
+  }
+  if (!TC.conformsToProtocol(
+          structDecl->swift::TypeDecl::getDeclaredInterfaceType(),
+          TC.Context.getProtocol(KnownProtocolKind::Differentiable),
+          structDecl, ConformanceCheckFlags::Used)) {
+    diagnoseAndRemoveAttr(attr,
+        diag::fieldwise_differentiable_only_on_differentiable_structs);
+    return;
+  }
 }
 
 void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
