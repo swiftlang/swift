@@ -1041,6 +1041,8 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
     TokenNodes = TokenNodes.slice(I);
     return true;
   }
+  if (isa<RethrowsAttr>(D))
+    return true;
   return false;
 }
 
