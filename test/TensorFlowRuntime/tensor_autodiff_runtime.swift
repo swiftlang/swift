@@ -143,4 +143,9 @@ TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {
   expectEqual(Tensor(1.0), pb(Tensor(1)))
 }
 
+let cube: (Tensor<Float>) -> Tensor<Float> = { $0 * $0 * $0 }
+TensorADTests.testAllBackends("DifferentiateGlobal") {
+  expectEqual(Tensor(48), gradient(at: Tensor(4), in: cube))
+}
+
 runAllTests()

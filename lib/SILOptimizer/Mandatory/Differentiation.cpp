@@ -68,10 +68,10 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
+/// Returns true if the module we are compiling is in an LLDB REPL.
 static bool isInLLDBREPL(SILModule &module) {
-  llvm::StringRef module_name = module.getSwiftModule()->getNameStr();
   // TODO(SR-9704): Use a more prinicpled way to do this check.
-  return module_name.startswith("__lldb_expr_");
+  return module.getSwiftModule()->getNameStr().startswith("__lldb_expr_");
 }
 
 /// Creates arguments in the entry block based on the function type.
@@ -195,31 +195,6 @@ static CanType joinElementTypesFromValues(SILValueRange &&range,
   transform(range, elts.begin(),
             [&](SILValue val) { return val->getType().getASTType(); });
   return TupleType::get(elts, ctx)->getCanonicalType();
-}
-
-/// Looks through the definition of a function value. If the source that
-/// produced this function value is `function_ref` and the function is visible
-/// (either in the same module or is serialized), returns the instruction.
-/// Otherwise, returns null.
-static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
-  auto *inst = value->getDefiningInstruction();
-  if (!inst)
-    return nullptr;
-  if (auto *fri = dyn_cast<FunctionRefInst>(inst)) {
-    auto *fn = fri->getReferencedFunction();
-    if (&fn->getModule() == &inst->getModule() ||
-        fn->isSerialized() == IsSerialized)
-      return fri;
-  }
-  if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(inst))
-    return findReferenceToVisibleFunction(thinToThick->getOperand());
-  if (auto *convertFn = dyn_cast<ConvertFunctionInst>(inst))
-    return findReferenceToVisibleFunction(convertFn->getOperand());
-  if (auto *convertFn = dyn_cast<ConvertEscapeToNoEscapeInst>(inst))
-    return findReferenceToVisibleFunction(convertFn->getOperand());
-  if (auto *partialApply = dyn_cast<PartialApplyInst>(inst))
-    return findReferenceToVisibleFunction(partialApply->getCallee());
-  return nullptr;
 }
 
 /// Given an operator name, such as "+", and a protocol, returns the
@@ -692,6 +667,15 @@ public:
   SILFunction *getAdjoint() const { return adjoint; }
   SILFunction *getJVP() const { return jvp; }
   SILFunction *getVJP() const { return vjp; }
+
+  SILFunction *getAssociatedFunction(AutoDiffAssociatedFunctionKind kind) {
+    switch (kind) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      return jvp;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      return vjp;
+    }
+  }
 
   DenseMap<ApplyInst *, NestedApplyActivity> &getNestedApplyActivities() {
     return nestedApplyActivities;
@@ -1581,21 +1565,18 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   llvm_unreachable("Unhandled function convertion instruction");
 }
 
-/// Looks through function conversion instructions to find an underlying witness
-/// method instruction. Returns `nullptr` if `value` does not come from a
-/// `witness_method` or if there are unhandled conversion instructions between
-/// `value` and the `witness_method`..
-static WitnessMethodInst *findWitnessMethod(SILValue value) {
-  if (auto *witnessMethod = dyn_cast<WitnessMethodInst>(value))
-    return witnessMethod;
+template<class Inst>
+static Inst *peerThroughFunctionConversions(SILValue value) {
+  if (auto *inst = dyn_cast<Inst>(value))
+    return inst;
   if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(value))
-    return findWitnessMethod(thinToThick->getOperand());
+    return peerThroughFunctionConversions<Inst>(thinToThick->getOperand());
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
-    return findWitnessMethod(convertFn->getOperand());
+    return peerThroughFunctionConversions<Inst>(convertFn->getOperand());
   if (auto *convertFn = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
-    return findWitnessMethod(convertFn->getOperand());
+    return peerThroughFunctionConversions<Inst>(convertFn->getOperand());
   if (auto *partialApply = dyn_cast<PartialApplyInst>(value))
-    return findWitnessMethod(partialApply->getCallee());
+    return peerThroughFunctionConversions<Inst>(partialApply->getCallee());
   return nullptr;
 }
 
@@ -1615,8 +1596,8 @@ static WitnessMethodInst *findWitnessMethod(SILValue value) {
 static Optional<std::pair<SILValue, SILAutoDiffIndices>>
 emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     const DifferentiationTask *parentTask, SILAutoDiffIndices desiredIndices,
-    AutoDiffAssociatedFunctionKind kind,
-    SILValue original, DifferentiationInvoker invoker,
+    AutoDiffAssociatedFunctionKind kind, SILValue original,
+    DifferentiationInvoker invoker,
     std::function<void(DifferentiationTask *)> taskCallback) {
 
   // If `original` is itself an `AutoDiffFunctionExtractInst` whose kind matches
@@ -1646,24 +1627,21 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     }
   }
 
-  // TODO: Refactor this function to recursively handle function conversions,
-  // rather than using `findReferenceToVisibleFunction`, `findWitnessMethod`,
-  // and `reapplyFunctionConversion`.
-
-  if (auto *originalFRI = findReferenceToVisibleFunction(original)) {
+  // Find local function reference.
+  if (auto *originalFRI =
+          peerThroughFunctionConversions<FunctionRefInst>(original)) {
     auto loc = originalFRI->getLoc();
     auto *originalFn = originalFRI->getReferencedFunction();
     auto *task =
         context.lookUpMinimalDifferentiationTask(originalFn, desiredIndices);
     if (!task) {
       if (originalFn->isExternalDeclaration()) {
-        // For lldb repl, we should attempt to load the function as
+        // For LLDB REPL, we should attempt to load the function as
         // this may be defined in a different cell.
-        if (isInLLDBREPL(*original->getModule())) {
+        if (isInLLDBREPL(*original->getModule()))
           original->getModule()->loadFunction(originalFn);
-        }
         // If we still don't have the definition, generate an error message.
-        if (!originalFn->isDefinition()) {
+        if (originalFn->isExternalDeclaration()) {
           context.emitNondifferentiabilityError(
               original, parentTask,
               diag::autodiff_external_nondifferentiable_function);
@@ -1675,22 +1653,75 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     }
     assert(task);
     taskCallback(task);
-    SILFunction *assocFn = nullptr;
-    switch (kind) {
-    case AutoDiffAssociatedFunctionKind::JVP:
-      assocFn = task->getJVP();
-      break;
-    case AutoDiffAssociatedFunctionKind::VJP:
-      assocFn = task->getVJP();
-      break;
-    }
-    auto *ref = builder.createFunctionRef(loc, assocFn);
-    auto convertedRef =
-        reapplyFunctionConversion(ref, originalFRI, original, builder, loc);
+    auto *ref =
+        builder.createFunctionRef(loc, task->getAssociatedFunction(kind));
+    auto convertedRef = reapplyFunctionConversion(
+        ref, originalFRI, original, builder, loc);
     return std::make_pair(convertedRef, task->getIndices());
   }
 
-  if (auto *witnessMethod = findWitnessMethod(original)) {
+  // Find global `let` closure.
+  if (auto *load = peerThroughFunctionConversions<LoadInst>(original)) {
+    FunctionRefInst *initialFnRef = nullptr;
+    SILValue initVal;
+    if (auto *globalAddr = dyn_cast<GlobalAddrInst>(load->getOperand())) {
+      // Search for the original function used to initialize this `let`
+      // constant.
+      if (auto *global = globalAddr->getReferencedGlobal()) {
+        if (!global->isLet()) {
+          context.emitNondifferentiabilityError(original, parentTask,
+              diag::autodiff_cannot_differentiate_global_var_closures);
+          return None;
+        }
+        // FIXME: In LLDB REPL, "main" will not be the function we should look
+        // for.
+        if (auto *mainFn = global->getModule().lookUpFunction("main")) {
+          if (mainFn->isDefinition())
+            for (auto &inst : mainFn->front())
+              if (auto *globalAddrInMain = dyn_cast<GlobalAddrInst>(&inst))
+                if (globalAddrInMain->getReferencedGlobal() == global)
+                  for (auto *use : globalAddrInMain->getUses())
+                    if (auto *store = dyn_cast<StoreInst>(use->getUser()))
+                      if (store->getDest() == globalAddrInMain)
+                        initialFnRef = peerThroughFunctionConversions
+                            <FunctionRefInst>((initVal = store->getSrc()));
+        }
+      }
+    }
+    if (initialFnRef) {
+      assert(initVal);
+      auto *initialFn = initialFnRef->getReferencedFunction();
+      auto *task =
+          context.lookUpMinimalDifferentiationTask(initialFn, desiredIndices);
+      if (!task) {
+        if (initialFn->isExternalDeclaration()) {
+          if (isInLLDBREPL(*original->getModule()))
+            original->getModule()->loadFunction(initialFn);
+          if (initialFn->isExternalDeclaration()) {
+            context.emitNondifferentiabilityError(original, parentTask,
+                diag::autodiff_global_let_closure_not_differentiable);
+            return None;
+          }
+        }
+        task = context.registerDifferentiationTask(
+            initialFn, desiredIndices, invoker);
+      }
+      auto loc = original.getLoc();
+      auto *initialVJPRef = builder.createFunctionRef(
+          loc, task->getAssociatedFunction(kind));
+      auto converted =
+          reapplyFunctionConversion(initialVJPRef, initialFnRef, initVal,
+                                    builder, loc);
+      converted = reapplyFunctionConversion(converted, load, original,
+                                            builder, loc);
+      SILAutoDiffIndices indices(0, desiredIndices.parameters);
+      return std::make_pair(converted, indices);
+    }
+  }
+
+  // Find witness method retrieval.
+  if (auto *witnessMethod =
+          peerThroughFunctionConversions<WitnessMethodInst>(original)) {
     auto loc = witnessMethod->getLoc();
     auto requirement = witnessMethod->getMember();
     auto *requirementDecl = requirement.getDecl();
@@ -1735,6 +1766,7 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     return std::make_pair(convertedRef, requirementIndices);
   }
 
+  // Emit the general opaque function error.
   context.emitNondifferentiabilityError(original, parentTask,
       diag::autodiff_opaque_function_not_differentiable);
   return None;
