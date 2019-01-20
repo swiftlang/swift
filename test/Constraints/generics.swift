@@ -638,3 +638,11 @@ func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
 {
   _ = Dictionary(uniqueKeysWithValues: Array(c))
 }
+
+// https://bugs.swift.org/browse/SR-7984
+struct SR_7984<Bar> {
+  func doSomething() {}
+}
+
+extension SR_7984 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} 
+// expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{28-29= == }}
