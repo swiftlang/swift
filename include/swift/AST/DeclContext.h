@@ -784,7 +784,7 @@ private:
 template <typename ParamT, typename = typename std::enable_if<
                                std::is_same<ParamT, DeclContext>::value>::type>
 void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
- if (!dc) {
+  if (!dc) {
     out << "(null)";
     return;
   }

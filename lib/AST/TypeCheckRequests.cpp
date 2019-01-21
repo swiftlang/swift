@@ -457,7 +457,8 @@ SourceFile *DefaultTypeRequest::getSourceFile() const {
 }
 
 llvm::SmallVectorImpl<Type> &DefaultTypeRequest::getCache() const {
-  return getDeclContext()->getASTContext().getDefaultTypeRequestCache(getSourceFile());
+  return getDeclContext()->getASTContext().getDefaultTypeRequestCache(
+      getSourceFile());
 }
 
 Optional<Type> DefaultTypeRequest::getCachedResult() const {
