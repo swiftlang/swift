@@ -941,7 +941,7 @@ public:
   bool isAccessControlDisabled() const {
     return !LangOpts.EnableAccessControl;
   }
-  
+
   llvm::SmallVectorImpl<Type> &getDefaultTypeRequestCache();
 
 private:
