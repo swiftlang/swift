@@ -588,7 +588,7 @@ public:
 
   void dumpContext() const;
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
-                        bool includeAncestors = true) const;
+                        bool onlyAPartialLine = false) const;
 
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
@@ -783,15 +783,12 @@ private:
 /// avoid ambiguities with Decl* arguments.
 template <typename ParamT, typename = typename std::enable_if<
                                std::is_same<ParamT, DeclContext>::value>::type>
-void simple_display(llvm::raw_ostream &out, const ParamT *x) {
-  if (!std::is_same<ParamT, DeclContext>::value)
-    llvm_unreachable("Template should only be defined for DeclConsts.");
-  const DeclContext *dc = (const DeclContext *)x;
-  if (!dc) {
+void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
+ if (!dc) {
     out << "(null)";
     return;
   }
-  dc->printContext(out, 0, false);
+  dc->printContext(out, 0, true);
 }
 
 } // end namespace swift

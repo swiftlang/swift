@@ -521,9 +521,9 @@ static unsigned getLineNumber(DCType *DC) {
 }
 
 unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
-                                   const bool includeAncestors) const {
+                                   const bool onlyAPartialLine) const {
   unsigned Depth = 0;
-  if (includeAncestors)
+  if (!onlyAPartialLine)
     if (auto *P = getParent())
       Depth = P->printContext(OS, indent);
 
@@ -645,7 +645,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
   }
   }
 
-  OS << "\n";
+  if (!onlyAPartialLine)
+    OS << "\n";
   return Depth + 1;
 }
 
