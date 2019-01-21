@@ -942,7 +942,7 @@ public:
     return !LangOpts.EnableAccessControl;
   }
 
-  /// Logically, there is a separate cache for each SourceFile.
+  /// Each kind and SourceFile has its own cache for a Type.
   Type &getDefaultTypeRequestCache(SourceFile *, KnownProtocolKind);
 
 private:

@@ -784,11 +784,10 @@ private:
 template <typename ParamT, typename = typename std::enable_if<
                                std::is_same<ParamT, DeclContext>::value>::type>
 void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
-  if (!dc) {
+  if (dc)
+    dc->printContext(out, 0, true);
+  else
     out << "(null)";
-    return;
-  }
-  dc->printContext(out, 0, true);
 }
 
 } // end namespace swift
