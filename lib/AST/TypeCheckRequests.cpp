@@ -472,11 +472,14 @@ Optional<Type> DefaultTypeRequest::getCachedResult() const {
 }
 
 bool DefaultTypeRequest::isDependencyMissing(Type result) const {
-  if (const auto *NTD = result->getNominalOrBoundGenericNominal())
-    if (auto *SF = getSourceFile())
-      if (auto *tracker = SF->getReferencedNameTracker())
-        return tracker->getTopLevelNames().find(NTD->getBaseName()) ==
-               tracker->getTopLevelNames().end();
+  if (auto *SF = getSourceFile())
+    if (auto *tracker = SF->getReferencedNameTracker()) {
+      Identifier name = getDeclContext()->getASTContext().getIdentifier(
+          getTypeName(getKnownProtocolKind()));
+      DeclBaseName bn = DeclBaseName(name);
+      return tracker->getTopLevelNames().find(bn) ==
+             tracker->getTopLevelNames().end();
+    }
   return false;
 }
 
