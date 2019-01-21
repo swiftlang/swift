@@ -58,16 +58,10 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
       continue;
     if (!vd->hasInterfaceType())
       C.getLazyResolver()->resolveDeclSignature(vd);
-    // If a stored property's type does not conform to `Differentiable`, make
-    // the property implicitly `@noDerivative` and emit a warning later when we
-    // are deriving all associated types.
     if (!vd->hasInterfaceType() ||
-        !TypeChecker::conformsToProtocol(vd->getType(),
-                                         diffableProto, nominal,
-                                         ConformanceCheckFlags::Used)) {
-      vd->getAttrs().add(new (C) NoDerivativeAttr(/*implicit*/ true));
+        !TypeChecker::conformsToProtocol(vd->getType(), diffableProto, nominal,
+                                         ConformanceCheckFlags::Used))
       continue;
-    }
     result.push_back(vd);
   }
 }
@@ -240,6 +234,11 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     return;
   }
 
+  // Hash properties for differentiation into a set for fast lookup.
+  SmallVector<VarDecl *, 8> diffProps;
+  getStoredPropertiesForDifferentiation(nominal, diffProps);
+  SmallPtrSet<VarDecl *, 8> diffPropsSet(diffProps.begin(), diffProps.end());
+
   // Create call expression applying a member method to a parameter member.
   // Format: `<member>.method(<parameter>.<member>)`.
   // Example: `x.moved(along: direction.x)`.
@@ -253,12 +252,10 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
       }
     }
     assert(selfMember && "Could not find corresponding self member");
-    // If member has `@noDerivative`, create direct reference to member.
-    if (retNominalMember->getAttrs().hasAttribute<NoDerivativeAttr>()) {
-      return new (C)
-          MemberRefExpr(selfDRE, SourceLoc(), selfMember, DeclNameLoc(),
-                        /*Implicit*/ true);
-    }
+    // If member is not for differentiation, create direct reference to member.
+    if (!diffPropsSet.count(selfMember))
+      return new (C) MemberRefExpr(selfDRE, SourceLoc(), selfMember,
+                                   DeclNameLoc(), /*Implicit*/ true);
     // Otherwise, construct member method call.
     auto module = nominal->getModuleContext();
     auto confRef = module->lookupConformance(selfMember->getType(), diffProto);
@@ -309,7 +306,7 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   // Create array of member method call expressions.
   llvm::SmallVector<Expr *, 2> memberMethodCallExprs;
   llvm::SmallVector<Identifier, 2> memberNames;
-  for (auto member : retNominal->getStoredProperties()) {
+  for (auto *member : retNominal->getStoredProperties()) {
     // Initialized `let` properties don't get an argument in memberwise
     // initializers.
     if (member->isLet() && member->getParentInitializer())
@@ -784,12 +781,19 @@ static void addAssociatedTypeAliasDecl(Identifier name,
 // a fixit so that the user will make it explicit.
 static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
                                                  NominalTypeDecl *nominal) {
-  for (auto *vd : nominal->getStoredProperties())
-    if (auto *attr = vd->getAttrs().getAttribute<NoDerivativeAttr>())
-      if (attr->isImplicit())
-        TC.diagnose(vd, diag::differentiable_implicit_noderivative_fixit)
-            .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
-                         "@noDerivative ");
+  auto *diffableProto =
+      TC.Context.getProtocol(KnownProtocolKind::Differentiable);
+  for (auto *vd : nominal->getStoredProperties()) {
+    if (vd->getAttrs().hasAttribute<NoDerivativeAttr>() ||
+        TC.conformsToProtocol(vd->getType(), diffableProto, nominal,
+                              ConformanceCheckFlags::Used))
+      continue;
+    nominal->getAttrs().add(
+        new (TC.Context) NoDerivativeAttr(/*Implicit*/ true));
+    TC.diagnose(vd, diag::differentiable_implicit_noderivative_fixit)
+        .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
+                     "@noDerivative ");
+  }
 }
 
 // Get or synthesize all associated struct types: 'TangentVector',
