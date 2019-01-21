@@ -228,7 +228,7 @@
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
-                "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2018-08-25-a",
+                "swift-syntax": "1aeb642da66a23a66c9ac80d74813e1a4b963999",
                 "compiler-rt": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
