@@ -4,6 +4,7 @@ import argparse
 import os
 import re
 
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('name', help='The name of the new benchmark to be created')
@@ -17,6 +18,7 @@ def main():
     add_import_benchmark(args.name)
     # registers the benchmark with the driver in `main.swift`
     add_register_benchmark(args.name)
+
 
 def update_cmakelists(name):
     """Adds a new entry to the `CMakeLists.txt` file with the given
@@ -38,11 +40,12 @@ def update_cmakelists(name):
         for line in file_new_contents:
             f.write(line)
 
+
 def create_benchmark_file(name):
     """Creates a new Swift file with the given name based on the template
     and places it in the `single-source` directory.
     """
-    
+
     template_path = create_relative_path('Template.swift')
     benchmark_template = ''
     with open(template_path, 'r') as f:
@@ -55,6 +58,7 @@ def create_benchmark_file(name):
     source_file_path = os.path.join(relative_path, name + '.swift')
     with open(source_file_path, 'w') as f:
         f.write(formatted_template)
+
 
 def add_import_benchmark(name):
     """Adds an `import` statement to the `main.swift` file for the new 
@@ -80,8 +84,8 @@ def add_import_benchmark(name):
             benchmark_name = match.group(1)
             # find where to insert the new benchmark in the right alphabetical 
             # order.
-            if ((name < benchmark_name and previous_benchmark_name is None) or
-                (name < benchmark_name and name > previous_benchmark_name)):
+            if (name < benchmark_name and previous_benchmark_name is None or
+                    name < benchmark_name and name > previous_benchmark_name):
                 if read_test_dependencies:
                     file_new_contents.append('import ' + name + '\n' + line)
                 else:
@@ -97,6 +101,7 @@ def add_import_benchmark(name):
     with open(relative_path, 'w') as f:
         for line in file_new_contents:
             f.write(line)
+
 
 def add_register_benchmark(name):
     """Adds an `import` statement to the `main.swift` file for the new
@@ -118,9 +123,10 @@ def add_register_benchmark(name):
         for line in file_new_contents:
             f.write(line)
 
+
 def insert_line_alphabetically(name, new_line, lines, regex):
-    """Iterates through the given lines and executes the regex on each line
-    to find where the new benchmark should be inserted with the given `new_line`.
+    """Iterates through the given lines and executes the regex on each line to
+    find where the new benchmark should be inserted with the given `new_line`.
     """
     # the name of the previous seen benchmark in order to insert the new
     # one at the correct position 
@@ -134,8 +140,8 @@ def insert_line_alphabetically(name, new_line, lines, regex):
             benchmark_name = match.group(1)
             # check if we're at the line where we have to insert the new
             # benchmark in the correct alphabetical order
-            if ((name < benchmark_name and previous_benchmark_name is None) or 
-                (name < benchmark_name and name > previous_benchmark_name)):
+            if (name < benchmark_name and previous_benchmark_name is None or 
+                    name < benchmark_name and name > previous_benchmark_name):
                 updated_lines.append(new_line + line)
             else:
                 updated_lines.append(line)    
@@ -144,8 +150,10 @@ def insert_line_alphabetically(name, new_line, lines, regex):
             updated_lines.append(line)
     return updated_lines
 
+
 def create_relative_path(file_path):
     return os.path.join(os.path.dirname(__file__), file_path)
+
 
 if __name__ == "__main__":
     main()
