@@ -460,8 +460,6 @@ llvm::SmallVectorImpl<Type> &DefaultTypeRequest::getCache() const {
   return getDeclContext()->getASTContext().getDefaultTypeRequestCache();
 }
 
-
-
 Optional<Type> DefaultTypeRequest::getCachedResult() const {
   auto const &cache = getCache();
   Type result = cache[size_t(getKnownProtocolKind())];
