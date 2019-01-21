@@ -460,10 +460,24 @@ llvm::SmallVectorImpl<Type> &DefaultTypeRequest::getCache() const {
   return getDeclContext()->getASTContext().getDefaultTypeRequestCache();
 }
 
+
+
 Optional<Type> DefaultTypeRequest::getCachedResult() const {
   auto const &cache = getCache();
-  Type t = cache[size_t(getKnownProtocolKind())];
-  return t ? Optional<Type>(t) : None;
+  Type result = cache[size_t(getKnownProtocolKind())];
+  if (!result)
+    return None;
+  recordDependencyOnCachedResult(result);
+  return result;
+}
+
+void DefaultTypeRequest::recordDependencyOnCachedResult(Type result) const {
+  // An uncached result was looked up & the dependency was recorded there.
+  // Here, record the dependency in case the cache spaces source files.
+  if (const auto *NTD = result->getNominalOrBoundGenericNominal())
+    if (auto *SF = getSourceFile())
+      if (auto *tracker = SF->getReferencedNameTracker())
+        tracker->addTopLevelName(NTD->getBaseName(), true);
 }
 
 void DefaultTypeRequest::cacheResult(Type value) const {

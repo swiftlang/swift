@@ -362,6 +362,7 @@ private:
   TypeChecker &getTypeChecker() const;
   SourceFile *getSourceFile() const;
   llvm::SmallVectorImpl<Type> &getCache() const;
+  void recordDependencyOnCachedResult(Type result) const;
 };
 
 /// The zone number for the type checker.
