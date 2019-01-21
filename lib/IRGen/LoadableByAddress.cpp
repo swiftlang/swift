@@ -2639,6 +2639,25 @@ void LoadableByAddress::recreateConvInstrs() {
           instr->getLoc(), instr->getValue(), instr->getBase());
       break;
     }
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILInstructionKind::AutoDiffFunctionInst: {
+      auto instr = cast<AutoDiffFunctionInst>(convInstr);
+      SmallVector<SILValue, 2> associatedFunctions;
+      for (auto &assocFn : instr->getAssociatedFunctions())
+        associatedFunctions.push_back(assocFn.get());
+      newInstr = convBuilder.createAutoDiffFunction(
+          instr->getLoc(), instr->getParameterIndices(),
+          instr->getDifferentiationOrder(), instr->getOriginalFunction(),
+          associatedFunctions);
+      break;
+    }
+    case SILInstructionKind::AutoDiffFunctionExtractInst: {
+      auto instr = cast<AutoDiffFunctionExtractInst>(convInstr);
+      newInstr = convBuilder.createAutoDiffFunctionExtract(
+          instr->getLoc(), instr->getExtractee(),
+          instr->getDifferentiationOrder(), instr->getFunctionOperand());
+      break;
+    }
      default:
       llvm_unreachable("Unexpected conversion instruction");
     }
@@ -2725,7 +2744,10 @@ void LoadableByAddress::run() {
               case SILInstructionKind::ConvertEscapeToNoEscapeInst:
               case SILInstructionKind::MarkDependenceInst:
               case SILInstructionKind::ThinFunctionToPointerInst:
-              case SILInstructionKind::ThinToThickFunctionInst: {
+              // SWIFT_ENABLE_TENSORFLOW
+              case SILInstructionKind::ThinToThickFunctionInst:
+              case SILInstructionKind::AutoDiffFunctionInst:
+              case SILInstructionKind::AutoDiffFunctionExtractInst: {
                 conversionInstrs.insert(
                               cast<SingleValueInstruction>(currInstr));
                 break;
@@ -2792,6 +2814,10 @@ void LoadableByAddress::run() {
           if (modApplies.count(PAI) == 0) {
             modApplies.insert(PAI);
           }
+        } else if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(&I)) {
+          conversionInstrs.insert(ADFI);
+        } else if (auto *ADFEI = dyn_cast<AutoDiffFunctionExtractInst>(&I)) {
+          conversionInstrs.insert(ADFEI);
         }
       }
     }
