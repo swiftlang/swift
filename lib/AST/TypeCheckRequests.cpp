@@ -466,17 +466,17 @@ Optional<Type> DefaultTypeRequest::getCachedResult() const {
   Type result = cache[size_t(getKnownProtocolKind())];
   if (!result)
     return None;
-  recordDependencyOnCachedResult(result);
+  assert(!isDependencyMissing(result) &&
+         "Since the cache is now cached by SourceFile, the dependency should have been recorded when it was looked up.");
   return result;
 }
 
-void DefaultTypeRequest::recordDependencyOnCachedResult(Type result) const {
-  // An uncached result was looked up & the dependency was recorded there.
-  // Here, record the dependency in case the cache spaces source files.
+bool DefaultTypeRequest::isDependencyMissing(Type result) const {
   if (const auto *NTD = result->getNominalOrBoundGenericNominal())
     if (auto *SF = getSourceFile())
       if (auto *tracker = SF->getReferencedNameTracker())
-        tracker->addTopLevelName(NTD->getBaseName(), true);
+        return tracker->getTopLevelNames().find(NTD->getBaseName()) == tracker->getTopLevelNames().end();
+  return false;
 }
 
 void DefaultTypeRequest::cacheResult(Type value) const {
