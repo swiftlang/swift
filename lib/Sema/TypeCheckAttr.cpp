@@ -2769,7 +2769,7 @@ void AttributeChecker::visitFieldwiseDifferentiableAttr(
 
 void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
   auto *vd = dyn_cast<VarDecl>(D);
-  if (!vd) {
+  if (!vd || vd->isStatic()) {
     diagnoseAndRemoveAttr(attr,
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);
     return;
