@@ -587,7 +587,8 @@ public:
   bool walkContext(ASTWalker &Walker);
 
   void dumpContext() const;
-  unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0) const;
+  unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
+                        bool includeAncestors = true) const;
 
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
@@ -790,7 +791,7 @@ void simple_display(llvm::raw_ostream &out, const ParamT *x) {
     out << "(null)";
     return;
   }
-  dc->printContext(out);
+  dc->printContext(out, 0, false);
 }
 
 } // end namespace swift
