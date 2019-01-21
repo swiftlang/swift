@@ -290,11 +290,10 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
                  ProtocolConformanceRef>
     DefaultAssociatedConformanceWitnesses;
 
-  /// Cache of default types for DefaultTypeRequest.
+  /// Caches of default types for DefaultTypeRequest.
   /// Used to be instance variables in the TypeChecker.
-  /// Soon to become more specific.
-  llvm::SmallVector<Type, NumKnownProtocols> DefaultTypeRequestCache{
-      NumKnownProtocols, Type()};
+  /// There is a logically separate cache for each SourceFile.
+  llvm::DenseMap<SourceFile*, llvm::SmallVector<Type, NumKnownProtocols>> DefaultTypeRequestCaches;
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -5080,6 +5079,6 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
   return LayoutConstraint(New);
 }
 
-llvm::SmallVectorImpl<Type> &ASTContext::getDefaultTypeRequestCache() {
-  return getImpl().DefaultTypeRequestCache;
+llvm::SmallVectorImpl<Type> &ASTContext::getDefaultTypeRequestCache(SourceFile* SF) {
+  return getImpl().DefaultTypeRequestCaches[SF];
 }

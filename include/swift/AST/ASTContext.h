@@ -942,7 +942,8 @@ public:
     return !LangOpts.EnableAccessControl;
   }
 
-  llvm::SmallVectorImpl<Type> &getDefaultTypeRequestCache();
+  /// Logically, there is a separate cache for each SourceFile.
+  llvm::SmallVectorImpl<Type> &getDefaultTypeRequestCache(SourceFile*);
 
 private:
   friend Decl;
