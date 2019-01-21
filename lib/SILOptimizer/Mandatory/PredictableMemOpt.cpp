@@ -244,6 +244,18 @@ public:
     return {NewValue, SubElementNumber, InsertionPoints};
   }
 
+  AvailableValue emitBeginBorrow(SILBuilder &b, SILLocation loc) const {
+    // If we do not have ownership or already are guaranteed, just return a copy
+    // of our state.
+    if (!b.hasOwnership() || Value.getOwnershipKind().isCompatibleWith(
+                                 ValueOwnershipKind::Guaranteed)) {
+      return {Value, SubElementNumber, InsertionPoints};
+    }
+
+    // Otherwise, return newValue.
+    return {b.createBeginBorrow(loc, Value), SubElementNumber, InsertionPoints};
+  }
+
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(llvm::raw_ostream &os) const;
 
@@ -301,10 +313,17 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
       SILType EltTy = ValTy.getTupleElementType(EltNo);
       unsigned NumSubElt = getNumSubElements(EltTy, B.getModule());
       if (SubElementNumber < NumSubElt) {
-        auto NewVal = Val.emitTupleExtract(B, Loc, EltNo, SubElementNumber);
-        return nonDestructivelyExtractSubElement(NewVal, B, Loc);
+        auto BorrowedVal = Val.emitBeginBorrow(B, Loc);
+        auto NewVal =
+            BorrowedVal.emitTupleExtract(B, Loc, EltNo, SubElementNumber);
+        SILValue result = nonDestructivelyExtractSubElement(NewVal, B, Loc);
+        // If our original value wasn't guaranteed and we did actually perform a
+        // borrow as a result, insert the end_borrow.
+        if (BorrowedVal.getValue() != Val.getValue())
+          B.createEndBorrow(Loc, BorrowedVal.getValue());
+        return result;
       }
-      
+
       SubElementNumber -= NumSubElt;
     }
     
@@ -318,8 +337,15 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
       unsigned NumSubElt = getNumSubElements(fieldType, B.getModule());
       
       if (SubElementNumber < NumSubElt) {
-        auto NewVal = Val.emitStructExtract(B, Loc, D, SubElementNumber);
-        return nonDestructivelyExtractSubElement(NewVal, B, Loc);
+        auto BorrowedVal = Val.emitBeginBorrow(B, Loc);
+        auto NewVal =
+            BorrowedVal.emitStructExtract(B, Loc, D, SubElementNumber);
+        SILValue result = nonDestructivelyExtractSubElement(NewVal, B, Loc);
+        // If our original value wasn't guaranteed and we did actually perform a
+        // borrow as a result, insert the end_borrow.
+        if (BorrowedVal.getValue() != Val.getValue())
+          B.createEndBorrow(Loc, BorrowedVal.getValue());
+        return result;
       }
       
       SubElementNumber -= NumSubElt;
@@ -327,10 +353,16 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
     }
     llvm_unreachable("Didn't find field");
   }
-  
-  // Otherwise, we're down to a scalar.
+
+  // Otherwise, we're down to a scalar. If we have ownership enabled,
+  // we return a copy. Otherwise, there we can ignore ownership
+  // issues. This is ok since in [ossa] we are going to eliminate a
+  // load [copy] or a load [trivial], while in non-[ossa] SIL we will
+  // be replacing unqualified loads.
   assert(SubElementNumber == 0 && "Miscalculation indexing subelements");
-  return Val.getValue();
+  if (!B.hasOwnership())
+    return Val.getValue();
+  return B.emitCopyValueOperation(Loc, Val.getValue());
 }
 
 //===----------------------------------------------------------------------===//
@@ -429,29 +461,61 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
 // aggregate. This is a super-common case for single-element structs, but is
 // also a general answer for arbitrary structs and tuples as well.
 SILValue
-AvailableValueAggregator::aggregateFullyAvailableValue(SILType LoadTy,
-                                                       unsigned FirstElt) {
-  if (FirstElt >= AvailableValueList.size()) { // #Elements may be zero.
+AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
+                                                       unsigned firstElt) {
+  if (firstElt >= AvailableValueList.size()) { // #Elements may be zero.
     return SILValue();
   }
 
-  auto &FirstVal = AvailableValueList[FirstElt];
+  auto &firstVal = AvailableValueList[firstElt];
 
   // Make sure that the first element is available and is the correct type.
-  if (!FirstVal || FirstVal.getType() != LoadTy)
+  if (!firstVal || firstVal.getType() != loadTy)
     return SILValue();
 
   // If the first element of this value is available, check that any extra
   // available values are from the same place as our first value.
-  if (llvm::any_of(range(getNumSubElements(LoadTy, M)),
-                   [&](unsigned Index) -> bool {
-                     auto &Val = AvailableValueList[FirstElt + Index];
-                     return Val.getValue() != FirstVal.getValue() ||
-                            Val.getSubElementNumber() != Index;
+  if (llvm::any_of(range(getNumSubElements(loadTy, M)),
+                   [&](unsigned index) -> bool {
+                     auto &val = AvailableValueList[firstElt + index];
+                     return val.getValue() != firstVal.getValue() ||
+                            val.getSubElementNumber() != index;
                    }))
     return SILValue();
 
-  return FirstVal.getValue();
+  // Ok, we know that all of our available values are all parts of the same
+  // value. Without ownership, we can just return the underlying first value.
+  if (!B.hasOwnership())
+    return firstVal.getValue();
+
+  // Otherwise, we need to put in a copy. This is b/c we only propagate along +1
+  // values and we are eliminating a load [copy].
+  ArrayRef<StoreInst *> insertPts = firstVal.getInsertionPoints();
+  if (insertPts.size() == 1) {
+    // Use the scope and location of the store at the insertion point.
+    SILBuilderWithScope builder(insertPts[0]);
+    SILLocation loc = insertPts[0]->getLoc();
+    return builder.emitCopyValueOperation(loc, firstVal.getValue());
+  }
+
+  // If we have multiple insertion points, put copies at each point and use the
+  // SSA updater to get a value. The reason why this is safe is that we can only
+  // have multiple insertion points if we are storing exactly the same value
+  // implying that we can just copy firstVal at each insertion point.
+  SILSSAUpdater updater(B.getModule());
+  updater.Initialize(loadTy);
+  for (auto *insertPt : firstVal.getInsertionPoints()) {
+    // Use the scope and location of the store at the insertion point.
+    SILBuilderWithScope builder(insertPt);
+    SILLocation loc = insertPt->getLoc();
+    SILValue eltVal = builder.emitCopyValueOperation(loc, firstVal.getValue());
+    updater.AddAvailableValue(insertPt->getParent(), eltVal);
+  }
+
+  // Finally, grab the value from the SSA updater.
+  SILValue result = updater.GetValueInMiddleOfBlock(B.getInsertionBB());
+  assert(result.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
+  return result;
 }
 
 SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
@@ -511,8 +575,13 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
 
   // If the value is not available, load the value and update our use list.
   if (!Val) {
-    auto *Load =
-        B.createLoad(Loc, Address, LoadOwnershipQualifier::Unqualified);
+    LoadInst *Load = ([&]() {
+      if (B.hasOwnership()) {
+        return B.createTrivialLoadOr(Loc, Address,
+                                     LoadOwnershipQualifier::Copy);
+      }
+      return B.createLoad(Loc, Address, LoadOwnershipQualifier::Unqualified);
+    }());
     Uses.emplace_back(Load, PMOUseKind::Load);
     return Load;
   }
@@ -527,6 +596,9 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
     SILBuilderWithScope Builder(InsertPts[0]);
     SILLocation Loc = InsertPts[0]->getLoc();
     SILValue EltVal = nonDestructivelyExtractSubElement(Val, Builder, Loc);
+    assert(
+        !Builder.hasOwnership() ||
+        EltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
     assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
     return EltVal;
   }
@@ -540,11 +612,16 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
     SILBuilderWithScope Builder(I);
     SILLocation Loc = I->getLoc();
     SILValue EltVal = nonDestructivelyExtractSubElement(Val, Builder, Loc);
+    assert(
+        !Builder.hasOwnership() ||
+        EltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
     Updater.AddAvailableValue(I->getParent(), EltVal);
   }
 
   // Finally, grab the value from the SSA updater.
   SILValue EltVal = Updater.GetValueInMiddleOfBlock(B.getInsertionBB());
+  assert(!B.hasOwnership() ||
+         EltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
   assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
   return EltVal;
 }
@@ -568,7 +645,7 @@ class AvailableValueDataflowContext {
   /// The set of uses that we are tracking. This is only here so we can update
   /// when exploding copy_addr. It would be great if we did not have to store
   /// this.
-  llvm::SmallVectorImpl<PMOMemoryUse> &Uses;
+  SmallVectorImpl<PMOMemoryUse> &Uses;
 
   /// The set of blocks with local definitions.
   ///
@@ -587,7 +664,7 @@ class AvailableValueDataflowContext {
 public:
   AvailableValueDataflowContext(AllocationInst *TheMemory,
                                 unsigned NumMemorySubElements,
-                                llvm::SmallVectorImpl<PMOMemoryUse> &Uses);
+                                SmallVectorImpl<PMOMemoryUse> &Uses);
 
   /// Try to compute available values for "TheMemory" at the instruction \p
   /// StartingFrom. We only compute the values for set bits in \p
@@ -666,32 +743,33 @@ void AvailableValueDataflowContext::updateAvailableValues(
     assert(StartSubElt != ~0U && "Store within enum projection not handled");
     SILType ValTy = SI->getSrc()->getType();
 
-    for (unsigned i = 0, e = getNumSubElements(ValTy, getModule()); i != e;
-         ++i) {
+    for (unsigned i : range(getNumSubElements(ValTy, getModule()))) {
       // If this element is not required, don't fill it in.
       if (!RequiredElts[StartSubElt+i]) continue;
-      
+
+      // This element is now provided.
+      RequiredElts[StartSubElt + i] = false;
+
       // If there is no result computed for this subelement, record it.  If
       // there already is a result, check it for conflict.  If there is no
       // conflict, then we're ok.
       auto &Entry = Result[StartSubElt+i];
       if (!Entry) {
         Entry = {SI->getSrc(), i, SI};
-      } else {
-        // TODO: This is /really/, /really/, conservative. This basically means
-        // that if we do not have an identical store, we will not promote.
-        if (Entry.getValue() != SI->getSrc() ||
-            Entry.getSubElementNumber() != i) {
-          ConflictingValues[StartSubElt + i] = true;
-        } else {
-          Entry.addInsertionPoint(SI);
-        }
+        continue;
       }
 
-      // This element is now provided.
-      RequiredElts[StartSubElt+i] = false;
+      // TODO: This is /really/, /really/, conservative. This basically means
+      // that if we do not have an identical store, we will not promote.
+      if (Entry.getValue() != SI->getSrc() ||
+          Entry.getSubElementNumber() != i) {
+        ConflictingValues[StartSubElt + i] = true;
+        continue;
+      }
+
+      Entry.addInsertionPoint(SI);
     }
-    
+
     return;
   }
   
@@ -704,8 +782,7 @@ void AvailableValueDataflowContext::updateAvailableValues(
     SILType ValTy = CAI->getDest()->getType();
 
     bool AnyRequired = false;
-    for (unsigned i = 0, e = getNumSubElements(ValTy, getModule()); i != e;
-         ++i) {
+    for (unsigned i : range(getNumSubElements(ValTy, getModule()))) {
       // If this element is not required, don't fill it in.
       AnyRequired = RequiredElts[StartSubElt+i];
       if (AnyRequired) break;
@@ -1044,9 +1121,11 @@ private:
 /// instruction is loading from. If we can not optimize \p Inst, then just
 /// return an empty SILValue.
 static SILValue tryFindSrcAddrForLoad(SILInstruction *Inst) {
-  // We only handle load [copy], load [trivial] and copy_addr right now.
+  // We only handle load [copy], load [trivial], load and copy_addr right
+  // now. Notably we do not support load [take] when promoting loads.
   if (auto *LI = dyn_cast<LoadInst>(Inst))
-    return LI->getOperand();
+    if (LI->getOwnershipQualifier() != LoadOwnershipQualifier::Take)
+      return LI->getOperand();
 
   // If this is a CopyAddr, verify that the element type is loadable.  If not,
   // we can't explode to a load.
@@ -1161,19 +1240,19 @@ bool AllocOptimize::canPromoteDestroyAddr(
   unsigned FirstElt = computeSubelement(Address, TheMemory);
   assert(FirstElt != ~0U && "destroy within enum projection is not valid");
   unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
-  
-  // Set up the bitvector of elements being demanded by the load.
-  SmallBitVector RequiredElts(NumMemorySubElements);
-  RequiredElts.set(FirstElt, FirstElt+NumLoadSubElements);
 
   // Find out if we have any available values.  If no bits are demanded, we
   // trivially succeed. This can happen when there is a load of an empty struct.
   if (NumLoadSubElements == 0)
     return true;
 
+  // Set up the bitvector of elements being demanded by the load.
+  SmallBitVector RequiredElts(NumMemorySubElements);
+  RequiredElts.set(FirstElt, FirstElt + NumLoadSubElements);
+
   // Compute our available values. If we do not have any available values,
   // return false. We have nothing further to do.
-  llvm::SmallVector<AvailableValue, 8> TmpList;
+  SmallVector<AvailableValue, 8> TmpList;
   TmpList.resize(NumMemorySubElements);
   if (!DataflowContext.computeAvailableValues(DAI, FirstElt, NumLoadSubElements,
                                               RequiredElts, TmpList))
@@ -1208,7 +1287,7 @@ void AllocOptimize::promoteDestroyAddr(
   SILValue NewVal = Agg.aggregateValues(LoadTy, Address, FirstElt);
 
   ++NumDestroyAddrPromoted;
-  
+
   LLVM_DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *DAI << "\n");
   LLVM_DEBUG(llvm::dbgs() << "      To value: " << *NewVal << "\n");
 
