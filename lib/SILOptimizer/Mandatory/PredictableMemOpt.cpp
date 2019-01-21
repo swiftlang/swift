@@ -162,13 +162,12 @@ class AvailableValueAggregator;
 struct AvailableValue {
   friend class AvailableValueAggregator;
 
-  /// If this gets too expensive in terms of copying, we can use an arena and a
-  /// FrozenPtrSet like we do in ARC.
-  using SetVector = llvm::SmallSetVector<SILInstruction *, 1>;
-
   SILValue Value;
   unsigned SubElementNumber;
-  SetVector InsertionPoints;
+
+  /// If this gets too expensive in terms of copying, we can use an arena and a
+  /// FrozenPtrSet like we do in ARC.
+  SmallSetVector<StoreInst *, 1> InsertionPoints;
 
   /// Just for updating.
   SmallVectorImpl<PMOMemoryUse> *Uses;
@@ -181,7 +180,7 @@ public:
   /// *NOTE* We assume that all available values start with a singular insertion
   /// point and insertion points are added by merging.
   AvailableValue(SILValue Value, unsigned SubElementNumber,
-                 SILInstruction *InsertPoint)
+                 StoreInst *InsertPoint)
       : Value(Value), SubElementNumber(SubElementNumber), InsertionPoints() {
     InsertionPoints.insert(InsertPoint);
   }
@@ -221,7 +220,7 @@ public:
   SILValue getValue() const { return Value; }
   SILType getType() const { return Value->getType(); }
   unsigned getSubElementNumber() const { return SubElementNumber; }
-  ArrayRef<SILInstruction *> getInsertionPoints() const {
+  ArrayRef<StoreInst *> getInsertionPoints() const {
     return InsertionPoints.getArrayRef();
   }
 
@@ -230,16 +229,14 @@ public:
     InsertionPoints.set_union(Other.InsertionPoints);
   }
 
-  void addInsertionPoint(SILInstruction *I) & { InsertionPoints.insert(I); }
+  void addInsertionPoint(StoreInst *I) & { InsertionPoints.insert(I); }
 
-  /// TODO: This needs a better name.
   AvailableValue emitStructExtract(SILBuilder &B, SILLocation Loc, VarDecl *D,
                                    unsigned SubElementNumber) const {
     SILValue NewValue = B.emitStructExtract(Loc, Value, D);
     return {NewValue, SubElementNumber, InsertionPoints};
   }
 
-  /// TODO: This needs a better name.
   AvailableValue emitTupleExtract(SILBuilder &B, SILLocation Loc,
                                   unsigned EltNo,
                                   unsigned SubElementNumber) const {
@@ -253,7 +250,7 @@ public:
 private:
   /// Private constructor.
   AvailableValue(SILValue Value, unsigned SubElementNumber,
-                 const SetVector &InsertPoints)
+                 const decltype(InsertionPoints) &InsertPoints)
       : Value(Value), SubElementNumber(SubElementNumber),
         InsertionPoints(InsertPoints) {}
 };
@@ -524,7 +521,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   //
   // This saves us from having to spend compile time in the SSA updater in this
   // case.
-  ArrayRef<SILInstruction *> InsertPts = Val.getInsertionPoints();
+  ArrayRef<StoreInst *> InsertPts = Val.getInsertionPoints();
   if (InsertPts.size() == 1) {
     // Use the scope and location of the store at the insertion point.
     SILBuilderWithScope Builder(InsertPts[0]);
@@ -679,7 +676,7 @@ void AvailableValueDataflowContext::updateAvailableValues(
       // conflict, then we're ok.
       auto &Entry = Result[StartSubElt+i];
       if (!Entry) {
-        Entry = {SI->getSrc(), i, Inst};
+        Entry = {SI->getSrc(), i, SI};
       } else {
         // TODO: This is /really/, /really/, conservative. This basically means
         // that if we do not have an identical store, we will not promote.
@@ -687,7 +684,7 @@ void AvailableValueDataflowContext::updateAvailableValues(
             Entry.getSubElementNumber() != i) {
           ConflictingValues[StartSubElt + i] = true;
         } else {
-          Entry.addInsertionPoint(Inst);
+          Entry.addInsertionPoint(SI);
         }
       }
 
