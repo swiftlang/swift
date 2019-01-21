@@ -456,24 +456,19 @@ SourceFile *DefaultTypeRequest::getSourceFile() const {
   return getDeclContext()->getParentSourceFile();
 }
 
-std::array<Type, NumKnownProtocols> *DefaultTypeRequest::getCache() const {
-  SourceFile *SF = getSourceFile();
-  return !SF ? nullptr : &SF->defaultTypeRequestCache;
+llvm::SmallVectorImpl<Type> &DefaultTypeRequest::getCache() const {
+  return getDeclContext()->getASTContext().getDefaultTypeRequestCache();
 }
 
 Optional<Type> DefaultTypeRequest::getCachedResult() const {
-  auto const *cache = getCache();
-  if (!cache)
-    return None;
-  Type t = (*cache)[size_t(getKnownProtocolKind())];
+  auto const &cache = getCache();
+  Type t = cache[size_t(getKnownProtocolKind())];
   return t ? Optional<Type>(t) : None;
 }
 
 void DefaultTypeRequest::cacheResult(Type value) const {
-  auto *cache = getCache();
-  if (!cache)
-    return;
-  (*cache)[size_t(getKnownProtocolKind())] = value;
+  auto &cache = getCache();
+  cache[size_t(getKnownProtocolKind())] = value;
 }
 
 const char *

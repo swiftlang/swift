@@ -1234,8 +1234,6 @@ private:
 
   std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 
-public:
-  std::array<Type, NumKnownProtocols> defaultTypeRequestCache;
 };
 
 

@@ -289,6 +289,12 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::DenseMap<std::tuple<const ProtocolDecl *, CanType, ProtocolDecl *>,
                  ProtocolConformanceRef>
     DefaultAssociatedConformanceWitnesses;
+  
+  /// Cache of default types for DefaultTypeRequest.
+  /// Used to be instance variables in the TypeChecker.
+  /// Soon to become more specific.
+  
+  llvm::SmallVector<Type, NumKnownProtocols> DefaultTypeRequestCache;
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -5075,3 +5081,6 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
 }
 
 
+llvm::SmallVectorImpl<Type> &ASTContext::getDefaultTypeRequestCache() {
+  return getImpl().DefaultTypeRequestCache;
+}

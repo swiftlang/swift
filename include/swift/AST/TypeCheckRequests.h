@@ -345,7 +345,7 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Caching
-  bool isCached() const { return getCache() != nullptr; }
+  bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 
@@ -361,7 +361,7 @@ private:
   static bool getPerformLocalLookup(KnownProtocolKind);
   TypeChecker &getTypeChecker() const;
   SourceFile *getSourceFile() const;
-  std::array<Type, NumKnownProtocols> *getCache() const;
+  llvm::SmallVectorImpl<Type> &getCache() const;
 };
 
 /// The zone number for the type checker.
