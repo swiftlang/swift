@@ -2628,7 +2628,6 @@ public:
                                    ArrayRef<AdjointValue> elements,
                                    llvm::BumpPtrAllocator &allocator) {
     // Tuple type elements must match the type of each adjoint value element.
-    assert(isLegalAggregate(elements, type));
     AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
         elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
     MutableArrayRef<AdjointValue> array(buf, elements.size());
@@ -2644,23 +2643,6 @@ public:
   SILValue getMaterializedValue() const {
     assert(isMaterialized());
     return value.materialized;
-  }
-
-private:
-  static bool isLegalAggregate(ArrayRef<AdjointValue> elements, SILType type) {
-    if (auto *structDecl = type.getASTType()->getStructOrBoundGenericStruct()) {
-      for (auto pair : llvm::zip(structDecl->getStoredProperties(), elements))
-        if (!std::get<0>(pair)->getType()->getCanonicalType()
-                ->isEqual(std::get<1>(pair).getSwiftType()))
-          return false;
-    } else if (auto tupleTy = type.getAs<TupleType>()) {
-      for (auto pair : llvm::zip(tupleTy->getElementTypes(), elements))
-        if (!std::get<0>(pair)->isEqual(std::get<1>(pair).getSwiftType()))
-          return false;
-    } else {
-      llvm_unreachable("Not an aggregate type");
-    }
-    return true;
   }
 
 public:
