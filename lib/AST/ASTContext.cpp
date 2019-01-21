@@ -293,8 +293,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// Cache of default types for DefaultTypeRequest.
   /// Used to be instance variables in the TypeChecker.
   /// Soon to become more specific.
-
-  llvm::SmallVector<Type, NumKnownProtocols> DefaultTypeRequestCache;
+  llvm::SmallVector<Type, NumKnownProtocols> DefaultTypeRequestCache{
+      NumKnownProtocols, Type()};
 
   /// Structure that captures data that is segregated into different
   /// arenas.
