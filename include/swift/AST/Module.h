@@ -1233,7 +1233,6 @@ private:
   Optional<std::vector<Token>> AllCorrectedTokens;
 
   std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
-
 };
 
 
