@@ -33,10 +33,10 @@ internal func _stringCompareWithSmolCheck(
 
     if lhsRaw.0 != rhsRaw.0 {
       return _lexicographicalCompare(
-        lhsRaw.0.byteSwapped, rhsRaw.0.byteSwapped, expecting: expecting)
+        lhsRaw.0.bigEndian, rhsRaw.0.bigEndian, expecting: expecting)
     }
     return _lexicographicalCompare(
-      lhsRaw.1.byteSwapped, rhsRaw.1.byteSwapped, expecting: expecting)
+      lhsRaw.1.bigEndian, rhsRaw.1.bigEndian, expecting: expecting)
   }
 
   return _stringCompareInternal(lhs, rhs, expecting: expecting)
