@@ -1996,7 +1996,27 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       hasFunctionAttr = true;
       break;
     }
-
+  
+  // If we have an @autoclosure then try resolving the top level type repr
+  // first as it may be pointing to a typealias
+  if (attrs.has(TAK_autoclosure)) {
+    if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(repr)) {
+      auto typeAliasResolver = TypeResolverContext::TypeAliasDecl;
+      if (auto type = resolveTopLevelIdentTypeComponent(resolution, CITR,
+                                                        typeAliasResolver)) {
+        if (auto TAT = dyn_cast<TypeAliasType>(type.getPointer())) {
+          if (auto underlyingRepr = TAT->getDecl()
+                                       ->getUnderlyingTypeLoc()
+                                        .getTypeRepr()) {
+            if (!underlyingRepr->isInvalid()) {
+              repr = underlyingRepr;
+            }
+          }
+        }
+      }
+    }
+  }
+  
   // Function attributes require a syntactic function type.
   auto *fnRepr = dyn_cast<FunctionTypeRepr>(repr);
 
