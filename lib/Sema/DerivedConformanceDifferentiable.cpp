@@ -951,8 +951,8 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   }
 
   // Otherwise, check if all stored properties have all `Differentiable`
-  // protocol associated types equal to `Self`:
-  // `Self == TangentVector == CotangentVector == AllDifferentiableVariables`.
+  // protocol associated types equal to each other:
+  // `TangentVector == CotangentVector == AllDifferentiableVariables`.
   bool allMembersAssocTypesEqualsSelf =
       llvm::all_of(diffProperties, [&](VarDecl *member) {
         auto tangentType =
@@ -961,9 +961,8 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
             getAssociatedType(member, nominal, C.Id_CotangentVector);
         auto allDiffableVarsType =
             getAssociatedType(member, nominal, C.Id_AllDifferentiableVariables);
-        return member->getType()->isEqual(tangentType) &&
-               member->getType()->isEqual(cotangentType) &&
-               member->getType()->isEqual(allDiffableVarsType);
+        return tangentType->isEqual(cotangentType) &&
+            tangentType->isEqual(allDiffableVarsType);
       });
 
   // If the following conditions hold:
