@@ -368,8 +368,9 @@ ERROR(autodiff_unsupported_type,none,
       "differentiating '%0' is not supported yet", (Type))
 ERROR(autodiff_function_not_differentiable,none,
       "function is not differentiable", ())
-NOTE(autodiff_function_generic_functions_unsupported,none,
-     "differentiating generic functions is not supported yet", ())
+NOTE(autodiff_function_indirect_params_or_result_unsupported,none,
+     "differentiating functions with parameters or result of unknown size "
+     "is not supported yet", ())
 NOTE(autodiff_external_nondifferentiable_function,none,
      "cannot differentiate an external function that has not been marked "
      "'@differentiable'", ())
@@ -386,6 +387,9 @@ NOTE(autodiff_protocol_member_subset_indices_not_differentiable,none,
 NOTE(autodiff_function_subset_indices_not_differentiable,none,
      "function is differentiable only with respect to a smaller subset of "
      "arguments", ())
+NOTE(autodiff_function_assoc_func_requirements_unmet,none,
+     "function call is not differentiate because generic requirements are not "
+     "met", ())
 NOTE(autodiff_opaque_function_not_differentiable,none,
      "opaque non-'@autodiff' function is not differentiable", ())
 NOTE(autodiff_property_not_differentiable,none,

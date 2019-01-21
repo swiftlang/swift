@@ -2446,6 +2446,9 @@ ERROR(broken_vector_numeric_requirement,none,
       "VectorNumeric protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
+WARNING(differentiable_implicit_noderivative_fixit,none,
+      "stored property has no derivative because it does not conform to "
+      "'Differentiable'; add '@noDerivative' to make it explicit", ())
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2762,12 +2765,12 @@ ERROR(tfparameter_attr_not_in_parameterized,none,
 
 // @noDerivative attribute
 ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,
-      "@noDerivative is only allowed on stored properties in structure types "
+      "'@noDerivative' is only allowed on stored properties in structure types "
       "that declare a conformance to 'Differentiable'", ())
 
 // @_fieldwiseDifferentiable attribute
 ERROR(fieldwise_differentiable_only_on_differentiable_structs,none,
-      "@_fieldwiseDifferentiable is only allowed on structure types that "
+      "'@_fieldwiseDifferentiable' is only allowed on structure types that "
       "conform to 'Differentiable'", ())
 
 //------------------------------------------------------------------------------

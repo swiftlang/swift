@@ -289,9 +289,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, tangentParams, {},
         tangentResults, None, ctx);
-    SmallVector<SILResultInfo, 8> jvpResults(
-        curryLevels.back()->getResults().begin(),
-        curryLevels.back()->getResults().end());
     break;
   }
   case AutoDiffAssociatedFunctionKind::VJP: {
