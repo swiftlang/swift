@@ -2688,10 +2688,10 @@ ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
 ERROR(differentiable_attr_wrt_self_must_be_first,none,
       "'self' parameter must come first in the parameter list", ())
-ERROR(differentiable_attr_wrt_indices_must_be_ascending,none,
-      "parameter indices must be ascending", ())
-ERROR(differentiable_attr_wrt_index_out_of_bounds,none,
-      "parameter index out of bounds", ())
+ERROR(differentiable_attr_wrt_names_not_original_order,none,
+      "parameter names must be specified in original order", ())
+ERROR(differentiable_attr_wrt_name_unknown,none,
+      "unknown parameter name %0", (Identifier))
 ERROR(differentiable_attr_wrt_self_instance_method_only,none,
       "'self' parameter is only applicable to instance methods", ())
 ERROR(differentiable_attr_cannot_diff_wrt_objects_or_existentials,none,
@@ -2764,6 +2764,11 @@ ERROR(tfparameter_attr_not_in_parameterized,none,
 ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,
       "@noDerivative is only allowed on stored properties in structure types "
       "that declare a conformance to 'Differentiable'", ())
+
+// @_fieldwiseDifferentiable attribute
+ERROR(fieldwise_differentiable_only_on_differentiable_structs,none,
+      "@_fieldwiseDifferentiable is only allowed on structure types that "
+      "conform to 'Differentiable'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
@@ -3684,11 +3689,15 @@ ERROR(unreferenced_generic_parameter,none,
 // SWIFT_ENABLE_TENSORFLOW
 // Function differentiability
 ERROR(autodiff_attr_argument_not_differentiable,none,
-      "argument is not differentiable, but the enclosing function type is marked '@autodiff'; did you want to add '@nondiff' to this argument?", ())
+      "argument is not differentiable, but the enclosing function type is "
+      "marked '@autodiff'; did you want to add '@nondiff' to this argument?",
+      ())
 ERROR(autodiff_attr_result_not_differentiable,none,
-      "result is not differentiable, but the function type is marked '@autodiff'", ())
+      "result is not differentiable, but the function type is marked "
+      "'@autodiff'", ())
 ERROR(nondiff_attr_invalid_on_nondifferentiable_function,none,
-      "'nondiff' cannot be applied to arguments of a non-differentiable function", ())
+      "'nondiff' cannot be applied to arguments of a non-differentiable "
+      "function", ())
 
 // SIL
 ERROR(opened_non_protocol,none,

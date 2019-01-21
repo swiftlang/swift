@@ -373,6 +373,10 @@ NOTE(autodiff_function_generic_functions_unsupported,none,
 NOTE(autodiff_external_nondifferentiable_function,none,
      "cannot differentiate an external function that has not been marked "
      "'@differentiable'", ())
+NOTE(autodiff_global_let_closure_not_differentiable,none,
+     "global constant closure is not differentiable", ())
+NOTE(autodiff_cannot_differentiate_global_var_closures,none,
+     "cannot differentiate global mutable closures", ())
 NOTE(autodiff_protocol_member_not_differentiable,none,
      "member is not differentiable because the corresponding protocol "
      "requirement is not '@differentiable'", ())

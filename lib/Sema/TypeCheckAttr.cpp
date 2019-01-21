@@ -127,7 +127,7 @@ public:
   IGNORED_ATTR(CompilerEvaluable)
   IGNORED_ATTR(TensorFlowGraph)
   IGNORED_ATTR(TFParameter)
-  IGNORED_ATTR(FieldwiseProductSpace)
+  IGNORED_ATTR(FieldwiseDifferentiable)
   IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
 
@@ -920,7 +920,7 @@ public:
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
   void visitTFParameterAttr(TFParameterAttr *attr);
-  void visitFieldwiseProductSpaceAttr(FieldwiseProductSpaceAttr *attr);
+  void visitFieldwiseDifferentiableAttr(FieldwiseDifferentiableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
 };
 } // end anonymous namespace
@@ -2597,17 +2597,22 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     for (unsigned i : indices(parsedWrtParams)) {
       auto paramLoc = parsedWrtParams[i].getLoc();
       switch (parsedWrtParams[i].getKind()) {
-      case ParsedAutoDiffParameter::Kind::Index: {
-        unsigned index = parsedWrtParams[i].getIndex();
-        if ((int)index <= lastIndex) {
-          TC.diagnose(paramLoc,
-                      diag::differentiable_attr_wrt_indices_must_be_ascending);
+      case ParsedAutoDiffParameter::Kind::Named: {
+        auto nameIter =
+            llvm::find_if(originalParams.getArray(), [&](ParamDecl *param) {
+              return param->getName() == parsedWrtParams[i].getName();
+            });
+        // Parameter name must exist.
+        if (nameIter == originalParams.end()) {
+          TC.diagnose(paramLoc, diag::differentiable_attr_wrt_name_unknown,
+                      parsedWrtParams[i].getName());
           return;
         }
-        // Parameter index cannot exceed bounds.
-        if (index >= originalParams.size()) {
+        // Parameter names must be specified in the original order.
+        unsigned index = std::distance(originalParams.begin(), nameIter);
+        if ((int)index <= lastIndex) {
           TC.diagnose(paramLoc,
-                      diag::differentiable_attr_wrt_index_out_of_bounds);
+                      diag::differentiable_attr_wrt_names_not_original_order);
           return;
         }
         autoDiffParameterIndicesBuilder.setParameter(index);
@@ -2961,20 +2966,22 @@ void AttributeChecker::visitTFParameterAttr(TFParameterAttr *attr) {
   }
 }
 
-void AttributeChecker::visitFieldwiseProductSpaceAttr(
-    FieldwiseProductSpaceAttr *attr) {
-  // If we make this attribute user-facing, we'll need to do various checks.
-  //   - check that this attribute is on a
-  //     Tangent/Cotangent/AllDifferentiableVariables type alias
-  //   - check that we can access the raw fields of the
-  //     Tangent/Cotangent/AllDifferentiableVariables structs from
-  //     this module (e.g. the Tangent can't be a public resilient struct
-  //     defined in a different module).
-  //   - check that the stored properties of the
-  //     Tangent/Cotangent/AllDifferentiableVariables match
-  //
-  // If we don't make this attribute user-facing, we can avoid doing checks
-  // here: the assertions in Differentiation.cpp suffice.
+void AttributeChecker::visitFieldwiseDifferentiableAttr(
+    FieldwiseDifferentiableAttr *attr) {
+  auto *structDecl = dyn_cast<StructDecl>(D);
+  if (!structDecl) {
+    diagnoseAndRemoveAttr(attr,
+        diag::fieldwise_differentiable_only_on_differentiable_structs);
+    return;
+  }
+  if (!TC.conformsToProtocol(
+          structDecl->swift::TypeDecl::getDeclaredInterfaceType(),
+          TC.Context.getProtocol(KnownProtocolKind::Differentiable),
+          structDecl, ConformanceCheckFlags::Used)) {
+    diagnoseAndRemoveAttr(attr,
+        diag::fieldwise_differentiable_only_on_differentiable_structs);
+    return;
+  }
 }
 
 void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {

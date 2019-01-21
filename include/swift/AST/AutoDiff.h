@@ -25,15 +25,15 @@ namespace swift {
 
 class ParsedAutoDiffParameter {
 public:
-  enum class Kind { Index, Self };
+  enum class Kind { Named, Self };
 
 private:
   SourceLoc Loc;
   Kind Kind;
   union Value {
-    struct { unsigned Index; }; // Index
+    struct { Identifier Name; }; // Index
     struct {};                  // Self
-    Value(unsigned index) : Index(index) {}
+    Value(Identifier name) : Name(name) {}
     Value() {}
   } V;
 
@@ -41,18 +41,18 @@ public:
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
     : Loc(loc), Kind(kind), V(value) {}
 
-  static ParsedAutoDiffParameter getIndexParameter(SourceLoc loc,
-                                                   unsigned index) {
-    return { loc, Kind::Index, index };
+  static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
+                                                   Identifier name) {
+    return { loc, Kind::Named, name };
   }
 
   static ParsedAutoDiffParameter getSelfParameter(SourceLoc loc) {
     return { loc, Kind::Self, {} };
   }
 
-  unsigned getIndex() const {
-    assert(Kind == Kind::Index);
-    return V.Index;
+  Identifier getName() const {
+    assert(Kind == Kind::Named);
+    return V.Name;
   }
 
   enum Kind getKind() const {
@@ -64,8 +64,8 @@ public:
   }
 
   bool isEqual(const ParsedAutoDiffParameter &other) const {
-    if (getKind() == other.getKind() && getKind() == Kind::Index)
-      return getIndex() == other.getIndex();
+    if (getKind() == other.getKind() && getKind() == Kind::Named)
+      return getName() == other.getName();
     return getKind() == other.getKind() && getKind() == Kind::Self;
   }
 };

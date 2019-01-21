@@ -233,16 +233,13 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DeclName': 228,
     'PoundAssertStmt': 229,
     # SWIFT_ENABLE_TENSORFLOW
-    'ReverseAutoDiffExpr': 230,
-    'ReverseAutoDiffExprParamList': 231,
-    'ReverseAutoDiffExprParam': 232,
-    'AdjointExpr': 233,
-    'DifferentiableAttributeArguments': 234,
-    'DifferentiableAttributeDiffParams': 235,
-    'DifferentiableAttributeDiffParamList': 236,
-    'DifferentiableAttributeDiffParam': 237,
-    'DifferentiationIndexParam': 238,
-    'DifferentiableAttributeFuncSpecifier': 239,
+    'DifferentiableAttributeArguments': 230,
+    'DifferentiableAttributeDiffParamsClause': 231,
+    'DifferentiableAttributeDiffParams': 232,
+    'DifferentiableAttributeDiffParamList': 233,
+    'DifferentiableAttributeDiffParam': 234,
+    'DifferentiationIndexParam': 235,
+    'DifferentiableAttributeFuncSpecifier': 236,
 }
 
 

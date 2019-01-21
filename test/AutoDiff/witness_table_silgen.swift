@@ -4,13 +4,14 @@ protocol Proto : Differentiable {
   @differentiable()
   func function1(_ x: Float, _ y: Float) -> Float
 
-  @differentiable(wrt: (self, .0, .1))
+  @differentiable(wrt: (self, x, y))
   func function2(_ x: Float, _ y: Float) -> Float
 
-  @differentiable(wrt: (.1))
+  @differentiable(wrt: (y))
   func function3(_ x: Float, _ y: Float) -> Float
 }
 
+@_fieldwiseDifferentiable
 struct S : Proto, VectorNumeric {
   static var zero: S { return S(p: 0) }
   typealias Scalar = Float
@@ -18,9 +19,7 @@ struct S : Proto, VectorNumeric {
   static func - (lhs: S, rhs: S) -> S { return S(p: lhs.p - rhs.p) }
   static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
 
-  @_fieldwiseProductSpace
   typealias TangentVector = S
-  @_fieldwiseProductSpace
   typealias CotangentVector = S
 
   @differentiable(wrt: (self), vjp: vjpP)

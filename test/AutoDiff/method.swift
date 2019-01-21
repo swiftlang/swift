@@ -192,12 +192,12 @@ extension CustomParameter {
   // There is currently no way to define multiple custom VJPs wrt different
   // parameters on the same func, so we define a copy of this func per adjoint.
 
-  @differentiable(wrt: (self, .0), vjp: dMultiplied_wrtAll)
+  @differentiable(wrt: (self, other), vjp: dMultiplied_wrtAll)
   func multiplied(with other: Float) -> Float {
     return x * other
   }
 
-  @differentiable(wrt: (.0), vjp: dMultiplied_wrtOther)
+  @differentiable(wrt: (other), vjp: dMultiplied_wrtOther)
   func multiplied_constSelf(with other: Float) -> Float {
     return x * other
   }
@@ -229,7 +229,7 @@ extension CustomParameter {
     return lhs.x * rhs.x
   }
 
-  @differentiable(wrt: (.1), vjp: dMultiply_wrtRhs)
+  @differentiable(wrt: (rhs), vjp: dMultiply_wrtRhs)
   static func multiply_constLhs(_ lhs: CustomParameter, _ rhs: CustomParameter) -> Float {
     return lhs.x * rhs.x
   }
