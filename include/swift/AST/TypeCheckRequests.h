@@ -361,7 +361,7 @@ private:
   static bool getPerformLocalLookup(KnownProtocolKind);
   TypeChecker &getTypeChecker() const;
   SourceFile *getSourceFile() const;
-  llvm::SmallVectorImpl<Type> &getCache() const;
+  Type &getCache() const;
   bool isDependencyMissing(Type result) const;
 };
 

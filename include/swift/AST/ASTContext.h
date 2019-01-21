@@ -943,7 +943,7 @@ public:
   }
 
   /// Logically, there is a separate cache for each SourceFile.
-  llvm::SmallVectorImpl<Type> &getDefaultTypeRequestCache(SourceFile *);
+  Type &getDefaultTypeRequestCache(SourceFile *, KnownProtocolKind);
 
 private:
   friend Decl;

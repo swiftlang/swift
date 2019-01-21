@@ -456,20 +456,19 @@ SourceFile *DefaultTypeRequest::getSourceFile() const {
   return getDeclContext()->getParentSourceFile();
 }
 
-llvm::SmallVectorImpl<Type> &DefaultTypeRequest::getCache() const {
+Type &DefaultTypeRequest::getCache() const {
   return getDeclContext()->getASTContext().getDefaultTypeRequestCache(
-      getSourceFile());
+      getSourceFile(), getKnownProtocolKind());
 }
 
 Optional<Type> DefaultTypeRequest::getCachedResult() const {
-  auto const &cache = getCache();
-  Type result = cache[size_t(getKnownProtocolKind())];
-  if (!result)
+  auto const &cachedType = getCache();
+  if (!cachedType)
     return None;
-  assert(!isDependencyMissing(result) &&
+  assert(!isDependencyMissing(cachedType) &&
          "Since the cache is now cached by SourceFile, the dependency should "
          "have been recorded when it was looked up.");
-  return result;
+  return cachedType;
 }
 
 bool DefaultTypeRequest::isDependencyMissing(Type result) const {
@@ -482,8 +481,7 @@ bool DefaultTypeRequest::isDependencyMissing(Type result) const {
 }
 
 void DefaultTypeRequest::cacheResult(Type value) const {
-  auto &cache = getCache();
-  cache[size_t(getKnownProtocolKind())] = value;
+  getCache() = value;
 }
 
 const char *
