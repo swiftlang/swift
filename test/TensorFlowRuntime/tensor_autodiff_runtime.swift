@@ -22,6 +22,13 @@ TensorADTests.testAllBackends("TestSimpleGrad") {
   expectTrue(gradient(at: [[10], [20]], in: square) == [[20], [40]])
 }
 
+TensorADTests.testAllBackends("TestGenericGrad") {
+  func square<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> Tensor<T> {
+    return x * x
+  }
+  expectEqual([0.2, 0.4, 0.6], gradient(at: Tensor([0.1, 0.2, 0.3]), in: square))
+}
+
 TensorADTests.testAllBackends("+") {
   let f = { (a: Tensor<Float>, b: Tensor<Float>) in a + b }
   expectTrue((Tensor(1), Tensor(1)) == gradient(at: Tensor(0), Tensor(0), in: f))

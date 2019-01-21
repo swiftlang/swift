@@ -24,7 +24,7 @@ _ = gradient(at: 0, in: one_to_one_0) // okay!
 // Generics
 //===----------------------------------------------------------------------===//
 
-// expected-note @+3 {{differentiating generic functions is not supported yet}}
+// expected-note @+3 {{differentiating functions with parameters or result of unknown size is not supported yet}}
 // expected-error @+2 {{function is not differentiable}}
 @differentiable()
 func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {

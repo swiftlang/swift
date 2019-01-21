@@ -2188,23 +2188,6 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
   return candidate;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-/// Require that the given type either not involve type parameters or be
-/// a type parameter.
-// TODO: Generalize function to take a `Diagnostic` and merge with
-// `diagnoseIndirectGenericTypeParam`.
-static bool diagnoseDifferentiableAttrIndirectGenericType(SourceLoc loc,
-                                                          Type type,
-                                                          TypeRepr *typeRepr) {
-  if (type->hasTypeParameter() && !type->is<GenericTypeParamType>()) {
-    type->getASTContext()
-        .Diags.diagnose(loc, diag::differentiable_attr_only_generic_param_req)
-        .highlight(typeRepr->getSourceRange());
-    return true;
-  }
-  return false;
-}
-
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto &ctx = TC.Context;
   auto lookupConformance =
@@ -2303,11 +2286,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     RequirementRequest::visitRequirements(
       WhereClauseOwner(original, attr), TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
-        // Check additional constraints.
-        // TODO: refine constraints.
         switch (req.getKind()) {
         case RequirementKind::SameType:
         case RequirementKind::Superclass:
+        case RequirementKind::Conformance:
           break;
 
         // Layout requirements are not supported.
@@ -2316,24 +2298,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                       diag::differentiable_attr_unsupported_req_kind)
             .highlight(reqRepr->getSourceRange());
           return false;
-
-        // Conformance requirements are valid if:
-        // - The first type is a generic type parameter type.
-        // - The second type is a protocol type or protocol composition type.
-        case RequirementKind::Conformance:
-          if (diagnoseDifferentiableAttrIndirectGenericType(
-                  attr->getLocation(), req.getFirstType(),
-                  reqRepr->getSubjectRepr()))
-            return false;
-
-          if (!req.getSecondType()->is<ProtocolType>() &&
-              !req.getSecondType()->is<ProtocolCompositionType>()) {
-            TC.diagnose(attr->getLocation(),
-                     diag::differentiable_attr_non_protocol_type_constraint_req)
-              .highlight(reqRepr->getSourceRange());
-            return false;
-          }
-          break;
         }
 
         // Add requirement to generic signature builder.

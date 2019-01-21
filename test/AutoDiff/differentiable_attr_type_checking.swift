@@ -391,7 +391,7 @@ extension FloatingPoint {
   }
 }
 
-// expected-error @+2 {{only conformances to protocol types are supported by @differentiable attribute}}
+// expected-error @+2 {{type 'Scalar' constrained to non-protocol, non-class type 'Float'}}
 // expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Scalar' does not conform to 'Differentiable'}}
 @differentiable(where Scalar : Float)
 func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
