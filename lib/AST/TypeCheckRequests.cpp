@@ -467,7 +467,8 @@ Optional<Type> DefaultTypeRequest::getCachedResult() const {
   if (!result)
     return None;
   assert(!isDependencyMissing(result) &&
-         "Since the cache is now cached by SourceFile, the dependency should have been recorded when it was looked up.");
+         "Since the cache is now cached by SourceFile, the dependency should "
+         "have been recorded when it was looked up.");
   return result;
 }
 
@@ -475,7 +476,8 @@ bool DefaultTypeRequest::isDependencyMissing(Type result) const {
   if (const auto *NTD = result->getNominalOrBoundGenericNominal())
     if (auto *SF = getSourceFile())
       if (auto *tracker = SF->getReferencedNameTracker())
-        return tracker->getTopLevelNames().find(NTD->getBaseName()) == tracker->getTopLevelNames().end();
+        return tracker->getTopLevelNames().find(NTD->getBaseName()) ==
+               tracker->getTopLevelNames().end();
   return false;
 }
 
