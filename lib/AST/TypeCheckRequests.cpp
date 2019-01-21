@@ -480,9 +480,7 @@ bool DefaultTypeRequest::isDependencyMissing(Type result) const {
   return false;
 }
 
-void DefaultTypeRequest::cacheResult(Type value) const {
-  getCache() = value;
-}
+void DefaultTypeRequest::cacheResult(Type value) const { getCache() = value; }
 
 const char *
 DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
