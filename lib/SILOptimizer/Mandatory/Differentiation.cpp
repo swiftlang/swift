@@ -879,7 +879,7 @@ public:
 
   /// Creates a struct declaration (without contents) for storing primal values
   /// of a function. The newly created struct will have the same generic
-  /// parameters as the function.
+  /// signature as the given primal generic signature.
   StructDecl *createPrimalValueStruct(const DifferentiationTask *task,
                                       CanGenericSignature primalGenericSig);
 
@@ -1502,19 +1502,19 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
 /// differentiation parameters/result, emit a "unknown parameter or result
 /// size" error at appropriate source locations. Returns true if error is
 /// emitted.
-static bool diagnoseIndirectParamsOrResult(ADContext &context,
-                                           DifferentiationTask *task) {
+static bool diagnoseIndirectParametersOrResult(ADContext &context,
+                                               DifferentiationTask *task) {
   auto originalFnTy = task->getOriginal()->getLoweredFunctionType();
   auto indices = task->getIndices();
   // Check whether differentiation result or parameters are indirect.
   bool originalHasIndirectParamOrResult =
       originalFnTy->getResults()[indices.source].isFormalIndirect();
   for (unsigned i : swift::indices(originalFnTy->getParameters())) {
-    if (indices.isWrtParameter(i)) {
-      if (originalFnTy->getParameters()[i].isFormalIndirect()) {
-        originalHasIndirectParamOrResult = true;
-        break;
-      }
+    if (!indices.isWrtParameter(i))
+      continue;
+    if (originalFnTy->getParameters()[i].isFormalIndirect()) {
+      originalHasIndirectParamOrResult = true;
+      break;
     }
   }
   if (originalHasIndirectParamOrResult) {
@@ -2078,7 +2078,6 @@ public:
     auto loc = getPrimal()->getLocation();
     auto structTy =
         getPrimalInfo().getPrimalValueStruct()->getDeclaredInterfaceType();
-    // TODO: Replace line above.
     if (auto primalGenericEnv = getPrimal()->getGenericEnvironment())
       structTy = primalGenericEnv->mapTypeIntoContext(structTy);
     auto &builder = getBuilder();
@@ -2264,19 +2263,18 @@ public:
 
     // If all requirements are satisfied, return associated function
     // substitution map.
-    if (!assocSubstMap.empty()) {
-      return assocSubstMap.subst(
-        [&](SubstitutableType *ty) -> Type {
-          Type type(ty);
-          if (!primalSubstMap.empty())
-            type = type.subst(primalSubstMap);
-          if (type->hasArchetype() && primalGenEnv)
-            return type;
-          return type.subst(origSubstMap);
-        },
-        LookUpConformanceInModule(context.getModule().getSwiftModule()));
-    }
-    return origSubstMap;
+    if (assocSubstMap.empty())
+      return origSubstMap;
+    return assocSubstMap.subst(
+      [&](SubstitutableType *ty) -> Type {
+        Type type(ty);
+        if (!primalSubstMap.empty())
+          type = type.subst(primalSubstMap);
+        if (type->hasArchetype() && primalGenEnv)
+          return type;
+        return type.subst(origSubstMap);
+      },
+      LookUpConformanceInModule(context.getModule().getSwiftModule()));
   }
 
   void visitApplyInst(ApplyInst *ai) {
@@ -2416,7 +2414,7 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // parameters/result, bail out since AD does not support side-effecting
   // instructions yet.
   if (diagnoseUnsupportedControlFlow(context, item.task) ||
-      diagnoseIndirectParamsOrResult(context, item.task)) {
+      diagnoseIndirectParametersOrResult(context, item.task)) {
     errorOccurred = true;
     return true;
   }
@@ -3853,7 +3851,7 @@ void DifferentiationTask::createEmptyPrimal() {
   auto *primalGenericEnv = primalGenericSig
       ? primalGenericSig->createGenericEnvironment()
       : nullptr;
-  StructDecl *primalValueStructDecl =
+  auto *primalValueStructDecl =
       context.createPrimalValueStruct(this, primalGenericSig);
   primalInfo = std::unique_ptr<PrimalInfo>(
       new PrimalInfo(primalValueStructDecl));
