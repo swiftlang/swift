@@ -5390,11 +5390,14 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
 
   // Record the fix.
 
-  // Increase the score. If this would make the current solution worse than
-  // the best solution we've seen already, stop now.
-  increaseScore(SK_Fix);
-  if (worseThanBestSolution())
-    return true;
+  // If this is just a warning it's shouldn't affect the solver.
+  if (!fix->isWarning()) {
+    // Otherswise increase the score. If this would make the current
+    // solution worse than the best solution we've seen already, stop now.
+    increaseScore(SK_Fix);
+    if (worseThanBestSolution())
+      return true;
+  }
 
   if (isAugmentingFix(fix)) {
     // Always useful, unless duplicate of exactly the same fix and location.
