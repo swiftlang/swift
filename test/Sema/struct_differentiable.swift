@@ -226,3 +226,22 @@ struct VectorSpaceCustomStruct : AdditiveArithmetic, Differentiable { // expecte
     typealias CotangentVector = VectorSpaceCustomStruct.CotangentVector
   }
 }
+
+struct StaticNoDerivative : Differentiable {
+  @noDerivative static var s: Bool = true // expected-error {{'@noDerivative' is only allowed on stored properties in structure types that declare a conformance to 'Differentiable'}}
+}
+
+struct StaticMembersShouldNotAffectAnything : AdditiveArithmetic, Differentiable {
+  static var x: Bool = true
+  static var y: Bool = false
+}
+
+struct ImplicitNoDerivative : Differentiable {
+  var a: Float
+  var b: Bool // expected-warning {{stored property has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
+}
+
+struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
+  var x: DifferentiableSubset
+  var b: Bool // expected-warning {{stored property has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
+}

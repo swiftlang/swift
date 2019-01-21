@@ -51,9 +51,23 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
 static void
 getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
                                       SmallVectorImpl<VarDecl *> &result) {
+  auto &C = nominal->getASTContext();
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   for (auto *vd : nominal->getStoredProperties()) {
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
+    if (!vd->hasInterfaceType())
+      C.getLazyResolver()->resolveDeclSignature(vd);
+    // If a stored property's type does not conform to `Differentiable`, make
+    // the property implicitly `@noDerivative` and emit a warning later when we
+    // are deriving all associated types.
+    if (!vd->hasInterfaceType() ||
+        !TypeChecker::conformsToProtocol(vd->getType(),
+                                         diffableProto, nominal,
+                                         ConformanceCheckFlags::Used)) {
+      vd->getAttrs().add(new (C) NoDerivativeAttr(/*implicit*/ true));
+      continue;
+    }
     result.push_back(vd);
   }
 }
@@ -596,8 +610,9 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
 
 // Return associated `TangentVector`, `CotangentVector`, or
 // `AllDifferentiableVariables` struct for a nominal type, if it exists.
-// If not, synthesize the struct.
-static StructDecl *
+// If not, synthesize the struct. Also return a Boolean value that indicates
+// whether synthesis occurred.
+static std::pair<StructDecl *, bool>
 getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
                                       Identifier id) {
   auto &TC = derived.TC;
@@ -614,7 +629,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   if (lookup.size() == 1) {
     auto structDecl = dyn_cast<StructDecl>(lookup.front());
     assert(structDecl && "Expected lookup result to be a struct");
-    return structDecl;
+    return {structDecl, false};
   }
 
   // Otherwise, synthesize a new struct. The struct must conform to
@@ -728,7 +743,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   derived.addMembersToConformanceContext({structDecl});
   C.addSynthesizedDecl(structDecl);
 
-  return structDecl;
+  return {structDecl, true};
 }
 
 // Add a typealias declaration with the given name and underlying target
@@ -764,6 +779,21 @@ static void addAssociatedTypeAliasDecl(Identifier name,
   C.addSynthesizedDecl(aliasDecl);
 };
 
+// If any stored property in the nominal does not conform to `Differentiable`
+// but does not have an explicit `@noDerivative` attribute, emit a warning and
+// a fixit so that the user will make it explicit.
+static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
+                                                 NominalTypeDecl *nominal) {
+  for (auto *vd : nominal->getStoredProperties()) {
+    if (auto *attr = vd->getAttrs().getAttribute<NoDerivativeAttr>()) {
+      if (attr->isImplicit()) {
+        TC.diagnose(vd, diag::differentiable_implicit_noderivative_fixit)
+            .fixItInsert(vd->getStartLoc(), "@noDerivative ");
+      }
+    }
+  }
+}
+
 // Get or synthesize all associated struct types: 'TangentVector',
 // 'CotangentVector', and 'AllDifferentiableVariables'.
 // Return the type corresponding to the given identifier.
@@ -775,16 +805,30 @@ getOrSynthesizeAssociatedStructType(DerivedConformance &derived,
   auto nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
-  // Otherwise, get or synthesize `TangentVector`, `CotangentVector`, and
+  // Get or synthesize `TangentVector`, `CotangentVector`, and
   // `AllDifferentiableVariables` structs at once. Synthesizing all three
   // structs at once is necessary in order to correctly set their mutually
   // recursive associated types.
-  auto tangentStruct =
+  auto tangentStructSynthesis =
       getOrSynthesizeSingleAssociatedStruct(derived, C.Id_TangentVector);
-  auto cotangentStruct =
+  auto *tangentStruct = tangentStructSynthesis.first;
+  bool freshlySynthesized = tangentStructSynthesis.second;
+  auto cotangentStructSynthesis =
       getOrSynthesizeSingleAssociatedStruct(derived, C.Id_CotangentVector);
-  auto allDiffableVarsStruct = getOrSynthesizeSingleAssociatedStruct(derived,
-      C.Id_AllDifferentiableVariables);
+  auto *cotangentStruct = cotangentStructSynthesis.first;
+  assert(freshlySynthesized == tangentStructSynthesis.second);
+  auto allDiffableVarsStructSynthesis =
+      getOrSynthesizeSingleAssociatedStruct(derived,
+                                            C.Id_AllDifferentiableVariables);
+  auto *allDiffableVarsStruct = allDiffableVarsStructSynthesis.first;
+  assert(freshlySynthesized == allDiffableVarsStructSynthesis.second);
+  
+  // When all structs are freshly synthesized, we check emit warnings for
+  // implicit `@noDerivative` members. Checking for fresh synthesis is necessary
+  // because `getOrSynthesizeAssociatedStructType` will be called multiple times
+  // during synthesis.
+  if (freshlySynthesized)
+    checkAndDiagnoseImplicitNoDerivative(TC, nominal);
 
   // Add associated typealiases for structs.
   addAssociatedTypeAliasDecl(C.Id_TangentVector,
@@ -927,18 +971,26 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   // Then get or synthesize `AllDifferentiableVariables` struct and let
   // `TangentVector` and `CotangentVector` alias to it.
   if (allMembersAssocTypesEqualsSelf) {
-    auto allDiffableVarsStruct = getOrSynthesizeSingleAssociatedStruct(
+    auto allDiffableVarsStructSynthesis = getOrSynthesizeSingleAssociatedStruct(
         derived, C.Id_AllDifferentiableVariables);
+    auto allDiffableVarsStruct = allDiffableVarsStructSynthesis.first;
+    auto freshlySynthesized = allDiffableVarsStructSynthesis.second;
+    // When the struct is freshly synthesized, we check emit warnings for
+    // implicit `@noDerivative` members. Checking for fresh synthesis is
+    // necessary because this code path will be executed called multiple times
+    // during synthesis.
+    if (freshlySynthesized)
+      checkAndDiagnoseImplicitNoDerivative(TC, nominal);
     addAssociatedTypeAliasDecl(C.Id_AllDifferentiableVariables,
-                               allDiffableVarsStruct, allDiffableVarsStruct, TC);
+        allDiffableVarsStruct, allDiffableVarsStruct, TC);
     addAssociatedTypeAliasDecl(C.Id_TangentVector,
-                               allDiffableVarsStruct, allDiffableVarsStruct, TC);
+        allDiffableVarsStruct, allDiffableVarsStruct, TC);
     addAssociatedTypeAliasDecl(C.Id_CotangentVector,
-                               allDiffableVarsStruct, allDiffableVarsStruct, TC);
+        allDiffableVarsStruct, allDiffableVarsStruct, TC);
     addAssociatedTypeAliasDecl(C.Id_TangentVector,
-                               nominal, allDiffableVarsStruct, TC);
+        nominal, allDiffableVarsStruct, TC);
     addAssociatedTypeAliasDecl(C.Id_CotangentVector,
-                               nominal, allDiffableVarsStruct, TC);
+        nominal, allDiffableVarsStruct, TC);
     TC.validateDecl(allDiffableVarsStruct);
     return parentDC->mapTypeIntoContext(
         allDiffableVarsStruct->getDeclaredInterfaceType());
