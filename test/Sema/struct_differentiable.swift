@@ -243,5 +243,5 @@ struct ImplicitNoDerivative : Differentiable {
 
 struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
   var x: DifferentiableSubset
-  var b: Bool // expected-warning {{stored property has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
+  var b: Bool // expected-warning {{stored property has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
 }

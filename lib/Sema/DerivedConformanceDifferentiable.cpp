@@ -784,14 +784,12 @@ static void addAssociatedTypeAliasDecl(Identifier name,
 // a fixit so that the user will make it explicit.
 static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
                                                  NominalTypeDecl *nominal) {
-  for (auto *vd : nominal->getStoredProperties()) {
-    if (auto *attr = vd->getAttrs().getAttribute<NoDerivativeAttr>()) {
-      if (attr->isImplicit()) {
+  for (auto *vd : nominal->getStoredProperties())
+    if (auto *attr = vd->getAttrs().getAttribute<NoDerivativeAttr>())
+      if (attr->isImplicit())
         TC.diagnose(vd, diag::differentiable_implicit_noderivative_fixit)
-            .fixItInsert(vd->getStartLoc(), "@noDerivative ");
-      }
-    }
-  }
+            .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
+                         "@noDerivative ");
 }
 
 // Get or synthesize all associated struct types: 'TangentVector',
