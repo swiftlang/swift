@@ -3048,6 +3048,25 @@ ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() {
   return memberwiseInitDecl;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void NominalTypeDecl::addFixedLayoutAttr() {
+  auto &C = getASTContext();
+  // If nominal already has `@_fixed_layout`, return.
+  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+    return;
+  auto access = getEffectiveAccess();
+  // If nominal does not have at least internal access, return.
+  if (access < AccessLevel::Internal)
+    return;
+  // If nominal is internal, it should have the `@usableFromInline` attribute.
+  if (access == AccessLevel::Internal &&
+      !getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    getAttrs().add(new (C) UsableFromInlineAttr(/*Implicit*/ true));
+  }
+  // Add `@_fixed_layout` to the nominal.
+  getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
+}
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  MutableArrayRef<TypeLoc> inherited,
