@@ -725,6 +725,11 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     }
   }
 
+  // If nominal type has `@_fixed_layout` attribute, mark associated struct as
+  // `@_fixed_layout` as well.
+  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
+    structDecl->addFixedLayoutAttr();
+
   // The implicit memberwise constructor must be explicitly created so that it
   // can called in `AdditiveArithmetic` and `Differentiable` methods. Normally,
   // the memberwise constructor is synthesized during SILGen, which is too late.

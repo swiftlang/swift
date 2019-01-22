@@ -3235,6 +3235,10 @@ public:
   /// Get the memberwise initializer of the nominal type, if it exists.
   ConstructorDecl *getMemberwiseInitializer();
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Add `@_fixed_layout` attribute to the nominal type, if possible.
+  void addFixedLayoutAttr();
+
 private:
   /// Predicate used to filter StoredPropertyRange.
   struct ToStoredProperty {

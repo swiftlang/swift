@@ -69,26 +69,6 @@ DerivedConformance::canDeriveParameterGroup(NominalTypeDecl *nominal) {
   return bool(deriveParameterGroup_Parameter(nominal));
 }
 
-// Add @_fixed_layout attribute to type conforming to `ParameterGroup`, if
-// necessary.
-void addFixedLayoutAttrIfNeeded(TypeChecker &TC, NominalTypeDecl *nominal) {
-  // If nominal already has @_fixed_layout, return.
-  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
-    return;
-  auto access = nominal->getEffectiveAccess();
-  // If nominal does not have at least internal access, return.
-  if (access < AccessLevel::Internal)
-    return;
-  // If nominal is internal, it should have the @usableFromInline attribute.
-  if (access == AccessLevel::Internal &&
-      !nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    nominal->getAttrs().add(new (TC.Context)
-                                UsableFromInlineAttr(/*Implicit*/ true));
-  }
-  // Add the @_fixed_layout attribute to the nominal.
-  nominal->getAttrs().add(new (TC.Context) FixedLayoutAttr(/*Implicit*/ true));
-}
-
 static TypeAliasDecl *getParameterTypeAliasDecl(NominalTypeDecl *nominal) {
   auto &ctx = nominal->getASTContext();
   TypeAliasDecl *parameterDecl = nullptr;
@@ -236,7 +216,7 @@ static ValueDecl *deriveParameterGroup_update(DerivedConformance &derived) {
 ValueDecl *
 DerivedConformance::deriveParameterGroup(ValueDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.getIdentifier("update")) {
-    addFixedLayoutAttrIfNeeded(TC, Nominal);
+    Nominal->addFixedLayoutAttr();
     return deriveParameterGroup_update(*this);
   }
   TC.diagnose(requirement->getLoc(), diag::broken_parameter_group_requirement);
@@ -245,7 +225,7 @@ DerivedConformance::deriveParameterGroup(ValueDecl *requirement) {
 
 Type DerivedConformance::deriveParameterGroup(AssociatedTypeDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.Id_Parameter) {
-    addFixedLayoutAttrIfNeeded(TC, Nominal);
+    Nominal->addFixedLayoutAttr();
     return deriveParameterGroup_Parameter(Nominal);
   }
   TC.diagnose(requirement->getLoc(), diag::broken_parameter_group_requirement);
