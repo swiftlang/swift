@@ -35,8 +35,10 @@ struct ErrorBehaviorKind {
     ReturnFalse = 1,
     PrintMessage = 2,
     Assert = 4,
+    ReturnFalseOnLeak = 8,
     PrintMessageAndReturnFalse = PrintMessage | ReturnFalse,
     PrintMessageAndAssert = PrintMessage | Assert,
+    ReturnFalseOnLeakAssertOtherwise = ReturnFalseOnLeak | Assert,
   } Value;
 
   ErrorBehaviorKind() : Value(Invalid) {}
@@ -45,6 +47,11 @@ struct ErrorBehaviorKind {
   bool shouldAssert() const {
     assert(Value != Invalid);
     return Value & Assert;
+  }
+
+  bool shouldReturnFalseOnLeak() const {
+    assert(Value != Invalid);
+    return Value & ReturnFalseOnLeak;
   }
 
   bool shouldPrintMessage() const {
@@ -95,12 +102,21 @@ struct OwnershipChecker {
 /// non-consuming uses, or from the producer instruction.
 /// 2. The consuming use set jointly post dominates producers and all non
 /// consuming uses.
-bool valueHasLinearLifetime(SILValue value,
-                            ArrayRef<BranchPropagatedUser> consumingUses,
-                            ArrayRef<BranchPropagatedUser> nonConsumingUses,
-                            SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-                            DeadEndBlocks &deadEndBlocks,
-                            ownership::ErrorBehaviorKind errorBehavior);
+///
+/// \p value The value whose lifetime we are checking.
+/// \p consumingUses the array of users that destroy or consume a value.
+/// \p nonConsumingUses regular uses
+/// \p deadEndBlocks a cache for the dead end block computation
+/// \p errorBehavior If we detect an error, should we return false or hard
+/// error.
+/// \p leakingBlocks If non-null a list of blocks where the value was detected
+/// to leak. Can be used to insert missing destroys.
+bool valueHasLinearLifetime(
+    SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
+    ArrayRef<BranchPropagatedUser> nonConsumingUses,
+    SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+    DeadEndBlocks &deadEndBlocks, ownership::ErrorBehaviorKind errorBehavior,
+    SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
 
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v, SILModule &m);
