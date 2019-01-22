@@ -239,21 +239,36 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     }
 
     // Stores *to* the allocation are writes.
-    if (isa<StoreInst>(User) && UI->getOperandNumber() == 1) {
-      if (PointeeType.is<TupleType>()) {
-        UsesToScalarize.push_back(User);
+    if (auto *si = dyn_cast<StoreInst>(User)) {
+      if (UI->getOperandNumber() == StoreInst::Dest) {
+        if (PointeeType.is<TupleType>()) {
+          UsesToScalarize.push_back(User);
+          continue;
+        }
+
+        auto kind = ([&]() -> PMOUseKind {
+          switch (si->getOwnershipQualifier()) {
+          // Coming out of SILGen, we assume that raw stores are
+          // initializations, unless they have trivial type (which we classify
+          // as InitOrAssign).
+          case StoreOwnershipQualifier::Unqualified:
+            if (PointeeType.isTrivial(User->getModule()))
+              return PMOUseKind::InitOrAssign;
+            return PMOUseKind::Initialization;
+
+          case StoreOwnershipQualifier::Init:
+            return PMOUseKind::Initialization;
+
+          case StoreOwnershipQualifier::Assign:
+            return PMOUseKind::Assign;
+
+          case StoreOwnershipQualifier::Trivial:
+            return PMOUseKind::InitOrAssign;
+          }
+        })();
+        Uses.emplace_back(si, kind);
         continue;
       }
-
-      // Coming out of SILGen, we assume that raw stores are initializations,
-      // unless they have trivial type (which we classify as InitOrAssign).
-      auto Kind = ([&]() -> PMOUseKind {
-        if (PointeeType.isTrivial(User->getModule()))
-          return PMOUseKind::InitOrAssign;
-        return PMOUseKind::Initialization;
-      })();
-      Uses.emplace_back(User, Kind);
-      continue;
     }
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
