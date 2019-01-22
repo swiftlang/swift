@@ -90,7 +90,7 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   }
 
   public func isConcreteTensor() -> Bool {
-    return TFE_TensorHandleIsTensorBuffer(_cTensorHandle) != 0
+    return TFE_TensorHandleIsConcrete(_cTensorHandle) != 0
   }
 }
 
@@ -181,7 +181,7 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
   @usableFromInline
   @inline(never)
   init(cTensorHandle: CTensorHandle) {
-    internalConsistencyCheck(TFE_TensorHandleIsTensorBuffer(cTensorHandle) != 0)
+    internalConsistencyCheck(TFE_TensorHandleIsConcrete(cTensorHandle) != 0)
     let status = TF_NewStatus()
     let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
     checkOk(status)

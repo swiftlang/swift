@@ -145,7 +145,7 @@ private class S4TFTrace {
   // Only used in GPE code path.
   func addInput(_ idx: Int, _ inputTensorHandle: CTensorHandle) -> TF_Output {
     let abstractInput: TF_Output
-    if TFE_TensorHandleIsTensorBuffer(inputTensorHandle) != 0 {
+    if TFE_TensorHandleIsConcrete(inputTensorHandle) != 0 {
       debugLog("  Got a concrete input, which is the \(idx)-th")
       internalConsistencyCheck(idx < abstractInputs.count)
 
@@ -155,7 +155,8 @@ private class S4TFTrace {
       abstractInput = abstractInputs[idx]
     } else {
       debugLog("  Got an abstract input, which is the \(idx)-th")
-      abstractInput = TFE_GetTFOutputFromTensorHandle(inputTensorHandle)
+      abstractInput = TFE_GetTFOutputFromTensorHandle(inputTensorHandle, status)
+      checkOk(status)
     }
     internalConsistencyCheck(abstractInput.oper != nil)
     return abstractInput
@@ -185,7 +186,7 @@ private class S4TFTrace {
     // list of the generated trace graph function.
     let tensorCount = TFE_FinalizeInputTensorsFromTraceContext(traceCtx)
     for i in 0..<tensorCount {
-      abstractInputs.append(TFE_GetInputSymbolicTensorFromTraceContext(traceCtx, UInt32(i)))
+      abstractInputs.append(TFE_GetInputGraphNodeFromTraceContext(traceCtx, UInt32(i)))
     }
 
     debugLog("Finalizing traced func \(tracedFunctionName), with \(inputs.count) tracer inputs and \(tensorCount) additional inputs, and up to \(outputs.count) return values.")
@@ -238,7 +239,7 @@ private class S4TFTrace {
     // Points to an element in `returnValues`
     var returnValueIdx = 0
     for output in outputs {
-      if TFE_TensorHandleIsTensorBuffer(output) != 0 {
+      if TFE_TensorHandleIsConcrete(output) != 0 {
         let newOutput = TFE_TensorHandleCopySharingTensor(output, status)
         checkOk(status)
         internalConsistencyCheck(newOutput != nil)
@@ -258,11 +259,12 @@ private class S4TFTrace {
     var abstractOutputs: [TF_Output] = []
     // Only add abstract output tensors as the outputs of the trace graph function.
     for (i, output) in outputs.enumerated() {
-      if TFE_TensorHandleIsTensorBuffer(output) != 0 {
+      if TFE_TensorHandleIsConcrete(output) != 0 {
         continue
       }
       debugLog("Adding abstract output tensor \(i) as a trace graph function output.")
-      abstractOutputs.append(TFE_GetTFOutputFromTensorHandle(output))
+      abstractOutputs.append(TFE_GetTFOutputFromTensorHandle(output ,status))
+      checkOk(status)
     }
 
     debugLog("The trace graph function has a total of \(abstractOutputs.count) outputs.")
@@ -678,7 +680,7 @@ public func trace(_ fn: () -> Tensor<Float>) -> () -> Tensor<Float> {
                                                  outputs: [outputTensors.handle._cTensorHandle])
 
     let returnValue = returnValues[0]
-    assert(TFE_TensorHandleIsTensorBuffer(returnValue) != 0)
+    assert(TFE_TensorHandleIsConcrete(returnValue) != 0)
     let handle = TensorHandle<Float>(_owning: returnValue)
     return Tensor<Float>(handle: handle)
   }
@@ -714,7 +716,7 @@ public func trace(_ fn: (Tensor<Float>, Tensor<Float>) -> Tensor<Float>)
                                                  outputs: [outputTensors.handle._cTensorHandle])
 
     let returnValue = returnValues[0]
-    assert(TFE_TensorHandleIsTensorBuffer(returnValue) != 0)
+    assert(TFE_TensorHandleIsConcrete(returnValue) != 0)
     let handle = TensorHandle<Float>(_owning: returnValue)
     return Tensor<Float>(handle: handle)
   }
@@ -731,7 +733,7 @@ public extension TensorArrayProtocol {
     var output: [CTensorHandle] = []
     for idx in 0..<self._tensorHandleCount {
       let address = buffer.advanced(by: Int(idx))
-      let isConcrete = TFE_TensorHandleIsTensorBuffer(address.pointee) != 0
+      let isConcrete = TFE_TensorHandleIsConcrete(address.pointee) != 0
       debugLog(" Copying the \(idx)-th C handle \(address.pointee) with concrete=\(isConcrete).")
       debugLog(" It's a concrete tensor.")
       if isConcrete {
@@ -768,7 +770,7 @@ public extension TensorModel {
     for (idx, inputTensorHandle) in input.enumerated() {
       let address = buffer.advanced(by: idx)
       // Can be an abstract tensor (for creating a symbolic input instance) or concrete one (for output instance).
-      // internalConsistencyCheck(TFE_TensorHandleIsTensorBuffer(inputTensorHandle) == 0)
+      // internalConsistencyCheck(TFE_TensorHandleIsConcrete(inputTensorHandle) == 0)
       let newHandle = TFE_TensorHandleCopySharingTensor(/*input[idx]*/inputTensorHandle, status)
       checkOk(status)
       address.initialize(to: newHandle!)
@@ -990,7 +992,7 @@ public extension _ExecutionContext {
 internal func dumpTensorContent<Scalar : _TensorFlowDataTypeCompatible>(
   _ inputTensor: CTensorHandle, _: Scalar.Type
 ) {
-  assert(TFE_TensorHandleIsTensorBuffer(inputTensor) != 0)
+  assert(TFE_TensorHandleIsConcrete(inputTensor) != 0)
   
   let array = ShapedArray<Scalar>(cTensorHandle: inputTensor)
   debugLog("Rank is \(array.rank), shape is \(array.shape).")
@@ -1004,7 +1006,7 @@ internal func dumpTensorContent<Scalar : _TensorFlowDataTypeCompatible>(
 internal func dumpCTensorHandleContent(
   _ idx: Int,
   _ inputTensorHandle: CTensorHandle) {
-  if TFE_TensorHandleIsTensorBuffer(inputTensorHandle) == 0 {
+  if TFE_TensorHandleIsConcrete(inputTensorHandle) == 0 {
     debugLog("Skip dumpping a tensor handle that's not a buffer.")
     return
   }
