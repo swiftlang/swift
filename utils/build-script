@@ -993,8 +993,10 @@ def main_preset():
         help="Print the expanded build-script invocation generated "
              "by the preset, but do not run the preset",
         action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--swiftsyntax-install-prefix",
+        help="specify the directory to where SwiftSyntax should be installed")
     args = parser.parse_args()
-
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
             os.path.join(
@@ -1044,6 +1046,10 @@ def main_preset():
         build_script_args += ["--distcc"]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
+    if args.swiftsyntax_install_prefix:
+        build_script_args += ["--install-swiftsyntax",
+                              "--install-destdir",
+                              args.swiftsyntax_install_prefix]
 
     diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
         args.preset, shell.quote_command(build_script_args)))
