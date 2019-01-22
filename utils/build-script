@@ -304,6 +304,14 @@ class BuildScriptInvocation(object):
                 diagnostics.fatal(
                     "invalid file specified for --tensorflow-swift-bindings "
                     "(was '{}')".format(args.tensorflow_swift_bindings))
+
+            if args.tensorflow_swift_apis is not None:
+                if not os.path.isdir(args.tensorflow_swift_apis):
+                    diagnostics.fatal(
+                        "invalid repository specified for "
+                        "--tensorflow-swift-apis (was '{}')"
+                        .format(args.tensorflow_swift_apis))
+
         if args.enable_tensorflow_gpu:
             os.environ['TF_NEED_CUDA'] = '1'
             if '--config=cuda' not in args.tensorflow_bazel_options:
