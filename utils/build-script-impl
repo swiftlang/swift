@@ -3566,8 +3566,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     exit 1
                 fi
                 echo "--- Installing ${product} ---"
-                DYLIB_DIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
-                MODULE_DIR="${DYLIB_DIR}/${SWIFT_HOST_VARIANT_ARCH}"
+                if [ "${BUILD_LIBPARSER_ONLY}" ]; then
+                    # We don't have a toolchain so we should install to the specified dir
+                    DYLIB_DIR="${INSTALL_DESTDIR}"
+                    MODULE_DIR="${INSTALL_DESTDIR}"
+                    # Install libParser is necessary
+                    rsync -a "$(build_directory ${host} swift)/lib/lib_InternalSwiftSyntaxParser.dylib" "${INSTALL_DESTDIR}"
+                else
+                    # We have a toolchain so install to the toolchain
+                    DYLIB_DIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
+                    MODULE_DIR="${DYLIB_DIR}/${SWIFT_HOST_VARIANT_ARCH}"
+                fi
+
                 if [[ -z "${SKIP_INSTALL_SWIFTSYNTAX_MODULE}" ]] ; then
                     call "${swiftsyntax_build_command[@]}" --dylib-dir="${DYLIB_DIR}" --swiftmodule-dir "${MODULE_DIR}" --install
                 else
