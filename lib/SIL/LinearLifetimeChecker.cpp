@@ -53,6 +53,11 @@ struct State {
   /// The blocks that we have already visited.
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
 
+  /// If non-null a list that we should place any detected leaking blocks for
+  /// our caller. The intention is that this can be used in a failing case to
+  /// put in missing destroys.
+  SmallVectorImpl<SILBasicBlock *> *leakingBlocks;
+
   /// The set of blocks with consuming uses.
   SmallPtrSet<SILBasicBlock *, 8> blocksWithConsumingUses;
 
@@ -66,12 +71,13 @@ struct State {
 
   /// A list of successor blocks that we must visit by the time the algorithm
   /// terminates.
-  SmallPtrSet<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
+  SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
   State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        ErrorBehaviorKind errorBehavior)
+        ErrorBehaviorKind errorBehavior,
+        SmallVectorImpl<SILBasicBlock *> *leakingBlocks)
       : value(value), errorBehavior(errorBehavior),
-        visitedBlocks(visitedBlocks) {}
+        visitedBlocks(visitedBlocks), leakingBlocks(leakingBlocks) {}
 
   void initializeAllNonConsumingUses(
       ArrayRef<BranchPropagatedUser> nonConsumingUsers);
@@ -331,7 +337,7 @@ bool State::performDataflow(DeadEndBlocks &deBlocks) {
     // First remove BB from the SuccessorBlocksThatMustBeVisited list. This
     // ensures that when the algorithm terminates, we know that BB was not the
     // beginning of a non-covered path to the exit.
-    successorBlocksThatMustBeVisited.erase(block);
+    successorBlocksThatMustBeVisited.remove(block);
 
     // Then remove BB from BlocksWithNonLifetimeEndingUses so we know that
     // this block was properly joint post-dominated by our lifetime ending
@@ -395,23 +401,41 @@ bool State::performDataflow(DeadEndBlocks &deBlocks) {
 bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
   // Make sure that we visited all successor blocks that we needed to visit to
   // make sure we didn't leak.
+  bool doesntHaveAnyLeaks = true;
+
   if (!successorBlocksThatMustBeVisited.empty()) {
-    return handleError([&] {
-      llvm::errs()
-          << "Function: '" << value->getFunction()->getName() << "'\n"
-          << "Error! Found a leak due to a consuming post-dominance failure!\n"
-          << "    Value: " << *value << "    Post Dominating Failure Blocks:\n";
-      for (auto *succBlock : successorBlocksThatMustBeVisited) {
-        llvm::errs() << "        bb" << succBlock->getDebugID();
-      }
-      llvm::errs() << '\n';
-    });
+    // If we are asked to store any leaking blocks, put them in the leaking
+    // blocks array.
+    if (leakingBlocks) {
+      copy(successorBlocksThatMustBeVisited,
+           std::back_inserter(*leakingBlocks));
+    }
+
+    // If we are supposed to error on leaks, do so now.
+    if (!errorBehavior.shouldReturnFalseOnLeak()) {
+      return handleError([&] {
+        llvm::errs() << "Function: '" << value->getFunction()->getName()
+                     << "'\n"
+                     << "Error! Found a leak due to a consuming post-dominance "
+                        "failure!\n"
+                     << "    Value: " << *value
+                     << "    Post Dominating Failure Blocks:\n";
+        for (auto *succBlock : successorBlocksThatMustBeVisited) {
+          llvm::errs() << "        bb" << succBlock->getDebugID();
+        }
+        llvm::errs() << '\n';
+      });
+    }
+
+    // Otherwise... see if we have any other failures. This signals the user
+    // wants us to tell it where to insert compensating destroys.
+    doesntHaveAnyLeaks = false;
   }
 
   // Make sure that we do not have any lifetime ending uses left to visit that
   // are not transitively unreachable blocks.... so return early.
   if (blocksWithNonConsumingUses.empty()) {
-    return true;
+    return doesntHaveAnyLeaks;
   }
 
   // If we do have remaining blocks, then these non lifetime ending uses must be
@@ -436,7 +460,7 @@ bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
 
   // If all of our remaining blocks were dead uses, then return true. We are
   // good.
-  return true;
+  return doesntHaveAnyLeaks;
 }
 
 //===----------------------------------------------------------------------===//
@@ -447,10 +471,11 @@ bool swift::valueHasLinearLifetime(
     SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
     ArrayRef<BranchPropagatedUser> nonConsumingUses,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks, DeadEndBlocks &deBlocks,
-    ErrorBehaviorKind errorBehavior) {
+    ErrorBehaviorKind errorBehavior,
+    SmallVectorImpl<SILBasicBlock *> *leakingBlocks) {
   assert(!consumingUses.empty() && "Must have at least one consuming user?!");
 
-  State state(value, visitedBlocks, errorBehavior);
+  State state(value, visitedBlocks, errorBehavior, leakingBlocks);
 
   // First add our non-consuming uses and their blocks to the
   // blocksWithNonConsumingUses map. While we do this, if we have multiple uses
