@@ -59,7 +59,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
   if (Offset == 0 && EndOffset == 0)
     EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
 
-  Lexer L(LangOpts, SM, BufferID, Diags, /*InSILMode=*/false,
+  Lexer L(LangOpts, SM, BufferID, Diags, LexerMode::Swift,
           HashbangMode::Allowed, RetainComments, TriviaRetention, Offset,
           EndOffset);
 
@@ -345,6 +345,19 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
 //===----------------------------------------------------------------------===//
 
 
+static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
+  switch (kind) {
+    case swift::SourceFileKind::Interface:
+      return LexerMode::SwiftInterface;
+    case swift::SourceFileKind::SIL:
+      return LexerMode::SIL;
+    case swift::SourceFileKind::Library:
+    case swift::SourceFileKind::Main:
+    case swift::SourceFileKind::REPL:
+      return LexerMode::Swift;
+  }
+}
+
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions,
@@ -361,7 +374,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
               BufferID, LexerDiags,
-              /*InSILMode=*/SIL != nullptr,
+              sourceFileKindToLexerMode(SF.Kind),
               SF.Kind == SourceFileKind::Main
                   ? HashbangMode::Allowed
                   : HashbangMode::Disallowed,
@@ -399,7 +412,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
 
   void relexComment(CharSourceRange CommentRange,
                     llvm::SmallVectorImpl<Token> &Scratch) {
-    Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+    Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, LexerMode::Swift,
             HashbangMode::Disallowed,
             CommentRetentionMode::ReturnAsTokens,
             TriviaRetentionMode::WithoutTrivia,
@@ -1119,7 +1132,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,
                       BufferID, &Impl.Diags,
-                      /*InSILMode=*/false,
+                      LexerMode::Swift,
                       HashbangMode::Allowed,
                       CommentRetentionMode::None,
                       TriviaRetentionMode::WithoutTrivia,

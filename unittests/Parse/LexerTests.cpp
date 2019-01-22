@@ -29,7 +29,7 @@ public:
 
   std::vector<Token> tokenizeAndKeepEOF(unsigned BufferID) {
     Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr,
-            /*InSILMode=*/false);
+            LexerMode::Swift);
     std::vector<Token> Tokens;
     do {
       Tokens.emplace_back();
@@ -131,7 +131,7 @@ TEST_F(LexerTest, ContentStartHashbangSkip) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -148,7 +148,7 @@ TEST_F(LexerTest, ContentStartHashbangSkipUTF8BOM) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -165,7 +165,7 @@ TEST_F(LexerTest, ContentStartOperatorLeftBound) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -182,7 +182,7 @@ TEST_F(LexerTest, ContentStartOperatorLeftBoundUTF8BOM) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -205,7 +205,7 @@ TEST_F(LexerTest, ContentStartConflictMarker) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -228,7 +228,7 @@ TEST_F(LexerTest, ContentStartConflictMarkerUTF8BOM) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -244,7 +244,7 @@ TEST_F(LexerTest, ContentStartTokenIsStartOfLine) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -262,7 +262,7 @@ TEST_F(LexerTest, ContentStartTokenIsStartOfLineUTF8BOM) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -280,7 +280,7 @@ TEST_F(LexerTest, BOMNoCommentNoTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::None,
           TriviaRetentionMode::WithoutTrivia);
   
@@ -312,7 +312,7 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
           TriviaRetentionMode::WithoutTrivia);
   
@@ -371,7 +371,7 @@ TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithoutTrivia);
   
@@ -403,7 +403,7 @@ TEST_F(LexerTest, BOMNoCommentTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::None,
           TriviaRetentionMode::WithTrivia);
   
@@ -445,7 +445,7 @@ TEST_F(LexerTest, BOMAttachCommentTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia);
   
@@ -487,7 +487,7 @@ TEST_F(LexerTest, RestoreBasic) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, 14));
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
 
   Token Tok;
 
@@ -534,7 +534,7 @@ TEST_F(LexerTest, RestoreNewlineFlag) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, 16));
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
 
   Token Tok;
 
@@ -582,7 +582,7 @@ TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, 16));
   SourceMgr.setCodeCompletionPoint(BufferID, 6);
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
 
   Token Tok;
 
@@ -675,7 +675,7 @@ TEST_F(LexerTest, NestedSubLexers) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(Source);
 
   Lexer Primary(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr,
-                /*InSILMode=*/false);
+                LexerMode::Swift);
   std::vector<Token> TokensPrimary;
   do {
     TokensPrimary.emplace_back();
@@ -786,7 +786,7 @@ TEST_F(LexerTest, DiagnoseEmbeddedNul) {
   Diags.addConsumer(DiagConsumer);
 
   Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
-          /*InSILMode=*/false, HashbangMode::Disallowed,
+          LexerMode::Swift, HashbangMode::Disallowed,
           CommentRetentionMode::None, TriviaRetentionMode::WithTrivia);
 
   ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
@@ -808,7 +808,7 @@ TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
   Diags.addConsumer(DiagConsumer);
 
   Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
-          /*InSILMode=*/false, HashbangMode::Disallowed,
+          LexerMode::Swift, HashbangMode::Disallowed,
           CommentRetentionMode::None, TriviaRetentionMode::WithTrivia,
           /*Offset=*/5, /*EndOffset=*/SourceLen);
 

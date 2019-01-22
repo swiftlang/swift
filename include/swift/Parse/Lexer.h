@@ -55,6 +55,12 @@ enum class HashbangMode : bool {
   Allowed,
 };
 
+enum class LexerMode {
+  Swift,
+  SwiftInterface,
+  SIL
+};
+
 /// Kinds of conflict marker which the lexer might encounter.
 enum class ConflictMarkerKind {
   /// A normal or diff3 conflict marker, initiated by at least 7 "<"s,
@@ -98,9 +104,10 @@ class Lexer {
 
   Token NextToken;
   
-  /// This is true if we're lexing a .sil file instead of a .swift
-  /// file.  This enables the 'sil' keyword.
-  const bool InSILMode;
+  /// The kind of source we're lexing. This either enables special behavior for
+  /// parseable interfaces, or enables things like the 'sil' keyword if lexing
+  /// a .sil file.
+  const LexerMode LexMode;
 
   /// True if we should skip past a `#!` line at the start of the file.
   const bool IsHashbangAllowed;
@@ -135,8 +142,8 @@ class Lexer {
   /// everything.
   Lexer(const PrincipalTag &, const LangOptions &LangOpts,
         const SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode, HashbangMode HashbangAllowed,
-        CommentRetentionMode RetainComments,
+        DiagnosticEngine *Diags, LexerMode LexMode,
+        HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
         TriviaRetentionMode TriviaRetention);
 
   void initialize(unsigned Offset, unsigned EndOffset);
@@ -150,21 +157,21 @@ public:
   ///   identifier), but not things like how many characters are
   ///   consumed.  If that changes, APIs like getLocForEndOfToken will
   ///   need to take a LangOptions explicitly.
-  /// \param InSILMode - whether we're parsing a SIL source file.
+  /// \param LexMode - the kind of source file we're lexing.
   ///   Unlike language options, this does affect primitive lexing, which
   ///   means that APIs like getLocForEndOfToken really ought to take
   ///   this flag; it's just that we don't care that much about fidelity
   ///   when parsing SIL files.
   Lexer(
       const LangOptions &Options, const SourceManager &SourceMgr,
-      unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+      unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
       HashbangMode HashbangAllowed = HashbangMode::Disallowed,
       CommentRetentionMode RetainComments = CommentRetentionMode::None,
       TriviaRetentionMode TriviaRetention = TriviaRetentionMode::WithoutTrivia);
 
   /// Create a lexer that scans a subrange of the source buffer.
   Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
-        unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+        unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
         HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
         TriviaRetentionMode TriviaRetention, unsigned Offset,
         unsigned EndOffset);

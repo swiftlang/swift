@@ -20,7 +20,7 @@ TEST_F(LexerTriviaTest, RestoreWithTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(SourceStr);
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia);
 
@@ -75,7 +75,7 @@ TEST_F(LexerTriviaTest, TriviaHashbang) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(SourceStr);
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia);
 
@@ -98,7 +98,7 @@ TEST_F(LexerTriviaTest, TriviaHashbangAfterBOM) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(SourceStr);
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia);
 
@@ -131,7 +131,7 @@ TEST_F(LexerTriviaTest, TriviaConflictMarker) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(SourceStr);
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia);
 
@@ -166,7 +166,7 @@ TEST_F(LexerTriviaTest, TriviaCarriageReturn) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(SourceStr);
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia);
 
@@ -208,7 +208,7 @@ TEST_F(LexerTriviaTest, TriviaNewLines) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(SourceStr);
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia);
 
