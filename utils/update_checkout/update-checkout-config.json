@@ -229,6 +229,7 @@
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swift-syntax": "1aeb642da66a23a66c9ac80d74813e1a4b963999",
+                "swift-stress-tester": "2fc093642df924f6adf9de9e4397c7c6fc8b5fc8",
                 "compiler-rt": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
