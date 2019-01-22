@@ -2809,17 +2809,66 @@ public:
 using ExtensionContextDescriptor = TargetExtensionContextDescriptor<InProcess>;
 
 template<typename Runtime>
+struct TargetMangledContextName {
+  /// The mangled name of the context.
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> name;
+};
+
+template<typename Runtime>
 struct TargetAnonymousContextDescriptor final
     : TargetContextDescriptor<Runtime>,
-      TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>>
+      TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>,
+                                    TargetGenericContextDescriptorHeader,
+                                    TargetMangledContextName<Runtime>>
 {
 private:
   using TrailingGenericContextObjects
-    = TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>>;
+    = TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>,
+                                    TargetGenericContextDescriptorHeader,
+                                    TargetMangledContextName<Runtime>>;
+  using TrailingObjects =
+    typename TrailingGenericContextObjects::TrailingObjects;
+  friend TrailingObjects;
 
 public:
-  using TrailingGenericContextObjects::getGenericContext;
+  using MangledContextName = TargetMangledContextName<Runtime>;
 
+  using TrailingGenericContextObjects::getGenericContext;
+  using TrailingGenericContextObjects::getGenericContextHeader;
+  using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TrailingGenericContextObjects::getGenericParams;
+
+  AnonymousContextDescriptorFlags getAnonymousContextDescriptorFlags() const {
+    return AnonymousContextDescriptorFlags(this->Flags.getKindSpecificFlags());
+  }
+
+  /// Whether this anonymous context descriptor contains a full mangled name,
+  /// which can be used to match the anonymous type to its textual form.
+  bool hasMangledName() const {
+    return getAnonymousContextDescriptorFlags().hasMangledName();
+  }
+
+  /// Retrieve the mangled name of this context, or NULL if it was not
+  /// recorded in the metadata.
+  ConstTargetPointer<Runtime, char> getMangledName() const {
+    if (!hasMangledName())
+      return nullptr;
+
+    return this->template getTrailingObjects<MangledContextName>()->name;
+  }
+
+private:
+  template<typename T>
+  using OverloadToken =
+    typename TrailingGenericContextObjects::template OverloadToken<T>;
+
+  using TrailingGenericContextObjects::numTrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<MangledContextName>) const {
+    return this->hasMangledNam() ? 1 : 0;
+  }
+
+public:
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Anonymous;
   }

@@ -1344,6 +1344,23 @@ public:
                                  setSpecialProtocol)
 };
 
+/// Flags for anonymous type context descriptors. These values are used as the
+/// kindSpecificFlags of the ContextDescriptorFlags for the anonymous context.
+class AnonymousContextDescriptorFlags : public FlagSet<uint16_t> {
+  enum {
+    /// Whether this anonymous context descriptor is followed by its
+    /// mangled name, which can be used to match the descriptor at runtime.
+    HasMangledName = 0,
+  };
+
+public:
+  explicit AnonymousContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
+  constexpr AnonymousContextDescriptorFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasMangledName, hasMangledName,
+                                setHasMangledName)
+};
+
 enum class GenericParamKind : uint8_t {
   /// A type parameter.
   Type = 0,
