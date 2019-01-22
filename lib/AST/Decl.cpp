@@ -2550,8 +2550,6 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
-/// Returns \c true if this declaration is *not* intended to be used directly
-/// by application developers despite of the visibility.
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
