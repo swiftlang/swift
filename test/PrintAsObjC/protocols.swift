@@ -187,6 +187,20 @@ extension NSString : A, ZZZ {}
 // CHECK: @interface RootClass4 <A, ZZZ>{{$}}
 @objc class RootClass4 : A, ZZZ {}
 
+// CHECK-LABEL: @interface RootClass4 (SWIFT_EXTENSION(protocols))
+// CHECK-NEXT: @end
+extension RootClass4 {
+
+  // CHECK-LABEL: @protocol DefinedInExtension
+  // CHECK-NEXT: @end
+  @objc protocol DefinedInExtension {}
+
+  // CHECK-LABEL: SWIFT_PROTOCOL_NAMED("DefinedInExtension2")
+  // CHECK-NEXT: @protocol RootClass4Delegate
+  // CHECK-NEXT: @end
+  @objc(RootClass4Delegate) protocol DefinedInExtension2 {}
+}
+
 // CHECK-LABEL: @interface Subclass : RootClass1 <ZZZ>{{$}}
 @objc class Subclass : RootClass1, ZZZ {}
 

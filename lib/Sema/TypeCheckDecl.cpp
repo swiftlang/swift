@@ -2481,20 +2481,11 @@ public:
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
     TC.diagnoseInlinableLocalType(NTD);
 
-    // We don't support protocols outside the top level of a file.
-    if (isa<ProtocolDecl>(NTD) &&
-        !NTD->getParent()->isModuleScopeContext()) {
-      TC.diagnose(NTD->getLoc(),
-                  diag::unsupported_nested_protocol,
-                  NTD->getName());
-      return;
-    }
-
-    // We don't support nested types in generics yet.
-    if (NTD->isGenericContext()) {
-      auto DC = NTD->getDeclContext();
-      if (auto proto = DC->getSelfProtocolDecl()) {
-        if (DC->getExtendedProtocolDecl()) {
+    auto Parent = NTD->getDeclContext();
+    if (Parent->isGenericContext()) {
+      // We don't support nested types inside of protocols.
+      if (auto proto = Parent->getSelfProtocolDecl()) {
+        if (Parent->getExtendedProtocolDecl()) {
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_protocol_extension,
                       NTD->getName(),
@@ -2505,11 +2496,12 @@ public:
                       NTD->getName(),
                       proto->getName());
         }
+        return;
       }
-
-      if (DC->isLocalContext() && DC->isGenericContext()) {
-        // A local generic context is a generic function.
-        if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+      // We don't support nested types inside of generic functions or closures.
+      // A local generic context is a generic function.
+      if (Parent->isLocalContext()) {
+        if (auto AFD = dyn_cast<AbstractFunctionDecl>(Parent)) {
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_generic_function,
                       NTD->getName(),
@@ -2519,6 +2511,13 @@ public:
                       diag::unsupported_type_nested_in_generic_closure,
                       NTD->getName());
         }
+        return;
+      }
+      // We don't support nesting protocols in generic contexts.
+      if (isa<ProtocolDecl>(NTD)) {
+        TC.diagnose(NTD->getLoc(),
+                    diag::unsupported_nested_protocol_in_generic,
+                    NTD->getName());
       }
     }
   }

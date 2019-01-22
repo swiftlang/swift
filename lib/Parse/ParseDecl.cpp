@@ -6222,7 +6222,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   ProtocolDecl *Proto = new (Context)
       ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc, ProtocolName,
                    Context.AllocateCopy(InheritedProtocols), TrailingWhere);
-  // No need to setLocalDiscriminator: protocols can't appear in local contexts.
+  setLocalDiscriminator(Proto);
 
   Proto->getAttrs() = Attributes;
 

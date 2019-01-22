@@ -15,7 +15,7 @@ extension { // expected-error {{expected type name in extension declaration}}
 
   class M : S {} // expected-error {{use of undeclared type 'S'}}
 
-  protocol P { // expected-error {{protocol 'P' cannot be nested inside another declaration}}
+  protocol P {
     associatedtype A
   }
 }

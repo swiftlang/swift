@@ -37,7 +37,6 @@ public:
   }
   BAD_MEMBER(Extension)
   BAD_MEMBER(Import)
-  BAD_MEMBER(Protocol)
   BAD_MEMBER(TopLevelCode)
   BAD_MEMBER(Operator)
   BAD_MEMBER(PrecedenceGroup)
