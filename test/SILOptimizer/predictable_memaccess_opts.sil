@@ -441,6 +441,27 @@ bb0(%0 : @owned $KlassAndTuple):
   return %4 : $Klass
 }
 
+// CHECK-LABEL: sil [ossa] @simple_assignstore : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+// CHECK: bb0([[ARG0:%.*]] : @owned $Klass, [[ARG1:%.*]] : @owned $Klass):
+// CHECK:   [[STACK:%.*]] = alloc_stack $Klass
+// CHECK:   store [[ARG0]] to [init] [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [assign] [[STACK]]
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[ARG1_COPY]]
+// CHECK: } // end sil function 'simple_assignstore'
+sil [ossa] @simple_assignstore : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  store %1 to [assign] %2 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  return %3 : $Klass
+}
+
 ////////////////////
 // Negative Tests //
 ////////////////////
