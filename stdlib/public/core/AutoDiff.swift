@@ -145,6 +145,36 @@ public func differentiableFunction<T, U, R>(
   return original
 }
 
+/// Make a function be recomputed in its pullback, known as "checkpointing" in
+/// traditional automatic differentiation.
+@inlinable
+public func withRecomputationInPullbacks<T, U>(
+  _ body: @escaping @autodiff (T) -> U
+) -> @autodiff (T) -> U where T : Differentiable, U : Differentiable {
+  return differentiableFunction { x in
+    (value: body(x), pullback: { v in pullback(at: x, in: body)(v) })
+  }
+}
+
+// FIXME: The method variant produces a zero cotangent. Need to investigate.
+//
+// public extension Differentiable {
+//   @inlinable
+//   @differentiable(wrt: self, vjp: _vjp_withRecomputationInPullbacks)
+//   func withRecomputationInPullbacks<Result : Differentiable>(
+//     _ body: @escaping @autodiff (Self) -> Result
+//   ) -> Result {
+//     return body(self)
+//   }
+// 
+//   @usableFromInline
+//   internal func _vjp_withRecomputationInPullbacks<Result : Differentiable>(
+//     _ body: @escaping @autodiff (Self) -> Result
+//   ) -> (Result, (Result.CotangentVector) -> CotangentVector) {
+//     return valueWithPullback(in: Swift.withRecomputationInPullbacks(body))
+//   }
+// }
+
 //===----------------------------------------------------------------------===//
 // Method-style differential operators
 //===----------------------------------------------------------------------===//
