@@ -1974,6 +1974,12 @@ function(add_swift_target_library name)
             WORLD_READ)
       endif()
 
+      set(optional_arg)
+      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+        # Allow installation of stdlib without building all variants on Darwin.
+        set(optional_arg "OPTIONAL")
+      endif()
+
       if(sdk STREQUAL WINDOWS AND CMAKE_SYSTEM_NAME STREQUAL Windows)
         swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
           TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
@@ -1986,7 +1992,7 @@ function(add_swift_target_library name)
             FILES "${UNIVERSAL_LIBRARY_NAME}"
             DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
             PERMISSIONS ${file_permissions}
-            OPTIONAL)
+            "${optional_arg}")
       endif()
       if(sdk STREQUAL WINDOWS)
         foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
@@ -2034,7 +2040,7 @@ function(add_swift_target_library name)
               OWNER_READ OWNER_WRITE
               GROUP_READ
               WORLD_READ
-            OPTIONAL)
+            "${optional_arg}")
       endif()
 
       # Add Swift standard library targets as dependencies to the top-level
