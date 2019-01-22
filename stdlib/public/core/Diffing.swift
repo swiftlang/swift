@@ -127,7 +127,7 @@ extension BidirectionalCollection {
   ///
   /// - Complexity: O(*n* * *d*), where *n* is `other.count + self.count` and
   ///   *d* is the number of changes between the two ordered collections.
-  public func shortestEditScript<C>(
+  public func difference<C>(
     from other: C, by areEquivalent: (Element, C.Element) -> Bool
   ) -> OrderedCollectionDifference<Element>
     where C : BidirectionalCollection, C.Element == Self.Element
@@ -182,10 +182,10 @@ extension BidirectionalCollection where Element : Equatable {
   ///
   /// - Complexity: O(*n* * *d*), where *n* is `other.count + self.count` and
   ///   *d* is the number of changes between the two ordered collections.
-  public func shortestEditScript<C>(from other: C) -> OrderedCollectionDifference<Element>
+  public func difference<C>(from other: C) -> OrderedCollectionDifference<Element>
     where C: BidirectionalCollection, C.Element == Self.Element
   {
-    return shortestEditScript(from: other, by: ==)
+    return difference(from: other, by: ==)
   }
 }
 
