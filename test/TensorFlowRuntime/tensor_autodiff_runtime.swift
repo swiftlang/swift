@@ -151,8 +151,27 @@ TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {
 }
 
 let cube: (Tensor<Float>) -> Tensor<Float> = { $0 * $0 * $0 }
-TensorADTests.testAllBackends("DifferentiateGlobal") {
+TensorADTests.testAllBackends("Differentiate global") {
   expectEqual(Tensor(48), gradient(at: Tensor(4), in: cube))
+}
+
+TensorADTests.testAllBackends("Side effects") {
+  // FIXME: This requires support for indirect passing.
+  // func foo(x: Tensor<Float>) -> Tensor<Float> {
+  //   var a = x
+  //   a = a * x
+  //   a = a * x
+  //   a = a * x
+  // }
+  // expectEqual(Tensor([108, 108]), pullback(at: Tensor(4), in: foo)([1, 1]))
+  let foo: @autodiff (Tensor<Float>) -> Tensor<Float> = { x in
+    var a = x
+    a = a + x
+    a = a + x
+    return a + x
+  }
+  // FIXME: This currently segfaults.
+  // expectEqual(Tensor([108, 108]), pullback(at: Tensor(4), in: foo)([1, 1]))
 }
 
 runAllTests()

@@ -243,7 +243,7 @@ static SILType getCotangentType(CanType type, SILModule &mod) {
 /// Assuming the given type conforms to `Differentiable`, returns the associated
 /// cotangent space type.
 static SILType getCotangentType(SILType type, SILModule &mod) {
-  return getCotangentType(type.getASTType(), mod);
+  return getCotangentType(type.getASTType(), mod).copyCategory(type);
 }
 
 // Return the expected generic signature for autodiff associated functions given
@@ -2439,8 +2439,8 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
   // FIXME: If the original function has indirect differentiation
-  // parameters/result, bail out since AD does not support side-effecting
-  // instructions yet.
+  // parameters/result, bail out since AD does not support function calls with
+  // indirect parameters yet.
   if (diagnoseUnsupportedControlFlow(context, item.task) ||
       diagnoseIndirectParametersOrResult(context, item.task)) {
     errorOccurred = true;
@@ -2700,6 +2700,9 @@ private:
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
 
+  /// Post-dominance info.
+  const PostDominanceInfo &postDomInfo;
+
   /// Global AdjointGen.
   AdjointGen &adjointGen;
 
@@ -2709,6 +2712,9 @@ private:
   /// Mapping from original basic blocks to their corresponding adjoint basic
   /// blocks.
   DenseMap<SILBasicBlock *, SILBasicBlock *> adjointBBMap;
+
+  /// Local stack allocations.
+  SmallVector<AllocStackInst *, 8> localAllocations;
 
   /// Original parameters passed to the adjoint function, in the same order as
   /// they appear in the adjoint function.
@@ -2750,8 +2756,9 @@ private:
 public:
   explicit AdjointEmitter(const FunctionSynthesisItem &item,
                           DifferentiableActivityInfo &activityInfo,
+                          PostDominanceInfo &postDomInfo,
                           AdjointGen &adjointGen)
-      : synthesis(item), activityInfo(activityInfo),
+      : synthesis(item), activityInfo(activityInfo), postDomInfo(postDomInfo),
         adjointGen(adjointGen), builder(getAdjoint()) {}
 
 private:
@@ -2777,12 +2784,20 @@ private:
   void materializeAdjointIndirectHelper(AdjointValue val,
                                         SILValue destBufferAccess);
 
+  /// Materialize an adjoint value in a newly-created local buffer. Return an
+  /// address to the buffer.
+  SILValue materializeAdjointIndirectToStack(AdjointValue val, SILLocation loc);
+
+  /// Materialize an adjoint value in the most efficient way.
+  SILValue materializeAdjoint(AdjointValue val, SILLocation loc);
+
   /// Given two adjoint values, accumulate them.
   AdjointValue accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs);
 
   /// Given two materialized adjoint values, accumulate them. These two
   /// adjoints must be objects of loadable type.
   SILValue accumulateMaterializedAdjointsDirect(SILValue lhs, SILValue rhs);
+  
 
   /// Given two materialized adjoint values, accumulate them using
   /// `VectorNumeric.+` or `FloatingPoint.+`, depending on the differentiation
@@ -2790,10 +2805,29 @@ private:
   void accumulateMaterializedAdjointsIndirect(SILValue lhsBufAccess,
                                               SILValue rhsBufAccess,
                                               SILValue resultBufAcess);
+
+  /// Remap any archetypes into the current function's context.
+  SILType remapType(SILType ty) {
+    if (!ty.hasArchetype())
+      return ty;
+    auto *adjointGenEnv = getAdjoint().getGenericEnvironment();
+    if (!adjointGenEnv)
+      return ty;
+    return ty.subst(getAdjoint().getModule(),
+                    adjointGenEnv->getForwardingSubstitutionMap());
+  }
   
   /// Returns true if the original value has a corresponding adjoint value.
   bool hasAdjointValue(SILValue originalValue) const {
     return adjointMap.count(originalValue);
+  }
+
+  /// Initializes an original value's corresponding adjoint value. Its adjoint
+  /// value must not be present before this function is called.
+  void initializeAdjointValue(SILValue originalValue,
+                              AdjointValue adjointValue) {
+    auto insertion = adjointMap.try_emplace(originalValue, adjointValue);
+    assert(insertion.second && "Adjoint value inserted before");
   }
 
   /// Get the adjoint for an original value. The given value must be in the
@@ -2804,19 +2838,9 @@ private:
   AdjointValue getAdjointValue(SILValue originalValue) {
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = adjointMap.try_emplace(
-        originalValue, AdjointValue::getZero(
-            getCotangentType(originalValue->getType(), getModule())));
+        originalValue, AdjointValue::getZero(remapType(
+            getCotangentType(originalValue->getType(), getModule()))));
     return insertion.first->getSecond();
-  }
-
-  SILType remapType(SILType ty) {
-    if (!ty.hasArchetype())
-      return ty;
-    auto *adjointGenEnv = getAdjoint().getGenericEnvironment();
-    if (!adjointGenEnv)
-      return ty;
-    return ty.subst(getAdjoint().getModule(),
-                    adjointGenEnv->getForwardingSubstitutionMap());
   }
 
   /// Add an adjoint value for the given original value.
@@ -2855,27 +2879,19 @@ private:
         auto *resultBufAccess = builder.createBeginAccess(
             loc, resultBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
             /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-        auto *lhsBufReadAccess = builder.createBeginAccess(loc, lhsBuf,
-            SILAccessKind::Read, SILAccessEnforcement::Static,
-            /*noNestedConflict*/ true, /*fromBuiltin*/ false);
         auto *rhsBufReadAccess = builder.createBeginAccess(loc, rhsBuf,
             SILAccessKind::Read, SILAccessEnforcement::Static,
             /*noNestedConflict*/ true, /*fromBuiltin*/ false);
         accumulateMaterializedAdjointsIndirect(
-            lhsBufReadAccess, rhsBufReadAccess, resultBufAccess);
+            lhsBuf, rhsBufReadAccess, resultBufAccess);
         builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
         builder.createEndAccess(loc, rhsBufReadAccess, /*aborted*/ false);
-        builder.createEndAccess(loc, lhsBufReadAccess, /*aborted*/ false);
         // Replace the existing adjoint value with the accumulated result.
         resultBufAccess = builder.createBeginAccess(
             loc, resultBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
             /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-        auto *lhsBufModifyAccess = builder.createBeginAccess(loc, lhsBuf,
-            SILAccessKind::Modify, SILAccessEnforcement::Static,
-            /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-        builder.createCopyAddr(loc, resultBufAccess, lhsBufModifyAccess, IsTake,
+        builder.createCopyAddr(loc, resultBufAccess, lhsBuf, IsTake,
                                IsNotInitialization);
-        builder.createEndAccess(loc, lhsBufModifyAccess, /*aborted*/ false);
         builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
         // Deallocate the temporary result buffer.
         builder.createDeallocStack(loc, resultBuf);
@@ -2897,11 +2913,10 @@ private:
       for (auto indRes : ai->getIndirectSILResults())
         if (activityInfo.isActive(indRes, indices))
           return true;
-    // TODO: Check for side-effecting instructions.
-    // if (inst->mayWriteToMemory())
-    //   if (llvm::any_of(inst->getAllOperands(), [&](Operand &op) {
-    //           return activityInfo.isActive(op.get(), indices); }))
-    //     return true;
+    if (inst->mayWriteToMemory())
+      for (auto &op : inst->getAllOperands())
+        if (activityInfo.isActive(op.get(), indices))
+          return true;
     return false;
   }
 
@@ -2971,6 +2986,14 @@ public:
       // Get the corresponding adjoint basic block.
       auto adjBB = getAdjointBlock(bb);
       builder.setInsertionPoint(adjBB);
+      LLVM_DEBUG({
+        auto &s = getADDebugStream()
+            << "To differentiate or not to differentiate?\n";
+        for (auto &inst : reversed(*bb)) {
+          s << (shouldBeDifferentiated(&inst, indices) ? "[∂] " : "[ ] ")
+            << inst;
+        }
+      });
       // Visit each instruction in reverse order.
       for (auto &inst : reversed(*bb)) {
         if (!shouldBeDifferentiated(&inst, indices))
@@ -2989,7 +3012,7 @@ public:
     // Place the builder at the adjoint block corresponding to the original
     // entry. This block is going to be our exit block and we emit a `return`
     // there.
-    builder.setInsertionPoint(adjointEntry);
+    builder.setInsertionPoint(getAdjointBlock(original.getEntryBlock()));
 
     // This vector will contain all the materialized return elements.
     SmallVector<SILValue, 8> retElts;
@@ -3023,6 +3046,20 @@ public:
       addRetElt(i);
     }
     builder.createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
+
+    // For any temporary allocations, emit a deallocation in the right place.
+    for (auto *alloc : reversed(localAllocations)) {
+      auto useIt = alloc->use_begin();
+      assert(useIt != alloc->use_end());
+      SILBasicBlock *deallocationPoint = (useIt++)->getUser()->getParent();
+      do {
+        postDomInfo.findNearestCommonDominator(
+            deallocationPoint, (useIt++)->getUser()->getParent());
+      } while (useIt != alloc->use_end());
+      builder.setInsertionPoint(deallocationPoint->getTerminator());
+      builder.createDeallocStack(adjLoc, alloc);
+    }
+
     LLVM_DEBUG(getADDebugStream() << "Generated adjoint\n" << adjoint);
     return errorOccurred;
   }
@@ -3041,12 +3078,8 @@ public:
     errorOccurred = true;
   }
 
-  SILLocation remapLocation(SILLocation loc) { return loc; }
-
   void visitApplyInst(ApplyInst *ai) {
     // Replace a call to a function with a call to its pullback.
-    auto loc = remapLocation(ai->getLoc());
-
     auto &nestedApplyActivities =
         getDifferentiationTask()->getNestedApplyActivities();
     auto applyInfoLookUp = nestedApplyActivities.find(ai);
@@ -3065,7 +3098,8 @@ public:
     // Get the pullback.
     auto *field = getPrimalInfo().lookUpPullbackDecl(ai);
     assert(field);
-    SILValue pullback = builder.createStructExtract(remapLocation(ai->getLoc()),
+    auto loc = ai->getLoc();
+    SILValue pullback = builder.createStructExtract(loc,
                                                     primalValueAggregateInAdj,
                                                     field);
 
@@ -3182,7 +3216,7 @@ public:
   }
 
   void visitStructExtractInst(StructExtractInst *sei) {
-    auto loc = remapLocation(sei->getLoc());
+    auto loc = sei->getLoc();
     auto &differentiationStrategies =
         getDifferentiationTask()->getStructExtractDifferentiationStrategies();
     auto strategy = differentiationStrategies.lookup(sei);
@@ -3329,88 +3363,134 @@ public:
     }
   }
 
-//  FIXME: Fix side effect handling logic.
-//
-//  // Handle `alloc_stack` instruction.
-//  //   Original: y = alloc_stack $T
-//  //    Adjoint: dealloc_stack adj[y]
-//  void visitAllocStackInst(AllocStackInst *asi) {
-//    auto adjBuf = getAdjointValue(asi).getMaterializedValue();
-//    builder.createDeallocStack(asi->getLoc(), adjBuf);
-//  }
-//
-//  // Handle `dealloc_stack` instruction.
-//  //   Original: dealloc_stack y
-//  //    Adjoint: adj[y] = alloc_stack $T.CotangentVector
-//  void visitDeallocStackInst(DeallocStackInst *dsi) {
-//    auto *adjBuf = builder.createAllocStack(dsi->getLoc(),
-//        getCotangentType(dsi->getOperand()->getType(), getModule()));
-//    addAdjointValue(dsi->getOperand(), adjBuf);
-//  }
-//
-//  // Handle `load` instruction.
-//  //   Original: y = load x
-//  //    Adjoint: adj[y] += adj[x]
-//  void visitLoadInst(LoadInst *li) {
-//    auto adjVal = materializeAdjointDirect(getAdjointValue(li), li->getLoc());
-//    auto *buf = builder.createAllocStack(li->getLoc(), adjVal->getType());
-//    auto *access = builder.createBeginAccess(
-//        li->getLoc(), buf, SILAccessKind::Init, SILAccessEnforcement::Static,
-//        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-//    addAdjointValue(li->getOperand(), access);
-//    builder.createEndAccess(li->getLoc(), access, /*aborted*/ false);
-//    builder.createDeallocStack(li->getLoc(), buf);
-//  }
-//
-//  // Handle `store` instruction.
-//  //   Original: store x to y
-//  //    Adjoint: adj[y] += load adj[x]
-//  void visitStoreInst(StoreInst *si) {
-//    auto adjBuf = getAdjointValue(si->getDest()).getMaterializedValue();
-//    auto adjVal = builder.createLoad(si->getLoc(), adjBuf,
-//        getBufferLOQ(adjBuf->getType().getASTType(), getAdjoint()));
-//    addAdjointValue(si->getSrc(), adjVal);
-//  }
-//
-//  // Handle `begin_access` instruction.
-//  //   Original: y = begin_access x
-//  //    Adjoint: end_access adj[y]
-//  void visitBeginAccessInst(BeginAccessInst *bai) {
-//    auto accessBuf = getAdjointValue(bai).getMaterializedValue();
-//    builder.createEndAccess(bai->getLoc(), accessBuf, /*aborted*/ false);
-//  }
-//
-//  // Handle `end_access` instruction.
-//  //   Original: end_access y, where y = begin_access x
-//  //    Adjoint: adj[y] += begin_access adj[x]
-//  void visitEndAccessInst(EndAccessInst *eai) {
-//    auto adjBuf = getAdjointValue(eai->getSource()).getMaterializedValue();
-//    auto adjAccess = builder.createBeginAccess(
-//        eai->getLoc(), adjBuf,
-//        eai->getBeginAccess()->getAccessKind(),
-//        eai->getBeginAccess()->getEnforcement(),
-//        eai->getBeginAccess()->hasNoNestedConflict(),
-//        eai->getBeginAccess()->isFromBuiltin());
-//    addAdjointValue(eai->getOperand(), adjAccess);
-//  }
+  // Handle `alloc_stack` instruction.
+  //   Original: y = alloc_stack $T
+  //    Adjoint: dealloc_stack adj[y]
+  void visitAllocStackInst(AllocStackInst *asi) {
+    auto adjBuf = materializeAdjoint(getAdjointValue(asi), asi->getLoc());
+    builder.createDeallocStack(asi->getLoc(), adjBuf);
+  }
 
-#define NOT_DIFFERENTIABLE(INST) \
+  // Handle `dealloc_stack` instruction.
+  //   Original: dealloc_stack y
+  //    Adjoint: adj[y] = alloc_stack $T.CotangentVector
+  void visitDeallocStackInst(DeallocStackInst *dsi) {
+    auto bufType =
+        remapType(getCotangentType(dsi->getOperand()->getType(), getModule()));
+    auto *adjBuf = builder.createAllocStack(dsi->getLoc(), bufType);
+    materializeZeroIndirect(bufType.getASTType(), adjBuf, dsi->getLoc());
+    initializeAdjointValue(dsi->getOperand(), adjBuf);
+  }
+
+  // Handle `load` instruction.
+  //   Original: y = load x
+  //    Adjoint: adj[x] += adj[y]
+  void visitLoadInst(LoadInst *li) {
+    auto adjVal = materializeAdjointDirect(getAdjointValue(li), li->getLoc());
+    auto *buf = builder.createAllocStack(li->getLoc(),
+                                         remapType(adjVal->getType()));
+    auto *access = builder.createBeginAccess(
+        li->getLoc(), buf, SILAccessKind::Init, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    builder.createStore(li->getLoc(), adjVal, access,
+        getBufferSOQ(buf->getType().getASTType(), getAdjoint()));
+    builder.createEndAccess(li->getLoc(), access, /*aborted*/ false);
+    addAdjointValue(li->getOperand(), access);
+    builder.createDeallocStack(li->getLoc(), buf);
+  }
+
+  // Handle `store` instruction.
+  //   Original: store x to y
+  //    Adjoint: adj[x] += load adj[y]; adj[y] = 0
+  void visitStoreInst(StoreInst *si) {
+    auto adjBuf =
+        materializeAdjoint(getAdjointValue(si->getDest()), si->getLoc());
+    auto bufType = remapType(adjBuf->getType());
+    auto adjVal = builder.createLoad(si->getLoc(), adjBuf,
+        getBufferLOQ(bufType.getASTType(), getAdjoint()));
+    addAdjointValue(si->getSrc(), adjVal);
+    materializeZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
+  }
+
+  // Handle `begin_access` instruction.
+  //   Original: y = begin_access x
+  //    Adjoint: end_access adj[y]
+  void visitBeginAccessInst(BeginAccessInst *bai) {
+    // Check for non-differentiable writes.
+    if (bai->getAccessKind() == SILAccessKind::Modify) {
+      if (auto *gai = dyn_cast<GlobalAddrInst>(bai->getSource())) {
+        getContext()
+            .emitNondifferentiabilityError(bai, getDifferentiationTask(),
+                diag::autodiff_cannot_differentiate_writes_to_global_variables);
+        errorOccurred = true;
+        return;
+      }
+      if (auto *pbi = dyn_cast<ProjectBoxInst>(bai->getSource())) {
+        getContext()
+            .emitNondifferentiabilityError(bai, getDifferentiationTask(),
+                 diag::autodiff_cannot_differentiate_writes_to_mutable_captures);
+        errorOccurred = true;
+        return;
+      }
+    }
+    auto accessBuf = materializeAdjoint(getAdjointValue(bai), bai->getLoc());
+    builder.createEndAccess(bai->getLoc(), accessBuf, /*aborted*/ false);
+  }
+
+  // Handle `end_access` instruction.
+  //   Original: end_access y, where y = begin_access x
+  //    Adjoint: adj[y] = begin_access inverse(access_kind) adj[x]
+  void visitEndAccessInst(EndAccessInst *eai) {
+    auto adjBuf =
+        materializeAdjoint(getAdjointValue(eai->getSource()), eai->getLoc());
+    SILAccessKind kind;
+    switch (eai->getBeginAccess()->getAccessKind()) {
+    case SILAccessKind::Read: kind = SILAccessKind::Modify; break;
+    case SILAccessKind::Modify: kind = SILAccessKind::Read; break;
+    case SILAccessKind::Init: kind = SILAccessKind::Deinit; break;
+    case SILAccessKind::Deinit: kind = SILAccessKind::Init; break;
+    }
+    auto adjAccess = builder.createBeginAccess(
+        eai->getLoc(), adjBuf, kind, eai->getBeginAccess()->getEnforcement(),
+        eai->getBeginAccess()->hasNoNestedConflict(),
+        eai->getBeginAccess()->isFromBuiltin());
+    initializeAdjointValue(eai->getOperand(), adjAccess);
+  }
+
+#define REFCOUNTING_ADJOINT(ORIG, ADJ) \
+  void visit##ORIG##Inst(ORIG##Inst *inst) { \
+    auto adj = getAdjointValue(inst->getOperand()); \
+    auto adjVal = materializeAdjointDirect(adj, inst->getLoc()); \
+        builder.create##ADJ(inst->getLoc(), adjVal, \
+                            builder.getDefaultAtomicity()); \
+  }
+  REFCOUNTING_ADJOINT(RetainValue, ReleaseValue)
+  REFCOUNTING_ADJOINT(RetainValueAddr, ReleaseValueAddr)
+  REFCOUNTING_ADJOINT(ReleaseValue, RetainValue)
+  REFCOUNTING_ADJOINT(ReleaseValueAddr, RetainValueAddr)
+  REFCOUNTING_ADJOINT(StrongRetain, StrongRelease)
+  REFCOUNTING_ADJOINT(StrongRelease, StrongRetain)
+  REFCOUNTING_ADJOINT(UnownedRetain, UnownedRelease)
+  REFCOUNTING_ADJOINT(UnownedRelease, UnownedRetain)
+  REFCOUNTING_ADJOINT(StrongRetainUnowned, StrongRelease)
+#undef REFCOUNTING_ADJOINT
+
+#define NOT_DIFFERENTIABLE(INST, DIAG) \
   void visit##INST##Inst(INST##Inst *inst) { \
     getContext().emitNondifferentiabilityError( \
-      inst, getDifferentiationTask()); \
+        inst, getDifferentiationTask(), DIAG); \
+    errorOccurred = true; \
+    return; \
   }
-  
-  NOT_DIFFERENTIABLE(GlobalAddr)
-
 #undef NOT_DIFFERENTIABLE
-  
+
 #define NO_ADJOINT(INST) \
   void visit##INST##Inst(INST##Inst *inst) {}
-  
   NO_ADJOINT(Return)
   NO_ADJOINT(DebugValue)
   NO_ADJOINT(DebugValueAddr)
-  
+  NO_ADJOINT(DestroyValue) // TODO: Revisit this.
+  NO_ADJOINT(DestroyAddr)
 #undef NO_DERIVATIVE
 };
 } // end anonymous namespace
@@ -3460,7 +3540,7 @@ SILValue AdjointEmitter::materializeZeroDirect(CanType type, SILLocation loc) {
   builder.createEndAccess(loc, access, /*aborted*/ false);
   access = builder.createBeginAccess(loc, buffer, SILAccessKind::Read,
                                      SILAccessEnforcement::Static,
-                                     /*noNestedConflict*/ false,
+                                     /*noNestedConflict*/ true,
                                      /*fromBuiltin*/ false);
   auto *loaded = builder.createLoad(loc, access,
                                     getBufferLOQ(type, getAdjoint()));
@@ -3471,6 +3551,7 @@ SILValue AdjointEmitter::materializeZeroDirect(CanType type, SILLocation loc) {
 
 SILValue AdjointEmitter::materializeAdjointDirect(AdjointValue val,
                                                   SILLocation loc) {
+  assert(val.getType().isObject());
   LLVM_DEBUG(getADDebugStream() <<
              "Materializing adjoints for " << val << '\n');
   switch (val.getKind()) {
@@ -3567,8 +3648,30 @@ void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
   builder.createEndAccess(destBuffer.getLoc(), access, /*aborted*/ false);
 }
 
+SILValue AdjointEmitter::materializeAdjointIndirectToStack(AdjointValue val,
+                                                           SILLocation loc) {
+  LLVM_DEBUG(getADDebugStream() <<
+             "Materializing adjoint to stack: " << val << '\n');
+  auto *buf =
+      builder.createAllocStack(loc, remapType(val.getType().getObjectType()));
+  localAllocations.push_back(buf);
+  materializeAdjointIndirect(val, buf);
+  return buf;
+}
+
+SILValue AdjointEmitter::materializeAdjoint(AdjointValue val, SILLocation loc) {
+  if (val.isMaterialized())
+    return val.getMaterializedValue();
+  if (val.getType().isObject())
+    return materializeAdjointDirect(val, loc);
+  return materializeAdjointIndirectToStack(val, loc);
+}
+
 AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
                                                       AdjointValue rhs) {
+  LLVM_DEBUG(getADDebugStream()
+             << "Materializing adjoint directly.\nLHS: " << lhs
+             << "\nRHS: " << rhs << '\n');
   switch (lhs.getKind()) {
   // x
   case AdjointValue::Kind::Materialized: {
@@ -3764,8 +3867,11 @@ bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
       passManager.getAnalysis<DifferentiableActivityAnalysis>();
+  auto *postDomAnalysis =
+      passManager.getAnalysis<PostDominanceAnalysis>();
   // Generate primal code.
-  AdjointEmitter emitter(item, *activityAnalysis->get(item.original), *this);
+  AdjointEmitter emitter(item, *activityAnalysis->get(item.original),
+                         *postDomAnalysis->get(item.original), *this);
   // Run the adjoint emitter.
   return emitter.run();
 }
@@ -4242,8 +4348,8 @@ void DifferentiationTask::createVJP() {
   auto *primalRef = builder.createFunctionRef(loc, primal);
 
   auto vjpSubstMap = vjpGenericEnv
-    ? vjpGenericEnv->getForwardingSubstitutionMap()
-    : vjp->getForwardingSubstitutionMap();
+      ? vjpGenericEnv->getForwardingSubstitutionMap()
+      : vjp->getForwardingSubstitutionMap();
 
   auto *primalApply = builder.createApply(
       loc, primalRef, vjpSubstMap, primalArgs, /*isNonThrowing*/ false);
@@ -4305,13 +4411,10 @@ void DifferentiationTask::createVJP() {
   SmallVector<SILValue, 8> directResults;
   auto originalDirectResults = ArrayRef<SILValue>(primalDirectResults)
       .take_back(originalConv.getNumDirectSILResults());
-  for (auto originalDirectResult : originalDirectResults)
-    directResults.push_back(originalDirectResult);
+  directResults.append(originalDirectResults.begin(),
+                       originalDirectResults.end());
   directResults.push_back(adjointPartialApply);
-  if (directResults.size() > 1)
-    builder.createReturn(loc, builder.createTuple(loc, directResults));
-  else
-    builder.createReturn(loc, directResults.front());
+  builder.createReturn(loc, joinElements(directResults, builder, loc));
 }
 
 //===----------------------------------------------------------------------===//
