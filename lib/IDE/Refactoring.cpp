@@ -3377,3 +3377,5 @@ int swift::ide::findLocalRenameRanges(
   return findSyntacticRenameRanges(SF, RangeCollector.results(), RenameConsumer,
                                    DiagConsumer);
 }
+
+// Inconsequential change
