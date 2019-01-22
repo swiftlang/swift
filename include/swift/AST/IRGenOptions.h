@@ -165,6 +165,9 @@ public:
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
 
+  /// Emit mangled names of anonymous context descriptors.
+  unsigned EnableAnonymousContextMangledNames : 1;
+
   /// Enables resilient class layout.
   unsigned EnableClassResilience : 1;
 
@@ -224,7 +227,8 @@ public:
         EmitStackPromotionChecks(false), PrintInlineTree(false),
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
-        EnableReflectionNames(true), EnableClassResilience(false),
+        EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
+        EnableClassResilience(false),
         EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
         UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),

@@ -1041,6 +1041,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = false;
   }
 
+  if (Args.hasArg(OPT_enable_anonymous_context_mangled_names))
+    Opts.EnableAnonymousContextMangledNames = true;
+
   if (Args.hasArg(OPT_disable_reflection_names)) {
     Opts.EnableReflectionNames = false;
   }

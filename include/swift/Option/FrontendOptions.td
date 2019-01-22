@@ -272,6 +272,10 @@ def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
 def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
   HelpText<"Add names to local values in LLVM IR">;
 
+def enable_anonymous_context_mangled_names :
+  Flag<["-"], "enable-anonymous-context-mangled-names">,
+  HelpText<"Enable emission of mangled names in anonymous context descriptors">;
+
 def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
   HelpText<"Disable emission of reflection metadata for nominal types">;
 
