@@ -39,16 +39,16 @@ public:
 
   // Ignore callbacks for suffix completions
   // {
-  void completeDotExpr(Expr *E, SourceLoc DotLoc) override{};
-  void completePostfixExpr(Expr *E, bool hasSpace) override{};
-  void completeExprSuper(SuperRefExpr *SRE) override{};
-  void completeExprSuperDot(SuperRefExpr *SRE) override{};
+  void completeDotExpr(Expr *E, SourceLoc DotLoc) override {};
+  void completePostfixExpr(Expr *E, bool hasSpace) override {};
+  void completeExprSuper(SuperRefExpr *SRE) override {};
+  void completeExprSuperDot(SuperRefExpr *SRE) override {};
   // }
 
   // Ignore non-expression callbacks.
   // {
-  void completeInPrecedenceGroup(SyntaxKind SK) override{};
-  void completePoundAvailablePlatform() override{};
+  void completeInPrecedenceGroup(SyntaxKind SK) override {};
+  void completePoundAvailablePlatform() override {};
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override {}
   void completeTypeSimpleBeginning() override {}
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override {}
@@ -65,15 +65,15 @@ public:
   void completePlatformCondition() override {}
   void completeGenericParams(TypeLoc TL) override {}
   void completeAfterIfStmt(bool hasElse) override {}
-  void completeAccessorBeginning() override{};
+  void completeAccessorBeginning() override {};
   // }
 
-  void completeStmtOrExpr() override{};
+  void completeStmtOrExpr() override {};
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
   void completeCaseStmtBeginning() override;
 
-  void completeAssignmentRHS(AssignExpr *E) override{};
+  void completeAssignmentRHS(AssignExpr *E) override {};
   void completeCallArg(CodeCompletionExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
