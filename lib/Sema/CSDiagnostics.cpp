@@ -580,8 +580,21 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     anchor = assignExpr->getSrc();
   
   auto *unwrapped = anchor->getValueProvidingExpr();
-  auto type = getType(anchor)->getRValueType();
-
+  Type type = [&] {
+    // The anchor could be pointing to an OptionalEvaluationExpr, with the sub
+    // expression being a CallExpr, UnresolvedDotExpr, etc which could produce
+    // an >= 1 optional, so let's return the type of the sub expression.
+    if (auto OEE = dyn_cast<OptionalEvaluationExpr>(anchor)) {
+      if (auto subTy = getType(OEE->getSubExpr())) {
+        if (!subTy->hasLValueType() && subTy->getOptionalObjectType()) {
+          return subTy->getRValueType();
+        }
+      }
+    }
+    // Just return the type of the anchor
+    return getType(anchor)->getRValueType();
+  }();
+  
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
   if (!tryExpr)
     return diagnoseUnwrap(getConstraintSystem(), unwrapped, type);
