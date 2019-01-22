@@ -133,7 +133,7 @@ DynamicallyReplaceable.test("DynamicallyReplaceable") {
 #elseif os(Windows)
         _ = LoadLibraryA(target_library_name("Module2"))
 #else
-	_ = dlopen(target_library_name("Module2"), RTLD_NOW)
+	_ = dlopen(executablePath+target_library_name("Module2"), RTLD_NOW)
 #endif
 	checkExpectedResults(forOriginalLibrary: false)
 }
