@@ -3572,6 +3572,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     MODULE_DIR="${INSTALL_DESTDIR}"
                     # Install libParser is necessary
                     rsync -a "$(build_directory ${host} swift)/lib/lib_InternalSwiftSyntaxParser.dylib" "${INSTALL_DESTDIR}"
+                    # Install module map of libParser so client can import SwiftSyntax
+                    rsync -a "${SWIFT_SOURCE_DIR}/include/swift-c/SyntaxParser" "${INSTALL_DESTDIR}"
                 else
                     # We have a toolchain so install to the toolchain
                     DYLIB_DIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
