@@ -907,8 +907,9 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
 
   // Since associated types will be derived, we make this struct a fieldwise
   // differentiable type.
-  nominal->getAttrs().add(
-      new (C) FieldwiseDifferentiableAttr(/*implicit*/ true));
+  if (!nominal->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>())
+    nominal->getAttrs().add(
+        new (C) FieldwiseDifferentiableAttr(/*implicit*/ true));
 
   // Get all stored properties for differentation.
   SmallVector<VarDecl *, 16> diffProperties;
