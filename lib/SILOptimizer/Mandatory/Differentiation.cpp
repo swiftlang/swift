@@ -2441,8 +2441,8 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // FIXME: If the original function has indirect differentiation
   // parameters/result, bail out since AD does not support side-effecting
   // instructions yet.
-  if (diagnoseUnsupportedControlFlow(context, item.task) ||
-      diagnoseIndirectParametersOrResult(context, item.task)) {
+  if (diagnoseUnsupportedControlFlow(context, item.task)
+      /*|| diagnoseIndirectParametersOrResult(context, item.task)*/) {
     errorOccurred = true;
     return true;
   }
@@ -3329,70 +3329,68 @@ public:
     }
   }
 
-//  FIXME: Fix side effect handling logic.
-//
-//  // Handle `alloc_stack` instruction.
-//  //   Original: y = alloc_stack $T
-//  //    Adjoint: dealloc_stack adj[y]
-//  void visitAllocStackInst(AllocStackInst *asi) {
-//    auto adjBuf = getAdjointValue(asi).getMaterializedValue();
-//    builder.createDeallocStack(asi->getLoc(), adjBuf);
-//  }
-//
-//  // Handle `dealloc_stack` instruction.
-//  //   Original: dealloc_stack y
-//  //    Adjoint: adj[y] = alloc_stack $T.CotangentVector
-//  void visitDeallocStackInst(DeallocStackInst *dsi) {
-//    auto *adjBuf = builder.createAllocStack(dsi->getLoc(),
-//        getCotangentType(dsi->getOperand()->getType(), getModule()));
-//    addAdjointValue(dsi->getOperand(), adjBuf);
-//  }
-//
-//  // Handle `load` instruction.
-//  //   Original: y = load x
-//  //    Adjoint: adj[y] += adj[x]
-//  void visitLoadInst(LoadInst *li) {
-//    auto adjVal = materializeAdjointDirect(getAdjointValue(li), li->getLoc());
-//    auto *buf = builder.createAllocStack(li->getLoc(), adjVal->getType());
-//    auto *access = builder.createBeginAccess(
-//        li->getLoc(), buf, SILAccessKind::Init, SILAccessEnforcement::Static,
-//        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-//    addAdjointValue(li->getOperand(), access);
-//    builder.createEndAccess(li->getLoc(), access, /*aborted*/ false);
-//    builder.createDeallocStack(li->getLoc(), buf);
-//  }
-//
-//  // Handle `store` instruction.
-//  //   Original: store x to y
-//  //    Adjoint: adj[y] += load adj[x]
-//  void visitStoreInst(StoreInst *si) {
-//    auto adjBuf = getAdjointValue(si->getDest()).getMaterializedValue();
-//    auto adjVal = builder.createLoad(si->getLoc(), adjBuf,
-//        getBufferLOQ(adjBuf->getType().getASTType(), getAdjoint()));
-//    addAdjointValue(si->getSrc(), adjVal);
-//  }
-//
-//  // Handle `begin_access` instruction.
-//  //   Original: y = begin_access x
-//  //    Adjoint: end_access adj[y]
-//  void visitBeginAccessInst(BeginAccessInst *bai) {
-//    auto accessBuf = getAdjointValue(bai).getMaterializedValue();
-//    builder.createEndAccess(bai->getLoc(), accessBuf, /*aborted*/ false);
-//  }
-//
-//  // Handle `end_access` instruction.
-//  //   Original: end_access y, where y = begin_access x
-//  //    Adjoint: adj[y] += begin_access adj[x]
-//  void visitEndAccessInst(EndAccessInst *eai) {
-//    auto adjBuf = getAdjointValue(eai->getSource()).getMaterializedValue();
-//    auto adjAccess = builder.createBeginAccess(
-//        eai->getLoc(), adjBuf,
-//        eai->getBeginAccess()->getAccessKind(),
-//        eai->getBeginAccess()->getEnforcement(),
-//        eai->getBeginAccess()->hasNoNestedConflict(),
-//        eai->getBeginAccess()->isFromBuiltin());
-//    addAdjointValue(eai->getOperand(), adjAccess);
-//  }
+  // Handle `alloc_stack` instruction.
+  //   Original: y = alloc_stack $T
+  //    Adjoint: dealloc_stack adj[y]
+  void visitAllocStackInst(AllocStackInst *asi) {
+    auto adjBuf = getAdjointValue(asi).getMaterializedValue();
+    builder.createDeallocStack(asi->getLoc(), adjBuf);
+  }
+
+  // Handle `dealloc_stack` instruction.
+  //   Original: dealloc_stack y
+  //    Adjoint: adj[y] = alloc_stack $T.CotangentVector
+  void visitDeallocStackInst(DeallocStackInst *dsi) {
+    auto *adjBuf = builder.createAllocStack(dsi->getLoc(),
+        getCotangentType(dsi->getOperand()->getType(), getModule()));
+    addAdjointValue(dsi->getOperand(), adjBuf);
+  }
+
+  // Handle `load` instruction.
+  //   Original: y = load x
+  //    Adjoint: adj[y] += adj[x]
+  void visitLoadInst(LoadInst *li) {
+    auto adjVal = materializeAdjointDirect(getAdjointValue(li), li->getLoc());
+    auto *buf = builder.createAllocStack(li->getLoc(), adjVal->getType());
+    auto *access = builder.createBeginAccess(
+        li->getLoc(), buf, SILAccessKind::Init, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    addAdjointValue(li->getOperand(), access);
+    builder.createEndAccess(li->getLoc(), access, /*aborted*/ false);
+    builder.createDeallocStack(li->getLoc(), buf);
+  }
+
+  // Handle `store` instruction.
+  //   Original: store x to y
+  //    Adjoint: adj[y] += load adj[x]
+  void visitStoreInst(StoreInst *si) {
+    auto adjBuf = getAdjointValue(si->getDest()).getMaterializedValue();
+    auto adjVal = builder.createLoad(si->getLoc(), adjBuf,
+        getBufferLOQ(adjBuf->getType().getASTType(), getAdjoint()));
+    addAdjointValue(si->getSrc(), adjVal);
+  }
+
+  // Handle `begin_access` instruction.
+  //   Original: y = begin_access x
+  //    Adjoint: end_access adj[y]
+  void visitBeginAccessInst(BeginAccessInst *bai) {
+    auto accessBuf = getAdjointValue(bai).getMaterializedValue();
+    builder.createEndAccess(bai->getLoc(), accessBuf, /*aborted*/ false);
+  }
+
+  // Handle `end_access` instruction.
+  //   Original: end_access y, where y = begin_access x
+  //    Adjoint: adj[y] += begin_access adj[x]
+  void visitEndAccessInst(EndAccessInst *eai) {
+    auto adjBuf = getAdjointValue(eai->getSource()).getMaterializedValue();
+    auto adjAccess = builder.createBeginAccess(
+        eai->getLoc(), adjBuf,
+        eai->getBeginAccess()->getAccessKind(),
+        eai->getBeginAccess()->getEnforcement(),
+        eai->getBeginAccess()->hasNoNestedConflict(),
+        eai->getBeginAccess()->isFromBuiltin());
+    addAdjointValue(eai->getOperand(), adjAccess);
+  }
 
 #define NOT_DIFFERENTIABLE(INST) \
   void visit##INST##Inst(INST##Inst *inst) { \
