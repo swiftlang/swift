@@ -87,6 +87,10 @@ _ = pullback(at: Nested(simple: simple, mixed: mixed, generic: genericSame)) { m
   model.simple + model.simple
 }
 
+// Verify that a `Differentiable` type upholds `AllDifferentiableVariables == CotangentVector`.
+func checkAllDifferentiableVariablesEqualsCotangentVector<T>(_: T.Type)
+  where T : Differentiable, T.AllDifferentiableVariables == T.CotangentVector {}
+
 // Test type that does not conform to `AdditiveArithmetic` but whose members do.
 // Thus, `Self` cannot be used as `TangentVector` or `CotangentVector`.
 // Vector space structs types must be synthesized.
@@ -96,6 +100,7 @@ struct AllMembersAdditiveArithmetic : Differentiable {
   var w: Float
   var b: Float
 }
+checkAllDifferentiableVariablesEqualsCotangentVector(AllMembersAdditiveArithmetic.self)
 
 // Test type `AllMembersVectorNumeric` whose members conforms to `VectorNumeric`,
 // in which case we should make `TangentVector` and `CotangentVector` conform to
@@ -126,6 +131,7 @@ struct DifferentiableSubset : Differentiable {
   @noDerivative var flag: Bool
   @noDerivative let technicallyDifferentiable: Float = .pi
 }
+checkAllDifferentiableVariablesEqualsCotangentVector(DifferentiableSubset.self)
 let tangentSubset = DifferentiableSubset.TangentVector(w: 1, b: 1)
 let cotangentSubset = DifferentiableSubset.CotangentVector(w: 1, b: 1)
 let allDiffVarsSubset = DifferentiableSubset.AllDifferentiableVariables(w: 1, b: 1)
@@ -140,6 +146,7 @@ struct NestedDifferentiableSubset : Differentiable {
   var mixed: Mixed
   @noDerivative var technicallyDifferentiable: Float
 }
+checkAllDifferentiableVariablesEqualsCotangentVector(NestedDifferentiableSubset.self)
 
 // Test type that uses synthesized vector space types but provides custom
 // method.
