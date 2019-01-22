@@ -234,3 +234,14 @@ func rdar_30906031(in arr: [Int], fn: @autoclosure () -> Int) -> Bool {
     arr.lazy.filter { $0 >= escapableF() }.isEmpty
   }
 }
+
+// SR-2688
+class Foo {
+  typealias FooClosure = () -> String
+  func fooFunction(closure: @autoclosure FooClosure) {} // ok
+}
+
+class Bar {
+  typealias BarClosure = (String) -> String
+  func barFunction(closure: @autoclosure BarClosure) {} // expected-error {{argument type of @autoclosure parameter must be '()'}}
+}
