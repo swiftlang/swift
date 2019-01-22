@@ -423,13 +423,14 @@ public:
   void print(llvm::raw_ostream &os) const;
   void dump() const LLVM_ATTRIBUTE_USED;
 private:
-  SILValue aggregateFullyAvailableValue(SILType LoadTy, unsigned FirstElt);
-  SILValue aggregateTupleSubElts(TupleType *TT, SILType LoadTy,
-                                 SILValue Address, unsigned FirstElt);
-  SILValue aggregateStructSubElts(StructDecl *SD, SILType LoadTy,
-                                  SILValue Address, unsigned FirstElt);
-  SILValue handlePrimitiveValue(SILType LoadTy, SILValue Address,
-                                unsigned FirstElt);
+  SILValue aggregateFullyAvailableValue(SILType loadTy, unsigned firstElt);
+  SILValue aggregateTupleSubElts(TupleType *tt, SILType loadTy,
+                                 SILValue address, unsigned firstElt);
+  SILValue aggregateStructSubElts(StructDecl *sd, SILType loadTy,
+                                  SILValue address, unsigned firstElt);
+  SILValue handlePrimitiveValue(SILType loadTy, SILValue address,
+                                unsigned firstElt);
+  bool isFullyAvailable(SILType loadTy, unsigned firstElt) const;
 };
 
 } // end anonymous namespace
@@ -442,6 +443,26 @@ void AvailableValueAggregator::print(llvm::raw_ostream &os) const {
   for (auto &V : AvailableValueList) {
     os << V;
   }
+}
+
+bool AvailableValueAggregator::isFullyAvailable(SILType loadTy,
+                                                unsigned firstElt) const {
+  if (firstElt >= AvailableValueList.size()) { // #Elements may be zero.
+    return false;
+  }
+
+  auto &firstVal = AvailableValueList[firstElt];
+
+  // Make sure that the first element is available and is the correct type.
+  if (!firstVal || firstVal.getType() != loadTy)
+    return false;
+
+  return llvm::all_of(range(getNumSubElements(loadTy, M)),
+                      [&](unsigned index) -> bool {
+                        auto &val = AvailableValueList[firstElt + index];
+                        return val.getValue() == firstVal.getValue() &&
+                               val.getSubElementNumber() == index;
+                      });
 }
 
 /// Given a bunch of primitive subelement values, build out the right aggregate
@@ -475,25 +496,12 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
 SILValue
 AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
                                                        unsigned firstElt) {
-  if (firstElt >= AvailableValueList.size()) { // #Elements may be zero.
+  // Check if our underlying type is fully available. If it isn't, bail.
+  if (!isFullyAvailable(loadTy, firstElt))
     return SILValue();
-  }
 
+  // Ok, grab out first value. (note: any actually will do).
   auto &firstVal = AvailableValueList[firstElt];
-
-  // Make sure that the first element is available and is the correct type.
-  if (!firstVal || firstVal.getType() != loadTy)
-    return SILValue();
-
-  // If the first element of this value is available, check that any extra
-  // available values are from the same place as our first value.
-  if (llvm::any_of(range(getNumSubElements(loadTy, M)),
-                   [&](unsigned index) -> bool {
-                     auto &val = AvailableValueList[firstElt + index];
-                     return val.getValue() != firstVal.getValue() ||
-                            val.getSubElementNumber() != index;
-                   }))
-    return SILValue();
 
   // Ok, we know that all of our available values are all parts of the same
   // value. Without ownership, we can just return the underlying first value.
