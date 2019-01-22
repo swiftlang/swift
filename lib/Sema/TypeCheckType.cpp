@@ -2005,13 +2005,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       if (auto type = resolveTopLevelIdentTypeComponent(resolution, CITR,
                                                         typeAliasResolver)) {
         if (auto TAT = dyn_cast<TypeAliasType>(type.getPointer())) {
-          if (auto underlyingRepr = TAT->getDecl()
-                                       ->getUnderlyingTypeLoc()
-                                        .getTypeRepr()) {
-            if (!underlyingRepr->isInvalid()) {
-              repr = underlyingRepr;
-            }
-          }
+          repr = TAT->getDecl()->getUnderlyingTypeLoc().getTypeRepr();
         }
       }
     }
