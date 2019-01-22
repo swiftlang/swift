@@ -12,8 +12,8 @@ import Swift
 class Klass {}
 
 struct NativeObjectPair {
-  var first: Klass
-  var second: Klass
+  var x: Klass
+  var y: Klass
 }
 
 /// Needed to avoid tuple scalarization code in the use gatherer.
@@ -79,8 +79,8 @@ bb0(%0 : @owned $Klass):
 sil [ossa] @struct_nontrivial_load_promotion : $@convention(thin) (@owned Klass, @owned Klass) -> @owned NativeObjectPair {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   %2 = alloc_stack $NativeObjectPair
-  %3 = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.first
-  %4 = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.second
+  %3 = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.x
+  %4 = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.y
   store %0 to [init] %3 : $*Klass
   store %1 to [init] %4 : $*Klass
   %5 = load [copy] %2 : $*NativeObjectPair
@@ -191,15 +191,15 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   cond_br undef, bb1, bb2
 
 bb1:
-  %3a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.first
-  %4a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.second
+  %3a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.x
+  %4a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.y
   store %0 to [init] %3a : $*Klass
   store %1 to [init] %4a : $*Klass
   br bb3
 
 bb2:
-  %3b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.first
-  %4b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.second
+  %3b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.x
+  %4b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.y
   store %0 to [init] %3b : $*Klass
   store %1 to [init] %4b : $*Klass
   br bb3
@@ -307,16 +307,16 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass, %arg2 : @owned $Klass):
   cond_br undef, bb1, bb2
 
 bb1:
-  %3a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.first
-  %4a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.second
+  %3a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.x
+  %4a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.y
   store %0 to [init] %3a : $*Klass
   store %1 to [init] %4a : $*Klass
   destroy_value %arg2 : $Klass
   br bb3
 
 bb2:
-  %3b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.first
-  %4b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.second
+  %3b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.x
+  %4b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.y
   store %0 to [init] %3b : $*Klass
   destroy_value %1 : $Klass
   store %arg2 to [init] %4b : $*Klass
@@ -409,7 +409,7 @@ sil [ossa] @simple_partialstructuse_load_promotion : $@convention(thin) (@owned 
 bb0(%0 : @owned $NativeObjectPair):
   %1 = alloc_stack $NativeObjectPair
   store %0 to [init] %1 : $*NativeObjectPair
-  %2 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.first
+  %2 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.x
   %3 = load [copy] %2 : $*Klass
   destroy_addr %1 : $*NativeObjectPair
   dealloc_stack %1 : $*NativeObjectPair
@@ -460,6 +460,53 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   destroy_addr %2 : $*Klass
   dealloc_stack %2 : $*Klass
   return %3 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @diamond_test_2 : $@convention(thin) (@owned NativeObjectPair) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] : @owned $NativeObjectPair):
+// CHECK:   [[STACK:%.*]] = alloc_stack $NativeObjectPair
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[LHS1:%.*]] = struct_extract [[BORROWED_ARG]] : $NativeObjectPair, #NativeObjectPair.x
+// CHECK:   [[LHS1_COPY:%.*]] = copy_value [[LHS1]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[LHS2:%.*]] = struct_extract [[BORROWED_ARG]] : $NativeObjectPair, #NativeObjectPair.x
+// CHECK:   [[LHS2_COPY:%.*]] = copy_value [[LHS2]]
+// CHECK:   store [[ARG]] to [init] [[STACK]]
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   destroy_value [[LHS1_COPY]]
+// CHECK:   br bb3([[LHS2_COPY]] :
+//
+// CHECK: bb2:
+// CHECK:   destroy_value [[LHS2_COPY]]
+// CHECK:   br bb3([[LHS1_COPY]] :
+//
+// CHECK: bb3([[PHI:%.*]] :
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[PHI]]
+// CHECK: } // end sil function 'diamond_test_2'
+sil [ossa] @diamond_test_2 : $@convention(thin) (@owned NativeObjectPair) -> @owned Klass {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = alloc_stack $NativeObjectPair
+  store %0 to [init] %1 : $*NativeObjectPair
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.x
+  %3 = load [copy] %2 : $*Klass
+  br bb3(%3 : $Klass)
+
+bb2:
+  %4 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.x
+  %5 = load [copy] %4 : $*Klass
+  br bb3(%5 : $Klass)
+
+bb3(%6 : @owned $Klass):
+  destroy_addr %1 : $*NativeObjectPair
+  dealloc_stack %1 : $*NativeObjectPair
+  return %6 : $Klass
 }
 
 ////////////////////
