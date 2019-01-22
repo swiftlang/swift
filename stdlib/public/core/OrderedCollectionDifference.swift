@@ -99,7 +99,7 @@ public struct OrderedCollectionDifference<ChangeElement> {
     /// Creates an instance from a collection of changes.
     ///
     /// For clients interested in the difference between two ordered
-    /// collections, see `OrderedCollection.shortestEditScript(from:)`.
+    /// collections, see `OrderedCollection.difference(from:)`.
     ///
     /// To guarantee that instances are unambiguous and safe for compatible base
     /// states, this initializer will fail unless its parameter meets to the

@@ -9,8 +9,8 @@ let suite = "Diffing"
 TestSuite(suite).test("Diffing empty collections") {
   let a = [Int]()
   let b = [Int]()
-  let diff = b.shortestEditScript(from: a)
-  expectEqual(diff, a.shortestEditScript(from: a))
+  let diff = b.difference(from: a)
+  expectEqual(diff, a.difference(from: a))
   expectTrue(diff.isEmpty)
 }
 
@@ -335,7 +335,7 @@ TestSuite(suite).test("Basic diffing algorithm validators") {
   ]
 
   for (source, target, expected, line) in expectedChanges {
-    let actual = target.shortestEditScript(from: source).inferringMoves()
+    let actual = target.difference(from: source).inferringMoves()
     expectEqual(actual, OrderedCollectionDifference(expected), "failed test at line \(line)")
   }
 }
@@ -557,7 +557,7 @@ TestSuite(suite).test("Three way diff demo code") {
   let myLines = mine.components(separatedBy: "\n")
 
   // Create a difference from base to theirs
-  let diff = theirLines.shortestEditScript(from:baseLines)
+  let diff = theirLines.difference(from: baseLines)
 
   // Apply it to mine, if possible
   guard let patchedLines = myLines.applying(diff) else {
@@ -594,7 +594,7 @@ TestSuite(suite).test("Naive application by enumeration") {
   let theirLines = theirs.components(separatedBy: "\n")
 
   // Create a difference from base to theirs
-  let diff = theirLines.shortestEditScript(from:arr)
+  let diff = theirLines.difference(from: arr)
 
   for c in diff {
     switch c {
@@ -627,7 +627,7 @@ TestSuite(suite).test("Fast applicator boundary conditions") {
     if insertFirst  { b.insert(12, at: 0) }
 
     // Generate diff
-    let diff = b.shortestEditScript(from: a)
+    let diff = b.difference(from: a)
 
     // Validate application
     expectEqual(b, a.applying(diff)!)
@@ -645,7 +645,7 @@ TestSuite(suite).test("Fast applicator fuzzer") {
   for _ in 0..<1000 {
     let a = makeArray()
     let b = makeArray()
-    let d = b.shortestEditScript(from: a)
+    let d = b.difference(from: a)
     let applied = a.applying(d)
     expectNotNil(applied)
     if let applied = applied {
@@ -655,7 +655,7 @@ TestSuite(suite).test("Fast applicator fuzzer") {
           // repro:
           let a = \(a)
           let b = \(b)
-          let d = b.shortestEditScript(from: a)
+          let d = b.difference(from: a)
           expectEqual(b, a.applying(d))
         """)
         break
