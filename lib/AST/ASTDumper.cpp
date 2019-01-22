@@ -410,6 +410,11 @@ static void printName(raw_ostream &os, DeclName name) {
     os << name;
 }
 
+static void dumpSubstitutionMapRec(
+    SubstitutionMap map, llvm::raw_ostream &out,
+    SubstitutionMap::DumpStyle style, unsigned indent,
+    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
+
 namespace {
   class PrintPattern : public PatternVisitor<PrintPattern> {
   public:
@@ -637,6 +642,24 @@ namespace {
       }
       printInherited(TAD->getInherited());
       OS << "')";
+    }
+    
+    void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
+      printCommon(OTD, "opaque_type");
+      OS << " naming_decl=";
+      printDeclName(OTD->getNamingDecl());
+      PrintWithColorRAII(OS, TypeColor) << " opaque_interface="
+        << Type(OTD->getUnderlyingInterfaceType()).getString();
+      OS << " in "
+         << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
+      if (auto underlyingSubs = OTD->getUnderlyingTypeSubstitutions()) {
+        OS << " underlying:\n";
+        SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+        dumpSubstitutionMapRec(*underlyingSubs, OS,
+                               SubstitutionMap::DumpStyle::Full,
+                               Indent + 2, Dumped);
+      }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void printAbstractTypeParamCommon(AbstractTypeParamDecl *decl,
@@ -1033,6 +1056,14 @@ namespace {
           OS << "result\n";
           printRec(FD->getBodyResultTypeLoc().getTypeRepr());
           PrintWithColorRAII(OS, ParenthesisColor) << ')';
+          if (auto opaque = FD->getOpaqueResultTypeDecl()) {
+            OS << '\n';
+            OS.indent(Indent);
+            PrintWithColorRAII(OS, ParenthesisColor) << '(';
+            OS << "opaque_result_decl\n";
+            printRec(opaque);
+            PrintWithColorRAII(OS, ParenthesisColor) << ')';
+          }
           Indent -= 2;
         }
       }
@@ -2152,7 +2183,11 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-
+  void visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E){
+    printCommon(E, "underlying_to_opaque_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitErasureExpr(ErasureExpr *E) {
     printCommon(E, "erasure_expr") << '\n';
     for (auto conf : E->getConformances()) {
@@ -2864,11 +2899,6 @@ static void dumpProtocolConformanceRec(
     unsigned indent,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
 
-static void dumpSubstitutionMapRec(
-    SubstitutionMap map, llvm::raw_ostream &out,
-    SubstitutionMap::DumpStyle style, unsigned indent,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
-
 static void dumpProtocolConformanceRefRec(
     const ProtocolConformanceRef conformance, llvm::raw_ostream &out,
     unsigned indent,
@@ -3389,6 +3419,20 @@ namespace {
       printArchetypeCommon(T, "opened_archetype_type", label);
       printRec("opened_existential", T->getOpenedExistentialType());
       printField("opened_existential_id", T->getOpenedExistentialID());
+      printArchetypeNestedTypes(T);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+    void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T,
+                                      StringRef label) {
+      printArchetypeCommon(T, "opaque_type", label);
+      printField("decl", T->getOpaqueDecl()->getNamingDecl()->printRef());
+      if (!T->getSubstitutions().empty()) {
+        OS << '\n';
+        SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+        dumpSubstitutionMapRec(T->getSubstitutions(), OS,
+                               SubstitutionMap::DumpStyle::Full,
+                               Indent + 2, Dumped);
+      }
       printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

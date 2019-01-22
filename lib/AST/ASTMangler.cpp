@@ -871,6 +871,22 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::NestedArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
 
+    case TypeKind::OpaqueTypeArchetype: {
+      // TODO: Mangle opaque archetypes as themselves, not their underlying type
+      auto opaqueTy = cast<OpaqueTypeArchetypeType>(tybase);
+      
+      // Currently an opaque type will only lack an underlying type when in
+      // error. Mangle an error type for USRs and other queries that might apply
+      // to a failed AST.
+      if (!opaqueTy->getOpaqueDecl()->getUnderlyingTypeSubstitutions()) {
+        return appendType(ErrorType::get(opaqueTy->getASTContext()));
+      }
+      auto underlyingType =
+        type.substOpaqueTypesWithUnderlyingTypes();
+      assert(!underlyingType->isEqual(type));
+      return appendType(underlyingType->getCanonicalType());
+    }
+      
     case TypeKind::DynamicSelf: {
       auto dynamicSelf = cast<DynamicSelfType>(tybase);
       if (dynamicSelf->getSelfType()->getAnyNominal()) {

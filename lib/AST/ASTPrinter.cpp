@@ -2150,6 +2150,10 @@ void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
   Printer << "(\"" << PDD->getMessage()->getValue() << "\")";
 }
 
+void PrintAST::visitOpaqueTypeDecl(OpaqueTypeDecl *decl) {
+  // TODO: Need a parsable representation for generated interfaces.
+}
+
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
@@ -4039,6 +4043,20 @@ public:
   
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
     printArchetypeCommon(T);
+  }
+  
+  void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
+    // TODO(opaque): present opaque types with user-facing syntax
+    Printer << "(__opaque " << T->getOpaqueDecl()->getNamingDecl()->printRef();
+    if (!T->getSubstitutions().empty()) {
+      Printer << '<';
+      auto replacements = T->getSubstitutions().getReplacementTypes();
+      interleave(replacements.begin(), replacements.end(),
+                 [&](Type t) { visit(t); },
+                 [&] { Printer << ", "; });
+      Printer << '>';
+    }
+    Printer << ')';
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {

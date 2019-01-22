@@ -914,6 +914,17 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     // Typealiases don't introduce any other scopes.
     return nullptr;
   }
+      
+  case DeclKind::OpaqueType: {
+    // If we have a generic type and our parent isn't describing our
+    // generic parameters, build the generic parameter scope.
+    auto opaque = cast<OpaqueTypeDecl>(decl);
+    if (auto scope = nextGenericParam(opaque->getGenericParams(), opaque))
+      return scope;
+
+    // Opaque type decls don't introduce any other scopes.
+    return nullptr;
+  }
 
   case DeclKind::Func:
   case DeclKind::Accessor:

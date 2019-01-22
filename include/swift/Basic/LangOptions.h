@@ -291,6 +291,9 @@ namespace swift {
     /// Scaffolding to permit experimentation with finer-grained dependencies
     /// and faster rebuilds.
     bool EnableExperimentalDependencies = false;
+    
+    /// Enable the experimental opaque result types feature.
+    bool EnableOpaqueResultTypes = true;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

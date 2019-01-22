@@ -775,8 +775,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
     auto upcast =
       B.createInitExistentialMetatype(loc, metatype,
-                                      existentialTL.getLoweredType(),
-                                      conformances);
+                      existentialTL.getLoweredType(),
+                      cast<MetatypeType>(concreteFormalType).getInstanceType(),
+                      conformances);
     return ManagedValue::forUnmanaged(upcast);
   }
   case ExistentialRepresentation::Class: {

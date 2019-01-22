@@ -93,18 +93,28 @@ ProtocolConformanceRef::subst(Type origType,
 ProtocolConformanceRef
 ProtocolConformanceRef::subst(Type origType,
                               TypeSubstitutionFn subs,
-                              LookupConformanceFn conformances) const {
+                              LookupConformanceFn conformances,
+                              SubstOptions options) const {
   if (isInvalid())
     return *this;
 
   // If we have a concrete conformance, we need to substitute the
   // conformance to apply to the new type.
   if (isConcrete())
-    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances));
+    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances,
+                                                       options));
+  // If the type is an opaque archetype, the conformance will remain abstract,
+  // unless we're specifically substituting opaque types.
+  if (auto origArchetype = origType->getAs<ArchetypeType>()) {
+    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+        && isa<OpaqueTypeArchetypeType>(origArchetype->getRoot())) {
+      return *this;
+    }
+  }
 
   // Otherwise, compute the substituted type.
   auto substType = origType.subst(subs, conformances,
-                                  SubstFlags::UseErrorType);
+                                  options | SubstFlags::UseErrorType);
 
   // Opened existentials trivially conform and do not need to go through
   // substitution map lookup.
@@ -128,6 +138,13 @@ ProtocolConformanceRef::subst(Type origType,
   }
 
   llvm_unreachable("Invalid conformance substitution");
+}
+
+ProtocolConformanceRef
+ProtocolConformanceRef::substOpaqueTypesWithUnderlyingTypes(Type origType) const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer;
+  return subst(origType, replacer, replacer,
+               SubstFlags::SubstituteOpaqueArchetypes);
 }
 
 Type
@@ -1204,7 +1221,8 @@ ProtocolConformance::subst(SubstitutionMap subMap) const {
 
 ProtocolConformance *
 ProtocolConformance::subst(TypeSubstitutionFn subs,
-                           LookupConformanceFn conformances) const {
+                           LookupConformanceFn conformances,
+                           SubstOptions options) const {
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto origType = getType();
@@ -1214,7 +1232,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto subMap = SubstitutionMap::get(getGenericSignature(),
                                        subs, conformances);
-    auto substType = origType.subst(subMap, SubstFlags::UseErrorType);
+    auto substType = origType.subst(subMap, options | SubstFlags::UseErrorType);
     if (substType->isEqual(origType))
       return const_cast<ProtocolConformance *>(this);
 
@@ -1240,11 +1258,12 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
     if (origBaseType->hasTypeParameter() ||
         origBaseType->hasArchetype()) {
       // Substitute into the superclass.
-      inheritedConformance = inheritedConformance->subst(subs, conformances);
+      inheritedConformance = inheritedConformance->subst(subs, conformances,
+                                                         options);
     }
 
     auto substType = origType.subst(subs, conformances,
-                                    SubstFlags::UseErrorType);
+                                    options | SubstFlags::UseErrorType);
     return substType->getASTContext()
       .getInheritedConformance(substType, inheritedConformance);
   }
@@ -1256,10 +1275,10 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto origType = getType();
     auto substType = origType.subst(subs, conformances,
-                                    SubstFlags::UseErrorType);
+                                    options | SubstFlags::UseErrorType);
     return substType->getASTContext()
       .getSpecializedConformance(substType, genericConformance,
-                                 subMap.subst(subs, conformances));
+                                 subMap.subst(subs, conformances, options));
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");

@@ -406,6 +406,10 @@ def solver_enable_operator_designated_types :
   Flag<["-"], "solver-enable-operator-designated-types">,
   HelpText<"Enable operator designated types in constraint solver">;
 
+def enable_opaque_result_types :
+  Flag<["-"], "enable-opaque-result-types">,
+  HelpText<"Enable experimental opaque result types feature">;
+
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
 

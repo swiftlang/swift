@@ -621,16 +621,23 @@ public:
 
       bool foundError = type->getCanonicalType().findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
+          auto root = archetype->getRoot();
+          
+          // Opaque archetypes are globally available. We don't need to check
+          // them here.
+          if (isa<OpaqueTypeArchetypeType>(root))
+            return false;
+          
           // Only visit each archetype once.
           if (!visitedArchetypes.insert(archetype).second)
             return false;
 
           // We should know about archetypes corresponding to opened
           // existential archetypes.
-          if (auto opened = dyn_cast<OpenedArchetypeType>(archetype)) {
+          if (auto opened = dyn_cast<OpenedArchetypeType>(root)) {
             if (OpenedExistentialArchetypes.count(opened) == 0) {
               Out << "Found opened existential archetype "
-                  << archetype->getString()
+                  << root->getString()
                   << " outside enclosing OpenExistentialExpr\n";
               return true;
             }
@@ -641,18 +648,18 @@ public:
           // Otherwise, the archetype needs to be from this scope.
           if (GenericEnv.empty() || !GenericEnv.back()) {
             Out << "AST verification error: archetype outside of generic "
-                   "context: " << archetype->getString() << "\n";
+                   "context: " << root->getString() << "\n";
             return true;
           }
 
           // Get the primary archetype.
-          auto *parent = archetype->getPrimary();
+          auto rootPrimary = cast<PrimaryArchetypeType>(root);
 
-          if (!GenericEnv.back().containsPrimaryArchetype(parent)) {
+          if (!GenericEnv.back().containsPrimaryArchetype(rootPrimary)) {
             Out << "AST verification error: archetype "
-                << archetype->getString() << " not allowed in this context\n";
+                << root->getString() << " not allowed in this context\n";
 
-            if (auto env = parent->getGenericEnvironment()) {
+            if (auto env = rootPrimary->getGenericEnvironment()) {
               if (auto owningDC = env->getOwningDeclContext()) {
                 llvm::errs() << "archetype came from:\n";
                 owningDC->dumpContext();

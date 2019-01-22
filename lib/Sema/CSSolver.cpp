@@ -1096,6 +1096,11 @@ ConstraintSystem::solveImpl(Expr *&expr,
   // constraint.
   if (convertType) {
     auto constraintKind = ConstraintKind::Conversion;
+    
+    if (getContextualTypePurpose() == CTP_ReturnStmt
+        && Options.contains(ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType))
+      constraintKind = ConstraintKind::OpaqueUnderlyingType;
+    
     if (getContextualTypePurpose() == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
@@ -1399,7 +1404,8 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::ArgumentConversion:
       case ConstraintKind::Conversion:
       case ConstraintKind::BridgingConversion:
-      case ConstraintKind::BindParam: {
+      case ConstraintKind::BindParam:
+      case ConstraintKind::OpaqueUnderlyingType: {
         auto secondTy = constraint->getSecondType();
         if (secondTy->is<TypeVariableType>()) {
           auto otherRep =

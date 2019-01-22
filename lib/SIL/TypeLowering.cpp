@@ -1423,7 +1423,9 @@ TypeConverter::getSILFunctionType(AbstractionPattern origType,
 const TypeLowering &
 TypeConverter::getTypeLowering(AbstractionPattern origType,
                                Type origSubstType) {
-  CanType substType = origSubstType->getCanonicalType();
+  CanType substType = origSubstType
+    .substOpaqueTypesWithUnderlyingTypes()
+    ->getCanonicalType();
   auto key = getTypeKey(origType, substType);
   
   assert((!key.isDependent() || getCurGenericContext())

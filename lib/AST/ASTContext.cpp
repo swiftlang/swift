@@ -317,6 +317,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     llvm::FoldingSet<ProtocolType> ProtocolTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
+    llvm::FoldingSet<OpaqueTypeArchetypeType> OpaqueArchetypes;
 
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
@@ -3624,7 +3625,7 @@ isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 10,
+  static_assert(RecursiveTypeProperties::BitWidth == 11,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -4098,7 +4099,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 10,
+  static_assert(RecursiveTypeProperties::BitWidth == 11,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getType()->getRecursiveProperties();
@@ -4270,6 +4271,139 @@ DependentMemberType *DependentMemberType::get(Type base,
   return known;
 }
 
+OpaqueTypeArchetypeType *
+OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
+                             SubstitutionMap Substitutions) {
+  // TODO: We could attempt to preserve type sugar in the substitution map.
+  Substitutions = Substitutions.getCanonical();
+  
+  // TODO: Eventually an opaque archetype ought to be arbitrarily substitutable
+  // into any generic environment. However, there isn't currently a good way to
+  // do this with GenericSignatureBuilder; in a situation like this:
+  //
+  // __opaque_type Foo<t_0_0: P>: Q // internal signature <t_0_0: P, t_1_0: Q>
+  //
+  // func bar<t_0_0, t_0_1, t_0_2: P>() -> Foo<t_0_2>
+  //
+  // we'd want to feed the GSB constraints to form:
+  //
+  // <t_0_0: P, t_1_0: Q where t_0_0 == t_0_2>
+  //
+  // even though t_0_2 isn't *in* this generic signature; it represents a type
+  // bound elsewhere from some other generic context. If we knew the generic
+  // environment `t_0_2` came from, then maybe we could map it into that context,
+  // but currently we have no way to know that with certainty.
+  //
+  // For now, opaque types cannot propagate across decls; every declaration
+  // with an opaque type has a unique opaque decl. Therefore, the only
+  // expressions involving opaque types ought to be contextualized inside
+  // function bodies, and the only time we need an opaque interface type should
+  // be for the opaque decl itself and the originating decl with the opaque
+  // result type, in which case the interface type mapping is identity and
+  // this problem can be temporarily avoided.
+#ifndef NDEBUG
+  for (unsigned i : indices(Substitutions.getReplacementTypes())) {
+    auto replacement = Substitutions.getReplacementTypes()[i];
+    
+    if (!replacement->hasTypeParameter())
+      continue;
+    
+    auto replacementParam = replacement->getAs<GenericTypeParamType>();
+    if (!replacementParam)
+      llvm_unreachable("opaque types cannot currently be parameterized by non-identity type parameter mappings");
+    
+    assert(i == Decl->getGenericSignature()->getGenericParamOrdinal(replacementParam)
+           && "opaque types cannot currently be parameterized by non-identity type parameter mappings");
+  }
+#endif
+  
+  llvm::FoldingSetNodeID id;
+  Profile(id, Decl, Substitutions);
+  
+  auto &ctx = Decl->getASTContext();
+
+  // An opaque type isn't contextually dependent like other archetypes, so
+  // by itself, it doesn't impose the "Has Archetype" recursive property,
+  // but the substituted types might. A disjoint "Has Opaque Archetype" tracks
+  // the presence of opaque archetypes.
+  RecursiveTypeProperties properties =
+    RecursiveTypeProperties::HasOpaqueArchetype;
+  for (auto type : Substitutions.getReplacementTypes()) {
+    properties |= type->getRecursiveProperties();
+  }
+  
+  auto arena = getArena(properties);
+  
+  llvm::FoldingSet<OpaqueTypeArchetypeType> &set
+    = ctx.getImpl().getArena(arena).OpaqueArchetypes;
+  
+  {
+    void *insertPos; // Discarded because the work below may invalidate the
+                     // insertion point inside the folding set
+    if (auto existing = set.FindNodeOrInsertPos(id, insertPos)) {
+      return existing;
+    }
+  }
+  
+  // Create a new opaque archetype.
+  // It lives in an environment in which the interface generic arguments of the
+  // decl have all been same-type-bound to the arguments from our substitution
+  // map.
+  GenericSignatureBuilder builder(ctx);
+  builder.addGenericSignature(Decl->getOpaqueInterfaceGenericSignature());
+  // Same-type-constrain the arguments in the outer signature to their
+  // replacements in the substitution map.
+  if (auto outerSig = Decl->getGenericSignature()) {
+    for (auto outerParam : outerSig->getGenericParams()) {
+      auto boundType = Type(outerParam).subst(Substitutions);
+      builder.addSameTypeRequirement(Type(outerParam), boundType,
+         GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
+         GenericSignatureBuilder::UnresolvedHandlingKind::GenerateConstraints,
+         [](Type, Type) { llvm_unreachable("error?"); });
+    }
+  }
+  
+  auto signature = std::move(builder)
+    .computeGenericSignature(SourceLoc());
+  
+  auto opaqueInterfaceTy = Decl->getUnderlyingInterfaceType();
+  auto layout = signature->getLayoutConstraint(opaqueInterfaceTy);
+  auto superclass = signature->getSuperclassBound(opaqueInterfaceTy);
+  SmallVector<ProtocolDecl*, 4> protos;
+  for (auto proto : signature->getConformsTo(opaqueInterfaceTy)) {
+    protos.push_back(proto);
+  }
+  
+  auto mem = ctx.Allocate(
+    OpaqueTypeArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
+      protos.size(), superclass ? 1 : 0, layout ? 1 : 0),
+      alignof(OpaqueTypeArchetypeType),
+      arena);
+  
+  auto newOpaque = ::new (mem) OpaqueTypeArchetypeType(Decl, Substitutions,
+                                                    properties,
+                                                    opaqueInterfaceTy,
+                                                    protos, superclass, layout);
+  
+  // Create a generic environment and bind the opaque archetype to the
+  // opaque interface type from the decl's signature.
+  auto env = signature->createGenericEnvironment();
+  env->addMapping(GenericParamKey(opaqueInterfaceTy), newOpaque);
+  newOpaque->Environment = env;
+  
+  // Look up the insertion point in the folding set again in case something
+  // invalidated it above.
+  {
+    void *insertPos;
+    auto existing = set.FindNodeOrInsertPos(id, insertPos);
+    (void)existing;
+    assert(!existing && "race to create opaque archetype?!");
+    set.InsertNode(newOpaque, insertPos);
+  }
+  
+  return newOpaque;
+}
+
 CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
                                                 Optional<UUID> knownID) {
   auto &ctx = existential->getASTContext();
@@ -4311,6 +4445,15 @@ CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
       ::new (mem) OpenedArchetypeType(ctx, existential,
                                 protos, layoutSuperclass,
                                 layoutConstraint, *knownID);
+  
+  // Create a generic environment to represent the opened type.
+  auto signature = ctx.getExistentialSignature(existential->getCanonicalType(),
+                                               nullptr);
+  auto env = signature->createGenericEnvironment();
+  env->addMapping(signature->getGenericParams()[0], result);
+  result->Environment = env;
+  result->InterfaceType = signature->getGenericParams()[0];
+  
   openedExistentialArchetypes[*knownID] = result;
 
   return CanOpenedArchetypeType(result);
@@ -4986,6 +5129,9 @@ SILLayout *SILLayout::get(ASTContext &C,
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionMap Substitutions) {
+  // TODO: Support resilient opaque types.
+  Substitutions = Substitutions
+    .substOpaqueTypesWithUnderlyingTypes();
   // Canonicalize substitutions.
   Substitutions = Substitutions.getCanonical();
 
@@ -5060,5 +5206,3 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
       .LayoutConstraints.InsertNode(New, InsertPos);
   return LayoutConstraint(New);
 }
-
-

@@ -1421,7 +1421,7 @@ const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Get the primary archetype.
-  auto primary = t->getPrimary();
+  auto primary = dyn_cast<PrimaryArchetypeType>(t->getRoot());
   
   // If there is no primary (IOW, it's an opened archetype), the archetype is
   // an exemplar.
@@ -1686,6 +1686,9 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
+  case TypeKind::OpaqueTypeArchetype:
+    // TODO: opaque type resilience
+    llvm_unreachable("should be lowered to underlying type; resilience not implemented");
   case TypeKind::Class:
   case TypeKind::Enum:
   case TypeKind::Struct:
@@ -2132,7 +2135,7 @@ void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
 
 #ifndef NDEBUG
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
-  auto primary = arch->getPrimary();
+  auto primary = dyn_cast<PrimaryArchetypeType>(arch->getRoot());
   if (!primary) return true;
   auto genericEnv = primary->getGenericEnvironment();
 
