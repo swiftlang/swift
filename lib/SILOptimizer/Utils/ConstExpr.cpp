@@ -287,6 +287,25 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return calculatedValues[apply];
   }
 
+  if (auto *enumVal = dyn_cast<EnumInst>(value)) {
+    if (!enumVal->hasOperand())
+      return SymbolicValue::getEnum(enumVal->getElement());
+
+    auto payload = getConstantValue(enumVal->getOperand());
+    if (!payload.isConstant())
+      return payload;
+    return SymbolicValue::getEnumWithPayload(enumVal->getElement(), payload,
+                                             evaluator.getASTContext());
+  }
+
+  // This one returns the address of its enum payload.
+  if (auto *dai = dyn_cast<UncheckedTakeEnumDataAddrInst>(value)) {
+    auto enumVal = getConstAddrAndLoadResult(dai->getOperand());
+    if (!enumVal.isConstant())
+      return enumVal;
+    return createMemoryObject(value, enumVal.getEnumPayloadValue());
+  }
+
   // This instruction is a marker that returns its first operand.
   if (auto *bai = dyn_cast<BeginAccessInst>(value))
     return getConstantValue(bai->getOperand());
@@ -1241,6 +1260,34 @@ static llvm::Optional<SymbolicValue> evaluateAndCacheCall(
         return evaluator.getUnknown(cbr, UnknownReason::Loop);
 
       nextInst = destBB->begin();
+      continue;
+    }
+
+    if (isa<SwitchEnumAddrInst>(inst) || isa<SwitchEnumInst>(inst)) {
+      SymbolicValue value;
+      SwitchEnumInstBase *switchInst = dyn_cast<SwitchEnumInst>(inst);
+      if (switchInst) {
+        value = state.getConstantValue(switchInst->getOperand());
+      } else {
+        switchInst = cast<SwitchEnumAddrInst>(inst);
+        value = state.getConstAddrAndLoadResult(switchInst->getOperand());
+      }
+      if (!value.isConstant())
+        return value;
+      assert(value.getKind() == SymbolicValue::Enum ||
+             value.getKind() == SymbolicValue::EnumWithPayload);
+      // Set up basic block arguments.
+      auto *caseBB = switchInst->getCaseDestination(value.getEnumValue());
+      if (caseBB->getNumArguments() > 0) {
+        assert(value.getKind() == SymbolicValue::EnumWithPayload);
+        // When there are multiple payload components, they form a single
+        // tuple-typed argument.
+        assert(caseBB->getNumArguments() == 1);
+        auto argument = value.getEnumPayloadValue();
+        assert(argument.isConstant());
+        state.setValue(caseBB->getArgument(0), argument);
+      }
+      nextInst = caseBB->begin();
       continue;
     }
 
