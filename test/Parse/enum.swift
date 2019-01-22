@@ -197,6 +197,7 @@ enum RawTypeWithCharacterValues_Correct : Character {
   case First = "😅" // ok
   case Second = "👩‍👩‍👧‍👦" // ok
   case Third = "👋🏽" // ok
+  case Fourth = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}" // ok
 }
 
 enum RawTypeWithCharacterValues_Error1 : Character { // expected-error {{'RawTypeWithCharacterValues_Error1' declares raw type 'Character', but does not conform to RawRepresentable and conformance could not be synthesized}}

@@ -904,9 +904,9 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &SGF,
     SILGenFunctionBuilder builder(SGF);
     thunkFn = builder.getOrCreateFunction(
         SILLocation(behaviorVar), behaviorInitName, SILLinkage::PrivateExternal,
-        initConstantTy, IsBare, IsTransparent, IsSerialized);
+        initConstantTy, IsBare, IsTransparent, IsSerialized, IsNotDynamic);
   }
-  return SGF.B.createFunctionRef(behaviorVar, thunkFn);
+  return SGF.B.createFunctionRefFor(behaviorVar, thunkFn);
 }
 
 static SILValue getBehaviorSetterFn(SILGenFunction &SGF, VarDecl *behaviorVar) {
@@ -915,7 +915,7 @@ static SILValue getBehaviorSetterFn(SILGenFunction &SGF, VarDecl *behaviorVar) {
 
   // TODO: The setter may need to be a thunk, to implode tuples or perform
   // reabstractions.
-  return SGF.B.createFunctionRef(behaviorVar, setFn);
+  return SGF.B.createFunctionRefFor(behaviorVar, setFn);
 }
 
 static Type getInitializationTypeInContext(

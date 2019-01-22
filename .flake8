@@ -1,5 +1,5 @@
 [flake8]
-ignore = W291
+ignore = W291 W504
 filename = *.py,
            ./utils/80+-check,
            ./utils/backtrace-check,

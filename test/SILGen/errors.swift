@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership -Xllvm -sil-print-debuginfo -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership -Xllvm -sil-print-debuginfo -verify -swift-version 5 -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
 
 import Swift
 
@@ -694,45 +694,6 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: throw [[ERROR]]
 // CHECK: } // end sil function '$s6errors16supportStructure_4nameyAA6BridgeVz_SStKF'
 
-struct OwnedBridge {
-  var owner : AnyObject
-  subscript(name: String) -> Pylon {
-    addressWithOwner { return (someValidPointer(), owner) }
-    mutableAddressWithOwner { return (someValidPointer(), owner) }
-  }
-}
-func supportStructure(_ b: inout OwnedBridge, name: String) throws {
-  try b[name].support()
-}
-// CHECK:    sil hidden @$s6errors16supportStructure_4nameyAA11OwnedBridgeVz_SStKF :
-// CHECK:    bb0([[ARG1:%.*]] : @trivial $*OwnedBridge, [[ARG2:%.*]] : @guaranteed $String):
-// CHECK:      [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $String
-// CHECK:      [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*OwnedBridge
-// CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @$s6errors11OwnedBridgeVyAA5PylonVSSciaO :
-// CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[WRITE]])
-// CHECK-NEXT: ([[T1:%.*]], [[OWNER:%.*]]) = destructure_tuple [[T0]]
-// CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
-// CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
-// CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
-// CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T5]] : $*Pylon
-// CHECK:      [[SUPPORT:%.*]] = function_ref @$s6errors5PylonV7supportyyKF
-// CHECK-NEXT: try_apply [[SUPPORT]]([[ACCESS]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
-// CHECK:    [[BB_NORMAL]]
-// CHECK-NEXT: end_access [[ACCESS]] : $*Pylon
-// CHECK-NEXT: end_access [[WRITE]]
-// CHECK-NEXT: destroy_value [[OWNER]] : $AnyObject
-// CHECK-NEXT: destroy_value [[ARG2_COPY]] : $String
-// CHECK-NEXT: tuple ()
-// CHECK-NEXT: return
-// CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
-// CHECK-NEXT: end_access [[ACCESS]] : $*Pylon
-// CHECK-NEXT: destroy_value [[OWNER]] : $AnyObject
-// CHECK-NEXT: end_access [[WRITE]]
-// CHECK-NEXT: destroy_value [[ARG2_COPY]] : $String
-// CHECK-NEXT: throw [[ERROR]]
-// CHECK: } // end sil function '$s6errors16supportStructure_4nameyAA11OwnedBridgeVz_SStKF'
-
 // ! peepholes its argument with getSemanticsProvidingExpr().
 // Test that that doesn't look through try!.
 // rdar://21515402
@@ -774,12 +735,11 @@ func testOptionalTryThatNeverThrows() {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT: [[BOX:%.+]] = alloc_box ${ var Optional<Cat> }
 // CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @$s6errors10make_a_catAA3CatCyKF
 // CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
 // CHECK: [[SUCCESS]]([[VALUE:%.+]] : @owned $Cat)
-// CHECK-NEXT: store [[VALUE]] to [init] [[BOX_DATA]] : $*Cat
-// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
+// CHECK-NEXT: [[CAT_ENUM:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt.1
+// CHECK-NEXT: store [[CAT_ENUM]] to [init] [[PB]] : $*Optional<Cat>
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
 // CHECK-NEXT: destroy_value [[BOX]] : ${ var Optional<Cat> }
@@ -886,8 +846,9 @@ func testOptionalTryNeverFails() {
 // CHECK: bb0:
 // CHECK-NEXT:   [[BOX:%.+]] = alloc_box ${ var Optional<()> }
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[BOX]]
-// CHECK-NEXT:   = init_enum_data_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
-// CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
+// CHECK-NEXT:   [[VALUE:%.+]] = tuple ()
+// CHECK-NEXT:   [[ENUM:%.+]] = enum $Optional<()>, #Optional.some!enumelt.1, [[VALUE]]
+// CHECK-NEXT:   store [[ENUM]] to [trivial] [[PB]] :
 // CHECK-NEXT:   destroy_value [[BOX]] : ${ var Optional<()> }
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()

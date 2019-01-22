@@ -852,6 +852,14 @@ public:
       *this << "  // function_ref "
             << demangleSymbol(FRI->getReferencedFunction()->getName())
             << "\n";
+    else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(I))
+      *this << "  // dynamic_function_ref "
+            << demangleSymbol(FRI->getReferencedFunction()->getName())
+            << "\n";
+    else if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(I))
+      *this << "  // prev_dynamic_function_ref "
+            << demangleSymbol(FRI->getReferencedFunction()->getName())
+            << "\n";
 
     *this << "  ";
 
@@ -1191,7 +1199,16 @@ public:
     FRI->getReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
-  
+  void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI) {
+    FRI->getReferencedFunction()->printName(PrintState.OS);
+    *this << " : " << FRI->getType();
+  }
+  void
+  visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI) {
+    FRI->getReferencedFunction()->printName(PrintState.OS);
+    *this << " : " << FRI->getType();
+  }
+
   void visitBuiltinInst(BuiltinInst *BI) {
     *this << QuotedString(BI->getName().str());
     printSubstitutions(BI->getSubstitutions());
@@ -2465,6 +2482,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     break;
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
   }
+  if (isDynamicallyReplaceable()) {
+    OS << "[dynamically_replacable] ";
+  }
   if (isWithoutActuallyEscapingThunk())
     OS << "[without_actually_escaping] ";
 
@@ -2494,6 +2514,18 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[readwrite] ";
   else if (getEffectsKind() == EffectsKind::ReleaseNone)
     OS << "[releasenone] ";
+
+  if (auto *replacedFun = getDynamicallyReplacedFunction()) {
+    OS << "[dynamic_replacement_for \"";
+    OS << replacedFun->getName();
+    OS << "\"] ";
+  }
+
+  if (hasObjCReplacement()) {
+    OS << "[objc_replacement_for \"";
+    OS << getObjCReplacement().str();
+    OS << "\"] ";
+  }
 
   for (auto &Attr : getSemanticsAttrs())
     OS << "[_semantics \"" << Attr << "\"] ";

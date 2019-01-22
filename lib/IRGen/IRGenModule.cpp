@@ -47,6 +47,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 
+#include "ConformanceDescription.h"
 #include "GenEnum.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
@@ -462,6 +463,23 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   IsSwiftErrorInRegister =
     clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
       ClangCodeGen->CGM());
+
+  DynamicReplacementsTy =
+      llvm::StructType::get(getLLVMContext(), {Int8PtrPtrTy, Int8PtrTy});
+  DynamicReplacementsPtrTy = DynamicReplacementsTy->getPointerTo(DefaultAS);
+
+  DynamicReplacementLinkEntryTy =
+      llvm::StructType::create(getLLVMContext(), "swift.dyn_repl_link_entry");
+  DynamicReplacementLinkEntryPtrTy =
+      DynamicReplacementLinkEntryTy->getPointerTo(DefaultAS);
+  llvm::Type *linkEntryFields[] = {
+    Int8PtrTy, // function pointer.
+    DynamicReplacementLinkEntryPtrTy // next.
+  };
+  DynamicReplacementLinkEntryTy->setBody(linkEntryFields);
+
+  DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
+                                             {RelativeAddressTy, Int32Ty});
 }
 
 IRGenModule::~IRGenModule() {
@@ -735,7 +753,7 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
     return true;
 
   NominalTypeDecl *ConformingTy =
-    wt->getConformance()->getType()->getNominalOrBoundGenericNominal();
+    wt->getConformingType()->getNominalOrBoundGenericNominal();
 
   switch (ConformingTy->getEffectiveAccess()) {
     case AccessLevel::Private:
@@ -1085,19 +1103,23 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
   // arbitrary keys to put in the image info.
 
   const char *ObjectiveCGarbageCollection = "Objective-C Garbage Collection";
+  uint8_t Major, Minor;
+  std::tie(Major, Minor) = version::getSwiftNumericVersion();
+  uint32_t Value = (Major << 24) | (Minor << 16) | (swiftVersion << 8);
+
   if (Module.getModuleFlag(ObjectiveCGarbageCollection)) {
     bool FoundOldEntry = replaceModuleFlagsEntry(
         Module.getContext(), Module, ObjectiveCGarbageCollection,
         llvm::Module::Override,
         llvm::ConstantAsMetadata::get(
-            llvm::ConstantInt::get(Int32Ty, (uint32_t)(swiftVersion << 8))));
+            llvm::ConstantInt::get(Int32Ty, Value)));
 
     (void)FoundOldEntry;
     assert(FoundOldEntry && "Could not replace old module flag entry?");
   } else
     Module.addModuleFlag(llvm::Module::Override,
                          ObjectiveCGarbageCollection,
-                         (uint32_t)(swiftVersion << 8));
+                         Value);
 }
 
 bool IRGenModule::finalize() {

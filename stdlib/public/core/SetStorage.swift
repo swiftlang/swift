@@ -16,7 +16,7 @@ import SwiftShims
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
-@_fixed_layout // FIXME(sil-serialize-all)
+@_fixed_layout
 @usableFromInline
 @_objc_non_lazy_realization
 internal class _RawSetStorage: __SwiftNativeNSSet {
@@ -73,7 +73,7 @@ internal class _RawSetStorage: __SwiftNativeNSSet {
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 
   @inlinable
@@ -109,13 +109,13 @@ internal class _RawSetStorage: __SwiftNativeNSSet {
 internal class _EmptySetSingleton: _RawSetStorage {
   @nonobjc
   override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 
 #if _runtime(_ObjC)
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 #endif
 }
@@ -175,7 +175,6 @@ extension _EmptySetSingleton: _NSSetCore {
 #endif
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _SetStorage<Element: Hashable>
   : _RawSetStorage, _NSSetCore {
@@ -183,7 +182,7 @@ final internal class _SetStorage<Element: Hashable>
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 
   deinit {
@@ -212,7 +211,7 @@ final internal class _SetStorage<Element: Hashable>
 #if _runtime(_ObjC)
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("don't call this designated initializer")
+    _internalInvariantFailure("don't call this designated initializer")
   }
 
   @objc(copyWithZone:)
@@ -330,7 +329,7 @@ extension _SetStorage {
   ) -> _SetStorage {
     // The entry count must be representable by an Int value; hence the scale's
     // peculiar upper bound.
-    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
+    _internalInvariant(scale >= 0 && scale < Int.bitWidth - 1)
 
     let bucketCount = (1 as Int) &<< scale
     let wordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)

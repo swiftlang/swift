@@ -15,6 +15,8 @@
 // FIXME: This test runs very slowly on watchOS.
 // UNSUPPORTED: OS=watchos
 
+import SwiftPrivate
+
 public enum ApproximateCount {
   case Unknown
   case Precise(Int64)

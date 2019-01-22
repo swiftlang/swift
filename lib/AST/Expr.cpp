@@ -365,8 +365,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(ObjCSelector);
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
-  // SWIFT_ENABLE_TENSORFLOW
-  NO_REFERENCE(PoundAssert);
+  NO_REFERENCE(Tap);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -674,9 +673,10 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
   case ExprKind::KeyPathDot:
-  // SWIFT_ENABLE_TENSORFLOW
-  case ExprKind::PoundAssert:
     return false;
+
+  case ExprKind::Tap:
+    return true;
   }
 
   llvm_unreachable("Unhandled ExprKind in switch.");
@@ -799,7 +799,9 @@ static LiteralExpr *
 shallowCloneImpl(const InterpolatedStringLiteralExpr *E, ASTContext &Ctx,
                  llvm::function_ref<Type(const Expr *)> getType) {
   auto res = new (Ctx) InterpolatedStringLiteralExpr(E->getLoc(),
-                const_cast<InterpolatedStringLiteralExpr*>(E)->getSegments());
+                                                     E->getLiteralCapacity(),
+                                                     E->getInterpolationCount(),
+                                                     E->getAppendingExpr());
   res->setSemanticExpr(E->getSemanticExpr());
   return res;
 }
@@ -1825,6 +1827,13 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
       candidate = covariantExpr->getSubExpr();
       continue;
     }
+    
+    // Look through inject into optional expressions
+    if (auto injectIntoOptionalExpr
+        = dyn_cast<InjectIntoOptionalExpr>(candidate)) {
+      candidate = injectIntoOptionalExpr->getSubExpr();
+      continue;
+    }
     break;
   }
 
@@ -2226,6 +2235,53 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Identity:
     llvm_unreachable("no hashable conformances for this kind");
   }
+}
+
+void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx, 
+    llvm::function_ref<void(bool, CallExpr *)> callback) {
+  auto appendingExpr = getAppendingExpr();
+  if (SemanticExpr) {
+    SemanticExpr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+      if (auto tap = dyn_cast_or_null<TapExpr>(subExpr)) {
+        appendingExpr = tap;
+        return nullptr;
+      }
+      return subExpr;
+    });
+  }
+
+  for (auto stmt : appendingExpr->getBody()->getElements()) {
+    if (auto expr = stmt.dyn_cast<Expr*>()) {
+      if (auto call = dyn_cast<CallExpr>(expr)) {
+        DeclName name;
+        if (auto fn = call->getCalledValue()) {
+          name = fn->getFullName();
+        } else if (auto unresolvedDot =
+                      dyn_cast<UnresolvedDotExpr>(call->getFn())) {
+          name = unresolvedDot->getName();
+        }
+
+        bool isInterpolation = (name.getBaseName() ==
+                                Ctx.Id_appendInterpolation);
+
+        callback(isInterpolation, call);
+      }
+    }
+  }
+}
+
+TapExpr::TapExpr(Expr * SubExpr, BraceStmt *Body)
+    : Expr(ExprKind::Tap, /*Implicit=*/true),
+      SubExpr(SubExpr), Body(Body) {
+  if (Body) {
+    assert(Body->getNumElements() > 0 &&
+         Body->getElement(0).isDecl(DeclKind::Var) &&
+         "First element of Body should be a variable to init with the subExpr");
+  }
+}
+
+VarDecl * TapExpr::getVar() const {
+  return dyn_cast<VarDecl>(Body->getElement(0).dyn_cast<Decl *>());
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is

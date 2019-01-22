@@ -39,6 +39,9 @@ class FailureDiagnostic {
   ConstraintSystem &CS;
   ConstraintLocator *Locator;
 
+  /// The original anchor before any simplification.
+  Expr *RawAnchor;
+  /// Simplified anchor associated with the given locator.
   Expr *Anchor;
   /// Indicates whether locator could be simplified
   /// down to anchor expression.
@@ -47,7 +50,7 @@ class FailureDiagnostic {
 public:
   FailureDiagnostic(Expr *expr, ConstraintSystem &cs,
                     ConstraintLocator *locator)
-      : E(expr), CS(cs), Locator(locator) {
+      : E(expr), CS(cs), Locator(locator), RawAnchor(locator->getAnchor()) {
     std::tie(Anchor, HasComplexLocator) = computeAnchor();
   }
 
@@ -77,6 +80,8 @@ public:
   }
 
   Expr *getParentExpr() const { return E; }
+
+  Expr *getRawAnchor() const { return RawAnchor; }
 
   Expr *getAnchor() const { return Anchor; }
 
@@ -556,6 +561,50 @@ private:
              isLoadedLValue(ifExpr->getElseExpr());
     return false;
   }
+};
+
+/// Intended to diagnose any possible contextual failure
+/// e.g. argument/parameter, closure result, conversions etc.
+class ContextualFailure final : public FailureDiagnostic {
+  Type FromType, ToType;
+
+public:
+  ContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                    ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
+        ToType(resolve(rhs)) {}
+
+  bool diagnoseAsError() override;
+
+  // If we're trying to convert something of type "() -> T" to T,
+  // then we probably meant to call the value.
+  bool diagnoseMissingFunctionCall() const;
+
+  /// Try to add a fix-it when converting between a collection and its slice
+  /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
+  static bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
+                                           ConstraintSystem &CS, Type fromType,
+                                           Type toType, Expr *expr);
+
+private:
+  Type resolve(Type rawType) {
+    auto type = resolveType(rawType)->getWithoutSpecifierType();
+    if (auto *BGT = type->getAs<BoundGenericType>()) {
+      if (BGT->hasUnresolvedType())
+        return BGT->getDecl()->getDeclaredInterfaceType();
+    }
+    return type;
+  }
+};
+
+/// Diagnose situations when @autoclosure argument is passed to @autoclosure
+/// parameter directly without calling it first.
+class AutoClosureForwardingFailure final : public FailureDiagnostic {
+public:
+  AutoClosureForwardingFailure(ConstraintSystem &cs, ConstraintLocator *locator)
+      : FailureDiagnostic(nullptr, cs, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints

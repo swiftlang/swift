@@ -768,15 +768,3 @@ func tuple_explosion() {
   // CHECK-NOT: tuple_extract [[TUPLE]]
   // CHECK-NOT: destroy_value [[TUPLE]]
 }
-
-class C {
-  var v = ""
-  // CHECK-LABEL: sil hidden @$s8lifetime1CC18ignored_assignment{{[_0-9a-zA-Z]*}}F
-  func ignored_assignment() {
-    // CHECK: [[STRING:%.*]] = alloc_stack $String
-    // CHECK: [[UNINIT:%.*]] = mark_uninitialized [var] [[STRING]]
-    // CHECK: assign {{%.*}} to [[UNINIT]]
-    // CHECK: destroy_addr [[UNINIT]]
-    _ = self.v
-  }
-}

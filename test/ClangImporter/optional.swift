@@ -27,8 +27,8 @@ class A {
 // CHECK:      [[T0:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK-NEXT: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_STR]])
-// CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]]
 // CHECK-NEXT: end_borrow [[BORROWED_STR:%.*]]
+// CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]]
 // CHECK-NEXT: destroy_value [[STR]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.

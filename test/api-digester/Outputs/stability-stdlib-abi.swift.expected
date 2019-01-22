@@ -1,92 +1,500 @@
+Func MutableCollection._partition(within:by:) has generic signature change from <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RandomAccessCollection> to <τ_0_0 where τ_0_0 : BidirectionalCollection, τ_0_0 : MutableCollection>
+Func MutableCollection._partition(within:by:) has been renamed to Func MutableCollection._partitionImpl(by:)
+Func MutableCollection._heapSort(within:by:) has been removed
+Func MutableCollection._heapify(within:by:) has been removed
+Func MutableCollection._introSort(within:by:) has been removed
+Func MutableCollection._introSortImpl(within:by:depthLimit:) has been removed
+Func MutableCollection._siftDown(_:within:by:) has been removed
+Func MutableCollection._sort3(_:_:_:by:) has been removed
+Func MutableCollection._partition(within:by:) has parameter 0 type change from Range<τ_0_0.Index> to (τ_0_0.Element) throws -> Bool
 
-/* Generic Signature Changes */
+Func BinaryInteger._description(radix:uppercase:) has been removed
+Struct _Buffer32 has been removed
+Struct _Buffer72 has been removed
+Func _int64ToString(_:radix:uppercase:) has been removed
+Func _int64ToStringImpl(_:_:_:_:_:) has been removed
+Func _uint64ToStringImpl(_:_:_:_:_:) has been removed
+Func _typeByMangledName(_:substitutions:) has been removed
+Func _withUninitializedString(_:) has been removed
 
-/* RawRepresentable Changes */
+Func Optional.unwrappedOrError() has been removed
+Struct _UnwrappingFailed has been removed
 
-/* Removed Decls */
-Constructor AnyHashable.init(_box:) has been removed
-Constructor AnyHashable.init(_usingDefaultRepresentationOf:) has been removed
-Constructor ManagedBufferPointer.init(_:_:_:) has been removed
-Constructor Zip2Sequence.init(_sequence1:_sequence2:) has been removed
-Constructor _BridgeStorage.init(native:bits:) has been removed
-Constructor _BridgeableMetatype.init(value:) has been removed
-Func AnyHashable._downCastConditional(into:) has been removed
-Func Collection.prefix(through:) has been removed
-Func Collection.prefix(upTo:) has been removed
-Func Collection.suffix(from:) has been removed
-Func Sequence.filter(_:) has been removed
-Func Sequence.forEach(_:) has been removed
-Func Sequence.map(_:) has been removed
-Func _BridgeStorage.isNativeWithClearedSpareBits(_:) has been removed
-Func _BridgeStorage.isUniquelyReferenced_native_noSpareBits() has been removed
-Func _CocoaDictionary.Index.copy() has been removed
-Func _ContiguousArrayStorage._getNonVerbatimBridgedHeapBuffer() has been removed
-Func _ContiguousArrayStorage._withVerbatimBridgedUnsafeBufferImpl(_:) has been removed
-Func _SequenceWrapper.filter(_:) has been removed
-Func _SequenceWrapper.forEach(_:) has been removed
-Func _SequenceWrapper.map(_:) has been removed
-Func __ContiguousArrayStorageBase._getNonVerbatimBridgedHeapBuffer() has been removed
-Func __EmptyArrayStorage._getNonVerbatimBridgedHeapBuffer() has been removed
-Func __SwiftDeferredNSArray._destroyBridgedStorage(_:) has been removed
-Func _getEnumCaseName(_:) has been removed
-Func _opaqueSummary(_:) has been removed
-Func _stdlib_NSDictionary_allKeys(_:) has been removed
-Func _stdlib_NSSet_allObjects(_:) has been removed
-Protocol _HeapBufferHeader_ has been removed
-Struct _ConcreteHashableBox has been removed
-Struct _HeapBufferHeader has been removed
-Struct _SipHash13 has been removed
-Struct _SipHash13Core has been removed
-Struct _SipHash24 has been removed
-Struct _SipHashState has been removed
-Subscript ManagedBufferPointer.subscript(_:) has been removed
-Var AnyBidirectionalCollection.first has been removed
-Var AnyBidirectionalCollection.last has been removed
-Var AnyCollection.first has been removed
-Var AnyRandomAccessCollection.first has been removed
-Var AnyRandomAccessCollection.last has been removed
-Var BidirectionalCollection.last has been removed
-Var Collection.first has been removed
-Var Dictionary.first has been removed
-Var LazyCollection.first has been removed
-Var LazyCollection.last has been removed
-Var LazyMapCollection.first has been removed
-Var LazyMapCollection.last has been removed
-Var ManagedBufferPointer.baseAddress has been removed
-Var ManagedBufferPointer.storage has been removed
-Var ManagedBufferPointer.value has been removed
-Var Optional._nilSentinel has been removed
-Var Set.first has been removed
-Var _AnyBidirectionalCollectionBox._last has been removed
-Var _AnyCollectionBox._first has been removed
-Var _ArrayBuffer.deferredTypeCheckMask has been removed
-Var _BidirectionalCollectionBox._first has been removed
-Var _BidirectionalCollectionBox._last has been removed
-Var _BridgeStorage._isTagged has been removed
-Var _BridgeStorage.nativeInstance_noSpareBits has been removed
-Var _BridgeStorage.spareBits has been removed
-Var _BridgeableMetatype.value has been removed
-Var _CocoaDictionary.Index._object has been removed
-Var _CocoaSet.Index._object has been removed
-Var _CollectionBox._first has been removed
-Var _RandomAccessCollectionBox._first has been removed
-Var _RandomAccessCollectionBox._last has been removed
-Var __SwiftDeferredNSArray._heapBufferBridged has been removed
-Var __SwiftDeferredNSArray._heapBufferBridgedPtr has been removed
-Var Hasher._core has declared type change from _BufferingHasher<_SipHash13Core> to _BufferingHasher<Hasher._Core>
+Constructor _UIntBuffer.Index.init(bitOffset:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Constructor _UIntBuffer.Iterator.init(_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Constructor _UIntBuffer.Iterator.init(_:) has parameter 0 type change from _UIntBuffer<τ_0_0, τ_0_1> to _UIntBuffer<τ_0_0>
+Constructor _UIntBuffer.init() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Constructor _UIntBuffer.init() has return type change from _UIntBuffer<τ_0_0, τ_0_1> to _UIntBuffer<τ_0_0>
+Constructor _UIntBuffer.init(_storage:_bitCount:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Constructor _UIntBuffer.init(_storage:_bitCount:) has parameter 0 type change from τ_0_0 to UInt32
+Constructor _UIntBuffer.init(_storage:_bitCount:) has return type change from _UIntBuffer<τ_0_0, τ_0_1> to _UIntBuffer<τ_0_0>
+Constructor _UIntBuffer.init(containing:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Constructor _UIntBuffer.init(containing:) has return type change from _UIntBuffer<τ_0_0, τ_0_1> to _UIntBuffer<τ_0_0>
+Constructor _ValidUTF8Buffer.Index.init(_biasedBits:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.Index.init(_biasedBits:) has parameter 0 type change from τ_0_0 to UInt32
+Constructor _ValidUTF8Buffer.Iterator.init(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.Iterator.init(_:) has parameter 0 type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Constructor _ValidUTF8Buffer.init() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.init() has return type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Constructor _ValidUTF8Buffer.init(_biasedBits:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.init(_biasedBits:) has parameter 0 type change from τ_0_0 to UInt32
+Constructor _ValidUTF8Buffer.init(_biasedBits:) has return type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Constructor _ValidUTF8Buffer.init(_containing:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.init(_containing:) has return type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Enum Unicode.UTF16 has type witness type for _UnicodeEncoding.EncodedScalar changing from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Enum Unicode.UTF8 has type witness type for _UnicodeEncoding.EncodedScalar changing from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF16.ForwardParser._bufferedScalar(bitCount:) has return type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Func Unicode.UTF16.ReverseParser._bufferedScalar(bitCount:) has return type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Func Unicode.UTF16.decode(_:) has parameter 0 type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Func Unicode.UTF16.encode(_:) has return type change from Optional<_UIntBuffer<UInt32, UInt16>> to Optional<_UIntBuffer<UInt16>>
+Func Unicode.UTF16.transcode(_:from:) has return type change from Optional<_UIntBuffer<UInt32, UInt16>> to Optional<_UIntBuffer<UInt16>>
+Func Unicode.UTF8.ForwardParser._bufferedScalar(bitCount:) has return type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF8.ReverseParser._bufferedScalar(bitCount:) has return type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF8.decode(_:) has parameter 0 type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF8.encode(_:) has return type change from Optional<_ValidUTF8Buffer<UInt32>> to Optional<_ValidUTF8Buffer>
+Func Unicode.UTF8.transcode(_:from:) has return type change from Optional<_ValidUTF8Buffer<UInt32>> to Optional<_ValidUTF8Buffer>
+Func _UIntBuffer.Index.<(_:_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.Index.==(_:_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.Iterator.next() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.append(_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.distance(from:to:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.index(_:offsetBy:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.index(after:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.index(before:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.makeIterator() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.removeFirst() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.replaceSubrange(_:with:) has generic signature change from <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger, τ_0_1 == τ_1_0.Element, τ_1_0 : Collection> to <τ_0_0, τ_1_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_0 == τ_1_0.Element, τ_1_0 : Collection>
+Func _ValidUTF8Buffer.Index.<(_:_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.Index.==(_:_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.Iterator.next() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer._isValid(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.append(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.append(contentsOf:) has generic signature change from <τ_0_0, τ_1_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_1_0 : FixedWidthInteger, τ_1_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.append(contentsOf:) has parameter 0 type change from _ValidUTF8Buffer<τ_1_0> to _ValidUTF8Buffer
+Func _ValidUTF8Buffer.distance(from:to:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.index(_:offsetBy:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.index(after:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.index(before:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.removeFirst() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.replaceSubrange(_:with:) has generic signature change from <τ_0_0, τ_1_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_1_0 : Collection, τ_1_0.Element == UInt8> to <τ_0_0 where τ_0_0 : Collection, τ_0_0.Element == UInt8>
+Struct _UIntBuffer has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Struct _UIntBuffer has type witness type for BidirectionalCollection.Indices changing from DefaultIndices<_UIntBuffer<τ_0_0, τ_0_1>> to DefaultIndices<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for BidirectionalCollection.SubSequence changing from Slice<_UIntBuffer<τ_0_0, τ_0_1>> to Slice<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for Collection.Indices changing from DefaultIndices<_UIntBuffer<τ_0_0, τ_0_1>> to DefaultIndices<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for Collection.SubSequence changing from Slice<_UIntBuffer<τ_0_0, τ_0_1>> to Slice<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for RandomAccessCollection.Indices changing from DefaultIndices<_UIntBuffer<τ_0_0, τ_0_1>> to DefaultIndices<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for RandomAccessCollection.SubSequence changing from Slice<_UIntBuffer<τ_0_0, τ_0_1>> to Slice<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for RangeReplaceableCollection.SubSequence changing from Slice<_UIntBuffer<τ_0_0, τ_0_1>> to Slice<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer.Index has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Struct _UIntBuffer.Iterator has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Struct _ValidUTF8Buffer has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Struct _ValidUTF8Buffer has type witness type for BidirectionalCollection.Indices changing from DefaultIndices<_ValidUTF8Buffer<τ_0_0>> to DefaultIndices<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for BidirectionalCollection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for Collection.Indices changing from DefaultIndices<_ValidUTF8Buffer<τ_0_0>> to DefaultIndices<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for Collection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for RandomAccessCollection.Indices changing from DefaultIndices<_ValidUTF8Buffer<τ_0_0>> to DefaultIndices<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for RandomAccessCollection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for RangeReplaceableCollection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer.Index has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Struct _ValidUTF8Buffer.Iterator has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Subscript _UIntBuffer.subscript(_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Subscript _ValidUTF8Buffer.subscript(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Var Unicode.Scalar._isASCIIDigit has been removed
+Var Unicode.Scalar._isPrintableASCII has been removed
+Var Unicode.Scalar._replacementCharacter has been removed
+Var Unicode.UTF16.ForwardParser._buffer has declared type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Var Unicode.UTF16.ReverseParser._buffer has declared type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Var Unicode.UTF16.encodedReplacementCharacter has declared type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Var Unicode.UTF8.ForwardParser._buffer has declared type change from _UIntBuffer<UInt32, UInt8> to _UIntBuffer<UInt8>
+Var Unicode.UTF8.ReverseParser._buffer has declared type change from _UIntBuffer<UInt32, UInt8> to _UIntBuffer<UInt8>
+Var Unicode.UTF8.encodedReplacementCharacter has declared type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Var _UIntBuffer.Iterator._impl has declared type change from _UIntBuffer<τ_0_0, τ_0_1> to _UIntBuffer<τ_0_0>
+Var _UIntBuffer._storage has declared type change from τ_0_0 to UInt32
+Var _UTFParser._buffer has declared type change from _UIntBuffer<UInt32, τ_0_0.Encoding.CodeUnit> to _UIntBuffer<τ_0_0.Encoding.CodeUnit>
+Var _ValidUTF8Buffer.Index._biasedBits has declared type change from τ_0_0 to UInt32
+Var _ValidUTF8Buffer.Iterator._biasedBits has declared type change from τ_0_0 to UInt32
+Var _ValidUTF8Buffer._biasedBits has declared type change from τ_0_0 to UInt32
+Var _ValidUTF8Buffer.encodedReplacementCharacter has declared type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Var __swift_stdlib_UErrorCode.isFailure has been removed
+Var __swift_stdlib_UErrorCode.isSuccess has been removed
+Var __swift_stdlib_UErrorCode.isWarning has been removed
 
-/* Moved Decls */
+Class _stdlib_AtomicInt has been removed
+Func _stdlib_atomicCompareExchangeStrongInt(object:expected:desired:) has been removed
+Func _stdlib_atomicCompareExchangeStrongInt32(object:expected:desired:) has been removed
+Func _stdlib_atomicCompareExchangeStrongInt64(object:expected:desired:) has been removed
+Func _stdlib_atomicCompareExchangeStrongUInt32(object:expected:desired:) has been removed
+Func _stdlib_atomicCompareExchangeStrongUInt64(object:expected:desired:) has been removed
+Func _swift_stdlib_atomicFetchAddInt(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAddInt32(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAddInt64(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAddUInt32(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAddUInt64(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAndInt(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAndInt32(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAndInt64(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAndUInt32(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAndUInt64(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchOrInt(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchOrInt32(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchOrInt64(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchOrUInt32(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchOrUInt64(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchXorInt(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchXorInt32(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchXorInt64(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchXorUInt32(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchXorUInt64(object:operand:) has been removed
+Func _swift_stdlib_atomicLoadInt(object:) has been removed
+Func _swift_stdlib_atomicLoadInt32(object:) has been removed
+Func _swift_stdlib_atomicLoadInt64(object:) has been removed
+Func _swift_stdlib_atomicLoadUInt32(object:) has been removed
+Func _swift_stdlib_atomicLoadUInt64(object:) has been removed
+Func _swift_stdlib_atomicStoreInt(object:desired:) has been removed
+Func _swift_stdlib_atomicStoreInt32(object:desired:) has been removed
+Func _swift_stdlib_atomicStoreInt64(object:desired:) has been removed
+Func _swift_stdlib_atomicStoreUInt32(object:desired:) has been removed
+Func _swift_stdlib_atomicStoreUInt64(object:desired:) has been removed
 
-/* Renamed Decls */
+Var _FixedArray16._count has been removed
+Var _FixedArray16.capacity has been removed
+Var _FixedArray16.count has been removed
+Var _FixedArray16.endIndex has been removed
+Var _FixedArray16.startIndex has been removed
+Var _FixedArray16.storage has been removed
+Var _FixedArray2._count has been removed
+Var _FixedArray2.capacity has been removed
+Var _FixedArray2.count has been removed
+Var _FixedArray2.endIndex has been removed
+Var _FixedArray2.startIndex has been removed
+Var _FixedArray2.storage has been removed
+Var _FixedArray4._count has been removed
+Var _FixedArray4.capacity has been removed
+Var _FixedArray4.count has been removed
+Var _FixedArray4.endIndex has been removed
+Var _FixedArray4.startIndex has been removed
+Var _FixedArray4.storage has been removed
+Var _FixedArray8._count has been removed
+Var _FixedArray8.capacity has been removed
+Var _FixedArray8.count has been removed
+Var _FixedArray8.endIndex has been removed
+Var _FixedArray8.startIndex has been removed
+Var _FixedArray8.storage has been removed
+Subscript _FixedArray16.subscript(_:) has been removed
+Subscript _FixedArray2.subscript(_:) has been removed
+Subscript _FixedArray4.subscript(_:) has been removed
+Subscript _FixedArray8.subscript(_:) has been removed
+Struct _FixedArray16 is now without @_fixed_layout
+Struct _FixedArray2 is now without @_fixed_layout
+Struct _FixedArray4 is now without @_fixed_layout
+Struct _FixedArray8 is now without @_fixed_layout
+Func _FixedArray16.append(_:) has been removed
+Func _FixedArray16.index(after:) has been removed
+Func _FixedArray16.index(before:) has been removed
+Func _FixedArray16.withUnsafeBufferPointer(_:) has been removed
+Func _FixedArray16.withUnsafeMutableBufferPointer(_:) has been removed
+Func _FixedArray2.append(_:) has been removed
+Func _FixedArray2.index(after:) has been removed
+Func _FixedArray2.index(before:) has been removed
+Func _FixedArray2.withUnsafeBufferPointer(_:) has been removed
+Func _FixedArray2.withUnsafeMutableBufferPointer(_:) has been removed
+Func _FixedArray4.append(_:) has been removed
+Func _FixedArray4.index(after:) has been removed
+Func _FixedArray4.index(before:) has been removed
+Func _FixedArray4.withUnsafeBufferPointer(_:) has been removed
+Func _FixedArray4.withUnsafeMutableBufferPointer(_:) has been removed
+Func _FixedArray8.append(_:) has been removed
+Func _FixedArray8.index(after:) has been removed
+Func _FixedArray8.index(before:) has been removed
+Func _FixedArray8.withUnsafeBufferPointer(_:) has been removed
+Func _FixedArray8.withUnsafeMutableBufferPointer(_:) has been removed
+Constructor _FixedArray16.init() has been removed
+Constructor _FixedArray16.init(allZeros:) has been removed
+Constructor _FixedArray16.init(count:) has been removed
+Constructor _FixedArray2.init() has been removed
+Constructor _FixedArray2.init(allZeros:) has been removed
+Constructor _FixedArray2.init(count:) has been removed
+Constructor _FixedArray4.init() has been removed
+Constructor _FixedArray4.init(allZeros:) has been removed
+Constructor _FixedArray4.init(count:) has been removed
+Constructor _FixedArray8.init() has been removed
+Constructor _FixedArray8.init(allZeros:) has been removed
+Constructor _FixedArray8.init(count:) has been removed
 
-/* Type Changes */
-Struct _BridgeableMetatype is now without @_fixed_layout
-Func __ContiguousArrayStorageBase._getNonVerbatimBridgingBuffer() is added to a non-resilient type
-Var _CocoaDictionary.Index._offset is added to a non-resilient type
-Var _CocoaDictionary.Index._storage in a non-resilient type changes position from 1 to 0
-Var _CocoaSet.Index._offset is added to a non-resilient type
-Var _CocoaSet.Index._storage in a non-resilient type changes position from 1 to 0
+Struct Hasher._Core has removed conformance to _HasherCore
+Protocol _HasherCore has been removed
+Struct _BufferingHasher has been removed
+Struct _HasherTailBuffer has been removed
+Var Hasher._core has declared type change from _BufferingHasher<Hasher._Core> to Hasher._Core
+Var Hasher._Core._buffer is added to a non-resilient type
+Var Hasher._Core._state in a non-resilient type changes position from 0 to 1
 
-/* Decl Attribute changes */
+Class _AbstractStringStorage has been removed
+Constructor _StringGuts.init(_:) has been removed
+Constructor _StringObject.init(_:) has been removed
+Constructor _StringStorage.init() has been removed
+Var _StringObject.nativeStorage has been removed
+Var _StringStorage._countAndFlags has been removed
+Var _StringStorage._realCapacityAndFlags has been removed
+Var _StringStorage.count has been removed
+Var _StringStorage.mutableStart has been removed
+Var _StringStorage.start has been removed
+Class _StringStorage is now without @_fixed_layout
+Class _SharedStringStorage has removed conformance to _NSStringCore
+Class _StringStorage has removed conformance to _NSStringCore
+Protocol _NSStringCore has been removed
 
-/* Protocol Requirement Changes */
+Func String.UnicodeScalarView._foreignSubscript(aligned:) has been removed
+Struct String.UnicodeScalarView has type witness type for Collection.Iterator changing from IndexingIterator<String.UnicodeScalarView> to String.UnicodeScalarView.Iterator
+Struct String.UnicodeScalarView has type witness type for Sequence.Iterator changing from IndexingIterator<String.UnicodeScalarView> to String.UnicodeScalarView.Iterator
+Func String._foreignSubscript(position:distance:) has been removed
+Struct String has type witness type for Collection.Iterator changing from IndexingIterator<String> to String.Iterator
+Struct String has type witness type for Sequence.Iterator changing from IndexingIterator<String> to String.Iterator
+Func Unicode.UTF32._decode(_:) has been removed
+Func _UnicodeParser._decode(_:repairingIllFormedSequences:into:) has been removed
+Func _UnicodeParser._parse(_:repairingIllFormedSequences:into:) has been removed
+Struct Unicode._ParsingIterator has been removed
+
+Constructor ManagedBuffer.init(_doNotCallMe:) has been removed
+Func _makeAnyHashableUpcastingToHashableBaseType(_:storingResultInto:) has been removed
+
+Func RandomNumberGenerator._fill(bytes:) has been removed
+Func SystemRandomNumberGenerator._fill(bytes:) has been removed
+
+Func _createStringTableCache(_:) has been removed
+Struct _StringSwitchContext has been removed
+
+Class __SwiftNativeNSEnumerator has been removed
+Constructor _RawDictionaryStorage.init() has been removed
+Constructor _RawSetStorage.init() has been removed
+Constructor __SwiftNativeNSDictionary.init() has been removed
+Constructor __SwiftNativeNSSet.init() has been removed
+Class _DictionaryStorage is now without @_fixed_layout
+Class _SetStorage is now without @_fixed_layout
+
+Protocol Numeric has generic signature change from <τ_0_0 : Equatable, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric> to <τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric>
+Func Numeric.+(_:) has been removed
+Func Numeric.+(_:_:) has been removed
+Func Numeric.+=(_:_:) has been removed
+Func Numeric.-(_:_:) has been removed
+Func Numeric.-=(_:_:) has been removed
+Protocol BinaryFloatingPoint has added inherited protocol AdditiveArithmetic
+Protocol BinaryInteger has added inherited protocol AdditiveArithmetic
+Protocol FixedWidthInteger has added inherited protocol AdditiveArithmetic
+Protocol FloatingPoint has added inherited protocol AdditiveArithmetic
+Protocol Numeric has added inherited protocol AdditiveArithmetic
+Protocol SignedInteger has added inherited protocol AdditiveArithmetic
+Protocol SignedNumeric has added inherited protocol AdditiveArithmetic
+Protocol UnsignedInteger has added inherited protocol AdditiveArithmetic
+
+/* SE-0234 */
+AssociatedType Sequence.SubSequence has been removed
+Constructor _DropWhileSequence.init(iterator:nextElement:predicate:) has been removed
+Func AnyBidirectionalCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnyCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnyRandomAccessCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnySequence.dropLast(_:) has return type change from AnySequence<τ_0_0> to Array<τ_0_0>
+Func AnySequence.prefix(while:) has return type change from AnySequence<τ_0_0> to Array<τ_0_0>
+Func AnySequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnySequence.suffix(_:) has return type change from AnySequence<τ_0_0> to Array<τ_0_0>
+Func Collection.joined() has been removed
+Func DropFirstSequence.dropFirst(_:) has return type change from AnySequence<τ_0_0.Element> to DropFirstSequence<τ_0_0>
+Func PrefixSequence.prefix(_:) has return type change from AnySequence<τ_0_0.Element> to PrefixSequence<τ_0_0>
+Func Sequence.drop(while:) has return type change from τ_0_0.SubSequence to DropWhileSequence<τ_0_0>
+Func Sequence.dropFirst() has been removed
+Func Sequence.dropFirst(_:) has return type change from τ_0_0.SubSequence to DropFirstSequence<τ_0_0>
+Func Sequence.dropLast() has been removed
+Func Sequence.dropLast(_:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
+Func Sequence.prefix(_:) has return type change from τ_0_0.SubSequence to PrefixSequence<τ_0_0>
+Func Sequence.prefix(while:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
+Func Sequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has return type change from Array<τ_0_0.SubSequence> to Array<ArraySlice<τ_0_0.Element>>
+Func Sequence.split(separator:maxSplits:omittingEmptySubsequences:) has return type change from Array<τ_0_0.SubSequence> to Array<ArraySlice<τ_0_0.Element>>
+Func Sequence.suffix(_:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
+Func _AnyBidirectionalCollectionBox._formIndex(before:) in a non-resilient type changes position from 8 to 7
+Func _AnyBidirectionalCollectionBox._index(before:) in a non-resilient type changes position from 7 to 6
+Func _AnyBidirectionalCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnyCollectionBox._distance(from:to:) in a non-resilient type changes position from 13 to 12
+Func _AnyCollectionBox._formIndex(_:offsetBy:) in a non-resilient type changes position from 11 to 10
+Func _AnyCollectionBox._formIndex(_:offsetBy:limitedBy:) in a non-resilient type changes position from 12 to 11
+Func _AnyCollectionBox._formIndex(after:) in a non-resilient type changes position from 8 to 7
+Func _AnyCollectionBox._index(_:offsetBy:) in a non-resilient type changes position from 9 to 8
+Func _AnyCollectionBox._index(_:offsetBy:limitedBy:) in a non-resilient type changes position from 10 to 9
+Func _AnyCollectionBox._index(after:) in a non-resilient type changes position from 7 to 6
+Func _AnyCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnyRandomAccessCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnySequenceBox._dropLast(_:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
+Func _AnySequenceBox._prefix(while:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
+Func _AnySequenceBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnySequenceBox._suffix(_:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
+Func _BidirectionalCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _CollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _DropWhileSequence.drop(while:) has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Func _DropWhileSequence.drop(while:) has return type change from AnySequence<τ_0_0.Element> to DropWhileSequence<τ_0_0>
+Func _DropWhileSequence.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Func _DropWhileSequence.makeIterator() has return type change from _DropWhileSequence<τ_0_0> to DropWhileSequence<τ_0_0>.Iterator
+Func _DropWhileSequence.makeIterator() has self access kind changing from __Consuming to NonMutating
+Func _DropWhileSequence.next() has been removed
+Func _RandomAccessCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _SequenceBox._dropLast(_:) has return type change from _AnySequenceBox<τ_0_0.Element> to Array<τ_0_0.Element>
+Func _SequenceBox._prefix(while:) has return type change from _AnySequenceBox<τ_0_0.Element> to Array<τ_0_0.Element>
+Func _SequenceBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _SequenceBox._suffix(_:) has return type change from _AnySequenceBox<τ_0_0.Element> to Array<τ_0_0.Element>
+Protocol Collection has generic signature change from <τ_0_0 : Sequence, τ_0_0.Index : Comparable, τ_0_0.Index == τ_0_0.Indices.Element, τ_0_0.Indices : Collection, τ_0_0.Indices == τ_0_0.Indices.SubSequence, τ_0_0.SubSequence : Collection, τ_0_0.Indices.Element == τ_0_0.Indices.Index, τ_0_0.Indices.Index == τ_0_0.SubSequence.Index, τ_0_0.SubSequence.Index == τ_0_0.Indices.Indices.Element, τ_0_0.Indices.Indices.Element == τ_0_0.Indices.Indices.Index, τ_0_0.Indices.Indices.Index == τ_0_0.SubSequence.Indices.Element, τ_0_0.SubSequence.Indices.Element == τ_0_0.SubSequence.Indices.Index, τ_0_0.SubSequence.Indices.Index == τ_0_0.SubSequence.Indices.Indices.Element, τ_0_0.SubSequence.Indices.Indices.Element == τ_0_0.SubSequence.Indices.Indices.Index> to <τ_0_0 : Sequence, τ_0_0.Element == τ_0_0.SubSequence.Element, τ_0_0.Index : Comparable, τ_0_0.Index == τ_0_0.Indices.Element, τ_0_0.Indices : Collection, τ_0_0.Indices == τ_0_0.Indices.SubSequence, τ_0_0.SubSequence : Collection, τ_0_0.SubSequence == τ_0_0.SubSequence.SubSequence, τ_0_0.Indices.Element == τ_0_0.Indices.Index, τ_0_0.Indices.Index == τ_0_0.SubSequence.Index, τ_0_0.SubSequence.Index == τ_0_0.Indices.Indices.Element, τ_0_0.Indices.Indices.Element == τ_0_0.Indices.Indices.Index, τ_0_0.Indices.Indices.Index == τ_0_0.SubSequence.Indices.Element, τ_0_0.SubSequence.Indices.Element == τ_0_0.SubSequence.Indices.Index, τ_0_0.SubSequence.Indices.Index == τ_0_0.SubSequence.Indices.Indices.Element, τ_0_0.SubSequence.Indices.Indices.Element == τ_0_0.SubSequence.Indices.Indices.Index>
+Protocol Sequence has generic signature change from <τ_0_0.Element == τ_0_0.Iterator.Element, τ_0_0.Iterator : IteratorProtocol, τ_0_0.SubSequence : Sequence, τ_0_0.SubSequence == τ_0_0.SubSequence.SubSequence, τ_0_0.Iterator.Element == τ_0_0.SubSequence.Element, τ_0_0.SubSequence.Element == τ_0_0.SubSequence.Iterator.Element> to <τ_0_0.Element == τ_0_0.Iterator.Element, τ_0_0.Iterator : IteratorProtocol>
+Protocol _SequenceWrapper has been removed
+Struct AnySequence has removed conformance to Sequence
+Struct FlattenCollection has been removed
+Struct LazyCollection has been removed
+Struct LazyDropWhileCollection has been removed
+Struct LazyFilterCollection has been removed
+Struct LazyMapCollection has been removed
+Struct LazyPrefixWhileCollection has been removed
+Struct LazySequence has removed conformance to _SequenceWrapper
+Struct ReversedCollection has removed conformance to LazyCollectionProtocol
+Struct Slice has removed conformance to LazyCollectionProtocol
+Struct _DropWhileSequence has been renamed to Struct DropWhileSequence
+Struct _DropWhileSequence has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Struct _DropWhileSequence has removed conformance to IteratorProtocol
+Struct _DropWhileSequence has type witness type for Sequence.Iterator changing from _DropWhileSequence<τ_0_0> to DropWhileSequence<τ_0_0>.Iterator
+Var Collection.lazy has been removed
+Var Dictionary.keys has declared type change from LazyMapCollection<Dictionary<τ_0_0, τ_0_1>, τ_0_0> to LazyMapSequence<Dictionary<τ_0_0, τ_0_1>, τ_0_0>
+Var Dictionary.values has declared type change from LazyMapCollection<Dictionary<τ_0_0, τ_0_1>, τ_0_1> to LazyMapSequence<Dictionary<τ_0_0, τ_0_1>, τ_0_1>
+Var LazySequence._base has removed its setter
+Var _DropWhileSequence._iterator has declared type change from τ_0_0 to τ_0_0.Iterator
+Func Collection._preprocessingPass(_:) has been removed
+Func StrideThrough._preprocessingPass(_:) has been removed
+Func StrideTo._preprocessingPass(_:) has been removed
+Func AnyBidirectionalCollection._preprocessingPass(_:) has been removed
+Func AnyCollection._preprocessingPass(_:) has been removed
+Func AnyRandomAccessCollection._preprocessingPass(_:) has been removed
+Func AnySequence._preprocessingPass(_:) has been removed
+Func Sequence._preprocessingPass(_:) has been removed
+Func _AnySequenceBox.__copyContents(initializing:) in a non-resilient type changes position from 7 to 6
+Func _AnySequenceBox.__copyToContiguousArray() in a non-resilient type changes position from 6 to 5
+Func _AnySequenceBox.__preprocessingPass(_:) has been removed
+Func _AnySequenceBox._drop(while:) in a non-resilient type changes position from 8 to 7
+Func _AnySequenceBox._dropFirst(_:) in a non-resilient type changes position from 9 to 8
+Func _AnySequenceBox._dropLast(_:) in a non-resilient type changes position from 10 to 9
+Func _AnySequenceBox._prefix(_:) in a non-resilient type changes position from 11 to 10
+Func _AnySequenceBox._prefix(while:) in a non-resilient type changes position from 12 to 11
+Func _AnySequenceBox._suffix(_:) in a non-resilient type changes position from 13 to 12
+Func _BidirectionalCollectionBox.__preprocessingPass(_:) has been removed
+Func _CollectionBox.__preprocessingPass(_:) has been removed
+Func _RandomAccessCollectionBox.__preprocessingPass(_:) has been removed
+Func _SequenceBox.__preprocessingPass(_:) has been removed
+
+Class _DictionaryStorage has removed conformance to _NSDictionaryCore
+Class _EmptyDictionarySingleton has removed conformance to _NSDictionaryCore
+Constructor Dictionary.init(_immutableCocoaDictionary:) has parameter 0 type change from _NSDictionary to AnyObject
+Constructor _CocoaDictionary.init(_:) has parameter 0 type change from _NSDictionary to AnyObject
+Func Dictionary._bridgeToObjectiveCImpl() has return type change from _NSDictionaryCore to AnyObject
+Func _NativeDictionary.bridged() has return type change from _NSDictionary to AnyObject
+Protocol _NSDictionary has been removed
+Protocol _NSDictionaryCore has been removed
+Var Dictionary._Variant.object has declared type change from _BridgeStorage<_RawDictionaryStorage, _NSDictionary> to _BridgeStorage<_RawDictionaryStorage>
+Var _CocoaDictionary.object has declared type change from _NSDictionary to AnyObject
+
+Class _EmptySetSingleton has removed conformance to _NSSetCore
+Class _SetStorage has removed conformance to _NSSetCore
+Constructor Set.init(_immutableCocoaSet:) has parameter 0 type change from _NSSet to AnyObject
+Constructor _CocoaSet.init(_:) has parameter 0 type change from _NSSet to AnyObject
+Func Set._bridgeToObjectiveCImpl() has return type change from _NSSetCore to AnyObject
+Func _NativeSet.bridged() has return type change from _NSSet to AnyObject
+Func _stdlib_CFSetGetValues(_:_:) has been removed
+Protocol _NSSet has been removed
+Protocol _NSSetCore has been removed
+Var Set._Variant.object has declared type change from _BridgeStorage<_RawSetStorage, _NSSet> to _BridgeStorage<_RawSetStorage>
+Var _CocoaSet.object has declared type change from _NSSet to AnyObject
+
+Protocol _NSNumber has been removed
+
+Class _ContiguousArrayStorage has removed conformance to _NSArrayCore
+Class __ContiguousArrayStorageBase has removed conformance to _NSArrayCore
+Class __EmptyArrayStorage has removed conformance to _NSArrayCore
+Class __SwiftDeferredNSArray has removed conformance to _NSArrayCore
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _NSArrayCore
+Constructor Array.init(_immutableCocoaArray:) has parameter 0 type change from _NSArrayCore to AnyObject
+Constructor _ArrayBuffer.init(nsArray:) has parameter 0 type change from _NSArrayCore to AnyObject
+Constructor _ArrayBuffer.init(storage:) has parameter 0 type change from _BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore> to _BridgeStorage<__ContiguousArrayStorageBase>
+Constructor _CocoaArrayWrapper.init(_:) has parameter 0 type change from _NSArrayCore to AnyObject
+Func _ArrayBuffer._asCocoaArray() has return type change from _NSArrayCore to AnyObject
+Func _CocoaArrayWrapper.contiguousStorage(_:) has been removed
+Func _ContiguousArrayBuffer._asCocoaArray() has return type change from _NSArrayCore to AnyObject
+Func _bridgeCocoaArray(_:) has parameter 0 type change from _NSArrayCore to AnyObject
+Protocol _NSArrayCore has been removed
+Struct _CocoaArrayWrapper has type witness type for BidirectionalCollection.SubSequence changing from Slice<_CocoaArrayWrapper> to _SliceBuffer<AnyObject>
+Struct _CocoaArrayWrapper has type witness type for Collection.SubSequence changing from Slice<_CocoaArrayWrapper> to _SliceBuffer<AnyObject>
+Struct _CocoaArrayWrapper has type witness type for RandomAccessCollection.SubSequence changing from Slice<_CocoaArrayWrapper> to _SliceBuffer<AnyObject>
+Var _ArrayBuffer._nonNative has declared type change from _NSArrayCore to _CocoaArrayWrapper
+Var _ArrayBuffer._storage has declared type change from _BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore> to _BridgeStorage<__ContiguousArrayStorageBase>
+Var _CocoaArrayWrapper.buffer has declared type change from _NSArrayCore to AnyObject
+
+Var _SliceBuffer.endIndexAndFlags in a non-resilient type changes position from 2 to 3
+Var _SliceBuffer.startIndex in a non-resilient type changes position from 3 to 2
+
+Constructor _BridgeStorage.init(native:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Constructor _BridgeStorage.init(native:) has return type change from _BridgeStorage<τ_0_0, τ_0_1> to _BridgeStorage<τ_0_0>
+Constructor _BridgeStorage.init(native:isFlagged:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Constructor _BridgeStorage.init(native:isFlagged:) has return type change from _BridgeStorage<τ_0_0, τ_0_1> to _BridgeStorage<τ_0_0>
+Constructor _BridgeStorage.init(objC:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Constructor _BridgeStorage.init(objC:) has parameter 0 type change from τ_0_1 to AnyObject
+Constructor _BridgeStorage.init(objC:) has return type change from _BridgeStorage<τ_0_0, τ_0_1> to _BridgeStorage<τ_0_0>
+Constructor _BridgeStorage.init(taggedPayload:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Constructor _BridgeStorage.init(taggedPayload:) has return type change from _BridgeStorage<τ_0_0, τ_0_1> to _BridgeStorage<τ_0_0>
+Func _BridgeStorage.isUniquelyReferencedNative() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Func _BridgeStorage.isUniquelyReferencedUnflaggedNative() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Struct _BridgeStorage has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Var _BridgeStorage.objCInstance has declared type change from τ_0_1 to AnyObject
+
+Class _ContiguousArrayStorage has removed conformance to _NSCopying
+Class _ContiguousArrayStorage has removed conformance to _NSFastEnumeration
+Class _ContiguousArrayStorage has removed conformance to _ShadowProtocol
+Class _DictionaryStorage has removed conformance to _NSCopying
+Class _DictionaryStorage has removed conformance to _NSFastEnumeration
+Class _DictionaryStorage has removed conformance to _ShadowProtocol
+Class _EmptyDictionarySingleton has removed conformance to _NSCopying
+Class _EmptyDictionarySingleton has removed conformance to _NSFastEnumeration
+Class _EmptyDictionarySingleton has removed conformance to _ShadowProtocol
+Class _EmptySetSingleton has removed conformance to _NSCopying
+Class _EmptySetSingleton has removed conformance to _NSFastEnumeration
+Class _EmptySetSingleton has removed conformance to _ShadowProtocol
+Class _SetStorage has removed conformance to _NSCopying
+Class _SetStorage has removed conformance to _NSFastEnumeration
+Class _SetStorage has removed conformance to _ShadowProtocol
+Class _SharedStringStorage has removed conformance to _NSCopying
+Class _SharedStringStorage has removed conformance to _ShadowProtocol
+Class _StringStorage has removed conformance to _NSCopying
+Class _StringStorage has removed conformance to _ShadowProtocol
+Class __ContiguousArrayStorageBase has removed conformance to _NSCopying
+Class __ContiguousArrayStorageBase has removed conformance to _NSFastEnumeration
+Class __ContiguousArrayStorageBase has removed conformance to _ShadowProtocol
+Class __EmptyArrayStorage has removed conformance to _NSCopying
+Class __EmptyArrayStorage has removed conformance to _NSFastEnumeration
+Class __EmptyArrayStorage has removed conformance to _ShadowProtocol
+Class __SwiftDeferredNSArray has removed conformance to _NSCopying
+Class __SwiftDeferredNSArray has removed conformance to _NSFastEnumeration
+Class __SwiftDeferredNSArray has removed conformance to _ShadowProtocol
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _NSCopying
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _NSFastEnumeration
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _ShadowProtocol
+Protocol _NSCopying has been removed
+Protocol _NSEnumerator has been removed
+Protocol _NSFastEnumeration has been removed
+Protocol _ShadowProtocol has been removed
+
+Func ManagedBufferPointer._sanityCheckValidBufferClass(_:creating:) has been removed
+Func _sanityCheck(_:_:file:line:) has been removed
+Func _sanityCheckFailure(_:file:line:) has been removed
+
+AssociatedType LazyCollectionProtocol.Elements has been removed
+Func LazyCollectionProtocol.compactMap(_:) has been removed
+Func LazyCollectionProtocol.drop(while:) has been removed
+Func LazyCollectionProtocol.filter(_:) has been removed
+Func LazyCollectionProtocol.flatMap(_:) has been removed
+Func LazyCollectionProtocol.flatMap(_:) has been removed (deprecated)
+Func LazyCollectionProtocol.joined() has been removed
+Func LazyCollectionProtocol.map(_:) has been removed
+Func LazyCollectionProtocol.prefix(while:) has been removed
+Func LazyCollectionProtocol.reversed() has been removed
+Var LazyCollectionProtocol.lazy has declared type change from LazyCollection<τ_0_0.Elements> to LazySequence<τ_0_0.Elements>

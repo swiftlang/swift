@@ -822,6 +822,7 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
       irgen.emitEagerClassInitialization();
+      irgen.emitDynamicReplacements();
     }
 
     // Emit symbols for eliminated dead methods.
@@ -980,6 +981,8 @@ static void performParallelIRGeneration(
   irgen.emitLazyDefinitions();
 
   irgen.emitSwiftProtocols();
+
+  irgen.emitDynamicReplacements();
 
   irgen.emitProtocolConformances();
 

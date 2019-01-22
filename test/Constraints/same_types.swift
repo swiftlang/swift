@@ -303,9 +303,9 @@ func testSameTypeCommutativity4<U, T>(_ t: T, _ u: U)
 // expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
 
 func testSameTypeCommutativity5<U, T: P1>(_ t: T, _ u: U)
-  where P1 & P2 == T.Assoc { } // Ok, equivalent to T.Assoc == P1 & P2
+  where PPP & P3 == T.Assoc { } // Ok, equivalent to T.Assoc == PPP & P3
 
 // FIXME: Error emitted twice.
 func testSameTypeCommutativity6<U, T: P1>(_ t: T, _ u: U)
-  where U & P2 == T.Assoc { } // Equivalent to T.Assoc == U & P2
+  where U & P3 == T.Assoc { } // Equivalent to T.Assoc == U & P3
 // expected-error@-1 2 {{non-protocol, non-class type 'U' cannot be used within a protocol-constrained type}}

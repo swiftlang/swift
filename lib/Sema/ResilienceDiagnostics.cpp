@@ -58,11 +58,6 @@ TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
         return std::make_pair(FragileFunctionKind::Inlinable,
                               /*treatUsableFromInlineAsPublic=*/true);
 
-      if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
-        if (attr->getKind() == InlineKind::Always)
-          return std::make_pair(FragileFunctionKind::InlineAlways,
-                                /*treatUsableFromInlineAsPublic=*/true);
-
       // If a property or subscript is @inlinable, the accessors are
       // @inlinable also.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD))
@@ -114,7 +109,7 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
   // Dynamic declarations were mistakenly not checked in Swift 4.2.
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
   // building is resilient, though.
-  if (D->isDynamic() && !Context.isSwiftVersionAtLeast(5) &&
+  if (D->isObjCDynamic() && !Context.isSwiftVersionAtLeast(5) &&
       DC->getParentModule()->getResilienceStrategy() !=
         ResilienceStrategy::Resilient) {
     return false;

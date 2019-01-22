@@ -277,10 +277,6 @@ public:
   LLVM_READONLY
   bool isTypeContext() const;
 
-  /// \brief Determine whether this is an extension context.
-  LLVM_READONLY
-  bool isExtensionContext() const; // see swift/AST/Decl.h
-
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
   LLVM_READONLY

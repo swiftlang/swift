@@ -438,7 +438,7 @@ bb0(%0 : $*U):
 // CHECK: end sil function 'testExclusivity' 
 
 struct X {
-  @sil_stored var i: Int64 { get set }
+  @_hasStorage var i: Int64 { get set }
   init(i: Int64)
   init()
 }

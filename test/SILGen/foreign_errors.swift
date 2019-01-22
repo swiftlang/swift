@@ -103,8 +103,8 @@ extension NSObject {
 // CHECK:   [[T0:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
 // CHECK:   [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]]
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[BORROWED_RESULT]])
-// CHECK:   [[T2:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]] : $NSString
 // CHECK:   end_borrow [[BORROWED_RESULT]]
+// CHECK:   [[T2:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]] : $NSString
 // CHECK:   destroy_value [[RESULT]]  
 // CHECK:   br bb6([[T2]] : $Optional<NSString>)
 //

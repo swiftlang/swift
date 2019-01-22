@@ -116,7 +116,7 @@ ErrorHandlingTests.test("ErrorHandling/split") {
   } catch {}
 
   do {
-    let _: [AnySequence<Character>]
+    let _: [ArraySlice<Character>]
       = try AnySequence("foo").split { _ in
         throw SillyError.JazzHands
         return false

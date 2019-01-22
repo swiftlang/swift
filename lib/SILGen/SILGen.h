@@ -296,7 +296,7 @@ public:
 
   /// Get or emit the witness table for a protocol conformance.
   SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
-  
+
   /// Emit a protocol witness entry point.
   SILFunction *
   emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,
@@ -343,9 +343,13 @@ public:
 
   SILDeclRef getAccessorDeclRef(AccessorDecl *accessor);
 
+  bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
+                                           ResilienceExpansion expansion);
+
   KeyPathPatternComponent
   emitKeyPathComponentForDecl(SILLocation loc,
                               GenericEnvironment *genericEnv,
+                              ResilienceExpansion expansion,
                               unsigned &baseOperand,
                               bool &needsGenericContext,
                               SubstitutionMap subs,
@@ -406,6 +410,9 @@ public:
 
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
+
+  SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
+                                             KeyPathTypeKind typeKind);
 
   /// Report a diagnostic.
   template<typename...T, typename...U>

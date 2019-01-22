@@ -215,16 +215,18 @@ script is used by swift.org's CI to produce snapshots and can allow for one to
 locally reproduce such builds for development or distribution purposes. E.x.:
 
 ```
-  $ ./utils/build-toolchain $TOOLCHAIN_PREFIX
+  $ ./utils/build-toolchain $BUNDLE_PREFIX
 ```
 
-where ``$TOOLCHAIN_PREFIX`` is a string that will be prepended to the swift
-package name in the produced tar ball. For instance, if ``$TOOLCHAIN_PREFIX``
-was ``macOS``, the produced archive will have the name
-``swift-macOS.tar.gz``.
+where ``$BUNDLE_PREFIX`` is a string that will be prepended to the build 
+date to give the bundle identifier of the toolchain's ``Info.plist``. For 
+instance, if ``$BUNDLE_PREFIX`` was ``com.example``, the toolchain 
+produced will have the bundle identifier ``com.example.YYYYMMDD``. It 
+will be created in the directory you run the script with a filename 
+of the form: ``swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
 
-Beyond building the toolchain, ``build-toolchain`` also supports the following
-(non-exhaustive) set of useful options::
+Beyond building the toolchain, ``build-toolchain`` also supports the 
+following (non-exhaustive) set of useful options::
 
 - ``--dry-run``: Perform a dry run build. This is off by default.
 - ``--test``: Test the toolchain after it has been compiled. This is off by default.
@@ -242,8 +244,17 @@ On macOS if one wants to install such a toolchain into Xcode:
    `~/Library/Developer/Toolchains/`. E.x.:
 
 ```
-  $ tar -xzf swift-macOS.tar.gz -C /
-  $ tar -xzf swift-macOS.tar.gz -C ~/
+  $ sudo tar -xzf swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz -C /
+  $ tar -xzf swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz -C ~/
+```
+
+The script also generates an archive containing debug symbols which
+can be installed over the main archive allowing symbolication of any
+compiler crashes.
+
+```
+  $ sudo tar -xzf swift-LOCAL-YYYY-MM-DD-a-osx-symbols.tar.gz -C /
+  $ tar -xzf swift-LOCAL-YYYY-MM-DD-a-osx-symbols.tar.gz -C ~/
 ```
 
 2. Specify the local toolchain for Xcode's use via `Xcode->Toolchains`.

@@ -17,7 +17,7 @@ class Bar {
 }
 
 public class FooClass {
-  @sil_stored var value: Int32 { get set }
+  @_hasStorage var value: Int32 { get set }
   @inline(never) func foo(x: Int32) -> Int32
   init(value: Int32)
    deinit

@@ -21,6 +21,7 @@ import TestsUtils
 let sequenceCount = 4096
 let prefixCount = sequenceCount - 1024
 let sumCount = prefixCount * (prefixCount - 1) / 2
+let array: [Int] = Array(0..<sequenceCount)
 
 public let Prefix = [
   BenchmarkInfo(
@@ -50,7 +51,8 @@ public let Prefix = [
   BenchmarkInfo(
     name: "PrefixArray",
     runFunction: run_PrefixArray,
-    tags: [.validation, .api, .Array]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
   BenchmarkInfo(
     name: "PrefixCountableRangeLazy",
     runFunction: run_PrefixCountableRangeLazy,
@@ -78,7 +80,8 @@ public let Prefix = [
   BenchmarkInfo(
     name: "PrefixArrayLazy",
     runFunction: run_PrefixArrayLazy,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
 ]
 
 @inline(never)
@@ -149,7 +152,7 @@ public func run_PrefixAnyCollection(_ N: Int) {
 }
 @inline(never)
 public func run_PrefixArray(_ N: Int) {
-  let s = Array(0..<sequenceCount)
+  let s = array
   for _ in 1...20*N {
     var result = 0
     for element in s.prefix(prefixCount) {
@@ -226,7 +229,7 @@ public func run_PrefixAnyCollectionLazy(_ N: Int) {
 }
 @inline(never)
 public func run_PrefixArrayLazy(_ N: Int) {
-  let s = (Array(0..<sequenceCount)).lazy
+  let s = (array).lazy
   for _ in 1...20*N {
     var result = 0
     for element in s.prefix(prefixCount) {

@@ -276,7 +276,8 @@ namespace {
       return (ClassHasMissingMembers ||
               ClassHasResilientMembers ||
               ClassHasResilientAncestry ||
-              ClassHasGenericAncestry);
+              ClassHasGenericAncestry ||
+              IGM.getOptions().LazyInitializeClassMetadata);
     }
 
     bool doesMetadataRequireRelocation() const {

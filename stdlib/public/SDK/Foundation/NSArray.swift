@@ -43,9 +43,7 @@ extension Array : _ObjectiveCBridgeable {
     //
     // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
     // and watchOS.
-    self = Array(
-      _immutableCocoaArray:
-        unsafeBitCast(_cocoaArray.copy() as AnyObject, to: _NSArrayCore.self))
+    self = Array(_immutableCocoaArray: _cocoaArray.copy() as AnyObject)
   }
 
   @_semantics("convertToObjectiveC")

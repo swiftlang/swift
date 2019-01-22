@@ -1722,6 +1722,7 @@ extension FloatingPoint {
   /// - If `x` is `leastNonzeroMagnitude`, then `x.nextDown` is `0.0`.
   /// - If `x` is zero, then `x.nextDown` is `-leastNonzeroMagnitude`.
   /// - If `x` is `-greatestFiniteMagnitude`, then `x.nextDown` is `-infinity`.
+  @inlinable // FIXME(inline-always)
   public var nextDown: Self {
     @inline(__always)
     get {
@@ -1760,6 +1761,7 @@ extension FloatingPoint {
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
   ///   truncating division.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public func truncatingRemainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1799,6 +1801,7 @@ extension FloatingPoint {
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other`.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public func remainder(dividingBy other: Self) -> Self {
     var lhs = self

@@ -13,7 +13,7 @@ struct ArrayIntBuffer {
 }
 
 final class StorageBase {
-  @sil_stored var header: Int64
+  @_hasStorage var header: Int64
 }
 
 struct ArrayInt{

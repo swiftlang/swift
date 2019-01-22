@@ -685,6 +685,29 @@ static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
   return SF;
 }
 
+/// Dumps the AST of all available primary source files. If corresponding output
+/// files were specified, use them; otherwise, dump the AST to stdout.
+static void dumpAST(CompilerInvocation &Invocation,
+                    CompilerInstance &Instance) {
+  // FIXME: WMO doesn't use the notion of primary files, so this doesn't do the
+  // right thing. Perhaps it'd be best to ignore WMO when dumping the AST, just
+  // like WMO ignores `-incremental`.
+
+  auto primaryFiles = Instance.getPrimarySourceFiles();
+  if (!primaryFiles.empty()) {
+    for (SourceFile *sourceFile: primaryFiles) {
+      auto PSPs = Instance.getPrimarySpecificPathsForSourceFile(*sourceFile);
+      auto OutputFilename = PSPs.OutputFilename;
+      auto OS = getFileOutputStream(OutputFilename, Instance.getASTContext());
+      sourceFile->dump(*OS);
+    }
+  } else {
+    // Some invocations don't have primary files. In that case, we default to
+    // looking for the main file and dumping it to `stdout`.
+    getPrimaryOrMainSourceFile(Invocation, Instance)->dump(llvm::outs());
+  }
+}
+
 /// We may have been told to dump the AST (either after parsing or
 /// type-checking, which is already differentiated in
 /// CompilerInstance::performSema()), so dump or print the main source file and
@@ -728,7 +751,7 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
 
   case FrontendOptions::ActionType::DumpParse:
   case FrontendOptions::ActionType::DumpAST:
-    getPrimaryOrMainSourceFile(Invocation, Instance)->dump();
+    dumpAST(Invocation, Instance);
     break;
 
   case FrontendOptions::ActionType::EmitImportedModules:
@@ -1238,10 +1261,12 @@ static bool performCompileStepsPostSILGen(
 
   std::unique_ptr<llvm::raw_fd_ostream> OptRecordFile =
       createOptRecordFile(SILOpts.OptRecordFile, Instance.getDiags());
-  if (OptRecordFile)
-    SM->setOptRecordStream(llvm::make_unique<llvm::yaml::Output>(
-                               *OptRecordFile, &Instance.getSourceMgr()),
-                           std::move(OptRecordFile));
+  if (OptRecordFile) {
+    auto Output =
+        llvm::make_unique<llvm::yaml::Output>(*OptRecordFile,
+                                              &Instance.getSourceMgr());
+    SM->setOptRecordStream(std::move(Output), std::move(OptRecordFile));
+  }
 
   if (performMandatorySILPasses(Invocation, SM.get(), observer))
     return true;

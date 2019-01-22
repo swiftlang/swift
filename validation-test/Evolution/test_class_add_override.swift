@@ -15,6 +15,22 @@ ClassAddOverrideTest.test("AddOverrideGeneric") {
   } else {
     expectEqual("Generic", g.description)
   }
+
+  g.count = 41
+  if getVersion() == 0 {
+    expectEqual(41, g.count)
+  } else {
+    expectEqual(40, g.count)
+  }
+
+  let kp = \AddOverrideGeneric<Int>.count
+
+  g[keyPath: kp] = 51
+  if getVersion() == 0 {
+    expectEqual(51, g[keyPath: kp])
+  } else {
+    expectEqual(50, g[keyPath: kp])
+  }
 }
 
 class AddOverrideGenericSubclass<T> : AddOverrideGeneric<T> {
@@ -31,6 +47,22 @@ ClassAddOverrideTest.test("AddOverrideGenericSubclass") {
   } else {
     expectEqual("Generic", g.description)
   }
+
+  g.count = 41
+  if getVersion() == 0 {
+    expectEqual(41, g.count)
+  } else {
+    expectEqual(40, g.count)
+  }
+
+  let kp = \AddOverrideGenericSubclass<Int>.count
+
+  g[keyPath: kp] = 51
+  if getVersion() == 0 {
+    expectEqual(51, g[keyPath: kp])
+  } else {
+    expectEqual(50, g[keyPath: kp])
+  }
 }
 
 ClassAddOverrideTest.test("AddOverrideConcrete") {
@@ -40,6 +72,22 @@ ClassAddOverrideTest.test("AddOverrideConcrete") {
     expectEqual("Base", c.description)
   } else {
     expectEqual("Concrete", c.description)
+  }
+
+  c.count = 41
+  if getVersion() == 0 {
+    expectEqual(41, c.count)
+  } else {
+    expectEqual(40, c.count)
+  }
+
+  let kp = \AddOverrideConcrete.count
+
+  c[keyPath: kp] = 51
+  if getVersion() == 0 {
+    expectEqual(51, c[keyPath: kp])
+  } else {
+    expectEqual(50, c[keyPath: kp])
   }
 }
 
@@ -56,6 +104,22 @@ ClassAddOverrideTest.test("AddOverrideConcreteSubclass") {
     expectEqual("Base", c.description)
   } else {
     expectEqual("Concrete", c.description)
+  }
+
+  c.count = 41
+  if getVersion() == 0 {
+    expectEqual(41, c.count)
+  } else {
+    expectEqual(40, c.count)
+  }
+
+  let kp = \AddOverrideConcreteSubclass.count
+
+  c[keyPath: kp] = 51
+  if getVersion() == 0 {
+    expectEqual(51, c[keyPath: kp])
+  } else {
+    expectEqual(50, c[keyPath: kp])
   }
 }
 

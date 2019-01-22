@@ -5,7 +5,7 @@ final class Final<T> {
     init(x: T) { self.x = x }
 }
 // CHECK-LABEL: final class Final<T> {
-// CHECK:   @sil_stored final var x: T { get set }
+// CHECK:   @_hasStorage final var x: T { get set }
 // CHECK:   init(x: T)
 // CHECK:   deinit
 // CHECK:   enum CodingKeys : CodingKey {
@@ -25,7 +25,7 @@ class Nonfinal<T> {
     init(x: T) { self.x = x }
 }
 // CHECK-LABEL: class Nonfinal<T> {
-// CHECK:   @sil_stored var x: T { get set }
+// CHECK:   @_hasStorage var x: T { get set }
 // CHECK:   init(x: T)
 // CHECK:   deinit
 // CHECK:   enum CodingKeys : CodingKey {

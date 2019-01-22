@@ -82,6 +82,24 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 #endif
 }
 
+bool isObjCPinned(HeapObject *obj) {
+  #if SWIFT_OBJC_INTEROP
+    /* future: implement checking the relevant objc runtime bits */
+    return true;
+  #else
+    return false;
+  #endif
+}
+
+// returns non-null if realloc was successful
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+HeapObject *swift::_swift_reallocObject(HeapObject *obj, size_t size) {
+ if (isObjCPinned(obj) || obj->refCounts.hasSideTable()) {
+   return nullptr;
+ }
+ return (HeapObject *)realloc(obj, size);
+}
+
 #if SWIFT_OBJC_INTEROP
 
 /// \brief Replacement for ObjC object_isClass(), which is unavailable on
@@ -583,12 +601,13 @@ static bool isNonNative_unTagged_bridgeObject(void *object) {
   return (uintptr_t(object) & objectPointerIsObjCBit) != 0
       && (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) == 0;
 }
-#endif
 
 /// Return true iff the given BridgeObject is a tagged value.
 static bool isBridgeObjectTaggedPointer(void *object) {
-	return (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) != 0;
+  return (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) != 0;
 }
+
+#endif
 
 // Mask out the spare bits in a bridgeObject, returning the object it
 // encodes.

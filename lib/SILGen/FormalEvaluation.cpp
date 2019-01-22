@@ -106,25 +106,28 @@ void FormalEvaluationScope::popImpl() {
          "popping formal-evaluation scopes out of order");
   context.innermostScope = previous;
 
+  auto endDepth = *savedDepth;
+
   // Check to see if there is anything going on here.
-
-  using iterator = FormalEvaluationContext::iterator;
-  using stable_iterator = FormalEvaluationContext::stable_iterator;
-
-  iterator unwrappedSavedDepth = context.find(savedDepth.getValue());
-  iterator iter = context.begin();
-  if (iter == unwrappedSavedDepth)
+  if (endDepth == context.stable_begin())
     return;
+
+#ifndef NDEBUG
+  // Verify that all the accesses are valid.
+  for (auto i = context.begin(), e = context.find(endDepth); i != e; ++i) {
+    i->verify(SGF);
+  }
+#endif
 
   // Save our start point to make sure that we are not adding any new cleanups
   // to the front of the stack.
-  stable_iterator originalBegin = context.stable_begin();
-  (void)originalBegin;
+  auto originalBegin = context.stable_begin();
 
   // Then working down the stack until we visit unwrappedSavedDepth...
-  for (; iter != unwrappedSavedDepth; ++iter) {
-    // Grab the next evaluation...
-    FormalAccess &access = *iter;
+  auto i = originalBegin;
+  do {
+    // Grab the next evaluation.
+    FormalAccess &access = context.findAndAdvance(i);
 
     // If this access was already finished, continue. This can happen if an
     // owned formal access was forwarded.
@@ -149,10 +152,9 @@ void FormalEvaluationScope::popImpl() {
     // code. We do a simple N^2 comparison here to detect this because it is
     // extremely unlikely more than a few writebacks are active at once.
     if (access.getKind() == FormalAccess::Exclusive) {
-      iterator j = iter;
-      ++j;
-
-      for (; j != unwrappedSavedDepth; ++j) {
+      // Note that we already advanced 'iter' above, so we can just start
+      // iterating from there.  Also, this doesn't invalidate the iterators.
+      for (auto j = context.find(i), je = context.find(endDepth); j != je; ++j){
         FormalAccess &other = *j;
         if (other.getKind() != FormalAccess::Exclusive)
           continue;
@@ -167,33 +169,25 @@ void FormalEvaluationScope::popImpl() {
     //
     // This evaluates arbitrary code, so it's best to be paranoid
     // about iterators on the context.
-    access.finish(SGF);
-  }
+    DiverseValueBuffer<FormalAccess> copiedAccess(access);
+    copiedAccess.getCopy().finish(SGF);
+
+  } while (i != endDepth);
 
   // Then check that we did not add any additional cleanups to the beginning of
   // the stack...
   assert(originalBegin == context.stable_begin() &&
-         "more formal eval cleanups placed onto context during formal eval scope pop?!");
+         "pushed more formal evaluations while popping formal evaluations?!");
 
   // And then pop off all stack elements until we reach the savedDepth.
-  context.pop(savedDepth.getValue());
+  context.pop(endDepth);
 }
 
 void FormalEvaluationScope::verify() const {
-  // Check to see if there is anything going on here.
+  // Walk up the stack to the saved depth.
   auto &context = SGF.FormalEvalContext;
-  using iterator = FormalEvaluationContext::iterator;
-
-  iterator unwrappedSavedDepth = context.find(savedDepth.getValue());
-  iterator iter = context.begin();
-  if (iter == unwrappedSavedDepth)
-    return;
-
-  // Then working down the stack until we visit unwrappedSavedDepth...
-  for (; iter != unwrappedSavedDepth; ++iter) {
-    // Grab the next evaluation verify that we can successfully access this
-    // formal access.
-    (*iter).verify(SGF);
+  for (auto i = context.begin(), e = context.find(*savedDepth); i != e; ++i) {
+    i->verify(SGF);
   }
 }
 

@@ -123,7 +123,7 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
 ///     print(descriptions[AnyHashable(43)])       // prints "nil"
 ///     print(descriptions[AnyHashable(Int8(43))]!) // prints "an Int8"
 ///     print(descriptions[AnyHashable(Set(["a", "b"]))]!) // prints "a set of strings"
-@_fixed_layout // FIXME(sil-serialize-all)
+@_fixed_layout
 public struct AnyHashable {
   internal var _box: _AnyHashableBox
 
@@ -288,7 +288,6 @@ internal func _makeAnyHashableUsingDefaultRepresentation<H : Hashable>(
 }
 
 /// Provided by AnyHashable.cpp.
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("_swift_makeAnyHashableUpcastingToHashableBaseType")
 internal func _makeAnyHashableUpcastingToHashableBaseType<H : Hashable>(
   _ value: H,

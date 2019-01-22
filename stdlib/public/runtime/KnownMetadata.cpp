@@ -57,6 +57,7 @@ namespace ctypes {
     // Type definitions that map each names Swift builtin type to their
     // C counterparts.
     using Bi1_ = uint8_t;
+    using Bi7_ = uint8_t;
     using Bi8_ = uint8_t;
     using Bi16_ = uint16_t;
     using Bi32_ = uint32_t;
@@ -101,6 +102,8 @@ namespace pointer_types {
 
     /// The basic value-witness table for ObjC object pointers.
     using BO = ObjCRetainableBox;
+#else
+    using BO = UnknownObjectRetainableBox;
 #endif
 
   }

@@ -3,5 +3,7 @@ struct B {
   lazy var crash: String = {
     return ""
   }()
+  lazy var interpolatingMinimal: String = "Hello, \(1)!"
+  lazy var interpolatingTorture: String = "Hello, \( "\( "name" )" )\( { "!" }() )"
 }
 

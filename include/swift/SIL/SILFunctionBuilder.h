@@ -58,14 +58,9 @@ class SILFunctionBuilder {
                                          IsTransparent_t isTransparent,
                                          IsSerialized_t isSerialized,
                                          ProfileCounter entryCount,
-                                         IsThunk_t isThunk);
+                                         IsThunk_t isThunk,
+                                         IsDynamicallyReplaceable_t isDynamic);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // `addFunctionAttributes` edited because @differentiable attribute
-  // propagation requires access to original function declaration (via
-  // SILDeclRef).
-  void addFunctionAttributes(SILFunction *F, SILDeclRef constant,
-                             DeclAttributes &Attrs, SILModule &M);
 
 
   /// Return the declaration of a function, or create it if it doesn't exist.
@@ -73,6 +68,7 @@ class SILFunctionBuilder {
       SILLocation loc, StringRef name, SILLinkage linkage,
       CanSILFunctionType type, IsBare_t isBareSILFunction,
       IsTransparent_t isTransparent, IsSerialized_t isSerialized,
+      IsDynamicallyReplaceable_t isDynamic,
       ProfileCounter entryCount = ProfileCounter(),
       IsThunk_t isThunk = IsNotThunk,
       SubclassScope subclassScope = SubclassScope::NotApplicable);
@@ -93,6 +89,7 @@ class SILFunctionBuilder {
                  CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
                  Optional<SILLocation> loc, IsBare_t isBareSILFunction,
                  IsTransparent_t isTrans, IsSerialized_t isSerialized,
+                 IsDynamicallyReplaceable_t isDynamic,
                  ProfileCounter entryCount = ProfileCounter(),
                  IsThunk_t isThunk = IsNotThunk,
                  SubclassScope subclassScope = SubclassScope::NotApplicable,
@@ -100,6 +97,13 @@ class SILFunctionBuilder {
                  EffectsKind EK = EffectsKind::Unspecified,
                  SILFunction *InsertBefore = nullptr,
                  const SILDebugScope *DebugScope = nullptr);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // `addFunctionAttributes` edited because @differentiable attribute
+  // propagation requires access to original function declaration (via
+  // SILDeclRef).
+  void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
+                             SILModule &M, SILDeclRef constant = SILDeclRef());
 };
 } // namespace swift
 

@@ -220,6 +220,14 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
       auto *FRI = dyn_cast<FunctionRefInst>(I);
       if (FRI && FRI->getReferencedFunction())
         FRI->dropReferencedFunction();
+
+      auto *DFRI = dyn_cast<DynamicFunctionRefInst>(I);
+      if (DFRI && DFRI->getReferencedFunction())
+        DFRI->dropReferencedFunction();
+
+      auto *PFRI = dyn_cast<PreviousDynamicFunctionRefInst>(I);
+      if (PFRI && PFRI->getReferencedFunction())
+        PFRI->dropReferencedFunction();
     }
 
     for (auto I : DeadInsts) {
@@ -732,16 +740,10 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   auto AILeftOperandsNum = AILeft->getNumOperands();
   auto AIRightOperandsNum = AIRight->getNumOperands();
 
-  // makeUTF16 should have following parameters:
-  // (start: RawPointer, utf16CodeUnitCount: Word)
   // makeUTF8 should have following parameters:
   // (start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1)
-  if (!((FRILeftFun->hasSemanticsAttr("string.makeUTF16") &&
-         AILeftOperandsNum == 4) ||
-        (FRILeftFun->hasSemanticsAttr("string.makeUTF8") &&
+  if (!((FRILeftFun->hasSemanticsAttr("string.makeUTF8") &&
          AILeftOperandsNum == 5) ||
-        (FRIRightFun->hasSemanticsAttr("string.makeUTF16") &&
-         AIRightOperandsNum == 4) ||
         (FRIRightFun->hasSemanticsAttr("string.makeUTF8") &&
          AIRightOperandsNum == 5)))
     return false;
@@ -1568,8 +1570,9 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   if (!AFD->isChildContextOf(AssocDC))
     return false;
 
-  if (AFD->isDynamic())
+  if (AFD->isDynamic()) {
     return false;
+  }
 
   if (!AFD->hasAccess())
     return false;
@@ -1641,7 +1644,7 @@ StaticInitCloner::clone(SingleValueInstruction *InitVal) {
 }
 
 Optional<FindLocalApplySitesResult>
-swift::findLocalApplySites(FunctionRefInst *FRI) {
+swift::findLocalApplySites(FunctionRefBaseInst *FRI) {
   SmallVector<Operand *, 32> worklist(FRI->use_begin(), FRI->use_end());
 
   Optional<FindLocalApplySitesResult> f;

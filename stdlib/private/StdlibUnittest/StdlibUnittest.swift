@@ -329,6 +329,9 @@ public func expectLT<T : Comparable>(_ lhs: T, _ rhs: T,
   if !(lhs < rhs) {
     expectationFailure("\(lhs) < \(rhs)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  } else if !(rhs > lhs) {
+    expectationFailure("\(lhs) < \(rhs) (flipped)", trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
 
@@ -339,6 +342,9 @@ public func expectLE<T : Comparable>(_ lhs: T, _ rhs: T,
   file: String = #file, line: UInt = #line) {
   if !(lhs <= rhs) {
     expectationFailure("\(lhs) <= \(rhs)", trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  } else if !(rhs >= lhs) {
+    expectationFailure("\(lhs) <= \(rhs) (flipped)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
@@ -351,6 +357,9 @@ public func expectGT<T : Comparable>(_ lhs: T, _ rhs: T,
   if !(lhs > rhs) {
     expectationFailure("\(lhs) > \(rhs)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  } else if !(rhs < lhs) {
+    expectationFailure("\(lhs) > \(rhs) (flipped)", trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
 
@@ -361,6 +370,9 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T,
   file: String = #file, line: UInt = #line) {
   if !(lhs >= rhs) {
     expectationFailure("\(lhs) >= \(rhs)", trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  } else if !(rhs <= lhs) {
+    expectationFailure("\(lhs) >= \(rhs) (flipped)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
@@ -487,8 +499,7 @@ public func expectMutableSliceType<X : MutableCollection>(
 /// to be.
 public func expectSequenceAssociatedTypes<X : Sequence>(
   sequenceType: X.Type,
-  iteratorType: X.Iterator.Type,
-  subSequenceType: X.SubSequence.Type
+  iteratorType: X.Iterator.Type
 ) {}
 
 /// Check that all associated types of a `Collection` are what we expect them

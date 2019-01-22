@@ -133,8 +133,8 @@ class KlassWithBuffer {
   // CHECK:   [[BUF_BORROW:%.*]] = begin_borrow [[BUF]]
   // CHECK:   [[K:%.*]] = struct_extract [[BUF_BORROW]] : $Buffer, #Buffer.k
   // CHECK:   [[COPIED_K:%.*]] = copy_value [[K]]
-  // CHECK:   [[CASTED_COPIED_K:%.*]] = unchecked_ref_cast [[COPIED_K]]
   // CHECK:   end_borrow [[BUF_BORROW]]
+  // CHECK:   [[CASTED_COPIED_K:%.*]] = unchecked_ref_cast [[COPIED_K]]
   // CHECK:   destroy_value [[BUF]]
   // CHECK:   return [[CASTED_COPIED_K]]
   // CHECK: } // end sil function '$ss15KlassWithBufferC03getC14AsNativeObjectBoyF'

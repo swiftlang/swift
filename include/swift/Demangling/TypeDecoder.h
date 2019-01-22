@@ -22,6 +22,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
+#include "swift/Strings.h"
 #include <vector>
 
 namespace swift {
@@ -75,6 +76,34 @@ public:
   }
 };
 
+
+#if SWIFT_OBJC_INTEROP
+/// For a mangled node that refers to an Objective-C class or protocol,
+/// return the class or protocol name.
+static inline Optional<StringRef> getObjCClassOrProtocolName(
+    const Demangle::NodePointer &node) {
+  if (node->getKind() != Demangle::Node::Kind::Class &&
+      node->getKind() != Demangle::Node::Kind::Protocol)
+    return None;
+
+  if (node->getNumChildren() != 2)
+    return None;
+
+  // Check whether we have the __ObjC module.
+  auto moduleNode = node->getChild(0);
+  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
+      moduleNode->getText() != MANGLING_MODULE_OBJC)
+    return None;
+
+  // Check whether we have an identifier.
+  auto nameNode = node->getChild(1);
+  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
+    return None;
+
+  return nameNode->getText();
+}
+#endif
+
 /// Decode a mangled type to construct an abstract type, forming such
 /// types by invoking a custom builder.
 template <typename BuilderType>
@@ -112,6 +141,13 @@ class TypeDecoder {
 
       return decodeMangledType(Node->getChild(0));
     case NodeKind::Class:
+    {
+#if SWIFT_OBJC_INTEROP
+      if (auto mangledName = getObjCClassOrProtocolName(Node))
+        return Builder.createObjCClassType(mangledName->str());
+#endif
+      LLVM_FALLTHROUGH;
+    }
     case NodeKind::Enum:
     case NodeKind::Structure:
     case NodeKind::TypeAlias: // This can show up for imported Clang decls.
@@ -125,6 +161,14 @@ class TypeDecoder {
       return Builder.createNominalType(typeDecl, parent);
     }
     case NodeKind::BoundGenericClass:
+    {
+#if SWIFT_OBJC_INTEROP
+      if (Node->getNumChildren() == 2)
+        if (auto mangledName = getObjCClassOrProtocolName(Node->getChild(0)))
+          return Builder.createObjCClassType(mangledName->str());
+#endif
+      LLVM_FALLTHROUGH;
+    }
     case NodeKind::BoundGenericEnum:
     case NodeKind::BoundGenericStructure:
     case NodeKind::BoundGenericOtherNominalType: {
@@ -527,6 +571,11 @@ private:
     if ((node->getNumChildren() < 2 || node->getKind() != NodeKind::Protocol)
         && node->getKind() != NodeKind::ProtocolSymbolicReference)
       return BuiltProtocolDecl();
+
+#if SWIFT_OBJC_INTEROP
+    if (auto objcProtocolName = getObjCClassOrProtocolName(node))
+      return Builder.createObjCProtocolDecl(objcProtocolName->str());
+#endif
 
     return Builder.createProtocolDecl(node);
   }

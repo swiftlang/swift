@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %S/Inputs/multithread_module/main.swift -emit-ir -o %t/main.ll %s -o %t/mt_module.ll -num-threads 2 -O -g -module-name test
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %S/Inputs/multithread_module/main.swift -emit-ir -o %t/main.ll %/s -o %t/mt_module.ll -num-threads 2 -O -g -module-name test
 // RUN: %FileCheck --check-prefix=CHECK-MAINLL %s <%t/main.ll
 // RUN: %FileCheck --check-prefix=CHECK-MODULELL %s <%t/mt_module.ll
 

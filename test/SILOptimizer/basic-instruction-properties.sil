@@ -5,8 +5,8 @@
 import Builtin
 
 class X {
-  @sil_stored var a: Builtin.Int32
-  @sil_stored var x: X
+  @_hasStorage var a: Builtin.Int32
+  @_hasStorage var x: X
 
   init()
   func foo()

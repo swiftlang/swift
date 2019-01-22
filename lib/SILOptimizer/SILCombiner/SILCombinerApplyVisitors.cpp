@@ -747,9 +747,13 @@ static bool canReplaceCopiedArg(FullApplySite Apply,
       if (!DT->properlyDominates(AI, user))
         return false;
     } else {
+      // The caller has to guarantee that there are no other instructions which
+      // use the address. This is done in findInitExistential called from
+      // the constructor of ConcreteExistentialInfo.
       assert(isa<CopyAddrInst>(user) || isa<InitExistentialAddrInst>(user) ||
              isa<OpenExistentialAddrInst>(user) ||
              isa<DeallocStackInst>(user) ||
+             isa<ApplyInst>(user) || isa<TryApplyInst>(user) ||
              user->isDebugInstruction() && "Unexpected instruction");
     }
   }

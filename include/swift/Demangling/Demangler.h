@@ -440,6 +440,7 @@ protected:
   NodePointer demangleBoundGenericArgs(NodePointer nominalType,
                                     const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx);
+  NodePointer popAnyProtocolConformanceList();
   NodePointer demangleRetroactiveConformance();
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention();
@@ -457,6 +458,14 @@ protected:
   NodePointer getDependentGenericParamType(int depth, int index);
   NodePointer demangleGenericParamIndex();
   NodePointer popProtocolConformance();
+  NodePointer popProtocolConformanceRef();
+  NodePointer popAnyProtocolConformance();
+  NodePointer demangleConcreteProtocolConformance();
+  NodePointer popDependentProtocolConformance();
+  NodePointer demangleDependentProtocolConformanceRoot();
+  NodePointer demangleDependentProtocolConformanceInherited();
+  NodePointer popDependentAssociatedConformance();
+  NodePointer demangleDependentProtocolConformanceAssociated();
   NodePointer demangleThunkOrSpecialization();
   NodePointer demangleGenericSpecialization(Node::Kind SpecKind);
   NodePointer demangleFunctionSpecialization();

@@ -20,7 +20,7 @@ class AnNSArray {
 }
 
 struct AnArray<T> : _ObjectiveCBridgeable {
-  @sil_stored var Buffer : Builtin.NativeObject
+  @_hasStorage var Buffer : Builtin.NativeObject
 
   func _bridgeToObjectiveC() -> AnNSArray {
     return AnNSArray()

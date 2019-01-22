@@ -13,7 +13,7 @@ if(SWIFT_RUNTIME_USE_SANITIZERS)
   endif()
 endif()
 
-list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree" "-Xfrontend" "-enable-operator-designated-types")
+list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree")
 
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.

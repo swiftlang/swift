@@ -191,9 +191,8 @@ EXPR(EditorPlaceholder, Expr)
 EXPR(ObjCSelector, Expr)
 EXPR(KeyPath, Expr)
 UNCHECKED_EXPR(KeyPathDot, Expr)
-// SWIFT_ENABLE_TENSORFLOW
-EXPR(PoundAssert, Expr)
-LAST_EXPR(PoundAssert)
+EXPR(Tap, Expr)
+LAST_EXPR(Tap)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR

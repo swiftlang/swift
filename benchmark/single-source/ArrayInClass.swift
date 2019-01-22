@@ -14,7 +14,11 @@ import TestsUtils
 public let ArrayInClass = BenchmarkInfo(
   name: "ArrayInClass",
   runFunction: run_ArrayInClass,
-  tags: [.validation, .api, .Array])
+  tags: [.validation, .api, .Array],
+  setUpFunction: { ac = ArrayContainer() },
+  tearDownFunction: { ac = nil })
+
+var ac: ArrayContainer!
 
 class ArrayContainer {
   final var arr : [Int]
@@ -33,12 +37,7 @@ class ArrayContainer {
 }
 
 @inline(never)
-func getArrayContainer() -> ArrayContainer {
-  return ArrayContainer()
-}
-
-@inline(never)
 public func run_ArrayInClass(_ N: Int) {
-  let a = getArrayContainer()
+  let a = ac!
   a.runLoop(N)
 }

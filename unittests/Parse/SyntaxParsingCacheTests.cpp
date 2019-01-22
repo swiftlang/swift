@@ -1,119 +1,105 @@
 #include "swift/Parse/SyntaxParsingCache.h"
 #include "gtest/gtest.h"
 
+#include <iostream>
+
 using namespace swift;
 using namespace llvm;
 
+
+namespace llvm {
+template <typename T>
+void PrintTo(const Optional<T> &optVal, ::std::ostream *os) {
+  if (optVal.hasValue())
+    *os << *optVal;
+  else
+    *os << "None";
+}
+} // namespace llvm
+
+void check(ArrayRef<SourceEdit> Edits, ArrayRef<Optional<size_t>> expected) {
+  for (size_t Pos = 0; Pos != expected.size(); ++Pos) {
+    Optional<size_t> PrePos =
+        SyntaxParsingCache::translateToPreEditPosition(Pos, Edits);
+    EXPECT_EQ(PrePos, expected[Pos]) << "At post-edit position " << Pos;
+  }
+}
+
 class TranslateToPreEditPositionTest : public ::testing::Test {};
 
-TEST_F(TranslateToPreEditPositionTest, SingleEditBefore) {
+TEST_F(TranslateToPreEditPositionTest, SingleEdit1) {
   // Old: ab_xy
-  // New: a1b_xy
-  //
-  // Edits:
-  // (1) 1-2: a -> a1
-  //
-  // Lookup for _ at new position 4
+  // New: c_xy
 
   llvm::SmallVector<SourceEdit, 4> Edits = {
-      {1, 2, 2}
+      {0, 2, 1} // ab -> c
   };
 
-  size_t PreEditPos = SyntaxParsingCache::translateToPreEditPosition(4, Edits);
-  EXPECT_EQ(PreEditPos, 3u);
+  //            c     _  x  y
+  check(Edits, {None, 2, 3, 4});
 }
 
-TEST_F(TranslateToPreEditPositionTest, SingleEditDirectlyBefore) {
+TEST_F(TranslateToPreEditPositionTest, SingleEdit) {
   // Old: ab_xy
   // New: ablah_xy
-  //
-  // Edits:
-  // (1) 2-3: b -> blah
-  //
-  // Lookup for _ at new position 6
 
   llvm::SmallVector<SourceEdit, 4> Edits = {
-      {2, 3, 4}
+      {1, 2, 4} // b -> blah
   };
 
-  size_t PreEditPos = SyntaxParsingCache::translateToPreEditPosition(6, Edits);
-  EXPECT_EQ(PreEditPos, 3u);
+  //            a  b     l     a     h     _  x  y
+  check(Edits, {0, None, None, None, None, 2, 3, 4});
 }
 
-TEST_F(TranslateToPreEditPositionTest, SingleMultiCharacterEdit) {
+TEST_F(TranslateToPreEditPositionTest, SingleInsert) {
   // Old: ab_xy
-  // New: abcdef_xy
-  //
-  // Edits:
-  // (1) 1-3: ab -> abcdef
-  //
-  // Lookup for _ at new position 7
+  // New: 0123ab_xy
 
   llvm::SmallVector<SourceEdit, 4> Edits = {
-      {1, 3, 6}
+      {0, 0, 4} // '' -> 0123
   };
 
-  size_t PreEditPos = SyntaxParsingCache::translateToPreEditPosition(7, Edits);
-  EXPECT_EQ(PreEditPos, 3u);
+  //             0     1     2     3     a  b  _  x  y
+  check(Edits, { None, None, None, None, 0, 1, 2, 3, 4});
 }
 
-TEST_F(TranslateToPreEditPositionTest, EditAfterLookup) {
-  // Old: ab_xy
-  // New: ab_xyz
-  //
-  // Edits:
-  // (1) 4-6: xy -> xyz
-  //
-  // Lookup for _ at new position 3
+TEST_F(TranslateToPreEditPositionTest, SingleDelete) {
+  // Old: ab_xyz
+  // New: ab_z
 
-  llvm::SmallVector<SourceEdit, 4> Edits = {{4, 6, 4}};
+  llvm::SmallVector<SourceEdit, 4> Edits = {
+      {3, 5, 0} // xy -> ''
+  };
 
-  size_t PreEditPos = SyntaxParsingCache::translateToPreEditPosition(3, Edits);
-  EXPECT_EQ(PreEditPos, 3u);
+  //             a  b  _  z
+  check(Edits, { 0, 1, 2, 5 });
 }
 
 TEST_F(TranslateToPreEditPositionTest, SimpleMultiEdit) {
-  // Old: ab_xy
-  // New: a1b2_x3y4
-  //
-  // Edits:
-  // (1) 1-2: a -> a1
-  // (2) 2-3: b -> b2
-  // (3) 4-5: x -> x3
-  // (4) 5-6: y -> y4
-  //
-  // Lookup for _ at new position 5
+  // Old: _ab_xy
+  // New: _a1b2_x3y4
 
   llvm::SmallVector<SourceEdit, 4> Edits = {
-      {1, 2, 2},
-      {2, 3, 2},
-      {4, 5, 2},
-      {5, 6, 2},
+      {1, 2, 2}, // a -> a1
+      {2, 3, 2}, // b -> b2
+      {4, 5, 2}, // x -> x3
+      {5, 6, 2}, // y -> y4
   };
 
-  size_t PreEditPos = SyntaxParsingCache::translateToPreEditPosition(5, Edits);
-  EXPECT_EQ(PreEditPos, 3u);
+  //            _  a     1     b     1     _  x     3     y     4
+  check(Edits, {0, None, None, None, None, 3, None, None, None, None});
 }
 
-TEST_F(TranslateToPreEditPositionTest, LongMultiEdit) {
-  // Old: ab_xy
-  // New: a11111b2_x3y4
-  //
-  // Edits:
-  // (1) 1-2: a -> a11111
-  // (2) 2-3: b -> b2
-  // (3) 4-5: x -> x3
-  // (4) 5-6: y -> y4
-  //
-  // Lookup for _ at new position
+TEST_F(TranslateToPreEditPositionTest, ComplexMultiEdit) {
+  // Old: foo_bar_baz
+  // New: xx_edits_baz
 
   llvm::SmallVector<SourceEdit, 4> Edits = {
-      {1, 2, 6},
-      {2, 3, 2},
-      {4, 5, 2},
-      {5, 6, 2},
+      {0, 3, 2}, // foo -> xx
+      {4, 7, 0}, // bar -> ''
+      {7, 7, 5}, // '' -> edits
   };
 
-  size_t PreEditPos = SyntaxParsingCache::translateToPreEditPosition(9, Edits);
-  EXPECT_EQ(PreEditPos, 3u);
+  //            x     x     _  e     d     i     t     s     _  b  a  z
+  check(Edits, {None, None, 3, None, None, None, None, None, 7, 8, 9, 10});
 }

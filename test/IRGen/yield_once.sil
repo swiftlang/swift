@@ -90,5 +90,45 @@ cont:
   return %ret : $()
 }
 
+sil @yields_pair : $@yield_once @convention(thin) () -> (@yields Builtin.Int32, @yields Builtin.Int32)
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_yields_pair()
+sil @test_yields_pair : $() -> () {
+entry:
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+
+  //   Allocate the buffer.
+  // CHECK:         [[T0:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
+  // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds {{\[}}[[BUFFER_SIZE]] x i8], {{\[}}[[BUFFER_SIZE]] x i8]* [[T0]], i32 0, i32 0
+  // CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 [[BUFFER_SIZE]], i8* [[BUFFER]])
+
+  //   Prepare the continuation function pointer to block analysis.
+  // CHECK-NEXT:    [[T0:%.*]] = call i8* @llvm.coro.prepare.retcon(i8* bitcast ({ i8*, i32, i32 } (i8*)* @yields_pair to i8*))
+  // CHECK-NEXT:    [[PREPARE:%.*]] = bitcast i8* [[T0]] to { i8*, i32, i32 } (i8*)*
+  //   Call the function pointer.
+  // CHECK-NEXT:    [[PACKED:%.*]] = call swiftcc { i8*, i32, i32 } [[PREPARE]](i8* noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]])
+  // CHECK-NEXT:    [[CONTINUATION:%.*]] = extractvalue { i8*, i32, i32 } [[PACKED]], 0
+  // CHECK-NEXT:    [[FIRST:%.*]] = extractvalue { i8*, i32, i32 } [[PACKED]], 1
+  // CHECK-NEXT:    [[SECOND:%.*]] = extractvalue { i8*, i32, i32 } [[PACKED]], 2
+  %coro = function_ref @yields_pair : $@yield_once @convention(thin) () -> (@yields Builtin.Int32, @yields Builtin.Int32)
+  (%first, %second, %token) = begin_apply %coro() : $@yield_once @convention(thin) () -> (@yields Builtin.Int32, @yields Builtin.Int32)
+
+  // CHECK-NEXT:    call swiftcc void @marker(i32 [[FIRST]])
+  apply %marker(%first) : $@convention(thin) (Builtin.Int32) -> ()
+
+  // CHECK-NEXT:    [[T0:%.*]] = bitcast i8* [[CONTINUATION]] to void (i8*, i1)*
+  // CHECK-NEXT:    call swiftcc void [[T0]](i8* noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 false)
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 [[BUFFER_SIZE]], i8* [[BUFFER]])
+  end_apply %token
+
+  // CHECK-NEXT:    call swiftcc void @marker(i32 [[SECOND]])
+  apply %marker(%second) : $@convention(thin) (Builtin.Int32) -> ()
+
+  // CHECK-NEXT:    ret void
+  %ret = tuple ()
+  return %ret : $()
+}
+
+
 // CHECK:       attributes [[CORO_ATTRIBUTES]] =
 // CHECK-SAME:    noinline

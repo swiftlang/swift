@@ -129,3 +129,21 @@ private class PrivateDerivedFromPublic : PublicBase {}
 
 // CHECK-LABEL: sil private @$s19inlinable_attribute21PrivateDerivedFromUFI{{.+}}LLC5horseAdA5HorseC_tcfc : $@convention(method) (@owned Horse, @owned PrivateDerivedFromUFI) -> @owned PrivateDerivedFromUFI
 private class PrivateDerivedFromUFI : UFIBase {}
+
+// Make sure that nested functions are also serializable.
+
+// CHECK-LABEL: sil [serialized] @$s19inlinable_attribute3basyyF
+@inlinable
+public func bas() {
+  // CHECK-LABEL: sil shared [serialized] @$s19inlinable_attribute3basyyF3zimL_yyF
+  func zim() {
+    // CHECK-LABEL: sil shared [serialized] @$s19inlinable_attribute3basyyF3zimL_yyF4zangL_yyF
+    func zang() { }
+  }
+
+  // CHECK-LABEL: sil shared [serialized] @$s19inlinable_attribute3bas{{[_0-9a-zA-Z]*}}U_
+  let zung = {
+    // CHECK-LABEL: sil shared [serialized] @$s19inlinable_attribute3basyyFyycfU_7zippityL_yyF
+    func zippity() { }
+  }
+}

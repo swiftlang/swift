@@ -18,9 +18,9 @@ extension String {
   ///   instance.
   ///
   /// - Complexity: O(*n*), where *n* is the length of `substring`.
-  public init(_ substring: Substring) {
-    let wholeGuts = substring._wholeString._guts
-    self.init(wholeGuts._extractSlice(substring._encodedOffsetRange))
+  @inlinable
+  public init(_ substring: __shared Substring) {
+    self = substring._withUTF8 { return String._uncheckedFromUTF8($0) }
   }
 }
 
@@ -92,88 +92,101 @@ extension String {
 ///   when there is no other reference to the original string. Storing
 ///   substrings may, therefore, prolong the lifetime of string data that is
 ///   no longer otherwise accessible, which can appear to be memory leakage.
-@_fixed_layout // FIXME(sil-serialize-all)
-public struct Substring : StringProtocol {
+@_fixed_layout
+public struct Substring {
+  @usableFromInline
+  internal var _slice: Slice<String>
+
+  @inlinable @inline(__always)
+  internal init(_ slice: Slice<String>) {
+    self._slice = slice
+    _invariantCheck()
+  }
+
+  @inline(__always)
+  internal init(_ slice: _StringGutsSlice) {
+    self.init(String(slice._guts)[slice.range])
+  }
+
+  /// Creates an empty substring.
+  @inlinable @inline(__always)
+  public init() {
+    self.init(Slice())
+  }
+}
+
+extension Substring {
+  @inlinable
+  internal var _wholeGuts: _StringGuts {
+    @inline(__always) get { return _slice.base._guts }
+  }
+  @inlinable
+  internal var _wholeString: String {
+    @inline(__always) get { return String(self._wholeGuts) }
+  }
+
+  @inlinable
+  internal var _offsetRange: Range<Int> {
+    @inline(__always) get {
+      let start = _slice.startIndex
+      let end = _slice.endIndex
+      _internalInvariant(start.transcodedOffset == 0 && end.transcodedOffset == 0)
+
+      return Range(uncheckedBounds: (start.encodedOffset, end.encodedOffset))
+    }
+  }
+
+  #if !INTERNAL_CHECKS_ENABLED
+  @inlinable @inline(__always) internal func _invariantCheck() {}
+  #else
+  @usableFromInline @inline(never) @_effects(releasenone)
+  internal func _invariantCheck() {
+    self._wholeString._invariantCheck()
+  }
+  #endif // INTERNAL_CHECKS_ENABLED
+}
+
+extension Substring: StringProtocol {
   public typealias Index = String.Index
   public typealias SubSequence = Substring
 
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var _slice: Slice<String>
-
-  /// Creates an empty substring.
-  @inlinable // FIXME(sil-serialize-all)
-  public init() {
-    _slice = Slice()
+  @inlinable
+  public var startIndex: Index {
+    @inline(__always) get { return _slice.startIndex }
+  }
+  @inlinable
+  public var endIndex: Index {
+    @inline(__always) get { return _slice.endIndex }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(_slice: Slice<String>) {
-    self._slice = _slice
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(_ guts: _StringGuts, _ offsetRange: Range<Int>) {
-    self.init(
-      _base: String(guts),
-      Index(encodedOffset: offsetRange.lowerBound) ..<
-        Index(encodedOffset: offsetRange.upperBound))
-  }
-
-  /// Creates a substring with the specified bounds within the given string.
-  ///
-  /// - Parameters:
-  ///   - base: The string to create a substring of.
-  ///   - bounds: The range of `base` to use for the substring. The lower and
-  ///     upper bounds of `bounds` must be valid indices of `base`.
-  @inlinable // FIXME(sil-serialize-all)
-  public init(_base base: String, _ bounds: Range<Index>) {
-    _slice = Slice(base: base, bounds: bounds)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal init<R: RangeExpression>(
-    _base base: String, _ bounds: R
-  ) where R.Bound == Index {
-    self.init(_base: base, bounds.relative(to: base))
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var startIndex: Index { return _slice.startIndex }
-  @inlinable // FIXME(sil-serialize-all)
-  public var endIndex: Index { return _slice.endIndex }
-
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
     _precondition(i < endIndex, "Cannot increment beyond endIndex")
     _precondition(i >= startIndex, "Cannot increment an invalid index")
-    // FIXME(strings): slice types currently lack necessary bound checks
     return _slice.index(after: i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
     _precondition(i <= endIndex, "Cannot decrement an invalid index")
     _precondition(i > startIndex, "Cannot decrement beyond startIndex")
-    // FIXME(strings): slice types currently lack necessary bound checks
     return _slice.index(before: i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     let result = _slice.index(i, offsetBy: n)
-    // FIXME(strings): slice types currently lack necessary bound checks
     _precondition(
       (_slice._startIndex ... _slice.endIndex).contains(result),
       "Operation results in an invalid index")
     return result
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable @inline(__always)
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     let result = _slice.index(i, offsetBy: n, limitedBy: limit)
-    // FIXME(strings): slice types currently lack necessary bound checks
     _precondition(result.map {
         (_slice._startIndex ... _slice.endIndex).contains($0)
       } ?? true,
@@ -181,26 +194,22 @@ public struct Substring : StringProtocol {
     return result
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> Int {
     return _slice.distance(from: start, to: end)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public subscript(i: Index) -> Character {
     return _slice[i]
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Iterator.Element {
-    // FIXME(strings): slice types currently lack necessary bound checks
     _slice.replaceSubrange(bounds, with: newElements)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange(
     _ bounds: Range<Index>, with newElements: Substring
   ) {
@@ -215,7 +224,7 @@ public struct Substring : StringProtocol {
   ///     specified in `sourceEncoding`.
   ///   - sourceEncoding: The encoding in which `codeUnits` should be
   ///     interpreted.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // specialization
   public init<C: Collection, Encoding: _UnicodeEncoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
@@ -227,7 +236,6 @@ public struct Substring : StringProtocol {
   ///
   /// - Parameter nullTerminatedUTF8: A pointer to a sequence of contiguous,
   ///   UTF-8 encoded bytes ending just before the first zero byte.
-  @inlinable // FIXME(sil-serialize-all)
   public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
     self.init(String(cString: nullTerminatedUTF8))
   }
@@ -241,7 +249,7 @@ public struct Substring : StringProtocol {
   ///     before the first zero code unit.
   ///   - sourceEncoding: The encoding in which the code units should be
   ///     interpreted.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // specialization
   public init<Encoding: _UnicodeEncoding>(
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type
@@ -263,14 +271,12 @@ public struct Substring : StringProtocol {
   ///   `withCString(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // specialization
   public func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
-    return try _wholeString._guts._withCSubstringAndLength(
-      in: _encodedOffsetRange,
-      encoding: UTF8.self) { p, length in
-      try p.withMemoryRebound(to: CChar.self, capacity: length, body)
-    }
+    // TODO(String performance): Detect when we cover the rest of a nul-
+    // terminated String, and thus can avoid a copy.
+    return try String(self).withCString(body)
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -289,72 +295,43 @@ public struct Substring : StringProtocol {
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // specialization
   public func withCString<Result, TargetEncoding: _UnicodeEncoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    return try _wholeString._guts._withCSubstring(
-      in: _encodedOffsetRange,
-      encoding: targetEncoding,
-      body)
-  }
-}
-
-extension Substring : _SwiftStringView {
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _persistentContent: String {
-    return String(self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public // @testable
-  var _ephemeralContent: String {
-    return _persistentContent
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var _wholeString: String {
-    return _slice._base
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var _encodedOffsetRange: Range<Int> {
-    return startIndex.encodedOffset..<endIndex.encodedOffset
+    // TODO(String performance): Detect when we cover the rest of a nul-
+    // terminated String, and thus can avoid a copy.
+    return try String(self).withCString(encodedAs: targetEncoding, body)
   }
 }
 
 extension Substring : CustomReflectable {
-  public var customMirror: Mirror {
-    return String(self).customMirror
-  }
+ public var customMirror: Mirror { return String(self).customMirror }
 }
 
 extension Substring : CustomStringConvertible {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var description: String {
-    return String(self)
+    @inline(__always) get { return String(self) }
   }
 }
 
 extension Substring : CustomDebugStringConvertible {
-  public var debugDescription: String {
-    return String(self).debugDescription
-  }
+  public var debugDescription: String { return String(self).debugDescription }
 }
 
 extension Substring : LosslessStringConvertible {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(_ content: String) {
-    self.init(_base: content, content.startIndex ..< content.endIndex)
+    self = content[...]
   }
 }
 
-
 extension Substring {
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   public struct UTF8View {
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline
     internal var _slice: Slice<String.UTF8View>
   }
 }
@@ -366,98 +343,84 @@ extension Substring.UTF8View : BidirectionalCollection {
   public typealias SubSequence = Substring.UTF8View
 
   /// Creates an instance that slices `base` at `_bounds`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal init(_ base: String.UTF8View, _bounds: Range<Index>) {
     _slice = Slice(
       base: String(base._guts).utf8,
       bounds: _bounds)
   }
 
-  /// The entire String onto whose slice this view is a projection.
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _wholeString: String {
-    return String(_slice._base._guts)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _encodedOffsetRange: Range<Int> {
-    return startIndex.encodedOffset..<endIndex.encodedOffset
-  }
-
   //
   // Plumb slice operations through
   //
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var startIndex: Index { return _slice.startIndex }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var endIndex: Index { return _slice.endIndex }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public subscript(index: Index) -> Element { return _slice[index] }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var indices: Indices { return _slice.indices }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(after i: Index) -> Index { return _slice.index(after: i) }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func formIndex(after i: inout Index) {
     _slice.formIndex(after: &i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     return _slice.index(i, offsetBy: n)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     return _slice.index(i, offsetBy: n, limitedBy: limit)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
     return _slice.distance(from: start, to: end)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _slice._failEarlyRangeCheck(index, bounds: bounds)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _failEarlyRangeCheck(
     _ range: Range<Index>, bounds: Range<Index>
   ) {
     _slice._failEarlyRangeCheck(range, bounds: bounds)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index { return _slice.index(before: i) }
 
-  @inlinable // FIXME(sil-serialize-all)
   public func formIndex(before i: inout Index) {
     _slice.formIndex(before: &i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public subscript(r: Range<Index>) -> Substring.UTF8View {
     // FIXME(strings): tests.
     _precondition(r.lowerBound >= startIndex && r.upperBound <= endIndex,
       "UTF8View index range out of bounds")
-    return Substring.UTF8View(_wholeString.utf8, _bounds: r)
+    return Substring.UTF8View(_slice.base, _bounds: r)
   }
 }
 
 extension Substring {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var utf8: UTF8View {
     get {
-      return UTF8View(_wholeString.utf8, _bounds: startIndex..<endIndex)
+      return _wholeString.utf8[startIndex..<endIndex]
     }
     set {
       self = Substring(newValue)
@@ -467,9 +430,10 @@ extension Substring {
   /// Creates a Substring having the given content.
   ///
   /// - Complexity: O(1)
-  @inlinable // FIXME(sil-serialize-all)
   public init(_ content: UTF8View) {
-    self = content._wholeString[content.startIndex..<content.endIndex]
+    self = String(
+      content._slice.base._guts
+    )[content.startIndex..<content.endIndex]
   }
 }
 
@@ -480,20 +444,20 @@ extension String {
   ///
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
-  @inlinable // FIXME(sil-serialize-all)
   public init?(_ codeUnits: Substring.UTF8View) {
-    let wholeString = codeUnits._wholeString
-    guard
-      codeUnits.startIndex.samePosition(in: wholeString.unicodeScalars) != nil
-      && codeUnits.endIndex.samePosition(in: wholeString.unicodeScalars) != nil
-    else { return nil }
+    let guts = codeUnits._slice.base._guts
+    guard guts.isOnUnicodeScalarBoundary(codeUnits._slice.startIndex),
+          guts.isOnUnicodeScalarBoundary(codeUnits._slice.endIndex) else {
+      return nil
+    }
+
     self = String(Substring(codeUnits))
   }
 }
 extension Substring {
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   public struct UTF16View {
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline
     internal var _slice: Slice<String.UTF16View>
   }
 }
@@ -505,98 +469,84 @@ extension Substring.UTF16View : BidirectionalCollection {
   public typealias SubSequence = Substring.UTF16View
 
   /// Creates an instance that slices `base` at `_bounds`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal init(_ base: String.UTF16View, _bounds: Range<Index>) {
     _slice = Slice(
       base: String(base._guts).utf16,
       bounds: _bounds)
   }
 
-  /// The entire String onto whose slice this view is a projection.
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _wholeString: String {
-    return String(_slice._base._guts)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _encodedOffsetRange: Range<Int> {
-    return startIndex.encodedOffset..<endIndex.encodedOffset
-  }
-
   //
   // Plumb slice operations through
   //
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var startIndex: Index { return _slice.startIndex }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var endIndex: Index { return _slice.endIndex }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public subscript(index: Index) -> Element { return _slice[index] }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var indices: Indices { return _slice.indices }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(after i: Index) -> Index { return _slice.index(after: i) }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func formIndex(after i: inout Index) {
     _slice.formIndex(after: &i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     return _slice.index(i, offsetBy: n)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     return _slice.index(i, offsetBy: n, limitedBy: limit)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
     return _slice.distance(from: start, to: end)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _slice._failEarlyRangeCheck(index, bounds: bounds)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _failEarlyRangeCheck(
     _ range: Range<Index>, bounds: Range<Index>
   ) {
     _slice._failEarlyRangeCheck(range, bounds: bounds)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(before i: Index) -> Index { return _slice.index(before: i) }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func formIndex(before i: inout Index) {
     _slice.formIndex(before: &i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public subscript(r: Range<Index>) -> Substring.UTF16View {
-    // FIXME(strings): tests.
-    _precondition(r.lowerBound >= startIndex && r.upperBound <= endIndex,
-      "UTF16View index range out of bounds")
-    return Substring.UTF16View(_wholeString.utf16, _bounds: r)
+    return Substring.UTF16View(_slice.base, _bounds: r)
   }
 }
 
 extension Substring {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var utf16: UTF16View {
     get {
-      return UTF16View(_wholeString.utf16, _bounds: startIndex..<endIndex)
+      return _wholeString.utf16[startIndex..<endIndex]
     }
     set {
       self = Substring(newValue)
@@ -606,9 +556,10 @@ extension Substring {
   /// Creates a Substring having the given content.
   ///
   /// - Complexity: O(1)
-  @inlinable // FIXME(sil-serialize-all)
   public init(_ content: UTF16View) {
-    self = content._wholeString[content.startIndex..<content.endIndex]
+    self = String(
+      content._slice.base._guts
+    )[content.startIndex..<content.endIndex]
   }
 }
 
@@ -619,20 +570,20 @@ extension String {
   ///
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
-  @inlinable // FIXME(sil-serialize-all)
   public init?(_ codeUnits: Substring.UTF16View) {
-    let wholeString = codeUnits._wholeString
-    guard
-      codeUnits.startIndex.samePosition(in: wholeString.unicodeScalars) != nil
-      && codeUnits.endIndex.samePosition(in: wholeString.unicodeScalars) != nil
-    else { return nil }
+    let guts = codeUnits._slice.base._guts
+    guard guts.isOnUnicodeScalarBoundary(codeUnits._slice.startIndex),
+          guts.isOnUnicodeScalarBoundary(codeUnits._slice.endIndex) else {
+      return nil
+    }
+
     self = String(Substring(codeUnits))
   }
 }
 extension Substring {
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   public struct UnicodeScalarView {
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline
     internal var _slice: Slice<String.UnicodeScalarView>
   }
 }
@@ -644,98 +595,84 @@ extension Substring.UnicodeScalarView : BidirectionalCollection {
   public typealias SubSequence = Substring.UnicodeScalarView
 
   /// Creates an instance that slices `base` at `_bounds`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal init(_ base: String.UnicodeScalarView, _bounds: Range<Index>) {
     _slice = Slice(
       base: String(base._guts).unicodeScalars,
       bounds: _bounds)
   }
 
-  /// The entire String onto whose slice this view is a projection.
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _wholeString: String {
-    return String(_slice._base._guts)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _encodedOffsetRange: Range<Int> {
-    return startIndex.encodedOffset..<endIndex.encodedOffset
-  }
-
   //
   // Plumb slice operations through
   //
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var startIndex: Index { return _slice.startIndex }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var endIndex: Index { return _slice.endIndex }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public subscript(index: Index) -> Element { return _slice[index] }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var indices: Indices { return _slice.indices }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(after i: Index) -> Index { return _slice.index(after: i) }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func formIndex(after i: inout Index) {
     _slice.formIndex(after: &i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     return _slice.index(i, offsetBy: n)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     return _slice.index(i, offsetBy: n, limitedBy: limit)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
     return _slice.distance(from: start, to: end)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _slice._failEarlyRangeCheck(index, bounds: bounds)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _failEarlyRangeCheck(
     _ range: Range<Index>, bounds: Range<Index>
   ) {
     _slice._failEarlyRangeCheck(range, bounds: bounds)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(before i: Index) -> Index { return _slice.index(before: i) }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func formIndex(before i: inout Index) {
     _slice.formIndex(before: &i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public subscript(r: Range<Index>) -> Substring.UnicodeScalarView {
-    // FIXME(strings): tests.
-    _precondition(r.lowerBound >= startIndex && r.upperBound <= endIndex,
-      "UnicodeScalarView index range out of bounds")
-    return Substring.UnicodeScalarView(_wholeString.unicodeScalars, _bounds: r)
+    return Substring.UnicodeScalarView(_slice.base, _bounds: r)
   }
 }
 
 extension Substring {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var unicodeScalars: UnicodeScalarView {
     get {
-      return UnicodeScalarView(_wholeString.unicodeScalars, _bounds: startIndex..<endIndex)
+      return _wholeString.unicodeScalars[startIndex..<endIndex]
     }
     set {
       self = Substring(newValue)
@@ -745,9 +682,10 @@ extension Substring {
   /// Creates a Substring having the given content.
   ///
   /// - Complexity: O(1)
-  @inlinable // FIXME(sil-serialize-all)
   public init(_ content: UnicodeScalarView) {
-    self = content._wholeString[content.startIndex..<content.endIndex]
+    self = String(
+      content._slice.base._guts
+    )[content.startIndex..<content.endIndex]
   }
 }
 
@@ -756,7 +694,6 @@ extension String {
   ///
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
-  @inlinable // FIXME(sil-serialize-all)
   public init(_ content: Substring.UnicodeScalarView) {
     self = String(Substring(content))
   }
@@ -764,10 +701,9 @@ extension String {
 
 // FIXME: The other String views should be RangeReplaceable too.
 extension Substring.UnicodeScalarView : RangeReplaceableCollection {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init() { _slice = Slice.init() }
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange<C : Collection>(
     _ target: Range<Index>, with replacement: C
   ) where C.Element == Element {
@@ -776,18 +712,23 @@ extension Substring.UnicodeScalarView : RangeReplaceableCollection {
 }
 
 extension Substring : RangeReplaceableCollection {
-  @inlinable // FIXME(sil-serialize-all)
+  @_specialize(where S == String)
+  @_specialize(where S == Substring)
+  @_specialize(where S == Array<Character>)
   public init<S : Sequence>(_ elements: S)
   where S.Element == Character {
-    let e0 = elements as? _SwiftStringView
-    if _fastPath(e0 != nil), let e = e0 {
-      self.init(e._wholeString._guts, e._encodedOffsetRange)
-    } else {
-      self.init(String(elements))
+    if let str = elements as? String {
+      self = str[...]
+      return
     }
+    if let subStr = elements as? Substring {
+      self = subStr
+      return
+    }
+    self = String(elements)[...]
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // specialize
   public mutating func append<S : Sequence>(contentsOf elements: S)
   where S.Element == Character {
     var string = String(self)
@@ -798,17 +739,14 @@ extension Substring : RangeReplaceableCollection {
 }
 
 extension Substring {
-  @inlinable // FIXME(sil-serialize-all)
   public func lowercased() -> String {
     return String(self).lowercased()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public func uppercased() -> String {
     return String(self).uppercased()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> String {
@@ -817,61 +755,54 @@ extension Substring {
 }
 
 extension Substring : TextOutputStream {
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func write(_ other: String) {
     append(contentsOf: other)
   }
 }
 
 extension Substring : TextOutputStreamable {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // specializable
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(String(self))
   }
 }
 
 extension Substring : ExpressibleByUnicodeScalarLiteral {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(unicodeScalarLiteral value: String) {
-     self.init(_base: value, value.startIndex ..< value.endIndex)
+     self.init(value)
   }
 }
 extension Substring : ExpressibleByExtendedGraphemeClusterLiteral {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(extendedGraphemeClusterLiteral value: String) {
-     self.init(_base: value, value.startIndex ..< value.endIndex)
+     self.init(value)
   }
 }
 
 extension Substring : ExpressibleByStringLiteral {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(stringLiteral value: String) {
-     self.init(_base: value, value.startIndex ..< value.endIndex)
+     self.init(value)
   }
 }
 
-//===--- String/Substring Slicing Support ---------------------------------===//
-/// In Swift 3.2, in the absence of type context,
-///
-///     someString[someString.startIndex..<someString.endIndex]
-///
-/// was deduced to be of type `String`.  Therefore have a more-specific
-/// Swift-3-only `subscript` overload on `String` (and `Substring`) that
-/// continues to produce `String`.
+// String/Substring Slicing
 extension String {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
     _boundsCheck(r)
-    return Substring(
-      _slice: Slice(base: self, bounds: r))
+    return Substring(Slice(base: self, bounds: r))
   }
 }
 
 extension Substring {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
-    return Substring(_slice: _slice[r])
+    return Substring(_slice[r])
   }
 }
+
+

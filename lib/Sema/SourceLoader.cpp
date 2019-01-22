@@ -109,7 +109,9 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   std::unique_ptr<llvm::MemoryBuffer> inputFile =
     std::move(inputFileOrError.get());
 
-  addDependency(inputFile->getBufferIdentifier());
+  if (dependencyTracker)
+    dependencyTracker->addDependency(inputFile->getBufferIdentifier(),
+                                     /*isSystem=*/false);
 
   // Turn off debugging while parsing other modules.
   llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,

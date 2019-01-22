@@ -22,8 +22,10 @@
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/Debug.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
@@ -153,14 +155,14 @@ namespace {
   struct NominalTypeDescriptorCacheEntry {
   private:
     std::string Name;
-    const TypeContextDescriptor *Description;
+    const ContextDescriptor *Description;
 
   public:
     NominalTypeDescriptorCacheEntry(const llvm::StringRef name,
-                                    const TypeContextDescriptor *description)
+                                    const ContextDescriptor *description)
       : Name(name.str()), Description(description) {}
 
-    const TypeContextDescriptor *getDescription() {
+    const ContextDescriptor *getDescription() {
       return Description;
     }
 
@@ -221,9 +223,32 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
   _registerTypeMetadataRecords(T, begin, end);
 }
 
-static const TypeContextDescriptor *
+static const ContextDescriptor *
 _findNominalTypeDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem);
+
+/// Find the context descriptor for the type extended by the given extension.
+static const ContextDescriptor *
+_findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
+                                   Demangle::NodePointer *demangledNode
+                                     = nullptr) {
+  Demangle::NodePointer localNode;
+  Demangle::NodePointer &node = demangledNode ? *demangledNode : localNode;
+
+  auto mangledName = extension->getMangledExtendedContext();
+  auto demangler = getDemanglerForRuntimeTypeResolution();
+  node = demangler.demangleType(mangledName);
+  if (!node)
+    return nullptr;
+  if (node->getKind() == Node::Kind::Type) {
+    if (node->getNumChildren() < 1)
+      return nullptr;
+    node = node->getChild(0);
+  }
+  node = stripGenericArgsFromContextNode(node, demangler);
+
+  return _findNominalTypeDescriptor(node, demangler);
+}
 
 /// Recognize imported tag types, which have a special mangling rule.
 ///
@@ -330,31 +355,6 @@ ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
 }
 
 #if SWIFT_OBJC_INTEROP
-/// For a mangled node that refers to an Objective-C class or protocol,
-/// return the class or protocol name.
-static Optional<StringRef> getObjCClassOrProtocolName(
-                                           const Demangle::NodePointer &node) {
-  if (node->getKind() != Demangle::Node::Kind::Class &&
-      node->getKind() != Demangle::Node::Kind::Protocol)
-    return None;
-
-  if (node->getNumChildren() != 2)
-    return None;
-
-  // Check whether we have the __ObjC module.
-  auto moduleNode = node->getChild(0);
-  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
-      moduleNode->getText() != MANGLING_MODULE_OBJC)
-    return None;
-
-  // Check whether we have an identifier.
-  auto nameNode = node->getChild(1);
-  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
-    return None;
-
-  return nameNode->getText();
-}
-
 /// Determine whether the two demangle trees both refer to the same
 /// Objective-C class or protocol referenced by name.
 static bool sameObjCTypeManglings(Demangle::NodePointer node1,
@@ -363,10 +363,10 @@ static bool sameObjCTypeManglings(Demangle::NodePointer node1,
   if (node1->getKind() != node2->getKind())
     return false;
 
-  auto name1 = getObjCClassOrProtocolName(node1);
+  auto name1 = Demangle::getObjCClassOrProtocolName(node1);
   if (!name1) return false;
 
-  auto name2 = getObjCClassOrProtocolName(node2);
+  auto name2 = Demangle::getObjCClassOrProtocolName(node2);
   if (!name2) return false;
 
   return *name1 == *name2;
@@ -415,24 +415,15 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       
       // Check that the context being extended matches as well.
       auto extendedContextNode = node->getChild(1);
-      auto extendedContextMangledName = extension->getMangledExtendedContext();
       auto demangler = getDemanglerForRuntimeTypeResolution();
-      auto extendedContextDemangled =
-         demangler.demangleType(extendedContextMangledName);
-      if (!extendedContextDemangled)
-        return false;
-      if (extendedContextDemangled->getKind() == Node::Kind::Type) {
-        if (extendedContextDemangled->getNumChildren() < 1)
-          return false;
-        extendedContextDemangled = extendedContextDemangled->getChild(0);
-      }
-      extendedContextDemangled =
-        stripGenericArgsFromContextNode(extendedContextDemangled, demangler);
-      
+
       auto extendedDescriptorFromNode =
         _findNominalTypeDescriptor(extendedContextNode, demangler);
+
+      Demangle::NodePointer extendedContextDemangled;
       auto extendedDescriptorFromDemangled =
-        _findNominalTypeDescriptor(extendedContextDemangled, demangler);
+        _findExtendedTypeContextDescriptor(extension,
+                                           &extendedContextDemangled);
 
       // Determine whether the contexts match.
       bool contextsMatch =
@@ -441,6 +432,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                       extendedDescriptorFromDemangled);
       
 #if SWIFT_OBJC_INTEROP
+      // If we have manglings of the same Objective-C type, the contexts match.
       if (!contextsMatch &&
           (!extendedDescriptorFromNode || !extendedDescriptorFromDemangled) &&
           sameObjCTypeManglings(extendedContextNode,
@@ -584,10 +576,10 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
   return nullptr;
 }
 
-static const TypeContextDescriptor *
+static const ContextDescriptor *
 _findNominalTypeDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem) {
-  const TypeContextDescriptor *foundNominal = nullptr;
+  const ContextDescriptor *foundNominal = nullptr;
   auto &T = TypeMetadataRecords.get();
 
   // If we have a symbolic reference to a context, resolve it immediately.
@@ -827,6 +819,13 @@ Optional<unsigned> swift::_depthIndexToFlatIndex(
 bool swift::_gatherGenericParameterCounts(
                                  const ContextDescriptor *descriptor,
                                  std::vector<unsigned> &genericParamCounts) {
+  // If we have an extension descriptor, extract the extended type and use
+  // that.
+  if (auto extension = dyn_cast<ExtensionContextDescriptor>(descriptor)) {
+    if (auto extendedType = _findExtendedTypeContextDescriptor(extension))
+      descriptor = extendedType;
+  }
+
   // Once we hit a non-generic descriptor, we're done.
   if (!descriptor->isGeneric()) return false;
 
@@ -915,17 +914,6 @@ static ArrayRef<GenericParamDescriptor> getLocalGenericParams(
 /// Constructs metadata by decoding a mangled type name, for use with
 /// \c TypeDecoder.
 class DecodedMetadataBuilder {
-public:
-  /// Callback used to handle the substitution of a generic parameter for
-  /// its metadata.
-  using SubstGenericParameterFn =
-    std::function<const Metadata *(unsigned depth, unsigned index)>;
-
-  /// Callback used to handle the lookup of dependent member types.
-  using LookupDependentMemberFn =
-    std::function<const Metadata *(const Metadata *base, StringRef assocType,
-                                   const ProtocolDescriptor *protocol)>;
-
 private:
   /// The demangler we'll use when building new nodes.
   Demangler &demangler;
@@ -933,62 +921,34 @@ private:
   /// Substitute generic parameters.
   SubstGenericParameterFn substGenericParameter;
 
-  /// Lookup dependent member types.
-  LookupDependentMemberFn lookupDependentMember;
+  /// Substitute dependent witness tables.
+  SubstDependentWitnessTableFn substWitnessTable;
 
   /// Ownership information related to the metadata we are trying to lookup.
   TypeReferenceOwnership ReferenceOwnership;
 
 public:
   DecodedMetadataBuilder(Demangler &demangler,
-                         SubstGenericParameterFn substGenericParameter
-                           = nullptr,
-                         LookupDependentMemberFn lookupDependentMember
-                           = nullptr)
+                         SubstGenericParameterFn substGenericParameter,
+                         SubstDependentWitnessTableFn substWitnessTable)
     : demangler(demangler),
       substGenericParameter(substGenericParameter),
-      lookupDependentMember(lookupDependentMember) { }
+      substWitnessTable(substWitnessTable) { }
 
   using BuiltType = const Metadata *;
-
-  struct BuiltNominalTypeDecl :
-    llvm::PointerUnion<const TypeContextDescriptor *, const Metadata *>
-  {
-    using PointerUnion::PointerUnion;
-
-    explicit operator bool() const { return !isNull(); }
-  };
-
+  using BuiltNominalTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
   BuiltNominalTypeDecl createNominalTypeDecl(
                                      const Demangle::NodePointer &node) const {
-#if SWIFT_OBJC_INTEROP
-    // If we have an Objective-C class name, call into the Objective-C
-    // runtime to find them.
-    if (auto objcClassName = getObjCClassOrProtocolName(node)) {
-      auto objcClass = objc_getClass(objcClassName->str().c_str());
-      return swift_getObjCClassMetadata((const ClassMetadata *)objcClass);
-    }
-#endif
-
     // Look for a nominal type descriptor based on its mangled name.
     return _findNominalTypeDescriptor(node, demangler);
   }
 
   BuiltProtocolDecl createProtocolDecl(
                                     const Demangle::NodePointer &node) const {
-#if SWIFT_OBJC_INTEROP
-    // If we have an Objective-C protocol name, call into the Objective-C
-    // runtime to find them.
-    if (auto objcProtocolName = getObjCClassOrProtocolName(node)) {
-      return ProtocolDescriptorRef::forObjC(objc_getProtocol(
-                                              objcProtocolName->str().c_str()));
-    }
-#endif
-
     // Look for a protocol descriptor based on its mangled name.
     std::string mangledName;
     if (auto protocol = _findProtocolDescriptor(node, demangler, mangledName))
@@ -997,13 +957,31 @@ public:
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
     // is used for Objective-C entities.
-    std::string objcMangledName =
-      "_TtP" + mangledName.substr(0, mangledName.size()-1) + "_";
+    std::string objcMangledName = "_Tt" + mangleNodeOld(node) + "_";
     if (auto protocol = objc_getProtocol(objcMangledName.c_str()))
       return ProtocolDescriptorRef::forObjC(protocol);
 #endif
 
     return ProtocolDescriptorRef();
+  }
+
+  BuiltProtocolDecl createObjCProtocolDecl(
+                                         const std::string &mangledName) const {
+#if SWIFT_OBJC_INTEROP
+    return ProtocolDescriptorRef::forObjC(
+        objc_getProtocol(mangledName.c_str()));
+#else
+    return ProtocolDescriptorRef();
+#endif
+  }
+  
+  BuiltType createObjCClassType(const std::string &mangledName) const {
+#if SWIFT_OBJC_INTEROP
+    auto objcClass = objc_getClass(mangledName.c_str());
+    return swift_getObjCClassMetadata((const ClassMetadata *)objcClass);
+#else
+    return BuiltType();
+#endif
   }
 
   BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
@@ -1013,14 +991,16 @@ public:
     return createBoundGenericType(metadataOrTypeDecl, { }, parent);
   }
 
-  BuiltType createBoundGenericType(BuiltNominalTypeDecl metadataOrTypeDecl,
+  BuiltType createBoundGenericType(BuiltNominalTypeDecl anyTypeDecl,
                                    const ArrayRef<BuiltType> genericArgs,
                                    const BuiltType parent) const {
-    // If we already have metadata, return it.
-    if (auto metadata = metadataOrTypeDecl.dyn_cast<const Metadata *>())
-      return metadata;
+    auto typeDecl = dyn_cast<TypeContextDescriptor>(anyTypeDecl);
+    if (!typeDecl) {
+      if (auto protocol = dyn_cast<ProtocolDescriptor>(anyTypeDecl))
+        return _getSimpleProtocolTypeMetadata(protocol);
 
-    auto typeDecl = metadataOrTypeDecl.get<const TypeContextDescriptor *>();
+      return BuiltType();
+    }
 
     // Figure out the various levels of generic parameters we have in
     // this type.
@@ -1188,10 +1168,22 @@ public:
       return BuiltType();
 #endif
 
-    if (lookupDependentMember)
-      return lookupDependentMember(base, name, protocol.getSwiftProtocol());
+    auto swiftProtocol = protocol.getSwiftProtocol();
+    auto witnessTable = swift_conformsToProtocol(base, swiftProtocol);
+    if (!witnessTable)
+      return BuiltType();
 
-    return BuiltType();
+    // Look for the named associated type within the protocol.
+    auto assocType = findAssociatedTypeByName(swiftProtocol, name);
+    if (!assocType) return nullptr;
+
+    // Call the associated type access function.
+    return swift_getAssociatedTypeWitness(
+                                 MetadataState::Abstract,
+                                 const_cast<WitnessTable *>(witnessTable),
+                                 base,
+                                 swiftProtocol->getRequirementBaseDescriptor(),
+                                 *assocType).Value;
   }
 
 #define REF_STORAGE(Name, ...) \
@@ -1213,9 +1205,21 @@ public:
 
 }
 
-TypeInfo
-swift::_getTypeByMangledName(StringRef typeName,
-                             SubstGenericParameterFn substGenericParam) {
+static TypeInfo swift_getTypeByMangledNodeImpl(
+                              Demangler &demangler,
+                              Demangle::NodePointer node,
+                              SubstGenericParameterFn substGenericParam,
+                              SubstDependentWitnessTableFn substWitnessTable) {
+  DecodedMetadataBuilder builder(demangler, substGenericParam,
+                                 substWitnessTable);
+  auto type = Demangle::decodeMangledType(builder, node);
+  return {type, builder.getReferenceOwnership()};
+}
+
+TypeInfo swift_getTypeByMangledNameImpl(
+                              StringRef typeName,
+                              SubstGenericParameterFn substGenericParam,
+                              SubstDependentWitnessTableFn substWitnessTable) {
   auto demangler = getDemanglerForRuntimeTypeResolution();
   NodePointer node;
 
@@ -1259,52 +1263,22 @@ swift::_getTypeByMangledName(StringRef typeName,
     if (!node)
       return TypeInfo();
   }
-  
-  DecodedMetadataBuilder builder(demangler, substGenericParam,
-    [](const Metadata *base, StringRef assocType,
-       const ProtocolDescriptor *protocol) -> const Metadata * {
-      // Look for a conformance of the base type to the protocol.
-      auto witnessTable = swift_conformsToProtocol(base, protocol);
-      if (!witnessTable) return nullptr;
 
-      // Look for the named associated type within the protocol.
-      auto assocTypeReq = findAssociatedTypeByName(protocol, assocType);
-      if (!assocTypeReq) return nullptr;
-
-      // Call the associated type access function.
-      return swift_getAssociatedTypeWitness(
-                                     MetadataState::Abstract,
-                                     const_cast<WitnessTable *>(witnessTable),
-                                     base,
-                                     protocol->getRequirementBaseDescriptor(),
-                                     *assocTypeReq).Value;
-    });
-
-  auto type = Demangle::decodeMangledType(builder, node);
-  return {type, builder.getReferenceOwnership()};
+  return swift_getTypeByMangledNode(demangler, node, substGenericParam,
+                                    substWitnessTable);
 }
 
-static const Metadata * _Nullable
-swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
-                           size_t numberOfLevels,
-                           size_t *parametersPerLevel,
-                           const Metadata * const *flatSubstitutions) {
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const Metadata * _Nullable
+swift_stdlib_getTypeByMangledName(
+                        const char *typeNameStart,
+                        size_t typeNameLength,
+                        const TargetGenericEnvironment<InProcess> *environment,
+                        const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
-  auto metadata = _getTypeByMangledName(typeName,
-    [&](unsigned depth, unsigned index) -> const Metadata * {
-      if (depth >= numberOfLevels)
-        return nullptr;
-
-      if (index >= parametersPerLevel[depth])
-        return nullptr;
-
-      unsigned flatIndex = index;
-      for (unsigned i = 0; i < depth; ++i)
-        flatIndex += parametersPerLevel[i];
-
-      return flatSubstitutions[flatIndex];
-    });
-
+  SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
+  auto metadata = swift_getTypeByMangledName(typeName, substitutions,
+                                             substitutions);
   if (!metadata) return nullptr;
 
   return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
@@ -1316,7 +1290,7 @@ buildDescriptorPath(const ContextDescriptor *context) const {
   if (!context)
     return 0;
 
-  // Add the parent's contributino to the descriptor path.
+  // Add the parent's contribution to the descriptor path.
   unsigned numKeyGenericParamsInParent =
     buildDescriptorPath(context->Parent.get());
 
@@ -1327,7 +1301,8 @@ buildDescriptorPath(const ContextDescriptor *context) const {
   // Count the number of key generic params at this level.
   unsigned numKeyGenericParamsHere = 0;
   bool hasNonKeyGenericParams = false;
-  for (const auto &genericParam : getLocalGenericParams(context)) {
+  auto localGenericParams = getLocalGenericParams(context);
+  for (const auto &genericParam : localGenericParams) {
     if (genericParam.hasKeyArgument())
       ++numKeyGenericParamsHere;
     else
@@ -1335,40 +1310,69 @@ buildDescriptorPath(const ContextDescriptor *context) const {
   }
 
   // Form the path element.
-  descriptorPath.push_back(PathElement{context, numKeyGenericParamsInParent,
+  descriptorPath.push_back(PathElement{localGenericParams,
+                                       context->getNumGenericParams(),
+                                       numKeyGenericParamsInParent,
                                        numKeyGenericParamsHere,
                                        hasNonKeyGenericParams});
   return numKeyGenericParamsInParent + numKeyGenericParamsHere;
 }
 
-void SubstGenericParametersFromMetadata::setup() const {
-  if (!descriptorPath.empty() || !base)
-    return;
+  /// Builds a path from the generic environment.
+unsigned SubstGenericParametersFromMetadata::
+buildEnvironmentPath(
+    const TargetGenericEnvironment<InProcess> *environment) const {
+  unsigned totalParamCount = 0;
+  unsigned totalKeyParamCount = 0;
+  auto genericParams = environment->getGenericParameters();
+  for (unsigned numLocalParams : environment->getGenericParameterCounts()) {
+    // Adkjust totalParamCount so we have the # of local parameters.
+    numLocalParams -= totalParamCount;
 
-  buildDescriptorPath(base->getTypeContextDescriptor());
-}
+    // Get the local generic parameters.
+    auto localGenericParams = genericParams.slice(0, numLocalParams);
+    genericParams = genericParams.slice(numLocalParams);
 
-const Metadata *
-SubstGenericParametersFromMetadata::operator()(unsigned flatIndex) const {
-  // On first access, compute the descriptor path.
-  setup();
-
-  // Find the depth at which this parameter occurs.
-  unsigned depth = descriptorPath.size();
-  unsigned index = flatIndex;
-  for (const auto &pathElement : descriptorPath) {
-    // If the flat index is beyond the element at this position, we're done.
-    if (flatIndex >= pathElement.context->getNumGenericParams()) {
-      // Subtract off the number of parameters.
-      index -= pathElement.context->getNumGenericParams();
-      break;
+    // Count the parameters.
+    unsigned numKeyGenericParamsInParent = totalKeyParamCount;
+    unsigned numKeyGenericParamsHere = 0;
+    bool hasNonKeyGenericParams = false;
+    for (const auto &genericParam : localGenericParams) {
+      if (genericParam.hasKeyArgument())
+        ++numKeyGenericParamsHere;
+      else
+        hasNonKeyGenericParams = true;
     }
 
-    --depth;
+    // Update totals.
+    totalParamCount += numLocalParams;
+    totalKeyParamCount += numKeyGenericParamsHere;
+
+    // Add to the descriptor path.
+    descriptorPath.push_back(PathElement{localGenericParams,
+                                         totalParamCount,
+                                         numKeyGenericParamsInParent,
+                                         numKeyGenericParamsHere,
+                                         hasNonKeyGenericParams});
   }
 
-  // Perform the access based on depth/index.
-  return (*this)(depth, index);
+  return totalKeyParamCount;
+}
+
+void SubstGenericParametersFromMetadata::setup() const {
+  if (!descriptorPath.empty())
+    return;
+
+  if (sourceIsMetadata && base) {
+    auto descriptor = base->getTypeContextDescriptor();
+    numKeyGenericParameters = buildDescriptorPath(descriptor);
+    return;
+  }
+
+  if (!sourceIsMetadata && environment) {
+    numKeyGenericParameters = buildEnvironmentPath(environment);
+    return;
+  }
 }
 
 const Metadata *
@@ -1383,10 +1387,9 @@ SubstGenericParametersFromMetadata::operator()(
 
   /// Retrieve the descriptor path element at this depth.
   auto &pathElement = descriptorPath[depth];
-  auto currentContext = pathElement.context;
 
   // Check whether the index is clearly out of bounds.
-  if (index >= currentContext->getNumGenericParams())
+  if (index >= pathElement.numTotalGenericParams)
     return nullptr;
 
   // Compute the flat index.
@@ -1394,7 +1397,7 @@ SubstGenericParametersFromMetadata::operator()(
   if (pathElement.hasNonKeyGenericParams > 0) {
     // We have non-key generic parameters at this level, so the index needs to
     // be checked more carefully.
-    auto genericParams = getLocalGenericParams(currentContext);
+    auto genericParams = pathElement.localGenericParams;
 
     // Make sure that the requested parameter itself has a key argument.
     if (!genericParams[index].hasKeyArgument())
@@ -1410,15 +1413,16 @@ SubstGenericParametersFromMetadata::operator()(
     flatIndex += index;
   }
 
-  return base->getGenericArgs()[flatIndex];
+  return (const Metadata *)genericArgs[flatIndex];
 }
 
-const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
-                                                    unsigned flatIndex) const {
-  if (flatIndex < allGenericArgs.size())
-    return allGenericArgs[flatIndex];
+const WitnessTable *
+SubstGenericParametersFromMetadata::operator()(const Metadata *type,
+                                               unsigned index) const {
+  // On first access, compute the descriptor path.
+  setup();
 
-  return nullptr;
+  return (const WitnessTable *)genericArgs[index + numKeyGenericParameters];
 }
 
 const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
@@ -1431,6 +1435,31 @@ const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
   }
 
   return nullptr;
+}
+
+const WitnessTable *
+SubstGenericParametersFromWrittenArgs::operator()(const Metadata *type,
+                                                  unsigned index) const {
+  return nullptr;
+}
+
+/// Demangle the given type name to a generic parameter reference, which
+/// will be returned as (depth, index).
+static Optional<std::pair<unsigned, unsigned>>
+demangleToGenericParamRef(StringRef typeName) {
+  Demangler demangler;
+  NodePointer node = demangler.demangleType(typeName);
+  if (!node)
+    return None;
+
+  // Find the flat index that the right-hand side refers to.
+  if (node->getKind() == Demangle::Node::Kind::Type)
+    node = node->getChild(0);
+  if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
+    return None;
+
+  return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
+                                       node->getChild(1)->getIndex());
 }
 
 void swift::gatherWrittenGenericArgs(
@@ -1499,52 +1528,164 @@ void swift::gatherWrittenGenericArgs(
     if (req.Flags.getKind() != GenericRequirementKind::SameType)
       continue;
 
-    // Where the left-hand side is a generic parameter.
-    if (req.Param.begin() != req.Param.end())
+    auto lhsParam = demangleToGenericParamRef(req.getParam());
+    if (!lhsParam)
       continue;
 
     // If we don't yet have an argument for this parameter, it's a
     // same-type-to-concrete constraint.
-    unsigned lhsFlatIndex = req.Param.getRootParamIndex();
-    if (lhsFlatIndex >= allGenericArgs.size())
+    auto lhsFlatIndex =
+      _depthIndexToFlatIndex(lhsParam->first, lhsParam->second,
+                             genericParamCounts);
+    if (!lhsFlatIndex || *lhsFlatIndex >= allGenericArgs.size())
       continue;
 
-    if (!allGenericArgs[lhsFlatIndex]) {
+    if (!allGenericArgs[*lhsFlatIndex]) {
       // Substitute into the right-hand side.
       SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
                                                           genericParamCounts);
-      allGenericArgs[lhsFlatIndex] =
-          _getTypeByMangledName(req.getMangledTypeName(), substitutions);
+      allGenericArgs[*lhsFlatIndex] =
+          swift_getTypeByMangledName(req.getMangledTypeName(), substitutions,
+                                     substitutions);
       continue;
     }
 
     // If we do have an argument for this parameter, it might be that
     // the right-hand side is itself a generic parameter, which means
     // we have a same-type constraint A == B where A is already filled in.
-    Demangler demangler;
-    NodePointer node = demangler.demangleType(req.getMangledTypeName());
-    if (!node)
-      continue;
-
-    // Find the flat index that the right-hand side refers to.
-    if (node->getKind() == Demangle::Node::Kind::Type)
-      node = node->getChild(0);
-    if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
+    auto rhsParam = demangleToGenericParamRef(req.getMangledTypeName());
+    if (!rhsParam)
       continue;
 
     auto rhsFlatIndex =
-      _depthIndexToFlatIndex(node->getChild(0)->getIndex(),
-                             node->getChild(1)->getIndex(),
+      _depthIndexToFlatIndex(rhsParam->first, rhsParam->second,
                              genericParamCounts);
     if (!rhsFlatIndex || *rhsFlatIndex >= allGenericArgs.size())
       continue;
 
-    if (allGenericArgs[*rhsFlatIndex] || !allGenericArgs[lhsFlatIndex])
+    if (allGenericArgs[*rhsFlatIndex] || !allGenericArgs[*lhsFlatIndex])
       continue;
 
-    allGenericArgs[*rhsFlatIndex] = allGenericArgs[lhsFlatIndex];
+    allGenericArgs[*rhsFlatIndex] = allGenericArgs[*lhsFlatIndex];
   }
 }
 
+struct InitializeDynamicReplacementLookup {
+  InitializeDynamicReplacementLookup() {
+    initializeDynamicReplacementLookup();
+  }
+};
+
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
+static InitializeDynamicReplacementLookup initDynamicReplacements;
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
+
+void DynamicReplacementDescriptor::enableReplacement() const {
+  auto *chainRoot = const_cast<DynamicReplacementChainEntry *>(
+      replacedFunctionKey->root.get());
+
+  // Make sure this entry is not already enabled.
+  for (auto *curr = chainRoot; curr != nullptr; curr = curr->next) {
+    if (curr == chainEntry.get()) {
+      swift::swift_abortDynamicReplacementEnabling();
+    }
+  }
+
+  // Unlink the previous entry if we are not chaining.
+  if (!shouldChain() && chainRoot->next) {
+    auto *previous = chainRoot->next;
+    chainRoot->next = previous->next;
+    chainRoot->implementationFunction = previous->implementationFunction;
+  }
+
+  // First populate the current replacement's chain entry.
+  auto *currentEntry =
+      const_cast<DynamicReplacementChainEntry *>(chainEntry.get());
+  currentEntry->implementationFunction = chainRoot->implementationFunction;
+  currentEntry->next = chainRoot->next;
+
+  // Link the replacement entry.
+  chainRoot->next = chainEntry.get();
+  chainRoot->implementationFunction = replacementFunction.get();
+}
+
+void DynamicReplacementDescriptor::disableReplacement() const {
+  const auto *chainRoot = replacedFunctionKey->root.get();
+  auto *thisEntry =
+      const_cast<DynamicReplacementChainEntry *>(chainEntry.get());
+
+  // Find the entry previous to this one.
+  auto *prev = chainRoot;
+  while (prev && prev->next != thisEntry)
+    prev = prev->next;
+  if (!prev) {
+    swift::swift_abortDynamicReplacementDisabling();
+    return;
+  }
+
+  // Unlink this entry.
+  auto *previous = const_cast<DynamicReplacementChainEntry *>(prev);
+  previous->next = thisEntry->next;
+  previous->implementationFunction = thisEntry->implementationFunction;
+}
+
+/// An automatic dymamic replacement entry.
+class AutomaticDynamicReplacementEntry {
+  RelativeDirectPointer<DynamicReplacementScope, false> replacementScope;
+  uint32_t flags;
+
+public:
+  void enable() const { replacementScope->enable(); }
+
+  uint32_t getFlags() { return flags; }
+};
+
+/// A list of automatic dynamic replacement scopes.
+class AutomaticDynamicReplacements
+    : private swift::ABI::TrailingObjects<AutomaticDynamicReplacements,
+                                          AutomaticDynamicReplacementEntry> {
+  uint32_t flags;
+  uint32_t numScopes;
+
+  using TrailingObjects =
+      swift::ABI::TrailingObjects<AutomaticDynamicReplacements,
+                                  AutomaticDynamicReplacementEntry>;
+  friend TrailingObjects;
+
+
+  ArrayRef<AutomaticDynamicReplacementEntry> getReplacementEntries() const {
+    return {
+        this->template getTrailingObjects<AutomaticDynamicReplacementEntry>(),
+        numScopes};
+  }
+
+public:
+  void enableReplacements() const {
+    for (auto &replacementEntry : getReplacementEntries())
+      replacementEntry.enable();
+  }
+};
+
+namespace {
+  static Lazy<Mutex> DynamicReplacementLock;
+}
+
+void swift::addImageDynamicReplacementBlockCallback(
+    const void *replacements, uintptr_t replacementsSize) {
+  auto *automaticReplacements =
+      reinterpret_cast<const AutomaticDynamicReplacements *>(replacements);
+  DynamicReplacementLock.get().withLock(
+      [&] { automaticReplacements->enableReplacements(); });
+}
+
+void swift::swift_enableDynamicReplacementScope(
+    const DynamicReplacementScope *scope) {
+  DynamicReplacementLock.get().withLock([=] { scope->enable(); });
+}
+
+void swift::swift_disableDynamicReplacementScope(
+    const DynamicReplacementScope *scope) {
+  DynamicReplacementLock.get().withLock([=] { scope->disable(); });
+}
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"

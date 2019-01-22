@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -module-name struct_resilience -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -enable-sil-ownership -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-emit-silgen -module-name struct_resilience -I %t -enable-sil-ownership -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -enable-sil-ownership %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-emit-silgen -I %t -enable-sil-ownership -enable-resilience %s | %FileCheck %s
 
 import resilient_struct
 
@@ -195,8 +195,8 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   return s.w
 }
 
-// CHECK-LABEL: sil [serialized] [always_inline] @$s17struct_resilience26publicInlineAlwaysFunctionySiAA6MySizeVF : $@convention(thin) (@in_guaranteed MySize) -> Int
-@inline(__always) public func publicInlineAlwaysFunction(_ s: MySize) -> Int {
+// CHECK-LABEL: sil [serialized] @$s17struct_resilience23publicInlinableFunctionySiAA6MySizeVF : $@convention(thin) (@in_guaranteed MySize) -> Int
+@inlinable public func publicInlinableFunction(_ s: MySize) -> Int {
 
   // Since the body of a public transparent function might be inlined into
   // other resilience domains, we have to use accessors

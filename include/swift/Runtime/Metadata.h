@@ -22,6 +22,37 @@
 
 namespace swift {
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+
+/// The buffer used by a yield-once coroutine (such as the generalized
+/// accessors `read` and `modify`).
+struct YieldOnceBuffer {
+  void *Data[NumWords_YieldOnceBuffer];
+};
+using YieldOnceContinuation =
+  SWIFT_CC(swift) void (YieldOnceBuffer *buffer, bool forUnwind);
+
+/// The return type of a call to a yield-once coroutine.  The function
+/// must be declared with the swiftcall calling convention.
+template <class ResultTy>
+struct YieldOnceResult {
+  YieldOnceContinuation *Continuation;
+  ResultTy YieldValue;
+};
+
+template <class FnTy>
+struct YieldOnceCoroutine;
+
+/// A template which generates the type of the ramp function of a
+/// yield-once coroutine.
+template <class ResultTy, class... ArgTys>
+struct YieldOnceCoroutine<ResultTy(ArgTys...)> {
+  using type =
+    SWIFT_CC(swift) YieldOnceResult<ResultTy> (YieldOnceBuffer *buffer,
+                                               ArgTys...);
+};
+
 #if SWIFT_OBJC_INTEROP
 
   // Const cast shorthands for ObjC types.
@@ -385,13 +416,31 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
 /// \param assocType Associated type descriptor.
 ///
 /// \returns metadata for the associated type witness.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_getAssociatedTypeWitness(
                                           MetadataRequest request,
                                           WitnessTable *wtable,
                                           const Metadata *conformingType,
                                           const ProtocolRequirement *reqBase,
                                           const ProtocolRequirement *assocType);
+
+/// Retrieve an associated conformance witness table from the given witness
+/// table.
+///
+/// \param wtable The witness table.
+/// \param conformingType Metadata for the conforming type.
+/// \param assocType Metadata for the associated type.
+/// \param reqBase "Base" requirement used to compute the witness index
+/// \param assocConformance Associated conformance descriptor.
+///
+/// \returns corresponding witness table.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+const WitnessTable *swift_getAssociatedConformanceWitness(
+                                  WitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance);
 
 /// \brief Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
@@ -787,6 +836,36 @@ const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type
 // Defined in KeyPath.swift in the standard library.
 SWIFT_RUNTIME_EXPORT
 const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
+
+/// Given a pointer to a borrowed value of type `Root` and a
+/// `KeyPath<Root, Value>`, project a pointer to a borrowed value of type
+/// `Value`.
+SWIFT_RUNTIME_EXPORT
+YieldOnceCoroutine<const OpaqueValue* (const OpaqueValue *root,
+                                       void *keyPath)>::type
+swift_readAtKeyPath;
+
+/// Given a pointer to a mutable value of type `Root` and a
+/// `WritableKeyPath<Root, Value>`, project a pointer to a mutable value
+/// of type `Value`.
+SWIFT_RUNTIME_EXPORT
+YieldOnceCoroutine<OpaqueValue* (OpaqueValue *root, void *keyPath)>::type
+swift_modifyAtWritableKeyPath;
+
+/// Given a pointer to a borrowed value of type `Root` and a
+/// `ReferenceWritableKeyPath<Root, Value>`, project a pointer to a
+/// mutable value of type `Value`.
+SWIFT_RUNTIME_EXPORT
+YieldOnceCoroutine<OpaqueValue* (const OpaqueValue *root, void *keyPath)>::type
+swift_modifyAtReferenceWritableKeyPath;
+
+SWIFT_RUNTIME_EXPORT
+void swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope);
+
+SWIFT_RUNTIME_EXPORT
+void swift_disableDynamicReplacementScope(const DynamicReplacementScope *scope);
+
+#pragma clang diagnostic pop
 
 } // end namespace swift
 
