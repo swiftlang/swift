@@ -171,11 +171,11 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
 
 Lexer::Lexer(const PrincipalTag &, const LangOptions &LangOpts,
              const SourceManager &SourceMgr, unsigned BufferID,
-             DiagnosticEngine *Diags, bool InSILMode,
+             DiagnosticEngine *Diags, LexerMode LexMode,
              HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
              TriviaRetentionMode TriviaRetention)
     : LangOpts(LangOpts), SourceMgr(SourceMgr), BufferID(BufferID),
-      Diags(Diags), InSILMode(InSILMode),
+      Diags(Diags), LexMode(LexMode),
       IsHashbangAllowed(HashbangAllowed == HashbangMode::Allowed),
       RetainComments(RetainComments), TriviaRetention(TriviaRetention) {}
 
@@ -216,28 +216,28 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
 }
 
 Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
-             unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+             unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
              HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
              TriviaRetentionMode TriviaRetention)
-    : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, InSILMode,
+    : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, LexMode,
             HashbangAllowed, RetainComments, TriviaRetention) {
   unsigned EndOffset = SourceMgr.getRangeForBuffer(BufferID).getByteLength();
   initialize(/*Offset=*/0, EndOffset);
 }
 
 Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
-             unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+             unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
              HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
              TriviaRetentionMode TriviaRetention, unsigned Offset,
              unsigned EndOffset)
-    : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, InSILMode,
+    : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, LexMode,
             HashbangAllowed, RetainComments, TriviaRetention) {
   initialize(Offset, EndOffset);
 }
 
 Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
     : Lexer(PrincipalTag(), Parent.LangOpts, Parent.SourceMgr, Parent.BufferID,
-            Parent.Diags, Parent.InSILMode,
+            Parent.Diags, Parent.LexMode,
             Parent.IsHashbangAllowed
                 ? HashbangMode::Allowed
                 : HashbangMode::Disallowed,
@@ -264,7 +264,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
                          SourceMgr.findBufferContainingLoc(Loc)) &&
          "location from the wrong buffer");
 
-  Lexer L(LangOpts, SourceMgr, BufferID, Diags, InSILMode,
+  Lexer L(LangOpts, SourceMgr, BufferID, Diags, LexMode,
           HashbangMode::Allowed, CommentRetentionMode::None,
           TriviaRetentionMode::WithoutTrivia);
   L.restoreState(State(Loc));
@@ -672,7 +672,8 @@ void Lexer::lexIdentifier() {
   // Lex [a-zA-Z_$0-9[[:XID_Continue:]]]*
   while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
-  tok Kind = kindOfIdentifier(StringRef(TokStart, CurPtr-TokStart), InSILMode);
+  tok Kind = kindOfIdentifier(StringRef(TokStart, CurPtr-TokStart),
+                              LexMode == LexerMode::SIL);
   return formToken(Kind, TokStart);
 }
 
@@ -944,9 +945,11 @@ void Lexer::lexDollarIdent() {
     return formToken(tok::identifier, tokStart);
   }
 
-  // We reserve $nonNumeric for persistent bindings in the debugger.
+  // We reserve $nonNumeric for persistent bindings in the debugger and implicit
+  // variables, like storage for lazy properties.
   if (!isAllDigits) {
-    if (!LangOpts.EnableDollarIdentifiers && !InSILBody)
+    if (!LangOpts.EnableDollarIdentifiers && !InSILBody &&
+        LexMode != LexerMode::SwiftInterface)
       diagnose(tokStart, diag::expected_dollar_numeric);
 
     // Even if we diagnose, we go ahead and form an identifier token,
@@ -2515,7 +2518,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // comments and normally we won't be at the beginning of a comment token
   // (making this option irrelevant), or the caller lexed comments and
   // we need to lex just the comment token.
-  Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
+  Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
           HashbangMode::Allowed, CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
   return L.peekNextToken();
@@ -2671,7 +2674,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
   // and the exact token produced.
   LangOptions FakeLangOptions;
 
-  Lexer L(FakeLangOptions, SM, BufferID, nullptr, /*InSILMode=*/false,
+  Lexer L(FakeLangOptions, SM, BufferID, nullptr, LexerMode::Swift,
           HashbangMode::Allowed, CommentRetentionMode::None,
           TriviaRetentionMode::WithoutTrivia, BufferStart, BufferEnd);
 
@@ -2799,7 +2802,7 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   // comments and normally we won't be at the beginning of a comment token
   // (making this option irrelevant), or the caller lexed comments and
   // we need to lex just the comment token.
-  Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
+  Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
           HashbangMode::Allowed, CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
   L.skipToEndOfLine(/*EatNewline=*/true);
