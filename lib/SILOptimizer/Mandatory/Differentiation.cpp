@@ -2796,6 +2796,13 @@ private:
     return adjointMap.count(originalValue);
   }
 
+  void setAdjointValue(SILValue originalValue, SILValue adjointValue) {
+    AdjointValue adj(adjointValue);
+    auto insertion = adjointMap.try_emplace(originalValue, adj);
+    if (!insertion.second)
+      insertion.first->getSecond() = adj;
+  }
+
   /// Get the adjoint for an original value. The given value must be in the
   /// original function.
   ///
@@ -2897,11 +2904,10 @@ private:
       for (auto indRes : ai->getIndirectSILResults())
         if (activityInfo.isActive(indRes, indices))
           return true;
-    // TODO: Check for side-effecting instructions.
-    // if (inst->mayWriteToMemory())
-    //   if (llvm::any_of(inst->getAllOperands(), [&](Operand &op) {
-    //           return activityInfo.isActive(op.get(), indices); }))
-    //     return true;
+     if (inst->mayWriteToMemory())
+       if (llvm::any_of(inst->getAllOperands(), [&](Operand &op) {
+               return activityInfo.isActive(op.get(), indices); }))
+         return true;
     return false;
   }
 
@@ -2972,6 +2978,15 @@ public:
       auto adjBB = getAdjointBlock(bb);
       builder.setInsertionPoint(adjBB);
       // Visit each instruction in reverse order.
+      LLVM_DEBUG({
+        auto &s = getADDebugStream();
+        for (auto &inst : reversed(*bb)) {
+          if (shouldBeDifferentiated(&inst, indices))
+            s << "[DIFF] " << inst << '\n';
+          else
+            s << "[NONE] " << inst << '\n';
+        }
+      });
       for (auto &inst : reversed(*bb)) {
         if (!shouldBeDifferentiated(&inst, indices))
           continue;
@@ -3342,31 +3357,33 @@ public:
   //    Adjoint: adj[y] = alloc_stack $T.CotangentVector
   void visitDeallocStackInst(DeallocStackInst *dsi) {
     auto *adjBuf = builder.createAllocStack(dsi->getLoc(),
-        getCotangentType(dsi->getOperand()->getType(), getModule()));
+        remapType(getCotangentType(dsi->getOperand()->getType(), getModule())));
     addAdjointValue(dsi->getOperand(), adjBuf);
   }
 
   // Handle `load` instruction.
   //   Original: y = load x
-  //    Adjoint: adj[y] += adj[x]
+  //    Adjoint: adj[x] += adj[y]
   void visitLoadInst(LoadInst *li) {
     auto adjVal = materializeAdjointDirect(getAdjointValue(li), li->getLoc());
     auto *buf = builder.createAllocStack(li->getLoc(), adjVal->getType());
     auto *access = builder.createBeginAccess(
         li->getLoc(), buf, SILAccessKind::Init, SILAccessEnforcement::Static,
         /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    addAdjointValue(li->getOperand(), access);
+    builder.createStore(li->getLoc(), adjVal, access,
+        getBufferSOQ(buf->getType().getASTType(), getAdjoint()));
     builder.createEndAccess(li->getLoc(), access, /*aborted*/ false);
+    addAdjointValue(li->getOperand(), access);
     builder.createDeallocStack(li->getLoc(), buf);
   }
 
   // Handle `store` instruction.
   //   Original: store x to y
-  //    Adjoint: adj[y] += load adj[x]
+  //    Adjoint: adj[x] += load adj[y]
   void visitStoreInst(StoreInst *si) {
     auto adjBuf = getAdjointValue(si->getDest()).getMaterializedValue();
     auto adjVal = builder.createLoad(si->getLoc(), adjBuf,
-        getBufferLOQ(adjBuf->getType().getASTType(), getAdjoint()));
+        getBufferLOQ(remapType(adjBuf->getType()).getASTType(), getAdjoint()));
     addAdjointValue(si->getSrc(), adjVal);
   }
 
@@ -3380,7 +3397,7 @@ public:
 
   // Handle `end_access` instruction.
   //   Original: end_access y, where y = begin_access x
-  //    Adjoint: adj[y] += begin_access adj[x]
+  //    Adjoint: adj[y] = begin_access adj[x]
   void visitEndAccessInst(EndAccessInst *eai) {
     auto adjBuf = getAdjointValue(eai->getSource()).getMaterializedValue();
     auto adjAccess = builder.createBeginAccess(
@@ -3389,7 +3406,7 @@ public:
         eai->getBeginAccess()->getEnforcement(),
         eai->getBeginAccess()->hasNoNestedConflict(),
         eai->getBeginAccess()->isFromBuiltin());
-    addAdjointValue(eai->getOperand(), adjAccess);
+    setAdjointValue(eai->getOperand(), adjAccess);
   }
 
 #define NOT_DIFFERENTIABLE(INST) \
