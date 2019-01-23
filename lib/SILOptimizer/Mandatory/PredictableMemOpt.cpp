@@ -583,6 +583,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
   SILSSAUpdater updater(B.getModule());
   updater.Initialize(loadTy);
 
+  Optional<SILValue> singularValue;
   for (auto *insertPt : insertPts) {
     // Use the scope and location of the store at the insertion point.
     SILBuilderWithScope builder(insertPt, &insertedInsts);
@@ -594,9 +595,20 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
       eltVal = builder.emitCopyValueOperation(loc, eltVal);
     }
 
+    if (!singularValue.hasValue()) {
+      singularValue = eltVal;
+    } else if (*singularValue != eltVal) {
+      singularValue = SILValue();
+    }
+
     // And then put the value into the SSA updater.
     updater.AddAvailableValue(insertPt->getParent(), eltVal);
   }
+
+  // If we only are tracking a singular value, we do not need to construct
+  // SSA. Just return that value.
+  if (auto val = singularValue.getValueOr(SILValue()))
+    return val;
 
   // Finally, grab the value from the SSA updater.
   SILValue result = updater.GetValueInMiddleOfBlock(B.getInsertionBB());
@@ -702,6 +714,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   SILSSAUpdater updater(B.getModule());
   updater.Initialize(loadTy);
 
+  Optional<SILValue> singularValue;
   for (auto *i : insertPts) {
     // Use the scope and location of the store at the insertion point.
     SILBuilderWithScope builder(i, &insertedInsts);
@@ -711,8 +724,19 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
         !builder.hasOwnership() ||
         eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
 
+    if (!singularValue.hasValue()) {
+      singularValue = eltVal;
+    } else if (*singularValue != eltVal) {
+      singularValue = SILValue();
+    }
+
     updater.AddAvailableValue(i->getParent(), eltVal);
   }
+
+  // If we only are tracking a singular value, we do not need to construct
+  // SSA. Just return that value.
+  if (auto val = singularValue.getValueOr(SILValue()))
+    return val;
 
   // Finally, grab the value from the SSA updater.
   SILValue eltVal = updater.GetValueInMiddleOfBlock(B.getInsertionBB());
