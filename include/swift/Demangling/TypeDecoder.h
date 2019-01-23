@@ -464,7 +464,7 @@ class TypeDecoder {
       auto member = Node->getChild(1)->getText();
       auto assocTypeChild = Node->getChild(1);
       if (assocTypeChild->getNumChildren() < 1)
-        return BuiltType();
+        return Builder.createDependentMemberType(member, base);
 
       auto protocol = decodeMangledProtocolType(assocTypeChild->getChild(0));
       if (!protocol)

@@ -90,6 +90,8 @@ public:
 
   Type createGenericTypeParameterType(unsigned depth, unsigned index);
 
+  Type createDependentMemberType(StringRef member, Type base);
+
   Type createDependentMemberType(StringRef member, Type base,
                                  ProtocolDecl *protocol);
 

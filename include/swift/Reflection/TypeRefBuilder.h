@@ -302,6 +302,13 @@ public:
 
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member,
+                            const TypeRef *base) {
+    // Should not have unresolved dependent member types here.
+    return nullptr;
+  }
+
+  const DependentMemberTypeRef *
+  createDependentMemberType(const std::string &member,
                             const TypeRef *base,
                             BuiltProtocolDecl protocol) {
     // Objective-C protocols don't have dependent types.

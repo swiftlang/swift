@@ -1164,6 +1164,11 @@ public:
                                       /*proposedWitnesses=*/nullptr).Value;
   }
 
+  BuiltType createDependentMemberType(StringRef name, BuiltType base) const {
+    // Should not have unresolved dependent member types here.
+    return BuiltType();
+  }
+
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
                                       BuiltProtocolDecl protocol) const {
 #if SWIFT_OBJC_INTEROP

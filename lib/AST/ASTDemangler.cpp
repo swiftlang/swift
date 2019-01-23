@@ -330,6 +330,14 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
 }
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
+                                           Type base) {
+  if (!base->isTypeParameter())
+    return Type();
+
+  return DependentMemberType::get(base, Ctx.getIdentifier(member));
+}
+
+Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base,
                                            ProtocolDecl *protocol) {
   if (!base->isTypeParameter())
