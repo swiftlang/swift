@@ -2797,7 +2797,6 @@ private:
   /// Given two materialized adjoint values, accumulate them. These two
   /// adjoints must be objects of loadable type.
   SILValue accumulateMaterializedAdjointsDirect(SILValue lhs, SILValue rhs);
-  
 
   /// Given two materialized adjoint values, accumulate them using
   /// `VectorNumeric.+` or `FloatingPoint.+`, depending on the differentiation
