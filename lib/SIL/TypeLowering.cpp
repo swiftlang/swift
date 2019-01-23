@@ -1494,9 +1494,7 @@ const TypeLowering &
 TypeConverter::getTypeLowering(AbstractionPattern origType,
                                Type origSubstType,
                                ResilienceExpansion forExpansion) {
-  CanType substType = origSubstType->getCanonicalType()
-    .substOpaqueTypesWithUnderlyingTypes()
-    ->getCanonicalType();
+  CanType substType = origSubstType->getCanonicalType();
   auto key = getTypeKey(origType, substType);
   
   assert((!key.isDependent() || getCurGenericContext())
@@ -1517,7 +1515,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // Lower the type.
   auto loweredSubstType = computeLoweredRValueType(origType, substType);
 
-  // If that didn't change the type and the key is cacheable, there's no
+  // If that didn't change the type and the key is cachable, there's no
   // point in re-checking the table, so just construct a type lowering
   // and cache it.
   if (loweredSubstType == substType && key.isCacheable()) {

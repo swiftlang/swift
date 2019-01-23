@@ -1903,8 +1903,62 @@ RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
                                                   SGFContext C) {
-  // TODO: For now, opaque types are always lowered to their underlying type.
-  return visit(E->getSubExpr(), C);
+  // The opaque type has the layout of the underlying type, abstracted as
+  // a type parameter.
+  auto &opaqueTL = SGF.getTypeLowering(E->getType());
+  auto &underlyingTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(),
+                                           E->getSubExpr()->getType());
+  
+  auto &underlyingSubstTL = SGF.getTypeLowering(E->getSubExpr()->getType());
+  
+  // If the opaque type is address only, initialize in place.
+  if (opaqueTL.getLoweredType().isAddress()) {
+    auto opaqueAddr = SGF.getBufferForExprResult(
+                                               E, opaqueTL.getLoweredType(), C);
+    // Initialize the buffer as the underlying type.
+    auto underlyingAddr = SGF.B.createUncheckedAddrCast(E,
+                                opaqueAddr,
+                                underlyingTL.getLoweredType().getAddressType());
+    
+    auto underlyingInit = SGF.useBufferAsTemporary(underlyingAddr, underlyingTL);
+
+    // Try to emit directly into the buffer if no reabstraction is necessary.
+    ManagedValue underlying;
+    if (underlyingSubstTL.getLoweredType() == underlyingTL.getLoweredType()) {
+      underlying = SGF.emitRValueAsSingleValue(E->getSubExpr(),
+                                              SGFContext(underlyingInit.get()));
+    } else {
+      // Otherwise, emit the underlying value then bring it to the right
+      // abstraction level.
+      underlying = SGF.emitRValueAsSingleValue(E->getSubExpr());
+      underlying = SGF.emitSubstToOrigValue(E, underlying,
+                                AbstractionPattern::getOpaque(),
+                                E->getSubExpr()->getType()->getCanonicalType());
+    }
+    if (!underlying.isInContext()) {
+      underlyingInit->copyOrInitValueInto(SGF, E, underlying, /*init*/ true);
+      underlyingInit->finishInitialization(SGF);
+    }
+    // Kill the cleanup on the underlying value, and hand off the opaque buffer
+    // as the result.
+    underlyingInit->getManagedAddress().forward(SGF);
+    
+    auto opaque = SGF.manageBufferForExprResult(opaqueAddr, opaqueTL, C);
+    return RValue(SGF, E, opaque);
+  }
+  
+  // If the opaque type is loadable, emit the subexpression and bitcast it.
+  auto value = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  if (underlyingSubstTL.getLoweredType() == underlyingTL.getLoweredType()) {
+    value = SGF.emitSubstToOrigValue(E, value, AbstractionPattern::getOpaque(),
+                                E->getSubExpr()->getType()->getCanonicalType());
+  }
+  
+  auto cast = SGF.B.createUncheckedBitCast(E, value.forward(SGF),
+                                       opaqueTL.getLoweredType());
+  value = SGF.emitManagedRValueWithCleanup(cast);
+  
+  return RValue(SGF, E, value);
 }
 
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
