@@ -205,7 +205,8 @@ public:
   /// Factory methods for all TypeRef kinds
   ///
 
-  const BuiltinTypeRef *createBuiltinType(const std::string &mangledName) {
+  const BuiltinTypeRef *createBuiltinType(const std::string &builtinName,
+                                          const std::string &mangledName) {
     return BuiltinTypeRef::create(*this, mangledName);
   }
 

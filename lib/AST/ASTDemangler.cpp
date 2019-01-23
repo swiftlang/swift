@@ -47,8 +47,23 @@ Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
 
 
 Type
-ASTBuilder::createBuiltinType(const std::string &mangledName) {
-  // TODO
+ASTBuilder::createBuiltinType(StringRef builtinName,
+                              StringRef mangledName) {
+  if (builtinName.startswith(BUILTIN_TYPE_NAME_PREFIX)) {
+    SmallVector<ValueDecl *, 1> decls;
+
+    ModuleDecl::AccessPathTy accessPath;
+    StringRef strippedName =
+          builtinName.drop_front(strlen(BUILTIN_TYPE_NAME_PREFIX));
+    Ctx.TheBuiltinModule->lookupValue(accessPath,
+                                      Ctx.getIdentifier(strippedName),
+                                      NLKind::QualifiedLookup,
+                                      decls);
+    
+    if (decls.size() == 1 && isa<TypeDecl>(decls[0]))
+      return cast<TypeDecl>(decls[0])->getDeclaredInterfaceType();
+  }
+
   return Type();
 }
 

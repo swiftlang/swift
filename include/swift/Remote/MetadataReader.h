@@ -608,7 +608,7 @@ public:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
       // Treat these all as Builtin.NativeObject for type lowering purposes.
-      return Builder.createBuiltinType("Bo");
+      return Builder.createBuiltinType("Builtin.NativeObject", "Bo");
     case MetadataKind::Opaque:
     default: {
       auto BuiltOpaque = Builder.getOpaqueType();

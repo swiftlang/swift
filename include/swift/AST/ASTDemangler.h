@@ -57,7 +57,7 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
 
-  Type createBuiltinType(const std::string &mangledName);
+  Type createBuiltinType(StringRef builtinName, StringRef mangledName);
 
   NominalTypeDecl *createNominalTypeDecl(StringRef mangledName);
   

@@ -202,7 +202,7 @@ class TypeDecoder {
     }
     case NodeKind::BuiltinTypeName: {
       auto mangledName = Demangle::mangleNode(Node);
-      return Builder.createBuiltinType(mangledName);
+      return Builder.createBuiltinType(Node->getText(), mangledName);
     }
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
@@ -516,7 +516,7 @@ class TypeDecoder {
     case NodeKind::SILBoxTypeWithLayout: {
       // TODO: Implement SILBoxTypeRefs with layout. As a stopgap, specify the
       // NativeObject type ref.
-      return Builder.createBuiltinType("Bo");
+      return Builder.createBuiltinType("Builtin.NativeObject", "Bo");
     }
     default:
       return BuiltType();
