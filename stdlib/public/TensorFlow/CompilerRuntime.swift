@@ -884,10 +884,8 @@ func _TFCEagerExecute(_ op: CTFEOp,
     debugLog("Calling _TFCEagerExecute() over: ")
     TFE_OpPrintDebugString(op)
   }
-
   TFE_Execute(op, retvals, retvalCount, status)
 }
-
 
 //===----------------------------------------------------------------------===//
 // - MARK: Compiler runtime entrypoints
