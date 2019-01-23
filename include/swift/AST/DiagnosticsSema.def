@@ -1519,6 +1519,9 @@ WARNING(function_type_usable_from_inline_warn,none,
 ERROR(opaque_type_invalid_constraint,none,
       "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
       "and/or a base class", ())
+ERROR(inferred_opaque_type,none,
+      "property definition has inferred type %0, involving the '__opaque' "
+      "return type of another declaration", (Type))
 
 // Extensions
 ERROR(non_nominal_extension,none,
