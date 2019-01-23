@@ -394,6 +394,7 @@ class AvailableValueAggregator {
   MutableArrayRef<AvailableValue> AvailableValueList;
   SmallVectorImpl<PMOMemoryUse> &Uses;
   DeadEndBlocks &deadEndBlocks;
+  bool isTake;
 
   /// Keep track of all instructions that we have added. Once we are done
   /// promoting a value, we need to make sure that if we need to balance any
@@ -405,10 +406,10 @@ public:
   AvailableValueAggregator(SILInstruction *Inst,
                            MutableArrayRef<AvailableValue> AvailableValueList,
                            SmallVectorImpl<PMOMemoryUse> &Uses,
-                           DeadEndBlocks &deadEndBlocks)
+                           DeadEndBlocks &deadEndBlocks, bool isTake)
       : M(Inst->getModule()), B(Inst), Loc(Inst->getLoc()),
         AvailableValueList(AvailableValueList), Uses(Uses),
-        deadEndBlocks(deadEndBlocks) {}
+        deadEndBlocks(deadEndBlocks), isTake(isTake) {}
 
   // This is intended to be passed by reference only once constructed.
   AvailableValueAggregator(const AvailableValueAggregator &) = delete;
@@ -417,7 +418,13 @@ public:
   operator=(const AvailableValueAggregator &) = delete;
   AvailableValueAggregator &operator=(AvailableValueAggregator &&) = delete;
 
-  SILValue aggregateValues(SILType LoadTy, SILValue Address, unsigned FirstElt);
+  SILValue aggregateValues(SILType LoadTy, SILValue Address, unsigned FirstElt,
+                           bool isTopLevel = true);
+  bool canTake(SILType loadTy, unsigned firstElt) const;
+
+  /// If as a result of us copying values, we may have unconsumed destroys, find
+  /// the appropriate location and place the values there. Only used when
+  /// ownership is enabled.
   void addMissingDestroysForCopiedValues(LoadInst *li);
 
   void print(llvm::raw_ostream &os) const;
@@ -465,11 +472,58 @@ bool AvailableValueAggregator::isFullyAvailable(SILType loadTy,
                       });
 }
 
+// We can only take if we never have to split a larger value to promote this
+// address.
+bool AvailableValueAggregator::canTake(SILType loadTy,
+                                       unsigned firstElt) const {
+  // If we do not have ownership, we can always take since we do not need to
+  // keep any ownership invariants up to date. In the future, we should be able
+  // to chop up larger values before they are being stored.
+  if (!B.hasOwnership())
+    return true;
+
+  // If we are trivially fully available, just return true.
+  if (isFullyAvailable(loadTy, firstElt))
+    return true;
+
+  // Otherwise see if we are an aggregate with fully available leaf types.
+  if (TupleType *tt = loadTy.getAs<TupleType>()) {
+    return llvm::all_of(indices(tt->getElements()), [&](unsigned eltNo) {
+      SILType eltTy = loadTy.getTupleElementType(eltNo);
+      unsigned numSubElt = getNumSubElements(eltTy, M);
+      bool success = canTake(eltTy, firstElt);
+      firstElt += numSubElt;
+      return success;
+    });
+  }
+
+  if (auto *sd = getFullyReferenceableStruct(loadTy)) {
+    return llvm::all_of(sd->getStoredProperties(), [&](VarDecl *decl) -> bool {
+      SILType eltTy = loadTy.getFieldType(decl, M);
+      unsigned numSubElt = getNumSubElements(eltTy, M);
+      bool success = canTake(eltTy, firstElt);
+      firstElt += numSubElt;
+      return success;
+    });
+  }
+
+  // Otherwise, fail. The value is not fully available at its leafs. We can not
+  // perform a take.
+  return false;
+}
+
 /// Given a bunch of primitive subelement values, build out the right aggregate
 /// type (LoadTy) by emitting tuple and struct instructions as necessary.
 SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
                                                    SILValue Address,
-                                                   unsigned FirstElt) {
+                                                   unsigned FirstElt,
+                                                   bool isTopLevel) {
+  // If we are performing a take, make sure that we have available values for
+  // /all/ of our values. Otherwise, bail.
+  if (isTopLevel && isTake && !canTake(LoadTy, FirstElt)) {
+    return SILValue();
+  }
+
   // Check to see if the requested value is fully available, as an aggregate.
   // This is a super-common case for single-element structs, but is also a
   // general answer for arbitrary structs and tuples as well.
@@ -515,6 +569,10 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
     // Use the scope and location of the store at the insertion point.
     SILBuilderWithScope builder(insertPts[0], &insertedInsts);
     SILLocation loc = insertPts[0]->getLoc();
+    // If we have a take, just return the value.
+    if (isTake)
+      return firstVal.getValue();
+    // Otherwise, return a copy of the value.
     return builder.emitCopyValueOperation(loc, firstVal.getValue());
   }
 
@@ -524,11 +582,19 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
   // implying that we can just copy firstVal at each insertion point.
   SILSSAUpdater updater(B.getModule());
   updater.Initialize(loadTy);
-  for (auto *insertPt : firstVal.getInsertionPoints()) {
+
+  for (auto *insertPt : insertPts) {
     // Use the scope and location of the store at the insertion point.
     SILBuilderWithScope builder(insertPt, &insertedInsts);
     SILLocation loc = insertPt->getLoc();
-    SILValue eltVal = builder.emitCopyValueOperation(loc, firstVal.getValue());
+    SILValue eltVal = firstVal.getValue();
+
+    // If we are not taking, copy the element value.
+    if (!isTake) {
+      eltVal = builder.emitCopyValueOperation(loc, eltVal);
+    }
+
+    // And then put the value into the SSA updater.
     updater.AddAvailableValue(insertPt->getParent(), eltVal);
   }
 
@@ -551,38 +617,45 @@ SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
     // If we are missing any of the available values in this struct element,
     // compute an address to load from.
     SILValue EltAddr;
-    if (anyMissing(FirstElt, NumSubElt, AvailableValueList))
+    if (anyMissing(FirstElt, NumSubElt, AvailableValueList)) {
+      assert(!isTake && "When taking, values should never be missing?!");
       EltAddr =
           B.createTupleElementAddr(Loc, Address, EltNo, EltTy.getAddressType());
+    }
 
-    ResultElts.push_back(aggregateValues(EltTy, EltAddr, FirstElt));
+    ResultElts.push_back(
+        aggregateValues(EltTy, EltAddr, FirstElt, /*isTopLevel*/ false));
     FirstElt += NumSubElt;
   }
 
   return B.createTuple(Loc, LoadTy, ResultElts);
 }
 
-SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *SD,
-                                                          SILType LoadTy,
-                                                          SILValue Address,
-                                                          unsigned FirstElt) {
-  SmallVector<SILValue, 4> ResultElts;
+SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *sd,
+                                                          SILType loadTy,
+                                                          SILValue address,
+                                                          unsigned firstElt) {
+  SmallVector<SILValue, 4> resultElts;
 
-  for (auto *FD : SD->getStoredProperties()) {
-    SILType EltTy = LoadTy.getFieldType(FD, M);
-    unsigned NumSubElt = getNumSubElements(EltTy, M);
+  for (auto *decl : sd->getStoredProperties()) {
+    SILType eltTy = loadTy.getFieldType(decl, M);
+    unsigned numSubElt = getNumSubElements(eltTy, M);
 
     // If we are missing any of the available values in this struct element,
     // compute an address to load from.
-    SILValue EltAddr;
-    if (anyMissing(FirstElt, NumSubElt, AvailableValueList))
-      EltAddr =
-          B.createStructElementAddr(Loc, Address, FD, EltTy.getAddressType());
+    SILValue eltAddr;
+    if (anyMissing(firstElt, numSubElt, AvailableValueList)) {
+      assert(!isTake && "When taking, values should never be missing?!");
+      eltAddr =
+          B.createStructElementAddr(Loc, address, decl, eltTy.getAddressType());
+    }
 
-    ResultElts.push_back(aggregateValues(EltTy, EltAddr, FirstElt));
-    FirstElt += NumSubElt;
+    resultElts.push_back(
+        aggregateValues(eltTy, eltAddr, firstElt, /*isTopLevel*/ false));
+    firstElt += numSubElt;
   }
-  return B.createStruct(Loc, LoadTy, ResultElts);
+
+  return B.createStruct(Loc, loadTy, resultElts);
 }
 
 // We have looked through all of the aggregate values and finally found a
@@ -595,6 +668,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
 
   // If the value is not available, load the value and update our use list.
   if (!val) {
+    assert(!isTake && "Should only take fully available values?!");
     LoadInst *load = ([&]() {
       if (B.hasOwnership()) {
         return B.createTrivialLoadOr(Loc, address,
@@ -1178,10 +1252,10 @@ public:
 
 private:
   bool promoteLoad(SILInstruction *Inst);
-  void promoteDestroyAddr(DestroyAddrInst *DAI,
-                          MutableArrayRef<AvailableValue> Values);
-  bool canPromoteDestroyAddr(DestroyAddrInst *DAI,
-                             SmallVectorImpl<AvailableValue> &AvailableValues);
+  void promoteDestroyAddr(DestroyAddrInst *dai,
+                          MutableArrayRef<AvailableValue> values);
+  bool canPromoteDestroyAddr(DestroyAddrInst *dai,
+                             SmallVectorImpl<AvailableValue> &availableValues);
 };
 
 } // end anonymous namespace
@@ -1272,7 +1346,8 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   // type as the load did, and emit smaller loads for any subelements that were
   // not available.
   auto *Load = cast<LoadInst>(Inst);
-  AvailableValueAggregator Agg(Load, AvailableValues, Uses, deadEndBlocks);
+  AvailableValueAggregator Agg(Load, AvailableValues, Uses, deadEndBlocks,
+                               false /*isTake*/);
   SILValue NewVal = Agg.aggregateValues(LoadTy, Load->getOperand(), FirstElt);
 
   // If we inserted any copies, we created the copies at our stores. We know
@@ -1299,78 +1374,90 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
 
 /// Return true if we can promote the given destroy.
 bool AllocOptimize::canPromoteDestroyAddr(
-    DestroyAddrInst *DAI, SmallVectorImpl<AvailableValue> &AvailableValues) {
-  SILValue Address = DAI->getOperand();
+    DestroyAddrInst *dai, SmallVectorImpl<AvailableValue> &availableValues) {
+  SILValue address = dai->getOperand();
 
   // We cannot promote destroys of address-only types, because we can't expose
   // the load.
-  SILType LoadTy = Address->getType().getObjectType();
-  if (LoadTy.isAddressOnly(Module))
+  SILType loadTy = address->getType().getObjectType();
+  if (loadTy.isAddressOnly(Module))
     return false;
   
   // If the box has escaped at this instruction, we can't safely promote the
   // load.
-  if (DataflowContext.hasEscapedAt(DAI))
+  if (DataflowContext.hasEscapedAt(dai))
     return false;
   
   // Compute the access path down to the field so we can determine precise
   // def/use behavior.
-  unsigned FirstElt = computeSubelement(Address, TheMemory);
-  assert(FirstElt != ~0U && "destroy within enum projection is not valid");
-  unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
+  unsigned firstElt = computeSubelement(address, TheMemory);
+  assert(firstElt != ~0U && "destroy within enum projection is not valid");
+  unsigned numLoadSubElements = getNumSubElements(loadTy, Module);
 
   // Find out if we have any available values.  If no bits are demanded, we
   // trivially succeed. This can happen when there is a load of an empty struct.
-  if (NumLoadSubElements == 0)
+  if (numLoadSubElements == 0)
     return true;
 
   // Set up the bitvector of elements being demanded by the load.
-  SmallBitVector RequiredElts(NumMemorySubElements);
-  RequiredElts.set(FirstElt, FirstElt + NumLoadSubElements);
+  SmallBitVector requiredElts(NumMemorySubElements);
+  requiredElts.set(firstElt, firstElt + numLoadSubElements);
 
   // Compute our available values. If we do not have any available values,
   // return false. We have nothing further to do.
-  SmallVector<AvailableValue, 8> TmpList;
-  TmpList.resize(NumMemorySubElements);
-  if (!DataflowContext.computeAvailableValues(DAI, FirstElt, NumLoadSubElements,
-                                              RequiredElts, TmpList))
+  SmallVector<AvailableValue, 8> tmpList;
+  tmpList.resize(NumMemorySubElements);
+  if (!DataflowContext.computeAvailableValues(dai, firstElt, numLoadSubElements,
+                                              requiredElts, tmpList))
     return false;
 
-  // Now that we have our final list, move the temporary lists contents into
-  // AvailableValues.
-  std::move(TmpList.begin(), TmpList.end(),
-            std::back_inserter(AvailableValues));
+  // Now check that we can perform a take upon our available values. This
+  // implies today that our value is fully available. If the value is not fully
+  // available, we would need to split stores to promote this destroy_addr. We
+  // do not support that yet.
+  AvailableValueAggregator agg(dai, tmpList, Uses, deadEndBlocks,
+                               true /*isTake*/);
+  if (!agg.canTake(loadTy, firstElt))
+    return false;
+
+  // Ok, we can promote this destroy_addr... move the temporary lists contents
+  // into the final AvailableValues list.
+  std::move(tmpList.begin(), tmpList.end(),
+            std::back_inserter(availableValues));
 
   return true;
 }
 
-/// promoteDestroyAddr - DestroyAddr is a composed operation merging
-/// load+strong_release.  If the implicit load's value is available, explode it.
-///
-/// Note that we handle the general case of a destroy_addr of a piece of the
-/// memory object, not just destroy_addrs of the entire thing.
+// DestroyAddr is a composed operation merging load [take] + destroy_value.  If
+// the implicit load's value is available, explode it.
+//
+// NOTE: We only do this if we have a fully available value.
+//
+// Note that we handle the general case of a destroy_addr of a piece of the
+// memory object, not just destroy_addrs of the entire thing.
 void AllocOptimize::promoteDestroyAddr(
-    DestroyAddrInst *DAI, MutableArrayRef<AvailableValue> AvailableValues) {
-  SILValue Address = DAI->getOperand();
-  SILType LoadTy = Address->getType().getObjectType();
+    DestroyAddrInst *dai, MutableArrayRef<AvailableValue> availableValues) {
+  SILValue address = dai->getOperand();
+  SILType loadTy = address->getType().getObjectType();
 
   // Compute the access path down to the field so we can determine precise
   // def/use behavior.
-  unsigned FirstElt = computeSubelement(Address, TheMemory);
+  unsigned firstElt = computeSubelement(address, TheMemory);
 
   // Aggregate together all of the subelements into something that has the same
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
-  AvailableValueAggregator Agg(DAI, AvailableValues, Uses, deadEndBlocks);
-  SILValue NewVal = Agg.aggregateValues(LoadTy, Address, FirstElt);
+  AvailableValueAggregator agg(dai, availableValues, Uses, deadEndBlocks,
+                               true /*isTake*/);
+  SILValue newVal = agg.aggregateValues(loadTy, address, firstElt);
 
   ++NumDestroyAddrPromoted;
 
-  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *DAI << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "      To value: " << *NewVal << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *dai << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal << "\n");
 
-  SILBuilderWithScope(DAI).emitDestroyValueOperation(DAI->getLoc(), NewVal);
-  DAI->eraseFromParent();
+  SILBuilderWithScope(dai).emitDestroyValueOperation(dai->getLoc(), newVal);
+  dai->eraseFromParent();
 }
 
 namespace {
