@@ -5113,9 +5113,6 @@ SILLayout *SILLayout::get(ASTContext &C,
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionMap Substitutions) {
-  // TODO: Support resilient opaque types.
-  Substitutions = Substitutions
-    .substOpaqueTypesWithUnderlyingTypes();
   // Canonicalize substitutions.
   Substitutions = Substitutions.getCanonical();
 
