@@ -212,6 +212,7 @@ Running the testsuite on Windows has additional external dependencies.  You must
   5. sed
   
 ```cmd
+set PATH=S:\build\Ninja-DebugAssert\swift-windows-amd64\bin;S:\build\Ninja-DebugAssert\swift-windows-amd64\libdispatch-prefix\bin;%PATH%;C:\Program Files (x86)\GnuWin32\bin
 ninja -C "S:/build/Ninja-DebugAssert/swift-windows-amd64" check-swift
 ```
 
