@@ -122,11 +122,11 @@ func test7() -> Tensor<Float> {
 // Test 8: Take and return a struct conforming to TensorGroup
 ////////////////////////
 
-extension Tensor : TensorModel {
-}
+// extension Tensor : TensorModel {
+// }
 
-extension TensorPair : TensorModel {
-}
+// extension TensorPair : TensorModel {
+// }
 
 // TODO: try other dtype
 typealias Model = TensorPair<Tensor<Float>, Tensor<Float>>
@@ -276,20 +276,20 @@ public func driver() {
   // _hostOp(newM) // should be (2.0, 3.0)
 
   // test 9
-  // let state = createScalarTensor(2.0)
-  // let data = createScalarTensor(3.0) // Data(3.0)
-  // let tracedFn = trace(with: state, in: test9)
-  // let (newState, result) = tracedFn(state, data)
-  // _hostOp(newState) // should be 1.0
-  // _hostOp(result) // should be 4.0
+  let state = createScalarTensor(2.0)
+  let data = createScalarTensor(3.0) // Data(3.0)
+  let tracedFn = trace(with: state, in: test9)
+  let (newState, result) = tracedFn(state, data)
+  _hostOp(newState) // should be 1.0
+  _hostOp(result) // should be 4.0
 
   // test 10
-  let state = State()
-  let data = createScalarTensor(3.0) // Data(3.0)
-  let tracedFn = trace(with: state, in: test10)
-  let (newState, result) = tracedFn(state, data)
-  _hostOp(newState) // should be State(model: [3.0, 2.0], optimizer: [1.0, 2.0])
-  _hostOp(result) // should be 8.0
+  // let state = State()
+  // let data = createScalarTensor(3.0) // Data(3.0)
+  // let tracedFn = trace(with: state, in: test10)
+  // let (newState, result) = tracedFn(state, data)
+  // _hostOp(newState) // should be State(model: [3.0, 2.0], optimizer: [1.0, 2.0])
+  // _hostOp(result) // should be 8.0
 }
 
 driver()

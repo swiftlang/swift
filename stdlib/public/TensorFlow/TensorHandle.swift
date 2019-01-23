@@ -89,7 +89,9 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     TF_DeleteTensor(cTensor)
   }
 
-  public func isConcreteTensor() -> Bool {
+  /// Return true if the underlying tensor is concrete (as opposed to being
+  /// symbolic).
+  public func isConcrete() -> Bool {
     return TFE_TensorHandleIsConcrete(_cTensorHandle) != 0
   }
 }
@@ -123,7 +125,7 @@ internal extension TensorHandle {
   @usableFromInline
   @inline(never)
   func makeHostCopy() -> ShapedArray<Scalar> {
-    internalConsistencyCheck(isConcreteTensor())
+    internalConsistencyCheck(isConcrete())
     debugLog("Calling makeHostCopy() with c handle \(_cTensorHandle)")
     return ShapedArray(cTensorHandle: _cTensorHandle)
   }

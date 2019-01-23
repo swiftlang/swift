@@ -88,109 +88,128 @@ public enum _ExecutionMode : Equatable {
 }
 
 
-// S4TFTrace wraps a TF_Function that is either in the process of being
-// traced into, or which has been completed and is ready to go.  As ops are
-// executed in tracing mode, they add their ops to the trace instead of
-// executing them.  When the trace is fully formed and is time to be
-// executed, the TF_Function is run by the eager runtime on some
-//  parameters.
-private class S4TFTrace {
-  // var theTFFunction : CTFFunction? /*TF_Function*/ = nil
-
+// TraceContext contains the state as needed to build a trace graph function
+// (TF_Function). As eager ops are executed in tracing mode, their corresponding
+// nodes are added to the trace graph (via `addEagerOpToGraph()`). When the
+// trace is fully formed (via `finalizeAndExecute()`), the trace graph function
+// is run by the eager runtime.
+private class TraceContext {
   let status: CTFStatus = TF_NewStatus()
 
+  // The trace graph, which will be converted to a trace graph function
+  // (TF_Function) upon finalizing.
   let graph = TF_NewGraph()
 
-  // Used to create unique graph node names.
-  var traceGraphNodeCounter = 0
+  // Used to create unique trace graph node names and graph function names.
+  var traceGraphObjectCounter = 0
 
-  // This actually maps to the concrete inputs. It starts with the input to trace fn, and then can have additional inputs.
-  // e.g. if the trace fn does:
+  // The list of inputs to the trace graph function. It starts with the inputs
+  // to the function that we trace (referred to as the "tracee function" or
+  // "tracee"), followed by possible additional inputs that correspond to
+  // concrete tensors produced within the trace function.
+  //
+  // For example, if the tracee is:
   // func foo(x: TensorPair) -> Tensor {
   //   let y = Tensor<1.0>
   //   return x.first + x.second + y
   // }
-  // The generated trace function has 3 input tensors: x.first, x.second, and y.
-  // TODO: prune away the tensors in `x` if they are not used in the graph.
-  // TODO: find better naming
-  var abstractInputs: [TF_Output] = []
+  //
+  // Then the generated trace graph function has 3 input tensors: x.first,
+  // x.second, and y.
+  //
+  // These symbolic tensors corresond to PlaceHolder nodes in the trace graph,
+  // and will be filled in when we execute the trace graph function.
+  //
+  // TODO: If some tensors in `x` are not used within `foo()`, they can be
+  // pruned away in the inputs to the trace graph function.
+  var symbolicInputs: [TF_Output] = []
 
-  // The above state is needed for GPE mode. The ones below is for eager mode.
-  let traceCtx: OpaquePointer
+  // The trace context object used in TF C API calls that convert eager ops to
+  // (trace) graph nodes.
+  let cTraceContext: CTFETraceContext
 
-  // This init allocates a new TF_Function with `inputValueCount` float tensor
-  // placeholders in the current TensorFlow context, which will be populated as
-  // the ops are executed in tracing mode.
-  // TODO: add other dtype support.
+  // `inputValueCount` is the length of the (flattened) list of input tensors to
+  // the trace function.
   init(inputValueCount: Int) {
-    debugLog("Instiantiating S4TFTrace with \(inputValueCount) input tensors.")
+    debugLog("Instiantiating TraceContext with \(inputValueCount) input tensors.")
     for i in 0..<inputValueCount {
       let desc = TF_NewOperation(graph, "Placeholder", "input_\(i)")
+      // TODO: add other dtype support.
       TF_SetAttrType(desc, "dtype", TF_FLOAT)
       let result = TF_FinishOperation(desc, status)
       checkOk(status)
-      abstractInputs.append(TF_Output(oper: result, index: 0))
+      symbolicInputs.append(TF_Output(oper: result, index: 0))
     }
-    traceGraphNodeCounter = inputValueCount
+    traceGraphObjectCounter = inputValueCount
 
-    traceCtx = TFE_NewTraceContext(graph)
+    cTraceContext = TFE_NewTraceContext(graph)
   }
 
   deinit {
-    TFE_DeleteTraceContext(traceCtx)
+    TFE_DeleteTraceContext(cTraceContext)
     TF_DeleteGraph(graph)
     TF_DeleteStatus(status)
   }
 
   // Only used in GPE code path.
   func addInput(_ idx: Int, _ inputTensorHandle: CTensorHandle) -> TF_Output {
-    let abstractInput: TF_Output
+    let symbolicInput: TF_Output
     if TFE_TensorHandleIsConcrete(inputTensorHandle) != 0 {
       debugLog("  Got a concrete input, which is the \(idx)-th")
-      internalConsistencyCheck(idx < abstractInputs.count)
+      internalConsistencyCheck(idx < symbolicInputs.count)
 
       // this is a concrete tensor, and that means the input is fed into the
       // trace region, instead of a local tensor produced within the trace
       // region.
-      abstractInput = abstractInputs[idx]
+      symbolicInput = symbolicInputs[idx]
     } else {
-      debugLog("  Got an abstract input, which is the \(idx)-th")
-      abstractInput = TFE_GetTFOutputFromTensorHandle(inputTensorHandle, status)
+      debugLog("  Got an symbolic input, which is the \(idx)-th")
+      symbolicInput = TFE_GetTFOutputFromTensorHandle(inputTensorHandle, status)
       checkOk(status)
     }
-    internalConsistencyCheck(abstractInput.oper != nil)
-    return abstractInput
+    internalConsistencyCheck(symbolicInput.oper != nil)
+    return symbolicInput
   }
 
   func addEagerOpToGraph(_ op: CTFEOp,
                       _ retvals: UnsafeMutablePointer<OpaquePointer?>,
                       _ retvalCount: UnsafeMutablePointer<Int32>,
                       _ status: CTFStatus) {
-    TFE_AddEagerOpToGraph(op, traceCtx, retvals, retvalCount, status)
+    TFE_AddEagerOpToGraph(op, cTraceContext, retvals, retvalCount, status)
     checkOk(status)
   }
 
-  func finalizeAndExecute(tracedFunctionName: String,
+  // Finalize the trace graph function and execute it, and return the list of
+  // output tensors from the trace execution. These output tensors are owned by
+  // the caller.
+  func finalizeAndExecute(traceeBasicName: String,
                           inputs: [Tensor<Float>],
                           outputs: [CTensorHandle]) -> [CTensorHandle] {
-    // When running the trace, we do not run any host code, so this
-    // .runningTrace enum might not be needed.
-    // _RuntimeConfig.traceState = .runningTrace(tracedFn)
+    // We must be in the `notTracing` enum mode.
+    internalConsistencyCheck(_RuntimeConfig.traceState.getFunction == nil)
 
-    // Tell TensorFlow to execute the graph function we built, containing
-    // the trace.  Handle arguments here by passing them as wrappers
-    // around TFE_Execute normally do.
+    // Finish building the trace graph function.
     let eagerContext = _TFCGetGlobalEagerContext()
 
-    // Append concrete tensors created within trace region to the input param
-    // list of the generated trace graph function.
-    let tensorCount = TFE_FinalizeInputTensorsFromTraceContext(traceCtx)
-    for i in 0..<tensorCount {
-      abstractInputs.append(TFE_GetInputGraphNodeFromTraceContext(traceCtx, UInt32(i)))
+    // Append concrete tensors created within the tracee as symbolic inputs to
+    // the generated trace graph function.
+    let additionalInputTensorCount = TFE_FinalizeInputTensorsFromTraceContext(
+      cTraceContext)
+    for i in 0..<additionalInputTensorCount {
+      symbolicInputs.append(TFE_GetInputGraphNodeFromTraceContext(
+                              cTraceContext, UInt32(i)))
     }
 
-    debugLog("Finalizing traced func \(tracedFunctionName), with \(inputs.count) tracer inputs and \(tensorCount) additional inputs, and up to \(outputs.count) return values.")
-    let graphFn = finalize(tracedFunctionName: tracedFunctionName, outputs: outputs)
+    let tracedFunctionName = "\(traceeBasicName)_\(traceGraphObjectCounter)"
+    traceGraphObjectCounter += 1
+    debugLog("""
+               Finalizing trace graph func \(tracedFunctionName), with \
+               \(inputs.count) tracee inputs and \
+               \(additionalInputTensorCount) additional inputs, and up to \
+               \(outputs.count) return values.
+               """)
+    let graphFn = finalize(tracedFunctionName: tracedFunctionName,
+                           outputs: outputs)
 
     TFE_ContextAddFunction(eagerContext, graphFn, status)
     checkOk(status)
@@ -204,24 +223,34 @@ private class S4TFTrace {
       checkOk(status)
     }
 
-    debugLog("Adding \(inputs.count) tracer input values.")
-    internalConsistencyCheck(abstractInputs.count == inputs.count + Int(tensorCount))
+    debugLog("Adding \(inputs.count) tracee input tensors.")
+    internalConsistencyCheck(symbolicInputs.count == inputs.count
+                               + Int(additionalInputTensorCount))
     for input in inputs {
       _TFCOpAddInputFromTensorHandle(op, input.handle, status)
       checkOk(status)
     }
 
-    debugLog("Adding \(tensorCount) additional input values.")
-    // abstractInputs.append(TFE_GetSymbolicInputTensorFromTraceContext(traceCtx, i))
-    for i in 0..<tensorCount {
-      let input = TFE_ConsumeInputConcreteTensorFromTraceContext(traceCtx, UInt32(i))
-      debugLog("Adding input tensor \(inputs.count+Int(tensorCount)): \(input!).")
+    debugLog("Adding \(additionalInputTensorCount) additional input tensors.")
+    for i in 0..<additionalInputTensorCount {
+      let input = TFE_ConsumeInputConcreteTensorFromTraceContext(cTraceContext,
+                                                                 UInt32(i))
+      internalConsistencyCheck(input != nil)
+      debugLog("""
+                 Adding tensor \(inputs.count+Int(additionalInputTensorCount)):\
+                 \(input!).
+                 """)
       TFE_OpAddInput(op, input, status)
       checkOk(status)
     }
 
+    // Tell TensorFlow to execute the graph function we built, containing
+    // the trace.
     let maxReturnValueCount = outputs.count
-    debugLog("Executing trace func \(tracedFunctionName) with up to \(maxReturnValueCount) return values.")
+    debugLog("""
+               Executing trace func \(tracedFunctionName) with up to \
+               \(maxReturnValueCount) return values.
+               """)
     var returnValues: [CTensorHandle?]
     returnValues = Array(repeating: nil, count: maxReturnValueCount)
     var outputReturnValueCount = Int32(maxReturnValueCount)
@@ -233,18 +262,24 @@ private class S4TFTrace {
                """)
     internalConsistencyCheck(outputReturnValueCount <= returnValues.count)
 
-    // Now that all the elements have been filled in, remove a level of
+    // Now that all the output elements have been filled in, remove a level of
     // optional, and also add concrete outputs.
     var traceGraphOutputs: [CTensorHandle] = []
-    // Points to an element in `returnValues`
+    // Points to an element in `returnValues`.
     var returnValueIdx = 0
+    // See the comment block within finalize() below on why we handle concrete
+    // and symbolic output tensors differently.
     for output in outputs {
       if TFE_TensorHandleIsConcrete(output) != 0 {
+        // These concrete tensors are owned by some other objects, so we make a
+        // copy here.
         let newOutput = TFE_TensorHandleCopySharingTensor(output, status)
         checkOk(status)
         internalConsistencyCheck(newOutput != nil)
         traceGraphOutputs.append(newOutput!)
       } else {
+        // These symbolic tensors are produced by TFE_Execute() above, and we
+        // need no make an extra copy.
         internalConsistencyCheck(returnValues[returnValueIdx] != nil)
         traceGraphOutputs.append(returnValues[returnValueIdx]!)
         returnValueIdx += 1
@@ -254,29 +289,40 @@ private class S4TFTrace {
     return traceGraphOutputs
   }
 
+  // Finalize the trace graph function.
   private func finalize(tracedFunctionName: String,
                         outputs: [CTensorHandle]) -> CTFFunction {
-    var abstractOutputs: [TF_Output] = []
-    // Only add abstract output tensors as the outputs of the trace graph function.
+    var symbolicOutputs: [TF_Output] = []
+    // Only add symbolic output tensors as the outputs of the trace graph function.
+    // For example, let the tracee be:
+    //   func foo(x: Tensor) -> (Tensor, Tensor) {
+    //     let y = Tensor<1.0>
+    //     return (x + x, y)
+    //   }
+    //
+    // Here foo() returns 2 tensors, but only the first one (as computed by x +
+    // x) is symbolic. The second one for y is concrete, and is computed at
+    // trace creation time, not trace execution time.
+    // Also see the comment block above finalizeAndExecuteTraceFn().
     for (i, output) in outputs.enumerated() {
       if TFE_TensorHandleIsConcrete(output) != 0 {
         continue
       }
-      debugLog("Adding abstract output tensor \(i) as a trace graph function output.")
-      abstractOutputs.append(TFE_GetTFOutputFromTensorHandle(output ,status))
+      debugLog("Adding symbolic output \(i) as a trace graph func output.")
+      symbolicOutputs.append(TFE_GetTFOutputFromTensorHandle(output ,status))
       checkOk(status)
     }
 
-    debugLog("The trace graph function has a total of \(abstractOutputs.count) outputs.")
+    debugLog("Trace graph fn has \(symbolicOutputs.count) outputs.")
     let theTFFunction = 
       TF_GraphToFunction(graph, tracedFunctionName,
                          /*append_hash_to_fn_name*/ 0,
                          /*num_opers*/ -1,
                          /*opers*/ nil,
-                         /*numinputs*/ Int32(abstractInputs.count),
-                         /*inputs*/ abstractInputs,
-                         /*noutputs*/ Int32(abstractOutputs.count),
-                         /*outputs*/ abstractOutputs,
+                         /*numinputs*/ Int32(symbolicInputs.count),
+                         /*inputs*/ symbolicInputs,
+                         /*noutputs*/ Int32(symbolicOutputs.count),
+                         /*outputs*/ symbolicOutputs,
                          /*outputnames*/ nil,
                          /*functionoptions*/ nil, "", status)
     checkOk(status)
@@ -292,24 +338,16 @@ private class S4TFTrace {
   }
 }
 
-// This enum is maintained by the TensorFlow module, to keep track of
-// whether we are building or executing a trace.  _RuntimeConfig gets
-// a static (should be thread local!) property named
-// "_RuntimeConfig.traceState".
+// This enum keeps track of whether we are building or executing a trace.
 private enum TracingState {
   case notTracing
-  case tracing(S4TFTrace)
-  // case runningTrace(S4TFTrace)
+  case tracing(TraceContext)
 
-  // assert self is 'tracing' or 'runningTrace' and return the trace.
-  var getFunction : S4TFTrace? {
-    // assert (self != .notTracing)
+  // Return nil if we are not in tracing mode.
+  var getFunction : TraceContext? {
     switch self {
     case .tracing(let trace): return trace
-    // TODO: should we also assert this cannot happen?
-    // case .runningTrace(let trace): return trace
     default: return nil
-      // fatalError("Cannot happen.")
     }
   }
 }
@@ -318,6 +356,7 @@ private enum TracingState {
 // TODO(hongm): Revisit the longer-term design.
 @_frozen
 public enum _RuntimeConfig {
+  // TODO: change the state from being state to thread local.
   fileprivate static var traceState: TracingState = .notTracing
 
   /// When false, tensorflow runtime will be initialized before running any
@@ -623,9 +662,9 @@ public final class _ExecutionContext {
   }
 }
 
-// Elements in `outputs` produced by tensor ops (which are added as trace graph
-// nodes) are symbolic tensors. There can also be elements produced by host code
-// (e.g. Tensor(1.0)), and they are concrete tensors.
+// Elements in `outputs` can come from two sources:
+// a) Symbolic tensors produced by tensor ops, and added as trace graph nodes.
+// b) Concrete tensors produced by host code (e.g. Tensor(1.0)).
 func finalizeAndExecuteTraceFn(fnName: String,
                                inputs: [Tensor<Float>],
                                outputs: [CTensorHandle]) -> [CTensorHandle] {
@@ -634,7 +673,7 @@ func finalizeAndExecuteTraceFn(fnName: String,
   }
   _RuntimeConfig.traceState = .notTracing
 
-  return tracedFn.finalizeAndExecute(tracedFunctionName: fnName,
+  return tracedFn.finalizeAndExecute(traceeBasicName: fnName,
                                      inputs: inputs,
                                      outputs: outputs)
 }
@@ -643,7 +682,7 @@ public func trace(_ fn: () -> ()) -> () -> () {
   // Verify that we are not already tracing.
   // assert(_RuntimeConfig.traceState == .notTracing)
   // Switch to tracing mode, allocating a TF_Function.
-  _RuntimeConfig.traceState = .tracing(S4TFTrace(inputValueCount: 0))
+  _RuntimeConfig.traceState = .tracing(TraceContext(inputValueCount: 0))
 
   // Run the body, this builds the trace, adding ops to currentTrace.
   fn()
@@ -663,7 +702,7 @@ public func trace(_ fn: () -> Tensor<Float>) -> () -> Tensor<Float> {
   // Verify that we are not already tracing.
   // assert(_RuntimeConfig.traceState == .notTracing)
   // Switch to tracing mode, allocating a TF_Function.
-  _RuntimeConfig.traceState = .tracing(S4TFTrace(inputValueCount: 0))
+  _RuntimeConfig.traceState = .tracing(TraceContext(inputValueCount: 0))
   // NOTE: Argument handling code goes here, defined in a section below.
 
   // Run the body, this builds the trace, adding ops to currentTrace.
@@ -692,12 +731,12 @@ public func trace(_ fn: (Tensor<Float>, Tensor<Float>) -> Tensor<Float>)
   // Verify that we are not already tracing.
   // assert(_RuntimeConfig.traceState == .notTracing)
   // Switch to tracing mode, allocating a TF_Function.
-  _RuntimeConfig.traceState = .tracing(S4TFTrace(inputValueCount: 2))
+  _RuntimeConfig.traceState = .tracing(TraceContext(inputValueCount: 2))
   // NOTE: Argument handling code goes here, defined in a section below.
 
   // map each input to a symbolic tensors
   let traceFn = _RuntimeConfig.traceState.getFunction!
-  let inputSymbolicTensors = traceFn.abstractInputs.map { placeHolderNode -> Tensor<Float> in 
+  let inputSymbolicTensors = traceFn.symbolicInputs.map { placeHolderNode -> Tensor<Float> in 
     let cTensorHandle = TFE_NewTensorHandleFromTFOutput(placeHolderNode, TF_FLOAT)!
     let tensorHandle = TensorHandle<Float>(_owning: cTensorHandle)
     return Tensor<Float>(handle: tensorHandle)
@@ -723,9 +762,12 @@ public func trace(_ fn: (Tensor<Float>, Tensor<Float>) -> Tensor<Float>)
 }
 
 public extension TensorArrayProtocol {
+  // For concrete tensors, the returned handles are copied and owned by the caller.
+  // for symbolic tensors, get those symbolic tensors.
   func _getCTensorHandles() -> [CTensorHandle] {
     debugLog("Getting \(self._tensorHandleCount) C handles.")
-    let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: Int(self._tensorHandleCount))
+    let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(
+      capacity: Int(self._tensorHandleCount))
     debugLog("Unpacking handles into buffer.")
     self._unpackTensorHandles(into: buffer)
     let status = TF_NewStatus()
@@ -734,34 +776,27 @@ public extension TensorArrayProtocol {
     for idx in 0..<self._tensorHandleCount {
       let address = buffer.advanced(by: Int(idx))
       let isConcrete = TFE_TensorHandleIsConcrete(address.pointee) != 0
-      debugLog(" Copying the \(idx)-th C handle \(address.pointee) with concrete=\(isConcrete).")
-      debugLog(" It's a concrete tensor.")
-      if isConcrete {
-        let newHandle = TFE_TensorHandleCopySharingTensor(address.pointee, status)
-        checkOk(status)
-        output.append(newHandle!)
-      } else {
-        // symbolic tensor needs no copy.
-        output.append(address.pointee)
-      }
+      debugLog("""
+                 Copying the \(idx)-th C handle \(address.pointee) with \
+                 concrete=\(isConcrete).
+                 """)
+      // if isConcrete {
+      let newHandle = TFE_TensorHandleCopySharingTensor(address.pointee,
+                                                        status)
+      checkOk(status)
+      output.append(newHandle!)
+      // } else {
+      //   // symbolic tensor needs no copy.
+      //   output.append(address.pointee)
+      // }
     }
     TF_DeleteStatus(status)
     return output
   }
 }
 
-public protocol TensorModel : TensorGroup {
-  // For concrete tensors, the returned handles are copied and owned by the caller.
-  // for abstract tensors, get those symbolic tensors.
-  // TODO: revisit.
-  func _getCTensorHandles() -> [CTensorHandle]
-
+public extension TensorGroup {
   // The tensors in `input` are NOT owned by this instance.
-  // Only supports concrete tensors.
-  init(_copying input: [CTensorHandle])
-}
-
-public extension TensorModel {
   init(_copying input: [CTensorHandle]) {
     assert(Self._tensorHandleCount == input.count)
     let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: input.count)
@@ -769,9 +804,10 @@ public extension TensorModel {
     // copy input to buffer
     for (idx, inputTensorHandle) in input.enumerated() {
       let address = buffer.advanced(by: idx)
-      // Can be an abstract tensor (for creating a symbolic input instance) or concrete one (for output instance).
-      // internalConsistencyCheck(TFE_TensorHandleIsConcrete(inputTensorHandle) == 0)
-      let newHandle = TFE_TensorHandleCopySharingTensor(/*input[idx]*/inputTensorHandle, status)
+      // Each tensor can be symbolic (e.g. when using this API to create a
+      // symbolic input instance to tracee) or concrete (e.g. when creating the
+      // final output of the tracee).
+      let newHandle = TFE_TensorHandleCopySharingTensor(inputTensorHandle, status)
       checkOk(status)
       address.initialize(to: newHandle!)
     }
@@ -781,7 +817,7 @@ public extension TensorModel {
 }
 
 // Model -> Model
-public func trace<T: TensorModel>(_ fn: (T) -> T)
+public func trace<T: TensorGroup>(_ fn: (T) -> T)
   -> (T) -> T {
   debugLog("Tracing over a function Model -> Model with \(T._typeList.count) input tensors.")
 
@@ -789,19 +825,19 @@ public func trace<T: TensorModel>(_ fn: (T) -> T)
   // assert(_RuntimeConfig.traceState == .notTracing)
 
   // Switch to tracing mode, allocating a TF_Function.
-  _RuntimeConfig.traceState = .tracing(S4TFTrace(inputValueCount: T._typeList.count))
+  _RuntimeConfig.traceState = .tracing(TraceContext(inputValueCount: T._typeList.count))
   // NOTE: Argument handling code goes here, defined in a section below.
 
   let traceFn = _RuntimeConfig.traceState.getFunction!
-  let inputSymbolicTensors = traceFn.abstractInputs.map { 
+  let inputSymbolicTensors = traceFn.symbolicInputs.map { 
     TFE_NewTensorHandleFromTFOutput($0, TF_FLOAT)!
   }
   internalConsistencyCheck(inputSymbolicTensors.count == T._typeList.count)
   let dummyStruct = T(_copying: inputSymbolicTensors)
   
   // Run the body, this builds the trace, adding ops to currentTrace.
-  // The output will contain a list of abstract tensors
-  let outputAbstractStruct = fn(dummyStruct)
+  // The output will contain a list of symbolic tensors
+  let outputSymbolicStruct = fn(dummyStruct)
 
   // The result is a closure that captures 'fn' and captures and executes
   // the tracedFn.
@@ -817,7 +853,7 @@ public func trace<T: TensorModel>(_ fn: (T) -> T)
     let inputTensorHandles =  input._getCTensorHandles()
     let inputTensors = inputTensorHandles.map { Tensor<Float>(handle: TensorHandle(_owning: $0)) }
 
-    let outputTensorsHandles = outputAbstractStruct._getCTensorHandles()    
+    let outputTensorsHandles = outputSymbolicStruct._getCTensorHandles()    
     let returnValues = finalizeAndExecuteTraceFn(fnName: opType,
                                                  inputs: inputTensors,
                                                  outputs: outputTensorsHandles)
@@ -828,62 +864,80 @@ public func trace<T: TensorModel>(_ fn: (T) -> T)
 }
 
 public protocol TensorArrayProtocolEnhanced : TensorArrayProtocol {
+  // Create an instance based on `inputs`, which can be symbolic (e.g. when
+  // creating a symbolic input to tracee) or concrete (e.g. when creating a
+  // final output of executing the tracee).
   func createInstance(_owning inputs: [CTensorHandle]) -> Self
 }
 
-// TODO: TensorModel here really only means TensorGroup
-public func trace<State : TensorArrayProtocolEnhanced, Data : TensorModel, Result : TensorModel>(
+public func trace<State : TensorArrayProtocolEnhanced,
+                  Data : TensorGroup,
+                  Result : TensorGroup>(
   with state: State,
   in fn: (State, Data) -> (State, Result)
 ) -> (State, Data) -> (State, Result) {
-  debugLog("Tracing over a function based on TAP with \(state._tensorHandleCount) input state tensors and \(Data._typeList.count) input data tensors.")
+  debugLog("""
+             Tracing over a function with \(state._tensorHandleCount) input\
+             state tensors and \(Data._typeList.count) input data tensors.
+             """)
 
   // Verify that we are not already tracing.
-  // assert(_RuntimeConfig.traceState == .notTracing)
+  internalConsistencyCheck(_RuntimeConfig.traceState.getFunction == nil,
+                           "Should not be in tracing mode already!")
 
-  // Switch to tracing mode, allocating a TF_Function.
-  _RuntimeConfig.traceState = .tracing(S4TFTrace(inputValueCount: Int(state._tensorHandleCount) + Data._typeList.count))
-  // NOTE: Argument handling code goes here, defined in a section below.
+  // Switch to tracing mode.
+  let inputValueCount = Int(state._tensorHandleCount) + Data._typeList.count
+  _RuntimeConfig.traceState = .tracing(
+    TraceContext(inputValueCount: inputValueCount))
 
+  // Handle inputs.
   let traceFn = _RuntimeConfig.traceState.getFunction!
-  let inputSymbolicTensors = traceFn.abstractInputs.map { 
+  // TODO: support other dtypes.
+  let inputSymbolicTensors = traceFn.symbolicInputs.map { 
     TFE_NewTensorHandleFromTFOutput($0, TF_FLOAT)!
   }
-  internalConsistencyCheck(inputSymbolicTensors.count == Int(state._tensorHandleCount) + Data._typeList.count)
-  let dummyState = state.createInstance(_owning: Array(inputSymbolicTensors.dropLast(Data._typeList.count)))
-  let dummyData = Data(_copying: Array(inputSymbolicTensors.dropFirst(Int(state._tensorHandleCount))))
-  // The output will contain a list of abstract tensors
-  let (outputAbstractState, outputAbstractResult) = fn(dummyState, dummyData)
+  internalConsistencyCheck(inputSymbolicTensors.count == inputValueCount)
+  let symbolicState = state.createInstance(
+    _owning: Array(inputSymbolicTensors.dropLast(Data._typeList.count)))
+  let symbolicData = Data(
+    _copying: Array(inputSymbolicTensors.dropFirst(
+                      Int(state._tensorHandleCount))))
+  // Run tracee to build the trace, adding ops to the trace graph function.
+  // The tracee output can contain a mixture of symbolic and concrete tensors
+  // (see the comment block within TraceContext.finalize()).
+  let (outputState, outputResult) = fn(symbolicState, symbolicData)
 
-  // Run the body, this builds the trace, adding ops to currentTrace.
-
-  // // The result is a closure that captures 'fn' and captures and executes
-  // // the tracedFn.
+  // The result is a closure that captures and executes the trace graph
+  // function.
   return { (oldState: State, data: Data) -> (State, Result) in
     debugLog("Running trace function over state \(oldState) and data \(data).")
 
     // TAP means tensor array protocol.
     let opType = "MyTraceFn_TAP"
 
-    // Ok, we are done tracing.
-
-    // TODO: see if we should add a protocol method that returns a flat list of Tensors from a TensorGroup instance.
     debugLog("Getting input state tensor handles.")
     let inputStateTensorHandles =  oldState._getCTensorHandles()
-    var inputTensors = inputStateTensorHandles.map { Tensor<Float>(handle: TensorHandle(_owning: $0)) }
+    var inputTensors = inputStateTensorHandles.map {
+      Tensor<Float>(handle: TensorHandle(_owning: $0)) }
     debugLog("Getting input data tensor handles.")
     let inputDataTensorHandles =  data._getCTensorHandles()
-    inputTensors.append(contentsOf: inputDataTensorHandles.map { Tensor<Float>(handle: TensorHandle(_owning: $0)) })
+    inputTensors.append(contentsOf: inputDataTensorHandles.map {
+                          Tensor<Float>(handle: TensorHandle(_owning: $0)) })
 
     debugLog("Assembling output tensor handles.")
-    let outputAbstractTensorHandles = outputAbstractState._getCTensorHandles() + outputAbstractResult._getCTensorHandles()
+    let outputTensorHandles = outputState._getCTensorHandles()
+      + outputResult._getCTensorHandles()
+
+    debugLog("Finalizing and executing trace graph function.")
     let returnValues = finalizeAndExecuteTraceFn(fnName: opType,
                                                  inputs: inputTensors,
-                                                 outputs: outputAbstractTensorHandles)
+                                                 outputs: outputTensorHandles)
 
     debugLog("Creating output model instance.")
-    let newState = state.createInstance(_owning: Array(returnValues.dropLast(Data._typeList.count)))
-    let resultTensors: [CTensorHandle] = Array(returnValues.dropFirst(Int(state._tensorHandleCount)))
+    let newState = state.createInstance(_owning: Array(returnValues.dropLast(
+                                                         Data._typeList.count)))
+    let resultTensors: [CTensorHandle] = Array(returnValues.dropFirst(
+                                                 Int(state._tensorHandleCount)))
     let result = Result(_copying: resultTensors)
     return(newState, result)
   }
@@ -1042,7 +1096,7 @@ private class TFEState {
   /// function).
   var ops: [CTFEOp] = []
 
-  var op_descs: [CTFOperationDescription] = []
+  var opDescs: [CTFOperationDescription] = []
 
   init(_ programByteAddress: UnsafeRawPointer,
        programByteCount: Int,
@@ -1113,12 +1167,12 @@ private class TFEState {
       if let tracedFn = _RuntimeConfig.traceState.getFunction {
         // let opType = "trace_s5trace3fooyyF.tf_0_CPU.device_partition"
         // let opType = "trace_main.tf_0_CPU.device_partition"
-        let opName = "\(opType)_\(tracedFn.traceGraphNodeCounter)"
+        let opName = "\(opType)_\(tracedFn.traceGraphObjectCounter)"
         let opDesc = TF_NewOperation(tracedFn.graph, opType, opName)
         internalConsistencyCheck(opDesc != nil)
         debugLog("Creating trace graph node \(opDesc!) named \(opName) for graph fn \(opType) via TF_NewOperation().")
-        op_descs.append(opDesc!)
-        tracedFn.traceGraphNodeCounter += 1
+        opDescs.append(opDesc!)
+        tracedFn.traceGraphObjectCounter += 1
       } else {
       debugLog("Creating a new op based on type \(opType).")
       let op: CTFEOp? = TFE_NewOp(context.eagerContext, opType, status)
@@ -1164,10 +1218,10 @@ private class TFEState {
 extension TFEState {
   func addInput(_ idx: Int, _ inputTensorHandle: CTensorHandle) {
     if let tracedFn = _RuntimeConfig.traceState.getFunction {
-      debugLog("Calling TF_AddInput() on trace graph node desc \(op_descs[0]) for the \(idx)-th input")
-      let abstractInput = tracedFn.addInput(idx, inputTensorHandle)
-      debugLog(" The abstract input graph node is \(abstractInput.oper!)")
-      TF_AddInput(op_descs[0], abstractInput);
+      debugLog("Calling TF_AddInput() on trace graph node desc \(opDescs[0]) for the \(idx)-th input")
+      let symbolicInput = tracedFn.addInput(idx, inputTensorHandle)
+      debugLog(" The symbolic input graph node is \(symbolicInput.oper!)")
+      TF_AddInput(opDescs[0], symbolicInput);
     } else {
       TFE_OpAddInput(ops[0], inputTensorHandle, status)
     }
@@ -1207,16 +1261,16 @@ public final class _TensorComputation {
 
   // Populated by tracing a graph function. The "execution" of that graph
   // function in tracing mode via _TensorComputation will create a graph node in
-  // the trace graph function, and also track the output abstract tensor(s) in
-  // `abstractOutputs`. These tensors will be feed via CTensorHandle
+  // the trace graph function, and also track the output symbolic tensor(s) in
+  // `symbolicOutputs`. These tensors will be feed via CTensorHandle
   // (`returnValues` above) to subsequent users (graph nodes) encountered in the
   // trace region if any.
   //
   // TODO: can turn off async execution infra in _TensorComputation for
   // tracing. We just need sync execution. This way we can run execute() and
-  // finish() in the same call, and can make `abstractOutputs` a local variable
+  // finish() in the same call, and can make `symbolicOutputs` a local variable
   // in that method.
-  var abstractOutputs: [TF_Output] = []
+  var symbolicOutputs: [TF_Output] = []
 
   // NOTE: the following properties are intentionally not implemented as an enum
   // due to high churn, *please do not refactor for Swiftiness*.
@@ -1383,16 +1437,16 @@ private extension _TensorComputation {
       internalConsistencyCheck(threadIndex <= helperFunctionCount)
 
       if /*let tracedFn =*/ _RuntimeConfig.traceState.getFunction != nil {
-        debugLog("For thread \(threadIndex) finishing op creation for op \(state.op_descs[threadIndex]) in trace graph via TF_FinishOperation().")
+        debugLog("For thread \(threadIndex) finishing op creation for op \(state.opDescs[threadIndex]) in trace graph via TF_FinishOperation().")
         // this is always true
-        // internalConsistencyCheck(state.op_descs[threadIndex] != nil)
-        let result = TF_FinishOperation(state.op_descs[threadIndex], status)
+        // internalConsistencyCheck(state.opDescs[threadIndex] != nil)
+        let result = TF_FinishOperation(state.opDescs[threadIndex], status)
         checkOk(status)
         if threadIndex == 0 {
           debugLog("Tracking \(returnValues.count) outputs in tracedFn.")
-          internalConsistencyCheck(abstractOutputs.isEmpty)
+          internalConsistencyCheck(symbolicOutputs.isEmpty)
           for i in 0..<returnValues.count {
-            abstractOutputs.append(TF_Output(oper: result, index: Int32(i)))
+            symbolicOutputs.append(TF_Output(oper: result, index: Int32(i)))
           }
         }
         return
@@ -1450,10 +1504,10 @@ public extension _TensorComputation {
     debugLog("Done executing TF graph.")
 
     if /*let tracedFn =*/ _RuntimeConfig.traceState.getFunction != nil {
-      debugLog("Setting output abstract tensors: Expecting \(returnValues.count) return values, and gathered \(abstractOutputs.count) output tensors.")
-      assert (abstractOutputs.count == returnValues.count)
+      debugLog("Setting output symbolic tensors: Expecting \(returnValues.count) return values, and gathered \(symbolicOutputs.count) output tensors.")
+      assert (symbolicOutputs.count == returnValues.count)
       for i in 0..<returnValues.count {
-        returnValues[i] = TFE_NewTensorHandleFromTFOutput(abstractOutputs[i], TF_FLOAT)
+        returnValues[i] = TFE_NewTensorHandleFromTFOutput(symbolicOutputs[i], TF_FLOAT)
       }
     }
     
