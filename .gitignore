@@ -57,6 +57,3 @@ SortedCFDatabase.def
 htmlcov
 .coverage
 /benchmark/scripts/Benchmark_Driverc
-/mastermaster.srctrlprj
-/mastermaster.srctrldb
-/mastermaster.srctrlbm
