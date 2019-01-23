@@ -177,7 +177,7 @@ cmake --build "S:\build\Ninja-DebugAssert\swift-windows-amd64"
   a file.
 
 ```cmd
-cmake -G "Visual Studio 2017" "S:\swift" -DCMAKE_GENERATOR_PLATFORM="x64"^ ...
+cmake -G "Visual Studio 2017" -DCMAKE_GENERATOR_PLATFORM="x64"^ ...
 ```
 
 ### 8. Build lldb
