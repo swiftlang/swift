@@ -78,7 +78,7 @@
 /// offset by that number of bytes. The following example allocates four bytes
 /// of memory and stores `0xFF` in all four bytes:
 ///
-///     let bytesPointer = UnsafeMutableRawPointer.allocate(byteCount: 4, alignment: 1)
+///     let bytesPointer = UnsafeMutableRawPointer.allocate(byteCount: 4, alignment: 4)
 ///     bytesPointer.storeBytes(of: 0xFFFF_FFFF, as: UInt32.self)
 ///
 ///     // Load a value from the memory referenced by 'bytesPointer'
