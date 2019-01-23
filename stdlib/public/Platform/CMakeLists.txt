@@ -1,5 +1,3 @@
-set(swift_platform_name)
-set(swift_platform_flags)
 set(swift_platform_sources
     Platform.swift
     TiocConstants.swift
