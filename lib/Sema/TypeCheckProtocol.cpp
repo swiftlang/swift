@@ -885,14 +885,12 @@ swift::matchWitness(TypeChecker &tc,
         = cs->getTypeOfMemberReference(selfTy, witness, dc,
                                        /*isDynamicResult=*/false,
                                        FunctionRefKind::DoubleApply,
-                                       witnessLocator,
-                                       /*base=*/nullptr);
+                                       witnessLocator);
     } else {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfReference(witness,
                                  FunctionRefKind::DoubleApply,
-                                 witnessLocator,
-                                 /*base=*/nullptr);
+                                 witnessLocator, /*useDC=*/nullptr);
     }
     openWitnessType = openWitnessType->getRValueType();
 
