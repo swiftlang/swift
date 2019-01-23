@@ -304,7 +304,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   switch (kind) {
 #define PROTOCOL_WITH_NAME(Id, Name) \
   case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name)
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, __, ___)
 #include "swift/AST/KnownProtocols.def"
 
   case KnownProtocolKind::ExpressibleByArrayLiteral:     index = 0; break;
@@ -334,7 +334,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   switch (kind) {
 #define PROTOCOL_WITH_NAME(Id, Name) \
   case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name)
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, __, ___)
 #include "swift/AST/KnownProtocols.def"
 
   case KnownProtocolKind::ExpressibleByArrayLiteral:
