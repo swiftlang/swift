@@ -98,7 +98,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const LogJobSet &ljs) {
   return os;
 }
 
-
+// clang-format off
 Compilation::Compilation(DiagnosticEngine &Diags,
                          const ToolChain &TC,
                          OutputInfo const &OI,
@@ -154,6 +154,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       ExperimentalDependencyIncludePrivateDeps) {
       
 };
+// clang-format on
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
                                      DiagnosticEngine &diags);

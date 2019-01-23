@@ -472,7 +472,7 @@ const char *
 DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
   switch (knownProtocolKind) {
 
-// clang-format off
+  // clang-format off
     # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
       case KnownProtocolKind::Id: return typeName;
     # include "swift/AST/KnownProtocols.def"

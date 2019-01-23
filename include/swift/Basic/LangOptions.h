@@ -294,7 +294,7 @@ namespace swift {
     /// Scaffolding to permit experimentation with finer-grained dependencies
     /// and faster rebuilds.
     bool EnableExperimentalDependencies = false;
-    
+
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true;

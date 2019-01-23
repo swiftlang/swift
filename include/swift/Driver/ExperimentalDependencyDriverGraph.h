@@ -250,7 +250,7 @@ public:
         stats(stats) {
     assert(verify() && "ModuleDepGraph should be fine when created");
   }
-  
+
   DependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,
                                                DiagnosticEngine &);
 
@@ -336,9 +336,7 @@ private:
   void verifyCanFindEachJob() const;
   void verifyEachJobIsTracked() const;
 
-  static bool mapCorruption(const char *msg) {
-    llvm_unreachable(msg);
-  }
+  static bool mapCorruption(const char *msg) { llvm_unreachable(msg); }
 
   /// Use the known swiftDeps to find a directory for
   /// the job-independent dot file.

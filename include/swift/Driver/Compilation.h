@@ -227,6 +227,7 @@ private:
       ArrayRefView<std::unique_ptr<T>, T *, Compilation::unwrap<T>>;
 
 public:
+  // clang-format off
   Compilation(DiagnosticEngine &Diags, const ToolChain &TC,
               OutputInfo const &OI,
               OutputLevel Level,
@@ -250,6 +251,7 @@ public:
               bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
               bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
               bool ExperimentalDependencyIncludePrivateDeps = false);
+  // clang-format on
   ~Compilation();
 
   ToolChain const &getToolChain() const {
