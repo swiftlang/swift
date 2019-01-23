@@ -523,6 +523,7 @@ bool swift::isRepresentableInObjC(
     if (!ResultType->hasError() &&
         !ResultType->isVoid() &&
         !ResultType->isUninhabited() &&
+        !ResultType->hasDynamicSelfType() &&
         !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                        const_cast<FuncDecl *>(FD))) {
       if (Diagnose) {

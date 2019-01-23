@@ -323,7 +323,6 @@ class ConcreteContext3 {
   func dynamicSelf1() -> Self { return self }
 
   @objc func dynamicSelf1_() -> Self { return self }
-  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
   @objc func genericParams<T: NSObject>() -> [T] { return [] }
   // expected-error@-1{{method cannot be marked @objc because it has generic parameters}}
