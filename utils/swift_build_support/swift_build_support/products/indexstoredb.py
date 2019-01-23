@@ -34,6 +34,7 @@ class IndexStoreDB(product.Product):
         if self.args.test and self.args.test_indexstoredb:
             run_build_script_helper('test', host_target, self, self.args)
 
+
 def run_build_script_helper(action, host_target, product, args):
     script_path = os.path.join(
         product.source_dir, 'Utilities', 'build-script-helper.py')

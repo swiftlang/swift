@@ -259,10 +259,11 @@ class BuildScriptInvocation(object):
                     "--android-icu-i18n-include, and --android-icu-data "
                     "must be specified")
 
-        if args.legacy_impl and (args.build_indexstoredb or args.build_sourcekitlsp):
+        if args.legacy_impl and (args.build_indexstoredb or
+                                 args.build_sourcekitlsp):
             diagnostics.fatal(
-                "--legacy-impl is incompatible with building packages needing a"
-                " toolchain (indexstore-db or sourcekit-lsp)")
+                "--legacy-impl is incompatible with building packages needing "
+                "a toolchain (indexstore-db or sourcekit-lsp)")
 
     @staticmethod
     def apply_default_arguments(toolchain, args):
@@ -929,9 +930,8 @@ class BuildScriptInvocation(object):
         # matches that of `build-script-impl`.
         product_classes = self.compute_product_classes()
 
-        impl_product_classes = [
-            cls for cls in product_classes if cls.is_build_script_impl_product()
-        ]
+        impl_product_classes = [cls for cls in product_classes
+                                if cls.is_build_script_impl_product()]
 
         # Execute each "pass".
 

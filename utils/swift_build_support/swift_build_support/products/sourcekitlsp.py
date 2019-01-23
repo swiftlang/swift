@@ -10,8 +10,9 @@
 #
 # ----------------------------------------------------------------------------
 
-from . import product
 from . import indexstoredb
+from . import product
+
 
 class SourceKitLSP(product.Product):
     @classmethod
