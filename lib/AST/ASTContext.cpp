@@ -291,6 +291,13 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
                  ProtocolConformanceRef>
     DefaultAssociatedConformanceWitnesses;
 
+  /// Caches of default types for DefaultTypeRequest.
+  /// Used to be instance variables in the TypeChecker.
+  /// There is a logically separate cache for each SourceFile and
+  /// KnownProtocolKind.
+  llvm::DenseMap<SourceFile *, std::array<Type, NumKnownProtocols>>
+      DefaultTypeRequestCaches;
+
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -5075,4 +5082,7 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
   return LayoutConstraint(New);
 }
 
-
+Type &ASTContext::getDefaultTypeRequestCache(SourceFile *SF,
+                                             KnownProtocolKind kind) {
+  return getImpl().DefaultTypeRequestCaches[SF][size_t(kind)];
+}

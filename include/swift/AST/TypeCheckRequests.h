@@ -322,6 +322,48 @@ public:
   bool isCached() const { return true; }
 };
 
+void simple_display(llvm::raw_ostream &out, const KnownProtocolKind);
+class TypeChecker;
+
+// Find the type in the cache or look it up
+class DefaultTypeRequest
+    : public SimpleRequest<DefaultTypeRequest, CacheKind::SeparatelyCached,
+                           Type, KnownProtocolKind, const DeclContext *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &eval, KnownProtocolKind,
+                                const DeclContext *) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Caching
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+
+private:
+  KnownProtocolKind getKnownProtocolKind() const {
+    return std::get<0>(getStorage());
+  }
+  const DeclContext *getDeclContext() const {
+    return std::get<1>(getStorage());
+  }
+
+  static const char *getTypeName(KnownProtocolKind);
+  static bool getPerformLocalLookup(KnownProtocolKind);
+  TypeChecker &getTypeChecker() const;
+  SourceFile *getSourceFile() const;
+  Type &getCache() const;
+};
+
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
 

@@ -942,6 +942,9 @@ public:
     return !LangOpts.EnableAccessControl;
   }
 
+  /// Each kind and SourceFile has its own cache for a Type.
+  Type &getDefaultTypeRequestCache(SourceFile *, KnownProtocolKind);
+
 private:
   friend Decl;
   Optional<RawComment> getRawComment(const Decl *D);
