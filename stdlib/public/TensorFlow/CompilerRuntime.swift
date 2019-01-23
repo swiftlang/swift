@@ -874,6 +874,21 @@ public extension _TensorComputation {
   }
 }
 
+@usableFromInline
+@_cdecl("_swift_tfc_EagerExecute")
+func _TFCEagerExecute(_ op: CTFEOp,
+                      _ retvals: UnsafeMutablePointer<OpaquePointer?>,
+                      _ retvalCount: UnsafeMutablePointer<Int32>,
+                      _ status: CTFStatus) {
+  if _RuntimeConfig.printsDebugLog {
+    debugLog("Calling _TFCEagerExecute() over: ")
+    TFE_OpPrintDebugString(op)
+  }
+
+  TFE_Execute(op, retvals, retvalCount, status)
+}
+
+
 //===----------------------------------------------------------------------===//
 // - MARK: Compiler runtime entrypoints
 //===----------------------------------------------------------------------===//

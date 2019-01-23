@@ -88,6 +88,12 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     self.init(copyingFromCTensor: cTensor)
     TF_DeleteTensor(cTensor)
   }
+
+  /// Return true if the underlying tensor is concrete (as opposed to being
+  /// symbolic).
+  public func isConcrete() -> Bool {
+    return TFE_TensorHandleIsConcrete(_cTensorHandle) != 0
+  }
 }
 
 extension TensorHandle where Scalar : TensorFlowScalar {
@@ -119,6 +125,8 @@ internal extension TensorHandle {
   @usableFromInline
   @inline(never)
   func makeHostCopy() -> ShapedArray<Scalar> {
+    internalConsistencyCheck(isConcrete())
+    debugLog("Calling makeHostCopy() with c handle \(_cTensorHandle)")
     return ShapedArray(cTensorHandle: _cTensorHandle)
   }
 }
@@ -175,9 +183,12 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
   @usableFromInline
   @inline(never)
   init(cTensorHandle: CTensorHandle) {
+    internalConsistencyCheck(TFE_TensorHandleIsConcrete(cTensorHandle) != 0)
     let status = TF_NewStatus()
     let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
+    checkOk(status)
     TF_DeleteStatus(status)
+    internalConsistencyCheck(cTensor != nil)
     debugLog("# of dims is \(TF_NumDims(cTensor!))")
     debugLog("Returning a shaped array.")
     self.init(owning: cTensor!)

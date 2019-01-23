@@ -2976,7 +2976,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto returnValueCount =
       createAlloca(IGM.Int32Ty, IGM.getPointerAlignment(), "returnValueCount");
   Builder.CreateStore(expectedReturnValueCount, returnValueCount);
-  auto *tfeExecuteFn = IGM.getTFE_ExecuteFn();
+  auto *tfeExecuteFn = IGM.getTFC_EagerExecuteFn();
   Builder.CreateCall(tfeExecuteFn, {op, returnValuesAddress,
                                     returnValueCount.getAddress(), status});
   checkOk(status);
