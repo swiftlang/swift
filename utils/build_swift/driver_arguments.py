@@ -197,6 +197,8 @@ def _apply_default_arguments(args):
         args.test_ios = False
         args.test_tvos = False
         args.test_watchos = False
+        args.test_indexstoredb = False
+        args.test_sourcekitlsp = False
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if not args.test_ios:

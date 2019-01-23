@@ -190,6 +190,8 @@ EXPECTED_DEFAULTS = {
     'test_watchos': False,
     'test_watchos_host': False,
     'test_watchos_simulator': False,
+    'test_indexstoredb': False,
+    'test_sourcekitlsp': False,
     'tvos': False,
     'tvos_all': False,
     'validation_test': None,
@@ -490,6 +492,8 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-watchos-host', dest='test_watchos_host'),
     DisableOption('--skip-test-watchos-simulator',
                   dest='test_watchos_simulator'),
+    DisableOption('--skip-test-indexstore-db', dest='test_indexstoredb'),
+    DisableOption('--skip-test-sourcekit-lsp', dest='test_sourcekitlsp'),
 
     ChoicesOption('--android-ndk-gcc-version',
                   choices=['4.8', '4.9']),
