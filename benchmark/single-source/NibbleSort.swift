@@ -7,7 +7,8 @@ import TestsUtils
 public var NibbleSort = BenchmarkInfo(
   name: "NibbleSort",
   runFunction: run_NibbleSort,
-  tags: [.validation]
+  tags: [.validation],
+  legacyFactor: 10
 )
 
 @inline(never)
@@ -16,7 +17,7 @@ public func run_NibbleSort(_ N: Int) {
   let v: UInt64 = 0xbadbeef
   var c = NibbleCollection(v)
 
-  for _ in 1...10000*N {
+  for _ in 1...1_000*N {
     c.val = v
     c.sort()
 
