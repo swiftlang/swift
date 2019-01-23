@@ -56,6 +56,14 @@ func zlop() -> __opaque C & AnyObject & P {
   return D()
 }
 
+// Don't allow opaque types to propagate by inference into other global decls'
+// types
+struct Test {
+  let inferredOpaque = bar() // expected-error{{inferred type}}
+  let inferredOpaqueStructural = Optional(bar()) // expected-error{{inferred type}}
+  let inferredOpaqueStructural2 = (bar(), bas()) // expected-error{{inferred type}}
+}
+
 //let zingle = {() -> __opaque P in 1 } // FIXME ex/pected-error{{'opaque' types are only implemented}}
 
 // Invalid positions

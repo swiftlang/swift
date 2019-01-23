@@ -979,6 +979,15 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
     if (tc.typeCheckPatternBinding(binding, entryNumber))
       return;
+    
+    // A pattern binding at top level is not allowed to pick up another decl's
+    // opaque result type as its type by type inference.
+    if (!binding->getDeclContext()->isLocalContext()
+        && binding->getInit(entryNumber)->getType()->hasOpaqueArchetype()) {
+      // TODO: Check whether the type is the pattern binding's own opaque type.
+      tc.diagnose(binding, diag::inferred_opaque_type,
+                  binding->getInit(entryNumber)->getType());
+    }
   }
 
   // If the pattern binding appears in a type or library file context, then
