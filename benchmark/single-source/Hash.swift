@@ -18,7 +18,8 @@ import TestsUtils
 public let HashTest = BenchmarkInfo(
   name: "HashTest",
   runFunction: run_HashTest,
-  tags: [.validation, .algorithm])
+  tags: [.validation, .algorithm],
+  legacyFactor: 10)
 
 class Hash {
   /// C'tor.
@@ -581,7 +582,7 @@ public func run_HashTest(_ N: Int) {
     "The quick brown fox jumps over the lazy dog." : "ef537f25c895bfa782526529a9b63d97aa631564d5d789c2b765448c8635fb6c"]
   let size = 50
 
-  for _ in 1...10*N {
+  for _ in 1...N {
     // Check for precomputed values.
     let MD = MD5()
     for (K, V) in TestMD5 {
