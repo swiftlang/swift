@@ -362,7 +362,6 @@ private:
   TypeChecker &getTypeChecker() const;
   SourceFile *getSourceFile() const;
   Type &getCache() const;
-  bool isDependencyMissing(Type result) const;
 };
 
 /// The zone number for the type checker.

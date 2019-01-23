@@ -463,24 +463,7 @@ Type &DefaultTypeRequest::getCache() const {
 
 Optional<Type> DefaultTypeRequest::getCachedResult() const {
   auto const &cachedType = getCache();
-  if (!cachedType)
-    return None;
-  assert(!isDependencyMissing(cachedType) &&
-         "Since the cache is now cached by SourceFile, the dependency should "
-         "have been recorded when it was looked up.");
-  return cachedType;
-}
-
-bool DefaultTypeRequest::isDependencyMissing(Type result) const {
-  if (auto *SF = getSourceFile())
-    if (auto *tracker = SF->getReferencedNameTracker()) {
-      Identifier name = getDeclContext()->getASTContext().getIdentifier(
-          getTypeName(getKnownProtocolKind()));
-      DeclBaseName bn = DeclBaseName(name);
-      return tracker->getTopLevelNames().find(bn) ==
-             tracker->getTopLevelNames().end();
-    }
-  return false;
+  return cachedType ? Optional<Type>(cachedType) : None;
 }
 
 void DefaultTypeRequest::cacheResult(Type value) const { getCache() = value; }
