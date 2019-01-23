@@ -241,8 +241,6 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
 ManagedValue SILGenBuilder::createInitExistentialValue(
     SILLocation loc, SILType existentialType, CanType formalConcreteType,
     ManagedValue concrete, ArrayRef<ProtocolConformanceRef> conformances) {
-  lookThroughOpaqueTypes(formalConcreteType, conformances);
-
   // *NOTE* we purposely do not use a cleanup cloner here. The reason why is no
   // matter whether we have a trivial or non-trivial input,
   // init_existential_value returns a +1 value (the COW box).
@@ -255,8 +253,6 @@ ManagedValue SILGenBuilder::createInitExistentialValue(
 ManagedValue SILGenBuilder::createInitExistentialRef(
     SILLocation Loc, SILType ExistentialType, CanType FormalConcreteType,
     ManagedValue Concrete, ArrayRef<ProtocolConformanceRef> Conformances) {
-  lookThroughOpaqueTypes(FormalConcreteType, Conformances);
-
   CleanupCloner Cloner(*this, Concrete);
   InitExistentialRefInst *IERI =
       createInitExistentialRef(Loc, ExistentialType, FormalConcreteType,
