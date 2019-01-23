@@ -7,13 +7,13 @@ import Swift
 import SwiftShims
 
 struct StructWithStoredProperties {
-  @sil_stored var f: Int
-  @sil_stored var g: Int
+  @_hasStorage var f: Int
+  @_hasStorage var g: Int
 }
 
 struct StructWithStructWithStoredProperties {
-  @sil_stored var a: StructWithStoredProperties
-  @sil_stored var b: StructWithStoredProperties
+  @_hasStorage var a: StructWithStoredProperties
+  @_hasStorage var b: StructWithStoredProperties
 }
 
 // CHECK-LABEL: @assignsToCapture

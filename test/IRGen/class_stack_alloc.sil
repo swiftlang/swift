@@ -4,24 +4,24 @@ import Builtin
 import Swift
 
 class TestClass {
-  @sil_stored var a : Int64
+  @_hasStorage var a : Int64
   init()
 }
 
 struct TestStruct {
-  @sil_stored var a : Int64
-  @sil_stored var b : Int64
-  @sil_stored var c : Int64
+  @_hasStorage var a : Int64
+  @_hasStorage var b : Int64
+  @_hasStorage var c : Int64
 }
 
 class BigClass {
-  @sil_stored var a : Int64
-  @sil_stored var b : Int64
-  @sil_stored var c : Int64
-  @sil_stored var d : Int64
-  @sil_stored var e : Int64
-  @sil_stored var f : Int64
-  @sil_stored var g : Int64
+  @_hasStorage var a : Int64
+  @_hasStorage var b : Int64
+  @_hasStorage var c : Int64
+  @_hasStorage var d : Int64
+  @_hasStorage var e : Int64
+  @_hasStorage var f : Int64
+  @_hasStorage var g : Int64
   init()
 }
 

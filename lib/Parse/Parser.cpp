@@ -930,6 +930,10 @@ ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
                   llvm::function_ref<ParserStatus()> callback) {
+  auto TokIsStringInterpolationEOF = [&]() -> bool {
+    return Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren;
+  };
+  
   llvm::Optional<SyntaxParsingContext> ListContext;
   ListContext.emplace(SyntaxContext, Kind);
   if (Kind == SyntaxKind::Unknown)
@@ -940,6 +944,10 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   if (Tok.is(RightK)) {
     ListContext.reset();
     RightLoc = consumeToken(RightK);
+    return makeParserSuccess();
+  }
+  if (TokIsStringInterpolationEOF()) {
+    RightLoc = Tok.getLoc();
     return makeParserSuccess();
   }
 
@@ -961,7 +969,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     // If the lexer stopped with an EOF token whose spelling is ")", then this
     // is actually the tuple that is a string literal interpolation context.
     // Just accept the ")" and build the tuple as we usually do.
-    if (Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren) {
+    if (TokIsStringInterpolationEOF()) {
       RightLoc = Tok.getLoc();
       return Status;
     }
@@ -1017,6 +1025,29 @@ void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
   assert(New != Prev && "Cannot conflict with self");
   diagnose(New->getLoc(), diag::decl_redefinition);
   diagnose(Prev->getLoc(), diag::previous_decldef, Prev->getBaseName());
+}
+
+Optional<StringRef>
+Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
+                                          StringRef DiagText) {
+  assert(Tok.is(tok::string_literal));
+
+  // FIXME: Support extended escaping string literal.
+  if (Tok.getCustomDelimiterLen()) {
+    diagnose(Loc, diag::forbidden_extended_escaping_string, DiagText);
+    return None;
+  }
+
+  SmallVector<Lexer::StringSegment, 1> Segments;
+  L->getStringLiteralSegments(Tok, Segments);
+  if (Segments.size() != 1 ||
+      Segments.front().Kind == Lexer::StringSegment::Expr) {
+    diagnose(Loc, diag::forbidden_interpolated_string, DiagText);
+    return None;
+  }
+
+  return SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
+                                               Segments.front().Length));
 }
 
 struct ParserUnit::Implementation {

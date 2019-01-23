@@ -199,14 +199,6 @@ public struct Foo: Hashable {
     inlinableProperty = 4
   }
 
-  // CHECK: @inline(__always) [[ATTRS]] func inlineAlwaysMethod() {
-  // CHECK-NEXT: inlinableProperty = 4
-  // CHECK-NEXT: }
-  @inline(__always)
-  mutating public func inlineAlwaysMethod() {
-    inlinableProperty = 4
-  }
-
   // CHECK: public func nonInlinableMethod(){{$}}
   // CHECK-NOT: print("Not inlinable")
   public func nonInlinableMethod() {

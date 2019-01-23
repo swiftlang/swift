@@ -229,9 +229,9 @@ func testForcedPropertyValue(dummy: DummyClass) {
   // CHECK-NEXT: [[BORROW:%.*]] = begin_borrow [[OPTSTRING]]
   // CHECK-NEXT: store_borrow [[BORROW]] to [[TEMP]] : $*Optional<String>
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE]]<String>([[TEMP]])
+  // CHECK:      dealloc_stack [[TEMP]]
   // CHECK:      [[USE:%.*]] = function_ref @$s22objc_bridging_peephole12useAnyObjectyyyXlF
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
-  // CHECK:      dealloc_stack [[TEMP]]
   // CHECK:      destroy_value [[OPTSTRING]]
   useAnyObject(dummy.nullproneStringProperty as AnyObject)
 

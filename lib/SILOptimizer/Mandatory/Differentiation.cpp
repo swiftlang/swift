@@ -3902,10 +3902,10 @@ ADContext::declareExternalAssociatedFunction(
       module, LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
   SILOptFunctionBuilder fb(getTransform());
   // Create external function declaration.
-  auto *assocFn =
-      fb.createFunction(SILLinkage::PublicExternal, name, assocFnTy,
-                        /*GenericEnv*/ nullptr, originalLoc, original->isBare(),
-                        IsNotTransparent, original->isSerialized());
+  auto *assocFn = fb.createFunction(
+      SILLinkage::PublicExternal, name, assocFnTy,
+      /*GenericEnv*/ nullptr, originalLoc, original->isBare(), IsNotTransparent,
+      original->isSerialized(), original->isDynamicallyReplaceable());
   // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
   assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
   return assocFn;
@@ -3991,9 +3991,10 @@ void DifferentiationTask::createEmptyPrimal() {
   // `getAutoDiffFunctionLinkage` to make the linkage occasionally public. We'll
   // also need to update TBDGen to generate TBD entries for public primals.
   auto linkage = SILLinkage::Hidden;
-  primal = fb.getOrCreateFunction(
-      original->getLocation(), primalName, linkage, primalTy,
-      original->isBare(), IsNotTransparent, original->isSerialized());
+  primal = fb.getOrCreateFunction(original->getLocation(), primalName, linkage,
+                                  primalTy, original->isBare(),
+                                  IsNotTransparent, original->isSerialized(),
+                                  original->isDynamicallyReplaceable());
   primal->setUnqualifiedOwnership();
   if (primalGenericEnv)
     primal->setGenericEnvironment(primalGenericEnv);
@@ -4121,9 +4122,10 @@ void DifferentiationTask::createEmptyAdjoint() {
   // `getAutoDiffFunctionLinkage` to make the linkage occasionally public. We'll
   // also need to update TBDGen to generate TBD entries for public adjoints.
   auto linkage = SILLinkage::Hidden;
-  adjoint = fb.createFunction(
-      linkage, adjName, adjType, adjGenericEnv, original->getLocation(),
-      original->isBare(), IsNotTransparent, original->isSerialized());
+  adjoint = fb.createFunction(linkage, adjName, adjType, adjGenericEnv,
+                              original->getLocation(), original->isBare(),
+                              IsNotTransparent, original->isSerialized(),
+                              original->isDynamicallyReplaceable());
   adjoint->setUnqualifiedOwnership();
   adjoint->setDebugScope(new (module)
                              SILDebugScope(original->getLocation(), adjoint));
@@ -4158,7 +4160,8 @@ void DifferentiationTask::createJVP() {
   auto linkage = getAutoDiffFunctionLinkage(original->getLinkage());
   jvp = fb.createFunction(linkage, jvpName, jvpType, jvpGenericEnv,
                           original->getLocation(), original->isBare(),
-                          IsNotTransparent, original->isSerialized());
+                          IsNotTransparent, original->isSerialized(),
+                          original->isDynamicallyReplaceable());
   jvp->setUnqualifiedOwnership();
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
   attr->setJVPName(jvpName);
@@ -4215,7 +4218,8 @@ void DifferentiationTask::createVJP() {
   auto linkage = getAutoDiffFunctionLinkage(original->getLinkage());
   vjp = fb.createFunction(linkage, vjpName, vjpType, vjpGenericEnv,
                           original->getLocation(), original->isBare(),
-                          IsNotTransparent, original->isSerialized());
+                          IsNotTransparent, original->isSerialized(),
+                          original->isDynamicallyReplaceable());
   vjp->setUnqualifiedOwnership();
   vjp->setDebugScope(new (module)
                          SILDebugScope(original->getLocation(), vjp));

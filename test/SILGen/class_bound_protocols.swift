@@ -169,8 +169,6 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}") InheritsMutatingMethod
   x.mutateMe()
 
-  // CHECK-NEXT: [[RESULT_BOX:%.*]] = alloc_stack $Value
-  // CHECK-NEXT: [[RESULT:%.*]] = mark_uninitialized [var] [[RESULT_BOX]] : $*Value
   // CHECK-NEXT: [[X_ADDR:%.*]] = begin_access [read] [unknown] %0 : $*InheritsMutatingMethod
   // CHECK-NEXT: [[X_VALUE:%.*]] = load [copy] [[X_ADDR]] : $*InheritsMutatingMethod
   // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $InheritsMutatingMethod to $@opened("{{.*}}") InheritsMutatingMethod
@@ -192,9 +190,7 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // CHECK-NEXT: end_borrow
   // CHECK-NEXT: destroy_addr
   // CHECK-NEXT: end_access [[X_ADDR]] : $*InheritsMutatingMethod
-  // CHECK-NEXT: assign [[RESULT_VALUE]] to [[RESULT]] : $*Value
   // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}") InheritsMutatingMethod
-  // CHECK-NEXT: dealloc_stack [[RESULT_BOX]] : $*Value
   _ = x.mutatingCounter
 
   // CHECK-NEXT: [[X_ADDR:%.*]] = begin_access [modify] [unknown] %0 : $*InheritsMutatingMethod

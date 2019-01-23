@@ -277,136 +277,26 @@ func test_e(_ e: E) {
   e.value = 0
 }
 
-class F {
-  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.allocate(capacity: 100)
-
-  final var value: Int32 {
-    addressWithNativeOwner {
-      return (UnsafePointer(data), Builtin.castToNativeObject(self))
-    }
-    mutableAddressWithNativeOwner {
-      return (data, Builtin.castToNativeObject(self))
-    }
-  }
-}
-
-// CHECK-LABEL: sil hidden @$s10addressors1FC5values5Int32Vvlo : $@convention(method) (@guaranteed F) -> (UnsafePointer<Int32>, @owned Builtin.NativeObject) {
-// CHECK-LABEL: sil hidden @$s10addressors1FC5values5Int32Vvao : $@convention(method) (@guaranteed F) -> (UnsafeMutablePointer<Int32>, @owned Builtin.NativeObject) {
-
-func test_f0(_ f: F) -> Int32 {
-  return f.value
-}
-// CHECK-LABEL: sil hidden @$s10addressors7test_f0ys5Int32VAA1FCF : $@convention(thin) (@guaranteed F) -> Int32 {
-// CHECK: bb0([[SELF:%0]] : $F):
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @$s10addressors1FC5values5Int32Vvlo : $@convention(method) (@guaranteed F) -> (UnsafePointer<Int32>, @owned Builtin.NativeObject)
-// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
-// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 0
-// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 1
-// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[T2]] : $*Int32
-// CHECK:   [[VALUE:%.*]] = load [[ACCESS]] : $*Int32
-// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-// CHECK-NOT:   strong_release [[SELF]] : $F
-// CHECK:   return [[VALUE]] : $Int32
-
-func test_f1(_ f: F) {
-  f.value = 14
-}
-// CHECK-LABEL: sil hidden @$s10addressors7test_f1yyAA1FCF : $@convention(thin) (@guaranteed F) -> () {
-// CHECK: bb0([[SELF:%0]] : $F):
-// CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int32, 14
-// CHECK:   [[VALUE:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @$s10addressors1FC5values5Int32Vvao : $@convention(method) (@guaranteed F) -> (UnsafeMutablePointer<Int32>, @owned Builtin.NativeObject)
-// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
-// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
-// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
-// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
-// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T2]] : $*Int32
-// CHECK:   store [[VALUE]] to [[ACCESS]] : $*Int32
-// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-// CHECK-NOT:   strong_release [[SELF]] : $F
-
-class G {
-  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.allocate(capacity: 100)
-
-  var value: Int32 {
-    addressWithNativeOwner {
-      return (UnsafePointer(data), Builtin.castToNativeObject(self))
-    }
-    mutableAddressWithNativeOwner {
-      return (data, Builtin.castToNativeObject(self))
-    }
-  }
-}
-// CHECK-LABEL: sil hidden [transparent] @$s10addressors1GC5values5Int32Vvg : $@convention(method) (@guaranteed G) -> Int32 {
-// CHECK: bb0([[SELF:%0]] : $G):
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @$s10addressors1GC5values5Int32Vvlo : $@convention(method) (@guaranteed G) -> (UnsafePointer<Int32>, @owned Builtin.NativeObject)
-// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
-// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 0
-// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 1
-// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[T2]] : $*Int32
-// CHECK:   [[VALUE:%.*]] = load [[ACCESS]] : $*Int32
-// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-// CHECK:   return [[VALUE]] : $Int32
-
-// CHECK-LABEL: sil hidden [transparent] @$s10addressors1GC5values5Int32Vvs : $@convention(method) (Int32, @guaranteed G) -> () {
-// CHECK: bb0([[VALUE:%0]] : $Int32, [[SELF:%1]] : $G):
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @$s10addressors1GC5values5Int32Vvao : $@convention(method) (@guaranteed G) -> (UnsafeMutablePointer<Int32>, @owned Builtin.NativeObject)
-// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
-// CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
-// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
-// CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
-// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T2]] : $*Int32
-// CHECK:   store [[VALUE]] to [[ACCESS]] : $*Int32
-// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-
-// CHECK-LABEL: sil hidden [transparent] @$s10addressors1GC5values5Int32VvM : $@yield_once @convention(method) (@guaranteed G) -> @yields @inout Int32 {
-// CHECK: bb0([[SELF:%0]] : $G):
-//   Call the addressor.
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @$s10addressors1GC5values5Int32Vvao : $@convention(method) (@guaranteed G) -> (UnsafeMutablePointer<Int32>, @owned Builtin.NativeObject)
-// CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
-// CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
-// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
-//   Get the address.
-// CHECK:   [[PTR:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
-// CHECK:   [[ADDR_TMP:%.*]] = pointer_to_address [[PTR]]
-// CHECK:   [[ADDR:%.*]] = mark_dependence [[ADDR_TMP]] : $*Int32 on [[OWNER]]
-//   Yield.
-// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*Int32
-// CHECK:   yield [[ACCESS]] : $*Int32, resume bb1, unwind bb2
-// CHECK:   end_access [[ACCESS]]
-//   Clean up.
-// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-
 class Base {
   var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.allocate(capacity: 100)
 
   var value: Int32 {
-    addressWithNativeOwner {
-      return (UnsafePointer(data), Builtin.castToNativeObject(self))
+    unsafeAddress {
+      return UnsafePointer(data)
     }
-    mutableAddressWithNativeOwner {
-      return (data, Builtin.castToNativeObject(self))
+    unsafeMutableAddress {
+      return data
     }
   }
 }
 
 class Sub : Base {
   override var value: Int32 {
-    addressWithNativeOwner {
-      return (UnsafePointer(data), Builtin.castToNativeObject(self))
+    unsafeAddress {
+      return UnsafePointer(data)
     }
-    mutableAddressWithNativeOwner {
-      return (data, Builtin.castToNativeObject(self))
+    unsafeMutableAddress {
+      return data
     }
   }
 }

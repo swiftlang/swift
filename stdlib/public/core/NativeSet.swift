@@ -47,7 +47,7 @@ internal struct _NativeSet<Element: Hashable> {
 
   @inlinable
   internal init(_ cocoa: __owned _CocoaSet, capacity: Int) {
-    _sanityCheck(cocoa.count <= capacity)
+    _internalInvariant(cocoa.count <= capacity)
     self._storage = _SetStorage<Element>.convert(cocoa, capacity: capacity)
     for element in cocoa {
       let nativeElement = _forceBridgeFromObjectiveC(element, Element.self)
@@ -101,7 +101,7 @@ extension _NativeSet { // Low-level unchecked operations
   @inline(__always)
   internal func uncheckedElement(at bucket: Bucket) -> Element {
     defer { _fixLifetime(self) }
-    _sanityCheck(hashTable.isOccupied(bucket))
+    _internalInvariant(hashTable.isOccupied(bucket))
     return _elements[bucket.offset]
   }
 
@@ -110,7 +110,7 @@ extension _NativeSet { // Low-level unchecked operations
   internal func uncheckedInitialize(
     at bucket: Bucket,
     to element: __owned Element) {
-    _sanityCheck(hashTable.isValid(bucket))
+    _internalInvariant(hashTable.isValid(bucket))
     (_elements + bucket.offset).initialize(to: element)
   }
 }
@@ -189,9 +189,9 @@ extension _NativeSet { // ensureUnique
   @inlinable
   internal mutating func copy() {
     let newStorage = _SetStorage<Element>.copy(original: _storage)
-    _sanityCheck(newStorage._scale == _storage._scale)
-    _sanityCheck(newStorage._age == _storage._age)
-    _sanityCheck(newStorage._seed == _storage._seed)
+    _internalInvariant(newStorage._scale == _storage._scale)
+    _internalInvariant(newStorage._age == _storage._age)
+    _internalInvariant(newStorage._seed == _storage._seed)
     let result = _NativeSet(newStorage)
     if count > 0 {
       result.hashTable.copyContents(of: hashTable)
@@ -343,7 +343,7 @@ extension _NativeSet { // Insertions
   /// The `element` must not be already present in the Set.
   @inlinable
   internal func _unsafeInsertNew(_ element: __owned Element) {
-    _sanityCheck(count + 1 <= capacity)
+    _internalInvariant(count + 1 <= capacity)
     let hashValue = self.hashValue(for: element)
     if _isDebugAssertConfiguration() {
       // In debug builds, perform a full lookup and trap if we detect duplicate
@@ -385,7 +385,7 @@ extension _NativeSet { // Insertions
     at bucket: Bucket,
     isUnique: Bool
   ) {
-    _sanityCheck(!hashTable.isOccupied(bucket))
+    _internalInvariant(!hashTable.isOccupied(bucket))
     var bucket = bucket
     let rehashed = ensureUnique(isUnique: isUnique, capacity: count + 1)
     if rehashed {
@@ -474,7 +474,7 @@ extension _NativeSet { // Deletion
   internal mutating func _delete(at bucket: Bucket) {
     hashTable.delete(at: bucket, with: self)
     _storage._count -= 1
-    _sanityCheck(_storage._count >= 0)
+    _internalInvariant(_storage._count >= 0)
     invalidateIndices()
   }
 
@@ -483,9 +483,9 @@ extension _NativeSet { // Deletion
   internal mutating func uncheckedRemove(
     at bucket: Bucket,
     isUnique: Bool) -> Element {
-    _sanityCheck(hashTable.isOccupied(bucket))
+    _internalInvariant(hashTable.isOccupied(bucket))
     let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
-    _sanityCheck(!rehashed)
+    _internalInvariant(!rehashed)
     let old = (_elements + bucket.offset).move()
     _delete(at: bucket)
     return old

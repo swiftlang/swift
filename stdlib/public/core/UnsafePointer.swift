@@ -580,7 +580,8 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// block. The memory must not be initialized or `Pointee` must be a trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue,
+                       Builtin.alignof(Pointee.self))
   }
 
   /// Accesses the instance referenced by this pointer.

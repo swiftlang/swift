@@ -32,7 +32,7 @@ struct Z: P2 {
 
 // CHECK: @"$s35witness_table_indirect_conformances1WVAA2P3AAWP" = hidden global [5 x i8*] [
 // CHECK-SAME: @"$s35witness_table_indirect_conformances1WVAA2P3AAMc"
-// CHECK-SAME: i8* bitcast (i8** ()* @"$s35witness_table_indirect_conformances1ZVAcA2P2AAWl
+// CHECK-SAME: @"associated conformance 35witness_table_indirect_conformances1WVAA2P3AA05AssocE0AaDP_AA2P2"
 // CHECK-SAME: @"symbolic 35witness_table_indirect_conformances1ZV"
 // CHECK-SAME: i8* bitcast (void (%T35witness_table_indirect_conformances1ZV*, %T35witness_table_indirect_conformances1WV*, %swift.type*, i8**)* @"$s35witness_table_indirect_conformances1WVAA2P3A2aDP08getAssocE00gE0QzyFTW" to i8*)]
 struct W: P3 {

@@ -53,24 +53,6 @@ static bool hasAnyActiveCleanups(DiverseStackImpl<Cleanup>::iterator begin,
   return false;
 }
 
-namespace {
-  /// A CleanupBuffer is a location to which to temporarily copy a
-  /// cleanup.
-  class CleanupBuffer {
-    SmallVector<char, sizeof(Cleanup) + 10 * sizeof(void *)> data;
-
-  public:
-    CleanupBuffer(const Cleanup &cleanup) {
-      size_t size = cleanup.allocated_size();
-      data.reserve(size);
-      data.set_size(size);
-      memcpy(data.data(), reinterpret_cast<const void *>(&cleanup), size);
-    }
-
-    Cleanup &getCopy() { return *reinterpret_cast<Cleanup *>(data.data()); }
-  };
-} // end anonymous namespace
-
 void CleanupManager::popTopDeadCleanups() {
   auto end = (innermostScope ? innermostScope->depth : stack.stable_end());
   assert(end.isValid());
@@ -82,6 +64,8 @@ void CleanupManager::popTopDeadCleanups() {
     stack.checkIterator(end);
   }
 }
+
+using CleanupBuffer = DiverseValueBuffer<Cleanup>;
 
 void CleanupManager::popAndEmitCleanup(CleanupHandle handle,
                                        CleanupLocation loc,
@@ -107,22 +91,30 @@ void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation loc,
   auto topOfStack = cur;
 #endif
   while (cur != depth) {
+    // Advance the iterator.
+    auto cleanupHandle = cur;
+    auto iter = stack.find(cleanupHandle);
+    Cleanup &stackCleanup = *iter;
+    cur = stack.stabilize(++iter);
+
     // Copy the cleanup off the stack if it needs to be emitted.
     // This is necessary both because we might need to pop the cleanup and
     // because the cleanup might push other cleanups that will invalidate
     // references onto the stack.
-    auto iter = stack.find(cur);
-    Cleanup &stackCleanup = *iter;
     Optional<CleanupBuffer> copiedCleanup;
     if (stackCleanup.isActive() && SGF.B.hasValidInsertionPoint()) {
       copiedCleanup.emplace(stackCleanup);
     }
 
-    // Advance the iterator.
-    cur = stack.stabilize(++iter);
-
     // Pop now if that was requested.
     if (popCleanups) {
+#ifndef NDEBUG
+      // This is an implicit deactivation.
+      if (stackCleanup.isActive()) {
+        SGF.FormalEvalContext.checkCleanupDeactivation(cleanupHandle);
+      }
+#endif
+
       stack.pop();
 
 #ifndef NDEBUG

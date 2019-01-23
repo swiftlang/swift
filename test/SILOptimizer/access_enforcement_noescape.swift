@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -module-name access_enforcement_noescape -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -parse-as-library %s | %FileCheck %s
-// REQUIRES: asserts
 
 // This tests SILGen and AccessEnforcementSelection as a single set of tests.
 // (Some static/dynamic enforcement selection is done in SILGen, and some is

@@ -648,6 +648,14 @@ var global_observing_property : Int = zero {
   // CHECK: properties.zero.unsafeMutableAddressor
   // CHECK: return
 
+  // global_observing_property's setter needs to call didSet.
+
+  // CHECK-LABEL: sil hidden @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vs
+  // CHECK: function_ref properties.global_observing_property.unsafeMutableAddressor
+  // CHECK-NEXT:  function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vau
+  // CHECK: function_ref properties.global_observing_property.didset
+  // CHECK-NEXT: function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
+
   // CHECK-LABEL: sil private @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
   didSet {
     // The didSet implementation needs to call takeInt.
@@ -682,15 +690,6 @@ func force_global_observing_property_setter() {
   let x = global_observing_property
   global_observing_property = x
 }
-
-// global_observing_property's setter needs to call didSet.
-
-// CHECK-LABEL: sil hidden @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vs
-// CHECK: function_ref properties.global_observing_property.unsafeMutableAddressor
-// CHECK-NEXT:  function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vau
-// CHECK: function_ref properties.global_observing_property.didset
-// CHECK-NEXT: function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
-
 
 // Test local observing properties.
 
@@ -1212,9 +1211,7 @@ protocol NonmutatingProtocol {
 }
 
 // sil hidden @$s10properties19overlappingLoadExpr1cyAA13ReferenceTypeCz_tF : $@convention(thin) (@inout ReferenceType) -> () {
-// CHECK:        [[RESULT:%.*]] = alloc_stack $Int
-// CHECK-NEXT:   [[UNINIT:%.*]] = mark_uninitialized [var] [[RESULT]] : $*Int
-// CHECK-NEXT:   [[C_INOUT:%.*]] = begin_access [read] [unknown] %0 : $*ReferenceType
+// CHECK:        [[C_INOUT:%.*]] = begin_access [read] [unknown] %0 : $*ReferenceType
 // CHECK-NEXT:   [[C:%.*]] = load [copy] [[C_INOUT:%.*]] : $*ReferenceType
 // CHECK-NEXT:   end_access [[C_INOUT]] : $*ReferenceType
 // CHECK-NEXT:   [[C_BORROW:%.*]] = begin_borrow [[C]]
@@ -1232,13 +1229,11 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}") NonmutatingProtocol, #NonmutatingProtocol.x!getter.1 : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}") NonmutatingProtocol : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}") NonmutatingProtocol>([[C_FIELD_BORROW]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BORROW]]
-// CHECK-NEXT:   assign [[RESULT_VALUE]] to [[UNINIT]] : $*Int
 // CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BORROW]]
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*NonmutatingProtocol
-// CHECK-NEXT:   dealloc_stack [[RESULT]] : $*Int
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
 

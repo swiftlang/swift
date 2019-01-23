@@ -354,17 +354,15 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
 
   auto *NTD = Source.getNominalOrBoundGenericNominal();
   assert(NTD);
-  SmallVector<ValueDecl *, 4> FoundMembers;
-  ArrayRef<ValueDecl *> Members;
-  Members = NTD->lookupDirect(M.getASTContext().Id_bridgeToObjectiveC);
+  auto Members = NTD->lookupDirect(M.getASTContext().Id_bridgeToObjectiveC);
   if (Members.empty()) {
+    SmallVector<ValueDecl *, 4> FoundMembers;
     if (NTD->getDeclContext()->lookupQualified(
             NTD, M.getASTContext().Id_bridgeToObjectiveC,
             NLOptions::NL_ProtocolMembers, FoundMembers)) {
-      Members = FoundMembers;
       // Returned members are starting with the most specialized ones.
       // Thus, the first element is what we are looking for.
-      Members = Members.take_front(1);
+      Members.push_back(FoundMembers.front());
     }
   }
 

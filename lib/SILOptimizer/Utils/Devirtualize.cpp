@@ -712,7 +712,7 @@ FullApplySite swift::devirtualizeClassMethod(FullApplySite AI,
 
   SILBuilderWithScope B(AI.getInstruction());
   SILLocation Loc = AI.getLoc();
-  FunctionRefInst *FRI = B.createFunctionRef(Loc, F);
+  auto *FRI = B.createFunctionRefFor(Loc, F);
 
   // Create the argument list for the new apply, casting when needed
   // in order to handle covariant indirect return types and
@@ -952,7 +952,7 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // the witness thunk.
   SILBuilderWithScope Builder(AI.getInstruction());
   SILLocation Loc = AI.getLoc();
-  FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
+  auto *FRI = Builder.createFunctionRefFor(Loc, F);
 
   ApplySite SAI = replaceApplySite(Builder, Loc, AI, FRI, SubMap, Arguments,
                                    substConv);

@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 ///
+/// This pass contains two optimizations:
+///
+/// 1) DominatedAccessRemoval:
 /// This function pass removes dynamic access enforcement based on dominance.
 ///
 /// General case:
@@ -20,19 +23,46 @@
 /// begin_access A [no_nested_conflict] // dominated by the first access
 /// load/store
 /// end_access A
+///
 /// The second access scope does not need to be emitted.
 ///
-/// Note: This optimization must be aware of all possible access to a Class or
+/// 2) LoopDominatingAccessAdder:
+/// This function pass adds new dominating accesses to loop's dynamic accesses
+///
+/// General case:
+/// <loop preheader>
+/// A = ref_element_addr
+/// <loop>
+/// begin_access A [dynamic] [no_nested_conflict]
+///
+/// Adding an empty begin_access A in the preheader would allow us to
+/// turn the loop's access to [static]
+///
+/// Note 1: This optimization must be aware of all possible access to a Class or
 /// Global address. This includes unpaired access instructions and keypath
 /// entry points. Ignoring any access pattern would weaken enforcement.
+///
+/// Note 2: We either need to also flag the dominating access specially, or,
+/// we need to do this in the last-chance pipeline, with a guarantee that no,
+/// access marker removal is done after it.
+///
+/// Note 3: LoopDominatedAccessAdder makes some key assumptions:
+/// 1) Precondition: There are no unpaired accesses (or keypath accesses)
+///    anywhere in the function.
+/// 2) Invariant: An access scope cannot begin outside the loop and end on any
+///    path between the loop header and the original dominated access.
+/// 3) Expectation: Accesses will be hoisted across nested loops during
+///    bottom-up processing.
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-enforcement-dom"
 
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 
@@ -53,7 +83,7 @@ public:
   DominatedAccessRemoval(SILFunction &func, DominanceInfo *domInfo)
       : func(func), domInfo(domInfo) {}
 
-  void perform();
+  bool perform();
 
 protected:
   bool visitInstruction(SILInstruction *instr,
@@ -154,6 +184,13 @@ void DominatedAccessRemoval::visitBeginAccess(
     return;
   }
 
+  auto *parentBegin = visitedAccessesIt->first;
+  if (beginAccess->getAccessKind() > parentBegin->getAccessKind()) {
+    // we can't change to static: dominating access has a > access kind
+    // change parent's access kind so we would be able to do so
+    parentBegin->setAccessKind(beginAccess->getAccessKind());
+  }
+
   domInstrs.push_back(beginAccess);
 }
 
@@ -228,25 +265,198 @@ void DominatedAccessRemoval::optimize() {
   }
 }
 
-void DominatedAccessRemoval::perform() {
+// Returns a bool: If we should bail on this function
+// we return false - else true
+bool DominatedAccessRemoval::perform() {
   if (func.empty())
-    return;
+    return false;
 
   if (!analyze()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Bailed on function: " << func.getName() << "\n");
-    return;
+    return false;
   }
   optimize();
+  return true;
+}
+
+namespace {
+class LoopDominatingAccessAdder {
+  SmallVector<SILLoop *, 8> bottomUpWorkList;
+  DominanceInfo *domInfo;
+
+public:
+  LoopDominatingAccessAdder(SILLoop *topLevelLoop, DominanceInfo *domInfo)
+      : domInfo(domInfo) {
+    // Collect loops for a recursive bottom-up traversal in the loop tree.
+    bottomUpWorkList.push_back(topLevelLoop);
+    for (unsigned i = 0; i < bottomUpWorkList.size(); ++i) {
+      auto *loop = bottomUpWorkList[i];
+      for (auto *subLoop : *loop) {
+        bottomUpWorkList.push_back(subLoop);
+      }
+    }
+  }
+
+  void perform();
+
+protected:
+  /// \brief Collect a set of instructions that can be dominated
+  void
+  analyzeCurrentLoop(SILLoop *currentLoop,
+                     SmallVectorImpl<BeginAccessInst *> &dominatableInstrVec);
+
+  /// \brief Optimize the current loop nest.
+  void optimizeLoop(SILLoop *currnetLoop,
+                    SmallVectorImpl<BeginAccessInst *> &dominatableInstrVec);
+};
+} // namespace
+
+void LoopDominatingAccessAdder::analyzeCurrentLoop(
+    SILLoop *currentLoop,
+    SmallVectorImpl<BeginAccessInst *> &dominatableInstrVec) {
+  auto *preheader = currentLoop->getLoopPreheader();
+  if (!preheader) {
+    // Can't dominate this loop - bail
+    return;
+  }
+  for (auto *block : currentLoop->getBlocks()) {
+    for (auto &instr : *block) {
+      auto *beginAccess = dyn_cast<BeginAccessInst>(&instr);
+      if (!beginAccess) {
+        continue;
+      }
+      if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic) {
+        continue;
+      }
+      if (!beginAccess->hasNoNestedConflict()) {
+        continue;
+      }
+      auto operand = beginAccess->getOperand();
+      auto *parentBB = operand->getParentBlock();
+      if (currentLoop->contains(parentBB)) {
+        // Loop varaint argument
+        continue;
+      }
+      if (!domInfo->properlyDominates(parentBB, preheader) &&
+          parentBB != preheader) {
+        // Argument not dominated by the preheader
+        // TODO: Should this be a fatal error? Invalid control flow?
+        continue;
+      }
+      dominatableInstrVec.push_back(beginAccess);
+    }
+  }
+}
+
+void LoopDominatingAccessAdder::optimizeLoop(
+    SILLoop *currnetLoop,
+    SmallVectorImpl<BeginAccessInst *> &dominatableInstrVec) {
+  auto *preheader = currnetLoop->getLoopPreheader();
+  if (!preheader) {
+    // Can't dominate this loop - bail
+    return;
+  }
+  // Get the last instruction in the pre-header, this is
+  // We insert new access scopes before it.
+  // We also use it for our currently-optimizeable begin_access:
+  // We can only create a dominating scope if the
+  // dominatableInstr's operand dominates this instruction:
+  TermInst *preheaderTerm = preheader->getTerminator();
+
+  // Same operand may appear more than once in dominatableInstrVec
+  // No reason to create multiple dominating instructions
+  // The following set keeps track of operands we can safely skip
+  // i.e. we already created a dominating begin_access for
+  // We also need to keep track of the new dominating begin_access:
+  // First inner loop access might be [read] while a second one
+  // Might be [modify], the dominating access should be [modify]
+  // in that case
+  llvm::SmallDenseMap<SILValue, BeginAccessInst *> domOpToBeginAccess;
+
+  while (!dominatableInstrVec.empty()) {
+    BeginAccessInst *beginAccess = dominatableInstrVec.pop_back_val();
+    auto operand = beginAccess->getOperand();
+    auto domIt = domOpToBeginAccess.find(operand);
+    if (domIt != domOpToBeginAccess.end()) {
+      BeginAccessInst *domBegin = domIt->getSecond();
+      if (domBegin->getAccessKind() < beginAccess->getAccessKind()) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Changing " << *domBegin << " access kind to "
+                   << *beginAccess << " access kind\n");
+        domBegin->setAccessKind(beginAccess->getAccessKind());
+      }
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Already have a dominating access scope for: "
+                 << *beginAccess
+                 << ", settting the inner access' enforcement to static\n");
+      beginAccess->setEnforcement(SILAccessEnforcement::Static);
+      continue;
+    }
+    // We can go ahead with the optimization - do so:
+    SILBuilderWithScope scopeBuilder(preheaderTerm);
+    BeginAccessInst *newBegin = scopeBuilder.createBeginAccess(
+        beginAccess->getLoc(), operand, beginAccess->getAccessKind(),
+        SILAccessEnforcement::Dynamic, true /*no nested conflict*/,
+        beginAccess->isFromBuiltin());
+    scopeBuilder.createEndAccess(beginAccess->getLoc(), newBegin, false);
+    domOpToBeginAccess.insert(std::make_pair(operand, newBegin));
+    LLVM_DEBUG(llvm::dbgs()
+               << "Created a dominating access scope for: " << *beginAccess
+               << ", settting the inner access' enforcement to static\n");
+    beginAccess->setEnforcement(SILAccessEnforcement::Static);
+  }
+}
+
+void LoopDominatingAccessAdder::perform() {
+  // Process loops bottom up in the loop tree.
+  while (!bottomUpWorkList.empty()) {
+    SILLoop *currnetLoop = bottomUpWorkList.pop_back_val();
+    LLVM_DEBUG(llvm::dbgs() << "Processing loop " << *currnetLoop);
+
+    llvm::SmallVector<BeginAccessInst *, 8> dominatableInstrVec;
+    analyzeCurrentLoop(currnetLoop, dominatableInstrVec);
+    optimizeLoop(currnetLoop, dominatableInstrVec);
+  }
 }
 
 namespace {
 struct AccessEnforcementDom : public SILFunctionTransform {
   void run() override {
+    SILFunction *func = getFunction();
+
     DominanceAnalysis *domAnalysis = getAnalysis<DominanceAnalysis>();
-    DominanceInfo *domInfo = domAnalysis->get(getFunction());
-    DominatedAccessRemoval eliminationPass(*getFunction(), domInfo);
-    eliminationPass.perform();
+    DominanceInfo *domInfo = domAnalysis->get(func);
+    DominatedAccessRemoval eliminationPass(*func, domInfo);
+    if (!eliminationPass.perform()) {
+      // Bailed on the function due to key-path and/or other reasons
+      // Too risky to do anything else, don't repeat
+      // the analysis in subsequent optimizations
+      return;
+    }
+
+    SILLoopAnalysis *loopAnalysis = PM->getAnalysis<SILLoopAnalysis>();
+    SILLoopInfo *loopInfo = loopAnalysis->get(func);
+    if (loopInfo->empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "No loops in " << func->getName() << "\n");
+      return;
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "LoopDominatingAccessAdder: Processing loops in "
+                            << func->getName() << "\n");
+
+    for (auto *topLevelLoop : *loopInfo) {
+      LoopDominatingAccessAdder additionPass(topLevelLoop, domInfo);
+      additionPass.perform();
+    }
+
+    // TODO: Do we need to rerun the normal dominated check removal here?
+    // I don’t think we need to do so: there shouldn’t be any redundant
+    // accesses in the preheader that we can eliminate:
+    // We only create a single access no matter how many accesses to
+    // the same storage are inside the loop.
+    // If there was an access outside of the loop then no new potential
+    // would have been exposed by LoopDominatingAccessAdder?
   }
 };
 } // namespace

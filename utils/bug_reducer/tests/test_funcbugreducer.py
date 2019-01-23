@@ -117,7 +117,7 @@ class FuncBugReducerTestCase(unittest.TestCase):
                         "$s9testbasic6foo413yyF" in output)
         re_end = 'testfuncbugreducer_testbasic_'
         re_end += '92196894259b5d6c98d1b77f19240904.sib'
-        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
+        output_file_re = re.compile(r'\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
         self.assertEquals(sum(output_matches), 1)

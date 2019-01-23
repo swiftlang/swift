@@ -384,7 +384,7 @@ void ExistentialTransform::populateThunkBody() {
   auto Loc = ThunkBody->getParent()->getLocation();
 
   /// Create the function_ref instruction to the NewF.
-  auto *FRI = Builder.createFunctionRef(Loc, NewF);
+  auto *FRI = Builder.createFunctionRefFor(Loc, NewF);
 
   auto GenCalleeType = NewF->getLoweredFunctionType();
   auto CalleeGenericSig = GenCalleeType->getGenericSignature();
@@ -518,9 +518,9 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
   /// Step 1: Create the new protocol constrained generic function.
   NewF = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), F->getEntryCount(), F->isThunk(),
-      F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
-      nullptr, F->getDebugScope());
+      F->isTransparent(), F->isSerialized(), IsNotDynamic, F->getEntryCount(),
+      F->isThunk(), F->getClassSubclassScope(), F->getInlineStrategy(),
+      F->getEffectsKind(), nullptr, F->getDebugScope());
   /// Set the semantics attributes for the new function.
   for (auto &Attr : F->getSemanticsAttrs())
     NewF->addSemanticsAttr(Attr);

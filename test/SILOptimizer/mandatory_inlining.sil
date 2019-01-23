@@ -17,7 +17,7 @@ extension P2 {
 
 struct L {
   var start: Int32 { get }
-  @sil_stored let o: P2
+  @_hasStorage let o: P2
   init(o: P2)
 }
 

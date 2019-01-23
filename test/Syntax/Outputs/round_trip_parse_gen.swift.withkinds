@@ -559,7 +559,11 @@ func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSigna
 
 #sourceLocation()</PoundSourceLocation>
 
-"<StringSegment>abc </StringSegment>\( } )<StringSegment> def</StringSegment>"<FunctionDecl><Attribute>
+"<StringSegment>abc </StringSegment>\( } )<StringSegment> def</StringSegment>"<PoundAssertStmt>
+
+#assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>)</PoundAssertStmt><PoundAssertStmt>
+#assert(<BooleanLiteralExpr>false</BooleanLiteralExpr>)</PoundAssertStmt><PoundAssertStmt>
+#assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>, "hello world")</PoundAssertStmt><FunctionDecl><Attribute>
 
 // SWIFT_ENABLE_TENSORFLOW
 @differentiable(<DifferentiableAttributeArguments><DifferentiableAttributeFuncSpecifier>jvp: foo<DeclNameArguments>(<DeclNameArgument>_:</DeclNameArgument><DeclNameArgument>_:</DeclNameArgument>)</DeclNameArguments></DifferentiableAttributeFuncSpecifier></DifferentiableAttributeArguments>)</Attribute>
@@ -575,7 +579,5 @@ func bar<FunctionSignature><ParameterClause>(<FunctionParameter>_ x: <SimpleType
 func bar<FunctionSignature><ParameterClause>(<FunctionParameter>_ x: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>y: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Float </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock></FunctionDecl><FunctionDecl><Attribute>
 
 @differentiable(<DifferentiableAttributeArguments><DifferentiableAttributeDiffParamsClause>wrt: <DifferentiableAttributeDiffParams>(<DifferentiableAttributeDiffParam>self, </DifferentiableAttributeDiffParam><DifferentiableAttributeDiffParam>x, </DifferentiableAttributeDiffParam><DifferentiableAttributeDiffParam>y</DifferentiableAttributeDiffParam>)</DifferentiableAttributeDiffParams>, </DifferentiableAttributeDiffParamsClause><DifferentiableAttributeFuncSpecifier>jvp: bar, </DifferentiableAttributeFuncSpecifier><DifferentiableAttributeFuncSpecifier>vjp: foo<DeclNameArguments>(<DeclNameArgument>_:</DeclNameArgument><DeclNameArgument>_:</DeclNameArgument>) </DeclNameArguments></DifferentiableAttributeFuncSpecifier><GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>T </SimpleTypeIdentifier>: <SimpleTypeIdentifier>FloatingPoint</SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause></DifferentiableAttributeArguments>)</Attribute>
-func bar<GenericParameterClause><<GenericParameter>T : <SimpleTypeIdentifier>Numeric</SimpleTypeIdentifier></GenericParameter>></GenericParameterClause><FunctionSignature><ParameterClause>(<FunctionParameter>_ x: <SimpleTypeIdentifier>T</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>y: <SimpleTypeIdentifier>T</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>T </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock></FunctionDecl><PoundAssertExpr>
+func bar<GenericParameterClause><<GenericParameter>T : <SimpleTypeIdentifier>Numeric</SimpleTypeIdentifier></GenericParameter>></GenericParameterClause><FunctionSignature><ParameterClause>(<FunctionParameter>_ x: <SimpleTypeIdentifier>T</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>y: <SimpleTypeIdentifier>T</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>T </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock></FunctionDecl>
 
-#assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>)</PoundAssertExpr><PoundAssertExpr>
-#assert(<SequenceExpr><IntegerLiteralExpr>1 </IntegerLiteralExpr><BinaryOperatorExpr>== </BinaryOperatorExpr><IntegerLiteralExpr>2</IntegerLiteralExpr></SequenceExpr>, <StringLiteralExpr>"Error message"</StringLiteralExpr>)</PoundAssertExpr>

@@ -483,6 +483,14 @@ mapParsedParameters(Parser &parser,
                                                              parsingEnumElt);
       }
       param->getTypeLoc() = TypeLoc(type);
+
+      // If there is `@autoclosure` attribute associated with the type
+      // let's mark that in the declaration as well, because it
+      // belongs to both type flags and declaration.
+      if (auto *ATR = dyn_cast<AttributedTypeRepr>(type)) {
+        auto &attrs = ATR->getAttrs();
+        param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+      }
     } else if (paramContext != Parser::ParameterContextKind::Closure) {
       // Non-closure parameters require a type.
       if (!param->isInvalid())

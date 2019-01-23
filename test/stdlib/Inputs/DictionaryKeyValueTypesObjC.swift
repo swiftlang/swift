@@ -1,4 +1,5 @@
 import Swift
+import SwiftPrivate
 import Darwin
 import StdlibUnittest
 import Foundation

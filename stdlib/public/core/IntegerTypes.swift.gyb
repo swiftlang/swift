@@ -1435,7 +1435,7 @@ ${assignmentOperatorComment(x.operator, True)}
         _precondition(position >= 0, "Negative word index")
         _precondition(position < endIndex, "Word index out of range")
         let shift = UInt(position._value) &* ${word_bits}
-        _sanityCheck(shift < UInt(_value.bitWidth._value))
+        _internalInvariant(shift < UInt(_value.bitWidth._value))
         return (_value &>> ${Self}(_truncatingBits: shift))._lowWord
       }
     }
@@ -1784,7 +1784,7 @@ ${assignmentOperatorComment(x.operator, True)}
 /// It has only an effect if the argument is a load or call.
 @_transparent
 public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
-  _sanityCheck(x >= (0 as ${Self}))
+  _internalInvariant(x >= (0 as ${Self}))
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
 % end
@@ -1881,19 +1881,19 @@ internal struct _IntegerAnyHashableBox<
   }
 
   internal var _hashValue: Int {
-    _sanityCheck(Base.self == UInt64.self || Base.self == Int64.self,
+    _internalInvariant(Base.self == UInt64.self || Base.self == Int64.self,
       "self isn't canonical")
     return _value.hashValue
   }
 
   internal func _hash(into hasher: inout Hasher) {
-    _sanityCheck(Base.self == UInt64.self || Base.self == Int64.self,
+    _internalInvariant(Base.self == UInt64.self || Base.self == Int64.self,
       "self isn't canonical")
     _value.hash(into: &hasher)
   }
 
   internal func _rawHashValue(_seed: Int) -> Int {
-    _sanityCheck(Base.self == UInt64.self || Base.self == Int64.self,
+    _internalInvariant(Base.self == UInt64.self || Base.self == Int64.self,
       "self isn't canonical")
     return _value._rawHashValue(seed: _seed)
   }

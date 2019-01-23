@@ -7,7 +7,7 @@ public struct Foo : Differentiable {
 }
 
 // CHECK-AST-LABEL: @_fieldwiseDifferentiable public struct Foo : Differentiable {
-// CHECK-AST:   @sil_stored @differentiable(wrt: (self))
+// CHECK-AST:   @_hasStorage @differentiable(wrt: (self))
 // CHECK-AST:   public var a: Float { get set }
 // CHECK-AST:   @_fieldwiseDifferentiable struct AllDifferentiableVariables
 // CHECK-AST:     typealias AllDifferentiableVariables = Foo.AllDifferentiableVariables
@@ -38,8 +38,8 @@ struct TestNoDerivative : Differentiable {
 }
 
 // CHECK-AST-LABEL: @_fieldwiseDifferentiable struct TestNoDerivative : Differentiable {
-// CHECK-AST:         @sil_stored var w: Float { get set }
-// CHECK-AST:         @sil_stored @noDerivative var technicallyDifferentiable: Float { get set }
+// CHECK-AST:         @_hasStorage var w: Float { get set }
+// CHECK-AST:         @_hasStorage @noDerivative var technicallyDifferentiable: Float { get set }
 // CHECK-AST:         @_fieldwiseDifferentiable struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, VectorNumeric
 // CHECK-AST:           typealias AllDifferentiableVariables = TestNoDerivative.AllDifferentiableVariables
 // CHECK-AST:           typealias TangentVector = TestNoDerivative.AllDifferentiableVariables
@@ -53,8 +53,8 @@ struct TestKeyPathIterable : Differentiable, KeyPathIterable {
 }
 
 // CHECK-AST-LABEL: @_fieldwiseDifferentiable struct TestKeyPathIterable : Differentiable, KeyPathIterable {
-// CHECK-AST:         @sil_stored var w: Float { get set }
-// CHECK-AST:         @sil_stored @noDerivative var technicallyDifferentiable: Float { get set }
+// CHECK-AST:         @_hasStorage var w: Float { get set }
+// CHECK-AST:         @_hasStorage @noDerivative var technicallyDifferentiable: Float { get set }
 // CHECK-AST:         @_fieldwiseDifferentiable struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, KeyPathIterable, VectorNumeric
 // CHECK-AST:           typealias AllDifferentiableVariables = TestKeyPathIterable.AllDifferentiableVariables
 // CHECK-AST:           typealias TangentVector = TestKeyPathIterable.AllDifferentiableVariables

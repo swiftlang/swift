@@ -229,15 +229,17 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'YieldStmt': 224,
     'YieldList': 225,
     'IdentifierList': 226,
+    'NamedAttributeStringArgument': 227,
+    'DeclName': 228,
+    'PoundAssertStmt': 229,
     # SWIFT_ENABLE_TENSORFLOW
-    'PoundAssertExpr': 227,
-    'DifferentiableAttributeArguments': 228,
-    'DifferentiableAttributeDiffParamsClause': 229,
-    'DifferentiableAttributeDiffParams': 230,
-    'DifferentiableAttributeDiffParamList': 231,
-    'DifferentiableAttributeDiffParam': 232,
-    'DifferentiationIndexParam': 233,
-    'DifferentiableAttributeFuncSpecifier': 234,
+    'DifferentiableAttributeArguments': 230,
+    'DifferentiableAttributeDiffParamsClause': 231,
+    'DifferentiableAttributeDiffParams': 232,
+    'DifferentiableAttributeDiffParamList': 233,
+    'DifferentiableAttributeDiffParam': 234,
+    'DifferentiationIndexParam': 235,
+    'DifferentiableAttributeFuncSpecifier': 236,
 }
 
 

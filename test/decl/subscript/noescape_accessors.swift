@@ -59,7 +59,7 @@ struct Subscripts {
     get {
       return 0
     }
-    mutableAddressWithNativeOwner {
+    unsafeMutableAddress {
       fatalError()
     }
   }

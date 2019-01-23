@@ -243,10 +243,11 @@ function(_compile_swift_files
 
   if(SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
+    list(APPEND swift_flags "-Xfrontend" "-enable-mandatory-semantic-arc-opts")
   endif()
 
-  if(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING AND SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-enforce-exclusivity=checked")
+  if(NOT SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING AND SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-enforce-exclusivity=unchecked")
   endif()
 
   if(SWIFT_EMIT_SORTED_SIL_OUTPUT)

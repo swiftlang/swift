@@ -16,16 +16,16 @@ func apply() {
 
 // CHECK-AST-LABEL:  (func_decl {{.*}} "myfunction(_:)"
 // CHECK-AST:          (call_expr type='(Float)'
-// CHECK-AST-NEXT:       (autodiff_function_extract_original implicit type='(Float) -> (Float)'
-// CHECK-AST-NEXT:          (declref_expr type='@autodiff (Float) -> (Float)'
+// CHECK-AST:            (autodiff_function_extract_original implicit type='(Float) -> (Float)'
+// CHECK-AST:              (declref_expr type='@autodiff (Float) -> (Float)'
 // CHECK-AST:          (return_stmt
-// CHECK-AST-NEXT:       (function_conversion_expr implicit type='(Float) -> Float'
-// CHECK-AST-NEXT:         (autodiff_function_extract_original implicit type='(Float) -> (Float)'
-// CHECK-AST-NEXT:           (declref_expr type='@autodiff (Float) -> (Float)'
+// CHECK-AST:            (function_conversion_expr implicit type='(Float) -> Float'
+// CHECK-AST:              (autodiff_function_extract_original implicit type='(Float) -> (Float)'
+// CHECK-AST:                (declref_expr type='@autodiff (Float) -> (Float)'
 // CHECK-AST-LABEL:  (func_decl {{.*}} "apply()"
 // CHECK-AST:          (autodiff_function implicit type='@autodiff (Float) -> (Float)'
-// CHECK-AST-NEXT:       (function_conversion_expr implicit type='(Float) -> (Float)'
-// CHECK-AST-NEXT:         (declref_expr type='(Float) -> Float'
+// CHECK-AST:            (function_conversion_expr implicit type='(Float) -> (Float)'
+// CHECK-AST:              (declref_expr type='(Float) -> Float'
 
 // CHECK-SILGEN-LABEL: @{{.*}}myfunction{{.*}}
 // CHECK-SILGEN: bb0([[DIFFED:%.*]] : @guaranteed $@autodiff @callee_guaranteed (Float) -> Float):

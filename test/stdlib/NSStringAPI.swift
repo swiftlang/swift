@@ -687,6 +687,18 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
 NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   let s = "abc あかさた"
   do {
+    // A significantly too small buffer
+    let bufferLength = 1
+    var buffer = Array(
+      repeating: CChar(bitPattern: 0xff), count: bufferLength)
+    let result = s.getCString(&buffer, maxLength: 100,
+                              encoding: .utf8)
+    expectFalse(result)
+    let result2 = s.getCString(&buffer, maxLength: 1,
+                              encoding: .utf8)
+    expectFalse(result2)
+  }
+  do {
     // The largest buffer that cannot accommodate the string plus null terminator.
     let bufferLength = 16
     var buffer = Array(
@@ -694,6 +706,9 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     let result = s.getCString(&buffer, maxLength: 100,
       encoding: .utf8)
     expectFalse(result)
+    let result2 = s.getCString(&buffer, maxLength: 16,
+                              encoding: .utf8)
+    expectFalse(result2)
   }
   do {
     // The smallest buffer where the result can fit.
@@ -707,6 +722,10 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     let result = s.getCString(&buffer, maxLength: 100,
       encoding: .utf8)
     expectTrue(result)
+    expectEqualSequence(expectedStr, buffer)
+    let result2 = s.getCString(&buffer, maxLength: 17,
+                              encoding: .utf8)
+    expectTrue(result2)
     expectEqualSequence(expectedStr, buffer)
   }
   do {

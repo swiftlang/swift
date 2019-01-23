@@ -1,0 +1,78 @@
+// RUN: %target-sil-opt -loadable-address -enable-sil-verify-all %s | %FileCheck %s
+
+// REQUIRES: CPU=x86_64
+// REQUIRES: OS=macosx
+
+sil_stage canonical
+import Builtin
+import Swift
+
+public struct BigStruct {
+  var i0 : Int32 = 0
+  var i1 : Int32 = 1
+  var i2 : Int32 = 2
+  var i3 : Int32 = 3
+  var i4 : Int32 = 4
+  var i5 : Int32 = 5
+  var i6 : Int32 = 6
+  var i7 : Int32 = 7
+  var i8 : Int32 = 8
+}
+
+sil @make_big_struct : $@convention(thin) () -> BigStruct
+sil @use_big_struct : $@convention(thin) (BigStruct) -> ()
+
+// CHECK-LABEL: sil @test_yield_big : $@yield_once @convention(thin) () -> @yields @in_constant BigStruct {
+// CHECK:       bb0:
+// CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $BigStruct
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[MAKE:%.*]] = function_ref @make_big_struct : $@convention(thin) () -> @out BigStruct
+// CHECK-NEXT:    apply [[MAKE]]([[TEMP]])
+// CHECK-NEXT:    yield [[TEMP]] : $*BigStruct, resume bb1, unwind bb2
+// CHECK:       bb1:
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[TEMP]] : $*BigStruct
+// CHECK-NEXT:    return [[RET]] : $()
+// CHECK:       bb2:
+// CHECK-NEXT:    dealloc_stack [[TEMP]] : $*BigStruct
+// CHECK-NEXT:    unwind
+sil @test_yield_big : $@convention(thin) @yield_once() -> (@yields BigStruct) {
+entry:
+  %make = function_ref @make_big_struct : $@convention(thin) () -> BigStruct
+  %big = apply %make() : $@convention(thin) () -> BigStruct
+  yield %big : $BigStruct, resume resume, unwind unwind
+
+resume:
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  unwind
+}
+
+// CHECK-LABEL: sil @use_yield_big : $@convention(thin) () -> () {
+// CHECK:       bb0:
+// CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $BigStruct
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[CORO:%.*]] = function_ref @test_yield_big : $@yield_once @convention(thin) () -> @yields @in_constant BigStruct
+// CHECK-NEXT:    ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[CORO]]()
+//   TODO: this isn't very efficient
+// CHECK-NEXT:    [[T0:%.*]] = load [trivial] [[ADDR]] : $*BigStruct
+// CHECK-NEXT:    store [[T0]] to [trivial] [[TEMP]] : $*BigStruct
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[USE:%.*]] = function_ref @use_big_struct : $@convention(thin) (@in_constant BigStruct) -> ()
+// CHECK-NEXT:    apply [[USE]]([[TEMP]])
+// CHECK-NEXT:    end_apply [[TOKEN]]
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[TEMP]] : $*BigStruct
+// CHECK-NEXT:    return [[RET]] : $()
+sil @use_yield_big : $@convention(thin) () -> () {
+entry:
+  %yield_big = function_ref @test_yield_big : $@convention(thin) @yield_once() -> (@yields BigStruct)
+  (%big, %token) = begin_apply %yield_big() : $@convention(thin) @yield_once() -> (@yields BigStruct)
+  %use_big = function_ref @use_big_struct : $@convention(thin) (BigStruct) -> ()
+  apply %use_big(%big) : $@convention(thin) (BigStruct) -> ()
+  end_apply %token
+  %ret = tuple ()
+  return %ret : $()
+}

@@ -196,6 +196,8 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
                                              SGFContext ctxt) {
   assert(inputType != outputType);
 
+  FormalEvaluationScope scope(SGF);
+
   SILGenFunction::OpaqueValueState state;
   ArchetypeType *openedArchetype = nullptr;
 
@@ -578,6 +580,8 @@ ManagedValue Transform::transform(ManagedValue v,
 
       // Unwrap zero or more metatype levels
       auto openedArchetype = getOpenedArchetype(openedType);
+
+      FormalEvaluationScope scope(SGF);
 
       auto state = SGF.emitOpenExistential(Loc, v, openedArchetype,
                                            loweredOpenedType,
@@ -3179,7 +3183,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   }
 
   // Create it in our current function.
-  auto thunkValue = SGF.B.createFunctionRef(loc, thunk);
+  auto thunkValue = SGF.B.createFunctionRefFor(loc, thunk);
   ManagedValue thunkedFn =
     SGF.B.createPartialApply(loc, thunkValue,
                              SILType::getPrimitiveObjectType(substFnType),
@@ -3387,7 +3391,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   }
 
   // Create it in our current function.
-  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkValue = B.createFunctionRefFor(loc, thunk);
   SILValue noEscapeValue =
       noEscapingFunctionValue.ensurePlusOne(*this, loc).forward(*this);
   SingleValueInstruction *thunkedFn = B.createPartialApply(
@@ -3664,7 +3668,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   forwardFunctionArguments(*this, loc, fTy, substArgs, args);
 
   // Create the call.
-  auto implRef = B.createFunctionRef(loc, implFn);
+  auto implRef = B.createFunctionRefFor(loc, implFn);
   SILValue implResult = emitApplyWithRethrow(loc, implRef,
                                 SILType::getPrimitiveObjectType(fTy),
                                 subs, args);
@@ -3698,7 +3702,7 @@ static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness) {
     return WitnessDispatchKind::Static;
 
   // If the witness is dynamic, go through dynamic dispatch.
-  if (decl->isDynamic()) {
+  if (decl->isObjCDynamic()) {
     // For initializers we still emit a static allocating thunk around
     // the dynamic initializing entry point.
     if (witness.kind == SILDeclRef::Kind::Allocator)
@@ -3787,25 +3791,6 @@ getWitnessFunctionRef(SILGenFunction &SGF,
   }
 
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
-}
-
-namespace {
-  class EmitAbortApply : public Cleanup {
-    SILValue Token;
-  public:
-    EmitAbortApply(SILValue token) : Token(token) {}
-    void emit(SILGenFunction &SGF, CleanupLocation loc,
-              ForUnwind_t forUnwind) override {
-      SGF.B.createAbortApply(loc, Token);
-    }
-    void dump(SILGenFunction &SGF) const override {
-#ifndef NDEBUG
-      llvm::errs() << "EmitAbortApply\n"
-                   << "State:" << getState() << "\n"
-                   << "Token:" << Token << "\n";
-#endif
-    }
-  };
 }
 
 void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
@@ -3923,13 +3908,9 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
 
   case SILCoroutineKind::YieldOnce: {
     SmallVector<SILValue, 4> witnessYields;
-    auto token =
+    auto tokenAndCleanup =
       emitBeginApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs,
                                 args, witnessYields);
-
-    // Push a cleanup to abort the inner coroutine.
-    Cleanups.pushCleanup<EmitAbortApply>(token);
-    auto abortCleanup = Cleanups.getTopCleanup();
 
     YieldInfo witnessYieldInfo(SGM, witness, witnessFTy, witnessSubs);
     YieldInfo reqtYieldInfo(SGM, requirement, thunkTy,
@@ -3938,10 +3919,10 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
     translateYields(*this, loc, witnessYields, witnessYieldInfo, reqtYieldInfo);
 
     // Kill the abort cleanup without emitting it.
-    Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    Cleanups.setCleanupState(tokenAndCleanup.second, CleanupState::Dead);
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, token);
+    emitEndApplyWithRethrow(loc, tokenAndCleanup.first);
 
     reqtResultValue = B.createTuple(loc, {});
     break;
@@ -4088,7 +4069,7 @@ SILGenFunction::emitCanonicalFunctionThunk(SILLocation loc, ManagedValue fn,
   }
 
   // Create it in the current function.
-  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkValue = B.createFunctionRefFor(loc, thunk);
   ManagedValue thunkedFn = B.createPartialApply(
       loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy),
       interfaceSubs, {fn},

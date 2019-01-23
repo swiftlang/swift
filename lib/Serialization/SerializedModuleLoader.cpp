@@ -117,6 +117,13 @@ static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
     }
   }
 
+  if (foundArchs.empty()) {
+    // Maybe this swiftmodule directory only contains swiftinterfaces, or
+    // maybe something else is going on. Regardless, we shouldn't emit a
+    // possibly incorrect diagnostic.
+    return;
+  }
+
   ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch, moduleName,
                      archName, foundArchs);
 }
@@ -304,6 +311,8 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
+    if (extendedInfo.arePrivateImportsEnabled())
+      M.setPrivateImportsEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =
@@ -547,8 +556,9 @@ ModuleDecl *SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
                     isFramework)) {
       return nullptr;
     }
-
-    addDependency(moduleInputBuffer->getBufferIdentifier());
+    if (dependencyTracker)
+      dependencyTracker->addDependency(moduleInputBuffer->getBufferIdentifier(),
+                                       /*isSystem=*/false);
   }
 
   assert(moduleInputBuffer);

@@ -130,7 +130,9 @@ class CharSourceRange {
 
 public:
   /// \brief Constructs an invalid range.
-  CharSourceRange() {}
+  CharSourceRange() = default;
+
+  CharSourceRange &operator=(const CharSourceRange &) = default;
 
   CharSourceRange(SourceLoc Start, unsigned ByteLength)
     : Start(Start), ByteLength(ByteLength) {}

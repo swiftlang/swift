@@ -20,6 +20,25 @@
 
 namespace swift {
 
+struct InstructionMatchResult {
+  /// The instruction matches.
+  bool matches;
+
+  /// The search should be halted.
+  bool halt;
+};
+
+using InstructionMatcher =
+  llvm::function_ref<InstructionMatchResult(SILInstruction *i)>;
+
+/// Given a predicate defining interesting instructions, check whether
+/// the stack is different at any of them from how it stood at the start
+/// of the search.
+///
+/// The matcher function must halt the search before any edges which would
+/// lead back to before the start point.
+bool hasStackDifferencesAt(SILInstruction *start, InstructionMatcher matcher);
+
 /// A utility to correct the nesting of stack allocating/deallocating
 /// instructions.
 ///

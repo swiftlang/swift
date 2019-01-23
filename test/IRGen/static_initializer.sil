@@ -47,7 +47,7 @@ sil_global @$s6nested1xAA2S2Vv : $S2 = {
 // CHECK: @"$s6nested1xAA2S2Vv" = {{(protected )?}}global %T18static_initializer2S2V <{ %Ts5Int32V <{ i32 2 }>, %Ts5Int32V <{ i32 3 }>, %T18static_initializer1SV <{ %Ts5Int32V <{ i32 4 }> }> }>, align 4
 
 final class TestArrayStorage {
-  @sil_stored var count: Int32
+  @_hasStorage var count: Int32
   init()
 }
 
@@ -78,8 +78,8 @@ sil_global @static_aligned_array : $TestArrayStorage = {
 // CHECK: @static_aligned_array = {{(protected )?}}global %T18static_initializer16TestArrayStorageC_tailelems1c { [2 x i64] zeroinitializer, %T18static_initializer16TestArrayStorageC_tailelems1 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }>, [12 x i8] undef, %Ts7Float80V <{ x86_fp80 0xK3FFE8000000000000000 }> }> }, align 16
 
 final class ClassWithEmptyField {
-  @sil_stored var x: Int32
-  @sil_stored var y: ()
+  @_hasStorage var x: Int32
+  @_hasStorage var y: ()
   init()
 }
 

@@ -672,7 +672,7 @@ var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 BitTwiddlingTestSuite.test("_pointerSize") {
 #if arch(i386) || arch(arm)
   expectEqual(4, MemoryLayout<Optional<AnyObject>>.size)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(8, MemoryLayout<Optional<AnyObject>>.size)
 #else
   fatalError("implement")

@@ -1,5 +1,5 @@
 // RUN: %target-sil-opt -enforce-exclusivity=unchecked -emit-sorted-sil -access-marker-elim %s | %FileCheck %s --check-prefix=UNCHECKED
-// FIXME: %target-sil-opt -enforce-exclusivity=checked -emit-sorted-sil -access-marker-elim %s | %FileCheck %s --check-prefix=CHECKED
+// RUN: %target-sil-opt -enforce-exclusivity=checked -emit-sorted-sil -access-marker-elim %s | %FileCheck %s --check-prefix=CHECKED
 
 sil_stage raw
 
@@ -8,7 +8,7 @@ import Swift
 import SwiftShims
 
 public struct S {
-  @sil_stored var i: Builtin.Int64 { get set }
+  @_hasStorage var i: Builtin.Int64 { get set }
   init(i: Int)
 }
 
@@ -78,7 +78,7 @@ bb0:
 // UNCHECKED-LABEL: } // end sil function 'f020_boxArg'
 //
 // CHECKED-LABEL: sil hidden @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
-// CHECKED: bb0(%0 : ${ var Builtin.Int64 }):
+// CHECKED: bb0(%0 : @owned ${ var Builtin.Int64 }):
 // CHECKED:  [[ADR:%.*]] = project_box %0 : ${ var Builtin.Int64 }, 0
 // CHECKED:  [[VAL:%.*]] = integer_literal $Builtin.Int64, 42
 // CHECKED:  [[ACCESS:%.*]] = begin_access [modify] [unknown] [[ADR]]

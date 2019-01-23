@@ -119,14 +119,16 @@ void SILFunction::addDifferentiableAttr(SILDifferentiableAttr *attr) {
   DifferentiableAttrs.push_back(attr);
 }
 
-SILFunction *SILFunction::create(
-    SILModule &M, SILLinkage linkage, StringRef name,
-    CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-    Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-    IsTransparent_t isTrans, IsSerialized_t isSerialized,
-    ProfileCounter entryCount, IsThunk_t isThunk,
-    SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
-    SILFunction *insertBefore, const SILDebugScope *debugScope) {
+SILFunction *
+SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
+                    CanSILFunctionType loweredType,
+                    GenericEnvironment *genericEnv, Optional<SILLocation> loc,
+                    IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+                    IsSerialized_t isSerialized, ProfileCounter entryCount,
+                    IsDynamicallyReplaceable_t isDynamic, IsThunk_t isThunk,
+                    SubclassScope classSubclassScope, Inline_t inlineStrategy,
+                    EffectsKind E, SILFunction *insertBefore,
+                    const SILDebugScope *debugScope) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILFunction*> *entry = nullptr;
@@ -140,7 +142,7 @@ SILFunction *SILFunction::create(
   auto fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
                                 isBareSILFunction, isTrans, isSerialized,
                                 entryCount, isThunk, classSubclassScope,
-                                inlineStrategy, E, insertBefore, debugScope);
+                                inlineStrategy, E, insertBefore, debugScope, isDynamic);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -155,7 +157,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          SubclassScope classSubclassScope,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
-                         const SILDebugScope *DebugScope)
+                         const SILDebugScope *DebugScope,
+                         IsDynamicallyReplaceable_t isDynamic)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), SpecializationInfo(nullptr),
       DebugScope(DebugScope), Bare(isBareSILFunction), Transparent(isTrans),
@@ -163,8 +166,9 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       HasCReferences(false), IsWeakLinked(false),
-      OptMode(OptimizationMode::NotSet), EffectsKindAttr(E),
-      EntryCount(entryCount) {
+      IsDynamicReplaceable(isDynamic), OptMode(OptimizationMode::NotSet),
+      EffectsKindAttr(E), EntryCount(entryCount) {
+  assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
 
   // SWIFT_ENABLE_TENSORFLOW
@@ -191,6 +195,11 @@ SILFunction::~SILFunction() {
   // We also need to drop all references if instructions are allocated using
   // an allocator that may recycle freed memory.
   dropAllReferences();
+
+  if (ReplacedFunction) {
+    ReplacedFunction->decrementRefCount();
+    ReplacedFunction = nullptr;
+  }
 
   auto &M = getModule();
   for (auto &BB : *this) {
@@ -553,6 +562,9 @@ SILFunction::isPossiblyUsedExternally() const {
   if (linkage == SILLinkage::Hidden && hasCReferences())
     return true;
 
+  if (ReplacedFunction)
+    return true;
+
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
@@ -581,11 +593,30 @@ bool SILFunction::shouldVerifyOwnership() const {
   return !hasSemanticsAttr("verify.ownership.sil.never");
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 unsigned SILFunction::codeSize() const {
   unsigned size = 0;
   for (auto &BB : *this)
     size += BB.codeSize();
   return size;
+}
+
+static Identifier getIdentifierForObjCSelector(ObjCSelector selector, ASTContext &Ctxt) {
+  SmallVector<char, 64> buffer;
+  auto str = selector.getString(buffer);
+  return Ctxt.getIdentifier(str);
+}
+
+void SILFunction::setObjCReplacement(AbstractFunctionDecl *replacedFunc) {
+  assert(ReplacedFunction == nullptr && ObjCReplacementFor.empty());
+  assert(replacedFunc != nullptr);
+  ObjCReplacementFor = getIdentifierForObjCSelector(
+      replacedFunc->getObjCSelector(), getASTContext());
+}
+
+void SILFunction::setObjCReplacement(Identifier replacedFunc) {
+  assert(ReplacedFunction == nullptr && ObjCReplacementFor.empty());
+  ObjCReplacementFor = replacedFunc;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

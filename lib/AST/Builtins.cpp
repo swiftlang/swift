@@ -2056,8 +2056,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAutoDiffDestroyTape(Context, Id);
   case BuiltinValueKind::AutoDiffApply:
     llvm_unreachable("Handled above");
-  case BuiltinValueKind::PoundAssert:
-    return getPoundAssert(Context, Id);
 
   case BuiltinValueKind::OnFastPath:
     return getOnFastPath(Context, Id);
@@ -2068,6 +2066,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);
+
+  case BuiltinValueKind::PoundAssert:
+    return getPoundAssert(Context, Id);
 
   case BuiltinValueKind::TSanInoutAccess:
     return getTSanInoutAccess(Context, Id);

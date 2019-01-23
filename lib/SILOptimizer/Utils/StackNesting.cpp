@@ -18,6 +18,75 @@
 
 using namespace swift;
 
+bool swift::hasStackDifferencesAt(SILInstruction *start,
+                                  InstructionMatcher matcher) {
+  struct StackStatus {
+    /// The number of currently-active stack allocations on this path.
+    /// Because of the stack discipline, we only have to maintain a count.
+    unsigned depth;
+
+    /// Whether we've popped anything off of the stack that was active
+    /// at the start of the search.
+    bool hasPops;
+
+    bool hasDifferences() const { return hasPops || depth != 0; }
+  };
+
+  SmallPtrSet<SILBasicBlock*, 8> visited;
+  SmallVector<std::pair<SILInstruction *, StackStatus>, 8> worklist;
+  worklist.push_back({start, {0, false}});
+
+  while (!worklist.empty()) {
+    // Pull a block and depth off the worklist.
+    // Visitation order doesn't matter.
+    auto pair = worklist.pop_back_val();
+    auto status = pair.second;
+    auto firstInst = pair.first;
+    auto block = firstInst->getParent();
+
+    for (SILBasicBlock::iterator i(firstInst), e = block->end(); i != e; ++i) {
+      auto match = matcher(&*i);
+
+      // If this is an interesting instruction, check for stack
+      // differences here.
+      if (match.matches && status.hasDifferences())
+        return true;
+
+      // If we should halt, just go to the next work-list item, bypassing
+      // visiting the successors.
+      if (match.halt)
+        goto nextWorkListItem; // a labelled continue would be nice
+
+      // Otherwise, do stack-depth bookkeeping.
+      if (i->isAllocatingStack()) {
+        status.depth++;
+      } else if (i->isDeallocatingStack()) {
+        // If the stack depth is already zero, we're deallocating a stack
+        // allocation that was live into the search.
+        if (status.depth > 0) {
+          status.depth--;
+        } else {
+          status.hasPops = true;
+        }
+      }
+    }
+
+    // Add the successors to the worklist.
+    for (auto &succ : block->getSuccessors()) {
+      auto succBlock = succ.getBB();
+      auto insertResult = visited.insert(succBlock);
+      if (insertResult.second) {
+        worklist.push_back({&succBlock->front(), status});
+      }
+    }
+
+  nextWorkListItem: ;
+  }
+
+  return false;
+}
+
+
 void StackNesting::setup(SILFunction *F) {
   SmallVector<BlockInfo *, 8> WorkList;
   llvm::DenseMap<SILBasicBlock *, BlockInfo *> BlockMapping;

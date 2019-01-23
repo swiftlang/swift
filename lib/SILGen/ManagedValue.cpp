@@ -85,6 +85,8 @@ ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &SGF, SILLocation loc) {
 /// have cleanups.  It returns a +1 value with one.
 ManagedValue ManagedValue::formalAccessCopyUnmanaged(SILGenFunction &SGF,
                                                      SILLocation loc) {
+  assert(SGF.isInFormalEvaluationScope());
+
   if (getType().isObject()) {
     return SGF.B.createFormalAccessCopyValue(loc, *this);
   }
@@ -141,6 +143,7 @@ ManagedValue ManagedValue::borrow(SILGenFunction &SGF, SILLocation loc) const {
 
 ManagedValue ManagedValue::formalAccessBorrow(SILGenFunction &SGF,
                                               SILLocation loc) const {
+  assert(SGF.isInFormalEvaluationScope());
   assert(getValue() && "cannot borrow an invalid or in-context value");
   if (isLValue())
     return *this;
