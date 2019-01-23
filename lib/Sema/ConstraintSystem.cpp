@@ -1632,6 +1632,42 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
   llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
 }
 
+/// \returns true if given declaration is an instance method marked as
+/// `mutating`, false otherwise.
+bool isMutatingMethod(const ValueDecl *decl) {
+  if (!(decl->isInstanceMember() && isa<FuncDecl>(decl)))
+    return false;
+  return cast<FuncDecl>(decl)->isMutating();
+}
+
+/// Try to identify and fix failures related to partial function application
+/// e.g. partial application of `init` or 'mutating' instance methods.
+static std::pair<bool, unsigned>
+isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
+                            ConstraintLocator *locator) {
+  if (!isMutatingMethod(member))
+    return {false, 0};
+
+  auto *anchor = locator->getAnchor();
+  if (!isa<UnresolvedDotExpr>(anchor))
+    return {false, 0};
+
+  // If this choice is a partial application of `init` or
+  // `mutating` instance method we should report that it's not allowed.
+  auto baseTy = cs.getType(cast<UnresolvedDotExpr>(anchor)->getBase())
+                    ->getWithoutSpecifierType();
+
+  // If base is a metatype it would be ignored, but if it is
+  // some other type it means that we have a single application
+  // level already.
+  unsigned level = cs.simplifyType(baseTy)->is<MetatypeType>() ? 0 : 1;
+  if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(anchor))) {
+    level += dyn_cast_or_null<CallExpr>(cs.getParentExpr(call)) ? 2 : 1;
+  }
+
+  return {true, level};
+}
+
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice,
@@ -1872,10 +1908,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
   
-  // If we're binding to an init member, the 'throws' need to line up between
-  // the bound and reference types.
   if (choice.isDecl()) {
     auto decl = choice.getDecl();
+    // If we're binding to an init member, the 'throws' need to line up between
+    // the bound and reference types.
     if (auto CD = dyn_cast<ConstructorDecl>(decl)) {
       auto boundFunctionType = boundType->getAs<AnyFunctionType>();
         
@@ -1884,6 +1920,36 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         boundType = boundFunctionType->withExtInfo(
             boundFunctionType->getExtInfo().withThrows());
       }
+    }
+
+    // Check whether applying this overload would result in invalid
+    // partial function application e.g. partial application of
+    // mutating method or initializer.
+
+    bool isInvalidPartialApply;
+    unsigned level;
+
+    std::tie(isInvalidPartialApply, level) =
+        isInvalidPartialApplication(*this, decl, locator);
+
+    if (isInvalidPartialApply) {
+      // No application at all e.g. `Foo.bar`.
+      if (level == 0) {
+        // Swift 4 and earlier failed to diagnose a reference to a mutating
+        // method without any applications at all, which would get
+        // miscompiled into a function with undefined behavior. Warn for
+        // source compatibility.
+        bool isWarning = !getASTContext().isSwiftVersionAtLeast(5);
+        (void)recordFix(
+            AllowInvalidPartialApplication::create(isWarning, *this, locator));
+      } else if (level == 1) {
+        // `Self` parameter is applied, e.g. `foo.bar` or `Foo.bar(&foo)`
+        (void)recordFix(AllowInvalidPartialApplication::create(
+            /*isWarning=*/false, *this, locator));
+      }
+
+      // Otherwise both `Self` and arguments are applied,
+      // e.g. `foo.bar()` or `Foo.bar(&foo)()`, and there is nothing to do.
     }
   }
 
