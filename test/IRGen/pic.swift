@@ -64,3 +64,12 @@ public func use_global() -> Int {
 // powerpc64le-LABEL: {{_?}}$s4main10use_globalSiyF:
 // powerpc64le:        bl swift_beginAccess
 // powerpc64le:       addi 3, 3, ($s4main6globalSivp)@toc@l
+
+// s390x-LABEL: $s4main10use_globalSiyF:
+// s390x:        brasl   %[[REG1:r[0-9]+]], swift_beginAccess@PLT
+// s390x:        lgrl    %[[REG2:r[0-9]+]], ($s4main6globalSivp)
+// s390x:        lg      %[[REG3:r[0-9]+]], 168(%[[REG4:r[0-9]+]])
+// s390x:        stg     %[[REG2]], 160(%[[REG4]])
+// s390x:        lgr     %[[REG2]], %[[REG3]]
+// s390x:        brasl   %[[REG1]], swift_endAccess@PLT
+// s390x:        lg      %[[REG2]], 160(%[[REG4]])
