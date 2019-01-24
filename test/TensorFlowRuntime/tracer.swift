@@ -19,9 +19,10 @@ typealias Data = Tensor<Float>
 typealias Result = Tensor<Float>
 
 extension Tensor : TensorArrayProtocolEnhanced {
-  public func createInstance(_owning inputs: [CTensorHandle]) -> Tensor {
+  public func _makeInstance<C: Collection>(owning inputs: C) -> Tensor
+    where C.Element == CTensorHandle {
     assert(inputs.count == 1)
-    return Tensor(handle: TensorHandle<Scalar>(_owning: inputs[0]))
+    return Tensor(handle: TensorHandle<Scalar>(_owning: inputs.first!))
   }
 }
 
