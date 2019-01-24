@@ -2302,6 +2302,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_BUILD_EXTERNAL_PERF_TESTSUITE:BOOL=$(true_false "${build_external_perf_testsuite_this_time}")
                     -DSWIFT_BUILD_EXAMPLES:BOOL=$(true_false "${BUILD_SWIFT_EXAMPLES}")
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
+                    -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
                     -DSWIFT_TOOLS_ENABLE_LTO:STRING="${SWIFT_TOOLS_ENABLE_LTO}"
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
@@ -2369,13 +2370,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         "${cmake_options[@]}"
                         -DSWIFT_PRIMARY_VARIANT_SDK:STRING="${SWIFT_PRIMARY_VARIANT_SDK}"
                         -DSWIFT_PRIMARY_VARIANT_ARCH:STRING="${SWIFT_PRIMARY_VARIANT_ARCH}"
-                    )
-                fi
-
-                if [ "${SWIFT_INSTALL_COMPONENTS}" ] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     )
                 fi
 
