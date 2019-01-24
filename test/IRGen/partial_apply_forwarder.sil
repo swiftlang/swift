@@ -149,7 +149,7 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
 // CHECK:   call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[WBTY]]
 // CHECK:   ret void
 
-// CHECK-LABEL: define internal swiftcc void @"$s7takingQTA.2"(%T23partial_apply_forwarder7WeakBoxC*, %swift.refcounted* swiftself)
+// CHECK-LABEL: define internal swiftcc void @"$s7takingQTA.1"(%T23partial_apply_forwarder7WeakBoxC*, %swift.refcounted* swiftself)
 // CHECK: entry:
 // CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* %0
 // CHECK:   [[TY:%.*]] = load %swift.type*, %swift.type** [[TYADDR]]
