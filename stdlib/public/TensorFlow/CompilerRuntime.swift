@@ -99,9 +99,6 @@ private class TraceContext {
   // (TF_Function) upon finalizing.
   let graph = TF_NewGraph()
 
-  // Used to create unique trace graph node names and graph function names.
-  var traceGraphObjectCounter = 0
-
   // The list of inputs to the trace graph function.
   //
   // These symbolic tensors corresond to PlaceHolder nodes in the trace graph,
@@ -158,8 +155,8 @@ private class TraceContext {
     // Finish building the trace graph function.
     let eagerContext = _TFCGetGlobalEagerContext()
 
-    let tracedFunctionName = "\(traceeBasicName)_\(traceGraphObjectCounter)"
-    traceGraphObjectCounter += 1
+    let tracedFunctionName = "\(traceeBasicName)_\(_RuntimeConfig.traceGraphFunctionCounter)"
+    _RuntimeConfig.traceGraphFunctionCounter += 1
     debugLog("""
                Finalizing trace graph func \(tracedFunctionName), with \
                \(inputs.count) tracee inputs, and \
@@ -275,6 +272,9 @@ private enum TracingState {
 public enum _RuntimeConfig {
   // TODO: change this and subsequent properties from static to thread local.
   fileprivate static var traceState: TracingState = .notTracing
+
+  // Used to create unique trace graph function names.
+  fileprivate static var traceGraphFunctionCounter = 0
 
   /// When false, tensorflow runtime will be initialized before running any
   /// tensor program in this process.
@@ -648,7 +648,7 @@ public extension TensorGroup {
   }
 }
 
-// TODO: assess if this protocol should be foled into TensorArrayProtocol.
+// TODO: assess if this protocol should be folded into TensorArrayProtocol.
 public protocol TensorArrayProtocolEnhanced : TensorArrayProtocol {
   // Create an instance based on `inputs`, which can be symbolic (e.g. when
   // creating a symbolic input to tracee) or concrete (e.g. when creating a
