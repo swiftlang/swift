@@ -93,7 +93,7 @@ public enum _ExecutionMode : Equatable {
 /// `addEagerOpToGraph()`). When the trace is finalized (via `finalize()`), the
 /// trace graph function can then be executed (via `execute()`) by the eager
 /// runtime.
-class TraceContext {
+private class TraceContext {
   let status: CTFStatus = TF_NewStatus()
 
   /// The trace graph, which will be converted to a trace graph function
@@ -128,7 +128,6 @@ class TraceContext {
       checkOk(status)
       symbolicInputs.append(TF_Output(oper: result, index: 0))
     }
-
     cTraceContext = TFE_NewTraceContext(graph)
   }
 
@@ -583,13 +582,13 @@ public final class _ExecutionContext {
 // Elements in `outputs` can come from two sources:
 // a) Symbolic tensors produced by tensor ops, and added as trace graph nodes.
 // b) Concrete tensors produced by host code (e.g. Tensor(1.0)).
-func finalizeTraceFn(fnName: String,
-                     outputs: [CTensorHandle]) -> TraceContext {
+fileprivate func finalizeTraceFn(_ name: String,
+                                 outputs: [CTensorHandle]) -> TraceContext {
   guard let traceContext = _RuntimeConfig.traceState.context else {
     fatalError("Not in tracing mode!.")
   }
   _RuntimeConfig.traceState = .notTracing
-  traceContext.finalize(traceeBasicName: fnName, outputs: outputs)
+  traceContext.finalize(traceeBasicName: name, outputs: outputs)
   return traceContext
 }
 
@@ -614,6 +613,7 @@ private extension TensorArrayProtocol {
       let newHandle = TFE_TensorHandleCopySharingTensor(address.pointee,
                                                         status)
       checkOk(status)
+      internalConsistencyCheck(newHandle != nil)
       debugLog("""
                  Copying the \(i)-th C handle \(address.pointee) with \
                  concrete=\(isConcrete) to C handle create \(newHandle!).
@@ -627,7 +627,7 @@ private extension TensorArrayProtocol {
 
 private extension TensorGroup {
   // The tensors in `input` are NOT owned by this instance.
-  init(_copying input: [CTensorHandle]) {
+  init<C: Collection>(_copying input: C) where C.Element == CTensorHandle {
     assert(Self._tensorHandleCount == input.count)
     let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(
       capacity: input.count)
@@ -651,7 +651,7 @@ private extension TensorGroup {
 // TODO: Fold this protocol into TensorArrayProtocol.
 // This requires that we move concrete implementation such as
 // Tensor._makeInstance() to TensorGroup.swift.
-public protocol TensorArrayProtocolEnhanced : TensorArrayProtocol {
+public protocol _TensorArrayProtocolEnhanced : TensorArrayProtocol {
   // Create an instance based on `inputs`, which can be symbolic (e.g. when
   // creating a symbolic input to tracee) or concrete (e.g. when creating a
   // final output of executing the tracee).
@@ -659,9 +659,10 @@ public protocol TensorArrayProtocolEnhanced : TensorArrayProtocol {
     where C.Element == CTensorHandle
 }
 
-public func trace<State : TensorArrayProtocolEnhanced,
-                  Data : TensorGroup,
-                  Result : TensorGroup>(
+// TODO: rename this to `graph` when it's ready for end users.
+public func _graph<State : _TensorArrayProtocolEnhanced,
+                   Data : TensorGroup,
+                   Result : TensorGroup>(
   with state: State,
   in fn: (State, Data) -> (State, Result)
 ) -> (State, Data) -> (State, Result) {
@@ -687,10 +688,10 @@ public func trace<State : TensorArrayProtocolEnhanced,
   }
   internalConsistencyCheck(inputSymbolicTensors.count == inputValueCount)
   let symbolicState = state._makeInstance(
-    owning: Array(inputSymbolicTensors.dropLast(Data._typeList.count)))
+    owning: inputSymbolicTensors.dropLast(Data._typeList.count))
   let symbolicData = Data(
-    _copying: Array(inputSymbolicTensors.dropFirst(
-                      Int(state._tensorHandleCount))))
+    _copying: inputSymbolicTensors.dropFirst(
+      Int(state._tensorHandleCount)))
   // Run tracee to build the trace, adding ops to the trace graph function.
   debugLog("Running tracee in tracing mode.")
   let (outputState, outputResult) = fn(symbolicState, symbolicData)
@@ -702,7 +703,7 @@ public func trace<State : TensorArrayProtocolEnhanced,
   debugLog("Finalizing trace graph function.")
   // TAP means tensor array protocol.
   let opType = "MyTraceFn_TAP"
-  let traceContext = finalizeTraceFn(fnName: opType,
+  let traceContext = finalizeTraceFn(opType,
                                      outputs: outputTensorHandles)
 
   // The result is a closure that captures and executes the trace graph
@@ -719,18 +720,18 @@ public func trace<State : TensorArrayProtocolEnhanced,
     debugLog("Getting input data tensor handles.")
     let inputDataTensorHandles =  data.cTensorHandles
     inputTensors.append(contentsOf: inputDataTensorHandles.map {
-                          Tensor<Float>(handle: TensorHandle(_owning: $0)) })
+                          Tensor<Float>(handle: TensorHandle(_owning: $0))
+                        })
 
     debugLog("Executing trace graph function.")
     let returnValues = traceContext.execute(inputs: inputTensors,
                                             outputs: outputTensorHandles)
 
     debugLog("Creating output model instance.")
-    let newState = state._makeInstance(owning: Array(returnValues.dropLast(
-                                                       Data._typeList.count)))
-    let resultTensors: [CTensorHandle] =
-      Array(returnValues.dropFirst(Int(state._tensorHandleCount)))
-    let result = Result(_copying: resultTensors)
+    let newState = state._makeInstance(owning: returnValues.dropLast(
+                                         Data._typeList.count))
+    let result = Result(
+      _copying: returnValues.dropFirst(Int(state._tensorHandleCount)))
     return (newState, result)
   }
 }

@@ -18,7 +18,7 @@ typealias Data = Tensor<Float>
 
 typealias Result = Tensor<Float>
 
-extension Tensor : TensorArrayProtocolEnhanced {
+extension Tensor : _TensorArrayProtocolEnhanced {
   public func _makeInstance<C: Collection>(owning inputs: C) -> Tensor
     where C.Element == CTensorHandle {
     assert(inputs.count == 1)
@@ -40,7 +40,7 @@ TracerTests.testAllBackends("Basic") {
   _RuntimeConfig.printsDebugLog = true
   let state = Tensor<Float>(2.0)
   let data = Tensor<Float>(3.0)
-  let tracedFn = trace(with: state, in: tracee)
+  let tracedFn = _graph(with: state, in: tracee)
   let (newState, result) = tracedFn(state, data)
   
   _hostOp(newState)
