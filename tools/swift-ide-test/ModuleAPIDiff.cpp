@@ -769,9 +769,10 @@ public:
   }
 
   std::vector<sma::TypeName> collectProtocolConformances(NominalTypeDecl *NTD) {
+    const auto AllProtocols = NTD->getAllProtocols();
     std::vector<sma::TypeName> Result;
-    Result.reserve(NTD->getAllProtocols().size());
-    for (const auto *PD : NTD->getAllProtocols()) {
+    Result.reserve(AllProtocols.size());
+    for (const auto *PD : AllProtocols) {
       Result.emplace_back(convertToTypeName(PD->getDeclaredType()));
     }
     return Result;
