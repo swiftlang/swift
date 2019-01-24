@@ -1210,10 +1210,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                   : SolutionCompareResult::Incomparable;
 }
 
-Optional<unsigned> ConstraintSystem::findBestSolution(
-    SmallVectorImpl<Solution> &viable,
-    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights,
-    bool minimize) {
+Optional<unsigned>
+ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
+                                   bool minimize) {
   if (viable.empty())
     return None;
   if (viable.size() == 1)
@@ -1236,7 +1235,7 @@ Optional<unsigned> ConstraintSystem::findBestSolution(
   SmallVector<bool, 16> losers(viable.size(), false);
   unsigned bestIdx = 0;
   for (unsigned i = 1, n = viable.size(); i != n; ++i) {
-    switch (compareSolutions(*this, viable, diff, i, bestIdx, weights)) {
+    switch (compareSolutions(*this, viable, diff, i, bestIdx, ExprWeights)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1260,7 +1259,7 @@ Optional<unsigned> ConstraintSystem::findBestSolution(
     if (i == bestIdx)
       continue;
 
-    switch (compareSolutions(*this, viable, diff, bestIdx, i, weights)) {
+    switch (compareSolutions(*this, viable, diff, bestIdx, i, ExprWeights)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1312,7 +1311,7 @@ Optional<unsigned> ConstraintSystem::findBestSolution(
       if (losers[j])
         continue;
 
-      switch (compareSolutions(*this, viable, diff, i, j, weights)) {
+      switch (compareSolutions(*this, viable, diff, i, j, ExprWeights)) {
       case SolutionCompareResult::Identical:
         // FIXME: Dub one of these the loser arbitrarily?
         break;

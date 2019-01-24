@@ -70,11 +70,15 @@ ExpressionTimer::~ExpressionTimer() {
 }
 
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
-                                   ConstraintSystemOptions options)
+                                   ConstraintSystemOptions options,
+                                   Expr *expr)
   : TC(tc), DC(dc), Options(options),
     Arena(tc.Context, Allocator),
     CG(*new ConstraintGraph(*this))
 {
+  if (expr)
+    ExprWeights = expr->getDepthMap();
+
   assert(DC && "context required");
 }
 
@@ -2063,7 +2067,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
   {
     // Set up solver state.
-    SolverState state(expr, *this, FreeTypeVariableBinding::Disallow);
+    SolverState state(*this, FreeTypeVariableBinding::Disallow);
     state.recordFixes = true;
 
     // Solve the system.
@@ -2071,8 +2075,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.
-    if (auto best = findBestSolution(viable, state.ExprWeights,
-                                     /*minimize=*/true)) {
+    if (auto best = findBestSolution(viable, /*minimize=*/true)) {
       if (*best != 0)
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());
