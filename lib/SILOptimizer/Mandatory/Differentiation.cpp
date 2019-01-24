@@ -4391,7 +4391,8 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
            "FIXME: We could emit a thunk that converts the VJP to have the "
            "desired indices.");
     auto assocFn = assocFnAndIndices->first;
-    builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
+    if (assocFn->getType().isReferenceCounted(*getModule()))
+      builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
     assocFns.push_back(assocFnAndIndices->first);
   }
 
