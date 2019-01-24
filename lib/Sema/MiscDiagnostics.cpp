@@ -2708,9 +2708,10 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
 
       // If this is a parameter explicitly marked 'var', remove it.
       unsigned varKind = isa<ParamDecl>(var);
-      if (FixItLoc.isInvalid())
+      if (FixItLoc.isInvalid()) {
         Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
-                       var->getName(), varKind);
+                       var->getName(), varKind, true);
+      }
       else {
         bool suggestLet = true;
         if (auto *stmt = var->getParentPatternStmt()) {
@@ -2721,7 +2722,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         }
 
         auto diag = Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
-                                   var->getName(), varKind);
+                                   var->getName(), varKind, suggestLet);
 
         if (suggestLet)
           diag.fixItReplace(FixItLoc, "let");
