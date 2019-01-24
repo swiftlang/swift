@@ -2416,7 +2416,7 @@ public:
   bool isUsableFromInline() const;
 
   /// Returns \c true if this declaration is *not* intended to be used directly
-  /// by application developers despite of the visibility.
+  /// by application developers despite the visibility.
   bool shouldHideFromEditor() const;
 
   bool hasAccess() const {
