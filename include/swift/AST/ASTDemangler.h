@@ -104,6 +104,8 @@ public:
 
   ProtocolDecl *createObjCProtocolDecl(StringRef name);
 
+  Type createDynamicSelfType(Type selfType);
+
   Type createForeignClassType(StringRef mangledName);
 
   Type getUnnamedForeignClassType();

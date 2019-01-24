@@ -316,6 +316,10 @@ ProtocolDecl *ASTBuilder::createObjCProtocolDecl(StringRef name) {
   return nullptr;
 }
 
+Type ASTBuilder::createDynamicSelfType(Type selfType) {
+  return DynamicSelfType::get(selfType, Ctx);
+}
+
 Type ASTBuilder::createForeignClassType(StringRef mangledName) {
   auto typeDecl = createNominalTypeDecl(mangledName);
   if (!typeDecl) return Type();

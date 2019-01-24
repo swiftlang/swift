@@ -1120,6 +1120,11 @@ public:
                                             protocols.size(), protocols.data());
   }
 
+  BuiltType createDynamicSelfType(BuiltType selfType) const {
+    // Free-standing mangled type strings should not contain DynamicSelfType.
+    return BuiltType();
+  }
+
   BuiltType createGenericTypeParameterType(unsigned depth,
                                            unsigned index) const {
     // Use the callback, when provided.

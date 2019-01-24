@@ -288,7 +288,16 @@ class TypeDecoder {
 
       return BuiltType();
     }
+    case NodeKind::DynamicSelf: {
+      if (Node->getNumChildren() != 1)
+        return BuiltType();
 
+      auto selfType = decodeMangledType(Node->getChild(0));
+      if (!selfType)
+        return BuiltType();
+
+      return Builder.createDynamicSelfType(selfType);
+    }
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();
       auto index = Node->getChild(1)->getIndex();

@@ -329,6 +329,11 @@ public:
     return SILBoxTypeRef::create(*this, base);
   }
 
+  const TypeRef *createDynamicSelfType(const TypeRef *selfType) {
+    // TypeRefs should not contain DynamicSelfType.
+    return nullptr;
+  }
+
   const ObjCClassTypeRef *getUnnamedObjCClassType() {
     return createObjCClassType("");
   }
