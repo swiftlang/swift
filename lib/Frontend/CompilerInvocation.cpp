@@ -39,7 +39,7 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::remove_filename(LibPath); // Remove /swift
   llvm::sys::path::remove_filename(LibPath); // Remove /bin
   llvm::sys::path::append(LibPath, "lib", "swift");
-  setRuntimeResourcePath(LibPath.str());
+  setRuntimeResourcePath(LibPath.str(), /*IsDefault=*/true);
 }
 
 static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
@@ -53,9 +53,11 @@ static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
   SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
 }
 
-void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
+void CompilerInvocation::setRuntimeResourcePath(StringRef Path,
+                                                bool IsDefault) {
   SearchPathOpts.RuntimeResourcePath = Path;
   updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
+  SearchPathOpts.RuntimeLibraryPathIsDefault = IsDefault;
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
