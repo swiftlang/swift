@@ -582,8 +582,9 @@ public final class _ExecutionContext {
 // Elements in `outputs` can come from two sources:
 // a) Symbolic tensors produced by tensor ops, and added as trace graph nodes.
 // b) Concrete tensors produced by host code (e.g. Tensor(1.0)).
-fileprivate func finalizeTraceFn(_ name: String,
-                                 outputs: [CTensorHandle]) -> TraceContext {
+fileprivate func finalizeTraceFunction(_ name: String,
+                                       outputs: [CTensorHandle]
+) -> TraceContext {
   guard let traceContext = _RuntimeConfig.traceState.context else {
     fatalError("Not in tracing mode!.")
   }
@@ -703,8 +704,8 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
   debugLog("Finalizing trace graph function.")
   // TAP means tensor array protocol.
   let opType = "MyTraceFn_TAP"
-  let traceContext = finalizeTraceFn(opType,
-                                     outputs: outputTensorHandles)
+  let traceContext = finalizeTraceFunction(opType,
+                                           outputs: outputTensorHandles)
 
   // The result is a closure that captures and executes the trace graph
   // function in the trace context.
