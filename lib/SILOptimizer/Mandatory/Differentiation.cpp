@@ -2834,7 +2834,7 @@ private:
         AutoDiffAssociatedVectorSpaceKind::Cotangent,
         LookUpConformanceInModule(getModule().getSwiftModule()));
     // The adjoint value must be in the cotangent space.
-    assert(cotanSpace && remapType(adjointValue.getType()).getASTType()
+    assert(cotanSpace && adjointValue.getType().getASTType()
                == cotanSpace->getCanonicalType());
 #endif
     auto insertion = adjointMap.try_emplace(originalValue, adjointValue);
@@ -3074,10 +3074,9 @@ public:
     // Construct the pullback arguments.
     SmallVector<SILValue, 8> args;
     auto seed = getAdjointValue(ai);
-    auto seedType = remapType(seed.getType());
-    auto *seedBuf = builder.createAllocStack(loc, seedType);
+    auto *seedBuf = builder.createAllocStack(loc, seed.getType());
     materializeAdjointIndirect(seed, seedBuf);
-    if (seedType.isAddressOnly(getModule()))
+    if (seed.getType().isAddressOnly(getModule()))
       args.push_back(seedBuf);
     else {
       auto access = builder.createBeginAccess(
@@ -3085,7 +3084,7 @@ public:
           /*noNestedConflict*/ true,
           /*fromBuiltin*/ false);
       SILValue seedEltAddr;
-      if (auto tupleTy = seedType.getAs<TupleType>())
+      if (auto tupleTy = seed.getType().getAs<TupleType>())
         seedEltAddr = builder.createTupleElementAddr(
             loc, access, applyInfo.indices.source);
       else
@@ -3206,7 +3205,7 @@ public:
       assert(!getModule().Types.getTypeLowering(cotangentVectorTy)
                  .isAddressOnly());
       auto cotangentVectorSILTy =
-          remapType(SILType::getPrimitiveObjectType(cotangentVectorTy));
+          SILType::getPrimitiveObjectType(cotangentVectorTy);
       auto *cotangentVectorDecl =
           cotangentVectorTy->getStructOrBoundGenericStruct();
       assert(cotangentVectorDecl);
