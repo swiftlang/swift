@@ -2557,11 +2557,14 @@ bool AdjointGen::run() {
 //===----------------------------------------------------------------------===//
 
 namespace {
+class AdjointEmitter;
 
 /// A symbolic adjoint value that is capable of representing zero value 0 and
 /// 1, in addition to a materialized SILValue. This is expected to be passed
 /// around by value in most cases, as it's two words long.
 class AdjointValue {
+  friend class AdjointEmitter;
+
 public:
   enum Kind {
     /// An empty adjoint, i.e. zero. This case exists due to its special
@@ -2616,24 +2619,6 @@ public:
   bool isZero() const { return kind == Kind::Zero; }
   bool isAggregate() const { return kind == Kind::Aggregate; }
   bool isMaterialized() const { return kind == Kind::Materialized; }
-
-  static AdjointValue getZero(SILType type) { return {Kind::Zero, type, {}}; }
-
-  static AdjointValue getMaterialized(SILValue value) {
-    assert(value);
-    return {Kind::Materialized, value->getType(), value};
-  }
-
-  static AdjointValue getAggregate(SILType type,
-                                   ArrayRef<AdjointValue> elements,
-                                   llvm::BumpPtrAllocator &allocator) {
-    // Tuple type elements must match the type of each adjoint value element.
-    AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
-        elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
-    MutableArrayRef<AdjointValue> array(buf, elements.size());
-    std::uninitialized_copy(elements.begin(), elements.end(), array.begin());
-    return {Kind::Aggregate, type, array};
-  }
 
   ArrayRef<AdjointValue> getAggregateElements() const {
     assert(isAggregate());
@@ -2755,6 +2740,13 @@ public:
         adjointGen(adjointGen), builder(getAdjoint()) {}
 
 private:
+  AdjointValue getZeroAdjointValue(SILType type);
+
+  AdjointValue getMaterializedAdjointValue(SILValue value);
+
+  AdjointValue getAggregateAdjointValue(SILType type,
+                                        ArrayRef<AdjointValue> elements);
+
   /// Emit a zero value by calling `AdditiveArithmetic.zero`. The given type
   /// must conform to `AdditiveArithmetic`.
   void materializeZeroIndirect(CanType type, SILValue bufferAccess,
@@ -2804,8 +2796,8 @@ private:
   AdjointValue getAdjointValue(SILValue originalValue) {
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = adjointMap.try_emplace(
-        originalValue, AdjointValue::getZero(getCotangentType(
-                           remapType(originalValue->getType()), getModule())));
+        originalValue, getZeroAdjointValue(
+            getCotangentType(originalValue->getType(), getModule())));
     return insertion.first->getSecond();
   }
 
@@ -2851,7 +2843,7 @@ private:
     // If adjoint already exists, accumulate the adjoint onto the existing
     // adjoint.
     if (!inserted) {
-      auto silTy = remapType(value.getType());
+      auto silTy = value.getType();
       if (silTy.isObject())
         value = accumulateAdjointsDirect(value, adjointValue);
       else {
@@ -2966,7 +2958,7 @@ public:
     SmallVector<SILValue, 8> formalResults;
     collectAllFormalResultsInTypeOrder(original, formalResults);
     auto srcIdx = task->getIndices().source;
-    addAdjointValue(formalResults[srcIdx], AdjointValue::getMaterialized(seed));
+    addAdjointValue(formalResults[srcIdx], getMaterializedAdjointValue(seed));
     LLVM_DEBUG(getADDebugStream()
                << "Assigned seed " << *seed << " as the adjoint of "
                << formalResults[srcIdx]);
@@ -3141,7 +3133,7 @@ public:
     if (ai->hasSelfArgument() &&
         applyInfo.indices.isWrtParameter(selfParamIndex))
       addAdjointValue(ai->getArgument(origNumIndRes + selfParamIndex),
-                      AdjointValue::getMaterialized(*allResultsIt++));
+                      getMaterializedAdjointValue(*allResultsIt++));
     // Set adjoints for the remaining non-self original parameters.
     for (unsigned i : applyInfo.indices.parameters.set_bits()) {
       // Do not set the adjoint of the original self parameter because we
@@ -3149,7 +3141,7 @@ public:
       if (ai->hasSelfArgument() && i == selfParamIndex)
         continue;
       addAdjointValue(ai->getArgument(origNumIndRes + i),
-                      AdjointValue::getMaterialized(*allResultsIt++));
+                      getMaterializedAdjointValue(*allResultsIt++));
     }
   }
 
@@ -3166,9 +3158,8 @@ public:
     case AdjointValue::Zero:
       for (auto *field : decl->getStoredProperties()) {
         auto fv = si->getFieldValue(field);
-        addAdjointValue(
-            fv, AdjointValue::getZero(getCotangentType(remapType(fv->getType()),
-                                                       getModule())));
+        addAdjointValue(fv, getZeroAdjointValue(
+            getCotangentType(fv->getType(), getModule())));
       }
       break;
     case AdjointValue::Materialized: {
@@ -3236,7 +3227,7 @@ public:
       switch (av.getKind()) {
       case AdjointValue::Kind::Zero:
         addAdjointValue(sei->getOperand(),
-                        AdjointValue::getZero(cotangentVectorSILTy));
+                        getZeroAdjointValue(cotangentVectorSILTy));
         break;
       case AdjointValue::Kind::Materialized:
       case AdjointValue::Kind::Aggregate: {
@@ -3245,13 +3236,12 @@ public:
           if (field == correspondingField)
             eltVals.push_back(av);
           else
-            eltVals.push_back(AdjointValue::getZero(
-                remapType(SILType::getPrimitiveObjectType(field->getType()
-                    ->getCanonicalType()))));
+            eltVals.push_back(getZeroAdjointValue(
+                SILType::getPrimitiveObjectType(field->getType()
+                    ->getCanonicalType())));
         }
         addAdjointValue(sei->getOperand(),
-                        AdjointValue::getAggregate(cotangentVectorSILTy,
-                                                   eltVals, allocator));
+            getAggregateAdjointValue(cotangentVectorSILTy, eltVals));
       }
       }
       return;
@@ -3277,7 +3267,7 @@ public:
 
       // Set adjoint for the `struct_extract` operand.
       addAdjointValue(sei->getOperand(),
-                      AdjointValue::getMaterialized(pullbackCall));
+                      getMaterializedAdjointValue(pullbackCall));
       break;
     }
     }
@@ -3293,8 +3283,8 @@ public:
     case AdjointValue::Kind::Zero:
       for (auto eltVal : ti->getElements())
         addAdjointValue(eltVal,
-            AdjointValue::getZero(remapType(getCotangentType(eltVal->getType(),
-                                                             getModule()))));
+            getZeroAdjointValue(getCotangentType(eltVal->getType(),
+                                                 getModule())));
       break;
     case AdjointValue::Kind::Materialized:
       for (auto i : range(ti->getNumOperands()))
@@ -3320,7 +3310,7 @@ public:
     auto av = getAdjointValue(tei);
     switch (av.getKind()) {
     case AdjointValue::Kind::Zero:
-      addAdjointValue(tei->getOperand(), AdjointValue::getZero(tupleCotanTy));
+      addAdjointValue(tei->getOperand(), getZeroAdjointValue(tupleCotanTy));
       break;
     case AdjointValue::Kind::Aggregate:
     case AdjointValue::Kind::Materialized: {
@@ -3329,12 +3319,12 @@ public:
         if (tei->getFieldNo() == i)
           elements.push_back(av);
         else
-          elements.push_back(AdjointValue::getZero(
+          elements.push_back(getZeroAdjointValue(
               getCotangentType(tupleTy->getElementType(i)->getCanonicalType(),
                                getModule())));
       }
       addAdjointValue(tei->getOperand(),
-          AdjointValue::getAggregate(tupleCotanTy, elements, allocator));
+          getAggregateAdjointValue(tupleCotanTy, elements));
       break;
     }
     }
@@ -3425,6 +3415,25 @@ public:
 #undef NO_DERIVATIVE
 };
 } // end anonymous namespace
+
+AdjointValue AdjointEmitter::getZeroAdjointValue(SILType type) {
+  return {AdjointValue::Kind::Zero, remapType(type), {}};
+}
+
+AdjointValue AdjointEmitter::getMaterializedAdjointValue(SILValue value) {
+  assert(value);
+  return {AdjointValue::Kind::Materialized, remapType(value->getType()), value};
+}
+
+AdjointValue AdjointEmitter::getAggregateAdjointValue(SILType type,
+                                        ArrayRef<AdjointValue> elements) {
+  // Tuple type elements must match the type of each adjoint value element.
+  AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
+      elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
+  MutableArrayRef<AdjointValue> array(buf, elements.size());
+  std::uninitialized_copy(elements.begin(), elements.end(), array.begin());
+  return {AdjointValue::Kind::Aggregate, remapType(type), array};
+}
 
 void AdjointEmitter::materializeZeroIndirect(CanType type,
                                              SILValue bufferAccess,
@@ -3587,9 +3596,9 @@ AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
     switch (rhs.getKind()) {
     // x + y
     case AdjointValue::Kind::Materialized:
-      return AdjointValue::getMaterialized(
+      return getMaterializedAdjointValue(
           accumulateMaterializedAdjointsDirect(lhsVal,
-                                               rhs.getMaterializedValue()));
+              rhs.getMaterializedValue()));
     // x + 0 => x
     case AdjointValue::Kind::Zero:
       return lhs;
@@ -3601,11 +3610,10 @@ AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
         auto lhsElt =
             builder.createTupleExtract(lhsVal.getLoc(), lhsVal, i);
         auto newElt = accumulateAdjointsDirect(
-            AdjointValue::getMaterialized(lhsElt), rhsElements[i]);
+            getMaterializedAdjointValue(lhsElt), rhsElements[i]);
         newElements.push_back(newElt);
       }
-      return AdjointValue::getAggregate(
-          remapType(lhsVal->getType()), newElements, allocator);
+      return getAggregateAdjointValue(lhsVal->getType(), newElements);
     }
   }
   // 0
@@ -3627,8 +3635,7 @@ AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
                                 rhs.getAggregateElements()))
         newElements.push_back(
             accumulateAdjointsDirect(std::get<0>(elt), std::get<1>(elt)));
-      return AdjointValue::getAggregate(
-          remapType(lhs.getType()), newElements, allocator);
+      return getAggregateAdjointValue(lhs.getType(), newElements);
     }
     }
   }
