@@ -103,7 +103,8 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
     P.addSemanticARCOpts();
   }
   P.addClosureLifetimeFixup();
-  P.addOwnershipModelEliminator();
+  if (Options.StripOwnershipDuringDiagnosticsPipeline)
+    P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
@@ -294,6 +295,11 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
     // which reduces the ability of the compiler to optimize clients
     // importing this module.
     P.addSerializeSILPass();
+
+    // Now strip any transparent functions that still have ownership.
+    if (!P.getOptions().StripOwnershipDuringDiagnosticsPipeline)
+      P.addOwnershipModelEliminator();
+
     if (P.getOptions().StopOptimizationAfterSerialization)
       return;
 
@@ -370,6 +376,10 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Get rid of apparently dead functions as soon as possible so that
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
+
+  // Strip ownership from non-transparent functions.
+  if (!P.getOptions().StripOwnershipDuringDiagnosticsPipeline)
+    P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Start by cloning functions from stdlib.
   P.addPerformanceSILLinker();
@@ -642,6 +652,10 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Finally serialize the SIL if we are asked to.
   P.addSerializeSILPass();
+
+  // And then strip ownership before we IRGen.
+  if (!Options.StripOwnershipDuringDiagnosticsPipeline)
+    P.addOwnershipModelEliminator();
 
   return P;
 }
