@@ -1,5 +1,8 @@
 // RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+
+// SR-9737: hanging tests in GPE GPU mode
+// UN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 
@@ -22,6 +25,7 @@ RuntimeEntryPointTests.testCPUOrGPU("RoundTrip_CTensorHandle_AnyTensorHandle") {
   let anyHandle = _TFCCreateTensorHandleFromC(cHandle)
   let tensor = Tensor(handle: anyHandle as! TensorHandle<Float>)
   print(tensor)
+  // This line hangs in GPE
   expectTrue(tensor == Tensor(0.0))
 }
 

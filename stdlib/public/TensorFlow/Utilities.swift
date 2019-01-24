@@ -93,6 +93,12 @@ public typealias CTFEContext = OpaquePointer
 /// The `TFE_Op *` type.
 typealias CTFEOp = OpaquePointer
 
+/// The `TF_OperationDescription *` type.
+typealias CTFOperationDescription = OpaquePointer
+
+/// The `TFE_TraceContext *` type.
+typealias CTFETraceContext = OpaquePointer
+
 //===----------------------------------------------------------------------===//
 // Logging
 //===----------------------------------------------------------------------===//

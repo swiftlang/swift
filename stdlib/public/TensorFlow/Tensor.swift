@@ -23,6 +23,8 @@ import Glibc
 #endif
 import CTensorFlow
 
+infix operator .== : ComparisonPrecedence
+
 //===----------------------------------------------------------------------===//
 // Tensor
 //===----------------------------------------------------------------------===//
@@ -930,6 +932,8 @@ public extension Tensor {
     @inline(__always)
     get {
       debugLog("Returning a host copy of array.")
+      internalConsistencyCheck(toHost().handle.isConcrete)
+
       // This is considered to be a well known way to produce a copy to the
       // host, so an "implicit copy to host" warning should not be produced.
       return toHost().handle.makeHostCopy()
