@@ -24,6 +24,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Type.h"
@@ -424,6 +425,55 @@ ASTBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
       .Default(None);
 }
 
+CanGenericSignature ASTBuilder::demangleGenericSignature(
+    NominalTypeDecl *nominalDecl,
+    const Demangle::NodePointer &node) {
+  GenericSignatureBuilder builder(Ctx);
+  builder.addGenericSignature(nominalDecl->getGenericSignature());
+
+  for (auto &child : *node) {
+    if (child->getKind() ==
+          Demangle::Node::Kind::DependentGenericParamCount)
+      continue;
+
+    if (child->getNumChildren() != 2)
+      return CanGenericSignature();
+    auto subjectType = swift::Demangle::decodeMangledType(
+        *this, child->getChild(0));
+    auto constraintType = swift::Demangle::decodeMangledType(
+        *this, child->getChild(1));
+    if (!subjectType || !constraintType)
+      return CanGenericSignature();
+
+    auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+
+    switch (child->getKind()) {
+    case Demangle::Node::Kind::DependentGenericConformanceRequirement: {
+      builder.addRequirement(
+          Requirement(constraintType->isExistentialType()
+                        ? RequirementKind::Conformance
+                        : RequirementKind::Superclass,
+                      subjectType, constraintType),
+          source, nullptr);
+      break;
+    }
+    case Demangle::Node::Kind::DependentGenericSameTypeRequirement: {
+      builder.addRequirement(
+          Requirement(RequirementKind::SameType,
+                      subjectType, constraintType),
+          source, nullptr);
+      break;
+    }
+    default:
+      return CanGenericSignature();
+    }
+  }
+
+  return std::move(builder).computeGenericSignature(SourceLoc())
+      ->getCanonicalSignature();
+}
+
 DeclContext *
 ASTBuilder::findDeclContext(const Demangle::NodePointer &node) {
   switch (node->getKind()) {
@@ -500,9 +550,41 @@ ASTBuilder::findDeclContext(const Demangle::NodePointer &node) {
   case Demangle::Node::Kind::Global:
     return findDeclContext(node->getChild(0));
 
+  case Demangle::Node::Kind::Extension: {
+    auto *moduleDecl = dyn_cast_or_null<ModuleDecl>(
+        findDeclContext(node->getChild(0)));
+    if (!moduleDecl)
+      return nullptr;
+
+    auto *nominalDecl = dyn_cast_or_null<NominalTypeDecl>(
+        findDeclContext(node->getChild(1)));
+    if (!nominalDecl)
+      return nullptr;
+
+    CanGenericSignature genericSig;
+    if (node->getNumChildren() > 2)
+      genericSig = demangleGenericSignature(nominalDecl, node->getChild(2));
+
+    for (auto *ext : nominalDecl->getExtensions()) {
+      if (ext->getParentModule() != moduleDecl)
+        continue;
+
+      if (!ext->isConstrainedExtension()) {
+        if (!genericSig)
+          return ext;
+        continue;
+      }
+
+      if (ext->getGenericSignature()->getCanonicalSignature()
+          == genericSig) {
+        return ext;
+      }
+    }
+
+    return nullptr;
+  }
+
   // Bail out on other kinds of contexts.
-  // TODO: extensions
-  // TODO: local contexts
   default:
     return nullptr;
   }
@@ -514,6 +596,12 @@ ASTBuilder::findNominalTypeDecl(DeclContext *dc,
                                 Identifier privateDiscriminator,
                                 Demangle::Node::Kind kind) {
   auto module = dc->getParentModule();
+
+  // When looking into an extension, look into the nominal instead; the
+  // important thing is that the module, obtained above, is the module
+  // containing the extension and not the module containing the nominal
+  if (isa<ExtensionDecl>(dc))
+    dc = dc->getSelfNominalTypeDecl();
 
   SmallVector<ValueDecl *, 4> lookupResults;
   module->lookupMember(lookupResults, dc, name, privateDiscriminator);

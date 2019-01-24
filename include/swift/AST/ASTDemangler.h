@@ -114,6 +114,9 @@ public:
 
 private:
   bool validateNominalParent(NominalTypeDecl *decl, Type parent);
+  CanGenericSignature demangleGenericSignature(
+      NominalTypeDecl *nominalDecl,
+      const Demangle::NodePointer &node);
   DeclContext *findDeclContext(const Demangle::NodePointer &node);
   ModuleDecl *findModule(const Demangle::NodePointer &node);
   Demangle::NodePointer findModuleNode(const Demangle::NodePointer &node);
