@@ -159,13 +159,4 @@ void *swift_tfc_CreateScalarStringTensor(char *val, int32_t valLen,
   return tensor;
 }
 
-void swift_tfc_TFE_Execute(void *op, void **retvals, int32_t *num_retvals,
-                           void *status) {
-  int int_num_retvals = *num_retvals;
-  TFE_Execute(reinterpret_cast<TFE_Op *>(op),
-              reinterpret_cast<TFE_TensorHandle **>(retvals), &int_num_retvals,
-              reinterpret_cast<TF_Status *>(status));
-  *num_retvals = int_num_retvals;
-}
-
 }  // extern "C"

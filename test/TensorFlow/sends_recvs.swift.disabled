@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates %swift-tensorflow-extra-options -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -Xllvm -tf-warn-send-recv -O -emit-sil %s -verify | %FileCheck %filecheck-tensorflow-extra-options %s
+// SR-9736: Fix this test in GPE/compiler mode.
+// UN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates %swift-tensorflow-extra-options -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -Xllvm -tf-warn-send-recv -O -emit-sil %s -verify | %FileCheck %filecheck-tensorflow-extra-options %s
 
 // In this file, send means accelerator->host, and recv means the opposite.
 
