@@ -446,11 +446,7 @@ private:
     auto *varDecl = new (ctx) VarDecl(
         /*IsStatic*/ false, VarDecl::Specifier::Var,
         /*IsCaptureList*/ false, SourceLoc(), id, primalValueStruct);
-    if (primalValueStruct->getEffectiveAccess() < AccessLevel::Public)
-      varDecl->getAttrs().add(
-          new (ctx) UsableFromInlineAttr(/*implicit*/ true));
-    else
-      varDecl->setAccess(AccessLevel::Public);
+    varDecl->setAccess(primalValueStruct->getEffectiveAccess());
     if (type->hasArchetype())
       varDecl->setInterfaceType(type->mapTypeOutOfContext());
     else
@@ -1927,21 +1923,23 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task,
     pvStruct->setGenericEnvironment(
         primalGenericSig->createGenericEnvironment());
   }
-  pvStruct->computeType();
-  if (auto *dc = function->getDeclContext()) {
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(dc)) {
-      auto funcAccess = afd->getEffectiveAccess();
-      if (funcAccess >= AccessLevel::Public) {
-        pvStruct->getAttrs().add(
-            new (astCtx) FixedLayoutAttr(/*implicit*/ true));
-      }
-      pvStruct->setAccess(funcAccess);
-    }
-  } else {
+  switch (function->getEffectiveSymbolLinkage()) {
+  case swift::SILLinkage::Public:
+  case swift::SILLinkage::PublicNonABI:
+    pvStruct->setAccess(AccessLevel::Public);
+    pvStruct->addFixedLayoutAttr();
+    break;
+  case swift::SILLinkage::Hidden:
+  case swift::SILLinkage::Shared:
     pvStruct->setAccess(AccessLevel::Internal);
-    pvStruct->getAttrs().add(
-        new (astCtx) UsableFromInlineAttr(/*implicit*/ true));
+    break;
+  case swift::SILLinkage::Private:
+    pvStruct->setAccess(AccessLevel::FilePrivate);
+    break;
+  default:
+    llvm_unreachable("The original function cannot have external linkage");
   }
+  pvStruct->computeType();
   file.addVisibleDecl(pvStruct);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
