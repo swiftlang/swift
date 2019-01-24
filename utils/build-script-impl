@@ -281,6 +281,7 @@ KNOWN_SETTINGS=(
     tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
     tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
     tensorflow-swift-bindings          ""        "Path to TensorFlow Swift bindings file"
+    tensorflow-swift-apis              ""        "Path to TensorFlow high-level APIs repository"
 )
 
 # Centralized access point for traced command invocation.
@@ -1209,6 +1210,7 @@ PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 # SWIFT_ENABLE_TENSORFLOW
 TENSORFLOW_SOURCE_DIR="${WORKSPACE}/tensorflow"
 TENSORFLOW_SWIFT_BINDINGS_DIR="${WORKSPACE}/tensorflow-swift-bindings"
+TENSORFLOW_SWIFT_APIS_DIR="${WORKSPACE}/tensorflow-swift-apis"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
     echo "Couldn't find PlaygroundSupport source directory."
@@ -1222,6 +1224,10 @@ if [[ "${ENABLE_TENSORFLOW}" ]]; then
     fi
     if [[ "${TENSORFLOW_SWIFT_BINDINGS}" && ! -f "${TENSORFLOW_SWIFT_BINDINGS}" ]]; then
         echo "Invalid TensorFlow Swift bindings file specified."
+        exit 1
+    fi
+    if [[ "${TENSORFLOW_SWIFT_APIS}" && ! -d "${TENSORFLOW_SWIFT_APIS}" ]]; then
+        echo "Invalid TensorFlow high-level APIs repository specified."
         exit 1
     fi
 fi
@@ -2475,6 +2481,17 @@ for host in "${ALL_HOSTS[@]}"; do
                         cmake_options=(
                             "${cmake_options[@]}"
                             -DTENSORFLOW_SWIFT_BINDINGS:PATH="${TENSORFLOW_SWIFT_BINDINGS}"
+                        )
+                    fi
+                    # Handle TensorFlow high-level APIs repository.
+                    if [[ ! "${TENSORFLOW_SWIFT_APIS}" && -d "${TENSORFLOW_SWIFT_APIS_DIR}" ]] ; then
+                        TENSORFLOW_SWIFT_APIS="${TENSORFLOW_SWIFT_APIS_DIR}"
+                    fi
+                    echo "BUILD SCRIPT IMPL TF APIS: ${TENSORFLOW_SWIFT_APIS}"
+                    if [[ "${TENSORFLOW_SWIFT_APIS}" ]] ; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DTENSORFLOW_SWIFT_APIS:PATH="${TENSORFLOW_SWIFT_APIS}"
                         )
                     fi
                 fi

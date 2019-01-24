@@ -976,6 +976,9 @@ def create_argument_parser():
            default=None,
            help='Path to a TensorFlow Swift bindings file '
                 '(RawOpsGenerated.swift).')
+    option('--tensorflow-swift-apis', store_path,
+           default=None,
+           help='Path to a TensorFlow high-level APIs repository.')
     option('--tensorflow-bazel-options', append,
            type=argparse.ShellSplitType(),
            default=[],
