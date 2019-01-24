@@ -1,5 +1,19 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
+struct Foo {
+  var x: Float
+  var f: @autodiff (Float) -> Float
+}
+func diffableClosureInStruct(s: Foo) {
+  _ = gradient(of: s.f)
+}
+
+// CHECK-LABEL: @{{.*}}diffableClosureInStruct{{.*}} : $@convention(thin) (@guaranteed Foo) -> () {
+// CHECK:   [[CLOSURE:%.*]] = struct_extract {{%.*}} : $Foo, #Foo.f
+// CHECK:   retain_value [[CLOSURE]] : $@autodiff @callee_guaranteed (Float) -> Float
+// CHECK:   autodiff_function_extract [original] [[CLOSURE]] : $@autodiff @callee_guaranteed (Float) -> Float
+
+
 public func closureCaptureMutable() {
   var val: Float = 10
   let clo: (Float) -> Float = { x in
@@ -15,3 +29,4 @@ public func closureCaptureMutable() {
 // CHECK:   {{.*}} = apply [[PRIMAL]]({{.*}}, [[BOXED_ARG]])
 // CHECK:   [[ADJOINT:%.*]] = function_ref @AD__{{.*}}closureCaptureMutabley{{.*}}___adjoint_src_0_wrt_0
 // CHECK:   {{.*}} = partial_apply [callee_guaranteed] [[ADJOINT]]({{.*}}, {{.*}}, {{.*}}, [[BOXED_ARG]])
+
