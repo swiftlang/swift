@@ -21,7 +21,6 @@
 
 #include "swift/AST/ASTDemangler.h"
 
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
@@ -155,90 +154,7 @@ Type ASTBuilder::createBoundGenericType(NominalTypeDecl *decl,
   if (!validateNominalParent(decl, parent))
     return Type();
 
-  // Make a generic type repr that's been resolved to this decl.
-  TypeReprList genericArgReprs(args);
-  auto genericRepr = GenericIdentTypeRepr::create(Ctx, SourceLoc(),
-                                                  decl->getName(),
-                                                  genericArgReprs.getList(),
-                                                  SourceRange());
-  // FIXME
-  genericRepr->setValue(decl, nullptr);
-
-  Type genericType;
-
-  // If we have a parent type, we need to build a compound type repr.
-  if (parent) {
-    // Life would be much easier if we could just use a FixedTypeRepr for
-    // the parent.  But we can't!  So we have to recursively expand
-    // like this; and recursing with a lambda isn't impossible, so it gets
-    // even worse.
-    SmallVector<Type, 4> ancestry;
-    for (auto p = parent; p; p = p->getNominalParent()) {
-      ancestry.push_back(p);
-    }
-
-    struct GenericRepr {
-      TypeReprList GenericArgs;
-      GenericIdentTypeRepr *Ident;
-
-      GenericRepr(const ASTContext &Ctx, BoundGenericType *type)
-        : GenericArgs(type->getGenericArgs()),
-          Ident(GenericIdentTypeRepr::create(Ctx, SourceLoc(),
-                                             type->getDecl()->getName(),
-                                             GenericArgs.getList(),
-                                             SourceRange())) {
-        // FIXME
-        Ident->setValue(type->getDecl(), nullptr);
-      }
-
-      // SmallVector::emplace_back will never need to call this because
-      // we reserve the right size, but it does try statically.
-      GenericRepr(const GenericRepr &other) : GenericArgs({}), Ident(nullptr) {
-        llvm_unreachable("should not be called dynamically");
-      }
-    };
-
-    // Pre-allocate the component vectors so that we can form references
-    // into them safely.
-    SmallVector<SimpleIdentTypeRepr, 4> simpleComponents;
-    SmallVector<GenericRepr, 4> genericComponents;
-    simpleComponents.reserve(ancestry.size());
-    genericComponents.reserve(ancestry.size());
-
-    // Build the parent hierarchy.
-    SmallVector<ComponentIdentTypeRepr*, 4> componentReprs;
-    for (size_t i = ancestry.size(); i != 0; --i) {
-      Type p = ancestry[i - 1];
-      if (auto boundGeneric = p->getAs<BoundGenericType>()) {
-        genericComponents.emplace_back(Ctx, boundGeneric);
-        componentReprs.push_back(genericComponents.back().Ident);
-      } else {
-        auto nominal = p->castTo<NominalType>();
-        simpleComponents.emplace_back(SourceLoc(),
-                                      nominal->getDecl()->getName());
-        // FIXME
-        simpleComponents.back().setValue(nominal->getDecl(), nullptr);
-        componentReprs.push_back(&simpleComponents.back());
-      }
-    }
-    componentReprs.push_back(genericRepr);
-
-    auto compoundRepr = CompoundIdentTypeRepr::create(Ctx, componentReprs);
-    genericType = checkTypeRepr(compoundRepr);
-  } else {
-    genericType = checkTypeRepr(genericRepr);
-  }
-
-  // If type-checking failed, we've failed.
-  if (!genericType) return Type();
-
-  // Validate that we used the right decl.
-  if (auto bgt = genericType->getAs<BoundGenericType>()) {
-    if (bgt->getDecl() != decl)
-      return Type();
-  }
-
-  return genericType;
+  return BoundGenericType::get(decl, parent, args);
 }
 
 Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes,
@@ -432,16 +348,6 @@ bool ASTBuilder::validateNominalParent(NominalTypeDecl *decl,
   // FIXME: validate that the parent is a correct application of the
   // enclosing context?
   return true;
-}
-
-Type ASTBuilder::checkTypeRepr(TypeRepr *repr) {
-  DeclContext *dc = getNotionalDC();
-
-  TypeLoc loc(repr);
-  if (performTypeLocChecking(Ctx, loc, dc, /*diagnose*/ false))
-    return Type();
-
-  return loc.getType();
 }
 
 NominalTypeDecl *

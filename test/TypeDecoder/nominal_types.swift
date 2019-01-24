@@ -41,6 +41,12 @@ do {
   blackHole(x1, x2, x3)
 }
 
+protocol P {}
+
+struct Constrained<T : P> {}
+
+func generic<T>(_: Constrained<T>) {}
+
 // DEMANGLE: $s13nominal_types5OuterVD
 // CHECK: Outer
 
@@ -66,3 +72,6 @@ do {
 // DEMANGLE: $s13nominal_types12GenericOuterOySiSSGD
 // CHECK: GenericOuter<τ_0_0, τ_0_1>
 // CHECK: GenericOuter<Int, String>
+
+// DEMANGLE: $s13nominal_types11ConstrainedVyxGD
+// CHECK: Constrained<τ_0_0>

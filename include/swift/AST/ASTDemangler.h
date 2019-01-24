@@ -25,7 +25,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/TypeRepr.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
 
@@ -134,30 +133,8 @@ private:
                                               ForeignModuleKind lookupKind,
                                               Demangle::Node::Kind kind);
 
-  Type checkTypeRepr(TypeRepr *repr);
-
   static NominalTypeDecl *getAcceptableNominalTypeCandidate(ValueDecl *decl, 
                                                      Demangle::Node::Kind kind);
-
-  class TypeReprList {
-    SmallVector<FixedTypeRepr, 4> Reprs;
-    SmallVector<TypeRepr*, 4> Refs;
-
-  public:
-    explicit TypeReprList(ArrayRef<Type> types) {
-      Reprs.reserve(types.size());
-      Refs.reserve(types.size());
-
-      for (auto type : types) {
-        Reprs.emplace_back(type, SourceLoc());
-        Refs.push_back(&Reprs.back());
-      }
-    }
-
-    ArrayRef<TypeRepr*> getList() const {
-      return Refs;
-    }
-  };
 };
 
 }  // namespace Demangle
