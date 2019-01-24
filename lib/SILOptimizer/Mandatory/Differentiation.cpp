@@ -174,7 +174,7 @@ static CanType joinElementTypes(TypeRange &&range, const ASTContext &ctx) {
   return TupleType::get(typeElts, ctx);
 }
 
-/// Given a range of SIL values, retrives the canonical types of these values,
+/// Given a range of SIL values, retrieves the canonical types of these values,
 /// and joins these types into a single type.
 template <typename SILValueRange>
 static CanType joinElementTypesFromValues(SILValueRange &&range,
@@ -2804,8 +2804,8 @@ private:
   AdjointValue getAdjointValue(SILValue originalValue) {
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = adjointMap.try_emplace(
-        originalValue, AdjointValue::getZero(
-            getCotangentType(originalValue->getType(), getModule())));
+        originalValue, AdjointValue::getZero(getCotangentType(
+                           remapType(originalValue->getType()), getModule())));
     return insertion.first->getSecond();
   }
 
@@ -2817,6 +2817,16 @@ private:
       return ty;
     return ty.subst(getAdjoint().getModule(),
                     adjointGenEnv->getForwardingSubstitutionMap());
+  }
+
+  CanType remapASTType(CanType ty) {
+    if (!ty->hasArchetype())
+      return ty;
+    auto *adjointGenEnv = getAdjoint().getGenericEnvironment();
+    if (!adjointGenEnv)
+      return ty;
+    return ty.subst(adjointGenEnv->getForwardingSubstitutionMap())
+        ->getCanonicalType();
   }
 
   /// Add an adjoint value for the given original value.
@@ -2832,7 +2842,7 @@ private:
         AutoDiffAssociatedVectorSpaceKind::Cotangent,
         LookUpConformanceInModule(getModule().getSwiftModule()));
     // The adjoint value must be in the cotangent space.
-    assert(cotanSpace && adjointValue.getType().getASTType()
+    assert(cotanSpace && remapType(adjointValue.getType()).getASTType()
                == cotanSpace->getCanonicalType());
 #endif
     auto insertion = adjointMap.try_emplace(originalValue, adjointValue);
@@ -2841,7 +2851,7 @@ private:
     // If adjoint already exists, accumulate the adjoint onto the existing
     // adjoint.
     if (!inserted) {
-      auto silTy = value.getType();
+      auto silTy = remapType(value.getType());
       if (silTy.isObject())
         value = accumulateAdjointsDirect(value, adjointValue);
       else {
@@ -3072,9 +3082,10 @@ public:
     // Construct the pullback arguments.
     SmallVector<SILValue, 8> args;
     auto seed = getAdjointValue(ai);
-    auto *seedBuf = builder.createAllocStack(loc, seed.getType());
+    auto seedType = remapType(seed.getType());
+    auto *seedBuf = builder.createAllocStack(loc, seedType);
     materializeAdjointIndirect(seed, seedBuf);
-    if (seed.getType().isAddressOnly(getModule()))
+    if (seedType.isAddressOnly(getModule()))
       args.push_back(seedBuf);
     else {
       auto access = builder.createBeginAccess(
@@ -3082,7 +3093,7 @@ public:
           /*noNestedConflict*/ true,
           /*fromBuiltin*/ false);
       SILValue seedEltAddr;
-      if (auto tupleTy = seed.getType().getAs<TupleType>())
+      if (auto tupleTy = seedType.getAs<TupleType>())
         seedEltAddr = builder.createTupleElementAddr(
             loc, access, applyInfo.indices.source);
       else
@@ -3196,7 +3207,7 @@ public:
       //   adj[x] = struct (0, ..., key': adj[y], ..., 0)
       // where `key'` is the field in the cotangent space corresponding to
       // `key`.
-      auto structTy = sei->getOperand()->getType().getASTType();
+      auto structTy = remapType(sei->getOperand()->getType()).getASTType();
       auto cotangentVectorTy = structTy->getAutoDiffAssociatedVectorSpace(
           AutoDiffAssociatedVectorSpaceKind::Cotangent,
           LookUpConformanceInModule(getModule().getSwiftModule()))
@@ -3632,7 +3643,7 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
   assert(lhs->getType() == rhs->getType() && "Adjoints must have equal types!");
   assert(lhs->getType().isObject() && rhs->getType().isObject() &&
          "Adjoint types must be both object types!");
-  auto adjointTy = lhs->getType();
+  auto adjointTy = remapType(lhs->getType());
   auto adjointASTTy = adjointTy.getASTType();
   auto loc = lhs.getLoc();
   auto *swiftMod = getModule().getSwiftModule();
