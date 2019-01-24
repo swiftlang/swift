@@ -34,16 +34,17 @@ public func f() {
 }
 
 // b/76387659 - Verify that there is a way to configure the TPU.
-public func testDevice() {
-  TensorFlow.enableTPU()
-  let a = Tensor<Float>(1.0)
-  _ = a+a
+// SR-9736: Fix this test in GPE/compiler mode.
+// public func testDevice() {
+//   TensorFlow.enableTPU()
+//   let a = Tensor<Float>(1.0)
+//   _ = a+a
 
-  // TODO: remove the extra code below once TPU execution supports 0 output
-  // tensors (b/111123797)
-  let extra = Tensor<Float>(1.0)
-  _hostOp(extra)
-}
+//   // TODO: remove the extra code below once TPU execution supports 0 output
+//   // tensors (b/111123797)
+//   let extra = Tensor<Float>(1.0)
+//   _hostOp(extra)
+// }
 
 // This loop is unrolled, so we have multiple SIL values for `x`, but there
 // should be a single copy-to-host compiler warning.
