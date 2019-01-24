@@ -867,10 +867,15 @@ public:
   /// Retrieves the file unit that contains implicit declarations in the
   /// current Swift module. If it does not exist, create one.
   ///
-  // FIXME: Currently it defaults to any file unit in the module. To handle this
-  // more properly, we should make a DerivedFileUnit class to contain all
-  // synthesized implicit type declarations.
-  SourceFile &getPrimalValueDeclContainer() {
+  // FIXME: Currently it defaults to the file containing `origFn`, if it can be
+  // determined. Otherwise, it defaults to any file unit in the module. To
+  // handle this more properly, we should make a DerivedFileUnit class to
+  // contain all synthesized implicit type declarations.
+  SourceFile &getPrimalValueDeclContainer(SILFunction *origFn) {
+    if (origFn->hasLocation())
+      if (auto *declContext = origFn->getLocation().getAsDeclContext())
+        if (auto *parentSourceFile = declContext->getParentSourceFile())
+          return *parentSourceFile;
     for (auto *file : module.getSwiftModule()->getFiles())
       if (auto *src = dyn_cast<SourceFile>(file))
         return *src;
@@ -1909,7 +1914,7 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task,
   auto *function = task->getOriginal();
   assert(&function->getModule() == &module &&
          "The function must be in the same module");
-  auto &file = getPrimalValueDeclContainer();
+  auto &file = getPrimalValueDeclContainer(function);
   // Create a `<fn_name>__Type` struct.
   std::string pvStructName = "AD__" + function->getName().str() + "__Type__" +
                              task->getIndices().mangle();
