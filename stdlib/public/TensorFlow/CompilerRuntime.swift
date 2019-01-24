@@ -67,7 +67,7 @@ public func enableCPU() {
   #tfop("tfc.configureCPU") as Void
 }
 
-@_frozen
+// @_frozen // SR-9739
 public enum _ExecutionMode : Equatable {
   /// CPU or GPU execution.
   case auto
@@ -89,7 +89,7 @@ public enum _ExecutionMode : Equatable {
 
 /// The configuration for the compiler runtime.
 // TODO(hongm): Revisit the longer-term design.
-@_frozen
+// @_frozen // SR-9739
 public enum _RuntimeConfig {
   /// When false, tensorflow runtime will be initialized before running any
   /// tensor program in this process.
@@ -118,7 +118,7 @@ public enum _RuntimeConfig {
 
   /// Specifies whether the TensorFlow computation runs in a local (in-process)
   /// session, or a remote session with the specified server definition.
-  @_frozen
+  // @_frozen // SR-9739
   public enum RuntimeSession {
     case local
     case remote(serverDef: String)
