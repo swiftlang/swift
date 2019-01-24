@@ -35,7 +35,7 @@ class OptionalInoutFuncType {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i32 @main(i32, i8**)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}}{{( signext)?}} i32 @main(i32{{( signext)?}}, i8**)
 // CHECK: call void @llvm.lifetime.start
 // CHECK: call void @llvm.memcpy
 // CHECK: call void @llvm.lifetime.end
@@ -335,7 +335,7 @@ public extension sr8076_QueryHandler {
     }
 
 // CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself, %swift.error** swifterror)
-// CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** noalias nocapture swifterror {{.*}})
+// CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** noalias nocapture{{( swifterror)?}}{{( dereferenceable\(\{\{.\}\}\))?}} {{.*}})
 // CHECK-64: ret { i64, i64 }
 
 // CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself, %swift.error** swifterror)
