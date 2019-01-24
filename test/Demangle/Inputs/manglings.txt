@@ -1,5 +1,11 @@
-_TtBf80_ ---> Builtin.Float80
+_TtBf32_ ---> Builtin.FPIEEE32
+_TtBf64_ ---> Builtin.FPIEEE64
+_TtBf80_ ---> Builtin.FPIEEE80
 _TtBi32_ ---> Builtin.Int32
+$sBf32_ ---> Builtin.FPIEEE32
+$sBf64_ ---> Builtin.FPIEEE64
+$sBf80_ ---> Builtin.FPIEEE80
+$sBi32_ ---> Builtin.Int32
 _TtBw ---> Builtin.Word
 _TtBO ---> Builtin.UnknownObject
 _TtBo ---> Builtin.NativeObject
