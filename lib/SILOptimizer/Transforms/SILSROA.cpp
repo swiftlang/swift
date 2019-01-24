@@ -332,6 +332,11 @@ class SILSROA : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
+
+    // FIXME: We should be able to handle ownership.
+    if (F->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName()
                             << " *****\n");
 
