@@ -4187,8 +4187,8 @@ WARNING(immutable_value_never_used_but_assigned, none,
         (Identifier))
 WARNING(variable_never_mutated, none,
         "%select{variable|parameter}1 %0 was never mutated; "
-        "consider changing to 'let' constant",
-        (Identifier, unsigned))
+        "consider %select{removing 'var' to make it|changing to 'let'}2 constant",
+        (Identifier, unsigned, bool))
 WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
