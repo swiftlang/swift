@@ -63,13 +63,16 @@ class ExistentialSpecializer : public SILFunctionTransform {
   ClassHierarchyAnalysis *CHA;
 public:
   void run() override {
-
     auto *F = getFunction();
 
     /// Don't optimize functions that should not be optimized.
     if (!F->shouldOptimize() || !F->getModule().getOptions().ExistentialSpecializer) {
       return;
     }
+
+    // FIXME: This pass should be able to support ownership.
+    if (F->hasOwnership())
+      return;
 
     /// Get CallerAnalysis information handy.
     CA = PM->getAnalysis<CallerAnalysis>();

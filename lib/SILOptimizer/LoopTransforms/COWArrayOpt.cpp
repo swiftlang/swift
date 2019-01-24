@@ -1160,6 +1160,10 @@ namespace {
 
 class COWArrayOptPass : public SILFunctionTransform {
   void run() override {
+    // FIXME: Update for ownership.
+    if (getFunction()->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "COW Array Opts in Func "
                             << getFunction()->getName() << "\n");
 
@@ -1846,6 +1850,10 @@ class SwiftArrayOptPass : public SILFunctionTransform {
       return;
 
     auto *Fn = getFunction();
+
+    // FIXME: Add support for ownership.
+    if (Fn->hasOwnership())
+      return;
 
     // Don't hoist array property calls at Osize.
     if (Fn->optimizeForSize())

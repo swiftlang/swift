@@ -103,7 +103,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
     P.addSemanticARCOpts();
   }
   P.addClosureLifetimeFixup();
-  P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
@@ -179,121 +178,125 @@ enum OptimizationLevelKind {
 } // end anonymous namespace
 
 void addSimplifyCFGSILCombinePasses(SILPassPipelinePlan &P) {
-  P.addSimplifyCFG();
-  P.addConditionForwarding();
+  P.addSimplifyCFG();         // Ownership: skip.
+  P.addConditionForwarding(); // Ownership: skip.
   // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
   // cond_br).
-  P.addSILCombine();
+  P.addSILCombine(); // Ownership: skip.
   // Which can expose opportunity for simplifcfg.
-  P.addSimplifyCFG();
+  P.addSimplifyCFG(); // Ownership: skip.
 }
 
 /// Perform semantic annotation/loop base optimizations.
 void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   // Perform classic SSA optimizations for cleanup.
-  P.addLowerAggregateInstrs();
-  P.addSILCombine();
-  P.addSROA();
-  P.addMem2Reg();
-  P.addDCE();
-  P.addSILCombine();
-  addSimplifyCFGSILCombinePasses(P);
+  P.addLowerAggregateInstrs();       // Ownership: skip
+  P.addSILCombine();                 // Ownership: skip
+  P.addSROA();                       // Ownership: skip
+  P.addMem2Reg();                    // Ownership: skip
+  P.addDCE();                        // Ownership: skip
+  P.addSILCombine();                 // Ownership: skip
+  addSimplifyCFGSILCombinePasses(P); // Ownership: skip
 
   // Run high-level loop opts.
-  P.addLoopRotate();
+  P.addLoopRotate(); // Ownership: skip
 
   // Cleanup.
-  P.addDCE();
+  P.addDCE(); // Ownership: skip
   // Also CSE semantic calls.
-  P.addHighLevelCSE();
-  P.addSILCombine();
-  P.addSimplifyCFG();
+  P.addHighLevelCSE(); // Ownership: ok.
+  P.addSILCombine();   // Ownership: skip
+  P.addSimplifyCFG();  // Ownership: skip
   // Optimize access markers for better LICM: might merge accesses
   // It will also set the no_nested_conflict for dynamic accesses
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   P.addHighLevelLICM();
   // Simplify CFG after LICM that creates new exit blocks
-  P.addSimplifyCFG();
+  P.addSimplifyCFG(); // Ownership: skip.
   // LICM might have added new merging potential by hoisting
   // we don't want to restart the pipeline - ignore the
   // potential of merging out of two loops
-  P.addAccessEnforcementReleaseSinking();
-  P.addAccessEnforcementOpts();
+  P.addAccessEnforcementReleaseSinking(); // Ownership: skip.
+  P.addAccessEnforcementOpts();           // Ownership: skip.
   // Start of loop unrolling passes.
-  P.addArrayCountPropagation();
+  P.addArrayCountPropagation(); // Ownership: skip.
   // To simplify induction variable.
-  P.addSILCombine();
-  P.addLoopUnroll();
-  P.addSimplifyCFG();
-  P.addPerformanceConstantPropagation();
-  P.addSimplifyCFG();
-  P.addArrayElementPropagation();
+  P.addSILCombine();                     // Ownership: skip.
+  P.addLoopUnroll();                     // Ownership: skip.
+  P.addSimplifyCFG();                    // Ownership: skip.
+  P.addPerformanceConstantPropagation(); // Ownership: ok.
+  P.addSimplifyCFG();                    // Ownership: skip.
+  P.addArrayElementPropagation();        // Ownership: skip.
   // End of unrolling passes.
-  P.addABCOpt();
+  P.addABCOpt(); // Ownership: skip.
   // Cleanup.
-  P.addDCE();
-  P.addCOWArrayOpts();
+  P.addDCE();          // Ownership: skip.
+  P.addCOWArrayOpts(); // Ownership: skip.
   // Cleanup.
-  P.addDCE();
-  P.addSwiftArrayOpts();
+  P.addDCE();            // Ownership: skip.
+  P.addSwiftArrayOpts(); // Ownership: skip.
 }
 
 // Perform classic SSA optimizations.
 void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel,
                   bool stopAfterSerialization = false) {
   // Promote box allocations to stack allocations.
-  P.addAllocBoxToStack();
+  P.addAllocBoxToStack(); // Ownership: ok.
 
   // Propagate copies through stack locations.  Should run after
   // box-to-stack promotion since it is limited to propagating through
   // stack locations. Should run before aggregate lowering since that
   // splits up copy_addr.
-  P.addCopyForwarding();
+  P.addCopyForwarding(); // Ownership: skip.
 
   // Split up opaque operations (copy_addr, retain_value, etc.).
-  P.addLowerAggregateInstrs();
+  P.addLowerAggregateInstrs(); // Ownership: skip.
 
   // Split up operations on stack-allocated aggregates (struct, tuple).
-  P.addSROA();
+  P.addSROA(); // Ownership: skip.
 
   // Promote stack allocations to values.
-  P.addMem2Reg();
+  P.addMem2Reg(); // Ownership: skip.
 
   // Run the existential specializer Pass.
-  P.addExistentialSpecializer();
+  P.addExistentialSpecializer(); // Ownership: Skip.
 
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
-  P.addPerformanceConstantPropagation();
-  P.addSimplifyCFG();
-  P.addSILCombine();
+  P.addPerformanceConstantPropagation(); // Ownership: ok.
+  P.addSimplifyCFG();                    // Ownership: skip.
+  P.addSILCombine();                     // Ownership: skip.
 
   // Mainly for Array.append(contentsOf) optimization.
-  P.addArrayElementPropagation();
-  
+  P.addArrayElementPropagation(); // Ownership: skip.
+
   // Run the devirtualizer, specializer, and inliner. If any of these
   // makes a change we'll end up restarting the function passes on the
   // current function (after optimizing any new callees).
-  P.addDevirtualizer();
-  P.addGenericSpecializer();
+  P.addDevirtualizer();      // Ownership: ok.
+  P.addGenericSpecializer(); // Ownership: ok.
   // Run devirtualizer after the specializer, because many
   // class_method/witness_method instructions may use concrete types now.
-  P.addDevirtualizer();
+  P.addDevirtualizer(); // Ownership: ok.
 
   switch (OpLevel) {
   case OptimizationLevelKind::HighLevel:
     // Does not inline functions with defined semantics.
-    P.addEarlyInliner();
+    P.addEarlyInliner(); // Ownership: ok.
     break;
   case OptimizationLevelKind::MidLevel:
-    P.addGlobalOpt();
-    P.addLetPropertiesOpt();
+    P.addGlobalOpt();        // Ownership: ok.
+    P.addLetPropertiesOpt(); // Ownership: skip.
     // It is important to serialize before any of the @_semantics
     // functions are inlined, because otherwise the information about
     // uses of such functions inside the module is lost,
     // which reduces the ability of the compiler to optimize clients
     // importing this module.
     P.addSerializeSILPass();
+
+    // Now strip any transparent functions that still have ownership.
+    P.addOwnershipModelEliminator();
+
     if (stopAfterSerialization)
       return;
 
@@ -309,54 +312,56 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel,
 
   // Promote stack allocations to values and eliminate redundant
   // loads.
-  P.addMem2Reg();
-  P.addPerformanceConstantPropagation();
+  P.addMem2Reg();                        // Ownership: skip.
+  P.addPerformanceConstantPropagation(); // Ownership: ok.
   //  Do a round of CFG simplification, followed by peepholes, then
   //  more CFG simplification.
 
   // Jump threading can expose opportunity for SILCombine (enum -> is_enum_tag->
   // cond_br).
-  P.addJumpThreadSimplifyCFG();
-  P.addSILCombine();
+  P.addJumpThreadSimplifyCFG(); // Ownership: skip.
+  P.addSILCombine();            // Ownership: skip.
   // SILCombine can expose further opportunities for SimplifyCFG.
-  P.addSimplifyCFG();
+  P.addSimplifyCFG(); // Ownership: skip.
 
-  P.addCSE();
+  P.addCSE(); // Ownership: ok.
+
   if (OpLevel == OptimizationLevelKind::HighLevel) {
     // Early RLE does not touch loads from Arrays. This is important because
     // later array optimizations, like ABCOpt, get confused if an array load in
     // a loop is converted to a pattern with a phi argument.
-    P.addEarlyRedundantLoadElimination();
+    P.addEarlyRedundantLoadElimination(); // Ownership: skip.
   } else {
-    P.addRedundantLoadElimination();
+    P.addRedundantLoadElimination(); // Ownership: skip.
   }
 
-  P.addPerformanceConstantPropagation();
-  P.addCSE();
-  P.addDCE();
+  P.addPerformanceConstantPropagation(); // Ownership: ok.
+  P.addCSE();                            // Ownership: ok.
+  P.addDCE();                            // Ownership: skip.
 
   // Perform retain/release code motion and run the first ARC optimizer.
-  P.addEarlyCodeMotion();
-  P.addReleaseHoisting();
-  P.addARCSequenceOpts();
+  P.addEarlyCodeMotion(); // Ownership: skip.
+  P.addReleaseHoisting(); // Ownership: skip.
+  P.addARCSequenceOpts(); // Ownership: skip.
 
-  P.addSimplifyCFG();
+  P.addSimplifyCFG(); // Ownership: skip.
   if (OpLevel == OptimizationLevelKind::LowLevel) {
     // Remove retain/releases based on Builtin.unsafeGuaranteed
     P.addUnsafeGuaranteedPeephole();
     // Only hoist releases very late.
     P.addLateCodeMotion();
-  } else
-    P.addEarlyCodeMotion();
+  } else {
+    P.addEarlyCodeMotion(); // Ownership: skip.
+  }
 
-  P.addRetainSinking();
+  P.addRetainSinking(); // Ownership: skip.
   // Retain sinking does not sink all retains in one round.
   // Let it run one more time time, because it can be beneficial.
   // FIXME: Improve the RetainSinking pass to sink more/all
   // retains in one go.
-  P.addRetainSinking();
-  P.addReleaseHoisting();
-  P.addARCSequenceOpts();
+  P.addRetainSinking();   // Ownership: skip.
+  P.addReleaseHoisting(); // Ownership: skip.
+  P.addARCSequenceOpts(); // Ownership: skip.
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
@@ -369,34 +374,38 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 
   // Get rid of apparently dead functions as soon as possible so that
   // we do not spend time optimizing them.
-  P.addDeadFunctionElimination();
+  P.addDeadFunctionElimination(); // Ownership: ok.
+
+  // Strip ownership from non-transparent functions.
+  P.addNonTransparentFunctionOwnershipModelEliminator();
+
   // Start by cloning functions from stdlib.
-  P.addPerformanceSILLinker();
+  P.addPerformanceSILLinker(); // Ownership: ok.
 
   // Cleanup after SILGen: remove trivial copies to temporaries.
-  P.addTempRValueOpt();
+  P.addTempRValueOpt(); // Ownership: skip.
 
   // Add the outliner pass (Osize).
-  P.addOutliner();
+  P.addOutliner(); // Ownership: skip.
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("HighLevel+EarlyLoopOpt");
   // FIXME: update this to be a function pass.
-  P.addEagerSpecializer();
+  P.addEagerSpecializer(); // Ownership: ok.
   addSSAPasses(P, OptimizationLevelKind::HighLevel);
   addHighLevelLoopOptPasses(P);
 }
 
 static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidModulePasses+StackPromote");
-  P.addDeadFunctionElimination();
-  P.addPerformanceSILLinker();
-  P.addDeadObjectElimination();
-  P.addGlobalPropertyOpt();
+  P.addDeadFunctionElimination(); // Ownership: ok.
+  P.addPerformanceSILLinker();    // Ownership: ok.
+  P.addDeadObjectElimination();   // Ownership: skip.
+  P.addGlobalPropertyOpt();       // Ownership: ok.
 
   // Do the first stack promotion on high-level SIL.
-  P.addStackPromotion();
+  P.addStackPromotion(); // Ownership: skip.
 }
 
 static bool addMidLevelPassPipeline(SILPassPipelinePlan &P,
@@ -641,6 +650,9 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
 
   // Finally serialize the SIL if we are asked to.
   P.addSerializeSILPass();
+
+  // And then strip ownership before we IRGen.
+  P.addOwnershipModelEliminator();
 
   return P;
 }
