@@ -132,12 +132,17 @@ Adding New Benchmarks
 
 The harness generator supports both single and multiple file tests.
 
-To add a new single file test:
+To add a new single file test, execute the following script with the new of the benchmark:
 
+```
+swift-source$ ./swift/benchmark/scripts/create_benchmark.py YourTestNameHere
+```
+
+The script will automatically:
 1.  Add a new Swift file (`YourTestNameHere.swift`), built according to
     the template below, to the `single-source` directory.
-2.  Add the filename of the new Swift file to CMakeLists.txt
-3.  Edit `main.swift`. Import and register your new Swift module.
+2.  Add the filename of the new Swift file to `CMakeLists.txt`.
+3.  Edit `main.swift` by importing and registering your new Swift module.
 
 To add a new multiple file test:
 
