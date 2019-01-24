@@ -2740,12 +2740,12 @@ public:
         adjointGen(adjointGen), builder(getAdjoint()) {}
 
 private:
-  AdjointValue getZeroAdjointValue(SILType type);
+  AdjointValue makeZeroAdjointValue(SILType type);
 
-  AdjointValue getMaterializedAdjointValue(SILValue value);
+  AdjointValue makeMaterializedAdjointValue(SILValue value);
 
-  AdjointValue getAggregateAdjointValue(SILType type,
-                                        ArrayRef<AdjointValue> elements);
+  AdjointValue makeAggregateAdjointValue(SILType type,
+                                         ArrayRef<AdjointValue> elements);
 
   /// Emit a zero value by calling `AdditiveArithmetic.zero`. The given type
   /// must conform to `AdditiveArithmetic`.
@@ -2796,7 +2796,7 @@ private:
   AdjointValue getAdjointValue(SILValue originalValue) {
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = adjointMap.try_emplace(
-        originalValue, getZeroAdjointValue(
+        originalValue, makeZeroAdjointValue(
             getCotangentType(originalValue->getType(), getModule())));
     return insertion.first->getSecond();
   }
@@ -2809,16 +2809,6 @@ private:
       return ty;
     return ty.subst(getAdjoint().getModule(),
                     adjointGenEnv->getForwardingSubstitutionMap());
-  }
-
-  CanType remapASTType(CanType ty) {
-    if (!ty->hasArchetype())
-      return ty;
-    auto *adjointGenEnv = getAdjoint().getGenericEnvironment();
-    if (!adjointGenEnv)
-      return ty;
-    return ty.subst(adjointGenEnv->getForwardingSubstitutionMap())
-        ->getCanonicalType();
   }
 
   /// Add an adjoint value for the given original value.
@@ -2958,7 +2948,7 @@ public:
     SmallVector<SILValue, 8> formalResults;
     collectAllFormalResultsInTypeOrder(original, formalResults);
     auto srcIdx = task->getIndices().source;
-    addAdjointValue(formalResults[srcIdx], getMaterializedAdjointValue(seed));
+    addAdjointValue(formalResults[srcIdx], makeMaterializedAdjointValue(seed));
     LLVM_DEBUG(getADDebugStream()
                << "Assigned seed " << *seed << " as the adjoint of "
                << formalResults[srcIdx]);
@@ -3132,7 +3122,7 @@ public:
     if (ai->hasSelfArgument() &&
         applyInfo.indices.isWrtParameter(selfParamIndex))
       addAdjointValue(ai->getArgument(origNumIndRes + selfParamIndex),
-                      getMaterializedAdjointValue(*allResultsIt++));
+                      makeMaterializedAdjointValue(*allResultsIt++));
     // Set adjoints for the remaining non-self original parameters.
     for (unsigned i : applyInfo.indices.parameters.set_bits()) {
       // Do not set the adjoint of the original self parameter because we
@@ -3140,7 +3130,7 @@ public:
       if (ai->hasSelfArgument() && i == selfParamIndex)
         continue;
       addAdjointValue(ai->getArgument(origNumIndRes + i),
-                      getMaterializedAdjointValue(*allResultsIt++));
+                      makeMaterializedAdjointValue(*allResultsIt++));
     }
   }
 
@@ -3157,7 +3147,7 @@ public:
     case AdjointValue::Zero:
       for (auto *field : decl->getStoredProperties()) {
         auto fv = si->getFieldValue(field);
-        addAdjointValue(fv, getZeroAdjointValue(
+        addAdjointValue(fv, makeZeroAdjointValue(
             getCotangentType(fv->getType(), getModule())));
       }
       break;
@@ -3226,7 +3216,7 @@ public:
       switch (av.getKind()) {
       case AdjointValue::Kind::Zero:
         addAdjointValue(sei->getOperand(),
-                        getZeroAdjointValue(cotangentVectorSILTy));
+                        makeZeroAdjointValue(cotangentVectorSILTy));
         break;
       case AdjointValue::Kind::Materialized:
       case AdjointValue::Kind::Aggregate: {
@@ -3235,12 +3225,12 @@ public:
           if (field == correspondingField)
             eltVals.push_back(av);
           else
-            eltVals.push_back(getZeroAdjointValue(
+            eltVals.push_back(makeZeroAdjointValue(
                 SILType::getPrimitiveObjectType(field->getType()
                     ->getCanonicalType())));
         }
         addAdjointValue(sei->getOperand(),
-            getAggregateAdjointValue(cotangentVectorSILTy, eltVals));
+            makeAggregateAdjointValue(cotangentVectorSILTy, eltVals));
       }
       }
       return;
@@ -3266,7 +3256,7 @@ public:
 
       // Set adjoint for the `struct_extract` operand.
       addAdjointValue(sei->getOperand(),
-                      getMaterializedAdjointValue(pullbackCall));
+                      makeMaterializedAdjointValue(pullbackCall));
       break;
     }
     }
@@ -3282,7 +3272,7 @@ public:
     case AdjointValue::Kind::Zero:
       for (auto eltVal : ti->getElements())
         addAdjointValue(eltVal,
-            getZeroAdjointValue(getCotangentType(eltVal->getType(),
+            makeZeroAdjointValue(getCotangentType(eltVal->getType(),
                                                  getModule())));
       break;
     case AdjointValue::Kind::Materialized:
@@ -3309,7 +3299,7 @@ public:
     auto av = getAdjointValue(tei);
     switch (av.getKind()) {
     case AdjointValue::Kind::Zero:
-      addAdjointValue(tei->getOperand(), getZeroAdjointValue(tupleCotanTy));
+      addAdjointValue(tei->getOperand(), makeZeroAdjointValue(tupleCotanTy));
       break;
     case AdjointValue::Kind::Aggregate:
     case AdjointValue::Kind::Materialized: {
@@ -3318,12 +3308,12 @@ public:
         if (tei->getFieldNo() == i)
           elements.push_back(av);
         else
-          elements.push_back(getZeroAdjointValue(
+          elements.push_back(makeZeroAdjointValue(
               getCotangentType(tupleTy->getElementType(i)->getCanonicalType(),
                                getModule())));
       }
       addAdjointValue(tei->getOperand(),
-          getAggregateAdjointValue(tupleCotanTy, elements));
+          makeAggregateAdjointValue(tupleCotanTy, elements));
       break;
     }
     }
@@ -3415,16 +3405,16 @@ public:
 };
 } // end anonymous namespace
 
-AdjointValue AdjointEmitter::getZeroAdjointValue(SILType type) {
+AdjointValue AdjointEmitter::makeZeroAdjointValue(SILType type) {
   return {AdjointValue::Kind::Zero, remapType(type), {}};
 }
 
-AdjointValue AdjointEmitter::getMaterializedAdjointValue(SILValue value) {
+AdjointValue AdjointEmitter::makeMaterializedAdjointValue(SILValue value) {
   assert(value);
   return {AdjointValue::Kind::Materialized, remapType(value->getType()), value};
 }
 
-AdjointValue AdjointEmitter::getAggregateAdjointValue(SILType type,
+AdjointValue AdjointEmitter::makeAggregateAdjointValue(SILType type,
                                         ArrayRef<AdjointValue> elements) {
   // Tuple type elements must match the type of each adjoint value element.
   AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
@@ -3595,7 +3585,7 @@ AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
     switch (rhs.getKind()) {
     // x + y
     case AdjointValue::Kind::Materialized:
-      return getMaterializedAdjointValue(
+      return makeMaterializedAdjointValue(
           accumulateMaterializedAdjointsDirect(lhsVal,
               rhs.getMaterializedValue()));
     // x + 0 => x
@@ -3609,10 +3599,10 @@ AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
         auto lhsElt =
             builder.createTupleExtract(lhsVal.getLoc(), lhsVal, i);
         auto newElt = accumulateAdjointsDirect(
-            getMaterializedAdjointValue(lhsElt), rhsElements[i]);
+            makeMaterializedAdjointValue(lhsElt), rhsElements[i]);
         newElements.push_back(newElt);
       }
-      return getAggregateAdjointValue(lhsVal->getType(), newElements);
+      return makeAggregateAdjointValue(lhsVal->getType(), newElements);
     }
   }
   // 0
@@ -3634,7 +3624,7 @@ AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
                                 rhs.getAggregateElements()))
         newElements.push_back(
             accumulateAdjointsDirect(std::get<0>(elt), std::get<1>(elt)));
-      return getAggregateAdjointValue(lhs.getType(), newElements);
+      return makeAggregateAdjointValue(lhs.getType(), newElements);
     }
     }
   }
@@ -3649,7 +3639,7 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
   assert(lhs->getType() == rhs->getType() && "Adjoints must have equal types!");
   assert(lhs->getType().isObject() && rhs->getType().isObject() &&
          "Adjoint types must be both object types!");
-  auto adjointTy = remapType(lhs->getType());
+  auto adjointTy = lhs->getType();
   auto adjointASTTy = adjointTy.getASTType();
   auto loc = lhs.getLoc();
   auto *swiftMod = getModule().getSwiftModule();
