@@ -962,6 +962,8 @@ public:
 
 private:
 
+  llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> ExprWeights;
+
   /// Allocator used for all of the related constraint systems.
   llvm::BumpPtrAllocator Allocator;
 
@@ -1163,11 +1165,9 @@ private:
 
   /// Describes the current solver state.
   struct SolverState {
-    SolverState(Expr *const expr, ConstraintSystem &cs,
+    SolverState(ConstraintSystem &cs,
                 FreeTypeVariableBinding allowFreeTypeVariables);
     ~SolverState();
-
-    llvm::DenseMap<Expr *, unsigned> ExprWeights;
 
     /// The constraint system.
     ConstraintSystem &CS;
@@ -1513,7 +1513,8 @@ public:
   };
 
   ConstraintSystem(TypeChecker &tc, DeclContext *dc,
-                   ConstraintSystemOptions options);
+                   ConstraintSystemOptions options,
+                   Expr *expr = nullptr);
   ~ConstraintSystem();
 
   /// Retrieve the type checker associated with this constraint system.
@@ -1563,13 +1564,13 @@ private:
   /// set of solutions should be filtered even if there is
   /// no single best solution, see `findBestSolution` for
   /// more details.
-  void filterSolutions(SmallVectorImpl<Solution> &solutions,
-                       llvm::DenseMap<Expr *, unsigned> &weights,
-                       bool minimize = false) {
+  void
+  filterSolutions(SmallVectorImpl<Solution> &solutions,
+                  bool minimize = false) {
     if (solutions.size() < 2)
       return;
 
-    if (auto best = findBestSolution(solutions, weights, minimize)) {
+    if (auto best = findBestSolution(solutions, minimize)) {
       if (*best != 0)
         solutions[0] = std::move(solutions[*best]);
       solutions.erase(solutions.begin() + 1, solutions.end());
@@ -3144,11 +3145,10 @@ private:
   /// \param diff The differences among the solutions.
   /// \param idx1 The index of the first solution.
   /// \param idx2 The index of the second solution.
-  /// \param weights The weights of the sub-expressions used for ranking.
   static SolutionCompareResult
   compareSolutions(ConstraintSystem &cs, ArrayRef<Solution> solutions,
                    const SolutionDiff &diff, unsigned idx1, unsigned idx2,
-                   llvm::DenseMap<Expr *, unsigned> &weights);
+                   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights);
 
 public:
   /// Increase the score of the given kind for the current (partial) solution
@@ -3163,7 +3163,6 @@ public:
   /// solution.
   ///
   /// \param solutions The set of viable solutions to consider.
-  /// \param weights The weights of the sub-expressions used for ranking.
   ///
   /// \param minimize If true, then in the case where there is no single
   /// best solution, minimize the set of solutions by removing any solutions
@@ -3172,9 +3171,9 @@ public:
   ///
   /// \returns The index of the best solution, or nothing if there was no
   /// best solution.
-  Optional<unsigned> findBestSolution(SmallVectorImpl<Solution> &solutions,
-                                      llvm::DenseMap<Expr *, unsigned> &weights,
-                                      bool minimize);
+  Optional<unsigned>
+  findBestSolution(SmallVectorImpl<Solution> &solutions,
+                   bool minimize);
 
   /// Apply a given solution to the expression, producing a fully
   /// type-checked expression.
