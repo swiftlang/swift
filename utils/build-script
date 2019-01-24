@@ -531,9 +531,11 @@ class BuildScriptInvocation(object):
             # just invoke cmake from build-script directly rather than futzing
             # with build-script-impl. This makes even more sense since there
             # really isn't a security issue here.
-            impl_args += [
-                "--%s-cmake-options=%s" % (product_name, ' '.join(cmake_opts))
-            ]
+            if cmake_opts:
+                impl_args += [
+                    "--{}-cmake-options={}".format(
+                        product_name, ' '.join(cmake_opts))
+                ]
 
         if args.build_stdlib_deployment_targets:
             impl_args += [
@@ -844,16 +846,20 @@ class BuildScriptInvocation(object):
         product_classes.append(products.Swift)
         if self.args.build_lldb:
             product_classes.append(products.LLDB)
-        if self.args.build_llbuild:
-            product_classes.append(products.LLBuild)
         if self.args.build_libdispatch:
             product_classes.append(products.LibDispatch)
         if self.args.build_foundation:
             product_classes.append(products.Foundation)
         if self.args.build_xctest:
             product_classes.append(products.XCTest)
+        if self.args.build_llbuild:
+            product_classes.append(products.LLBuild)
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
+        if self.args.build_swiftsyntax:
+            product_classes.append(products.SwiftSyntax)
+        if self.args.build_skstresstester:
+            product_classes.append(products.SKStressTester)
         return product_classes
 
     def execute(self):
@@ -878,7 +884,7 @@ class BuildScriptInvocation(object):
                         name == "merged-hosts-lipo"), "invalid action"
                 action_name = name
             elif product_class is None:
-                assert name == "package", "invalid action"
+                assert name in ("package", "extractsymbols"), "invalid action"
                 action_name = "{}-{}".format(host.name, name)
             else:
                 assert name is not None, "invalid action"
@@ -929,6 +935,10 @@ class BuildScriptInvocation(object):
         for host_target in all_hosts:
             for product_class in product_classes:
                 execute_one_impl_action(host_target, product_class, "install")
+
+        # Extract symbols...
+        for host_target in all_hosts:
+            execute_one_impl_action(host_target, name="extractsymbols")
 
         # Package...
         for host_target in all_hosts:

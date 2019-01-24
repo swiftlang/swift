@@ -18,8 +18,10 @@ from .llbuild import LLBuild
 from .lldb import LLDB
 from .llvm import LLVM
 from .ninja import Ninja
+from .skstresstester import SKStressTester
 from .swift import Swift
 from .swiftpm import SwiftPM
+from .swiftsyntax import SwiftSyntax
 from .xctest import XCTest
 
 __all__ = [
@@ -35,4 +37,6 @@ __all__ = [
     'Swift',
     'SwiftPM',
     'XCTest',
+    'SwiftSyntax',
+    'SKStressTester',
 ]
