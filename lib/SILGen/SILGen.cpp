@@ -527,7 +527,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
 
   SILGenFunctionBuilder builder(*this);
   return builder.createFunction(
-      SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
+      SILLinkage::Hidden, SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
       Loc, IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
       ProfileCounter(), IsNotThunk, SubclassScope::NotApplicable);
 }
