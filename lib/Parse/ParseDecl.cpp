@@ -814,7 +814,6 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
 
-  using DeclNameWithLoc = DifferentiableAttr::DeclNameWithLoc;
   SmallVector<ParsedAutoDiffParameter, 8> params;
   Optional<DeclNameWithLoc> jvpSpec;
   Optional<DeclNameWithLoc> vjpSpec;
@@ -842,8 +841,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 
 bool Parser::parseDifferentiableAttributeArguments(
     SmallVectorImpl<ParsedAutoDiffParameter> &params,
-    Optional<DifferentiableAttr::DeclNameWithLoc> &jvpSpec,
-    Optional<DifferentiableAttr::DeclNameWithLoc> &vjpSpec,
+    Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
     TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
 
@@ -959,11 +957,10 @@ bool Parser::parseDifferentiableAttributeArguments(
       return errorAndSkipToEnd();
   }
 
-  using FuncSpec = DifferentiableAttr::DeclNameWithLoc;
   // Function that parses a label and a function specifier,
   // e.g. 'vjp: foo(_:)'.
   // Return true on error.
-  auto parseFuncSpec = [&](StringRef label, FuncSpec &result,
+  auto parseFuncSpec = [&](StringRef label, DeclNameWithLoc &result,
                            bool &terminateParsingArgs) -> bool {
     // Parse label.
     if (parseSpecificIdentifier(label,
@@ -991,7 +988,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   if (Tok.is(tok::identifier) && Tok.getText() == "jvp") {
     SyntaxParsingContext JvpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    jvpSpec = FuncSpec();
+    jvpSpec = DeclNameWithLoc();
     if (parseFuncSpec("jvp", *jvpSpec, terminateParsingArgs))
       return errorAndSkipToEnd();
     if (terminateParsingArgs)
@@ -1004,7 +1001,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   if (Tok.is(tok::identifier) && Tok.getText() == "vjp") {
     SyntaxParsingContext VjpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    vjpSpec = FuncSpec();
+    vjpSpec = DeclNameWithLoc();
     if (parseFuncSpec("vjp", *vjpSpec, terminateParsingArgs))
       return errorAndSkipToEnd();
     if (terminateParsingArgs)
@@ -1032,6 +1029,37 @@ bool Parser::parseDifferentiableAttributeArguments(
     whereClause = TrailingWhereClause::create(Context, whereLoc, requirements);
   }
   return false;
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+ParserResult<DifferentiatingAttr>
+Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
+  StringRef AttrName = "differentiating";
+  SourceLoc lParenLoc = loc, rParenLoc = loc;
+  DeclNameWithLoc original;
+
+  // Parse '('.
+  if (!consumeIf(tok::l_paren, lParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  // Parse the name of the function.
+  original.Name =
+    parseUnqualifiedDeclName(/*afterDot*/ false, original.Loc,
+                             diag::attr_differentiating_expected_original_name,
+                             /*allowOperators*/ true,
+                             /*allowZeroArgCompoundNames*/ true);
+  // Parse ')'.
+  if (!consumeIf(tok::r_paren, rParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  return ParserResult<DifferentiatingAttr>(
+      DifferentiatingAttr::create(Context, /*implicit*/ false, atLoc,
+                                  SourceRange(loc, rParenLoc),
+                                  original));
 }
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
@@ -1803,9 +1831,16 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   /// SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable: {
     auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
-    if (Attr.isNonNull()) {
+    if (Attr.isNonNull())
       Attributes.add(Attr.get());
-    }
+    break;
+  }
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  case DAK_Differentiating: {
+    auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
     break;
   }
   }

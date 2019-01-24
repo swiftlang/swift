@@ -409,6 +409,9 @@ SIMPLE_DECL_ATTR(_fieldwiseDifferentiable, FieldwiseDifferentiable,
                  OnNominalType | UserInaccessible, 87)
 SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
                  OnVar, 88)
+DECL_ATTR(differentiating, Differentiating,
+  OnAccessor | OnFunc | LongAttribute | AllowMultipleAttributes,
+  89)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

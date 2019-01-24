@@ -64,9 +64,11 @@ public:
   }
 
   bool isEqual(const ParsedAutoDiffParameter &other) const {
-    if (getKind() == other.getKind() && getKind() == Kind::Named)
+    if (getKind() != other.getKind())
+      return false;
+    if (getKind() == Kind::Named)
       return getName() == other.getName();
-    return getKind() == other.getKind() && getKind() == Kind::Self;
+    return getKind() == Kind::Self;
   }
 };
 

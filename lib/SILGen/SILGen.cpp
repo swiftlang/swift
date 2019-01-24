@@ -806,6 +806,10 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     if (!hasFunction(thunk))
       emitNativeToForeignThunk(thunk);
   }
+
+  // TODO: Handle SILGen for `@differentiating` attribute.
+  // Tentative solution: SILGen derivative function normally but also emit
+  // mangled redirection thunk for retroactive differentiation.
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {

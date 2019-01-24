@@ -1519,6 +1519,10 @@ ERROR(attr_differentiable_expected_colon_after_label,PointsToFirstBadToken,
 ERROR(attr_differentiable_expected_label,none,
       "expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'", ())
 
+// differentiating
+ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
+      "expected a qualified original function name", ())
+
 // [differentiable ...] (sil-decl attr)
 ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,
       "expected '%0' in 'differentiable' attribute", (StringRef))

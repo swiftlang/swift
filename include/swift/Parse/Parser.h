@@ -858,9 +858,13 @@ public:
   /// Parse the arguments inside the @differentiable attribute.
   bool parseDifferentiableAttributeArguments(
       SmallVectorImpl<ParsedAutoDiffParameter> &params,
-      Optional<DifferentiableAttr::DeclNameWithLoc> &jvpSpec,
-      Optional<DifferentiableAttr::DeclNameWithLoc> &vjpSpec,
+      Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  /// Parse the @differentiating attribute.
+  ParserResult<DifferentiatingAttr>
+  parseDifferentiatingAttribute(SourceLoc AtLoc, SourceLoc Loc);
 
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);

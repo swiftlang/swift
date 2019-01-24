@@ -565,7 +565,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *original = dyn_cast_or_null<AbstractFunctionDecl>(D);
     if (auto *varDecl = dyn_cast_or_null<VarDecl>(D))
       original = varDecl->getGetter();
-    bool isMethod = original && original->getImplicitSelfDecl() ? true : false;
+    bool isMethod = original && original->hasImplicitSelfDecl();
 
     // Print comma if not leading clause.
     bool isLeadingClause = true;
@@ -649,7 +649,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         Printer << ", ";
       });
     }
-    Printer << ")";
+    Printer << ')';
+    break;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case DAK_Differentiating: {
+    Printer.printAttrName("@differentiating");
+    Printer << '(';
+    auto *attr = cast<DifferentiatingAttr>(this);
+    Printer << attr->getOriginal().Name;
+    Printer << ')';
     break;
   }
 
@@ -790,6 +800,8 @@ StringRef DeclAttribute::getAttrName() const {
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable:
     return "differentiable";
+  case DAK_Differentiating:
+    return "differentiating";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1187,6 +1199,23 @@ void DifferentiableAttr::setRequirements(ASTContext &context,
   Requirements = context.AllocateCopy(requirements);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+DifferentiatingAttr::DifferentiatingAttr(ASTContext &context, bool implicit,
+                                         SourceLoc atLoc, SourceRange baseRange,
+                                         DeclNameWithLoc original)
+  : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
+    Original(std::move(original)) {}
+
+DifferentiatingAttr *
+DifferentiatingAttr::create(ASTContext &context, bool implicit,
+                            SourceLoc atLoc, SourceRange baseRange,
+                            DeclNameWithLoc original) {
+  void *mem = context.Allocate(sizeof(DifferentiatingAttr),
+                               alignof(DifferentiatingAttr));
+  return new (mem) DifferentiatingAttr(context, implicit, atLoc, baseRange,
+                                       std::move(original));
+}
+
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
                                TypeLoc ProtocolType,
                                DeclName MemberName,
@@ -1196,7 +1225,6 @@ ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
       MemberName(MemberName),
       MemberNameLoc(MemberNameLoc) {
 }
-
 
 ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,

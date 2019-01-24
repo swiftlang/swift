@@ -2560,14 +2560,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
             scratch, isImplicit, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
             parameters);
 
-        using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
-        Optional<FuncSpecifier> jvp;
+        Optional<DeclNameWithLoc> jvp;
         FuncDecl *jvpDecl = nullptr;
         if (jvpNameId != 0 && jvpDeclId != 0) {
           jvp = { getIdentifier(jvpNameId), DeclNameLoc() };
           jvpDecl = cast<FuncDecl>(getDecl(jvpDeclId));
         }
-        Optional<FuncSpecifier> vjp;
+        Optional<DeclNameWithLoc> vjp;
         FuncDecl *vjpDecl = nullptr;
         if (vjpNameId != 0 && vjpDeclId != 0) {
           vjp = { getIdentifier(vjpNameId), DeclNameLoc() };
@@ -2590,6 +2589,25 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         Attr = diffAttr;
         break;
       }
+
+      // SWIFT_ENABLE_TENSORFLOW
+      case decls_block::Differentiating_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t origNameId;
+        DeclID origDeclId;
+
+        serialization::decls_block::DifferentiatingDeclAttrLayout::readRecord(
+            scratch, isImplicit, origNameId, origDeclId);
+
+        DeclNameWithLoc origName = {getIdentifier(origNameId), DeclNameLoc()};
+        FuncDecl *origDecl = cast<FuncDecl>(getDecl(origDeclId));
+        auto diffAttr = DifferentiatingAttr::create(
+            ctx, isImplicit, SourceLoc(), SourceRange(), origName);
+        diffAttr->setOriginalFunction(origDecl);
+        Attr = diffAttr;
+        break;
+      }
+
       case decls_block::DynamicReplacement_DECL_ATTR: {
         bool isImplicit;
         uint64_t numArgs;
