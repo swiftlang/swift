@@ -266,7 +266,8 @@ KNOWN_SETTINGS=(
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
-    clang-profile-instr-use            ""        "If set, profile file to use for clang PGO"
+    clang-profile-instr-use            ""        "If set, profile file to use for clang PGO while building llvm/clang"
+    swift-profile-instr-use            ""        "If set, profile file to use for clang PGO while building swift"
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
     skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
@@ -759,6 +760,11 @@ function set_build_options_for_host() {
         )
     fi
 
+    if [[ "${SWIFT_PROFILE_INSTR_USE}" ]]; then
+        swift_cmake_options+=(
+            -DSWIFT_PROFDATA_FILE="${SWIFT_PROFILE_INSTR_USE}"
+        )
+    fi
     swift_cmake_options+=(
         -DCOVERAGE_DB="${COVERAGE_DB}"
     )
