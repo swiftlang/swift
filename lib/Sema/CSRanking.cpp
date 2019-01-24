@@ -772,7 +772,7 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2,
-    llvm::DenseMap<Expr *, unsigned> &weights) {
+    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights) {
   if (cs.TC.getLangOpts().DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     log.indent(cs.solverState->depth * 2)
@@ -806,7 +806,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (auto *anchor = locator->getAnchor()) {
       auto weight = weights.find(anchor);
       if (weight != weights.end())
-        return weight->getSecond() + 1;
+        return weight->getSecond().first + 1;
     }
 
     return 1;
@@ -1210,10 +1210,10 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                   : SolutionCompareResult::Incomparable;
 }
 
-Optional<unsigned>
-ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
-                                   llvm::DenseMap<Expr *, unsigned> &weights,
-                                   bool minimize) {
+Optional<unsigned> ConstraintSystem::findBestSolution(
+    SmallVectorImpl<Solution> &viable,
+    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights,
+    bool minimize) {
   if (viable.empty())
     return None;
   if (viable.size() == 1)

@@ -2289,10 +2289,11 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
     if (it == indexMap.end())
       continue;
     unsigned index = it->second;
-    it = depthMap.find(anchor);
-    if (it == depthMap.end())
+
+    auto e = depthMap.find(anchor);
+    if (e == depthMap.end())
       continue;
-    unsigned depth = it->second;
+    unsigned depth = e->second.first;
 
     // If we don't have a name to hang on to, it'll be hard to diagnose this
     // overload.

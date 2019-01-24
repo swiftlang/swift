@@ -1167,7 +1167,7 @@ private:
                 FreeTypeVariableBinding allowFreeTypeVariables);
     ~SolverState();
 
-    llvm::DenseMap<Expr *, unsigned> ExprWeights;
+    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> ExprWeights;
 
     /// The constraint system.
     ConstraintSystem &CS;
@@ -1313,6 +1313,11 @@ private:
     /// even with unbound type variables present.
     bool allowsFreeTypeVariables() const {
       return AllowFreeTypeVariables != FreeTypeVariableBinding::Disallow;
+    }
+
+    Expr *getParentExpr(Expr *expr) {
+      const auto &e = ExprWeights.find(expr);
+      return (e != ExprWeights.end()) ? e->second.second : nullptr;
     }
 
   private:
@@ -1563,9 +1568,10 @@ private:
   /// set of solutions should be filtered even if there is
   /// no single best solution, see `findBestSolution` for
   /// more details.
-  void filterSolutions(SmallVectorImpl<Solution> &solutions,
-                       llvm::DenseMap<Expr *, unsigned> &weights,
-                       bool minimize = false) {
+  void
+  filterSolutions(SmallVectorImpl<Solution> &solutions,
+                  llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights,
+                  bool minimize = false) {
     if (solutions.size() < 2)
       return;
 
@@ -3148,7 +3154,7 @@ private:
   static SolutionCompareResult
   compareSolutions(ConstraintSystem &cs, ArrayRef<Solution> solutions,
                    const SolutionDiff &diff, unsigned idx1, unsigned idx2,
-                   llvm::DenseMap<Expr *, unsigned> &weights);
+                   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights);
 
 public:
   /// Increase the score of the given kind for the current (partial) solution
@@ -3172,9 +3178,10 @@ public:
   ///
   /// \returns The index of the best solution, or nothing if there was no
   /// best solution.
-  Optional<unsigned> findBestSolution(SmallVectorImpl<Solution> &solutions,
-                                      llvm::DenseMap<Expr *, unsigned> &weights,
-                                      bool minimize);
+  Optional<unsigned>
+  findBestSolution(SmallVectorImpl<Solution> &solutions,
+                   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights,
+                   bool minimize);
 
   /// Apply a given solution to the expression, producing a fully
   /// type-checked expression.
