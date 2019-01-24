@@ -90,10 +90,10 @@ public enum _ExecutionMode : Equatable {
 /// TraceContext contains the state needed to build a trace graph function
 /// (TF_Function). As eager ops are executed in tracing mode, their
 /// corresponding nodes are added to the trace graph (via
-/// `addEagerOpToGraph()`). When the trace is finalized (via
-/// `finalizeAndExecute()`), the trace graph function is run by the eager
+/// `addEagerOpToGraph()`). When the trace is finalized (via `finalize()`), the
+/// trace graph function can then be executed (via `execute()`) by the eager
 /// runtime.
-private class TraceContext {
+class TraceContext {
   let status: CTFStatus = TF_NewStatus()
 
   /// The trace graph, which will be converted to a trace graph function
@@ -112,6 +112,9 @@ private class TraceContext {
   /// The trace context object used in TF C API calls that convert eager ops to
   /// (trace) graph nodes.
   let cTraceContext: CTFETraceContext
+
+  /// The trace graph function created by `finalize()`.
+  var traceGraphFn: CTFFunction?
 
   /// `inputValueCount` is the length of the (flattened) list of input tensors
   /// to the trace function.
@@ -143,30 +146,61 @@ private class TraceContext {
     checkOk(status)
   }
 
-  /// Finalize the trace graph function and execute it, and return the list of
-  /// output tensors from the trace execution. These output tensors are owned by
-  /// the caller.
-  func finalizeAndExecute(traceeBasicName: String,
-                          inputs: [Tensor<Float>],
-                          outputs: [CTensorHandle]) -> [CTensorHandle] {
-    // We must be in the `notTracing` enum mode.
-    internalConsistencyCheck(_RuntimeConfig.traceState.context == nil)
+  /// Finalize the trace graph function.
+  func finalize(traceeBasicName: String,
+                outputs: [CTensorHandle]) {
+    internalConsistencyCheck(traceGraphFn == nil)
+    var symbolicOutputs: [TF_Output] = []
+    for (i, output) in outputs.enumerated() {
+      debugLog("Adding symbolic output \(i) as a trace graph func output.")
+      symbolicOutputs.append(TFE_GetTFOutputFromTensorHandle(output ,status))
+      checkOk(status)
+    }
 
-    // Finish building the trace graph function.
-    let eagerContext = _TFCGetGlobalEagerContext()
-
-    let tracedFunctionName = "\(traceeBasicName)_\(_RuntimeConfig.traceGraphFunctionCounter)"
+    let tracedFunctionName =
+      "\(traceeBasicName)_\(_RuntimeConfig.traceGraphFunctionCounter)"
     _RuntimeConfig.traceGraphFunctionCounter += 1
     debugLog("""
                Finalizing trace graph func \(tracedFunctionName), with \
-               \(inputs.count) tracee inputs, and \
+               \(symbolicInputs.count) tracee inputs, and \
                \(outputs.count) return values.
                """)
-    let graphFn = finalize(tracedFunctionName: tracedFunctionName,
-                           outputs: outputs)
-
-    TFE_ContextAddFunction(eagerContext, graphFn, status)
+    traceGraphFn =
+      TF_GraphToFunction(graph, tracedFunctionName,
+                         /*append_hash_to_fn_name*/ 0,
+                         /*num_opers*/ -1,
+                         /*opers*/ nil,
+                         /*numinputs*/ Int32(symbolicInputs.count),
+                         /*inputs*/ symbolicInputs,
+                         /*noutputs*/ Int32(symbolicOutputs.count),
+                         /*outputs*/ symbolicOutputs,
+                         /*outputnames*/ nil,
+                         /*functionoptions*/ nil, "", status)
     checkOk(status)
+
+    if _RuntimeConfig.printsDebugLog {
+      var len: Int = 0
+      let funcDebugStr = TF_FunctionDebugString(traceGraphFn, &len)!
+      debugLog("The traced function is:\n\(String(cString: funcDebugStr))")
+      free(funcDebugStr)
+    }
+
+    let eagerContext = _TFCGetGlobalEagerContext()
+    TFE_ContextAddFunction(eagerContext, traceGraphFn, status)
+    checkOk(status)
+  }
+
+  /// Execute the trace graph function, and return the list of output tensors
+  /// from the trace execution. These output tensors are owned by the caller.
+  func execute(inputs: [Tensor<Float>],
+               outputs: [CTensorHandle]) -> [CTensorHandle] {
+    // We must be in the `notTracing` enum mode.
+    internalConsistencyCheck(_RuntimeConfig.traceState.context == nil)
+    internalConsistencyCheck(traceGraphFn != nil)
+
+    let tracedFunctionName = TF_FunctionName(traceGraphFn)
+    internalConsistencyCheck(tracedFunctionName != nil)
+    let eagerContext = _TFCGetGlobalEagerContext()
     let op: CTFEOp! = TFE_NewOp(eagerContext, tracedFunctionName, status)
     checkOk(status)
 
@@ -188,7 +222,7 @@ private class TraceContext {
     // the trace.
     let maxReturnValueCount = outputs.count
     debugLog("""
-               Executing trace func \(tracedFunctionName) with up to \
+               Executing trace func \(tracedFunctionName!) with up to \
                \(maxReturnValueCount) return values.
                """)
     var returnValues = [CTensorHandle?](repeating: nil,
@@ -218,39 +252,6 @@ private class TraceContext {
     }
     internalConsistencyCheck(returnValueIdx == outputReturnValueCount)
     return traceGraphOutputs
-  }
-
-  /// Finalize the trace graph function.
-  private func finalize(tracedFunctionName: String,
-                        outputs: [CTensorHandle]) -> CTFFunction {
-    var symbolicOutputs: [TF_Output] = []
-    for (i, output) in outputs.enumerated() {
-      debugLog("Adding symbolic output \(i) as a trace graph func output.")
-      symbolicOutputs.append(TFE_GetTFOutputFromTensorHandle(output ,status))
-      checkOk(status)
-    }
-
-    debugLog("Trace graph fn has \(symbolicOutputs.count) outputs.")
-    let theTFFunction =
-      TF_GraphToFunction(graph, tracedFunctionName,
-                         /*append_hash_to_fn_name*/ 0,
-                         /*num_opers*/ -1,
-                         /*opers*/ nil,
-                         /*numinputs*/ Int32(symbolicInputs.count),
-                         /*inputs*/ symbolicInputs,
-                         /*noutputs*/ Int32(symbolicOutputs.count),
-                         /*outputs*/ symbolicOutputs,
-                         /*outputnames*/ nil,
-                         /*functionoptions*/ nil, "", status)
-    checkOk(status)
-
-    if _RuntimeConfig.printsDebugLog {
-      var len: Int = 0
-      let funcDebugStr = TF_FunctionDebugString(theTFFunction, &len)!
-      debugLog("The traced function is:\n\(String(cString: funcDebugStr))")
-      free(funcDebugStr)
-    }
-    return theTFFunction!
   }
 }
 
@@ -582,16 +583,14 @@ public final class _ExecutionContext {
 // Elements in `outputs` can come from two sources:
 // a) Symbolic tensors produced by tensor ops, and added as trace graph nodes.
 // b) Concrete tensors produced by host code (e.g. Tensor(1.0)).
-func finalizeAndExecuteTraceFn(fnName: String,
-                               inputs: [Tensor<Float>],
-                               outputs: [CTensorHandle]) -> [CTensorHandle] {
+func finalizeTraceFn(fnName: String,
+                     outputs: [CTensorHandle]) -> TraceContext {
   guard let traceContext = _RuntimeConfig.traceState.context else {
     fatalError("Not in tracing mode!.")
   }
   _RuntimeConfig.traceState = .notTracing
-  return traceContext.finalizeAndExecute(traceeBasicName: fnName,
-                                         inputs: inputs,
-                                         outputs: outputs)
+  traceContext.finalize(traceeBasicName: fnName, outputs: outputs)
+  return traceContext
 }
 
 private extension TensorArrayProtocol {
@@ -693,15 +692,23 @@ public func trace<State : TensorArrayProtocolEnhanced,
     _copying: Array(inputSymbolicTensors.dropFirst(
                       Int(state._tensorHandleCount))))
   // Run tracee to build the trace, adding ops to the trace graph function.
+  debugLog("Running tracee in tracing mode.")
   let (outputState, outputResult) = fn(symbolicState, symbolicData)
 
+  debugLog("Assembling output tensor handles.")
+  let outputTensorHandles = outputState.cTensorHandles
+    + outputResult.cTensorHandles
+
+  debugLog("Finalizing trace graph function.")
+  // TAP means tensor array protocol.
+  let opType = "MyTraceFn_TAP"
+  let traceContext = finalizeTraceFn(fnName: opType,
+                                     outputs: outputTensorHandles)
+
   // The result is a closure that captures and executes the trace graph
-  // function.
+  // function in the trace context.
   return { (oldState: State, data: Data) -> (State, Result) in
     debugLog("Running trace function over state \(oldState) and data \(data).")
-
-    // TAP means tensor array protocol.
-    let opType = "MyTraceFn_TAP"
 
     debugLog("Getting input state tensor handles.")
     let inputStateTensorHandles =  oldState.cTensorHandles
@@ -714,14 +721,9 @@ public func trace<State : TensorArrayProtocolEnhanced,
     inputTensors.append(contentsOf: inputDataTensorHandles.map {
                           Tensor<Float>(handle: TensorHandle(_owning: $0)) })
 
-    debugLog("Assembling output tensor handles.")
-    let outputTensorHandles = outputState.cTensorHandles
-      + outputResult.cTensorHandles
-
-    debugLog("Finalizing and executing trace graph function.")
-    let returnValues = finalizeAndExecuteTraceFn(fnName: opType,
-                                                 inputs: inputTensors,
-                                                 outputs: outputTensorHandles)
+    debugLog("Executing trace graph function.")
+    let returnValues = traceContext.execute(inputs: inputTensors,
+                                            outputs: outputTensorHandles)
 
     debugLog("Creating output model instance.")
     let newState = state._makeInstance(owning: Array(returnValues.dropLast(

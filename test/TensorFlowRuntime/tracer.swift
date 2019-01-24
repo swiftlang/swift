@@ -48,6 +48,16 @@ TracerTests.testAllBackends("Basic") {
 
   _hostOp(result)
   expectNearlyEqualWithScalarTensor(3.0, result)
+
+  // A second call to `tracedFn` with different input data.
+  let data2 = Tensor<Float>(1.0)
+  let (newState2, result2) = tracedFn(newState, data2)
+
+  _hostOp(newState2)
+  expectNearlyEqualWithScalarTensor(6.0, newState2)
+
+  _hostOp(result2)
+  expectNearlyEqualWithScalarTensor(1.0, result2)
 }
 
 runAllTests()
