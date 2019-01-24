@@ -2602,12 +2602,13 @@ private:
       : kind(kind), type(type), value(value) {
   }
 
-public:
+protected:
   AdjointValue(SILValue materializedValue)
       : AdjointValue(Kind::Materialized, materializedValue->getType(),
                      materializedValue) {}
   AdjointValue(SingleValueInstruction *svi) : AdjointValue(SILValue(svi)) {}
 
+public:
   Kind getKind() const { return kind; }
   SILType getType() const { return type; }
   CanType getSwiftType() const { return type.getASTType(); }
