@@ -18,9 +18,6 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
-list(APPEND swift_runtime_compile_flags
-     "-D__SWIFT_CURRENT_DYLIB=swiftCore")
-
 set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
