@@ -15,7 +15,7 @@ where T : SIMD, T.Scalar : FixedWidthInteger {
   do {
     let data = try encoder.encode(input)
     let output = try decoder.decode(T.self, from: data)
-    assertEqual(input, output)
+    expectEqual(input, output)
   }
   catch {
     expectUnreachableCatch(error)
@@ -31,7 +31,7 @@ where T : SIMD, T.Scalar : BinaryFloatingPoint,
   do {
     let data = try encoder.encode(input)
     let output = try decoder.decode(T.self, from: data)
-    assertEqual(input, output)
+    expectEqual(input, output)
   }
   catch {
     expectUnreachableCatch(error)
