@@ -174,7 +174,7 @@ static CanType joinElementTypes(TypeRange &&range, const ASTContext &ctx) {
   return TupleType::get(typeElts, ctx);
 }
 
-/// Given a range of SIL values, retrives the canonical types of these values,
+/// Given a range of SIL values, retrieves the canonical types of these values,
 /// and joins these types into a single type.
 template <typename SILValueRange>
 static CanType joinElementTypesFromValues(SILValueRange &&range,
@@ -446,11 +446,7 @@ private:
     auto *varDecl = new (ctx) VarDecl(
         /*IsStatic*/ false, VarDecl::Specifier::Var,
         /*IsCaptureList*/ false, SourceLoc(), id, primalValueStruct);
-    if (primalValueStruct->getEffectiveAccess() < AccessLevel::Public)
-      varDecl->getAttrs().add(
-          new (ctx) UsableFromInlineAttr(/*implicit*/ true));
-    else
-      varDecl->setAccess(AccessLevel::Public);
+    varDecl->setAccess(primalValueStruct->getEffectiveAccess());
     if (type->hasArchetype())
       varDecl->setInterfaceType(type->mapTypeOutOfContext());
     else
@@ -867,10 +863,15 @@ public:
   /// Retrieves the file unit that contains implicit declarations in the
   /// current Swift module. If it does not exist, create one.
   ///
-  // FIXME: Currently it defaults to any file unit in the module. To handle this
-  // more properly, we should make a DerivedFileUnit class to contain all
-  // synthesized implicit type declarations.
-  SourceFile &getPrimalValueDeclContainer() {
+  // FIXME: Currently it defaults to the file containing `origFn`, if it can be
+  // determined. Otherwise, it defaults to any file unit in the module. To
+  // handle this more properly, we should make a DerivedFileUnit class to
+  // contain all synthesized implicit type declarations.
+  SourceFile &getPrimalValueDeclContainer(SILFunction *origFn) {
+    if (origFn->hasLocation())
+      if (auto *declContext = origFn->getLocation().getAsDeclContext())
+        if (auto *parentSourceFile = declContext->getParentSourceFile())
+          return *parentSourceFile;
     for (auto *file : module.getSwiftModule()->getFiles())
       if (auto *src = dyn_cast<SourceFile>(file))
         return *src;
@@ -1909,9 +1910,9 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task,
   auto *function = task->getOriginal();
   assert(&function->getModule() == &module &&
          "The function must be in the same module");
-  auto &file = getPrimalValueDeclContainer();
-  // Create a `<fn_name>__Type` struct.
-  std::string pvStructName = "AD__" + function->getName().str() + "__Type__" +
+  auto &file = getPrimalValueDeclContainer(function);
+  // Create a `_<fn_name>__Type` struct.
+  std::string pvStructName = "_AD__" + function->getName().str() + "__Type__" +
                              task->getIndices().mangle();
   auto structId = astCtx.getIdentifier(pvStructName);
   SourceLoc loc = function->getLocation().getSourceLoc();
@@ -1927,21 +1928,29 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task,
     pvStruct->setGenericEnvironment(
         primalGenericSig->createGenericEnvironment());
   }
-  pvStruct->computeType();
-  if (auto *dc = function->getDeclContext()) {
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(dc)) {
-      auto funcAccess = afd->getEffectiveAccess();
-      if (funcAccess >= AccessLevel::Public) {
-        pvStruct->getAttrs().add(
-            new (astCtx) FixedLayoutAttr(/*implicit*/ true));
-      }
-      pvStruct->setAccess(funcAccess);
-    }
-  } else {
+  switch (function->getEffectiveSymbolLinkage()) {
+  case swift::SILLinkage::Public:
+  case swift::SILLinkage::PublicNonABI:
     pvStruct->setAccess(AccessLevel::Internal);
     pvStruct->getAttrs().add(
-        new (astCtx) UsableFromInlineAttr(/*implicit*/ true));
+        new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
+    break;
+  case swift::SILLinkage::Hidden:
+  case swift::SILLinkage::Shared:
+    pvStruct->setAccess(AccessLevel::Internal);
+    break;
+  case swift::SILLinkage::Private:
+    pvStruct->setAccess(AccessLevel::FilePrivate);
+    break;
+  default:
+    // When the original function has external linkage, we create an internal
+    // struct for use by our own module. This is neccessary for cross-cell
+    // differentiation in Jupyter.
+    // TODO: Add a test in the compiler that exercises a similar situation as
+    // cross-cell differentiation in Jupyter.
+    pvStruct->setAccess(AccessLevel::Internal);
   }
+  pvStruct->computeType();
   file.addVisibleDecl(pvStruct);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
@@ -2557,11 +2566,14 @@ bool AdjointGen::run() {
 //===----------------------------------------------------------------------===//
 
 namespace {
+class AdjointEmitter;
 
 /// A symbolic adjoint value that is capable of representing zero value 0 and
 /// 1, in addition to a materialized SILValue. This is expected to be passed
 /// around by value in most cases, as it's two words long.
 class AdjointValue {
+  friend class AdjointEmitter;
+
 public:
   enum Kind {
     /// An empty adjoint, i.e. zero. This case exists due to its special
@@ -2599,12 +2611,13 @@ private:
       : kind(kind), type(type), value(value) {
   }
 
-public:
+protected:
   AdjointValue(SILValue materializedValue)
       : AdjointValue(Kind::Materialized, materializedValue->getType(),
                      materializedValue) {}
   AdjointValue(SingleValueInstruction *svi) : AdjointValue(SILValue(svi)) {}
 
+public:
   Kind getKind() const { return kind; }
   SILType getType() const { return type; }
   CanType getSwiftType() const { return type.getASTType(); }
@@ -2616,24 +2629,6 @@ public:
   bool isZero() const { return kind == Kind::Zero; }
   bool isAggregate() const { return kind == Kind::Aggregate; }
   bool isMaterialized() const { return kind == Kind::Materialized; }
-
-  static AdjointValue getZero(SILType type) { return {Kind::Zero, type, {}}; }
-
-  static AdjointValue getMaterialized(SILValue value) {
-    assert(value);
-    return {Kind::Materialized, value->getType(), value};
-  }
-
-  static AdjointValue getAggregate(SILType type,
-                                   ArrayRef<AdjointValue> elements,
-                                   llvm::BumpPtrAllocator &allocator) {
-    // Tuple type elements must match the type of each adjoint value element.
-    AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
-        elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
-    MutableArrayRef<AdjointValue> array(buf, elements.size());
-    std::uninitialized_copy(elements.begin(), elements.end(), array.begin());
-    return {Kind::Aggregate, type, array};
-  }
 
   ArrayRef<AdjointValue> getAggregateElements() const {
     assert(isAggregate());
@@ -2762,6 +2757,13 @@ public:
         adjointGen(adjointGen), builder(getAdjoint()) {}
 
 private:
+  AdjointValue makeZeroAdjointValue(SILType type);
+
+  AdjointValue makeMaterializedAdjointValue(SILValue value);
+
+  AdjointValue makeAggregateAdjointValue(SILType type,
+                                         ArrayRef<AdjointValue> elements);
+
   /// Emit a zero value by calling `AdditiveArithmetic.zero`. The given type
   /// must conform to `AdditiveArithmetic`.
   void materializeZeroIndirect(CanType type, SILValue bufferAccess,
@@ -2837,8 +2839,8 @@ private:
   AdjointValue getAdjointValue(SILValue originalValue) {
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = adjointMap.try_emplace(
-        originalValue, AdjointValue::getZero(remapType(
-            getCotangentType(originalValue->getType(), getModule()))));
+        originalValue, makeZeroAdjointValue(
+            getCotangentType(originalValue->getType(), getModule())));
     return insertion.first->getSecond();
   }
 
@@ -2970,7 +2972,7 @@ public:
     SmallVector<SILValue, 8> formalResults;
     collectAllFormalResultsInTypeOrder(original, formalResults);
     auto srcIdx = task->getIndices().source;
-    addAdjointValue(formalResults[srcIdx], AdjointValue::getMaterialized(seed));
+    addAdjointValue(formalResults[srcIdx], makeMaterializedAdjointValue(seed));
     LLVM_DEBUG(getADDebugStream()
                << "Assigned seed " << *seed << " as the adjoint of "
                << formalResults[srcIdx]);
@@ -3163,7 +3165,7 @@ public:
     if (ai->hasSelfArgument() &&
         applyInfo.indices.isWrtParameter(selfParamIndex))
       addAdjointValue(ai->getArgument(origNumIndRes + selfParamIndex),
-                      AdjointValue::getMaterialized(*allResultsIt++));
+                      makeMaterializedAdjointValue(*allResultsIt++));
     // Set adjoints for the remaining non-self original parameters.
     for (unsigned i : applyInfo.indices.parameters.set_bits()) {
       // Do not set the adjoint of the original self parameter because we
@@ -3171,7 +3173,7 @@ public:
       if (ai->hasSelfArgument() && i == selfParamIndex)
         continue;
       addAdjointValue(ai->getArgument(origNumIndRes + i),
-                      AdjointValue::getMaterialized(*allResultsIt++));
+                      makeMaterializedAdjointValue(*allResultsIt++));
     }
   }
 
@@ -3188,9 +3190,8 @@ public:
     case AdjointValue::Zero:
       for (auto *field : decl->getStoredProperties()) {
         auto fv = si->getFieldValue(field);
-        addAdjointValue(
-            fv, AdjointValue::getZero(getCotangentType(remapType(fv->getType()),
-                                                       getModule())));
+        addAdjointValue(fv, makeZeroAdjointValue(
+            getCotangentType(fv->getType(), getModule())));
       }
       break;
     case AdjointValue::Materialized: {
@@ -3229,7 +3230,7 @@ public:
       //   adj[x] = struct (0, ..., key': adj[y], ..., 0)
       // where `key'` is the field in the cotangent space corresponding to
       // `key`.
-      auto structTy = sei->getOperand()->getType().getASTType();
+      auto structTy = remapType(sei->getOperand()->getType()).getASTType();
       auto cotangentVectorTy = structTy->getAutoDiffAssociatedVectorSpace(
           AutoDiffAssociatedVectorSpaceKind::Cotangent,
           LookUpConformanceInModule(getModule().getSwiftModule()))
@@ -3237,7 +3238,7 @@ public:
       assert(!getModule().Types.getTypeLowering(cotangentVectorTy)
                  .isAddressOnly());
       auto cotangentVectorSILTy =
-          remapType(SILType::getPrimitiveObjectType(cotangentVectorTy));
+          SILType::getPrimitiveObjectType(cotangentVectorTy);
       auto *cotangentVectorDecl =
           cotangentVectorTy->getStructOrBoundGenericStruct();
       assert(cotangentVectorDecl);
@@ -3258,7 +3259,7 @@ public:
       switch (av.getKind()) {
       case AdjointValue::Kind::Zero:
         addAdjointValue(sei->getOperand(),
-                        AdjointValue::getZero(cotangentVectorSILTy));
+                        makeZeroAdjointValue(cotangentVectorSILTy));
         break;
       case AdjointValue::Kind::Materialized:
       case AdjointValue::Kind::Aggregate: {
@@ -3267,13 +3268,12 @@ public:
           if (field == correspondingField)
             eltVals.push_back(av);
           else
-            eltVals.push_back(AdjointValue::getZero(
-                remapType(SILType::getPrimitiveObjectType(field->getType()
-                    ->getCanonicalType()))));
+            eltVals.push_back(makeZeroAdjointValue(
+                SILType::getPrimitiveObjectType(field->getType()
+                    ->getCanonicalType())));
         }
         addAdjointValue(sei->getOperand(),
-                        AdjointValue::getAggregate(cotangentVectorSILTy,
-                                                   eltVals, allocator));
+            makeAggregateAdjointValue(cotangentVectorSILTy, eltVals));
       }
       }
       return;
@@ -3299,7 +3299,7 @@ public:
 
       // Set adjoint for the `struct_extract` operand.
       addAdjointValue(sei->getOperand(),
-                      AdjointValue::getMaterialized(pullbackCall));
+                      makeMaterializedAdjointValue(pullbackCall));
       break;
     }
     }
@@ -3315,8 +3315,8 @@ public:
     case AdjointValue::Kind::Zero:
       for (auto eltVal : ti->getElements())
         addAdjointValue(eltVal,
-            AdjointValue::getZero(remapType(getCotangentType(eltVal->getType(),
-                                                             getModule()))));
+            makeZeroAdjointValue(getCotangentType(eltVal->getType(),
+                                                 getModule())));
       break;
     case AdjointValue::Kind::Materialized:
       for (auto i : range(ti->getNumOperands()))
@@ -3342,7 +3342,7 @@ public:
     auto av = getAdjointValue(tei);
     switch (av.getKind()) {
     case AdjointValue::Kind::Zero:
-      addAdjointValue(tei->getOperand(), AdjointValue::getZero(tupleCotanTy));
+      addAdjointValue(tei->getOperand(), makeZeroAdjointValue(tupleCotanTy));
       break;
     case AdjointValue::Kind::Aggregate:
     case AdjointValue::Kind::Materialized: {
@@ -3351,12 +3351,12 @@ public:
         if (tei->getFieldNo() == i)
           elements.push_back(av);
         else
-          elements.push_back(AdjointValue::getZero(
+          elements.push_back(makeZeroAdjointValue(
               getCotangentType(tupleTy->getElementType(i)->getCanonicalType(),
                                getModule())));
       }
       addAdjointValue(tei->getOperand(),
-          AdjointValue::getAggregate(tupleCotanTy, elements, allocator));
+          makeAggregateAdjointValue(tupleCotanTy, elements));
       break;
     }
     }
@@ -3494,6 +3494,25 @@ public:
 #undef NO_DERIVATIVE
 };
 } // end anonymous namespace
+
+AdjointValue AdjointEmitter::makeZeroAdjointValue(SILType type) {
+  return {AdjointValue::Kind::Zero, remapType(type), {}};
+}
+
+AdjointValue AdjointEmitter::makeMaterializedAdjointValue(SILValue value) {
+  assert(value);
+  return {AdjointValue::Kind::Materialized, remapType(value->getType()), value};
+}
+
+AdjointValue AdjointEmitter::makeAggregateAdjointValue(SILType type,
+                                        ArrayRef<AdjointValue> elements) {
+  // Tuple type elements must match the type of each adjoint value element.
+  AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
+      elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
+  MutableArrayRef<AdjointValue> array(buf, elements.size());
+  std::uninitialized_copy(elements.begin(), elements.end(), array.begin());
+  return {AdjointValue::Kind::Aggregate, remapType(type), array};
+}
 
 void AdjointEmitter::materializeZeroIndirect(CanType type,
                                              SILValue bufferAccess,
@@ -3679,9 +3698,9 @@ AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
     switch (rhs.getKind()) {
     // x + y
     case AdjointValue::Kind::Materialized:
-      return AdjointValue::getMaterialized(
+      return makeMaterializedAdjointValue(
           accumulateMaterializedAdjointsDirect(lhsVal,
-                                               rhs.getMaterializedValue()));
+              rhs.getMaterializedValue()));
     // x + 0 => x
     case AdjointValue::Kind::Zero:
       return lhs;
@@ -3693,11 +3712,10 @@ AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
         auto lhsElt =
             builder.createTupleExtract(lhsVal.getLoc(), lhsVal, i);
         auto newElt = accumulateAdjointsDirect(
-            AdjointValue::getMaterialized(lhsElt), rhsElements[i]);
+            makeMaterializedAdjointValue(lhsElt), rhsElements[i]);
         newElements.push_back(newElt);
       }
-      return AdjointValue::getAggregate(
-          remapType(lhsVal->getType()), newElements, allocator);
+      return makeAggregateAdjointValue(lhsVal->getType(), newElements);
     }
   }
   // 0
@@ -3719,8 +3737,7 @@ AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
                                 rhs.getAggregateElements()))
         newElements.push_back(
             accumulateAdjointsDirect(std::get<0>(elt), std::get<1>(elt)));
-      return AdjointValue::getAggregate(
-          remapType(lhs.getType()), newElements, allocator);
+      return makeAggregateAdjointValue(lhs.getType(), newElements);
     }
     }
   }
@@ -4486,7 +4503,8 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
            "FIXME: We could emit a thunk that converts the VJP to have the "
            "desired indices.");
     auto assocFn = assocFnAndIndices->first;
-    builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
+    if (assocFn->getType().isReferenceCounted(*getModule()))
+      builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
     assocFns.push_back(assocFnAndIndices->first);
   }
 

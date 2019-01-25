@@ -1,7 +1,18 @@
 // SWIFT_ENABLE_TENSORFLOW
 // RUN: %target-swift-frontend -typecheck -verify %s
 
+// Verify that a `Differentiable` type upholds `AllDifferentiableVariables == CotangentVector`.
+func assertAllDifferentiableVariablesEqualsCotangentVector<T>(_: T.Type)
+  where T : Differentiable, T.AllDifferentiableVariables == T.CotangentVector {}
+
+// Verify that a type `T` conforms to `AdditiveArithmetic`.
+func assertConformsToAdditiveArithmetic<T>(_: T.Type) where T : AdditiveArithmetic {}
+
+// Verify that a type `T` conforms to `VectorNumeric`.
+func assertConformsToVectorNumeric<T>(_: T.Type) where T : VectorNumeric {}
+
 struct Empty : Differentiable {}
+assertConformsToAdditiveArithmetic(Empty.AllDifferentiableVariables.self)
 
 // Test interaction with `AdditiveArithmetic` derived conformances.
 // Previously, this crashed due to duplicate memberwise initializer synthesis.
@@ -87,10 +98,6 @@ _ = pullback(at: Nested(simple: simple, mixed: mixed, generic: genericSame)) { m
   model.simple + model.simple
 }
 
-// Verify that a `Differentiable` type upholds `AllDifferentiableVariables == CotangentVector`.
-func checkAllDifferentiableVariablesEqualsCotangentVector<T>(_: T.Type)
-  where T : Differentiable, T.AllDifferentiableVariables == T.CotangentVector {}
-
 // Test type that does not conform to `AdditiveArithmetic` but whose members do.
 // Thus, `Self` cannot be used as `TangentVector` or `CotangentVector`.
 // Vector space structs types must be synthesized.
@@ -100,7 +107,7 @@ struct AllMembersAdditiveArithmetic : Differentiable {
   var w: Float
   var b: Float
 }
-checkAllDifferentiableVariablesEqualsCotangentVector(AllMembersAdditiveArithmetic.self)
+assertAllDifferentiableVariablesEqualsCotangentVector(AllMembersAdditiveArithmetic.self)
 
 // Test type `AllMembersVectorNumeric` whose members conforms to `VectorNumeric`,
 // in which case we should make `TangentVector` and `CotangentVector` conform to
@@ -113,9 +120,8 @@ struct AllMembersVectorNumeric : Differentiable {
   var w: MyVector
   var b: MyVector
 }
-func testVectorNumeric<T: VectorNumeric>(_ x: T.Type) {}
-testVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
-testVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
+assertConformsToVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
+assertConformsToVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
 
 // Test type with immutable, differentiable stored property.
 struct ImmutableStoredProperty : Differentiable { // expected-error {{does not conform to protocol 'Differentiable'}}
@@ -131,7 +137,7 @@ struct DifferentiableSubset : Differentiable {
   @noDerivative var flag: Bool
   @noDerivative let technicallyDifferentiable: Float = .pi
 }
-checkAllDifferentiableVariablesEqualsCotangentVector(DifferentiableSubset.self)
+assertAllDifferentiableVariablesEqualsCotangentVector(DifferentiableSubset.self)
 let tangentSubset = DifferentiableSubset.TangentVector(w: 1, b: 1)
 let cotangentSubset = DifferentiableSubset.CotangentVector(w: 1, b: 1)
 let allDiffVarsSubset = DifferentiableSubset.AllDifferentiableVariables(w: 1, b: 1)
@@ -146,7 +152,7 @@ struct NestedDifferentiableSubset : Differentiable {
   var mixed: Mixed
   @noDerivative var technicallyDifferentiable: Float
 }
-checkAllDifferentiableVariablesEqualsCotangentVector(NestedDifferentiableSubset.self)
+assertAllDifferentiableVariablesEqualsCotangentVector(NestedDifferentiableSubset.self)
 
 // Test type that uses synthesized vector space types but provides custom
 // method.
