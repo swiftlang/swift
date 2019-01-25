@@ -1225,10 +1225,6 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpMean(squeezingAxes:)
-    where Scalar : Differentiable & FloatingPoint
-  )
   func mean(squeezingAxes axes: [Int32]) -> Tensor {
     return Raw.mean(self, reductionIndices: Tensor<Int32>(axes),
                     keepDims: false)
@@ -1239,10 +1235,6 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpMean(squeezingAxes:)
-    where Scalar : Differentiable & FloatingPoint
-  )
   func mean(squeezingAxes axes: Int32...) -> Tensor {
     return mean(squeezingAxes: axes)
   }
@@ -1252,10 +1244,6 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpSum(squeezingAxes:)
-    where Scalar : Differentiable & FloatingPoint
-  )
   func sum(squeezingAxes axes: [Int32]) -> Tensor {
     return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
@@ -1265,10 +1253,6 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpSum(squeezingAxes:)
-    where Scalar : Differentiable & FloatingPoint
-  )
   func sum(squeezingAxes axes: Int32...) -> Tensor {
     return sum(squeezingAxes: axes)
   }
@@ -1298,7 +1282,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: self, vjp: _vjpMean(squeezingAxes:)
+    wrt: self, vjp: _vjpMean(alongAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
   func mean(alongAxes axes: [Int32]) -> Tensor {
@@ -1310,10 +1294,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpMean(squeezingAxes:)
-    where Scalar : Differentiable & FloatingPoint
-  )
+  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
   func mean(alongAxes axes: Int32...) -> Tensor {
     return mean(alongAxes: axes)
   }
@@ -1324,7 +1305,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(
-    wrt: self, vjp: _vjpSum(squeezingAxes:)
+    wrt: self, vjp: _vjpSum(alongAxes:)
     where Scalar : Differentiable & FloatingPoint
   )
   func sum(alongAxes axes: [Int32]) -> Tensor {
@@ -1336,12 +1317,31 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpSum(squeezingAxes:)
-    where Scalar : Differentiable & FloatingPoint
-  )
+  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
   func sum(alongAxes axes: Int32...) -> Tensor {
     return sum(alongAxes: axes)
+  }
+
+  /// Returns the variance along the specified axes. The reduced dimensions are
+  /// retained with value 1. Does not apply Bessel's correction.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
+  func variance(alongAxes axes: Int32...) -> Tensor {
+    return variance(alongAxes: axes)
+  }
+
+  /// Returns the variance along the specified axes. The reduced dimensions are
+  /// retained with value 1. Does not apply Bessel's correction.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
+  func variance(alongAxes axes: [Int32]) -> Tensor {
+    let mean = self.mean(alongAxes: axes)
+    let squaredDiff = (self - mean).squared()
+    return squaredDiff.mean(alongAxes: axes)
   }
 
   /// Returns the product along the specified axes. The reduced dimensions are

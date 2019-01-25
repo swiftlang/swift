@@ -559,16 +559,16 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   }
 
   @inlinable
-  func _vjpMean(squeezingAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
-    let value = mean(squeezingAxes: axes)
+  func _vjpMean(alongAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
+    let value = mean(alongAxes: axes)
     return (value, { [shape = shapeTensor, count = scalarCountTensor] in
       $0.broadcast(toShape: shape) / Tensor(count)
     })
   }
 
   @inlinable
-  func _vjpSum(squeezingAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
-    let value = sum(squeezingAxes: axes)
+  func _vjpSum(alongAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
+    let value = sum(alongAxes: axes)
     return (value, { [shape = shapeTensor] in $0.broadcast(toShape: shape) })
   }
 }
