@@ -134,9 +134,6 @@ void StackNesting::setup(SILFunction *F) {
         }
       }
     }
-    if (BI->Block->getTerminator()->isFunctionExiting())
-      BI->ExitReachable = true;
-
     for (auto *SuccBB : BI->Block->getSuccessorBlocks()) {
       BlockInfo *&SuccBI = BlockMapping[SuccBB];
       if (!SuccBI) {
@@ -165,33 +162,78 @@ bool StackNesting::solve() {
   bool isNested = false;
   BitVector Bits(StackLocs.size());
 
-  // Iterate until we reach a fixed-point.
+  // Initialize all bit fields to 1s, expect 0s for the entry block.
+  bool initVal = false;
+  for (BlockInfo &BI : BlockInfos) {
+    BI.AliveStackLocsAtEntry.resize(StackLocs.size(), initVal);
+    initVal = false;
+  }
+
+  // First step: do a forward dataflow analysis to get the live stack locations
+  // at the block exits.
+  // This is necessary to get the live locations at blocks which end in
+  // unreachable instructions (otherwise the backward data flow would be
+  // sufficient). The special thing about unreachable-blocks is that it's
+  // okay to have alive locations at that point, i.e. locations which are never
+  // dealloced. We cannot get such locations with a purly backward dataflow.
+  do {
+    changed = false;
+
+    for (BlockInfo &BI : BlockInfos) {
+      Bits = BI.AliveStackLocsAtEntry;
+      for (SILInstruction *StackInst : BI.StackInsts) {
+        if (StackInst->isAllocatingStack()) {
+          Bits.set(bitNumberForAlloc(StackInst));
+        } else if (StackInst->isDeallocatingStack()) {
+          Bits.reset(bitNumberForDealloc(StackInst));
+        }
+      }
+      if (Bits != BI.AliveStackLocsAtExit) {
+        BI.AliveStackLocsAtExit = Bits;
+        assert(!(BI.Block->getTerminator()->isFunctionExiting() && Bits.any())
+               && "stack location is missing dealloc");
+        changed = true;
+      }
+      // Merge the bits into the successors.
+      for (BlockInfo *SuccBI : BI.Successors) {
+        SuccBI->AliveStackLocsAtEntry &= Bits;
+      }
+    }
+  } while (changed);
+
+  // Second step: do a backward dataflow analysis to extend the lifetimes of
+  // no properly nested allocations.
   do {
     changed = false;
 
     // It's a backward dataflow problem.
     for (BlockInfo &BI : reversed(BlockInfos)) {
       // Collect the alive-bits (at the block exit) from the successor blocks.
-      Bits.reset();
       for (BlockInfo *SuccBI : BI.Successors) {
-        Bits |= SuccBI->AliveStackLocsAtEntry;
+        BI.AliveStackLocsAtExit |= SuccBI->AliveStackLocsAtEntry;
+      }
+      Bits = BI.AliveStackLocsAtExit;
 
-        // Also get the ExitReachable flag from the successor blocks.
-        if (!BI.ExitReachable && SuccBI->ExitReachable) {
-          BI.ExitReachable = true;
-          changed = true;
+      if (isa<UnreachableInst>(BI.Block->getTerminator())) {
+        // We treat unreachable as an implicit deallocation for all locations
+        // which are still alive at this point.
+        for (int BitNr = Bits.find_first(); BitNr >= 0;
+             BitNr = Bits.find_next(BitNr)) {
+          // For each alive location extend the lifetime of all locations which
+          // are alive at the allocation point. This is the same as we do for
+          // a "real" deallocation instruction (see below).
+          Bits |= StackLocs[BitNr].AliveLocs;
         }
+        BI.AliveStackLocsAtExit = Bits;
       }
       for (SILInstruction *StackInst : reversed(BI.StackInsts)) {
         if (StackInst->isAllocatingStack()) {
-          auto AllocInst = cast<SingleValueInstruction>(StackInst);
-          int BitNr = StackLoc2BitNumbers[AllocInst];
+          int BitNr = bitNumberForAlloc(StackInst);
           if (Bits != StackLocs[BitNr].AliveLocs) {
             // More locations are alive around the StackInst's location.
             // Update the AlivaLocs bitset, which contains all those alive
             // locations.
-            assert((Bits.test(BitNr) || (!BI.ExitReachable && !Bits.any()))
-                   && "no dealloc found for alloc stack");
+            assert(Bits.test(BitNr) && "no dealloc found for alloc stack");
             StackLocs[BitNr].AliveLocs = Bits;
             changed = true;
             isNested = true;
@@ -203,10 +245,7 @@ bool StackNesting::solve() {
           // A stack deallocation begins the lifetime of its location (in
           // reverse order). And it also begins the lifetime of all other
           // locations which are alive at the allocation point.
-          auto *AllocInst =
-            cast<SingleValueInstruction>(StackInst->getOperand(0));
-          int BitNr = StackLoc2BitNumbers[AllocInst];
-          Bits |= StackLocs[BitNr].AliveLocs;
+          Bits |= StackLocs[bitNumberForDealloc(StackInst)].AliveLocs;
         }
       }
       if (Bits != BI.AliveStackLocsAtEntry) {
@@ -271,10 +310,7 @@ StackNesting::Changes StackNesting::adaptDeallocs() {
   // the same order as in solve().
   for (const BlockInfo &BI : reversed(BlockInfos)) {
     // Collect the alive-bits (at the block exit) from the successor blocks.
-    Bits.reset();
-    for (BlockInfo *SuccBI : BI.Successors) {
-      Bits |= SuccBI->AliveStackLocsAtEntry;
-    }
+    Bits = BI.AliveStackLocsAtExit;
 
     // Insert deallocations at block boundaries.
     // This can be necessary for unreachable blocks. Example:
@@ -292,12 +328,6 @@ StackNesting::Changes StackNesting::adaptDeallocs() {
     for (unsigned SuccIdx = 0, NumSuccs = BI.Successors.size();
          SuccIdx < NumSuccs; ++ SuccIdx) {
       BlockInfo *SuccBI = BI.Successors[SuccIdx];
-
-      // It's acceptable to not deallocate alive locations in unreachable
-      // blocks - as long as the nesting is not violated. So if there are no
-      // alive locations at the unreachable successor block, we can ignore it.
-      if (!SuccBI->ExitReachable && !SuccBI->AliveStackLocsAtEntry.any())
-        continue;
 
       if (SuccBI->AliveStackLocsAtEntry == Bits)
         continue;
@@ -320,16 +350,14 @@ StackNesting::Changes StackNesting::adaptDeallocs() {
     for (SILInstruction *StackInst : reversed(BI.StackInsts)) {
       if (StackInst->isAllocatingStack()) {
         // For allocations we just update the bit-set.
-        auto AllocInst = cast<SingleValueInstruction>(StackInst);
-        int BitNr = StackLoc2BitNumbers.lookup(AllocInst);
+        int BitNr = bitNumberForAlloc(StackInst);
         assert(Bits == StackLocs[BitNr].AliveLocs &&
                "dataflow didn't converge");
         Bits.reset(BitNr);
       } else if (StackInst->isDeallocatingStack()) {
         // Handle deallocations.
-        auto *AllocInst = cast<SingleValueInstruction>(StackInst->getOperand(0));
         SILLocation Loc = StackInst->getLoc();
-        int BitNr = StackLoc2BitNumbers.lookup(AllocInst);
+        int BitNr = bitNumberForDealloc(StackInst);
         SILInstruction *InsertionPoint = &*std::next(StackInst->getIterator());
         if (Bits.test(BitNr)) {
           // The location of StackInst is alive after StackInst. So we have to
@@ -372,17 +400,18 @@ void StackNesting::dump() const {
       continue;
 
     llvm::dbgs() << "Block " << BI.Block->getDebugID();
-    if (!BI.ExitReachable)
-      llvm::dbgs() << " (unreachable exit)";
-    llvm::dbgs() << ": bits=";
+    llvm::dbgs() << ": entry-bits=";
     dumpBits(BI.AliveStackLocsAtEntry);
+    llvm::dbgs() << ": exit-bits=";
+    dumpBits(BI.AliveStackLocsAtExit);
+    llvm::dbgs() << '\n';
     for (SILInstruction *StackInst : BI.StackInsts) {
       if (StackInst->isAllocatingStack()) {
         auto AllocInst = cast<SingleValueInstruction>(StackInst);
         int BitNr = StackLoc2BitNumbers.lookup(AllocInst);
         llvm::dbgs() << "  alloc #" << BitNr << ": alive=";
         dumpBits(StackLocs[BitNr].AliveLocs);
-        llvm::dbgs() << "    " << *StackInst;
+        llvm::dbgs() << ",     " << *StackInst;
       } else if (StackInst->isDeallocatingStack()) {
         auto *AllocInst = cast<SingleValueInstruction>(StackInst->getOperand(0));
         int BitNr = StackLoc2BitNumbers.lookup(AllocInst);
@@ -405,6 +434,5 @@ void StackNesting::dumpBits(const BitVector &Bits) {
     llvm::dbgs() << separator << Bit;
     separator = ",";
   }
-  llvm::dbgs() << ">\n";
+  llvm::dbgs() << '>';
 }
-
