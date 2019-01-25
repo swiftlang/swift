@@ -137,6 +137,8 @@ struct DifferentiableSubset : Differentiable {
   @noDerivative var flag: Bool
   @noDerivative let technicallyDifferentiable: Float = .pi
 }
+assertConformsToAdditiveArithmetic(DifferentiableSubset.AllDifferentiableVariables.self)
+assertConformsToVectorNumeric(DifferentiableSubset.AllDifferentiableVariables.self)
 assertAllDifferentiableVariablesEqualsCotangentVector(DifferentiableSubset.self)
 let tangentSubset = DifferentiableSubset.TangentVector(w: 1, b: 1)
 let cotangentSubset = DifferentiableSubset.CotangentVector(w: 1, b: 1)
