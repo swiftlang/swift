@@ -107,7 +107,7 @@ private class TraceContext {
   ///
   /// For example, if the tracee is:
   /// func foo(x: TensorPair) -> Tensor {
-  ///   let y = Tensor<1.0>
+  ///   let y = Tensor<Float>(1.0)
   ///   return x.first + x.second + y
   /// }
   ///
@@ -235,7 +235,7 @@ private class TraceContext {
 
   /// Execute the trace graph function, and return the list of output tensors
   /// from the trace execution. These output tensors are owned by the caller.
-  func execute(inputs: [Tensor<Float>],
+  func execute(traceeInputs: [Tensor<Float>],
                outputs: [CTensorHandle]) -> [CTensorHandle] {
     // We must be in the `notTracing` enum mode.
     internalConsistencyCheck(_RuntimeConfig.traceState.context == nil)
@@ -254,10 +254,10 @@ private class TraceContext {
       checkOk(status)
     }
 
-    debugLog("Adding \(inputs.count) tracee input tensors.")
-    internalConsistencyCheck(symbolicInputs.count == inputs.count
+    debugLog("Adding \(traceeInputs.count) tracee input tensors.")
+    internalConsistencyCheck(symbolicInputs.count == traceeInputs.count
                                + Int(additionalInputTensorCount))
-    for input in inputs {
+    for input in traceeInputs {
       _TFCOpAddInputFromTensorHandle(op, input.handle, status)
       checkOk(status)
     }
@@ -268,7 +268,8 @@ private class TraceContext {
                                                                  UInt32(i))
       internalConsistencyCheck(input != nil)
       debugLog("""
-                 Adding tensor \(inputs.count+Int(additionalInputTensorCount)):\
+                 Adding additional input tensor of idx \
+                 \(traceeInputs.count+Int(additionalInputTensorCount)):\
                  \(input!).
                  """)
       TFE_OpAddInput(op, input, status)
@@ -794,7 +795,7 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
                         })
 
     debugLog("Executing trace graph function.")
-    let returnValues = traceContext.execute(inputs: inputTensors,
+    let returnValues = traceContext.execute(traceeInputs: inputTensors,
                                             outputs: outputTensorHandles)
 
     debugLog("Creating output model instance.")
