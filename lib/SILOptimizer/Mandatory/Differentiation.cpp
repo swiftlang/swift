@@ -1943,7 +1943,12 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task,
     pvStruct->setAccess(AccessLevel::FilePrivate);
     break;
   default:
-    llvm_unreachable("The original function cannot have external linkage");
+    // When the original function has external linkage, we create an internal
+    // struct for use by our own module. This is neccessary for cross-cell
+    // differentiation in Jupyter.
+    // TODO: Add a test in the compiler that exercises a similar situation as
+    // cross-cell differentiation in Jupyter.
+    pvStruct->setAccess(AccessLevel::Internal);
   }
   pvStruct->computeType();
   file.addVisibleDecl(pvStruct);
