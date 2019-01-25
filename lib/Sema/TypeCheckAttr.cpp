@@ -2939,7 +2939,7 @@ void AttributeChecker::visitFieldwiseDifferentiableAttr(
     return;
   }
   if (!TC.conformsToProtocol(
-          structDecl->swift::TypeDecl::getDeclaredInterfaceType(),
+          structDecl->getDeclaredInterfaceType(),
           TC.Context.getProtocol(KnownProtocolKind::Differentiable),
           structDecl, ConformanceCheckFlags::Used)) {
     diagnoseAndRemoveAttr(attr,
@@ -2950,6 +2950,8 @@ void AttributeChecker::visitFieldwiseDifferentiableAttr(
 
 void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
   auto *vd = dyn_cast<VarDecl>(D);
+  if (attr->isImplicit())
+    return;
   if (!vd || vd->isStatic()) {
     diagnoseAndRemoveAttr(attr,
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);
@@ -2961,10 +2963,10 @@ void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);
     return;
   }
-  auto *diffable = TC.Context.getProtocol(KnownProtocolKind::Differentiable);
-  if (!TC.conformsToProtocol(structDecl->getDeclaredInterfaceType(), diffable,
-                             structDecl->getDeclContext(),
-                             ConformanceCheckFlags::Used))
+  if (!TC.conformsToProtocol(
+          structDecl->getDeclaredInterfaceType(),
+          TC.Context.getProtocol(KnownProtocolKind::Differentiable),
+          structDecl->getDeclContext(), ConformanceCheckFlags::Used))
     diagnoseAndRemoveAttr(attr,
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);
 }
