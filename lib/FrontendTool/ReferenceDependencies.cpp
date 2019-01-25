@@ -209,13 +209,8 @@ void ReferenceDependenciesEmitter::emit(SourceFile *SF,
 void ReferenceDependenciesEmitter::emit() const {
   assert(SF && "Cannot emit reference dependencies without a SourceFile");
   out << "### Swift dependencies file v0 ###\n";
-  if (SF->getASTContext().hadError())
-    out << "### Provides and depends are unknown because a compilation error "
-           "occurred. ###\n";
-  else {
-    emitProvides();
-    emitDepends();
-  }
+  emitProvides();
+  emitDepends();
   emitInterfaceHash();
 }
 

@@ -117,6 +117,10 @@ public:
 template <typename Key1, typename Key2, typename Value> class TwoStageMap {
 public:
   // Define this here so it can be changed easily.
+  // TODO: Use llvm structure such as DenseMap. However, DenseMap does not
+  // preserve pointers to elements, so be careful!
+  // TODO: Consider using an ordered structure to guarantee determinism
+  // when compilation order changes.
   template <typename Key, typename MapValue>
   using Map = std::unordered_map<Key, MapValue>;
 
