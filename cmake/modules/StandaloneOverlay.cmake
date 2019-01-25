@@ -61,7 +61,7 @@ precondition(TOOLCHAIN_DIR)
 
 # Some overlays include the runtime's headers,
 # and some of those headers are generated at build time.
-add_subdirectory("${SWIFT_SOURCE_DIR}/include" "swift/include")
+add_subdirectory("${SWIFT_SOURCE_DIR}/include" "${SWIFT_SOURCE_DIR}/include")
 add_subdirectory("${SWIFT_SOURCE_DIR}/apinotes" "swift/apinotes")
 
 # Without this line, installing components is broken. This needs refactoring.
