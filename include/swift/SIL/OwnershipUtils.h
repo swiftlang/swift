@@ -67,35 +67,6 @@ struct ErrorBehaviorKind {
 
 } // end namespace ownership
 
-/// This class is a higher level interface to the ownership checker meant for
-/// use with SILPasses. It uses the actual checker as an internal PImpl detail
-/// so types/etc do not leak.
-struct OwnershipChecker {
-  /// The list of regular users from the last run of the checker.
-  SmallVector<SILInstruction *, 16> regularUsers;
-
-  /// The list of regular users from the last run of the checker.
-  SmallVector<SILInstruction *, 16> lifetimeEndingUsers;
-
-  /// The live blocks for the SILValue we processed. This can be used to
-  /// determine if a block is in the "live" region of our SILInstruction.
-  SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
-
-  /// The list of implicit regular users from the last run of the checker.
-  ///
-  /// This is used to encode end of scope like instructions.
-  SmallVector<SILInstruction *, 4> endScopeRegularUsers;
-
-  /// The module that we are in.
-  SILModule &mod;
-
-  /// A cache of dead-end basic blocks that we use to determine if we can
-  /// ignore "leaks".
-  DeadEndBlocks &deadEndBlocks;
-
-  bool checkValue(SILValue Value);
-};
-
 /// Returns true if:
 ///
 /// 1. No consuming uses are reachable from any other consuming use, from any

@@ -724,32 +724,3 @@ void SILValue::verifyOwnership(SILModule &mod,
   }
 #endif
 }
-
-bool OwnershipChecker::checkValue(SILValue value) {
-  regularUsers.clear();
-  lifetimeEndingUsers.clear();
-  liveBlocks.clear();
-
-  // Since we do not have SILUndef, we now know that getFunction() should return
-  // a real function. Assert in case this assumption is no longer true.
-  SILFunction *f = value->getFunction();
-  assert(f && "Instructions and arguments should have a function");
-
-  // If the given function has unqualified ownership, there is nothing further
-  // to verify.
-  if (!f->hasOwnership())
-    return false;
-
-  ErrorBehaviorKind errorBehavior(ErrorBehaviorKind::ReturnFalse);
-  SILValueOwnershipChecker checker(mod, deadEndBlocks, value, errorBehavior,
-                                   liveBlocks);
-  if (!checker.check()) {
-    return false;
-  }
-
-  // TODO: Make this more efficient.
-  copy(checker.getRegularUsers(), std::back_inserter(regularUsers));
-  copy(checker.getLifetimeEndingUsers(),
-       std::back_inserter(lifetimeEndingUsers));
-  return true;
-}
