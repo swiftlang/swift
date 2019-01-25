@@ -8,11 +8,17 @@ import StdlibUnittest
 let SIMDCodableTests = TestSuite("SIMDCodable")
 
 // Round an integer to the closest representable JS integer value
-func jsInteger<T>(_ value: T) -> T where T : FixedWidthInteger {
+func jsInteger<T>(_ value: T) -> T
+where T : SIMD, T.Scalar : FixedWidthInteger {
   // Attempt to round-trip though Double; if that fails it's because the
   // rounded value is too large to fit in T, so use the largest value that
   // does fit instead.
-  return T(exactly: Double(value)) ?? T(Double(T.max).nextDown)
+  let upperBound = T.Scalar(Double(T.Scalar.max).nextDown)
+  var result = T()
+  for i in result.indices {
+    result[i] = T.Scalar(exactly: Double(value[i])) ?? upperBound
+  }
+  return result
 }
 
 func testRoundTrip<T>(_ for: T.Type)
