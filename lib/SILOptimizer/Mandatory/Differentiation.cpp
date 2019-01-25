@@ -1911,8 +1911,8 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task,
   assert(&function->getModule() == &module &&
          "The function must be in the same module");
   auto &file = getPrimalValueDeclContainer(function);
-  // Create a `<fn_name>__Type` struct.
-  std::string pvStructName = "AD__" + function->getName().str() + "__Type__" +
+  // Create a `_<fn_name>__Type` struct.
+  std::string pvStructName = "_AD__" + function->getName().str() + "__Type__" +
                              task->getIndices().mangle();
   auto structId = astCtx.getIdentifier(pvStructName);
   SourceLoc loc = function->getLocation().getSourceLoc();
@@ -1931,8 +1931,9 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task,
   switch (function->getEffectiveSymbolLinkage()) {
   case swift::SILLinkage::Public:
   case swift::SILLinkage::PublicNonABI:
-    pvStruct->setAccess(AccessLevel::Public);
-    pvStruct->addFixedLayoutAttr();
+    pvStruct->setAccess(AccessLevel::Internal);
+    pvStruct->getAttrs().add(
+        new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
     break;
   case swift::SILLinkage::Hidden:
   case swift::SILLinkage::Shared:
