@@ -939,13 +939,13 @@ public:
       substWitnessTable(substWitnessTable) { }
 
   using BuiltType = const Metadata *;
-  using BuiltNominalTypeDecl = const ContextDescriptor *;
+  using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
-  BuiltNominalTypeDecl createNominalTypeDecl(
-                                     const Demangle::NodePointer &node) const {
+  BuiltTypeDecl createTypeDecl(const Demangle::NodePointer &node,
+                               bool &typeAlias) const {
     // Look for a nominal type descriptor based on its mangled name.
     return _findNominalTypeDescriptor(node, demangler);
   }
@@ -987,14 +987,22 @@ public:
 #endif
   }
 
-  BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
+  BuiltType createNominalType(BuiltTypeDecl metadataOrTypeDecl,
                               BuiltType parent) const {
     // Treat nominal type creation the same way as generic type creation,
     // but with no generic arguments at this level.
     return createBoundGenericType(metadataOrTypeDecl, { }, parent);
   }
 
-  BuiltType createBoundGenericType(BuiltNominalTypeDecl anyTypeDecl,
+  BuiltType createTypeAliasType(BuiltTypeDecl typeAliasDecl,
+                                BuiltType parent) const {
+    // We can't support sugared types here since we have no way to
+    // resolve the underlying type of the type alias. However, some
+    // CF types are mangled as type aliases.
+    return createNominalType(typeAliasDecl, parent);
+  }
+
+  BuiltType createBoundGenericType(BuiltTypeDecl anyTypeDecl,
                                    const ArrayRef<BuiltType> genericArgs,
                                    const BuiltType parent) const {
     auto typeDecl = dyn_cast<TypeContextDescriptor>(anyTypeDecl);

@@ -109,7 +109,7 @@ static inline Optional<StringRef> getObjCClassOrProtocolName(
 template <typename BuilderType>
 class TypeDecoder {
   using BuiltType = typename BuilderType::BuiltType;
-  using BuiltNominalTypeDecl = typename BuilderType::BuiltNominalTypeDecl;
+  using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using NodeKind = Demangle::Node::Kind;
 
@@ -150,13 +150,17 @@ class TypeDecoder {
     }
     case NodeKind::Enum:
     case NodeKind::Structure:
-    case NodeKind::TypeAlias: // This can show up for imported Clang decls.
+    case NodeKind::TypeAlias:
     case NodeKind::TypeSymbolicReference:
     {
-      BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
+      BuiltTypeDecl typeDecl = BuiltTypeDecl();
       BuiltType parent = BuiltType();
-      if (!decodeMangledNominalType(Node, typeDecl, parent))
+      bool typeAlias = false;
+      if (!decodeMangledTypeDecl(Node, typeDecl, parent, typeAlias))
         return BuiltType();
+
+      if (typeAlias && Node->getKind() == NodeKind::TypeAlias)
+        return Builder.createTypeAliasType(typeDecl, parent);
 
       return Builder.createNominalType(typeDecl, parent);
     }
@@ -177,13 +181,16 @@ class TypeDecoder {
     }
     case NodeKind::BoundGenericEnum:
     case NodeKind::BoundGenericStructure:
+    case NodeKind::BoundGenericTypeAlias:
     case NodeKind::BoundGenericOtherNominalType: {
       if (Node->getNumChildren() < 2)
         return BuiltType();
 
-      BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
+      BuiltTypeDecl typeDecl = BuiltTypeDecl();
       BuiltType parent = BuiltType();
-      if (!decodeMangledNominalType(Node->getChild(0), typeDecl, parent))
+      bool typeAlias = false;
+      if (!decodeMangledTypeDecl(Node->getChild(0), typeDecl,
+                                 parent, typeAlias))
         return BuiltType();
 
       std::vector<BuiltType> args;
@@ -199,6 +206,40 @@ class TypeDecoder {
       }
 
       return Builder.createBoundGenericType(typeDecl, args, parent);
+    }
+    case NodeKind::BoundGenericProtocol: {
+      // This is a special case. When you write a protocol typealias with a
+      // concrete type base, for example:
+      //
+      // protocol P { typealias A<T> = ... }
+      // struct S : P {}
+      // let x: S.A<Int> = ...
+      //
+      // The mangling tree looks like this:
+      //
+      // BoundGenericProtocol ---> BoundGenericTypeAlias
+      // |                         |
+      // |                         |
+      // --> Protocol: P           --> TypeAlias: A
+      // |                         |
+      // --> TypeList:             --> TypeList:
+      //     |                         |
+      //     --> Structure: S          --> Structure: Int
+      //
+      // When resolving the mangling tree to a decl, we strip off the
+      // BoundGenericProtocol's *argument*, leaving behind only the
+      // protocol reference.
+      //
+      // But when resolving it to a type, we want to *keep* the argument
+      // so that the parent type becomes 'S' and not 'P'.
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
+      const auto &genericArgs = Node->getChild(1);
+      if (genericArgs->getNumChildren() != 1)
+        return BuiltType();
+
+      return decodeMangledType(genericArgs->getChild(0));
     }
     case NodeKind::BuiltinTypeName: {
       auto mangledName = Demangle::mangleNode(Node);
@@ -533,16 +574,18 @@ class TypeDecoder {
   }
 
 private:
-  bool decodeMangledNominalType(Demangle::NodePointer node,
-                                BuiltNominalTypeDecl &typeDecl,
-                                BuiltType &parent) {
+  bool decodeMangledTypeDecl(Demangle::NodePointer node,
+                             BuiltTypeDecl &typeDecl,
+                             BuiltType &parent,
+                             bool &typeAlias) {
     if (node->getKind() == NodeKind::Type)
-      return decodeMangledNominalType(node->getChild(0), typeDecl, parent);
+      return decodeMangledTypeDecl(node->getChild(0), typeDecl,
+                                   parent, typeAlias);
 
-    Demangle::NodePointer nominalNode;
+    Demangle::NodePointer declNode;
     if (node->getKind() == NodeKind::TypeSymbolicReference) {
       // A symbolic reference can be directly resolved to a nominal type.
-      nominalNode = node;
+      declNode = node;
     } else {
       if (node->getNumChildren() < 2)
         return false;
@@ -554,7 +597,7 @@ private:
       // in addition to a reference to the parent type. The
       // mangled name already includes the module and parent
       // types, if any.
-      nominalNode = node;
+      declNode = node;
       switch (parentContext->getKind()) {
       case Node::Kind::Module:
         break;
@@ -568,12 +611,12 @@ private:
         parent = decodeMangledType(parentContext);
         // Remove any generic arguments from the context node, producing a
         // node that references the nominal type declaration.
-        nominalNode =
+        declNode =
           stripGenericArgsFromContextNode(node, Builder.getNodeFactory());
         break;
       }
     }
-    typeDecl = Builder.createNominalTypeDecl(nominalNode);
+    typeDecl = Builder.createTypeDecl(declNode, typeAlias);
     if (!typeDecl) return false;
 
     return true;

@@ -24,7 +24,9 @@ NodePointer Demangle::stripGenericArgsFromContextNode(NodePointer node,
   case Demangle::Node::Kind::BoundGenericClass:
   case Demangle::Node::Kind::BoundGenericEnum:
   case Demangle::Node::Kind::BoundGenericStructure:
+  case Demangle::Node::Kind::BoundGenericProtocol:
   case Demangle::Node::Kind::BoundGenericOtherNominalType:
+  case Demangle::Node::Kind::BoundGenericTypeAlias:
     // Bound generic types have a 'Type' node under them, whose child is
     // the non-generic reference. If we don't see that structure, do nothing.
     if (node->getNumChildren() < 2 ||
@@ -39,7 +41,8 @@ NodePointer Demangle::stripGenericArgsFromContextNode(NodePointer node,
   case Demangle::Node::Kind::Class:
   case Demangle::Node::Kind::Enum:
   case Demangle::Node::Kind::Structure:
-  case Demangle::Node::Kind::OtherNominalType: {
+  case Demangle::Node::Kind::OtherNominalType:
+  case Demangle::Node::Kind::TypeAlias: {
     if (node->getNumChildren() < 2)
       return node;
 

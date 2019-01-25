@@ -19,6 +19,7 @@ do {
     let x5 = RenamedError.Code.good
     let x6 = Wrapper.MemberEnum.A
     let x7 = WrapperByAttribute(0)
+    let x8 = NSSize(width: 0, height: 0)
 }
 
 do {
@@ -29,6 +30,7 @@ do {
     let x5 = RenamedError.Code.self
     let x6 = Wrapper.MemberEnum.self
     let x7 = WrapperByAttribute.self
+    let x8 = NSSize.self
 }
 */
 
@@ -39,6 +41,8 @@ do {
 // DEMANGLE: $sSo14MyRenamedErrorLeVD
 // DEMANGLE: $sSo12MyMemberEnumVD
 // DEMANGLE: $sSo18WrapperByAttributeaD
+// DEMANGLE: $sSo6NSSizeaD
+// DEMANGLE: $sSo6CGSizeVD
 
 // CHECK: CCRefrigerator
 // CHECK: MyError.Code
@@ -47,6 +51,8 @@ do {
 // CHECK: RenamedError
 // CHECK: Wrapper.MemberEnum
 // CHECK: WrapperByAttribute
+// CHECK: NSSize
+// CHECK: CGSize
 
 // DEMANGLE: $sSo17CCRefrigeratorRefamD
 // DEMANGLE: $sSo7MyErrorVmD
@@ -55,6 +61,8 @@ do {
 // DEMANGLE: $sSC14MyRenamedErrorLeVmD
 // DEMANGLE: $sSo12MyMemberEnumVmD
 // DEMANGLE: $sSo18WrapperByAttributeamD
+// DEMANGLE: $sSo6NSSizeamD
+// DEMANGLE: $sSo6CGSizeVmD
 
 // CHECK: CCRefrigerator.Type
 // CHECK: MyError.Code.Type
@@ -63,3 +71,5 @@ do {
 // CHECK: RenamedError.Type
 // CHECK: Wrapper.MemberEnum.Type
 // CHECK: WrapperByAttribute.Type
+// CHECK: NSSize.Type
+// CHECK: CGSize.Type
