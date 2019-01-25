@@ -347,12 +347,6 @@ extension CGFloat {
   public static var max: CGFloat {
     fatalError("unavailable")
   }
-
-  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
-  @_transparent
-  public static func abs(_ x: CGFloat) -> CGFloat {
-    return x.magnitude
-  }
 }
 
 @available(*, unavailable, renamed: "CGFloat.leastNormalMagnitude")
