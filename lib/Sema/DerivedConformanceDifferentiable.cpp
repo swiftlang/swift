@@ -662,6 +662,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   // members conform to `VectorNumeric` and share the same scalar type.
   Type sameScalarType;
   bool canDeriveVectorNumeric =
+      !diffProperties.empty() &&
       llvm::all_of(diffProperties, [&](VarDecl *var) {
         auto conf = TC.conformsToProtocol(getAssociatedType(var, nominal, id),
                                           vecNumProto, nominal,
