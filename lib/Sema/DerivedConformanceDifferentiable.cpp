@@ -649,13 +649,40 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   SmallVector<VarDecl *, 8> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, diffProperties);
 
+  // Associated struct can derive `AdditiveArithmetic` if the associated types
+  // of all members conform to `AdditiveArithmetic`.
+  bool canDeriveAdditiveArithmetic =
+      llvm::all_of(diffProperties, [&](VarDecl *var) {
+        return TC.conformsToProtocol(getAssociatedType(var, nominal, id),
+                                     addArithProto, nominal,
+                                     ConformanceCheckFlags::Used);
+        });
+
+  // Associated struct can derive `VectorNumeric` if the associated types of all
+  // members conform to `VectorNumeric` and share the same scalar type.
+  Type sameScalarType;
+  bool canDeriveVectorNumeric =
+      llvm::all_of(diffProperties, [&](VarDecl *var) {
+        auto conf = TC.conformsToProtocol(getAssociatedType(var, nominal, id),
+                                          vecNumProto, nominal,
+                                          ConformanceCheckFlags::Used);
+        if (!conf)
+          return false;
+        Type scalarType = ProtocolConformanceRef::getTypeWitnessByName(
+            var->getType(), *conf, C.Id_Scalar, C.getLazyResolver());
+        if (!sameScalarType) {
+          sameScalarType = scalarType;
+          return true;
+        }
+        return scalarType->isEqual(sameScalarType);
+      });
+
   // If the associated struct is `AllDifferentiableVariables`, conform it to:
   // - `AdditiveArithmetic`, if all members of the parent conform to
   //   `AdditiveArithmetic`.
   // - `KeyPathIterable`, if the parent conforms to to `KeyPathIterable`.
   if (id == C.Id_AllDifferentiableVariables) {
-    if (DerivedConformance::canDeriveAdditiveArithmetic(diffProperties,
-                                                        nominal))
+    if (canDeriveAdditiveArithmetic)
       inherited.push_back(addArithType);
     if (TC.conformsToProtocol(nominal->getDeclaredInterfaceType(),
                               kpIterableProto, parentDC,
@@ -665,7 +692,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   // If all members also conform to `VectorNumeric` with the same `Scalar` type,
   // make the associated struct conform to `VectorNumeric` instead of just
   // `AdditiveArithmetic`.
-  if (DerivedConformance::canDeriveVectorNumeric(diffProperties, nominal))
+  if (canDeriveVectorNumeric)
     inherited.push_back(vecNumType);
 
   auto *structDecl = new (C) StructDecl(SourceLoc(), id, SourceLoc(),

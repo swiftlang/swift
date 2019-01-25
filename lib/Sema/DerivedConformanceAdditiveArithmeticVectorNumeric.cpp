@@ -101,11 +101,17 @@ static Type getVectorNumericScalarAssocType(VarDecl *decl, DeclContext *DC) {
 
 // Return the `Scalar` associated type for a nominal type with the given
 // members, or nullptr if `Scalar` cannot be derived.
-static Type deriveVectorNumeric_Scalar(ArrayRef<VarDecl *> members,
+static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal,
                                        DeclContext *DC) {
   auto &C = DC->getASTContext();
+  // Nominal type must be a struct. (Zero stored properties is okay.)
+  if (!isa<StructDecl>(nominal))
+    return nullptr;
+  // If all stored properties conform to `VectorNumeric` and have the same
+  // `Scalar` associated type, return that `Scalar` associated type.
+  // Otherwise, the `Scalar` type cannot be derived.
   Type sameScalarType;
-  for (auto member : members) {
+  for (auto member : nominal->getStoredProperties()) {
     if (!member->hasInterfaceType())
       C.getLazyResolver()->resolveDeclSignature(member);
     if (!member->hasInterfaceType())
@@ -126,52 +132,10 @@ static Type deriveVectorNumeric_Scalar(ArrayRef<VarDecl *> members,
   return sameScalarType;
 }
 
-// Return the `Scalar` associated type for a nominal type with the given
-// members, or nullptr if `Scalar` cannot be derived.
-static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal,
-                                       DeclContext *DC) {
-  // Nominal type must be a struct. (Zero stored properties is okay.)
-  if (!isa<StructDecl>(nominal))
-    return nullptr;
-  // If all stored properties conform to `VectorNumeric` and have the same
-  // `Scalar` associated type, return that `Scalar` associated type.
-  // Otherwise, the `Scalar` type cannot be derived.
-  SmallVector<VarDecl *, 4> storedProps;
-  storedProps.append(nominal->getStoredProperties().begin(),
-                     nominal->getStoredProperties().end());
-  return deriveVectorNumeric_Scalar(storedProps, DC);
-}
-
-// Return true if a `VectorNumeric` requirement can be derived for the given
-// members of a nominal type.
-bool DerivedConformance::canDeriveVectorNumeric(ArrayRef<VarDecl *> members,
-                                                DeclContext *DC) {
-  return (bool)deriveVectorNumeric_Scalar(members, DC);
-}
-
 // Return true if given nominal type has a `let` stored with an initial value.
 static bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
     return v->isLet() && v->hasInitialValue();
-  });
-}
-
-// Return true if an `AdditiveArithmetic` requirement can be derived for the
-// given members of a nominal type.
-bool DerivedConformance::canDeriveAdditiveArithmetic(
-    ArrayRef<VarDecl *> members, DeclContext *DC) {
-  auto &C = DC->getASTContext();
-  auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  return llvm::all_of(members, [&](VarDecl *v) {
-    if (!v->hasInterfaceType() || !v->getType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType() || !v->getType())
-      return false;
-    auto declType = v->getType()->hasArchetype()
-        ? v->getType()
-        : DC->mapTypeIntoContext(v->getType());
-    return (bool)TypeChecker::conformsToProtocol(declType, addArithProto, DC,
-                                                 ConformanceCheckFlags::Used);
   });
 }
 
@@ -188,10 +152,19 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
   if (hasLetStoredPropertyWithInitialValue(nominal))
     return false;
   // All stored properties must conform to `AdditiveArithmetic`.
-  SmallVector<VarDecl *, 4> storedProps;
-  storedProps.append(nominal->getStoredProperties().begin(),
-                     nominal->getStoredProperties().end());
-  return canDeriveAdditiveArithmetic(storedProps, DC);
+  auto &C = nominal->getASTContext();
+  auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
+    return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
+      if (!v->hasInterfaceType() || !v->getType())
+        C.getLazyResolver()->resolveDeclSignature(v);
+      if (!v->hasInterfaceType() || !v->getType())
+        return false;
+      auto declType = v->getType()->hasArchetype()
+          ? v->getType()
+          : DC->mapTypeIntoContext(v->getType());
+      return (bool)TypeChecker::conformsToProtocol(declType, addArithProto, DC,
+                                                   ConformanceCheckFlags::Used);
+  });
 }
 
 bool DerivedConformance::canDeriveVectorNumeric(NominalTypeDecl *nominal,
