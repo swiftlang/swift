@@ -80,16 +80,26 @@ SimpleMathTests.test("GlobalLet") {
   expectEqual(2, gradient(at: 1, in: foo))
 }
 
-var foo_diffable: @autodiff (Float) -> (Float) 
+var foo_diffable: @autodiff (Float) -> (Float)
   = differentiableFunction { x in (x * x, { v in 2 * x * v }) }
 SimpleMathTests.test("GlobalDiffableFunc") {
   expectEqual(2, gradient(at: 1, in: foo_diffable))
   expectEqual(2, gradient(at: 1, in: { x in foo_diffable(x) }))
   expectEqual(1, gradient(at: 1, in: { (x: Float) -> Float in
-    foo_diffable = { x in x + 1 }; 
+    foo_diffable = { x in x + 1 };
     return foo_diffable(x)
   }))
   expectEqual(1, gradient(at: 1, in: foo_diffable))
+}
+
+SimpleMathTests.test("SideEffects") {
+  func foo(x: Float) -> Float {
+    var a = x
+    a = a * x
+    a = a * x
+    return a * x
+  }
+  expectEqual(108, gradient(at: 3, in: foo))
 }
 
 runAllTests()

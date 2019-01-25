@@ -3,10 +3,9 @@
 func simpleStoreLoad(x: Float) -> Float {
   var y = x
   y = x + 1
-  // expected-note @+1 {{expression is not differentiable}}
+  y = x + y
   return y
 }
-// expected-error @+1 {{function is not differentiable}}
 let _: @autodiff (Float) -> Float = simpleStoreLoad(x:)
 
 var global: Float = 10
@@ -26,16 +25,25 @@ let _: @autodiff (Float) -> Float = { x in
 // Test differentiation of write to useful global variable.
 // expected-error @+1 {{function is not differentiable}}
 let _: @autodiff (Float) -> Float = { x in
+  // expected-note @+1 {{cannot differentiate writes to global variables}}
   global = x
-  // expected-note @+1 {{expression is not differentiable}}
   return global + x
 }
 
+// Test differentiation of mutation to captured variables.
+func testMutableCaptures() {
+  var y: Float = 10
+  // expected-error @+1 {{function is not differentiable}}
+  let _: @autodiff (Float) -> Float = { x in
+    // expected-note @+1 {{cannot differentiate writes to mutable captures}}
+    y = x
+    return y + x
+  }
+}
+
 // Test differentiation of write to useful local variable.
-// expected-error @+1 {{function is not differentiable}}
 let _: @autodiff (Float) -> Float = { x in
   var local = x // expected-warning {{variable 'local' was never mutated}}
-  // expected-note @+1 {{expression is not differentiable}}
   return local + x
 }
 
