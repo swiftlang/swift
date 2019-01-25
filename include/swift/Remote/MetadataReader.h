@@ -594,8 +594,8 @@ public:
         return BuiltType();
 
       // Build the demangling tree from the context tree.
-      Demangle::NodeFactory nodeFactory;
-      auto node = buildContextMangling(descriptor, nodeFactory);
+      Demangler dem;
+      auto node = buildContextMangling(descriptor, dem);
       if (!node || node->getKind() != Node::Kind::Type)
         return BuiltType();
 
@@ -1203,7 +1203,7 @@ private:
     }
   }
 
-  /// Given the address of a nominal type descriptor, attempt to read it.
+  /// Given the address of a context descriptor, attempt to read it.
   ContextDescriptorRef
   readContextDescriptor(StoredPointer address) {
     if (address == 0)
@@ -1248,6 +1248,10 @@ private:
       break;
     case ContextDescriptorKind::Anonymous:
       baseSize = sizeof(TargetAnonymousContextDescriptor<Runtime>);
+      if (AnonymousContextDescriptorFlags(flags.getKindSpecificFlags())
+            .hasMangledName()) {
+        baseSize += sizeof(TargetMangledContextName<Runtime>);
+      }
       break;
     case ContextDescriptorKind::Class:
       baseSize = sizeof(TargetClassDescriptor<Runtime>);
@@ -1352,11 +1356,161 @@ private:
     return false;
   }
 
+  /// Read the name from a module, type, or protocol context descriptor.
+  Optional<std::string> readContextDescriptorName(
+      ContextDescriptorRef descriptor,
+      Optional<TypeImportInfo<std::string>> &importInfo) {
+    std::string name;
+    auto context = descriptor.getLocalBuffer();
+
+    // Read the name of a protocol.
+    if (auto protoBuffer =
+            dyn_cast<TargetProtocolDescriptor<Runtime>>(context)) {
+      auto nameAddress = resolveRelativeField(descriptor, protoBuffer->Name);
+      if (Reader->readString(RemoteAddress(nameAddress), name))
+        return name;
+
+      return None;
+    }
+
+    // Read the name of a module.
+    if (auto moduleBuffer =
+            dyn_cast<TargetModuleContextDescriptor<Runtime>>(context)) {
+      auto nameAddress = resolveRelativeField(descriptor, moduleBuffer->Name);
+      if (Reader->readString(RemoteAddress(nameAddress), name))
+        return name;
+
+      return None;
+    }
+
+    // Only type contexts remain.
+    auto typeBuffer = dyn_cast<TargetTypeContextDescriptor<Runtime>>(context);
+    if (!typeBuffer)
+      return None;
+
+    auto nameAddress = resolveRelativeField(descriptor, typeBuffer->Name);
+    if (!Reader->readString(RemoteAddress(nameAddress), name))
+      return None;
+
+    // Read the TypeImportInfo if present.
+    if (typeBuffer->getTypeContextDescriptorFlags().hasImportInfo()) {
+      importInfo.emplace();
+      nameAddress += name.size() + 1;
+
+      while (true) {
+        // Read the next string.
+        std::string temp;
+        if (!Reader->readString(RemoteAddress(nameAddress), temp))
+          return None;
+
+        // If we read an empty string, we're done.
+        if (temp.empty())
+          break;
+
+        // Advance past the string.
+        nameAddress += temp.size() + 1;
+
+        // Collect the import information.  Ignore anything we don't
+        // understand.
+        importInfo->collect</*asserting*/false>(std::move(temp));
+      }
+
+      // Ignore the original if we have an ABI name override.
+      if (!importInfo->ABIName.empty())
+        name = std::move(importInfo->ABIName);
+    }
+
+    return name;
+  }
+
+  /// If we have a context whose parent context is an anonymous context
+  /// that provides the local/private name for the current context,
+  /// produce a mangled node describing the name of \c context.
+  Demangle::NodePointer
+  adoptAnonymousContextName(ContextDescriptorRef contextRef,
+                            Optional<ContextDescriptorRef> &parentContextRef,
+                            Demangler &dem) {
+    if (!parentContextRef || !*parentContextRef)
+      return nullptr;
+
+    auto context = contextRef.getLocalBuffer();
+    auto typeContext = dyn_cast<TargetTypeContextDescriptor<Runtime>>(context);
+    auto protoContext = dyn_cast<TargetProtocolDescriptor<Runtime>>(context);
+    if (!typeContext && !protoContext)
+      return nullptr;
+
+    auto anonymousParent = dyn_cast_or_null<TargetAnonymousContextDescriptor<Runtime>>(
+            parentContextRef->getLocalBuffer());
+    if (!anonymousParent)
+      return nullptr;
+
+    // Only perform this transformation when we have a mangled name describing
+    // the context.
+    if (!anonymousParent->hasMangledName())
+      return nullptr;
+
+    // Read the mangled name.
+    auto mangledContextName = anonymousParent->getMangledContextName();
+    auto mangledNameAddress = resolveRelativeField(*parentContextRef,
+                                                   mangledContextName->name);
+
+    std::string mangledName;
+    if (!Reader->readString(RemoteAddress(mangledNameAddress), mangledName))
+      return nullptr;
+
+    auto mangledNode = dem.demangleSymbol(mangledName);
+    if (!mangledNode)
+      return nullptr;
+
+    if (mangledNode->getKind() == Demangle::Node::Kind::Global)
+      mangledNode = mangledNode->getFirstChild();
+
+    if (mangledNode->getNumChildren() < 2)
+      return nullptr;
+
+    // Dig out the name of the entity.
+    // FIXME: LocalDeclName
+    NodePointer nameChild = mangledNode->getChild(1);
+    if (nameChild->getKind() != Node::Kind::PrivateDeclName ||
+        nameChild->getNumChildren() < 2)
+      return nullptr;
+
+    // Make sure we have an identifier where we expect it.
+    auto identifierNode = nameChild->getChild(1);
+    if (identifierNode->getKind() != Node::Kind::Identifier ||
+        !identifierNode->hasText())
+      return nullptr;
+
+    // Read the name of the current context.
+    Optional<TypeImportInfo<std::string>> importInfo;
+    auto contextName = readContextDescriptorName(contextRef, importInfo);
+    if (!contextName)
+      return nullptr;
+
+    // Make sure the name of the current context matches the one in the mangled
+    // name of the parent anonymous context.
+    // FIXME: Use the ABI name here.
+    if (*contextName != identifierNode->getText())
+      return nullptr;
+
+    // We have a match. Update the parent context to skip the anonymous
+    // context entirely.
+    parentContextRef = readParentContextDescriptor(*parentContextRef);
+
+    // Return the name.
+    return nameChild;
+  }
+
   Demangle::NodePointer
   buildContextDescriptorMangling(ContextDescriptorRef descriptor,
-                                 Demangle::NodeFactory &nodeFactory) {
+                                 Demangler &dem) {
     // Read the parent descriptor.
     auto parentDescriptorResult = readParentContextDescriptor(descriptor);
+
+    // If the parent is an anonymous context that provides a complete
+    // name for this node, note that.
+    auto nameNode = adoptAnonymousContextName(
+        descriptor, parentDescriptorResult, dem);
 
     // If there was a problem reading the parent descriptor, we're done.
     if (!parentDescriptorResult) return nullptr;
@@ -1365,81 +1519,48 @@ private:
     Demangle::NodePointer parentDemangling = nullptr;
     if (auto parentDescriptor = *parentDescriptorResult) {
       parentDemangling =
-        buildContextDescriptorMangling(parentDescriptor, nodeFactory);
+        buildContextDescriptorMangling(parentDescriptor, dem);
       if (!parentDemangling)
         return nullptr;
     }
 
-    std::string nodeName;
-    std::string relatedTag;
     Demangle::Node::Kind nodeKind;
     Optional<TypeImportInfo<std::string>> importInfo;
 
-    auto getTypeName = [&]() -> bool {
-      auto typeBuffer =
-        reinterpret_cast<const TargetTypeContextDescriptor<Runtime> *>
-          (descriptor.getLocalBuffer());
-      auto nameAddress = resolveRelativeField(descriptor, typeBuffer->Name);
-      if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
-        return false;
+    auto getContextName = [&]() -> bool {
+      if (nameNode)
+        return true;
 
-      // Read the TypeImportInfo if present.
-      if (typeBuffer->getTypeContextDescriptorFlags().hasImportInfo()) {
-        importInfo.emplace();
-        nameAddress += nodeName.size() + 1;
-
-        while (true) {
-          // Read the next string.
-          std::string temp;
-          if (!Reader->readString(RemoteAddress(nameAddress), temp))
-            return false;
-
-          // If we read an empty string, we're done.
-          if (temp.empty())
-            break;
-
-          // Advance past the string.
-          nameAddress += temp.size() + 1;
-
-          // Collect the import information.  Ignore anything we don't
-          // understand.
-          importInfo->collect</*asserting*/false>(std::move(temp));
-        }
-
-        // Ignore the original if we have an ABI name override.
-        if (!importInfo->ABIName.empty())
-          nodeName = std::move(importInfo->ABIName);
+      if (auto name = readContextDescriptorName(descriptor, importInfo)) {
+        nameNode = dem.createNode(Node::Kind::Identifier, std::move(*name));
+        return true;
       }
-      
-      return true;
+
+      return false;
     };
-    
+
     bool isTypeContext = false;
     switch (auto contextKind = descriptor->getKind()) {
     case ContextDescriptorKind::Class:
-      if (!getTypeName())
+      if (!getContextName())
         return nullptr;
       nodeKind = Demangle::Node::Kind::Class;
       isTypeContext = true;
       break;
     case ContextDescriptorKind::Struct:
-      if (!getTypeName())
+      if (!getContextName())
         return nullptr;
       nodeKind = Demangle::Node::Kind::Structure;
       isTypeContext = true;
       break;
     case ContextDescriptorKind::Enum:
-      if (!getTypeName())
+      if (!getContextName())
         return nullptr;
       nodeKind = Demangle::Node::Kind::Enum;
       isTypeContext = true;
       break;
     case ContextDescriptorKind::Protocol: {
-      auto protocolBuffer =
-        reinterpret_cast<const TargetProtocolDescriptor<Runtime> *>
-          (descriptor.getLocalBuffer());
-      auto nameAddress = resolveRelativeField(descriptor, protocolBuffer->Name);
-      if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+      if (!getContextName())
         return nullptr;
 
       nodeKind = Demangle::Node::Kind::Protocol;
@@ -1454,13 +1575,13 @@ private:
       char addressBuf[18];
       snprintf(addressBuf, sizeof(addressBuf), "$%" PRIx64,
                (uint64_t)descriptor.getAddress());
-      auto anonNode = nodeFactory.createNode(Node::Kind::AnonymousContext);
+      auto anonNode = dem.createNode(Node::Kind::AnonymousContext);
       CharVector addressStr;
-      addressStr.append(addressBuf, nodeFactory);
-      auto name = nodeFactory.createNode(Node::Kind::Identifier, addressStr);
-      anonNode->addChild(name, nodeFactory);
+      addressStr.append(addressBuf, dem);
+      auto name = dem.createNode(Node::Kind::Identifier, addressStr);
+      anonNode->addChild(name, dem);
       if (parentDemangling)
-        anonNode->addChild(parentDemangling, nodeFactory);
+        anonNode->addChild(parentDemangling, dem);
       
       return anonNode;
     }
@@ -1477,12 +1598,13 @@ private:
           (descriptor.getLocalBuffer());
       auto nameAddress
         = resolveRelativeField(descriptor, moduleBuffer->Name);
-      if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+      std::string moduleName;
+      if (!Reader->readString(RemoteAddress(nameAddress), moduleName))
         return nullptr;
 
       // The form of module contexts is a little different from other
       // contexts; just create the node directly here and return.
-      return nodeFactory.createNode(nodeKind, std::move(nodeName));
+      return dem.createNode(nodeKind, std::move(moduleName));
     }
     
     default:
@@ -1513,15 +1635,13 @@ private:
         nodeKind = Demangle::Node::Kind::Structure;
     }
 
-    auto nameNode = nodeFactory.createNode(Node::Kind::Identifier,
-                                           std::move(nodeName));
-
     // Use private declaration names for anonymous context references.
-    if (parentDemangling->getKind() == Node::Kind::AnonymousContext) {
+    if (parentDemangling->getKind() == Node::Kind::AnonymousContext
+        && nameNode->getKind() == Node::Kind::Identifier) {
       auto privateDeclName =
-        nodeFactory.createNode(Node::Kind::PrivateDeclName);
-      privateDeclName->addChild(parentDemangling->getChild(0), nodeFactory);
-      privateDeclName->addChild(nameNode, nodeFactory);
+        dem.createNode(Node::Kind::PrivateDeclName);
+      privateDeclName->addChild(parentDemangling->getChild(0), dem);
+      privateDeclName->addChild(nameNode, dem);
 
       nameNode = privateDeclName;
       parentDemangling = parentDemangling->getChild(1);
@@ -1529,15 +1649,15 @@ private:
 
     if (importInfo && !importInfo->RelatedEntityName.empty()) {
       auto relatedNode =
-        nodeFactory.createNode(Node::Kind::RelatedEntityDeclName,
+        dem.createNode(Node::Kind::RelatedEntityDeclName,
                                std::move(importInfo->RelatedEntityName));
-      relatedNode->addChild(nameNode, nodeFactory);
+      relatedNode->addChild(nameNode, dem);
       nameNode = relatedNode;
     }
 
-    auto demangling = nodeFactory.createNode(nodeKind);
-    demangling->addChild(parentDemangling, nodeFactory);
-    demangling->addChild(nameNode, nodeFactory);
+    auto demangling = dem.createNode(nodeKind);
+    demangling->addChild(parentDemangling, dem);
+    demangling->addChild(nameNode, dem);
     return demangling;
   }
 
@@ -1545,8 +1665,8 @@ private:
   /// for it.
   Demangle::NodePointer
   buildContextMangling(ContextDescriptorRef descriptor,
-                       Demangle::NodeFactory &nodeFactory) {
-    auto demangling = buildContextDescriptorMangling(descriptor, nodeFactory);
+                       Demangler &dem) {
+    auto demangling = buildContextDescriptorMangling(descriptor, dem);
     if (!demangling)
       return nullptr;
 
@@ -1554,8 +1674,8 @@ private:
     // References to type nodes behave as types in the mangling.
     if (isa<TargetTypeContextDescriptor<Runtime>>(descriptor.getLocalBuffer()) ||
         isa<TargetProtocolDescriptor<Runtime>>(descriptor.getLocalBuffer())) {
-      top = nodeFactory.createNode(Node::Kind::Type);
-      top->addChild(demangling, nodeFactory);
+      top = dem.createNode(Node::Kind::Type);
+      top->addChild(demangling, dem);
     } else {
       top = demangling;
     }
@@ -1568,8 +1688,8 @@ private:
   BuiltNominalTypeDecl
   buildNominalTypeDecl(ContextDescriptorRef descriptor) {
     // Build the demangling tree from the context tree.
-    Demangle::NodeFactory nodeFactory;
-    auto node = buildContextMangling(descriptor, nodeFactory);
+    Demangler dem;
+    auto node = buildContextMangling(descriptor, dem);
     if (!node || node->getKind() != Node::Kind::Type)
       return BuiltNominalTypeDecl();
     BuiltNominalTypeDecl decl = Builder.createNominalTypeDecl(node);

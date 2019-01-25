@@ -2851,9 +2851,17 @@ public:
   /// recorded in the metadata.
   ConstTargetPointer<Runtime, char> getMangledName() const {
     if (!hasMangledName())
-      return nullptr;
+      return ConstTargetPointer<Runtime, char>();
 
     return this->template getTrailingObjects<MangledContextName>()->name;
+  }
+
+  /// Retrieve a pointer to the mangled context name structure.
+  const MangledContextName *getMangledContextName() const {
+    if (!hasMangledName())
+      return nullptr;
+
+    return this->template getTrailingObjects<MangledContextName>();
   }
 
 private:
@@ -2872,6 +2880,7 @@ public:
     return cd->getKind() == ContextDescriptorKind::Anonymous;
   }
 };
+using AnonymousContextDescriptor = TargetAnonymousContextDescriptor<InProcess>;
 
 /// A protocol descriptor.
 ///
