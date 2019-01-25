@@ -290,7 +290,7 @@ extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does
 
 func optionalMemberAccess(_ w: NSWobbling) {
   w.wobble()
-  w.wibble() // expected-error{{value of optional type '(() -> Void)?' must be unwrapped}}
+  w.wibble() // expected-error{{value of optional type 'Optional<() -> Void>' must be unwrapped to a value of type '() -> Void'}}
   // expected-note@-1{{coalesce}}
   // expected-note@-2{{force-unwrap}}
   let x = w[5]!!

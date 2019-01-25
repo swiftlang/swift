@@ -93,7 +93,7 @@ func extraCall() {
   var i = 7
   i = i() // expected-error{{cannot call value of non-function type 'Int'}}{{8-10=}}
 
-  maybeFn()(5) // expected-error{{value of optional type '((Int) -> Int)?' must be unwrapped to a value of type '(Int) -> Int'}}
+  maybeFn()(5) // expected-error{{value of optional type 'Optional<((Int) -> Int)>' must be unwrapped to a value of type '(Int) -> Int'}}
   // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
   // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
