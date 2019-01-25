@@ -23,8 +23,9 @@ where T : SIMD, T.Scalar : FixedWidthInteger {
 }
 
 func testRoundTrip<T>(_ for: T.Type)
-where T : SIMD, T.Scalar : BinaryFloatingPoint {
-  let input = T.random(in: -16 ... (16 as T))
+where T : SIMD, T.Scalar : BinaryFloatingPoint,
+      T.Scalar.RawSignificand : FixedWidthInteger {
+  let input = T.random(in: -16 ..< 16)
   let encoder = JSONEncoder()
   let decoder = JSONDecoder()
   do {
