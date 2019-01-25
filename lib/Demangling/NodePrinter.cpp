@@ -1013,8 +1013,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::AnonymousContext:
     if (Options.QualifyEntities && Options.DisplayExtensionContexts) {
       print(Node->getChild(1));
-      Printer << ".(unknown context at " << Node->getChild(0)->getText() << ")";
-      if (Node->getChild(2)->getNumChildren() > 0) {
+      Printer << ".(unknown context at ";
+      print(Node->getChild(0));
+      Printer << ")";
+      if (Node->getNumChildren() >= 3 &&
+          Node->getChild(2)->getNumChildren() > 0) {
         Printer << '<';
         print(Node->getChild(2));
         Printer << '>';

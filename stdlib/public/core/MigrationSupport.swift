@@ -244,26 +244,6 @@ extension String.UnicodeScalarView : _CustomPlaygroundQuickLookable {
 }
 
 //===--- Slicing Support --------------------------------------------------===//
-// In Swift 3.2, in the absence of type context,
-//
-//   someString.unicodeScalars[
-//     someString.unicodeScalars.startIndex
-//     ..< someString.unicodeScalars.endIndex]
-//
-// was deduced to be of type `String.UnicodeScalarView`.  Provide a
-// more-specific Swift-3-only `subscript` overload that continues to produce
-// `String.UnicodeScalarView`.
-extension String.UnicodeScalarView {
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String.UnicodeScalarView {
-    Builtin.unreachable()
-  }
-
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String.UnicodeScalarView {
-    Builtin.unreachable()
-  }
-}
 
 // @available(swift,deprecated: 5.0, renamed: "Unicode.UTF8")
 public typealias UTF8 = Unicode.UTF8
@@ -326,11 +306,6 @@ extension Substring {
       "String index range is out of bounds")
     _precondition(range.upperBound <= endIndex,
       "String index range is out of bounds")
-  }
-
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String {
-    Builtin.unreachable()
   }
 }
 
@@ -566,13 +541,6 @@ extension Sequence {
     _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
     return try _compactMap(transform)
-  }
-
-  @available(swift, obsoleted: 4)
-  public func flatMap(
-    _ transform: (Element) throws -> String
-  ) rethrows -> [String] {
-    return try map(transform)
   }
 }
 

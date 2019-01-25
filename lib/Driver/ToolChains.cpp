@@ -244,6 +244,12 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(workingDirectory));
   }
 
+  // -g implies -enable-anonymous-context-mangled-names, because the extra
+  // metadata aids debugging.
+  if (inputArgs.hasArg(options::OPT_g)) {
+    arguments.push_back("-enable-anonymous-context-mangled-names");
+  }
+
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
