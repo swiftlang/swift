@@ -10,8 +10,7 @@ var PythonRuntimeTestSuite = TestSuite("PythonRuntime")
 PythonLibrary.useVersion(2, 7)
 
 PythonRuntimeTestSuite.test("CheckVersion") {
-  let version = Python.version
-  expectEqual("2.7.", version.prefix(4))
+  expectEqual("2.7.", String(Python.version)!.prefix(4))
   let versionInfo = Python.versionInfo
   expectEqual(2, versionInfo.major)
   expectEqual(7, versionInfo.minor)

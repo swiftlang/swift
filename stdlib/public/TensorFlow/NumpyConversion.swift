@@ -25,7 +25,7 @@ private let np = Python.import("numpy")
 
 extension ShapedArray : ConvertibleFromNumpyArray
   where Scalar : NumpyScalarCompatible {
-  public init?(numpyArray: PythonObject) {
+  public init?(numpy numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
       return nil
@@ -73,7 +73,7 @@ extension ShapedArray : ConvertibleFromNumpyArray
 
 extension Tensor : ConvertibleFromNumpyArray
   where Scalar : NumpyScalarCompatible {
-  public init?(numpyArray: PythonObject) {
+  public init?(numpy numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
       return nil
@@ -106,26 +106,6 @@ extension Tensor : ConvertibleFromNumpyArray
     let buffPtr = UnsafeBufferPointer(start: ptr,
                                       count: Int(shape.contiguousSize))
     self.init(shape: shape, scalars: buffPtr)
-  }
-}
-
-extension ShapedArray where Scalar : NumpyScalarCompatible {
-  // Creates a `ShapedArray` instance from the given `PythonObject` if it is a
-  // `numpy.ndarray` instance with a matching scalar datatype.
-  // TODO: Generalize `init?(_: PythonObject)` to handle (potentially nested)
-  // Python lists.
-  public init?(_ pythonObject: PythonObject) {
-    self.init(numpyArray: pythonObject)
-  }
-}
-
-extension Tensor where Scalar : NumpyScalarCompatible {
-  // Creates a `Tensor` instance from the given `PythonObject` if it is a
-  // `numpy.ndarray` instance with a matching scalar datatype.
-  // TODO: Generalize `init?(_: PythonObject)` to handle (potentially nested)
-  // Python lists, where the scalar type conforms to `TensorFlowScalar`.
-  public init?(_ pythonObject: PythonObject) {
-    self.init(numpyArray: pythonObject)
   }
 }
 
