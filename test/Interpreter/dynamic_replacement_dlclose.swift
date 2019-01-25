@@ -49,7 +49,12 @@ DynamicallyReplaceable.test("DynamicallyReplaceable") {
 
   expectEqual(2, test())
 
+#if os(Linux)
+  dlclose(h!)
+#elseif os(Windows)
+#else
   dlclose(h)
+#endif
 
 #if os(Linux)
   _ = dlopen(target_library_name("Module2"), RTLD_NOW)
