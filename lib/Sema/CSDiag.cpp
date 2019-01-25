@@ -1753,9 +1753,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
       CS.cacheExprTypes(savedExpr);
       return savedExpr;
     }
-
-    CS.TC.addExprForDiagnosis(subExpr, subExpr);
   }
+
+  // Mark current expression as about to be diagnosed.
+  CS.TC.addExprForDiagnosis(subExpr, subExpr);
 
   // Validate contextual type before trying to use it.
   std::tie(convertType, convertTypePurpose) =
@@ -5648,6 +5649,15 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   // Diagnose obvious assignments to literals.
   if (isa<LiteralExpr>(assignExpr->getDest()->getValueProvidingExpr())) {
     diagnose(assignExpr->getLoc(), diag::cannot_assign_to_literal);
+    return true;
+  }
+
+  // Situation like `var foo = &bar` didn't get diagnosed early
+  // because originally its parent is a `SequenceExpr` which hasn't
+  // been folded yet, and could represent an operator which accepts
+  // `inout` arguments.
+  if (auto *AddrOf = dyn_cast<InOutExpr>(assignExpr->getSrc())) {
+    diagnose(AddrOf->getLoc(), diag::extraneous_address_of);
     return true;
   }
 
