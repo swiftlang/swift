@@ -112,6 +112,8 @@ extension Tensor : ConvertibleFromNumpyArray
 extension ShapedArray where Scalar : NumpyScalarCompatible {
   // Creates a `ShapedArray` instance from the given `PythonObject` if it is a
   // `numpy.ndarray` instance with a matching scalar datatype.
+  // TODO: Generalize `init?(_: PythonObject)` to handle (potentially nested)
+  // Python lists.
   public init?(_ pythonObject: PythonObject) {
     self.init(numpyArray: pythonObject)
   }
@@ -120,6 +122,8 @@ extension ShapedArray where Scalar : NumpyScalarCompatible {
 extension Tensor where Scalar : NumpyScalarCompatible {
   // Creates a `Tensor` instance from the given `PythonObject` if it is a
   // `numpy.ndarray` instance with a matching scalar datatype.
+  // TODO: Generalize `init?(_: PythonObject)` to handle (potentially nested)
+  // Python lists, where the scalar type conforms to `TensorFlowScalar`.
   public init?(_ pythonObject: PythonObject) {
     self.init(numpyArray: pythonObject)
   }
