@@ -79,6 +79,12 @@ Type ASTBuilder::createNominalType(NominalTypeDecl *decl, Type parent) {
   if (decl->getGenericParams())
     return Type();
 
+  // Imported types can be renamed to be members of other (non-generic)
+  // types, but the mangling does not have a parent type. Just use the
+  // declared type directly in this case and skip the parent check below.
+  if (decl->hasClangNode() && !decl->isGenericContext())
+    return decl->getDeclaredType();
+
   // Validate the parent type.
   if (!validateNominalParent(decl, parent))
     return Type();
