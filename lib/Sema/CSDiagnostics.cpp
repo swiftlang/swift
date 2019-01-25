@@ -591,9 +591,10 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
   if (!tryExpr) {
-    auto resolvedBaseTy = BaseType ? resolveType(BaseType) : BaseType;
+    auto resolvedBaseTy =
+        resolveType(BaseType)->reconstituteSugar(/*recursive=*/true);
     auto resolvedUnwrappedTy =
-        UnwrappedType ? resolveType(UnwrappedType) : UnwrappedType;
+        resolveType(UnwrappedType)->reconstituteSugar(/*recursive=*/true);
     return diagnoseUnwrap(getConstraintSystem(), unwrapped, resolvedBaseTy,
                           resolvedUnwrappedTy);
   }

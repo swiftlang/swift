@@ -5409,7 +5409,12 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
     // This situation might happen when the same fix kind is applicable to
     // different overload choices.
     auto *loc = fix->getLocator();
+    auto *anchor = loc->getAnchor();
     auto existingFix = llvm::find_if(Fixes, [&](const ConstraintFix *e) {
+      if (e->getKind() == FixKind::ForceOptional &&
+          e->getLocator()->getAnchor() == anchor) {
+        return true;
+      }
       // If we already have a fix like this recorded, let's not do it again,
       return e->getKind() == fix->getKind() && e->getLocator() == loc;
     });

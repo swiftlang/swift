@@ -46,7 +46,7 @@ struct HasClosure {
 var _: HasClosure = .factoryNormal(0)
 var _: HasClosure = .factoryReturnOpt(1)!
 var _: HasClosure = .factoryIUO(2)
-var _: HasClosure = .factoryOpt(3) // expected-error {{value of optional type 'Optional<((Int) -> HasClosure)>' must be unwrapped to a value of type '(Int) -> HasClosure'}}
+var _: HasClosure = .factoryOpt(3) // expected-error {{value of optional type '((Int) -> HasClosure)?' must be unwrapped to a value of type '(Int) -> HasClosure'}}
                                   // expected-note@-1{{coalesce}}
                                  // expected-note@-2{{force-unwrap}}
 var _: HasClosure = .factoryOpt!(4) // expected-error {{type of expression is ambiguous without more context}}
