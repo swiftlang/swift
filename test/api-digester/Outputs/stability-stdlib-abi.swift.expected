@@ -73,3 +73,8 @@ Var _RawDictionaryStorage.empty has declared type change from _EmptyDictionarySi
 Var _RawSetStorage.empty has declared type change from _EmptySetSingleton to __EmptySetSingleton
 
 Func tryReallocateUniquelyReferenced(buffer:newMinimumCapacity:) has been removed
+
+Protocol SIMD has added inherited protocol Decodable
+Protocol SIMD has added inherited protocol Encodable
+Protocol SIMD has generic signature change from <τ_0_0 : CustomStringConvertible, τ_0_0 : ExpressibleByArrayLiteral, τ_0_0 : Hashable, τ_0_0 : SIMDStorage, τ_0_0.MaskStorage : SIMD, τ_0_0.MaskStorage.Scalar : FixedWidthInteger, τ_0_0.MaskStorage.Scalar : SignedInteger> to <τ_0_0 : CustomStringConvertible, τ_0_0 : Decodable, τ_0_0 : Encodable, τ_0_0 : ExpressibleByArrayLiteral, τ_0_0 : Hashable, τ_0_0 : SIMDStorage, τ_0_0.MaskStorage : SIMD, τ_0_0.MaskStorage.Scalar : FixedWidthInteger, τ_0_0.MaskStorage.Scalar : SignedInteger>
+Protocol SIMDStorage has generic signature change from <τ_0_0.Scalar : Hashable> to <τ_0_0.Scalar : Decodable, τ_0_0.Scalar : Encodable, τ_0_0.Scalar : Hashable>
