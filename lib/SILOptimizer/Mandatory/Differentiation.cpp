@@ -3460,10 +3460,10 @@ public:
   void visit##ORIG##Inst(ORIG##Inst *inst) { \
     auto adj = getAdjointValue(inst->getOperand()); \
     auto adjVal = materializeAdjointDirect(adj, inst->getLoc()); \
-        builder.create##ADJ(inst->getLoc(), adjVal, \
-                            builder.getDefaultAtomicity()); \
+    builder.create##ADJ(inst->getLoc(), adjVal, \
+                        builder.getDefaultAtomicity()); \
   }
-  REFCOUNTING_ADJOINT(RetainValue, ReleaseValue)
+  // REFCOUNTING_ADJOINT(RetainValue, ReleaseValue) // TODO: Revisit and fix leaks.
   REFCOUNTING_ADJOINT(RetainValueAddr, ReleaseValueAddr)
   REFCOUNTING_ADJOINT(ReleaseValue, RetainValue)
   REFCOUNTING_ADJOINT(ReleaseValueAddr, RetainValueAddr)
@@ -3490,6 +3490,7 @@ public:
   NO_ADJOINT(DebugValueAddr)
   NO_ADJOINT(DestroyValue) // TODO: Revisit this.
   NO_ADJOINT(DestroyAddr)
+  NO_ADJOINT(RetainValue) // TODO: Revisit and fix leaks.
 #undef NO_DERIVATIVE
 };
 } // end anonymous namespace

@@ -392,7 +392,7 @@ NOTE(autodiff_function_subset_indices_not_differentiable,none,
      "function is differentiable only with respect to a smaller subset of "
      "arguments", ())
 NOTE(autodiff_function_assoc_func_requirements_unmet,none,
-     "function call is not differentiate because generic requirements are not "
+     "function call is not differentiable because generic requirements are not "
      "met", ())
 NOTE(autodiff_opaque_function_not_differentiable,none,
      "opaque non-'@autodiff' function is not differentiable", ())

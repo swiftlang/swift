@@ -156,6 +156,14 @@ TensorADTests.testAllBackends("Differentiate global") {
 }
 
 TensorADTests.testAllBackends("Side effects") {
+  let foo: @autodiff (Tensor<Float>) -> Tensor<Float> = { x in
+    var a = x
+    a = a + x
+    a = a + x
+    return a + x
+  }
+  expectEqual(Tensor([8, 8]), pullback(at: Tensor(4), in: foo)([1, 1]))
+
   // FIXME: This requires support for indirect passing.
   // func foo(x: Tensor<Float>) -> Tensor<Float> {
   //   var a = x
@@ -163,15 +171,7 @@ TensorADTests.testAllBackends("Side effects") {
   //   a = a * x
   //   a = a * x
   // }
-  // expectEqual(Tensor([108, 108]), pullback(at: Tensor(4), in: foo)([1, 1]))
-  let foo: @autodiff (Tensor<Float>) -> Tensor<Float> = { x in
-    var a = x
-    a = a + x
-    a = a + x
-    return a + x
-  }
-  // FIXME: This currently segfaults.
-  // expectEqual(Tensor([108, 108]), pullback(at: Tensor(4), in: foo)([1, 1]))
+  // expectEqual(Tensor([8, 8]), pullback(at: Tensor(4), in: foo)([1, 1]))
 }
 
 runAllTests()
