@@ -1320,6 +1320,26 @@ public extension Tensor where Scalar : Numeric {
     return sum(alongAxes: axes)
   }
 
+  /// Returns the variance along the specified axes. The reduced dimensions are
+  /// retained with value 1. Does not apply Bessel's correction.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func variance(alongAxes axes: Int32...) -> Tensor {
+    return variance(alongAxes: axes)
+  }
+
+  /// Returns the variance along the specified axes. The reduced dimensions are
+  /// retained with value 1. Does not apply Bessel's correction.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func variance(alongAxes axes: [Int32]) -> Tensor {
+    let mean = self.mean(alongAxes: axes)
+    let squaredDiff = (self - mean).squared()
+    return squaredDiff.mean(alongAxes: axes)
+  }
+
   /// Returns the product along the specified axes. The reduced dimensions are
   /// retained with value 1.
   /// - Parameter axes: The dimensions to reduce.
