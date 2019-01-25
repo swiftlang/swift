@@ -75,7 +75,7 @@ TensorADTests.testAllBackends("negate") {
 TensorADTests.testAllBackends("sum") {
   let input = Tensor<Float>(randomNormal: [2, 2])
   let sumPullbackScalar = pullback(at: input) { (a: Tensor<Float>) in a.sum() }
-  let sumPullbackSqueezingAxes = pullback(at: input) { (a: Tensor<Float>) in a.sum(squeezingAxes: 0, 1) }
+  // let sumPullbackSqueezingAxes = pullback(at: input) { (a: Tensor<Float>) in a.sum(squeezingAxes: 0, 1) }
   let sumPullbackAlongAxes = pullback(at: input) { (a: Tensor<Float>) in a.sum(alongAxes: 0, 1) }
 
   let expected = Tensor<Float>(ones: [2, 2])
@@ -89,13 +89,13 @@ TensorADTests.testAllBackends("sum") {
 
 TensorADTests.testAllBackends("mean") {
   let meanGradScalar = gradient { (a: Tensor<Float>) in a.mean() }
-  let meanGradSqueezingAxes = gradient { (a: Tensor<Float>) in a.mean(squeezingAxes: 0, 1) }
+  // let meanGradSqueezingAxes = gradient { (a: Tensor<Float>) in a.mean(squeezingAxes: 0, 1) }
   let meanGradAlongAxes = gradient { (a: Tensor<Float>) in a.mean(alongAxes: 0, 1) }
 
   let input = Tensor<Float>(ones: [2, 2])
   let expected = Tensor<Float>(shape: [2, 2], repeating: 0.25)
   expectTrue(meanGradScalar(input) == expected)
-  expectTrue(meanGradSqueezingAxes(input) == expected)
+  // expectTrue(meanGradSqueezingAxes(input) == expected)
   expectTrue(meanGradAlongAxes(input) == expected)
 }
 
