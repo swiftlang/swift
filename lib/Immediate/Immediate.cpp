@@ -51,10 +51,22 @@
 using namespace swift;
 using namespace swift::immediate;
 
+/// The path for Swift libraries in the OS.
+#define OS_LIBRARY_PATH "/usr/lib/swift"
+
 static void *loadRuntimeLib(StringRef runtimeLibPathWithName) {
 #if defined(_WIN32)
   return LoadLibraryA(runtimeLibPathWithName.str().c_str());
 #else
+#if defined(__APPLE__) && defined(__MACH__)
+  if (!llvm::sys::path::is_absolute(runtimeLibPathWithName)) {
+    // Try an absolute path search for Swift in the OS first.
+    llvm::SmallString<128> absolutePath(OS_LIBRARY_PATH);
+    llvm::sys::path::append(absolutePath, runtimeLibPathWithName);
+    auto result = dlopen(absolutePath.c_str(), RTLD_LAZY | RTLD_GLOBAL);
+    if (result) return result;
+  }
+#endif
   return dlopen(runtimeLibPathWithName.str().c_str(), RTLD_LAZY | RTLD_GLOBAL);
 #endif
 }
@@ -66,8 +78,16 @@ static void *loadRuntimeLib(StringRef sharedLibName, StringRef runtimeLibPath) {
   return loadRuntimeLib(Path);
 }
 
-void *swift::immediate::loadSwiftRuntime(StringRef runtimeLibPath) {
-  return loadRuntimeLib("libswiftCore" LTDL_SHLIB_EXT, runtimeLibPath);
+void *swift::immediate::loadSwiftRuntime(StringRef runtimeLibPath,
+                                         bool IsDefault) {
+  StringRef LibName = "libswiftCore" LTDL_SHLIB_EXT;
+#if defined(__APPLE__) && defined(__MACH__)
+  if (IsDefault) {
+    auto result = loadRuntimeLib(LibName);
+    if (result) return result;
+  }
+#endif
+  return loadRuntimeLib(LibName, runtimeLibPath);
 }
 
 static bool tryLoadLibrary(LinkLibrary linkLib,
@@ -240,7 +260,9 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   //
   // This must be done here, before any library loading has been done, to avoid
   // racing with the static initializers in user code.
-  auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPath);
+  auto stdlib = loadSwiftRuntime(
+    Context.SearchPathOpts.RuntimeLibraryPath,
+    Context.SearchPathOpts.RuntimeLibraryPathIsDefault);
   if (!stdlib) {
     CI.getDiags().diagnose(SourceLoc(),
                            diag::error_immediate_mode_missing_stdlib);

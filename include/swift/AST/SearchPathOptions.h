@@ -72,6 +72,9 @@ public:
 
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPath = false;
+  
+  /// Whether the runtime library path is set to the compiler-relative default.
+  bool RuntimeLibraryPathIsDefault = true;
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
