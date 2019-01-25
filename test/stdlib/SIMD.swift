@@ -60,12 +60,15 @@ SIMDCodableTests.test("roundTrip") {
   testRoundTrip(SIMD2<UInt>.self)
   testRoundTrip(SIMD3<UInt>.self)
   testRoundTrip(SIMD4<UInt>.self)
+#if !arch(i386)
+  // https://bugs.swift.org/browse/SR-9759
   testRoundTrip(SIMD2<Float>.self)
   testRoundTrip(SIMD3<Float>.self)
   testRoundTrip(SIMD4<Float>.self)
   testRoundTrip(SIMD2<Double>.self)
   testRoundTrip(SIMD3<Double>.self)
   testRoundTrip(SIMD4<Double>.self)
+#endif
 }
 
 runAllTests()
