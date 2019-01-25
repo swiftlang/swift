@@ -480,10 +480,14 @@ public:
 /// Diagnose failures related to use of the unwrapped optional types,
 /// which require some type of force-unwrap e.g. "!" or "try!".
 class MissingOptionalUnwrapFailure final : public FailureDiagnostic {
+  Type BaseType;
+  Type UnwrappedType;
+
 public:
-  MissingOptionalUnwrapFailure(Expr *expr, ConstraintSystem &cs,
-                               ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator) {}
+  MissingOptionalUnwrapFailure(Expr *expr, ConstraintSystem &cs, Type baseType,
+                               Type unwrappedType, ConstraintLocator *locator)
+      : FailureDiagnostic(expr, cs, locator), BaseType(baseType),
+        UnwrappedType(unwrappedType) {}
 
   bool diagnoseAsError() override;
 };

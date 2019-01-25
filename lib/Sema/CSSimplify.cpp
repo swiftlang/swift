@@ -2390,11 +2390,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           forceUnwrapPossible = false;
         }
       }
-      
 
       if (forceUnwrapPossible) {
-        conversionsOrFixes.push_back(
-            ForceOptional::create(*this, getConstraintLocator(locator)));
+        conversionsOrFixes.push_back(ForceOptional::create(
+            *this, objectType1, objectType1->getOptionalObjectType(),
+            getConstraintLocator(locator)));
       }
     }
 
@@ -2743,7 +2743,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         locator.withPathElement(LocatorPathElt::getGenericArgument(0)),
         subflags);
     if (result == SolutionKind::Solved) {
-      auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+      auto *fix = ForceOptional::create(*this, type, optionalObjectType,
+                                        getConstraintLocator(locator));
       if (recordFix(fix)) {
         return SolutionKind::Error;
       }
@@ -2996,6 +2997,7 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
   auto simplified = simplifyType(first);
+  auto simplifiedCopy = simplified;
 
   unsigned unwrapCount = 0;
   if (shouldAttemptFixes()) {
@@ -3038,7 +3040,9 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
   }
 
   if (unwrapCount > 0) {
-    auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+    auto *fix = ForceOptional::create(*this, simplifiedCopy,
+                                      simplifiedCopy->getOptionalObjectType(),
+                                      getConstraintLocator(locator));
     while (unwrapCount-- > 0) {
       if (recordFix(fix))
         return SolutionKind::Error;
@@ -4662,7 +4666,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       return SolutionKind::Error;
 
     // Record any fixes we attempted to get to the correct solution.
-    auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+    auto *fix = ForceOptional::create(*this, origType2,
+                                      origType2->getOptionalObjectType(),
+                                      getConstraintLocator(locator));
     while (unwrapCount-- > 0) {
       if (recordFix(fix))
         return SolutionKind::Error;
@@ -4685,7 +4691,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     // Record any fixes we attempted to get to the correct solution.
     if (simplified == SolutionKind::Solved) {
-      auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+      auto *fix = ForceOptional::create(*this, origType2,
+                                        origType2->getOptionalObjectType(),
+                                        getConstraintLocator(locator));
       while (unwrapCount-- > 0) {
         if (recordFix(fix))
           return SolutionKind::Error;
