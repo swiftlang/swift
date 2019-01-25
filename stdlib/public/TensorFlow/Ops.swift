@@ -1294,6 +1294,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
   func mean(alongAxes axes: Int32...) -> Tensor {
     return mean(alongAxes: axes)
   }
@@ -1316,6 +1317,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
   func sum(alongAxes axes: Int32...) -> Tensor {
     return sum(alongAxes: axes)
   }
@@ -1325,6 +1327,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
   func variance(alongAxes axes: Int32...) -> Tensor {
     return variance(alongAxes: axes)
   }
@@ -1334,6 +1337,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
   func variance(alongAxes axes: [Int32]) -> Tensor {
     let mean = self.mean(alongAxes: axes)
     let squaredDiff = (self - mean).squared()
