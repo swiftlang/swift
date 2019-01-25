@@ -160,7 +160,9 @@ struct S1116 {
 }
 
 let a1116: [S1116] = []
-var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{cannot convert value of type '[Int?]' to expected argument type 'Set<Int>'}}
+var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+                                                        // expected-note@-1{{force-unwrap}}
+                                                       // expected-note@-2{{coalesce}}
 
 
 func moreComplexUnwrapFixes() {
@@ -202,22 +204,16 @@ func moreComplexUnwrapFixes() {
   // expected-note@-4{{force-unwrap using '!'}}{{17-17=!}}
 
   takeNon(os?.value) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-  // expected-note@-1{{force-unwrap using '!'}}{{13-14=!}}
+  // expected-note@-1{{force-unwrap using '!'}}{{21-21=!}}
   // expected-note@-2{{coalesce}}
   takeNon(os?.optValue) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-  // expected-note@-1{{force-unwrap using '!'}}{{11-11=(}}{{23-23=)!}}
+  // expected-note@-1{{force-unwrap using '!'}}{{24-24=!}}
   // expected-note@-2{{coalesce}}
 
   func sample(a: Int?, b: Int!) {
     let aa = a
-    // expected-note@-1{{short-circuit using 'guard'}}{{5-5=guard }} {{15-15= else \{ return \}}}
-    // expected-note@-2{{force-unwrap}}
-    // expected-note@-3{{coalesce}}
 
-    let bb = b // expected-note{{value inferred to be type 'Int?' when initialized with an implicitly unwrapped value}}
-    // expected-note@-1{{short-circuit using 'guard'}}{{5-5=guard }} {{15-15= else \{ return \}}}
-    // expected-note@-2{{force-unwrap}}
-    // expected-note@-3{{coalesce}}
+    let bb = b
 
     let cc = a
 
