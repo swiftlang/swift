@@ -674,6 +674,23 @@ private:
                                           DeclName memberName);
 };
 
+class PartialApplicationFailure final : public FailureDiagnostic {
+  enum RefKind : unsigned {
+    MutatingMethod,
+    SuperInit,
+    SelfInit,
+  };
+
+  bool CompatibilityWarning;
+
+public:
+  PartialApplicationFailure(Expr *root, bool warning, ConstraintSystem &cs,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), CompatibilityWarning(warning) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

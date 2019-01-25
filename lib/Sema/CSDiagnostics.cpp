@@ -1477,3 +1477,13 @@ bool MissingMemberFailure::diagnoseAsError() {
   corrections.noteAllCandidates();
   return true;
 }
+
+bool PartialApplicationFailure::diagnoseAsError() {
+  auto *anchor = cast<UnresolvedDotExpr>(getRawAnchor());
+  auto diagnostic = CompatibilityWarning
+                        ? diag::partial_application_of_function_invalid_swift4
+                        : diag::partial_application_of_function_invalid;
+
+  emitDiagnostic(anchor->getNameLoc(), diagnostic, RefKind::MutatingMethod);
+  return true;
+}

@@ -260,7 +260,9 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
 }
 
 bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
-  return false;
+  auto failure = PartialApplicationFailure(root, isWarning(),
+                                           getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowInvalidPartialApplication *
