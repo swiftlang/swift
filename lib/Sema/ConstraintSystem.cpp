@@ -1640,27 +1640,62 @@ bool isMutatingMethod(const ValueDecl *decl) {
   return cast<FuncDecl>(decl)->isMutating();
 }
 
+static bool shouldCheckForPartialApplication(ConstraintSystem &cs,
+                                             const ValueDecl *decl,
+                                             ConstraintLocator *locator) {
+  auto *anchor = locator->getAnchor();
+  if (!(anchor && isa<UnresolvedDotExpr>(anchor)))
+    return false;
+
+  // FIXME(diagnostics): This check should be removed together with
+  // expression based diagnostics.
+  if (cs.TC.isExprBeingDiagnosed(anchor))
+    return false;
+
+  // If this is a reference to instance method marked as 'mutating'
+  // it should be checked for invalid partial application.
+  if (isMutatingMethod(decl))
+    return true;
+
+  // Another unsupported partial application is related
+  // to constructor delegation via `self.init` or `super.init`.
+
+  if (!isa<ConstructorDecl>(decl))
+    return false;
+
+  auto *UDE = cast<UnresolvedDotExpr>(anchor);
+  // This is `super.init`
+  if (UDE->getBase()->isSuperExpr())
+    return true;
+
+  // Or this might be `self.init`.
+  if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+    if (auto *baseDecl = DRE->getDecl())
+      return baseDecl->getBaseName() == cs.getASTContext().Id_self;
+  }
+
+  return false;
+}
+
 /// Try to identify and fix failures related to partial function application
 /// e.g. partial application of `init` or 'mutating' instance methods.
 static std::pair<bool, unsigned>
 isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
                             ConstraintLocator *locator) {
-  if (!isMutatingMethod(member))
+  if (!shouldCheckForPartialApplication(cs, member, locator))
     return {false, 0};
 
-  auto *anchor = locator->getAnchor();
-  if (!isa<UnresolvedDotExpr>(anchor))
-    return {false, 0};
-
+  auto anchor = cast<UnresolvedDotExpr>(locator->getAnchor());
   // If this choice is a partial application of `init` or
   // `mutating` instance method we should report that it's not allowed.
-  auto baseTy = cs.getType(cast<UnresolvedDotExpr>(anchor)->getBase())
-                    ->getWithoutSpecifierType();
+  auto baseTy =
+      cs.simplifyType(cs.getType(anchor->getBase()))->getWithoutSpecifierType();
 
-  // If base is a metatype it would be ignored, but if it is
-  // some other type it means that we have a single application
-  // level already.
-  unsigned level = cs.simplifyType(baseTy)->is<MetatypeType>() ? 0 : 1;
+  // If base is a metatype it would be ignored (unless this is an initializer
+  // call), but if it is some other type it means that we have a single
+  // application level already.
+  unsigned level =
+      baseTy->is<MetatypeType>() && !isa<ConstructorDecl>(member) ? 0 : 1;
   if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(anchor))) {
     level += dyn_cast_or_null<CallExpr>(cs.getParentExpr(call)) ? 2 : 1;
   }
@@ -1925,6 +1960,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // Check whether applying this overload would result in invalid
     // partial function application e.g. partial application of
     // mutating method or initializer.
+
+    // This check is supposed to be performed without
+    // `shouldAttemptFixes` because name lookup can't
+    // detect that particular partial application is
+    // invalid, so it has to return all of the candidates.
 
     bool isInvalidPartialApply;
     unsigned level;

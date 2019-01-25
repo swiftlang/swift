@@ -1479,11 +1479,22 @@ bool MissingMemberFailure::diagnoseAsError() {
 }
 
 bool PartialApplicationFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
   auto *anchor = cast<UnresolvedDotExpr>(getRawAnchor());
+
+  RefKind kind = RefKind::MutatingMethod;
+
+  // If this is initializer delegation chain, we have a tailored message.
+  if (getOverloadChoiceIfAvailable(cs.getConstraintLocator(
+          anchor, ConstraintLocator::ConstructorMember))) {
+    kind = anchor->getBase()->isSuperExpr() ? RefKind::SuperInit
+                                            : RefKind::SelfInit;
+  }
+
   auto diagnostic = CompatibilityWarning
                         ? diag::partial_application_of_function_invalid_swift4
                         : diag::partial_application_of_function_invalid;
 
-  emitDiagnostic(anchor->getNameLoc(), diagnostic, RefKind::MutatingMethod);
+  emitDiagnostic(anchor->getNameLoc(), diagnostic, kind);
   return true;
 }
