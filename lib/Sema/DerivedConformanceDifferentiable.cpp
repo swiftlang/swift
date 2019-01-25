@@ -649,21 +649,13 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   SmallVector<VarDecl *, 8> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, diffProperties);
 
-  auto canDerive = [&](ProtocolDecl *proto) {
-      return !diffProperties.empty() && llvm::all_of(
-          diffProperties, [&](VarDecl *var) {
-            return TC.conformsToProtocol(getAssociatedType(var, nominal, id),
-                                         proto, nominal,
-                                         ConformanceCheckFlags::Used);
-          });
-  };
-
   // If the associated struct is `AllDifferentiableVariables`, conform it to:
   // - `AdditiveArithmetic`, if all members of the parent conform to
   //   `AdditiveArithmetic`.
   // - `KeyPathIterable`, if the parent conforms to to `KeyPathIterable`.
   if (id == C.Id_AllDifferentiableVariables) {
-    if (canDerive(addArithProto))
+    if (DerivedConformance::canDeriveAdditiveArithmetic(diffProperties,
+                                                        nominal))
       inherited.push_back(addArithType);
     if (TC.conformsToProtocol(nominal->getDeclaredInterfaceType(),
                               kpIterableProto, parentDC,
@@ -673,7 +665,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   // If all members also conform to `VectorNumeric` with the same `Scalar` type,
   // make the associated struct conform to `VectorNumeric` instead of just
   // `AdditiveArithmetic`.
-  if (canDerive(vecNumProto))
+  if (DerivedConformance::canDeriveVectorNumeric(diffProperties, nominal))
     inherited.push_back(vecNumType);
 
   auto *structDecl = new (C) StructDecl(SourceLoc(), id, SourceLoc(),
@@ -971,17 +963,18 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
             tangentType->isEqual(allDiffableVarsType);
       });
 
-  // If the following conditions hold:
-  // - No `@noDerivative stored properties exist.
-  // - All stored properties have all `Differentiable` protocol associated
-  //    types equal to `Self`.
-  // Then get or synthesize `AllDifferentiableVariables` struct and let
-  // `TangentVector` and `CotangentVector` alias to it.
+  // If all stored properties (excluding ones with `@noDerivative`) have all
+  // `Differentiable` protocol associated types equal to `Self`, then get or
+  // synthesize `AllDifferentiableVariables` struct and let `TangentVector` and
+  // `CotangentVector` alias to it.
   if (allMembersAssocTypesEqualsSelf) {
     auto allDiffableVarsStructSynthesis = getOrSynthesizeSingleAssociatedStruct(
         derived, C.Id_AllDifferentiableVariables);
     auto allDiffableVarsStruct = allDiffableVarsStructSynthesis.first;
     auto freshlySynthesized = allDiffableVarsStructSynthesis.second;
+    // `AllDifferentiableVariables` must conform to `AdditiveArithmetic`.
+    assert(allDiffableVarsStruct &&
+           "'AllDifferentiableVariable' must conform to 'AdditiveArithmetic'");
     // When the struct is freshly synthesized, we check emit warnings for
     // implicit `@noDerivative` members. Checking for fresh synthesis is
     // necessary because this code path will be executed called multiple times
