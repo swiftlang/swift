@@ -110,6 +110,22 @@ extension Tensor : ConvertibleFromNumpyArray
 }
 
 extension ShapedArray where Scalar : NumpyScalarCompatible {
+  // Creates a `ShapedArray` instance from the given `PythonObject` if it is a
+  // `numpy.ndarray` instance with a matching scalar datatype.
+  public init?(_ pythonObject: PythonObject) {
+    self.init(numpyArray: pythonObject)
+  }
+}
+
+extension Tensor where Scalar : NumpyScalarCompatible {
+  // Creates a `Tensor` instance from the given `PythonObject` if it is a
+  // `numpy.ndarray` instance with a matching scalar datatype.
+  public init?(_ pythonObject: PythonObject) {
+    self.init(numpyArray: pythonObject)
+  }
+}
+
+extension ShapedArray where Scalar : NumpyScalarCompatible {
   /// Creates a NumPy array with the same elements.
   ///
   /// - Precondition: The `numpy` Python package must have been installed.

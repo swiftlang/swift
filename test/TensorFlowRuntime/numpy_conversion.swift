@@ -111,12 +111,15 @@ NumpyConversionTests.test("tensor-round-trip") {
 
   let t1 = Tensor<Float>(shape: [1,2,3,4], repeating: 3.0)
   expectEqual(t1, Tensor<Float>(numpyArray: t1.makeNumpyArray())!)
+  expectEqual(t1, Tensor<Float>(t1.makeNumpyArray())!)
 
   let t2 = Tensor<UInt8>(shape: [2,3], scalars: [1, 2, 3, 4, 5, 6])
   expectEqual(t2, Tensor<UInt8>(numpyArray: t2.makeNumpyArray())!)
+  expectEqual(t2, Tensor<UInt8>(t2.makeNumpyArray())!)
 
   let t3 = Tensor<Int32>(shape: [8,5,4], repeating: 30)
   expectEqual(t3, Tensor<Int32>(numpyArray: t3.makeNumpyArray())!)
+  expectEqual(t3, Tensor<Int32>(t3.makeNumpyArray())!)
 }
 #endif
 
