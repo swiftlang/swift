@@ -246,7 +246,7 @@ _findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
       return nullptr;
     node = node->getChild(0);
   }
-  node = stripGenericArgsFromContextNode(node, demangler);
+  node = Demangle::getUnspecialized(node, demangler);
 
   return _findNominalTypeDescriptor(node, demangler);
 }
