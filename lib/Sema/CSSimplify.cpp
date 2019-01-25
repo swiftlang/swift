@@ -2394,7 +2394,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (forceUnwrapPossible) {
         conversionsOrFixes.push_back(ForceOptional::create(
             *this, objectType1, objectType1->getOptionalObjectType(),
-            getConstraintLocator(locator)));
+            getConstraintLocator(locator.getAnchor())));
       }
     }
 
@@ -2744,7 +2744,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         subflags);
     if (result == SolutionKind::Solved) {
       auto *fix = ForceOptional::create(*this, type, optionalObjectType,
-                                        getConstraintLocator(locator));
+                                        getConstraintLocator(locator.getAnchor()));
       if (recordFix(fix)) {
         return SolutionKind::Error;
       }
@@ -3042,7 +3042,7 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
   if (unwrapCount > 0) {
     auto *fix = ForceOptional::create(*this, simplifiedCopy,
                                       simplifiedCopy->getOptionalObjectType(),
-                                      getConstraintLocator(locator));
+                                      getConstraintLocator(locator.getAnchor()));
     while (unwrapCount-- > 0) {
       if (recordFix(fix))
         return SolutionKind::Error;
@@ -4668,7 +4668,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     // Record any fixes we attempted to get to the correct solution.
     auto *fix = ForceOptional::create(*this, origType2,
                                       origType2->getOptionalObjectType(),
-                                      getConstraintLocator(locator));
+                                      getConstraintLocator(locator.getAnchor()));
     while (unwrapCount-- > 0) {
       if (recordFix(fix))
         return SolutionKind::Error;
@@ -4693,7 +4693,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     if (simplified == SolutionKind::Solved) {
       auto *fix = ForceOptional::create(*this, origType2,
                                         origType2->getOptionalObjectType(),
-                                        getConstraintLocator(locator));
+                                        getConstraintLocator(locator.getAnchor()));
       while (unwrapCount-- > 0) {
         if (recordFix(fix))
           return SolutionKind::Error;
@@ -5409,12 +5409,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
     // This situation might happen when the same fix kind is applicable to
     // different overload choices.
     auto *loc = fix->getLocator();
-    auto *anchor = loc->getAnchor();
     auto existingFix = llvm::find_if(Fixes, [&](const ConstraintFix *e) {
-      if (e->getKind() == FixKind::ForceOptional &&
-          e->getLocator()->getAnchor() == anchor) {
-        return true;
-      }
       // If we already have a fix like this recorded, let's not do it again,
       return e->getKind() == fix->getKind() && e->getLocator() == loc;
     });
