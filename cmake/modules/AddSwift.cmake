@@ -2244,19 +2244,6 @@ function(add_swift_host_tool executable)
   endif()
 endfunction()
 
-# This declares a swift host tool that links with libfuzzer.
-function(add_swift_fuzzer_host_tool executable)
-  # First create our target. We do not actually parse the argument since we do
-  # not care about the arguments, we just pass them all through to
-  # add_swift_host_tool.
-  add_swift_host_tool(${executable} ${ARGN})
-
-  # Then make sure that we pass the -fsanitize=fuzzer flag both on the cflags
-  # and cxx flags line.
-  target_compile_options(${executable} PRIVATE "-fsanitize=fuzzer")
-  target_link_libraries(${executable} PRIVATE "-fsanitize=fuzzer")
-endfunction()
-
 macro(add_swift_tool_symlink name dest component)
   add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
   llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
