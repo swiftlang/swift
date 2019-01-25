@@ -178,10 +178,8 @@ private class TraceContext {
     // x) is symbolic. The second one for y is concrete, and is computed at
     // trace creation time, not trace execution time.
     // Also see the comment block above finalizeAndExecuteTraceFn().
-    for (i, output) in outputs.enumerated() {
-      if TFE_TensorHandleIsConcrete(output) != 0 {
-        continue
-      }
+    for (i, output) in outputs.enumerated()
+        where TFE_TensorHandleIsConcrete(output) == 0 {
       debugLog("Adding symbolic output \(i) as a trace graph func output.")
       symbolicOutputs.append(TFE_GetTFOutputFromTensorHandle(output ,status))
       checkOk(status)
