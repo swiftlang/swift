@@ -1677,11 +1677,15 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       replacedFunctionKey->root.get());
 
   // Make sure this entry is not already enabled.
+  // This does not work until we make sure that when a dynamic library is
+  // unloaded all descriptors are removed.
+#if 0
   for (auto *curr = chainRoot; curr != nullptr; curr = curr->next) {
     if (curr == chainEntry.get()) {
       swift::swift_abortDynamicReplacementEnabling();
     }
   }
+#endif
 
   // Unlink the previous entry if we are not chaining.
   if (!shouldChain() && chainRoot->next) {
