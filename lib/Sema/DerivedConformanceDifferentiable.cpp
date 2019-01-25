@@ -425,7 +425,7 @@ deriveDifferentiable_tangentVector(DerivedConformance &derived) {
       deriveBodyDifferentiable_tangentVector);
 }
 
-// Returns the underlying `allDifferentiableVariables` of a VarDecl `x`.
+// Return the underlying `allDifferentiableVariables` of a VarDecl `x`.
 // If `x` conforms to `Differentiable`, return `allDifferentiableVariables`.
 // Otherwise, return `x`.
 static ValueDecl *getUnderlyingAllDiffableVariables(ModuleDecl *module,

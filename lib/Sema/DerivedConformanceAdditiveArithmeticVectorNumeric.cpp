@@ -99,7 +99,7 @@ static Type getVectorNumericScalarAssocType(VarDecl *decl, DeclContext *DC) {
   return scalarType;
 }
 
-// Returns the `Scalar` associated type for a nominal type with the given
+// Return the `Scalar` associated type for a nominal type with the given
 // members, or nullptr if `Scalar` cannot be derived.
 static Type deriveVectorNumeric_Scalar(ArrayRef<VarDecl *> members,
                                        DeclContext *DC) {
@@ -126,7 +126,7 @@ static Type deriveVectorNumeric_Scalar(ArrayRef<VarDecl *> members,
   return sameScalarType;
 }
 
-// Returns the `Scalar` associated type for a nominal type with the given
+// Return the `Scalar` associated type for a nominal type with the given
 // members, or nullptr if `Scalar` cannot be derived.
 static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal,
                                        DeclContext *DC) {
@@ -142,21 +142,21 @@ static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal,
   return deriveVectorNumeric_Scalar(storedProps, DC);
 }
 
-// Returns true if a `VectorNumeric` requirement can be derived for the given
+// Return true if a `VectorNumeric` requirement can be derived for the given
 // members of a nominal type.
 bool DerivedConformance::canDeriveVectorNumeric(ArrayRef<VarDecl *> members,
                                                 DeclContext *DC) {
   return (bool)deriveVectorNumeric_Scalar(members, DC);
 }
 
-// Returns true if given nominal type has a `let` stored with an initial value.
+// Return true if given nominal type has a `let` stored with an initial value.
 static bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
     return v->isLet() && v->hasInitialValue();
   });
 }
 
-// Returns true if an `AdditiveArithmetic` requirement can be derived for the
+// Return true if an `AdditiveArithmetic` requirement can be derived for the
 // given members of a nominal type.
 bool DerivedConformance::canDeriveAdditiveArithmetic(
     ArrayRef<VarDecl *> members, DeclContext *DC) {
