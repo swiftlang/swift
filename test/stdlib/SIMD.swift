@@ -22,6 +22,21 @@ where T : SIMD, T.Scalar : FixedWidthInteger {
   }
 }
 
+func testRoundTrip<T>(_ for: T.Type)
+where T : SIMD, T.Scalar : BinaryFloatingPoint {
+  let input = T.random(in: -16 ... (16 as T))
+  let encoder = JSONEncoder()
+  let decoder = JSONDecoder()
+  do {
+    let data = try encoder.encode(input)
+    let output = try decoder.decode(T.self, from: data)
+    assertEqual(input, output)
+  }
+  catch {
+    expectUnreachableCatch(error)
+  }
+}
+
 // Very basic round-trip test. We can be much more sophisticated in the future,
 // but we want to at least exercise the API. Also need to add some negative
 // tests for the error paths, and test a more substantial set of types.
