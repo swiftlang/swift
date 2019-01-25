@@ -5390,7 +5390,7 @@ RValue RValueEmitter::visitAutoDiffFunctionExtractOriginalExpr(
   auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto *orig = SGF.B.createAutoDiffFunctionExtractOriginal(
       E, diffFunc.forward(SGF));
-  return RValue(SGF, E, ManagedValue::forUnmanaged(orig));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(orig));
 }
 
 RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {

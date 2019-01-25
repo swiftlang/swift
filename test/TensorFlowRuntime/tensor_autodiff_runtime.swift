@@ -80,10 +80,10 @@ TensorADTests.testAllBackends("sum") {
 
   let expected = Tensor<Float>(ones: [2, 2])
   expectTrue(sumPullbackScalar(Tensor(1)) == expected)
-  expectTrue(sumPullbackSqueezingAxes(Tensor(1)) == expected)
+  // expectTrue(sumPullbackSqueezingAxes(Tensor(1)) == expected)
   expectTrue(sumPullbackAlongAxes(Tensor(1))  == expected)
   expectTrue(sumPullbackScalar(Tensor(3)) == expected * 3)
-  expectTrue(sumPullbackSqueezingAxes(Tensor(3)) == expected * 3)
+  // expectTrue(sumPullbackSqueezingAxes(Tensor(3)) == expected * 3)
   expectTrue(sumPullbackAlongAxes(Tensor(3)) == expected * 3)
 }
 

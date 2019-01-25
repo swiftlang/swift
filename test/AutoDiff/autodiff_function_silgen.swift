@@ -33,10 +33,10 @@ func apply() {
 // CHECK-SILGEN:   [[ORIG:%.*]] = autodiff_function_extract [original] [[DIFFED_COPY]] : $@autodiff @callee_guaranteed (Float) -> Float
 // CHECK-SILGEN:   [[BORROWED_ORIG:%.*]] = begin_borrow [[ORIG]] : $@callee_guaranteed (Float) -> Float
 // CHECK-SILGEN:   apply [[BORROWED_ORIG]]({{%.*}}) : $@callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   destroy_value [[ORIG]] : $@callee_guaranteed (Float) -> Float
 // CHECK-SILGEN:   [[DIFFED_COPY:%.*]] = copy_value [[DIFFED]] : $@autodiff @callee_guaranteed (Float) -> Float
 // CHECK-SILGEN:   [[ORIG:%.*]] = autodiff_function_extract [original] [[DIFFED_COPY]] : $@autodiff @callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   [[ORIG_COPY:%.*]] = copy_value [[ORIG]] : $@callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   return [[ORIG_COPY]] : $@callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   return [[ORIG]] : $@callee_guaranteed (Float) -> Float
 
 // CHECK-SILGEN-LABEL: @{{.*}}apply{{.*}}
 // CHECK-SILGEN:       [[ORIG:%.*]] = function_ref @{{.*}}thin{{.*}} : $@convention(thin) (Float) -> Float
