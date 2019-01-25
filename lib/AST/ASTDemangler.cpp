@@ -399,15 +399,16 @@ ASTBuilder::findModule(const Demangle::NodePointer &node) {
 
 Demangle::NodePointer
 ASTBuilder::findModuleNode(const Demangle::NodePointer &node) {
-  if (node->getKind() == Demangle::Node::Kind::Module)
-    return node;
+  auto child = node;
+  while (child->hasChildren() &&
+         child->getKind() != Demangle::Node::Kind::Module) {
+    child = child->getFirstChild();
+  }
 
-  if (!node->hasChildren()) return nullptr;
-  const auto &child = node->getFirstChild();
-  if (child->getKind() != Demangle::Node::Kind::DeclContext)
+  if (child->getKind() != Demangle::Node::Kind::Module)
     return nullptr;
 
-  return findModuleNode(child->getFirstChild());
+  return child;
 }
 
 Optional<ASTBuilder::ForeignModuleKind>
