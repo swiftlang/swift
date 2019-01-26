@@ -1272,46 +1272,138 @@ swift::getLLVMIntrinsicIDForBuiltinWithOverflow(BuiltinValueKind ID) {
   llvm_unreachable("Cannot convert the overflow builtin to llvm intrinsic.");
 }
 
-static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
-                                ArrayRef<Type> Tys, ASTContext &Context) {
+namespace {
+
+class IntrinsicTypeDecoder {
+  ArrayRef<llvm::Intrinsic::IITDescriptor> &Table;
+  ArrayRef<Type> TypeArguments;
+  ASTContext &Context;
+public:
+  IntrinsicTypeDecoder(ArrayRef<llvm::Intrinsic::IITDescriptor> &table,
+                       ArrayRef<Type> typeArguments, ASTContext &ctx)
+    : Table(table), TypeArguments(typeArguments), Context(ctx) {}
+
+  Type decodeImmediate();
+
+  /// Return the type argument at the given index.
+  Type getTypeArgument(unsigned index) {
+    if (index >= TypeArguments.size())
+      return Type();
+    return TypeArguments[index];
+  }
+
+  /// Create a pointer type.
+  Type makePointer(Type eltType, unsigned addrspace) {
+    // Reject non-default address space pointers.
+    if (addrspace)
+      return Type();
+
+    // For now, always ignore the element type and use RawPointer.
+    return Context.TheRawPointerType;
+  }
+
+  /// Create a vector type.
+  Type makeVector(Type eltType, unsigned width) {
+    return BuiltinVectorType::get(Context, eltType, width);
+  }
+
+  /// Return the first type or, if the second type is a vector type, a vector
+  /// of the first type of the same length as the second type.
+  Type maybeMakeVectorized(Type eltType, Type maybeVectorType) {
+    if (auto vectorType = maybeVectorType->getAs<BuiltinVectorType>()) {
+      return makeVector(eltType, vectorType->getNumElements());
+    }
+    return eltType;
+  }
+};
+
+} // end anonymous namespace
+
+static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &table,
+                                ArrayRef<Type> typeArguments, ASTContext &ctx) {
+  return IntrinsicTypeDecoder(table, typeArguments, ctx).decodeImmediate();
+}
+
+Type IntrinsicTypeDecoder::decodeImmediate() {
   typedef llvm::Intrinsic::IITDescriptor IITDescriptor;
   IITDescriptor D = Table.front();
   Table = Table.slice(1);
   switch (D.Kind) {
-  default:
-    llvm_unreachable("Unhandled case");
-  case IITDescriptor::Half:
   case IITDescriptor::MMX:
   case IITDescriptor::Metadata:
-  case IITDescriptor::Vector:
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
+  case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
+  case IITDescriptor::Token:
+  case IITDescriptor::VecOfAnyPtrsToElt:
     // These types cannot be expressed in swift yet.
     return Type();
 
-  case IITDescriptor::Void: return TupleType::getEmpty(Context);
-  case IITDescriptor::Float: return Context.TheIEEE32Type;
-  case IITDescriptor::Double: return Context.TheIEEE64Type;
-
+  // Fundamental types.
+  case IITDescriptor::Void:
+    return TupleType::getEmpty(Context);
+  case IITDescriptor::Half:
+    return Context.TheIEEE16Type;
+  case IITDescriptor::Float:
+    return Context.TheIEEE32Type;
+  case IITDescriptor::Double:
+    return Context.TheIEEE64Type;
+  case IITDescriptor::Quad:
+    return Context.TheIEEE128Type;
   case IITDescriptor::Integer:
     return BuiltinIntegerType::get(D.Integer_Width, Context);
-  case IITDescriptor::Pointer:
-    if (D.Pointer_AddressSpace)
-      return Type();  // Reject non-default address space pointers.
-      
-    // Decode but ignore the pointee.  Just decode all IR pointers to unsafe
-    // pointer type.
-    (void)DecodeIntrinsicType(Table, Tys, Context);
-    return Context.TheRawPointerType;
+
+  // A vector of an immediate type.
+  case IITDescriptor::Vector: {
+    Type eltType = decodeImmediate();
+    if (!eltType) return Type();
+    return makeVector(eltType, D.Vector_Width);
+  }
+
+  // A pointer to an immediate type.
+  case IITDescriptor::Pointer: {
+    Type pointeeType = decodeImmediate();
+    if (!pointeeType) return Type();
+    return makePointer(pointeeType, D.Pointer_AddressSpace);
+  }
+
+  // A type argument.
   case IITDescriptor::Argument:
-    if (D.getArgumentNumber() >= Tys.size())
-      return Type();
-    return Tys[D.getArgumentNumber()];
+    return getTypeArgument(D.getArgumentNumber());
+
+  // A pointer to a type argument.
+  case IITDescriptor::PtrToArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    unsigned addrspace = 0; // An apparent limitation of LLVM.
+    return makePointer(argType, addrspace);
+  }
+
+  // A vector of the same width as a type argument.
+  case IITDescriptor::SameVecWidthArgument: {
+    Type maybeVectorType = getTypeArgument(D.getArgumentNumber());
+    if (!maybeVectorType) return Type();
+    Type eltType = decodeImmediate();
+    if (!eltType) return Type();
+    return maybeMakeVectorized(eltType, maybeVectorType);
+  }
+
+  // A pointer to the element type of a type argument, which must be a vector.
+  case IITDescriptor::PtrToElt: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    auto vecType = argType->getAs<BuiltinVectorType>();
+    if (!vecType) return Type();
+    unsigned addrspace = 0; // An apparent limitation of LLVM.
+    return makePointer(vecType->getElementType(), addrspace);
+  }
+
+  // A struct, which we translate as a tuple.
   case IITDescriptor::Struct: {
     SmallVector<TupleTypeElt, 5> Elts;
     for (unsigned i = 0; i != D.Struct_NumElements; ++i) {
-      Type T = DecodeIntrinsicType(Table, Tys, Context);
+      Type T = decodeImmediate();
       if (!T) return Type();
       
       Elts.push_back(T);
