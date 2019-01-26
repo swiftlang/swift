@@ -94,7 +94,7 @@ extension _StringGuts {
   internal func foreignHasNormalizationBoundary(
     before index: String.Index
   ) -> Bool {
-    let offset = index.encodedOffset
+    let offset = index._encodedOffset
     if offset == 0 || offset == count {
       return true
     }
@@ -350,11 +350,11 @@ internal func _fastNormalize(
   icuInputBuffer: inout UnsafeMutableBufferPointer<UInt16>,
   icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>
 ) -> NormalizationResult {
-  let start = readIndex.encodedOffset
+  let start = readIndex._encodedOffset
   let rebasedSourceBuffer = UnsafeBufferPointer(rebasing: sourceBuffer[start...])
   if let (read, filled) = fastFill(rebasedSourceBuffer, outputBuffer) {
     let nextIndex = readIndex.encoded(offsetBy: read)
-    _internalInvariant(sourceBuffer.isOnUnicodeScalarBoundary(nextIndex.encodedOffset))
+    _internalInvariant(sourceBuffer.isOnUnicodeScalarBoundary(nextIndex._encodedOffset))
     
     return NormalizationResult(
       amountFilled: filled, nextReadPosition: nextIndex, allocatedBuffers: false)
@@ -384,7 +384,7 @@ internal func _fastNormalize(
   }
   
   let nextIndex = readIndex.encoded(offsetBy: read)
-  _internalInvariant(sourceBuffer.isOnUnicodeScalarBoundary(nextIndex.encodedOffset))
+  _internalInvariant(sourceBuffer.isOnUnicodeScalarBoundary(nextIndex._encodedOffset))
   
   let normalized = performWithAllocationIfNecessary(preserving: .icuInput) { () -> Int? in
     return _tryNormalize(
@@ -426,8 +426,8 @@ internal func _foreignNormalize(
     return f()!
   }
   let (read, filled) = performWithAllocationIfNecessary(preserving: .none) { () -> (Int, Int)? in
-    let start = readIndex.encodedOffset
-    let end = endIndex.encodedOffset
+    let start = readIndex._encodedOffset
+    let end = endIndex._encodedOffset
     return copyUTF16Segment(boundedBy: start..<end, into: icuInputBuffer) { gutsOffset in
       return guts.errorCorrectedScalar(startingAt: gutsOffset)
     }

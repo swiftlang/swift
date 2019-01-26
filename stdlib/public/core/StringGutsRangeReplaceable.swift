@@ -218,8 +218,8 @@ extension _StringGuts {
   }
 
   internal mutating func remove(from lower: Index, to upper: Index) {
-    let lowerOffset = lower.encodedOffset
-    let upperOffset = upper.encodedOffset
+    let lowerOffset = lower._encodedOffset
+    let upperOffset = upper._encodedOffset
     _internalInvariant(lower.transcodedOffset == 0 && upper.transcodedOffset == 0)
     _internalInvariant(lowerOffset <= upperOffset && upperOffset <= self.count)
 
@@ -279,16 +279,16 @@ extension _StringGuts {
     isASCII: Bool
   ) {
     let neededCapacity =
-      bounds.lowerBound.encodedOffset
-      + codeUnits.count + (self.count - bounds.upperBound.encodedOffset)
+      bounds.lowerBound._encodedOffset
+      + codeUnits.count + (self.count - bounds.upperBound._encodedOffset)
     reserveCapacity(neededCapacity)
 
     _internalInvariant(bounds.lowerBound.transcodedOffset == 0)
     _internalInvariant(bounds.upperBound.transcodedOffset == 0)
 
     _object.nativeStorage.replace(
-      from: bounds.lowerBound.encodedOffset,
-      to: bounds.upperBound.encodedOffset,
+      from: bounds.lowerBound._encodedOffset,
+      to: bounds.upperBound._encodedOffset,
       with: codeUnits)
     self = _StringGuts(_object.nativeStorage)
   }
@@ -300,16 +300,16 @@ extension _StringGuts {
     let replCount = codeUnits.count
 
     let neededCapacity =
-      bounds.lowerBound.encodedOffset
-      + replCount + (self.count - bounds.upperBound.encodedOffset)
+      bounds.lowerBound._encodedOffset
+      + replCount + (self.count - bounds.upperBound._encodedOffset)
     reserveCapacity(neededCapacity)
 
     _internalInvariant(bounds.lowerBound.transcodedOffset == 0)
     _internalInvariant(bounds.upperBound.transcodedOffset == 0)
 
     _object.nativeStorage.replace(
-      from: bounds.lowerBound.encodedOffset,
-      to: bounds.upperBound.encodedOffset,
+      from: bounds.lowerBound._encodedOffset,
+      to: bounds.upperBound._encodedOffset,
       with: codeUnits,
       replacementCount: replCount)
     self = _StringGuts(_object.nativeStorage)

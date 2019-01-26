@@ -217,23 +217,23 @@ extension _StringGuts {
   internal func scalarAlign(_ idx: Index) -> Index {
     // TODO(String performance): isASCII check
 
-    if _slowPath(idx.transcodedOffset != 0 || idx.encodedOffset == 0) {
+    if _slowPath(idx.transcodedOffset != 0 || idx._encodedOffset == 0) {
       // Transcoded indices are already scalar aligned
-      return String.Index(encodedOffset: idx.encodedOffset)
+      return String.Index(_encodedOffset: idx._encodedOffset)
     }
     if _slowPath(self.isForeign) {
       return foreignScalarAlign(idx)
     }
 
     return self.withFastUTF8 { utf8 in
-      let i = _scalarAlign(utf8, idx.encodedOffset)
+      let i = _scalarAlign(utf8, idx._encodedOffset)
 
       // If no alignment is performed, keep grapheme cache
-      if i == idx.encodedOffset {
+      if i == idx._encodedOffset {
         return idx
       }
 
-      return Index(encodedOffset: i)
+      return Index(_encodedOffset: i)
     }
   }
 
@@ -277,7 +277,7 @@ extension _StringGuts {
     if i == self.startIndex || i == self.endIndex { return true }
 
     if _fastPath(isFastUTF8) {
-      return self.withFastUTF8 { return !_isContinuation($0[i.encodedOffset]) }
+      return self.withFastUTF8 { return !_isContinuation($0[i._encodedOffset]) }
     }
 
     return i == foreignScalarAlign(i)
@@ -305,9 +305,9 @@ extension _StringGuts {
     startingAt idx: String.Index
   ) -> (Unicode.Scalar, scalarLength: Int) {
     _internalInvariant(idx.transcodedOffset == 0)
-    _internalInvariant(idx.encodedOffset < self.count)
+    _internalInvariant(idx._encodedOffset < self.count)
 
-    let start = idx.encodedOffset
+    let start = idx._encodedOffset
     let leading = _getForeignCodeUnit(at: start)
 
     if _fastPath(!_isSurrogate(leading)) {
@@ -338,10 +338,10 @@ extension _StringGuts {
     endingAt idx: String.Index
   ) -> (Unicode.Scalar, scalarLength: Int) {
     _internalInvariant(idx.transcodedOffset == 0)
-    _internalInvariant(idx.encodedOffset <= self.count)
-    _internalInvariant(idx.encodedOffset > 0)
+    _internalInvariant(idx._encodedOffset <= self.count)
+    _internalInvariant(idx._encodedOffset > 0)
 
-    let end = idx.encodedOffset
+    let end = idx._encodedOffset
     let trailing = _getForeignCodeUnit(at: end &- 1)
     if _fastPath(!_isSurrogate(trailing)) {
       return (Unicode.Scalar(_unchecked: UInt32(trailing)), 1)
@@ -371,9 +371,9 @@ extension _StringGuts {
     at idx: String.Index
   ) -> UInt16 {
     _internalInvariant(idx.transcodedOffset == 0)
-    _internalInvariant(idx.encodedOffset < self.count)
+    _internalInvariant(idx._encodedOffset < self.count)
 
-    let start = idx.encodedOffset
+    let start = idx._encodedOffset
     let cu = _getForeignCodeUnit(at: start)
     if _fastPath(!_isSurrogate(cu)) {
       return cu
@@ -402,15 +402,15 @@ extension _StringGuts {
   @usableFromInline @inline(never) // slow-path
   @_effects(releasenone)
   internal func foreignScalarAlign(_ idx: Index) -> Index {
-    _internalInvariant(idx.encodedOffset < self.count)
+    _internalInvariant(idx._encodedOffset < self.count)
 
     let ecCU = foreignErrorCorrectedUTF16CodeUnit(at: idx)
     if _fastPath(!_isTrailingSurrogate(ecCU)) {
       return idx
     }
-    _internalInvariant(idx.encodedOffset > 0,
+    _internalInvariant(idx._encodedOffset > 0,
       "Error-correction shouldn't give trailing surrogate at position zero")
-    return String.Index(encodedOffset: idx.encodedOffset &- 1)
+    return String.Index(_encodedOffset: idx._encodedOffset &- 1)
   }
 
   @usableFromInline @inline(never)
@@ -426,7 +426,7 @@ extension _StringGuts {
     let count = end &- start
     if start &- end == 1 {
       return Character(String(self.foreignErrorCorrectedScalar(
-        startingAt: String.Index(encodedOffset: start)
+        startingAt: String.Index(_encodedOffset: start)
       ).0))
     }
 
@@ -459,7 +459,7 @@ extension _StringGuts {
       return withFastUTF8 { _decodeScalar($0, startingAt: i) }
     }
     return foreignErrorCorrectedScalar(
-      startingAt: String.Index(encodedOffset: i))
+      startingAt: String.Index(_encodedOffset: i))
   }
   @inlinable @inline(__always)
   internal func errorCorrectedCharacter(

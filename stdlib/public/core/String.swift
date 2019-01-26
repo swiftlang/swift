@@ -925,8 +925,8 @@ internal func _fastWithNormalizedCodeUnitsImpl(
   var icuInputBuffer = icuInputBuffer
   var icuOutputBuffer = icuOutputBuffer
 
-  var index = String.Index(encodedOffset: 0)
-  let cachedEndIndex = String.Index(encodedOffset: sourceBuffer.count)
+  var index = String.Index(_encodedOffset: 0)
+  let cachedEndIndex = String.Index(_encodedOffset: sourceBuffer.count)
   
   var hasBufferOwnership = false
   

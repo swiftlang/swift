@@ -79,8 +79,8 @@ extension _StringBreadcrumbs {
   internal func getBreadcrumb(
     forIndex idx: String.Index
   ) -> (lowerBound: String.Index, offset: Int) {
-    var lowerBound = idx.encodedOffset / 3 / stride
-    var upperBound = Swift.min(1 + (idx.encodedOffset / stride), crumbs.count)
+    var lowerBound = idx._encodedOffset / 3 / stride
+    var upperBound = Swift.min(1 + (idx._encodedOffset / stride), crumbs.count)
     _internalInvariant(crumbs[lowerBound] <= idx)
     _internalInvariant(upperBound == crumbs.count || crumbs[upperBound] >= idx)
 

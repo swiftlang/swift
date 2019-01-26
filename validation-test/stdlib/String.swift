@@ -1365,8 +1365,8 @@ StringTests.test("indexConversion")
     result, flags, stop
   in
     let r = result!.range(at: 1)
-    let start = String.Index(encodedOffset: r.location)
-    let end = String.Index(encodedOffset: r.location + r.length)
+    let start = String.Index(_encodedOffset: r.location)
+    let end = String.Index(_encodedOffset: r.location + r.length)
     matches.append(String(s.utf16[start..<end])!)
   }
 
