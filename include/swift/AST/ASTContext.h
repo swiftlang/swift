@@ -530,6 +530,9 @@ public:
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
+
+  // Retrieve the declaration of Swift._MaxBuiltinFloatType.
+  TypeAliasDecl *getMaxBuiltinFloatTypeDecl() const;
   
   /// Look for the declaration with the given name within the
   /// Swift module.
