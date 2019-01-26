@@ -860,6 +860,8 @@ class BuildScriptInvocation(object):
             product_classes.append(products.SwiftSyntax)
         if self.args.build_skstresstester:
             product_classes.append(products.SKStressTester)
+        if self.args.build_swiftevolve:
+            product_classes.append(products.SwiftEvolve)
         return product_classes
 
     def execute(self):
