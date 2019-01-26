@@ -85,8 +85,24 @@ module WinSDK [system] [extern_c] {
     }
   }
 
+  // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
+  module __DirectX {
+    header "directmanipulation.h"
+    export *
+  }
+
+  module DbgHelp {
+    header "DbgHelp.h"
+    export *
+  }
+
   module Shell {
     header "ShlObj.h"
+    export *
+  }
+
+  module WinCrypt {
+    header "wincrypt.h"
     export *
   }
 }
