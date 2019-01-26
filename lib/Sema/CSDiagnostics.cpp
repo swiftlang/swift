@@ -510,12 +510,18 @@ public:
   int referencesCount() { return count; }
 };
 
-static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
-  Type unwrappedType = type->getOptionalObjectType();
-  if (!unwrappedType)
+static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type baseType,
+                           Type unwrappedType) {
+
+  assert(!baseType->hasTypeVariable() &&
+         "Base type must not be a type variable");
+  assert(!unwrappedType->hasTypeVariable() &&
+         "Unwrapped type must not be a type variable");
+
+  if (baseType && !baseType->getOptionalObjectType())
     return false;
 
-  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
+  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, baseType,
                  unwrappedType);
 
   // If the expression we're unwrapping is the only reference to a
@@ -541,7 +547,8 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
         Expr *initializer = varDecl->getParentInitializer();
         if (auto declRefExpr = dyn_cast<DeclRefExpr>(initializer)) {
           if (declRefExpr->getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer, type);
+            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer,
+                           baseType);
           }
         }
 
@@ -580,12 +587,18 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     anchor = assignExpr->getSrc();
   
   auto *unwrapped = anchor->getValueProvidingExpr();
-  auto type = getType(anchor)->getRValueType();
+  Type type = getType(anchor)->getRValueType();
 
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
-  if (!tryExpr)
-    return diagnoseUnwrap(getConstraintSystem(), unwrapped, type);
-  
+  if (!tryExpr) {
+    auto resolvedBaseTy =
+        resolveType(BaseType)->reconstituteSugar(/*recursive=*/true);
+    auto resolvedUnwrappedTy =
+        resolveType(UnwrappedType)->reconstituteSugar(/*recursive=*/true);
+    return diagnoseUnwrap(getConstraintSystem(), unwrapped, resolvedBaseTy,
+                          resolvedUnwrappedTy);
+  }
+
   bool isSwift5OrGreater = getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5);
   auto subExprType = getType(tryExpr->getSubExpr());
   bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
