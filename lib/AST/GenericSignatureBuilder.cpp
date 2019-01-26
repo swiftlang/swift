@@ -4631,18 +4631,29 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       Impl->HadAnyError = true;
       
       bool shouldOfferFixit = false;
-      if (auto GTPT = subjectType->getAs<GenericTypeParamType>()) {
+      auto DMT = subjectType->getAs<DependentMemberType>();
+      auto GTPT = subjectType->getAs<GenericTypeParamType>();
+
+      if (GTPT) {
         shouldOfferFixit = isa<ExtensionDecl>(GTPT->getDecl()
                                                   ->getDeclContext());
       }
-      
+
+      if (DMT) {
+        shouldOfferFixit = isa<ExtensionDecl>(DMT->getRootGenericParam()
+																							   ->getDecl()
+																							   ->getDeclContext());
+      }
+
       if (shouldOfferFixit) {
+        auto subjectTypeName = DMT ? DMT->getName().str().str() :
+				                       subjectType.getString();
         Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
                        subjectType, constraintType);
         Diags.diagnose(source.getLoc(),
-                       diag::requires_conformance_nonprotocol_fixit,
-                       subjectType.getString(), constraintType.getString())
-             .fixItReplace(source.getLoc(), " == ");
+                      diag::requires_conformance_nonprotocol_fixit,
+                      subjectTypeName, constraintType.getString())
+            .fixItReplace(source.getLoc(), " == ");
       } else {
         Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
                        subjectType, constraintType);
