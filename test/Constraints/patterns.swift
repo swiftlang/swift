@@ -291,9 +291,10 @@ switch staticMembers {
   case .init(0): break
   case .init(_): break // expected-error{{'_' can only appear in a pattern}}
   case .init(let x): break // expected-error{{cannot appear in an expression}}
-  case .init(opt: 0): break // expected-error{{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
-                           // expected-note@-1{{coalesce}}
-                           // expected-note@-2{{force-unwrap}}
+  case .init(opt: 0): break
+  // expected-error@-1 {{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
+  // expected-note@-2 {{coalesce}}
+  // expected-note@-3 {{force-unwrap}}
 
   case .prop: break
   // TODO: repeated error message
@@ -310,9 +311,10 @@ switch staticMembers {
   case .method(withLabel: let x): break // expected-error{{cannot appear in an expression}}
 
   case .optMethod: break // expected-error{{cannot match}}
-  case .optMethod(0): break // expected-error{{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
-                           // expected-note@-1{{coalesce}}
-                          // expected-note@-2{{force-unwrap}}
+  case .optMethod(0): break
+  // expected-error@-1 {{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
+  // expected-note@-2 {{coalesce}}
+  // expected-note@-3 {{force-unwrap}}
 }
 
 _ = 0

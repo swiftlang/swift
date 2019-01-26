@@ -172,7 +172,10 @@ class ForceOptional final : public ConstraintFix {
   ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
                 ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
-        UnwrappedType(unwrappedType) {}
+        UnwrappedType(unwrappedType) {
+    assert(baseType && "Base type must not be null");
+    assert(unwrappedType && "Unwrapped type must not be null");
+  }
 
 public:
   std::string getName() const override { return "force optional"; }
