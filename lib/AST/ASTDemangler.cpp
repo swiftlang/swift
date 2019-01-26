@@ -21,10 +21,10 @@
 
 #include "swift/AST/ASTDemangler.h"
 
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Type.h"
@@ -47,63 +47,117 @@ Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
 
 
 Type
-ASTBuilder::createBuiltinType(const std::string &mangledName) {
-  // TODO
+ASTBuilder::createBuiltinType(StringRef builtinName,
+                              StringRef mangledName) {
+  if (builtinName.startswith(BUILTIN_TYPE_NAME_PREFIX)) {
+    SmallVector<ValueDecl *, 1> decls;
+
+    ModuleDecl::AccessPathTy accessPath;
+    StringRef strippedName =
+          builtinName.drop_front(strlen(BUILTIN_TYPE_NAME_PREFIX));
+    Ctx.TheBuiltinModule->lookupValue(accessPath,
+                                      Ctx.getIdentifier(strippedName),
+                                      NLKind::QualifiedLookup,
+                                      decls);
+    
+    if (decls.size() == 1 && isa<TypeDecl>(decls[0]))
+      return cast<TypeDecl>(decls[0])->getDeclaredInterfaceType();
+  }
+
   return Type();
 }
 
-NominalTypeDecl *
-ASTBuilder::createNominalTypeDecl(StringRef mangledName) {
+GenericTypeDecl *ASTBuilder::createTypeDecl(StringRef mangledName,
+                                            bool &typeAlias) {
   Demangle::Demangler Dem;
   Demangle::NodePointer node = Dem.demangleType(mangledName);
   if (!node) return nullptr;
 
-  return createNominalTypeDecl(node);
+  return createTypeDecl(node, typeAlias);
 }
 
 ProtocolDecl *
 ASTBuilder::createProtocolDecl(const Demangle::NodePointer &node) {
-  return dyn_cast_or_null<ProtocolDecl>(createNominalTypeDecl(node));
+  bool typeAlias;
+  return dyn_cast_or_null<ProtocolDecl>(
+    createTypeDecl(node, typeAlias));
 }
 
-Type ASTBuilder::createNominalType(NominalTypeDecl *decl) {
-  // If the declaration is generic, fail.
-  if (decl->isGenericContext())
+Type ASTBuilder::createNominalType(GenericTypeDecl *decl) {
+  auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl);
+  if (!nominalDecl)
     return Type();
 
-  return decl->getDeclaredType();
+  // If the declaration is generic, fail.
+  if (nominalDecl->isGenericContext())
+    return Type();
+
+  return nominalDecl->getDeclaredType();
 }
 
-Type ASTBuilder::createNominalType(NominalTypeDecl *decl, Type parent) {
+Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
+  auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl);
+  if (!nominalDecl)
+    return Type();
+
   // If the declaration is generic, fail.
-  if (decl->getGenericParams())
+  if (nominalDecl->getGenericParams())
+    return Type();
+
+  // Imported types can be renamed to be members of other (non-generic)
+  // types, but the mangling does not have a parent type. Just use the
+  // declared type directly in this case and skip the parent check below.
+  if (nominalDecl->hasClangNode() && !nominalDecl->isGenericContext())
+    return nominalDecl->getDeclaredType();
+
+  // Validate the parent type.
+  if (!validateParentType(nominalDecl, parent))
+    return Type();
+
+  return NominalType::get(nominalDecl, parent, Ctx);
+}
+
+Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
+  auto *aliasDecl = dyn_cast<TypeAliasDecl>(decl);
+  if (!aliasDecl)
+    return Type();
+
+  // If the declaration is generic, fail.
+  if (aliasDecl->getGenericParams())
     return Type();
 
   // Validate the parent type.
-  if (!validateNominalParent(decl, parent))
+  if (!validateParentType(aliasDecl, parent))
     return Type();
 
-  return NominalType::get(decl, parent, Ctx);
+  auto declaredType = aliasDecl->getDeclaredInterfaceType();
+  if (!parent)
+    return declaredType;
+
+  auto *dc = aliasDecl->getDeclContext();
+  auto subs = parent->getContextSubstitutionMap(dc->getParentModule(), dc);
+
+  // FIXME: subst() should build the sugar for us
+  declaredType = declaredType.subst(subs);
+  if (!declaredType)
+    return Type();
+
+  return TypeAliasType::get(aliasDecl, parent, subs, declaredType);
 }
 
-Type ASTBuilder::createBoundGenericType(NominalTypeDecl *decl,
-                                        ArrayRef<Type> args) {
-  // If the declaration isn't generic, fail.
-  if (!decl->isGenericContext())
-    return Type();
-
-  // Build a SubstitutionMap.
-  auto *genericSig = decl->getGenericSignature();
-
+static SubstitutionMap
+createSubstitutionMapFromGenericArgs(GenericSignature *genericSig,
+                                     ArrayRef<Type> args,
+                                     ModuleDecl *moduleDecl) {
   SmallVector<GenericTypeParamType *, 4> genericParams;
   genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     if (canonical)
       genericParams.push_back(gp);
   });
   if (genericParams.size() != args.size())
-    return Type();
+    return SubstitutionMap();
 
-  auto subMap = SubstitutionMap::get(
+  return SubstitutionMap::get(
       genericSig,
       [&](SubstitutableType *t) -> Type {
         for (unsigned i = 0, e = genericParams.size(); i < e; ++i) {
@@ -112,18 +166,34 @@ Type ASTBuilder::createBoundGenericType(NominalTypeDecl *decl,
         }
         return Type();
       },
-      // FIXME: Wrong module
-      LookUpConformanceInModule(decl->getParentModule()));
+      LookUpConformanceInModule(moduleDecl));
+}
 
-  auto origType = decl->getDeclaredInterfaceType();
+Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
+                                        ArrayRef<Type> args) {
+  auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl);
+  if (!nominalDecl)
+    return Type();
+
+  // If the declaration isn't generic, fail.
+  if (!nominalDecl->isGenericContext())
+    return Type();
+
+  // Build a SubstitutionMap.
+  auto *genericSig = nominalDecl->getGenericSignature();
+  auto subs = createSubstitutionMapFromGenericArgs(
+      genericSig, args, decl->getParentModule());
+  if (!subs)
+    return Type();
+  auto origType = nominalDecl->getDeclaredInterfaceType();
 
   // FIXME: We're not checking that the type satisfies the generic
   // requirements of the signature here.
-  auto substType = origType.subst(subMap);
+  auto substType = origType.subst(subs);
   return substType;
 }
 
-Type ASTBuilder::createBoundGenericType(NominalTypeDecl *decl,
+Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
                                         ArrayRef<Type> args,
                                         Type parent) {
   // If the declaration isn't generic, fail.
@@ -131,93 +201,43 @@ Type ASTBuilder::createBoundGenericType(NominalTypeDecl *decl,
     return Type();
 
   // Validate the parent type.
-  if (!validateNominalParent(decl, parent))
+  if (!validateParentType(decl, parent))
     return Type();
 
-  // Make a generic type repr that's been resolved to this decl.
-  TypeReprList genericArgReprs(args);
-  auto genericRepr = GenericIdentTypeRepr::create(Ctx, SourceLoc(),
-                                                  decl->getName(),
-                                                  genericArgReprs.getList(),
-                                                  SourceRange());
-  // FIXME
-  genericRepr->setValue(decl, nullptr);
+  if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
+    return BoundGenericType::get(nominalDecl, parent, args);
 
-  Type genericType;
+  // Combine the substitutions from our parent type with our generic
+  // arguments.
+  TypeSubstitutionMap subs;
+  if (parent)
+    subs = parent->getContextSubstitutions(decl->getDeclContext());
 
-  // If we have a parent type, we need to build a compound type repr.
-  if (parent) {
-    // Life would be much easier if we could just use a FixedTypeRepr for
-    // the parent.  But we can't!  So we have to recursively expand
-    // like this; and recursing with a lambda isn't impossible, so it gets
-    // even worse.
-    SmallVector<Type, 4> ancestry;
-    for (auto p = parent; p; p = p->getNominalParent()) {
-      ancestry.push_back(p);
-    }
+  auto *aliasDecl = cast<TypeAliasDecl>(decl);
 
-    struct GenericRepr {
-      TypeReprList GenericArgs;
-      GenericIdentTypeRepr *Ident;
+  auto *genericSig = aliasDecl->getGenericSignature();
+  for (unsigned i = 0, e = args.size(); i < e; i++) {
+    auto origTy = genericSig->getInnermostGenericParams()[i];
+    auto substTy = args[i];
 
-      GenericRepr(const ASTContext &Ctx, BoundGenericType *type)
-        : GenericArgs(type->getGenericArgs()),
-          Ident(GenericIdentTypeRepr::create(Ctx, SourceLoc(),
-                                             type->getDecl()->getName(),
-                                             GenericArgs.getList(),
-                                             SourceRange())) {
-        // FIXME
-        Ident->setValue(type->getDecl(), nullptr);
-      }
-
-      // SmallVector::emplace_back will never need to call this because
-      // we reserve the right size, but it does try statically.
-      GenericRepr(const GenericRepr &other) : GenericArgs({}), Ident(nullptr) {
-        llvm_unreachable("should not be called dynamically");
-      }
-    };
-
-    // Pre-allocate the component vectors so that we can form references
-    // into them safely.
-    SmallVector<SimpleIdentTypeRepr, 4> simpleComponents;
-    SmallVector<GenericRepr, 4> genericComponents;
-    simpleComponents.reserve(ancestry.size());
-    genericComponents.reserve(ancestry.size());
-
-    // Build the parent hierarchy.
-    SmallVector<ComponentIdentTypeRepr*, 4> componentReprs;
-    for (size_t i = ancestry.size(); i != 0; --i) {
-      Type p = ancestry[i - 1];
-      if (auto boundGeneric = p->getAs<BoundGenericType>()) {
-        genericComponents.emplace_back(Ctx, boundGeneric);
-        componentReprs.push_back(genericComponents.back().Ident);
-      } else {
-        auto nominal = p->castTo<NominalType>();
-        simpleComponents.emplace_back(SourceLoc(),
-                                      nominal->getDecl()->getName());
-        // FIXME
-        simpleComponents.back().setValue(nominal->getDecl(), nullptr);
-        componentReprs.push_back(&simpleComponents.back());
-      }
-    }
-    componentReprs.push_back(genericRepr);
-
-    auto compoundRepr = CompoundIdentTypeRepr::create(Ctx, componentReprs);
-    genericType = checkTypeRepr(compoundRepr);
-  } else {
-    genericType = checkTypeRepr(genericRepr);
+    subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
+      substTy;
   }
 
-  // If type-checking failed, we've failed.
-  if (!genericType) return Type();
+  // FIXME: This is the wrong module
+  auto *moduleDecl = decl->getParentModule();
+  auto subMap = SubstitutionMap::get(genericSig,
+                                     QueryTypeSubstitutionMap{subs},
+                                     LookUpConformanceInModule(moduleDecl));
+  if (!subMap)
+    return Type();
 
-  // Validate that we used the right decl.
-  if (auto bgt = genericType->getAs<BoundGenericType>()) {
-    if (bgt->getDecl() != decl)
-      return Type();
-  }
+  // FIXME: subst() should build the sugar for us
+  auto declaredType = aliasDecl->getDeclaredInterfaceType().subst(subMap);
+  if (!declaredType)
+    return Type();
 
-  return genericType;
+  return TypeAliasType::get(aliasDecl, parent, subMap, declaredType);
 }
 
 Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes,
@@ -324,6 +344,14 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
 }
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
+                                           Type base) {
+  if (!base->isTypeParameter())
+    return Type();
+
+  return DependentMemberType::get(base, Ctx.getIdentifier(member));
+}
+
+Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base,
                                            ProtocolDecl *protocol) {
   if (!base->isTypeParameter())
@@ -354,28 +382,32 @@ Type ASTBuilder::createSILBoxType(Type base) {
 
 Type ASTBuilder::createObjCClassType(StringRef name) {
   auto typeDecl =
-      findForeignNominalTypeDecl(name, /*relatedEntityKind*/{},
-                                 ForeignModuleKind::Imported,
-                                 Demangle::Node::Kind::Class);
+      findForeignTypeDecl(name, /*relatedEntityKind*/{},
+                          ForeignModuleKind::Imported,
+                          Demangle::Node::Kind::Class);
   if (!typeDecl) return Type();
-  return createNominalType(typeDecl, /*parent*/ Type());
+  return typeDecl->getDeclaredInterfaceType();
 }
 
 ProtocolDecl *ASTBuilder::createObjCProtocolDecl(StringRef name) {
   auto typeDecl =
-      findForeignNominalTypeDecl(name, /*relatedEntityKind*/{},
-                                 ForeignModuleKind::Imported,
-                                 Demangle::Node::Kind::Protocol);
+      findForeignTypeDecl(name, /*relatedEntityKind*/{},
+                          ForeignModuleKind::Imported,
+                          Demangle::Node::Kind::Protocol);
   if (auto *protocolDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl))
     return protocolDecl;
   return nullptr;
 }
 
-Type ASTBuilder::createForeignClassType(StringRef mangledName) {
-  auto typeDecl = createNominalTypeDecl(mangledName);
-  if (!typeDecl) return Type();
+Type ASTBuilder::createDynamicSelfType(Type selfType) {
+  return DynamicSelfType::get(selfType, Ctx);
+}
 
-  return createNominalType(typeDecl, /*parent*/ Type());
+Type ASTBuilder::createForeignClassType(StringRef mangledName) {
+  bool typeAlias = false;
+  auto typeDecl = createTypeDecl(mangledName, typeAlias);
+  if (!typeDecl) return Type();
+  return typeDecl->getDeclaredInterfaceType();
 }
 
 Type ASTBuilder::getUnnamedForeignClassType() {
@@ -386,8 +418,7 @@ Type ASTBuilder::getOpaqueType() {
   return Type();
 }
 
-bool ASTBuilder::validateNominalParent(NominalTypeDecl *decl,
-                                       Type parent) {
+bool ASTBuilder::validateParentType(TypeDecl *decl, Type parent) {
   auto parentDecl = decl->getDeclContext()->getSelfNominalTypeDecl();
 
   // If we don't have a parent type, fast-path.
@@ -395,9 +426,17 @@ bool ASTBuilder::validateNominalParent(NominalTypeDecl *decl,
     return parentDecl == nullptr;
   }
 
-  // We do have a parent type.  If the nominal type doesn't, it's an error.
+  // We do have a parent type. If our type doesn't, it's an error.
   if (!parentDecl) {
     return false;
+  }
+
+  if (isa<NominalTypeDecl>(decl)) {
+    // The parent should be a nominal type when desugared.
+    auto *parentNominal = parent->getAnyNominal();
+    if (!parentNominal || parentNominal != parentDecl) {
+      return false;
+    }
   }
 
   // FIXME: validate that the parent is a correct application of the
@@ -405,28 +444,20 @@ bool ASTBuilder::validateNominalParent(NominalTypeDecl *decl,
   return true;
 }
 
-Type ASTBuilder::checkTypeRepr(TypeRepr *repr) {
-  DeclContext *dc = getNotionalDC();
-
-  TypeLoc loc(repr);
-  if (performTypeLocChecking(Ctx, loc, dc, /*diagnose*/ false))
-    return Type();
-
-  return loc.getType();
-}
-
-NominalTypeDecl *
-ASTBuilder::getAcceptableNominalTypeCandidate(ValueDecl *decl, 
-                                              Demangle::Node::Kind kind) {
+GenericTypeDecl *
+ASTBuilder::getAcceptableTypeDeclCandidate(ValueDecl *decl,
+                                           Demangle::Node::Kind kind) {
   if (kind == Demangle::Node::Kind::Class) {
     return dyn_cast<ClassDecl>(decl);
   } else if (kind == Demangle::Node::Kind::Enum) {
     return dyn_cast<EnumDecl>(decl);
   } else if (kind == Demangle::Node::Kind::Protocol) {
     return dyn_cast<ProtocolDecl>(decl);
-  } else {
-    assert(kind == Demangle::Node::Kind::Structure);
+  } else if (kind == Demangle::Node::Kind::Structure) {
     return dyn_cast<StructDecl>(decl);
+  } else {
+    assert(kind == Demangle::Node::Kind::TypeAlias);
+    return dyn_cast<TypeAliasDecl>(decl);
   }
 }
 
@@ -438,16 +469,15 @@ DeclContext *ASTBuilder::getNotionalDC() {
   return NotionalDC;
 }
 
-NominalTypeDecl *
-ASTBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
+GenericTypeDecl *
+ASTBuilder::createTypeDecl(const Demangle::NodePointer &node,
+                           bool &typeAlias) {
   auto DC = findDeclContext(node);
   if (!DC)
     return nullptr;
 
-  auto decl = dyn_cast<NominalTypeDecl>(DC);
-  if (!decl) return nullptr;
-
-  return decl;
+  typeAlias = isa<TypeAliasDecl>(DC);
+  return dyn_cast<GenericTypeDecl>(DC);
 }
 
 ModuleDecl *
@@ -459,15 +489,16 @@ ASTBuilder::findModule(const Demangle::NodePointer &node) {
 
 Demangle::NodePointer
 ASTBuilder::findModuleNode(const Demangle::NodePointer &node) {
-  if (node->getKind() == Demangle::Node::Kind::Module)
-    return node;
+  auto child = node;
+  while (child->hasChildren() &&
+         child->getKind() != Demangle::Node::Kind::Module) {
+    child = child->getFirstChild();
+  }
 
-  if (!node->hasChildren()) return nullptr;
-  const auto &child = node->getFirstChild();
-  if (child->getKind() != Demangle::Node::Kind::DeclContext)
+  if (child->getKind() != Demangle::Node::Kind::Module)
     return nullptr;
 
-  return findModuleNode(child->getFirstChild());
+  return child;
 }
 
 Optional<ASTBuilder::ForeignModuleKind>
@@ -483,6 +514,55 @@ ASTBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
       .Case(MANGLING_MODULE_CLANG_IMPORTER,
             ForeignModuleKind::SynthesizedByImporter)
       .Default(None);
+}
+
+CanGenericSignature ASTBuilder::demangleGenericSignature(
+    NominalTypeDecl *nominalDecl,
+    const Demangle::NodePointer &node) {
+  GenericSignatureBuilder builder(Ctx);
+  builder.addGenericSignature(nominalDecl->getGenericSignature());
+
+  for (auto &child : *node) {
+    if (child->getKind() ==
+          Demangle::Node::Kind::DependentGenericParamCount)
+      continue;
+
+    if (child->getNumChildren() != 2)
+      return CanGenericSignature();
+    auto subjectType = swift::Demangle::decodeMangledType(
+        *this, child->getChild(0));
+    auto constraintType = swift::Demangle::decodeMangledType(
+        *this, child->getChild(1));
+    if (!subjectType || !constraintType)
+      return CanGenericSignature();
+
+    auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+
+    switch (child->getKind()) {
+    case Demangle::Node::Kind::DependentGenericConformanceRequirement: {
+      builder.addRequirement(
+          Requirement(constraintType->isExistentialType()
+                        ? RequirementKind::Conformance
+                        : RequirementKind::Superclass,
+                      subjectType, constraintType),
+          source, nullptr);
+      break;
+    }
+    case Demangle::Node::Kind::DependentGenericSameTypeRequirement: {
+      builder.addRequirement(
+          Requirement(RequirementKind::SameType,
+                      subjectType, constraintType),
+          source, nullptr);
+      break;
+    }
+    default:
+      return CanGenericSignature();
+    }
+  }
+
+  return std::move(builder).computeGenericSignature(SourceLoc())
+      ->getCanonicalSignature();
 }
 
 DeclContext *
@@ -546,43 +626,81 @@ ASTBuilder::findDeclContext(const Demangle::NodePointer &node) {
       // Do some backup logic for foreign type declarations.
       if (privateDiscriminator.empty()) {
         if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
-          return findForeignNominalTypeDecl(name, relatedEntityKind,
-                                            foreignModuleKind.getValue(),
-                                            node->getKind());
+          return findForeignTypeDecl(name, relatedEntityKind,
+                                     foreignModuleKind.getValue(),
+                                     node->getKind());
         }
       }
       return nullptr;
     }
 
-    return findNominalTypeDecl(dc, Ctx.getIdentifier(name),
-                               privateDiscriminator, node->getKind());
+    return findTypeDecl(dc, Ctx.getIdentifier(name),
+                        privateDiscriminator, node->getKind());
   }
 
   case Demangle::Node::Kind::Global:
     return findDeclContext(node->getChild(0));
 
+  case Demangle::Node::Kind::Extension: {
+    auto *moduleDecl = dyn_cast_or_null<ModuleDecl>(
+        findDeclContext(node->getChild(0)));
+    if (!moduleDecl)
+      return nullptr;
+
+    auto *nominalDecl = dyn_cast_or_null<NominalTypeDecl>(
+        findDeclContext(node->getChild(1)));
+    if (!nominalDecl)
+      return nullptr;
+
+    CanGenericSignature genericSig;
+    if (node->getNumChildren() > 2)
+      genericSig = demangleGenericSignature(nominalDecl, node->getChild(2));
+
+    for (auto *ext : nominalDecl->getExtensions()) {
+      if (ext->getParentModule() != moduleDecl)
+        continue;
+
+      if (!ext->isConstrainedExtension()) {
+        if (!genericSig)
+          return ext;
+        continue;
+      }
+
+      if (ext->getGenericSignature()->getCanonicalSignature()
+          == genericSig) {
+        return ext;
+      }
+    }
+
+    return nullptr;
+  }
+
   // Bail out on other kinds of contexts.
-  // TODO: extensions
-  // TODO: local contexts
   default:
     return nullptr;
   }
 }
 
-NominalTypeDecl *
-ASTBuilder::findNominalTypeDecl(DeclContext *dc,
-                                Identifier name,
-                                Identifier privateDiscriminator,
-                                Demangle::Node::Kind kind) {
+GenericTypeDecl *
+ASTBuilder::findTypeDecl(DeclContext *dc,
+                         Identifier name,
+                         Identifier privateDiscriminator,
+                         Demangle::Node::Kind kind) {
   auto module = dc->getParentModule();
+
+  // When looking into an extension, look into the nominal instead; the
+  // important thing is that the module, obtained above, is the module
+  // containing the extension and not the module containing the nominal
+  if (isa<ExtensionDecl>(dc))
+    dc = dc->getSelfNominalTypeDecl();
 
   SmallVector<ValueDecl *, 4> lookupResults;
   module->lookupMember(lookupResults, dc, name, privateDiscriminator);
 
-  NominalTypeDecl *result = nullptr;
+  GenericTypeDecl *result = nullptr;
   for (auto decl : lookupResults) {
-    // Ignore results that are not the right kind of nominal type declaration.
-    NominalTypeDecl *candidate = getAcceptableNominalTypeCandidate(decl, kind);
+    // Ignore results that are not the right kind of type declaration.
+    auto *candidate = getAcceptableTypeDeclCandidate(decl, kind);
     if (!candidate)
       continue;
 
@@ -617,11 +735,11 @@ getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
   }
 }
 
-NominalTypeDecl *
-ASTBuilder::findForeignNominalTypeDecl(StringRef name,
-                                       StringRef relatedEntityKind,
-                                       ForeignModuleKind foreignKind,
-                                       Demangle::Node::Kind kind) {
+GenericTypeDecl *
+ASTBuilder::findForeignTypeDecl(StringRef name,
+                                StringRef relatedEntityKind,
+                                ForeignModuleKind foreignKind,
+                                Demangle::Node::Kind kind) {
   // Check to see if we have an importer loaded.
   auto importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   if (!importer) return nullptr;
@@ -629,7 +747,7 @@ ASTBuilder::findForeignNominalTypeDecl(StringRef name,
   // Find the unique declaration that has the right kind.
   struct Consumer : VisibleDeclConsumer {
     Demangle::Node::Kind ExpectedKind;
-    NominalTypeDecl *Result = nullptr;
+    GenericTypeDecl *Result = nullptr;
     bool HadError = false;
 
     explicit Consumer(Demangle::Node::Kind kind) : ExpectedKind(kind) {}
@@ -638,16 +756,7 @@ ASTBuilder::findForeignNominalTypeDecl(StringRef name,
       if (HadError) return;
       if (decl == Result) return;
       if (!Result) {
-        // A synthesized type from the Clang importer may resolve to a
-        // compatibility alias.
-        if (auto resultAlias = dyn_cast<TypeAliasDecl>(decl)) {
-          if (resultAlias->isCompatibilityAlias()) {
-            Result = resultAlias->getUnderlyingTypeLoc().getType()
-                                ->getAnyNominal();
-          }
-        } else {
-          Result = dyn_cast<NominalTypeDecl>(decl);
-        }
+        Result = dyn_cast<GenericTypeDecl>(decl);
         HadError |= !Result;
       } else {
         HadError = true;
@@ -669,8 +778,10 @@ ASTBuilder::findForeignNominalTypeDecl(StringRef name,
       break;
     }
     importer->lookupValue(Ctx.getIdentifier(name), consumer);
-    if (consumer.Result)
-      consumer.Result = getAcceptableNominalTypeCandidate(consumer.Result,kind);
+    if (consumer.Result) {
+      consumer.Result =
+          getAcceptableTypeDeclCandidate(consumer.Result,kind);
+    }
     break;
   case ForeignModuleKind::Imported: {
     Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);

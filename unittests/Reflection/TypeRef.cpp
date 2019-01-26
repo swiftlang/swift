@@ -33,9 +33,9 @@ using Param = remote::FunctionParam<const TypeRef *>;
 TEST(TypeRefTest, UniqueBuiltinTypeRef) {
   TypeRefBuilder Builder;
 
-  auto BI1 = Builder.createBuiltinType(ABC);
-  auto BI2 = Builder.createBuiltinType(ABC);
-  auto BI3 = Builder.createBuiltinType(ABCD);
+  auto BI1 = Builder.createBuiltinType(ABC, ABC);
+  auto BI2 = Builder.createBuiltinType(ABC, ABC);
+  auto BI3 = Builder.createBuiltinType(ABCD, ABCD);
 
   EXPECT_EQ(BI1, BI2);
   EXPECT_NE(BI2, BI3);

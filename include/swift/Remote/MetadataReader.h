@@ -98,7 +98,7 @@ template <typename Runtime, typename BuilderType>
 class MetadataReader {
 public:
   using BuiltType = typename BuilderType::BuiltType;
-  using BuiltNominalTypeDecl = typename BuilderType::BuiltNominalTypeDecl;
+  using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
@@ -608,7 +608,7 @@ public:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
       // Treat these all as Builtin.NativeObject for type lowering purposes.
-      return Builder.createBuiltinType("Bo");
+      return Builder.createBuiltinType("Builtin.NativeObject", "Bo");
     case MetadataKind::Opaque:
     default: {
       auto BuiltOpaque = Builder.getOpaqueType();
@@ -869,10 +869,10 @@ public:
 
   /// Given the address of a nominal type descriptor, attempt to resolve
   /// its nominal type declaration.
-  BuiltNominalTypeDecl readNominalTypeFromDescriptor(StoredPointer address) {
+  BuiltTypeDecl readNominalTypeFromDescriptor(StoredPointer address) {
     auto descriptor = readContextDescriptor(address);
     if (!descriptor)
-      return BuiltNominalTypeDecl();
+      return BuiltTypeDecl();
 
     return buildNominalTypeDecl(descriptor);
   }
@@ -1685,14 +1685,15 @@ private:
 
   /// Given a read nominal type descriptor, attempt to build a
   /// nominal type decl from it.
-  BuiltNominalTypeDecl
+  BuiltTypeDecl
   buildNominalTypeDecl(ContextDescriptorRef descriptor) {
     // Build the demangling tree from the context tree.
     Demangler dem;
     auto node = buildContextMangling(descriptor, dem);
     if (!node || node->getKind() != Node::Kind::Type)
-      return BuiltNominalTypeDecl();
-    BuiltNominalTypeDecl decl = Builder.createNominalTypeDecl(node);
+      return BuiltTypeDecl();
+    bool typeAlias = false;
+    BuiltTypeDecl decl = Builder.createTypeDecl(node, typeAlias);
     return decl;
   }
 
@@ -1803,7 +1804,7 @@ private:
       return BuiltType();
 
     // From that, attempt to resolve a nominal type.
-    BuiltNominalTypeDecl typeDecl = buildNominalTypeDecl(descriptor);
+    BuiltTypeDecl typeDecl = buildNominalTypeDecl(descriptor);
     if (!typeDecl)
       return BuiltType();
 

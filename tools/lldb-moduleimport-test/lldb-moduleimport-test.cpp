@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTDemangler.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
@@ -91,6 +92,20 @@ static void resolveDeclFromMangledNameList(
 }
 
 static void resolveTypeFromMangledNameList(
+    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
+  for (auto &Mangled : MangledNames) {
+    swift::Type ResolvedType =
+        swift::Demangle::getTypeForMangling(Ctx, Mangled);
+    if (!ResolvedType) {
+      llvm::outs() << "Can't resolve type of " << Mangled << "\n";
+    } else {
+      ResolvedType->print(llvm::outs());
+      llvm::outs() << "\n";
+    }
+  }
+}
+
+static void resolveTypeFromMangledNameListOld(
     swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
   std::string Error;
   for (auto &Mangled : MangledNames) {
@@ -207,6 +222,11 @@ int main(int argc, char **argv) {
       "type-from-mangled", desc("dump type from mangled names list"),
       cat(Visible));
 
+  opt<std::string> DumpTypeFromMangledOld(
+      "type-from-mangled-old", desc("dump type from mangled names list using old "
+                                    "TypeReconstruction API"),
+      cat(Visible));
+
   opt<std::string> ResourceDir(
       "resource-dir",
       desc("The directory that holds the compiler resource files"),
@@ -223,6 +243,7 @@ int main(int argc, char **argv) {
   ModuleCachePath.removeArgument();
   DumpModule.removeArgument();
   DumpTypeFromMangled.removeArgument();
+  DumpTypeFromMangledOld.removeArgument();
   InputNames.removeArgument();
 
   auto validateInputFile = [](std::string Filename) {
@@ -240,6 +261,8 @@ int main(int argc, char **argv) {
   };
 
   if (!validateInputFile(DumpTypeFromMangled))
+    return 1;
+  if (!validateInputFile(DumpTypeFromMangledOld))
     return 1;
   if (!validateInputFile(DumpDeclFromMangled))
     return 1;
@@ -329,6 +352,11 @@ int main(int argc, char **argv) {
       llvm::SmallVector<std::string, 8> MangledNames;
       collectMangledNames(DumpTypeFromMangled, MangledNames);
       resolveTypeFromMangledNameList(CI.getASTContext(), MangledNames);
+    }
+    if (!DumpTypeFromMangledOld.empty()) {
+      llvm::SmallVector<std::string, 8> MangledNames;
+      collectMangledNames(DumpTypeFromMangledOld, MangledNames);
+      resolveTypeFromMangledNameListOld(CI.getASTContext(), MangledNames);
     }
     if (!DumpDeclFromMangled.empty()) {
       llvm::SmallVector<std::string, 8> MangledNames;
