@@ -511,6 +511,7 @@ namespace {
     void layout() {
       super::layout();
       asImpl().addGenericSignature();
+      asImpl().addMangledName();
     }
   
     ConstantReference getParent() {
@@ -528,6 +529,26 @@ namespace {
     
     bool isUniqueDescriptor() {
       return true;
+    }
+
+    uint16_t getKindSpecificFlags() {
+      AnonymousContextDescriptorFlags flags{};
+      flags.setHasMangledName(
+        IGM.IRGen.Opts.EnableAnonymousContextMangledNames);
+
+      return flags.getOpaqueValue();
+    }
+
+    void addMangledName() {
+      if (!IGM.IRGen.Opts.EnableAnonymousContextMangledNames)
+        return;
+
+      IRGenMangler mangler;
+      auto mangledName = mangler.mangleContext(DC);
+      auto mangledNameConstant =
+        IGM.getAddrOfGlobalString(mangledName,
+                                  /*willBeRelativelyAddressed*/ true);
+      B.addRelativeAddress(mangledNameConstant);
     }
 
     void emit() {
