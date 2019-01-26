@@ -274,11 +274,11 @@ extension _StringGuts {
 
   @inlinable
   internal var startIndex: String.Index {
-    @inline(__always) get { return Index(encodedOffset: 0) }
+    @inline(__always) get { return Index(_encodedOffset: 0) }
   }
   @inlinable
   internal var endIndex: String.Index {
-    @inline(__always) get { return Index(encodedOffset: self.count) }
+    @inline(__always) get { return Index(_encodedOffset: self.count) }
   }
 }
 

@@ -18,7 +18,7 @@ extension NLTagger {
   @nonobjc
   public func tokenRange(at index: String.Index, unit: NLTokenUnit) -> Range<String.Index> {
     let str = self.string ?? ""
-    let characterIndex = index.encodedOffset
+    let characterIndex = index.utf16Offset(in: str)
     let nsrange = self.__tokenRange(at: characterIndex, unit: unit)
     return Range(nsrange, in: str)!
   }
@@ -26,7 +26,7 @@ extension NLTagger {
   @nonobjc
   public func tag(at index: String.Index, unit: NLTokenUnit, scheme: NLTagScheme) -> (NLTag?, Range<String.Index>) {
     let str = self.string ?? ""
-    let characterIndex = index.encodedOffset
+    let characterIndex = index.utf16Offset(in: str)
     let rangePointer = NSRangePointer.allocate(capacity: 1)
     rangePointer.initialize(to: NSMakeRange(0, 0))
     let tag = self.__tag(at: characterIndex, unit: unit, scheme: scheme, tokenRange: rangePointer)
