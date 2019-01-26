@@ -1266,8 +1266,8 @@ public:
   }
 
   StringRef getObjCSelectorName(const Decl *D, SmallString<64> &Buf) {
-    if (auto FuncD = dyn_cast_or_null<AbstractFunctionDecl>(D)) {
-      // We only vend the selector name for @IBAction methods.
+    // We only vend the selector name for @IBAction methods.
+    if (auto FuncD = dyn_cast_or_null<FuncDecl>(D)) {
       if (FuncD->getAttrs().hasAttribute<IBActionAttr>())
         return FuncD->getObjCSelector().getString(Buf);
     }
