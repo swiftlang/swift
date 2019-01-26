@@ -55,10 +55,6 @@ def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
 
-def serialize_diagnostics_path
-  : Separate<["-"], "serialize-diagnostics-path">, MetaVarName<"<path>">,
-    HelpText<"Output serialized diagnostics to <path>">;
-
 def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
