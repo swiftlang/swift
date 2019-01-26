@@ -1139,17 +1139,6 @@ FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, C_CC,
          ATTRS(NoUnwind))
 FUNCTION(ObjCAllocWithZone, objc_allocWithZone, C_CC,
          RETURNS(ObjCPtrTy), ARGS(ObjCClassPtrTy), ATTRS(NoUnwind))
-FUNCTION(ObjCRetain, objc_retain, C_CC,
-         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
-FUNCTION(ObjCRelease, objc_release, C_CC,
-         RETURNS(VoidTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
-FUNCTION(ObjCAutorelease, objc_autorelease, C_CC,
-         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
-FUNCTION(ObjCRetainAutoreleasedReturnValue,
-         objc_retainAutoreleasedReturnValue, C_CC,
-         RETURNS(Int8PtrTy), ARGS(Int8PtrTy), ATTRS(NoUnwind))
-FUNCTION(ObjCAutoreleaseReturnValue, objc_autoreleaseReturnValue, C_CC,
-         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCMsgSend, objc_msgSend, C_CC,
          RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
 FUNCTION(ObjCMsgSendStret, objc_msgSend_stret, C_CC,

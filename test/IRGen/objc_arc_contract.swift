@@ -12,8 +12,8 @@
 // REQUIRES: objc_interop
 // REQUIRES: asserts
 
-// CHECK-WITHOUT-PASS: call void (...) @clang.arc.use
-// CHECK-WITH-PASS-NOT: call void (...) @clang.arc.use
+// CHECK-WITHOUT-PASS: call void (...) @llvm.objc.clang.arc.use
+// CHECK-WITH-PASS-NOT: call void (...) @llvm.objc.clang.arc.use
 
 import Foundation
 
