@@ -143,11 +143,9 @@ public:
   ///
   /// This is intended to be a debugging aid.
   class PathTracer: public PossiblePathTracer {
-    struct Entry {
-      const ModuleDepGraphNode *def; const ModuleDepGraphNode *use;
-    };
-    UnifiedStatsReporter *stats;
-    std::vector<Entry> entries;
+     UnifiedStatsReporter *stats;
+    std::vector<const ModuleDepGraphNode*> path;
+    llvm::DenseMap<const driver::Job*, std::vector<const ModuleDepGraphNode*>> pathsByJob;
   private:
     explicit PathTracer(UnifiedStatsReporter *stats): PossiblePathTracer(), stats(stats) {}
   public:

@@ -500,17 +500,21 @@ bool ModuleDepGraph::emitAndVerify(DiagnosticEngine &diags) {
 //==============================================================================
 // MARK: ModuleDepGraph::MarkTracer
 //==============================================================================
-void ModuleDepGraph::PathTracer::pushDef(const ModuleDepGraphNode*) {
-#error What?!
+void ModuleDepGraph::PathTracer::pushDef(const ModuleDepGraphNode* def) {
+  if (path.empty()) path.push_back(def);
+  else {assert(path.back() == def); }
 }
-void ModuleDepGraph::PathTracer::foundUse(const ModuleDepGraphNode*) {
-#error What?!
+void ModuleDepGraph::PathTracer::foundUse(const ModuleDepGraphNode* use) {
+  path.push_back(use);
 }
-void ModuleDepGraph::PathTracer::foundCascadingUse(const ModuleDepGraphNode*) {
-#error What?!
+void ModuleDepGraph::PathTracer::foundCascadingUse(const ModuleDepGraphNode* use) {
+  assert(path.back() == use);
+  pathsByJob[job] = path;
+  // copy path for use
 }
-void ModuleDepGraph::PathTracer::popUse(const ModuleDepGraphNode*) {
-#error What?!
+void ModuleDepGraph::PathTracer::popUse(const ModuleDepGraphNode* use) {
+  assert(path.back() == use);
+  path.pop_back();
 }
 
 /// Dump the path that led to \p node.
