@@ -1438,6 +1438,7 @@ private:
     auto mangledNameAddress = resolveRelativeField(contextRef,
                                                    mangledContextName->name);
 
+    // FIXME: Symbolic references can break this
     std::string mangledName;
     if (!Reader->readString(RemoteAddress(mangledNameAddress), mangledName))
       return nullptr;
@@ -1589,10 +1590,40 @@ private:
       nodeKind = Demangle::Node::Kind::Protocol;
       break;
     }
-    case ContextDescriptorKind::Extension:
-      // TODO: Remangle something about the extension context here.
+    case ContextDescriptorKind::Extension: {
+      // There should always be a parent describing where the extension
+      // lives.
+      if (!parentDemangling) {
+        return nullptr;
+      }
+
+      auto extensionBuffer =
+        reinterpret_cast<const TargetExtensionContextDescriptor<Runtime> *>(
+          descriptor.getLocalBuffer());
+
+      auto extendedContextAddress =
+        resolveRelativeField(descriptor, extensionBuffer->ExtendedContext);
+
+      // FIXME: Symbolic references can break this
+      std::string mangledExtendedContext;
+      if (!Reader->readString(RemoteAddress(extendedContextAddress),
+                              mangledExtendedContext))
+        return nullptr;
+
+      auto demangledExtendedContext = dem.demangleType(mangledExtendedContext);
+      if (!demangledExtendedContext)
+        return nullptr;
+
+      // FIXME: If there are generic requirements, turn them into a demangle
+      // tree.
+      auto demangling = dem.createNode(Node::Kind::Extension);
+      demangling->addChild(parentDemangling, dem);
+      demangling->addChild(demangledExtendedContext, dem);
+      return demangling;
+
       return nullptr;
-      
+    }
+
     case ContextDescriptorKind::Anonymous: {
       // Use the remote address to identify the anonymous context.
       char addressBuf[18];

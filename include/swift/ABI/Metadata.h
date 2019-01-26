@@ -2784,6 +2784,7 @@ private:
   using TrailingGenericContextObjects
     = TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>;
 
+public:
   /// A mangling of the `Self` type context that the extension extends.
   /// The mangled name represents the type in the generic context encoded by
   /// this descriptor. For example, a nongeneric nominal type extension will
@@ -2794,7 +2795,6 @@ private:
   /// extension is declared inside.
   RelativeDirectPointer<const char> ExtendedContext;
 
-public:
   using TrailingGenericContextObjects::getGenericContext;
 
   StringRef getMangledExtendedContext() const {
