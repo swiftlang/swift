@@ -126,3 +126,14 @@ struct M<T, U> {
   }
 }
 M<Int, String>.testPrivate()
+
+struct N {
+  static func testPrivate() {
+    struct LocalStruct {
+      struct Inner { }
+    }
+    // CHECK: LocalStruct.Inner
+    printType(LocalStruct.Inner.self)
+  }
+}
+N.testPrivate()

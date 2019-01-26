@@ -1423,13 +1423,38 @@ private:
     return name;
   }
 
+  /// Read and demangle the name of an anonymous context.
+  Demangle::NodePointer demangleAnonymousContextName(
+      ContextDescriptorRef contextRef,
+      Demangler &dem) {
+    auto anonymousBuffer = cast<TargetAnonymousContextDescriptor<Runtime>>(
+        contextRef.getLocalBuffer());
+
+    if (!anonymousBuffer->hasMangledName())
+      return nullptr;
+
+    // Read the mangled name.
+    auto mangledContextName = anonymousBuffer->getMangledContextName();
+    auto mangledNameAddress = resolveRelativeField(contextRef,
+                                                   mangledContextName->name);
+
+    std::string mangledName;
+    if (!Reader->readString(RemoteAddress(mangledNameAddress), mangledName))
+      return nullptr;
+
+    return dem.demangleSymbol(mangledName);
+  }
+
   /// If we have a context whose parent context is an anonymous context
   /// that provides the local/private name for the current context,
   /// produce a mangled node describing the name of \c context.
   Demangle::NodePointer
   adoptAnonymousContextName(ContextDescriptorRef contextRef,
                             Optional<ContextDescriptorRef> &parentContextRef,
-                            Demangler &dem) {
+                            Demangler &dem,
+                            Demangle::NodePointer &outerNode) {
+    outerNode = nullptr;
+
     if (!parentContextRef || !*parentContextRef)
       return nullptr;
 
@@ -1444,21 +1469,7 @@ private:
     if (!anonymousParent)
       return nullptr;
 
-    // Only perform this transformation when we have a mangled name describing
-    // the context.
-    if (!anonymousParent->hasMangledName())
-      return nullptr;
-
-    // Read the mangled name.
-    auto mangledContextName = anonymousParent->getMangledContextName();
-    auto mangledNameAddress = resolveRelativeField(*parentContextRef,
-                                                   mangledContextName->name);
-
-    std::string mangledName;
-    if (!Reader->readString(RemoteAddress(mangledNameAddress), mangledName))
-      return nullptr;
-
-    auto mangledNode = dem.demangleSymbol(mangledName);
+    auto mangledNode = demangleAnonymousContextName(*parentContextRef, dem);
     if (!mangledNode)
       return nullptr;
 
@@ -1469,9 +1480,9 @@ private:
       return nullptr;
 
     // Dig out the name of the entity.
-    // FIXME: LocalDeclName
     swift::Demangle::NodePointer nameChild = mangledNode->getChild(1);
-    if (nameChild->getKind() != Node::Kind::PrivateDeclName ||
+    if ((nameChild->getKind() != Node::Kind::PrivateDeclName &&
+         nameChild->getKind() != Node::Kind::LocalDeclName) ||
         nameChild->getNumChildren() < 2)
       return nullptr;
 
@@ -1497,6 +1508,9 @@ private:
     // context entirely.
     parentContextRef = readParentContextDescriptor(*parentContextRef);
 
+    // The outer node is the first child.
+    outerNode = mangledNode->getChild(0);
+
     // Return the name.
     return nameChild;
   }
@@ -1509,8 +1523,9 @@ private:
 
     // If the parent is an anonymous context that provides a complete
     // name for this node, note that.
+    NodePointer demangledParentNode = nullptr;
     auto nameNode = adoptAnonymousContextName(
-        descriptor, parentDescriptorResult, dem);
+        descriptor, parentDescriptorResult, dem, demangledParentNode);
 
     // If there was a problem reading the parent descriptor, we're done.
     if (!parentDescriptorResult) return nullptr;
@@ -1520,8 +1535,16 @@ private:
     if (auto parentDescriptor = *parentDescriptorResult) {
       parentDemangling =
         buildContextDescriptorMangling(parentDescriptor, dem);
-      if (!parentDemangling)
+      if (!parentDemangling && !demangledParentNode)
         return nullptr;
+    }
+
+    // If we have a better parent node produced from an enclosing nominal
+    // context, use that.
+    if (demangledParentNode &&
+        (!parentDemangling ||
+         parentDemangling->getKind() == Node::Kind::AnonymousContext)) {
+      parentDemangling = demangledParentNode;
     }
 
     Demangle::Node::Kind nodeKind;
