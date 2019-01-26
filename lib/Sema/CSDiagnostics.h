@@ -91,8 +91,11 @@ public:
   Type getType(Expr *expr) const;
 
   /// Resolve type variables present in the raw type, if any.
-  Type resolveType(Type rawType) const {
-    return CS.simplifyType(rawType);
+  Type resolveType(Type rawType, bool reconstituteSugar = false) const {
+    auto resolvedType = CS.simplifyType(rawType);
+    return reconstituteSugar
+               ? resolvedType->reconstituteSugar(/*recursive*/ true)
+               : resolvedType;
   }
 
   template <typename... ArgTypes>
@@ -490,6 +493,15 @@ public:
         UnwrappedType(unwrappedType) {}
 
   bool diagnoseAsError() override;
+
+private:
+  Type getBaseType() const {
+    return resolveType(BaseType, /*reconstituteSugar=*/true);
+  }
+
+  Type getUnwrappedType() const {
+    return resolveType(UnwrappedType, /*reconstituteSugar=*/true);
+  }
 };
 
 /// Diagnose errors associated with rvalues in positions

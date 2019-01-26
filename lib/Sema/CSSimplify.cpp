@@ -4665,6 +4665,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                      ConstraintLocator::FunctionResult)).isFailure())
       return SolutionKind::Error;
 
+    if (unwrapCount == 0)
+      return SolutionKind::Solved;
+
     // Record any fixes we attempted to get to the correct solution.
     auto *fix = ForceOptional::create(*this, origType2,
                                       origType2->getOptionalObjectType(),
@@ -4691,6 +4694,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     // Record any fixes we attempted to get to the correct solution.
     if (simplified == SolutionKind::Solved) {
+      if (unwrapCount == 0)
+        return SolutionKind::Solved;
+
       auto *fix = ForceOptional::create(*this, origType2,
                                         origType2->getOptionalObjectType(),
                                         getConstraintLocator(locator));

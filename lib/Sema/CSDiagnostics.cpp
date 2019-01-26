@@ -518,7 +518,7 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type baseType,
   assert(!unwrappedType->hasTypeVariable() &&
          "Unwrapped type must not be a type variable");
 
-  if (baseType && !baseType->getOptionalObjectType())
+  if (!baseType->getOptionalObjectType())
     return false;
 
   CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, baseType,
@@ -587,16 +587,12 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     anchor = assignExpr->getSrc();
   
   auto *unwrapped = anchor->getValueProvidingExpr();
-  Type type = getType(anchor)->getRValueType();
+  auto type = getType(anchor)->getRValueType();
 
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
   if (!tryExpr) {
-    auto resolvedBaseTy =
-        resolveType(BaseType)->reconstituteSugar(/*recursive=*/true);
-    auto resolvedUnwrappedTy =
-        resolveType(UnwrappedType)->reconstituteSugar(/*recursive=*/true);
-    return diagnoseUnwrap(getConstraintSystem(), unwrapped, resolvedBaseTy,
-                          resolvedUnwrappedTy);
+    return diagnoseUnwrap(getConstraintSystem(), unwrapped, getBaseType(),
+                          getUnwrappedType());
   }
 
   bool isSwift5OrGreater = getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5);
@@ -609,11 +605,10 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     // under Swift 5+, so just report that a missing unwrap can't be handled here.
     return false;
   }
-  else {
-    emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
-    .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
-    return true;
-  }
+
+  emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
+      .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
+  return true;
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
