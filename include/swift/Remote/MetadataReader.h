@@ -1470,7 +1470,7 @@ private:
 
     // Dig out the name of the entity.
     // FIXME: LocalDeclName
-    NodePointer nameChild = mangledNode->getChild(1);
+    swift::Demangle::NodePointer nameChild = mangledNode->getChild(1);
     if (nameChild->getKind() != Node::Kind::PrivateDeclName ||
         nameChild->getNumChildren() < 2)
       return nullptr;
