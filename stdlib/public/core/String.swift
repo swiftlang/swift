@@ -561,6 +561,7 @@ extension String {
 
   // String append
   @inlinable // Forward inlinability to append
+  @_semantics("string.append")
   public static func += (lhs: inout String, rhs: String) {
     lhs.append(rhs)
   }
