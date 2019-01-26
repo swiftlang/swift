@@ -236,6 +236,9 @@ namespace driver {
     /// Helper for tracing the propagation of marks in the graph.
     DependencyGraph::MarkTracer ActualIncrementalTracer;
     DependencyGraph::MarkTracer *IncrementalTracer = nullptr;
+    
+    /// Helper for tracing the propagation of marks in the experimental graph.
+    std::unique_ptr<experimental_dependencies::ModuleDepGraph::PossiblePathTracer> ExperimentalPathTracer;
 
     /// TaskQueue for execution.
     std::unique_ptr<TaskQueue> TQ;
@@ -257,7 +260,13 @@ namespace driver {
       if (ScheduledCommands.count(cmd))
         return;
       llvm::outs() << "Queuing " << reason << ": " << LogJob(cmd) << "\n";
-      if (!Comp.getEnableExperimentalDependencies())
+
+      if (Comp.getEnableExperimentalDependencies())
+        ExperimentalPathTracer.get()->printPath(
+                                                 llvm::outs(), cmd, [](raw_ostream &out, const Job *base) {
+                                                   out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
+                                                 });
+      else
         IncrementalTracer->printPath(
                                      llvm::outs(), cmd, [](raw_ostream &out, const Job *base) {
                                        out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
@@ -409,7 +418,8 @@ namespace driver {
     void reloadAndRemarkDeps(const Job *FinishedCmd,
                              int ReturnCode,
                              SmallVector<const Job *, N> &Dependents,
-                             DependencyGraphT &DepGraph) {
+                             DependencyGraphT &DepGraph,
+                             typename DependencyGraphT::MarkTracer* MarkTracer ) {
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
           Output.getAdditionalOutputForType(file_types::TY_SwiftDeps);
@@ -448,8 +458,7 @@ namespace driver {
               break;
             LLVM_FALLTHROUGH;
           case DependencyGraphImpl::LoadResult::AffectsDownstream:
-            DepGraph.markTransitive(Dependents, FinishedCmd,
-                                    IncrementalTracer);
+            DepGraph.markTransitive(Dependents, FinishedCmd, MarkTracer);
             break;
           }
         } else {
@@ -459,8 +468,7 @@ namespace driver {
             // The job won't be treated as newly added next time. Conservatively
             // mark it as affecting other jobs, because some of them may have
             // completed already.
-            DepGraph.markTransitive(Dependents, FinishedCmd,
-                                    IncrementalTracer);
+            DepGraph.markTransitive(Dependents, FinishedCmd, MarkTracer);
             break;
           case Job::Condition::Always:
             // Any incremental task that shows up here has already been marked;
@@ -474,8 +482,7 @@ namespace driver {
             // updated or compromised, so we don't actually know anymore; we
             // have to conservatively assume the changes could affect other
             // files.
-            DepGraph.markTransitive(Dependents, FinishedCmd,
-                                    IncrementalTracer);
+            DepGraph.markTransitive(Dependents, FinishedCmd, MarkTracer);
             break;
           case Job::Condition::CheckDependencies:
             // If the only reason we're running this is because something else
@@ -611,10 +618,12 @@ namespace driver {
       if (Comp.getIncrementalBuildEnabled()) {
         if (Comp.getEnableExperimentalDependencies())
           reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
-                              ExpDepGraph.getValue());
+                              ExpDepGraph.getValue(),
+                              ExperimentalPathTracer.get());
         else
           reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
-                              StandardDepGraph);
+                              StandardDepGraph,
+                              IncrementalTracer);
       }
 
       if (ReturnCode != EXIT_SUCCESS) {
@@ -705,15 +714,22 @@ namespace driver {
 
   public:
     PerformJobsState(Compilation &Comp, std::unique_ptr<TaskQueue> &&TaskQueue)
-      : Comp(Comp), ActualIncrementalTracer(Comp.getStatsReporter()),
+      : Comp(Comp),
+    ActualIncrementalTracer(Comp.getStatsReporter()),
+    ExperimentalPathTracer(
+                           std::unique_ptr<experimental_dependencies::ModuleDepGraph::PossiblePathTracer>
+                           (experimental_dependencies::ModuleDepGraph::PathTracer::
+                            create(Comp.getStatsReporter(),
+                                   Comp.getTraceDependencies())
+                            )
+                           ),
         TQ(std::move(TaskQueue)) {
       if (Comp.getEnableExperimentalDependencies())
         ExpDepGraph.emplace(
             Comp.getVerifyExperimentalDependencyGraphAfterEveryImport(),
             Comp.getEmitExperimentalDependencyDotFileAfterEveryImport(),
             Comp.getStatsReporter());
-      else if (Comp.getShowIncrementalBuildDecisions() ||
-               Comp.getStatsReporter())
+      else if (Comp.getTraceDependencies())
         IncrementalTracer = &ActualIncrementalTracer;
     }
 
@@ -799,10 +815,19 @@ namespace driver {
       if (ExpDepGraph.hasValue())
         assert(ExpDepGraph.getValue().emitAndVerify(Comp.getDiags()));
     }
+    
+    // Overload to get the right tracer.
+    void scheduleAdditionalJobs(DependencyGraph &DepGraph) {
+      scheduleAdditionalJobs(DepGraph, IncrementalTracer);
+    }
+    void scheduleAdditionalJobs(experimental_dependencies::ModuleDepGraph &DepGraph) {
+      scheduleAdditionalJobs(DepGraph, ExperimentalPathTracer.get());
+    }
 
     /// Schedule transitive closure of initial jobs, and external jobs.
     template <typename DependencyGraphT>
-    void scheduleAdditionalJobs(DependencyGraphT &DepGraph) {
+    void scheduleAdditionalJobs(DependencyGraphT &DepGraph,
+                                typename DependencyGraphT::MarkTracer *MarkTracer) {
       if (Comp.getIncrementalBuildEnabled()) {
         SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
 
@@ -811,7 +836,7 @@ namespace driver {
         // possible and after the first set of files if it's not.
         for (auto *Cmd : InitialCascadingCommands) {
           DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
-                                  IncrementalTracer);
+                                  MarkTracer);
         }
 
         for (auto *transitiveCmd : AdditionalOutOfDateCommands)

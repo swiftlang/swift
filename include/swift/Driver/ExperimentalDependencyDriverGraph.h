@@ -118,7 +118,54 @@ public:
 
 /// See \ref Node in ExperimentalDependencies.h
 class ModuleDepGraph {
+public:
+   /// Used instead of PathTracer when tracing is not needed.
+   class PossiblePathTracer {
+   public:
+    
+     virtual void pushDef(const ModuleDepGraphNode*) {}
+     virtual void foundUse(const ModuleDepGraphNode*) {}
+     virtual void foundCascadingUse(const ModuleDepGraphNode*) {}
+     virtual void popUse(const ModuleDepGraphNode*) {}
+    
+    /// Dump the path that led to \p node.
+    virtual void printPath(raw_ostream &out,
+                   const driver::Job* node,
+                   llvm::function_ref<void(raw_ostream &, driver::Job*)> printItem
+                           ) const {}
+    
+    virtual ~PossiblePathTracer();
+  };
+  using MarkTracer = PossiblePathTracer; // for compatibility with existing code
+  
+  /// Traces the graph traversal performed in ModuleDepGraph::markTransitive.
+  /// Inspired by its counterpart in DependencyGraph.
+  ///
+  /// This is intended to be a debugging aid.
+  class PathTracer: public PossiblePathTracer {
+    struct Entry {
+      const ModuleDepGraphNode *def; const ModuleDepGraphNode *use;
+    };
+    UnifiedStatsReporter *stats;
+    std::vector<Entry> entries;
+  private:
+    explicit PathTracer(UnifiedStatsReporter *stats): PossiblePathTracer(), stats(stats) {}
+  public:
+    static PossiblePathTracer* create(UnifiedStatsReporter *stats, const bool reallyTrace) {
+      return reallyTrace ? new PathTracer(stats) : new PossiblePathTracer();
+    }
+    void pushDef(const ModuleDepGraphNode*) override;
+    void foundUse(const ModuleDepGraphNode*) override;
+    void foundCascadingUse(const ModuleDepGraphNode*) override;
+    void popUse(const ModuleDepGraphNode*) override;
 
+    void printPath(raw_ostream &out,
+                           const driver::Job* node,
+                           llvm::function_ref<void(raw_ostream &, driver::Job*)> printItem
+                           ) const override;
+  };
+
+private:
   /// Find nodes, first by the swiftDeps file, then by key.
   /// Supports searching specific files for a node matching a key.
   /// Such a search is useful when integrating nodes from a given source file to
@@ -281,7 +328,7 @@ public:
   /// "Cascading" means has a use by an interface in another file.
   void markTransitive(
       SmallVectorImpl<const driver::Job *> &visited, const driver::Job *node,
-      DependencyGraph<const driver::Job *>::MarkTracer *tracer = nullptr);
+      ModuleDepGraph::MarkTracer *tracer = nullptr);
 
   /// "Mark" this node only.
   bool markIntransitive(const driver::Job *);
@@ -406,7 +453,8 @@ private:
   /// TODO: stop at marked jobs
   void checkTransitiveClosureForCascading(
       std::unordered_set<const ModuleDepGraphNode *> &visited,
-      const ModuleDepGraphNode *potentiallyCascadingDef);
+      const ModuleDepGraphNode *potentiallyCascadingDef,
+       MarkTracer *tracerOrNull);
 
   void rememberThatJobCascades(StringRef swiftDeps) {
     cascadingJobs.insert(swiftDeps);

@@ -358,6 +358,10 @@ public:
   UnifiedStatsReporter *getStatsReporter() const {
     return Stats.get();
   }
+  
+  bool getTraceDependencies() const {
+    return getShowIncrementalBuildDecisions() || getStatsReporter();
+  }
 
   OutputLevel getOutputLevel() const {
     return Level;
