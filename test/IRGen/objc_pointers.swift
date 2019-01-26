@@ -22,6 +22,6 @@ import Foundation
 // CHECK-LABEL: s13objc_pointers14returnNSObject3objSo0D0CAE_tF
 func returnNSObject(obj: NSObject) -> NSObject {
   // CHECK-NOT: return
-  // CHECK: @objc_retain
+  // CHECK: @llvm.objc.retain
   return obj
 }

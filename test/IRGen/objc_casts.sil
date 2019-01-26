@@ -13,6 +13,8 @@ sil_vtable SwiftClass {}
 protocol ClassProto : class {}
 
 // CHECK-LABEL: define hidden swiftcc %TSo8NSObjectC* @checkedClassBoundCast(%swift.type*, %TSo8NSObjectC*, %swift.type* %T) #0 {
+// CHECK: [[OBJ:%.+]] = bitcast %TSo8NSObjectC* %1 to i8*
+// CHECK: call i8* @llvm.objc.retain(i8* [[OBJ]])
 // CHECK: [[OPAQUE_OBJ:%.+]] = bitcast %TSo8NSObjectC* %1 to i8*
 // CHECK: [[OPAQUE_CLASS:%.+]] = bitcast %swift.type* %T to i8*
 // CHECK: [[OPAQUE_RESULT:%.+]] = call i8* @swift_dynamicCastUnknownClassUnconditional(i8* [[OPAQUE_OBJ]], i8* [[OPAQUE_CLASS]], {{.*}})

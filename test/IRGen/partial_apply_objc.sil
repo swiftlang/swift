@@ -143,7 +143,8 @@ entry(%c : $ObjCClass):
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* %0 to [[DATA_TYPE]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   [[SELF:%.*]] = load %T18partial_apply_objc9ObjCClassC*, %T18partial_apply_objc9ObjCClassC** [[X_ADDR]], align 8
-// CHECK:   call {{.*}}@objc_retain{{.*}}(%{{.*}}* [[SELF]])
+// CHECK:   [[T0:%.*]] = bitcast %T18partial_apply_objc9ObjCClassC* [[SELF]] to i8*
+// CHECK:   call i8* @llvm.objc.retain(i8* [[T0]])
 // CHECK:   [[CMD:%.*]] = load i8*, i8** @"\01L_selector(fakeInitFamily)", align 8
 // CHECK:   [[I8PTRSELF:%.*]] = bitcast %T18partial_apply_objc9ObjCClassC* [[SELF]] to [[OPAQUE4:%.*]]*
 // CHECK:   call [[OPAQUE3:%.*]]* bitcast (void ()* @objc_msgSend to [[OPAQUE3]]* ([[OPAQUE4:%.*]]*, i8*)*)([[OPAQUE4]]* [[I8PTRSELF]], i8* [[CMD]])
