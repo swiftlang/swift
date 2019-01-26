@@ -1508,6 +1508,19 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
   }
+
+  bool parametersMatch(const DifferentiableAttr &other) const {
+    auto a = getParsedParameters();
+    auto b = other.getParsedParameters();
+    if (a.size() != b.size())
+      return false;
+
+    for (unsigned i = 0, n = b.size(); i < n; ++i) {
+      if (!a[i].isEqual(b[i]))
+        return false;
+    }
+    return true;
+  }
 };
 
 /// \brief Attributes that may be applied to declarations.

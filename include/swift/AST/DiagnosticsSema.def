@@ -2449,6 +2449,8 @@ ERROR(broken_differentiable_requirement,none,
 WARNING(differentiable_implicit_noderivative_fixit,none,
       "stored property has no derivative because it does not conform to "
       "'Differentiable'; add '@noDerivative' to make it explicit", ())
+NOTE(protocol_witness_missing_differentiable_attr,none,
+     "candidate is missing attribute '%0'", (StringRef))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))

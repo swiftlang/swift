@@ -51,6 +51,7 @@ struct Quadratic : DiffReq, Equatable {
     self.c = c
   }
 
+  @differentiable(wrt: (self, x))
   func f(_ x: Float) -> Float {
     return a * x * x + b * x + c
   }

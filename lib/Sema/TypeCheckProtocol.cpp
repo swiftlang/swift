@@ -481,6 +481,22 @@ swift::matchWitness(
         cast<AbstractFunctionDecl>(witness)->hasThrows())
       return RequirementMatch(witness, MatchKind::RethrowsConflict);
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // Differentiation attributes must match completely or the generated
+    // functions will have the wrong signature.
+    {
+      auto *reqDifferentiationAttr =
+          reqAttrs.getAttribute<DifferentiableAttr>(/*AllowInvalid*/ true);
+      auto *witnessDifferentiationAttr =
+          witnessAttrs.getAttribute<DifferentiableAttr>(
+              /*AllowInvalid*/ true);
+      if (reqDifferentiationAttr &&
+          (!witnessDifferentiationAttr ||
+           !witnessDifferentiationAttr->parametersMatch(
+               *reqDifferentiationAttr)))
+        return RequirementMatch(witness, MatchKind::DifferentiableConflict);
+    }
+
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
@@ -2211,6 +2227,17 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
+    break;
+  // SWIFT_ENABLE_TENSORFLOW
+  case MatchKind::DifferentiableConflict:
+    std::string diffAttrReq;
+    {
+      llvm::raw_string_ostream stream(diffAttrReq);
+      req->getAttrs().getAttribute<DifferentiableAttr>()->print(stream, req);
+    }
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_missing_differentiable_attr,
+                   diffAttrReq);
     break;
   }
 }
