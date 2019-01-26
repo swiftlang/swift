@@ -2341,21 +2341,24 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
 
   auto *block = SGF.createBasicBlock();
   result.first->second.first = block;
-    
-  // Add args for any pattern variables
-  if (caseBlock->hasBoundDecls()) {
-    auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
-    pattern->forEachVariable([&](VarDecl *V) {
-      if (!V->hasName())
-        return;
 
-      // We don't pass address-only values in basic block arguments.
-      SILType ty = SGF.getLoweredType(V->getType());
-      if (ty.isAddressOnly(SGF.F.getModule()))
-        return;
-      block->createPhiArgument(ty, ValueOwnershipKind::Owned, V);
-    });
-  }
+  // If we do not have any bound decls, then we do not need to create arguments
+  // for pattern variables. Early exit.
+  if (!caseBlock->hasBoundDecls())
+    return;
+
+  // Add args for any pattern variables
+  auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
+  pattern->forEachVariable([&](VarDecl *V) {
+    if (!V->hasName())
+      return;
+
+    // We don't pass address-only values in basic block arguments.
+    SILType ty = SGF.getLoweredType(V->getType());
+    if (ty.isAddressOnly(SGF.F.getModule()))
+      return;
+    block->createPhiArgument(ty, ValueOwnershipKind::Owned, V);
+  });
 }
 
 /// Retrieve the jump destination for a shared case block.
@@ -2459,60 +2462,64 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     
     assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
 
+    // If we do not have any bound decls, just emit the case block and continue.
+    if (!caseBlock->hasBoundDecls()) {
+      emitCaseBody(caseBlock);
+      assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
+      continue;
+    }
+
     // If we have a shared case with bound decls, then the 0th pattern has the
     // order of variables that are the incoming BB arguments. Setup the VarLocs
-    // to point to the incoming args and setup initialization so any args needing
-    // cleanup will get that as well.
-    if (caseBlock->hasBoundDecls()) {
-      Scope scope(SGF.Cleanups, CleanupLocation(caseBlock));
-      auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
-      unsigned argIndex = 0;
-      pattern->forEachVariable([&](VarDecl *V) {
-        if (!V->hasName())
-          return;
+    // to point to the incoming args and setup initialization so any args
+    // needing cleanup will get that as well.
+    Scope scope(SGF.Cleanups, CleanupLocation(caseBlock));
+    auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
+    unsigned argIndex = 0;
+    pattern->forEachVariable([&](VarDecl *V) {
+      if (!V->hasName())
+        return;
 
-        SILType ty = SGF.getLoweredType(V->getType());
+      SILType ty = SGF.getLoweredType(V->getType());
 
-        // Initialize mv at +1. We always pass values in at +1 for today into
-        // shared blocks.
-        ManagedValue mv;
-        if (ty.isAddressOnly(SGF.F.getModule())) {
-          // There's no basic block argument, since we don't allow basic blocks
-          // to have address arguments.
-          //
-          // Instead, we map the variable to a temporary alloc_stack in
-          // emitAddressOnlyAllocations(), and store into it at each
-          // predecessor block.
-          //
-          // There's nothing to do here, since the value should already have
-          // been initialized on entry.
-          auto found = Temporaries.find(V);
-          assert(found != Temporaries.end());
-          mv = SGF.emitManagedRValueWithCleanup(found->second);
-        } else {
-          SILValue arg = caseBB->getArgument(argIndex++);
-          assert(arg.getOwnershipKind() == ValueOwnershipKind::Owned ||
-                 arg.getOwnershipKind() == ValueOwnershipKind::Any);
-          mv = SGF.emitManagedRValueWithCleanup(arg);
-        }
+      // Initialize mv at +1. We always pass values in at +1 for today into
+      // shared blocks.
+      ManagedValue mv;
+      if (ty.isAddressOnly(SGF.F.getModule())) {
+        // There's no basic block argument, since we don't allow basic blocks
+        // to have address arguments.
+        //
+        // Instead, we map the variable to a temporary alloc_stack in
+        // emitAddressOnlyAllocations(), and store into it at each
+        // predecessor block.
+        //
+        // There's nothing to do here, since the value should already have
+        // been initialized on entry.
+        auto found = Temporaries.find(V);
+        assert(found != Temporaries.end());
+        mv = SGF.emitManagedRValueWithCleanup(found->second);
+      } else {
+        SILValue arg = caseBB->getArgument(argIndex++);
+        assert(arg.getOwnershipKind() == ValueOwnershipKind::Owned ||
+               arg.getOwnershipKind() == ValueOwnershipKind::Any);
+        mv = SGF.emitManagedRValueWithCleanup(arg);
+      }
 
-        if (V->isLet()) {
-          // Just emit a let and leave the cleanup alone.
-          SGF.VarLocs[V].value = mv.getValue();
-        } else {
-          // The pattern variables were all emitted as lets and one got passed in,
-          // now we finally alloc a box for the var and forward in the chosen value.
-          SGF.VarLocs.erase(V);
-          auto newVar = SGF.emitInitializationForVarDecl(V, V->isLet());
-          newVar->copyOrInitValueInto(SGF, V, mv, /*isInit*/ true);
-          newVar->finishInitialization(SGF);
-        }
-      });
-      emitCaseBody(caseBlock);
-    } else {
-      emitCaseBody(caseBlock);
-    }
-    
+      if (V->isLet()) {
+        // Just emit a let and leave the cleanup alone.
+        SGF.VarLocs[V].value = mv.getValue();
+        return;
+      }
+
+      // The pattern variables were all emitted as lets and one got passed in,
+      // now we finally alloc a box for the var and forward in the chosen value.
+      SGF.VarLocs.erase(V);
+      auto newVar = SGF.emitInitializationForVarDecl(V, V->isLet());
+      newVar->copyOrInitValueInto(SGF, V, mv, /*isInit*/ true);
+      newVar->finishInitialization(SGF);
+    });
+    emitCaseBody(caseBlock);
+
     assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
   }
 }
@@ -2677,62 +2684,67 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       // statement.
       JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
       Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
-    } else if (row.hasFallthroughTo() || caseBlock->getCaseLabelItems().size() > 1) {
-      JumpDest sharedDest =
-          emission.getSharedCaseBlockDest(caseBlock);
-
-      // Generate the arguments from this row's pattern in the case block's
-      // expected order, and keep those arguments from being cleaned up, as
-      // we're passing the +1 along to the shared case block dest. (The
-      // cleanups still happen, as they are threaded through here messily,
-      // but the explicit retains here counteract them, and then the
-      // retain/release pair gets optimized out.)
-      ArrayRef<CaseLabelItem> labelItems = caseBlock->getCaseLabelItems();
-      SmallVector<SILValue, 4> args;
-      SmallVector<VarDecl *, 4> expectedVarOrder;
-      SmallVector<VarDecl *, 4> vars;
-      labelItems[0].getPattern()->collectVariables(expectedVarOrder);
-      row.getCasePattern()->collectVariables(vars);
-
-      SILModule &M = F.getModule();
-      for (auto expected : expectedVarOrder) {
-        if (!expected->hasName())
-          continue;
-        for (auto *var : vars) {
-          if (var->hasName() && var->getName() == expected->getName()) {
-            SILValue value = VarLocs[var].value;
-            SILType type = value->getType();
-
-            // If we have an address-only type, initialize the temporary
-            // allocation. We're not going to pass the address as a block
-            // argument.
-            if (type.isAddressOnly(M)) {
-              emission.emitAddressOnlyInitialization(expected, value);
-              break;
-            }
-
-            // If we have a loadable address, perform a load [copy].
-            if (type.isAddress()) {
-              value = B.emitLoadValueOperation(CurrentSILLoc, value,
-                                               LoadOwnershipQualifier::Copy);
-              args.push_back(value);
-              break;
-            }
-
-            value = B.emitCopyValueOperation(CurrentSILLoc, value);
-            args.push_back(value);
-            break;
-          }
-        }
-      }
-
-      Cleanups.emitBranchAndCleanups(sharedDest, caseBlock, args);
-    } else {
-      // However, if we don't have a fallthrough or a multi-pattern 'case', we
-      // can just emit the body inline and save some dead blocks.
-      // Emit the statement here.
-      emission.emitCaseBody(caseBlock);
+      return;
     }
+
+    // If we don't have a fallthrough or a multi-pattern 'case', we can just
+    // emit the body inline and save some dead blocks. Emit the statement here.
+    if (!row.hasFallthroughTo() && caseBlock->getCaseLabelItems().size() <= 1) {
+      emission.emitCaseBody(caseBlock);
+      return;
+    }
+
+    JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
+
+    // Generate the arguments from this row's pattern in the case block's
+    // expected order, and keep those arguments from being cleaned up, as
+    // we're passing the +1 along to the shared case block dest. (The
+    // cleanups still happen, as they are threaded through here messily,
+    // but the explicit retains here counteract them, and then the
+    // retain/release pair gets optimized out.)
+    ArrayRef<CaseLabelItem> labelItems = caseBlock->getCaseLabelItems();
+    SmallVector<SILValue, 4> args;
+    SmallVector<VarDecl *, 4> expectedVarOrder;
+    SmallVector<VarDecl *, 4> vars;
+    labelItems[0].getPattern()->collectVariables(expectedVarOrder);
+    row.getCasePattern()->collectVariables(vars);
+
+    SILModule &M = F.getModule();
+    for (auto *expected : expectedVarOrder) {
+      if (!expected->hasName())
+        continue;
+
+      for (auto *var : vars) {
+        if (!var->hasName() || var->getName() != expected->getName()) {
+          continue;
+        }
+
+        SILValue value = VarLocs[var].value;
+        SILType type = value->getType();
+
+        // If we have an address-only type, initialize the temporary
+        // allocation. We're not going to pass the address as a block
+        // argument.
+        if (type.isAddressOnly(M)) {
+          emission.emitAddressOnlyInitialization(expected, value);
+          break;
+        }
+
+        // If we have a loadable address, perform a load [copy].
+        if (type.isAddress()) {
+          value = B.emitLoadValueOperation(CurrentSILLoc, value,
+                                           LoadOwnershipQualifier::Copy);
+          args.push_back(value);
+          break;
+        }
+
+        value = B.emitCopyValueOperation(CurrentSILLoc, value);
+        args.push_back(value);
+        break;
+      }
+    }
+
+    Cleanups.emitBranchAndCleanups(sharedDest, caseBlock, args);
   };
 
   PatternMatchEmission emission(*this, S, completionHandler);
@@ -2856,51 +2868,60 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   }
 }
 
-void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
+void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *s) {
   assert(!SwitchStack.empty() && "fallthrough outside of switch?!");
   PatternMatchContext *context = SwitchStack.back();
   
   // Get the destination block.
-  CaseStmt *caseStmt = S->getFallthroughDest();
+  CaseStmt *caseStmt = s->getFallthroughDest();
   JumpDest sharedDest =
   context->Emission.getSharedCaseBlockDest(caseStmt);
 
   if (!caseStmt->hasBoundDecls()) {
-    Cleanups.emitBranchAndCleanups(sharedDest, S);
-  } else {
-    // Generate branch args to pass along current vars to fallthrough case.
-    SILModule &M = F.getModule();
-    ArrayRef<CaseLabelItem> labelItems = caseStmt->getCaseLabelItems();
-    SmallVector<SILValue, 4> args;
-    SmallVector<VarDecl *, 4> expectedVarOrder;
-    labelItems[0].getPattern()->collectVariables(expectedVarOrder);
-    
-    for (auto *expected : expectedVarOrder) {
-      if (!expected->hasName())
-        continue;
-      for (auto var : VarLocs) {
-        auto varDecl = dyn_cast<VarDecl>(var.getFirst());
-        if (varDecl && varDecl->hasName() && varDecl->getName() == expected->getName()) {
-          SILValue value = var.getSecond().value;
-
-          if (value->getType().isAddressOnly(M)) {
-            context->Emission.emitAddressOnlyInitialization(expected, value);
-          } else if (var.getSecond().box) {
-            auto &lowering = getTypeLowering(value->getType());
-            auto argValue = lowering.emitLoad(B, CurrentSILLoc, value, LoadOwnershipQualifier::Copy);
-            args.push_back(argValue);
-          } else {
-            auto argValue = B.emitCopyValueOperation(CurrentSILLoc, value);
-            args.push_back(argValue);
-          }
-          break;
-        }
-      }
-    }
-    Cleanups.emitBranchAndCleanups(sharedDest, S, args);
+    Cleanups.emitBranchAndCleanups(sharedDest, s);
+    return;
   }
-}
 
+  // Generate branch args to pass along current vars to fallthrough case.
+  SILModule &m = F.getModule();
+  ArrayRef<CaseLabelItem> labelItems = caseStmt->getCaseLabelItems();
+  SmallVector<SILValue, 4> args;
+  SmallVector<VarDecl *, 4> expectedVarOrder;
+  labelItems[0].getPattern()->collectVariables(expectedVarOrder);
+
+  for (auto *expected : expectedVarOrder) {
+    if (!expected->hasName())
+      continue;
+
+    for (auto var : VarLocs) {
+      auto *varDecl = dyn_cast<VarDecl>(var.getFirst());
+      if (!varDecl || !varDecl->hasName() ||
+          varDecl->getName() != expected->getName()) {
+        continue;
+      }
+
+      SILValue value = var.getSecond().value;
+
+      if (value->getType().isAddressOnly(m)) {
+        context->Emission.emitAddressOnlyInitialization(expected, value);
+        break;
+      }
+
+      if (var.getSecond().box) {
+        auto &lowering = getTypeLowering(value->getType());
+        auto argValue = lowering.emitLoad(B, CurrentSILLoc, value,
+                                          LoadOwnershipQualifier::Copy);
+        args.push_back(argValue);
+        break;
+      }
+
+      auto argValue = B.emitCopyValueOperation(CurrentSILLoc, value);
+      args.push_back(argValue);
+      break;
+    }
+  }
+  Cleanups.emitBranchAndCleanups(sharedDest, s, args);
+}
 
 /// Emit a sequence of catch clauses.
 void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
