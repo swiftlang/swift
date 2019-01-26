@@ -73,8 +73,9 @@ bool ForceOptional::diagnose(Expr *root, bool asNote) const {
 ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type baseType,
                                      Type unwrappedType,
                                      ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      ForceOptional(cs, baseType, unwrappedType, locator);
+  return new (cs.getAllocator()) ForceOptional(
+      cs, baseType, unwrappedType,
+      cs.getConstraintLocator(simplifyLocatorToAnchor(cs, locator)));
 }
 
 bool UnwrapOptionalBase::diagnose(Expr *root, bool asNote) const {
