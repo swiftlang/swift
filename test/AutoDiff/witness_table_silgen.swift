@@ -28,6 +28,7 @@ struct S : Proto, VectorNumeric {
     return (p, { dp in S(p: dp) })
   }
 
+  @differentiable()
   func function1(_ x: Float, _ y: Float) -> Float {
     return x + y + p
   }
@@ -48,6 +49,7 @@ struct S : Proto, VectorNumeric {
   // CHECK: apply [[VJP1]]
   // CHECK: } // end sil function 'AD__{{.*}}function1{{.*}}_vjp_SSU'
 
+  @differentiable(wrt: (self, x, y))
   func function2(_ x: Float, _ y: Float) -> Float {
     return x + y + p
   }
@@ -68,6 +70,7 @@ struct S : Proto, VectorNumeric {
   // CHECK: apply [[VJP2]]
   // CHECK: } // end sil function 'AD__{{.*}}function2{{.*}}_vjp_SSS'
 
+  @differentiable(wrt: (y))
   func function3(_ x: Float, _ y: Float) -> Float {
     return x + y + p
   }

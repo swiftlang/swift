@@ -404,3 +404,28 @@ func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
 func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
   return x
 }
+
+
+protocol DiffReq : Differentiable {
+  // expected-note @+2 {{protocol requires function 'f1'}}
+  @differentiable(wrt: (self, x))
+  func f1(_ x: Float) -> Float
+
+  // expected-note @+2 {{protocol requires function 'f2'}}
+  @differentiable(wrt: (self, x, y))
+  func f2(_ x: Float, _ y: Float) -> Float
+}
+
+// expected-error @+1 {{does not conform to protocol}}
+struct ConformingWithErrors : DiffReq {
+  // expected-note @+1 {{@differentiable(wrt: (x, self))}}
+  func f1(_ x: Float) -> Float {
+    return x
+  }
+
+  // expected-note @+2 {{@differentiable(wrt: (x, y, self))}}
+  @differentiable(wrt: (self, x))
+  func f2(_ x: Float, _ y: Float) -> Float {
+    return x + y
+  }
+}
