@@ -1,4 +1,4 @@
-// RUN: %target-swift-remoteast-test-with-sdk -I %S/../ClangImporter/Inputs/custom-modules -I %S/Inputs/custom-modules %s | %FileCheck %s
+// RUN: %target-swift-remoteast-test-with-sdk -I %S/../ClangImporter/Inputs/custom-modules -I %S/../Inputs/custom-modules %s | %FileCheck %s
 
 // REQUIRES: swift-remoteast-test
 // REQUIRES: objc_interop

@@ -2174,11 +2174,13 @@ bool ASTMangler::tryAppendStandardSubstitution(const GenericTypeDecl *decl) {
   if (!isStdlibType(decl))
     return false;
 
-  if (char Subst = getStandardTypeSubst(decl->getName().str())) {
-    if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
-      appendOperator("S", StringRef(&Subst, 1));
+  if (isa<NominalTypeDecl>(decl)) {
+    if (char Subst = getStandardTypeSubst(decl->getName().str())) {
+      if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
+        appendOperator("S", StringRef(&Subst, 1));
+      }
+      return true;
     }
-    return true;
   }
   return false;
 }
