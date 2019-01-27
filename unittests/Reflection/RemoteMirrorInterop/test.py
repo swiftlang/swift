@@ -48,15 +48,15 @@ for i, (swiftc, swiftlib) in enumerate(zip(swiftcs, swiftlibs)):
 for i in range(len(swiftcs) + 1):
     for localMirrorlibs in itertools.combinations(mirrorlibs, i):
         for i, arg in enumerate(absoluteArgs):
-            print 'Testing', arg, 'with mirror libs:'
+            print('Testing {} with mirror libs:'.format(arg))
             for l in localMirrorlibs:
                 print '\t', l
             callArgs = ['/tmp/test']
             dylibPath = os.path.join('/tmp', 'libtest' + str(i) + '.dylib')
             callArgs.append(dylibPath)
             callArgs += list(localMirrorlibs)
-            print ' '.join(callArgs)
+            print(' '.join(callArgs))
             subprocess.call(callArgs)
-            print 'DONE'
-            print ''
+            print('DONE')
+            print('')
         print localMirrorlibs
