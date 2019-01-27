@@ -397,6 +397,54 @@ public:
         {RemoteAddress(MetadataAddress), RemoteAddress(StartOfValue)});
   }
 
+  /// Read a protocol from a reference to said protocol.
+  template<typename Resolver>
+  typename Resolver::Result readProtocol(
+      const TargetProtocolDescriptorRef<Runtime> &ProtocolAddress,
+      Demangler &dem,
+      Resolver resolver) {
+#if SWIFT_OBJC_INTEROP
+    // Check whether we have an Objective-C protocol.
+    if (ProtocolAddress.isObjC()) {
+      auto Name = readObjCProtocolName(ProtocolAddress.getObjCProtocol());
+      StringRef NameStr(Name);
+
+      // If this is a Swift-defined protocol, demangle it.
+      if (NameStr.startswith("_TtP")) {
+        auto Demangled = dem.demangleSymbol(NameStr);
+        if (!Demangled)
+          return resolver.failure();
+
+        // FIXME: This appears in _swift_buildDemanglingForMetadata().
+        while (Demangled->getKind() == Node::Kind::Global ||
+               Demangled->getKind() == Node::Kind::TypeMangling ||
+               Demangled->getKind() == Node::Kind::Type ||
+               Demangled->getKind() == Node::Kind::ProtocolList ||
+               Demangled->getKind() == Node::Kind::TypeList ||
+               Demangled->getKind() == Node::Kind::Type) {
+          if (Demangled->getNumChildren() != 1)
+            return resolver.failure();
+          Demangled = Demangled->getFirstChild();
+        }
+
+        return resolver.swiftProtocol(Demangled);
+      }
+
+      // Otherwise, this is an imported protocol.
+      return resolver.objcProtocol(NameStr);
+    }
+#endif
+
+    // Swift-native protocol.
+    auto Demangled =
+      readDemanglingForContextDescriptor(ProtocolAddress.getSwiftProtocol(),
+                                         dem);
+    if (!Demangled)
+      return resolver.failure();
+
+    return resolver.swiftProtocol(Demangled);
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType readTypeFromMetadata(StoredPointer MetadataAddress,
                                  bool skipArtificialSubclasses = false) {
@@ -493,64 +541,34 @@ public:
         HasExplicitAnyObject = true;
       }
 
-      std::vector<BuiltProtocolDecl> Protocols;
-      for (auto ProtocolAddress : Exist->getProtocols()) {
+      /// Resolver to turn a protocol reference into a protocol declaration.
+      struct ProtocolResolver {
+        using Result = BuiltProtocolDecl;
+
+        BuilderType &builder;
+
+        BuiltProtocolDecl failure() const {
+          return BuiltProtocolDecl();
+        }
+
+        BuiltProtocolDecl swiftProtocol(Demangle::Node *node) {
+          return builder.createProtocolDecl(node);
+        }
+
 #if SWIFT_OBJC_INTEROP
-        // Check whether we have an Objective-C protocol.
-        if (ProtocolAddress.isObjC()) {
-          auto Name =
-            readObjCProtocolName(ProtocolAddress.getObjCProtocol());
-          StringRef NameStr(Name);
-
-          // If this is a Swift-defined protocol, demangle it.
-          if (NameStr.startswith("_TtP")) {
-            Demangle::Context DCtx;
-            auto Demangled = DCtx.demangleSymbolAsNode(NameStr);
-            if (!Demangled)
-              return BuiltType();
-
-            // FIXME: This appears in _swift_buildDemanglingForMetadata().
-            while (Demangled->getKind() == Node::Kind::Global ||
-                   Demangled->getKind() == Node::Kind::TypeMangling ||
-                   Demangled->getKind() == Node::Kind::Type ||
-                   Demangled->getKind() == Node::Kind::ProtocolList ||
-                   Demangled->getKind() == Node::Kind::TypeList ||
-                   Demangled->getKind() == Node::Kind::Type) {
-              if (Demangled->getNumChildren() != 1)
-                return BuiltType();
-              Demangled = Demangled->getFirstChild();
-            }
-
-            auto Protocol = Builder.createProtocolDecl(Demangled);
-            if (!Protocol)
-              return BuiltType();
-
-            Protocols.push_back(Protocol);
-            continue;
-          }
-
-          // Otherwise, this is an imported protocol.
-          auto Protocol = Builder.createObjCProtocolDecl(NameStr);
-          if (!Protocol)
-            return BuiltType();
-
-          Protocols.push_back(Protocol);
-          continue;
+        BuiltProtocolDecl objcProtocol(StringRef name) {
+          return builder.createObjCProtocolDecl(name);
         }
 #endif
+      } resolver{Builder};
 
-        // Swift-native protocol.
-        Demangle::Demangler Dem;
-        auto Demangled = readDemanglingForContextDescriptor(
-            ProtocolAddress.getSwiftProtocol(), Dem);
-        if (!Demangled)
+      Demangler dem;
+      std::vector<BuiltProtocolDecl> Protocols;
+      for (auto ProtocolAddress : Exist->getProtocols()) {
+        if (auto Protocol = readProtocol(ProtocolAddress, dem, resolver))
+          Protocols.push_back(Protocol);
+        else
           return BuiltType();
-
-        auto Protocol = Builder.createProtocolDecl(Demangled);
-        if (!Protocol)
-          return BuiltType();
-
-        Protocols.push_back(Protocol);
       }
       auto BuiltExist = Builder.createProtocolCompositionType(
         Protocols, SuperclassType, HasExplicitAnyObject);
