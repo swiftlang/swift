@@ -90,9 +90,6 @@ static void fixupReferenceCounts(
   auto errorBehavior =
       ownership::ErrorBehaviorKind::ReturnFalseOnLeakAssertOtherwise;
 
-  // Ok, at this point we know that we have a direct SSA relationship in between
-  // our partial_apply and
-
   // Add a copy of each non-address type capture argument to lifetime extend the
   // captured argument over at least the inlined function and till the end of a
   // box if we have an address. This deals with the possibility of the closure
@@ -183,8 +180,11 @@ static void fixupReferenceCounts(
       break;
     }
 
-    // If we have an owned value, we need to insert a copy here for lifetime
-    // extension purposes.
+    // If we have an owned value, we insert a copy here for two reasons:
+    //
+    // 1. To balance the consuming argument.
+    // 2. To lifetime extend the value over the call site in case our partial
+    // apply has another use that would destroy our value first.
     case ParameterConvention::Direct_Owned: {
       v = SILBuilderWithScope(pai).emitCopyValueOperation(loc, v);
 
