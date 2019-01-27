@@ -257,7 +257,8 @@ public:
             emitExperimentalDependencyDotFileAfterEveryImport),
         currentPathIfTracing(
             shouldTraceDependencies
-                ? llvm::Optional<std::vector<const ModuleDepGraphNode *>>(std::vector<const ModuleDepGraphNode *>())
+                ? llvm::Optional<std::vector<const ModuleDepGraphNode *>>(
+                      std::vector<const ModuleDepGraphNode *>())
                 : None),
         stats(stats) {
     assert(verify() && "ModuleDepGraph should be fine when created");

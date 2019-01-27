@@ -371,9 +371,9 @@ void ModuleDepGraph::checkTransitiveClosureForCascading(
   });
   if (currentPathIfTracing.hasValue())
     currentPathIfTracing->pop_back();
-  
- size_t finalPathLength =
-    currentPathIfTracing.hasValue() ? currentPathIfTracing->size() : 0;
+
+  size_t finalPathLength =
+      currentPathIfTracing.hasValue() ? currentPathIfTracing->size() : 0;
   assert(initialPathLength == finalPathLength && "Should preserve path length");
 }
 
@@ -513,7 +513,8 @@ bool ModuleDepGraph::emitAndVerify(DiagnosticEngine &diags) {
 /// Dump the path that led to \p node.
 void ModuleDepGraph::printPath(raw_ostream &out,
                                const driver::Job *jobToBeBuilt) const {
-  assert(currentPathIfTracing.hasValue() && "Cannot print paths of paths weren't tracked.");
+  assert(currentPathIfTracing.hasValue() &&
+         "Cannot print paths of paths weren't tracked.");
   auto const swiftDepsToBeBuilt = getSwiftDeps(jobToBeBuilt);
 
   std::for_each(
