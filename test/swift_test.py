@@ -30,7 +30,7 @@ class SwiftTest(lit.formats.ShTest, object):
             self.coverage_mode = coverage_mode
         self.skipped_tests = set()
 
-    def before_test(self, test, litConfig):
+    def before_test(self, test, litconfig):
         if self.coverage_mode:
             # FIXME: The compiler crashers run so fast they fill up the
             # merger's queue (and therefore the build bot's disk)
@@ -53,12 +53,12 @@ class SwiftTest(lit.formats.ShTest, object):
                     os.path.join(test.config.swift_test_results_dir,
                                  "swift-%4m.profraw")
 
-    def after_test(self, test, litConfig, result):
+    def after_test(self, test, litconfig, result):
         if test.getSourcePath() in self.skipped_tests:
             self.skipped_tests.remove(test.getSourcePath())
         return result
 
-    def execute(self, test, litConfig):
-        self.before_test(test, litConfig)
-        result = super(SwiftTest, self).execute(test, litConfig)
-        return self.after_test(test, litConfig, result)
+    def execute(self, test, litconfig):
+        self.before_test(test, litconfig)
+        result = super(SwiftTest, self).execute(test, litconfig)
+        return self.after_test(test, litconfig, result)
