@@ -336,7 +336,7 @@ public:
   bool getShowIncrementalBuildDecisions() const {
     return ShowIncrementalBuildDecisions;
   }
-  void setShowsIncrementalBuildDecisions(bool value = true) {
+  void setShowIncrementalBuildDecisions(bool value = true) {
     ShowIncrementalBuildDecisions = value;
   }
 

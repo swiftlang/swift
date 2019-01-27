@@ -987,7 +987,7 @@ Driver::buildCompilation(const ToolChain &TC,
     C->setContinueBuildingAfterErrors();
 
   if (ShowIncrementalBuildDecisions || ShowJobLifecycle)
-    C->setShowsIncrementalBuildDecisions();
+    C->setShowIncrementalBuildDecisions();
 
   if (ShowJobLifecycle)
     C->setShowJobLifecycle();
