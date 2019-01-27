@@ -4641,22 +4641,20 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
       if (DMT) {
         shouldOfferFixit = isa<ExtensionDecl>(DMT->getRootGenericParam()
-																							   ->getDecl()
-																							   ->getDeclContext());
+                                                 ->getDecl()
+                                                 ->getDeclContext());
       }
-
+      
+      Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
+                     subjectType, constraintType);
+      
       if (shouldOfferFixit) {
         auto subjectTypeName = DMT ? DMT->getName().str().str() :
-				                       subjectType.getString();
-        Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
-                       subjectType, constraintType);
+                                     subjectType.getString();
         Diags.diagnose(source.getLoc(),
-                      diag::requires_conformance_nonprotocol_fixit,
-                      subjectTypeName, constraintType.getString())
-            .fixItReplace(source.getLoc(), " == ");
-      } else {
-        Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
-                       subjectType, constraintType);
+                       diag::requires_conformance_nonprotocol_fixit,
+                       subjectTypeName, constraintType.getString())
+             .fixItReplace(source.getLoc(), " == ");
       }
     }
 

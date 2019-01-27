@@ -646,8 +646,8 @@ struct SR_7984<Bar> {
 
 extension SR_7984 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{28-29= ==}}
 
-protocol Foo {
+protocol SR_7984_Proto {
   associatedtype Bar
 }
 
-extension Foo where Bar: String {} // expected-error {{type 'Self.Bar' constrained to non-protocol, non-class type 'String'}} // expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{24-25= ==}}
+extension SR_7984_Proto where Bar: String {} // expected-error {{type 'Self.Bar' constrained to non-protocol, non-class type 'String'}} // expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{34-35= ==}}
