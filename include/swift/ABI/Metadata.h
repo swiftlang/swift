@@ -1547,10 +1547,10 @@ class TargetProtocolDescriptorRef {
   /// is clear).
   StoredPointer storage;
 
+public:
   constexpr TargetProtocolDescriptorRef(StoredPointer storage)
     : storage(storage) { }
 
-public:
   constexpr TargetProtocolDescriptorRef() : storage() { }
 
   TargetProtocolDescriptorRef(
@@ -2519,7 +2519,6 @@ public:
   /// The type that's constrained, described as a mangled name.
   RelativeDirectPointer<const char, /*nullable*/ false> Param;
 
-private:
   union {
     /// A mangled representation of the same-type or base class the param is
     /// constrained to.
@@ -2544,7 +2543,6 @@ private:
     GenericRequirementLayoutKind Layout;
   };
 
-public:
   constexpr GenericRequirementFlags getFlags() const {
     return Flags;
   }

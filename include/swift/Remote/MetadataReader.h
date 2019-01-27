@@ -1655,6 +1655,48 @@ private:
     return nameChild;
   }
 
+  /// Resolve a relative target protocol descriptor pointer, which uses
+  /// the lowest bit to indicate an indirect vs. direct relative reference and
+  /// the second lowest bit to indicate whether it is an Objective-C protocol.
+  StoredPointer resolveRelativeIndirectProtocol(
+      ContextDescriptorRef descriptor,
+      const RelativeTargetProtocolDescriptorPointer<Runtime> &protocol) {
+    // Map the offset from within our local buffer to the remote address.
+    auto distance = (intptr_t)&protocol - (intptr_t)descriptor.getLocalBuffer();
+    StoredPointer targetAddress(descriptor.getAddress() + distance);
+
+    // Read the relative offset.
+    int32_t relative;
+    if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
+      return StoredPointer();
+
+    // Collect and mask off the 'indirect' and 'isObjC' bits.
+    bool indirect = relative & 1;
+    relative &= ~1u;
+    bool isObjC = relative & 2;
+    relative &= ~2u;
+
+    using SignedPointer = typename std::make_signed<StoredPointer>::type;
+    auto signext = (SignedPointer)(int32_t)relative;
+
+    StoredPointer resultAddress = targetAddress + signext;
+
+    // Low bit set in the offset indicates that the offset leads to the absolute
+    // address in memory.
+    if (indirect) {
+      if (!Reader->readBytes(RemoteAddress(resultAddress),
+                             (uint8_t *)&resultAddress,
+                             sizeof(StoredPointer)))
+        return StoredPointer();
+    }
+
+    // Add back the Objective-C bit.
+    if (isObjC)
+      resultAddress |= 0x1;
+
+    return resultAddress;
+  }
+
   Demangle::NodePointer
   buildContextDescriptorMangling(ContextDescriptorRef descriptor,
                                  Demangler &dem) {
@@ -1748,14 +1790,141 @@ private:
                         MangledNameKind::Type,
                         dem);
 
-      // FIXME: If there are generic requirements, turn them into a demangle
-      // tree.
       auto demangling = dem.createNode(Node::Kind::Extension);
       demangling->addChild(parentDemangling, dem);
       demangling->addChild(demangledExtendedContext, dem);
-      return demangling;
 
-      return nullptr;
+      /// Resolver to turn a protocol reference into a demangling.
+      struct ProtocolResolver {
+        using Result = Demangle::Node *;
+
+        Demangler &dem;
+
+        Result failure() const {
+          return nullptr;
+        }
+
+        Result swiftProtocol(Demangle::Node *node) {
+          return node;
+        }
+
+#if SWIFT_OBJC_INTEROP
+        Result objcProtocol(StringRef name) {
+          // FIXME: Unify this with the runtime's Demangle.cpp
+          auto module = dem.createNode(Node::Kind::Module,
+                                       MANGLING_MODULE_OBJC);
+          auto node = dem.createNode(Node::Kind::Protocol);
+          node->addChild(module, dem);
+          node->addChild(dem.createNode(Node::Kind::Identifier, name),
+                         dem);
+          return node;
+        }
+#endif
+      } protocolResolver{dem};
+
+      // If there are generic requirements, form the generic signature.
+      auto requirements = extensionBuffer->getGenericRequirements();
+      if (!requirements.empty()) {
+        auto signatureNode =
+          dem.createNode(Node::Kind::DependentGenericSignature);
+        bool failed = false;
+        for (const auto &req : requirements) {
+          if (failed)
+            break;
+
+          // Demangle the subject.
+          auto subjectAddress = resolveRelativeField(descriptor, req.Param);
+          NodePointer subject = readMangledName(RemoteAddress(subjectAddress),
+                                                MangledNameKind::Type,
+                                                dem);
+          if (!subject) {
+            failed = true;
+            break;
+          }
+
+          switch (req.Flags.getKind()) {
+          case GenericRequirementKind::Protocol: {
+            auto protocolAddress =
+              resolveRelativeIndirectProtocol(descriptor, req.Protocol);
+            auto protocol = readProtocol(protocolAddress, dem,
+                                         protocolResolver);
+            if (!protocol) {
+              failed = true;
+              break;
+            }
+
+            auto reqNode =
+              dem.createNode(
+                Node::Kind::DependentGenericConformanceRequirement);
+            reqNode->addChild(subject, dem);
+            reqNode->addChild(protocol, dem);
+            signatureNode->addChild(reqNode, dem);
+            break;
+          }
+
+          case GenericRequirementKind::SameType:
+          case GenericRequirementKind::BaseClass: {
+            // Demangle the right-hand type.
+            auto typeAddress = resolveRelativeField(descriptor, req.Type);
+            NodePointer type = readMangledName(RemoteAddress(typeAddress),
+                                               MangledNameKind::Type,
+                                               dem);
+            if (!type) {
+              failed = true;
+              break;
+            }
+
+            Node::Kind nodeKind;
+            if (req.Flags.getKind() == GenericRequirementKind::SameType)
+              nodeKind = Node::Kind::DependentGenericSameTypeRequirement;
+            else
+              nodeKind = Node::Kind::DependentGenericConformanceRequirement;
+
+            auto reqNode = dem.createNode(nodeKind);
+            reqNode->addChild(subject, dem);
+            reqNode->addChild(type, dem);
+            signatureNode->addChild(reqNode, dem);
+            break;
+          }
+
+          case GenericRequirementKind::SameConformance:
+            // Do nothing
+            break;
+
+          case GenericRequirementKind::Layout: {
+            // Map the offset from within our local buffer to the remote
+            // address.
+            auto distance =
+              (intptr_t)&req.Layout - (intptr_t)descriptor.getLocalBuffer();
+            StoredPointer targetAddress(descriptor.getAddress() + distance);
+
+            GenericRequirementLayoutKind kind;
+            if (!Reader->readBytes(RemoteAddress(targetAddress),
+                                   (uint8_t *)&kind, sizeof(kind))) {
+              failed = true;
+              break;
+            }
+
+            if (kind == GenericRequirementLayoutKind::Class) {
+              auto reqNode =
+                dem.createNode(Node::Kind::DependentGenericLayoutRequirement);
+              reqNode->addChild(subject, dem);
+              auto idNode = dem.createNode(Node::Kind::Identifier, "C");
+              reqNode->addChild(idNode, dem);
+              signatureNode->addChild(reqNode, dem);
+            } else {
+              failed = true;
+            }
+            break;
+          }
+          }
+        }
+
+        if (!failed) {
+          demangling->addChild(signatureNode, dem);
+        }
+      }
+      return demangling;
     }
 
     case ContextDescriptorKind::Anonymous: {
