@@ -369,10 +369,6 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
-  if (NOT SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
-    list(APPEND result "-Xfrontend" "-disable-guaranteed-normal-arguments")
-  endif()
-  
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
     list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
   endif()
