@@ -51,7 +51,7 @@ constants.""")
 
     p = subprocess.Popen(
         [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
-    stdout, stderr = p.communicate(stdin)
+    stdout, stderr = p.communicate(stdin.encode('utf-8'))
     if stdout is not None:
         print(stdout)
     if stderr is not None:

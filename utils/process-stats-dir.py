@@ -105,18 +105,18 @@ def write_lnt_values(args):
             json.dump(j, args.output, indent=4)
         else:
             url = args.lnt_submit
-            print "\nsubmitting to LNT server: " + url
+            print("\nsubmitting to LNT server: {}".format(url))
             json_report = {'input_data': json.dumps(j), 'commit': '1'}
             data = urllib.urlencode(json_report)
             response_str = urllib2.urlopen(urllib2.Request(url, data))
             response = json.loads(response_str.read())
-            print "### response:"
-            print response
+            print("### response:")
+            print(response)
             if 'success' in response:
-                print "server response:\tSuccess"
+                print("server response:\tSuccess")
             else:
-                print "server response:\tError"
-                print "error:\t", response['error']
+                print("server response:\tError")
+                print("error:\t{}".format(response['error']))
                 sys.exit(1)
 
 
@@ -239,7 +239,7 @@ def set_csv_baseline(args):
             print ("updating %d baseline entries in %s" %
                    (len(existing), args.set_csv_baseline))
     else:
-        print "making new baseline " + args.set_csv_baseline
+        print("making new baseline {}".format(args.set_csv_baseline))
     fieldnames = ["epoch", "name", "value"]
     with open(args.set_csv_baseline, "wb") as f:
         out = csv.DictWriter(f, fieldnames, dialect='excel-tab',
@@ -248,7 +248,7 @@ def set_csv_baseline(args):
                                 for s in load_stats_dir(d, **vargs)),
                                **vargs)
         if m is None:
-            print "no stats found"
+            print("no stats found")
             return 1
         changed = 0
         newepoch = int(time.time())
@@ -265,7 +265,7 @@ def set_csv_baseline(args):
                               name=name,
                               value=int(value)))
         if existing is not None:
-            print "changed %d entries in baseline" % changed
+            print("changed %d entries in baseline" % changed)
     return 0
 
 

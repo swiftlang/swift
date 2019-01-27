@@ -12,7 +12,7 @@ import sys
 hex = re.compile(r"""<(i([0-9]+)\s+)0x([0-9A-Fa-f_]+)>""")
 
 
-def hexReplace(match):
+def hex_replace(match):
     # Integer type is match group 1
     ty = match.group(1)
     # Integer bit width is match group 2
@@ -28,4 +28,4 @@ def hexReplace(match):
 
 
 for line in sys.stdin:
-    print(re.sub(hex, hexReplace, line), end="")
+    print(re.sub(hex, hex_replace, line), end="")

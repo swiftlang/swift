@@ -21,10 +21,8 @@ from swift_build_support.swift_build_support import (
     arguments,
     shell
 )
-
 from swift_build_support.swift_build_support.SwiftBuildSupport import \
     SWIFT_SOURCE_ROOT
-
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 

@@ -69,7 +69,7 @@ def write_input_file(args, ast, d, n):
 
 def ensure_tmpdir(d):
     if d is not None and not os.path.exists(d):
-        os.makedirs(d, 0700)
+        os.makedirs(d, 0o700)
     return tempfile.mkdtemp(dir=d)
 
 

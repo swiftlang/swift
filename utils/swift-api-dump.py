@@ -161,8 +161,7 @@ def print_command(cmd, outfile=""):
 # Dump the API for the given module.
 
 
-def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet,
-                     verbose)):
+def dump_module_api(cmd, extra_dump_args, output_dir, module, quiet, verbose):
     # Collect the submodules
     submodules = collect_submodules(cmd, module)
 

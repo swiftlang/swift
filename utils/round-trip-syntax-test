@@ -92,7 +92,7 @@ def swift_files_in_dir(d):
     swift_files = []
     for root, dirs, files in os.walk(d):
         for basename in files:
-            if not basename.decode('utf-8').endswith('.swift'):
+            if not basename.endswith('.swift'):
                 continue
             abs_file = os.path.abspath(os.path.join(root, basename))
             swift_files.append(abs_file)
