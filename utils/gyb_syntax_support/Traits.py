@@ -1,4 +1,4 @@
-from Child import Child
+from .Child import Child
 
 
 class Trait(object):
