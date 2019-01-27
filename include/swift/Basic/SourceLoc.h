@@ -36,22 +36,36 @@ class SourceLoc {
   friend class DiagnosticConsumer;
 
   llvm::SMLoc Value;
+  uintptr_t SyntheticLocation = 0;
+  
+  bool isBefore(const SourceLoc &Other) const {
+    if (Value == Other.Value)
+      return SyntheticLocation < Other.SyntheticLocation;
+    else
+      return Value.getPointer() < Other.Value.getPointer();
+  }
 
 public:
   SourceLoc() {}
-  explicit SourceLoc(llvm::SMLoc Value) : Value(Value) {}
+  explicit SourceLoc(llvm::SMLoc Value, uintptr_t SyntheticLocation = 0)
+    : Value(Value), SyntheticLocation(SyntheticLocation) {
+    assert(SyntheticLocation == 0);
+  }
   
   bool isValid() const { return Value.isValid(); }
   bool isInvalid() const { return !isValid(); }
   
-  bool operator==(const SourceLoc &RHS) const { return RHS.Value == Value; }
+  bool operator==(const SourceLoc &RHS) const {
+    return RHS.Value == Value && RHS.SyntheticLocation == SyntheticLocation;
+  }
   bool operator!=(const SourceLoc &RHS) const { return !operator==(RHS); }
   
   /// Return a source location advanced a specified number of bytes.
   SourceLoc getAdvancedLoc(int ByteOffset) const {
     assert(isValid() && "Can't advance an invalid location");
     return SourceLoc(
-        llvm::SMLoc::getFromPointer(Value.getPointer() + ByteOffset));
+        llvm::SMLoc::getFromPointer(Value.getPointer() + ByteOffset),
+                     0);
   }
 
   SourceLoc getAdvancedLocOrInvalid(int ByteOffset) const {
@@ -61,6 +75,10 @@ public:
   }
 
   const void *getOpaquePointerValue() const { return Value.getPointer(); }
+  
+  uintptr_t getSyntheticLocation() const {
+    return SyntheticLocation;
+  }
 
   /// Print out the SourceLoc.  If this location is in the same buffer
   /// as specified by \c LastBufferID, then we don't print the filename.  If
@@ -157,16 +175,12 @@ public:
 
   /// Returns true if the given source location is contained in the range.
   bool contains(SourceLoc loc) const {
-    auto less = std::less<const char *>();
-    auto less_equal = std::less_equal<const char *>();
-    return less_equal(getStart().Value.getPointer(), loc.Value.getPointer()) &&
-           less(loc.Value.getPointer(), getEnd().Value.getPointer());
+    // Recall that !(b < a) is equivalent to (a <= b)
+    return !loc.isBefore(getStart()) && loc.isBefore(getEnd()); 
   }
 
   bool contains(CharSourceRange Other) const {
-    auto less_equal = std::less_equal<const char *>();
-    return contains(Other.getStart()) &&
-     less_equal(Other.getEnd().Value.getPointer(), getEnd().Value.getPointer());
+    return contains(Other.getStart()) && !getEnd().isBefore(Other.getEnd());
   }
 
   /// expands *this to cover Other
@@ -233,8 +247,10 @@ template <> struct DenseMapInfo<swift::SourceLoc> {
   }
 
   static unsigned getHashValue(const swift::SourceLoc &Val) {
-    return DenseMapInfo<const void *>::getHashValue(
-        Val.getOpaquePointerValue());
+    return hash_combine( 
+      DenseMapInfo<const void *>::getHashValue(Val.getOpaquePointerValue()),
+      DenseMapInfo<uintptr_t>::getHashValue(Val.getSyntheticLocation())
+    );
   }
 
   static bool isEqual(const swift::SourceLoc &LHS,

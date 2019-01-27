@@ -35,7 +35,13 @@ class DeclNameLoc {
   /// * The left parentheses location
   /// * The right parentheses location
   /// * The locations of each of the argument labels.
-  const void *LocationInfo;
+  union LocationInfoUnion {
+    SourceLoc SingleLoc;
+    SourceLoc *ManyLocs;
+    
+    LocationInfoUnion(SourceLoc Loc = SourceLoc()) : SingleLoc(Loc) {}
+    LocationInfoUnion(SourceLoc *Locs) : ManyLocs(Locs) {}
+  } LocationInfo;
 
   /// The number of argument labels stored in the name.
   unsigned NumArgumentLabels;
@@ -51,18 +57,18 @@ class DeclNameLoc {
   /// stored or to the array of source locations that was stored.
   SourceLoc const * getSourceLocs() const {
     if (NumArgumentLabels == 0) 
-      return reinterpret_cast<SourceLoc const *>(&LocationInfo);
+      return &LocationInfo.SingleLoc;
 
-    return reinterpret_cast<SourceLoc const *>(LocationInfo);
+    return LocationInfo.ManyLocs;
   }
 
 public:
   /// Create an invalid declaration name location.
-  DeclNameLoc() : LocationInfo(0), NumArgumentLabels(0) { }
+  DeclNameLoc() : LocationInfo(), NumArgumentLabels(0) { }
 
   /// Create declaration name location information for a base name.
   explicit DeclNameLoc(SourceLoc baseNameLoc)
-    : LocationInfo(baseNameLoc.getOpaquePointerValue()),
+    : LocationInfo(baseNameLoc),
       NumArgumentLabels(0) { }
 
   /// Create declaration name location information for a compound

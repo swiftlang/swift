@@ -87,7 +87,7 @@ public:
 
   /// Returns true if \c LHS is before \c RHS in the source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {
-    return LHS.Value.getPointer() < RHS.Value.getPointer();
+    return LHS.isBefore(RHS);
   }
 
   /// Returns true if range \c R contains the location \c Loc.  The location

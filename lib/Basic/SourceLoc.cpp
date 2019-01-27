@@ -166,7 +166,7 @@ StringRef SourceManager::getIdentifierForBuffer(unsigned bufferID) const {
 
 CharSourceRange SourceManager::getRangeForBuffer(unsigned bufferID) const {
   auto *buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
-  SourceLoc start{llvm::SMLoc::getFromPointer(buffer->getBufferStart())};
+  SourceLoc start{llvm::SMLoc::getFromPointer(buffer->getBufferStart()), 0};
   return CharSourceRange(start, buffer->getBufferSize());
 }
 
@@ -227,9 +227,9 @@ unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
 }
 
 void SourceRange::widen(SourceRange Other) {
-  if (Other.Start.Value.getPointer() < Start.Value.getPointer())
+  if (Other.Start.isBefore(Start))
     Start = Other.Start;
-  if (Other.End.Value.getPointer() > End.Value.getPointer())
+  if (End.isBefore(Other.End))
     End = Other.End;
 }
 
@@ -242,6 +242,9 @@ void SourceLoc::printLineAndColumn(raw_ostream &OS, const SourceManager &SM,
 
   auto LineAndCol = SM.getLineAndColumn(*this, BufferID);
   OS << "line:" << LineAndCol.first << ':' << LineAndCol.second;
+  if (SyntheticLocation) {
+    OS << '(' << SyntheticLocation << ')';
+  }
 }
 
 void SourceLoc::print(raw_ostream &OS, const SourceManager &SM,
@@ -261,6 +264,9 @@ void SourceLoc::print(raw_ostream &OS, const SourceManager &SM,
 
   auto LineAndCol = SM.getLineAndColumn(*this, BufferID);
   OS << ':' << LineAndCol.first << ':' << LineAndCol.second;
+  if (SyntheticLocation) {
+    OS << '(' << SyntheticLocation << ')';
+  }
 }
 
 void SourceLoc::dump(const SourceManager &SM) const {
