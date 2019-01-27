@@ -45,7 +45,8 @@ class OptBugReducerTestCase(unittest.TestCase):
         self.module_cache = os.path.join(self.tmp_dir, 'module_cache')
         self.sdk = subprocess.check_output(['xcrun', '--sdk', 'macosx',
                                             '--toolchain', 'Default',
-                                            '--show-sdk-path']).strip("\n")
+                                            '--show-sdk-path']
+                                          ).decode('utf-8').strip("\n")
         self.tools = swift_tools.SwiftTools(self.build_dir)
         json_data = json.loads(subprocess.check_output(
             [self.tools.sil_passpipeline_dumper, '-Performance']))
@@ -54,7 +55,7 @@ class OptBugReducerTestCase(unittest.TestCase):
             for z in y:
                 self.passes.append('--pass=-' + z[1])
         random.seed(0xf487c07f)
-        random.shuffle(self.passes)
+        random.shuffle(self.passes, random=random.random)
         self.passes.insert(random.randint(0, len(self.passes)),
                            '--pass=-bug-reducer-tester')
 
@@ -101,7 +102,7 @@ class OptBugReducerTestCase(unittest.TestCase):
             '--extra-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
-        output = subprocess.check_output(args).split("\n")
+        output = subprocess.check_output(args).decode('utf-8').split("\n")
         self.assertTrue('*** Found miscompiling passes!' in output)
         self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
         re_end = 'testoptbugreducer_testbasic_initial'
@@ -130,7 +131,7 @@ class OptBugReducerTestCase(unittest.TestCase):
             '--extra-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
-        output = subprocess.check_output(args).split("\n")
+        output = subprocess.check_output(args).decode('utf-8').split("\n")
         self.assertTrue('*** Found miscompiling passes!' in output)
         self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
         re_end = 'testoptbugreducer_testsuffixinneedofprefix_initial'
@@ -160,7 +161,7 @@ class OptBugReducerTestCase(unittest.TestCase):
             '--reduce-sil'
         ]
         args.extend(self.passes)
-        output = subprocess.check_output(args).split("\n")
+        output = subprocess.check_output(args).decode('utf-8').split("\n")
         self.assertTrue('*** Found miscompiling passes!' in output)
         self.assertTrue(
             '*** Final Functions: $s18testreducefunction6foo413yyF' in output)

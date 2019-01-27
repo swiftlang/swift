@@ -45,7 +45,8 @@ class FuncBugReducerTestCase(unittest.TestCase):
         self.module_cache = os.path.join(self.tmp_dir, 'module_cache')
         self.sdk = subprocess.check_output(['xcrun', '--sdk', 'macosx',
                                             '--toolchain', 'Default',
-                                            '--show-sdk-path']).strip("\n")
+                                            '--show-sdk-path']
+                                          ).decode('utf-8').strip("\n")
         self.tools = swift_tools.SwiftTools(self.build_dir)
         self.passes = ['--pass=-bug-reducer-tester']
 
@@ -111,7 +112,7 @@ class FuncBugReducerTestCase(unittest.TestCase):
             '--extra-silopt-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
-        output = self.run_check_output(args).split("\n")
+        output = self.run_check_output(args).decode('utf-8').split("\n")
         self.assertTrue("*** Successfully Reduced file!" in output)
         self.assertTrue("*** Final Functions: " +
                         "$s9testbasic6foo413yyF" in output)

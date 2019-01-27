@@ -3,7 +3,10 @@ from __future__ import print_function
 import os
 import subprocess
 
-import subprocess_utils
+try:
+	from . import subprocess_utils
+except ValueError:
+	import subprocess_utils
 
 DRY_RUN = False
 SQUELCH_STDERR = True
