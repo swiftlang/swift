@@ -45,8 +45,8 @@ class SourceManager {
     std::string Name;
     int LineOffset;
   };
-  std::map<const char *, VirtualFile> VirtualFiles;
-  mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
+  std::map<SourceLoc, VirtualFile> VirtualFiles;
+  mutable std::pair<SourceLoc, const VirtualFile*> CachedVFile = {SourceLoc(), nullptr};
 
 public:
   SourceManager(llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> FS =
@@ -87,7 +87,7 @@ public:
 
   /// Returns true if \c LHS is before \c RHS in the source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {
-    return LHS.isBefore(RHS);
+    return LHS < RHS;
   }
 
   /// Returns true if range \c R contains the location \c Loc.  The location

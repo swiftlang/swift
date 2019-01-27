@@ -38,13 +38,6 @@ class SourceLoc {
   llvm::SMLoc Value;
   uintptr_t SyntheticLocation = 0;
   
-  bool isBefore(const SourceLoc &Other) const {
-    if (Value == Other.Value)
-      return SyntheticLocation < Other.SyntheticLocation;
-    else
-      return Value.getPointer() < Other.Value.getPointer();
-  }
-
 public:
   SourceLoc() {}
   explicit SourceLoc(llvm::SMLoc Value, uintptr_t SyntheticLocation = 0)
@@ -59,6 +52,13 @@ public:
     return RHS.Value == Value && RHS.SyntheticLocation == SyntheticLocation;
   }
   bool operator!=(const SourceLoc &RHS) const { return !operator==(RHS); }
+  
+  bool operator<(const SourceLoc &RHS) const {
+    if (Value == RHS.Value)
+      return SyntheticLocation < RHS.SyntheticLocation;
+    else
+      return Value.getPointer() < RHS.Value.getPointer();
+  }
   
   /// Return a source location advanced a specified number of bytes.
   SourceLoc getAdvancedLoc(int ByteOffset) const {
@@ -176,11 +176,11 @@ public:
   /// Returns true if the given source location is contained in the range.
   bool contains(SourceLoc loc) const {
     // Recall that !(b < a) is equivalent to (a <= b)
-    return !loc.isBefore(getStart()) && loc.isBefore(getEnd()); 
+    return !(loc < getStart()) && (loc < getEnd()); 
   }
 
   bool contains(CharSourceRange Other) const {
-    return contains(Other.getStart()) && !getEnd().isBefore(Other.getEnd());
+    return contains(Other.getStart()) && !(getEnd() < Other.getEnd());
   }
 
   /// expands *this to cover Other

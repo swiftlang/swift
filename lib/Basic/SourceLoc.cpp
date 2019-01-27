@@ -85,7 +85,7 @@ bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
   CharSourceRange fullRange = getRangeForBuffer(findBufferContainingLoc(loc));
   SourceLoc end;
 
-  auto nextRangeIter = VirtualFiles.upper_bound(loc.Value.getPointer());
+  auto nextRangeIter = VirtualFiles.upper_bound(loc);
   if (nextRangeIter != VirtualFiles.end() &&
       fullRange.contains(nextRangeIter->second.Range.getStart())) {
     const VirtualFile &existingFile = nextRangeIter->second;
@@ -102,8 +102,8 @@ bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
   }
 
   CharSourceRange range = CharSourceRange(*this, loc, end);
-  VirtualFiles[end.Value.getPointer()] = { range, name, lineOffset };
-  CachedVFile = {nullptr, nullptr};
+  VirtualFiles[end] = { range, name, lineOffset };
+  CachedVFile = {SourceLoc(), nullptr};
   return true;
 }
 
@@ -120,29 +120,27 @@ void SourceManager::closeVirtualFile(SourceLoc end) {
 #endif
     return;
   }
-  CachedVFile = {nullptr, nullptr};
+  CachedVFile = {SourceLoc(), nullptr};
 
   CharSourceRange oldRange = virtualFile->Range;
   virtualFile->Range = CharSourceRange(*this, virtualFile->Range.getStart(),
                                        end);
-  VirtualFiles[end.Value.getPointer()] = std::move(*virtualFile);
+  VirtualFiles[end] = std::move(*virtualFile);
 
-  bool existed = VirtualFiles.erase(oldRange.getEnd().Value.getPointer());
+  bool existed = VirtualFiles.erase(oldRange.getEnd());
   assert(existed);
   (void)existed;
 }
 
 const SourceManager::VirtualFile *
 SourceManager::getVirtualFile(SourceLoc Loc) const {
-  const char *p = Loc.Value.getPointer();
-
-  if (CachedVFile.first == p)
+  if (CachedVFile.first == Loc)
     return CachedVFile.second;
 
   // Returns the first element that is >p.
-  auto VFileIt = VirtualFiles.upper_bound(p);
+  auto VFileIt = VirtualFiles.upper_bound(Loc);
   if (VFileIt != VirtualFiles.end() && VFileIt->second.Range.contains(Loc)) {
-    CachedVFile = { p, &VFileIt->second };
+    CachedVFile = { Loc, &VFileIt->second };
     return CachedVFile.second;
   }
 
@@ -227,9 +225,9 @@ unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
 }
 
 void SourceRange::widen(SourceRange Other) {
-  if (Other.Start.isBefore(Start))
+  if (Other.Start < Start)
     Start = Other.Start;
-  if (End.isBefore(Other.End))
+  if (End < Other.End)
     End = Other.End;
 }
 
