@@ -166,6 +166,7 @@ cmake -G Ninja^
  -DSWIFT_PATH_TO_LLVM_BUILD="S:\build\Ninja-DebugAssert\llvm-windows-amd64"^
  -DSWIFT_PATH_TO_CLANG_SOURCE="S:\clang"^
  -DSWIFT_PATH_TO_CLANG_BUILD="S:\build\Ninja-DebugAssert\llvm-windows-amd64"^
+ -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:\icu\include"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC="S:\icu\lib64\icuuc.lib"^
  -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:\icu\include"^
