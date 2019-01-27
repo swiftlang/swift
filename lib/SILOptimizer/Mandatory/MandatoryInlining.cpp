@@ -502,7 +502,7 @@ static SILValue getLoadedCalleeValue(LoadInst *li) {
   }
 
   // Make sure that our project_box has a single store user and our load user.
-  StoreInst *si;
+  StoreInst *si = nullptr;
   for (Operand *use : pbi->getUses()) {
     // If this use is our load... continue.
     if (use->getUser() == li)
