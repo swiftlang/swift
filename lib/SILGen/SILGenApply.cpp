@@ -5520,6 +5520,9 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
                                            stringLiteral->getEncoding());
     builtinInit = stringLiteral->getBuiltinInitializer();
     init = stringLiteral->getInitializer();
+  } else if (auto nilLiteral = dyn_cast<NilLiteralExpr>(literal)) {
+    builtinLiteralArgs = emitEmptyTupleRValue(literal, C);
+    builtinInit = nilLiteral->getInitializer();
   } else {
     ASTContext &ctx = getASTContext();
     SourceLoc loc = literal->getStartLoc();

@@ -711,6 +711,7 @@ public:
 ///
 class NilLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
+  ConcreteDeclRef Initializer;
 public:
   NilLiteralExpr(SourceLoc Loc, bool Implicit = false)
   : LiteralExpr(ExprKind::NilLiteral, Implicit), Loc(Loc) {
@@ -718,6 +719,15 @@ public:
   
   SourceRange getSourceRange() const {
     return Loc;
+  }
+
+  /// Retrieve the initializer that will be used to construct the 'nil'
+  /// literal from the result of the initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the 'nil' literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
   }
   
   static bool classof(const Expr *E) {
