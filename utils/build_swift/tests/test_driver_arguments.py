@@ -36,7 +36,7 @@ PRESETS_FILES = [
 ]
 
 
-class ParserError(Exception):
+class ArgParserError(Exception):
     pass
 
 
@@ -114,7 +114,7 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def generate_default_value_test(cls, dest, default_value):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 parsed_values = self.parse_default_args([])
 
             parsed_value = getattr(parsed_values, dest)
@@ -130,7 +130,7 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_help_option_test(cls, option):
         def test(self):
-            with redirect_stdout() as output, self.assertRaises(ParserError):
+            with redirect_stdout() as output, self.assertRaises(ArgParserError):
                 self.parse_args([option.option_string])
                 self.assertNotEmpty(output)
 
@@ -139,11 +139,11 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_set_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 namespace = self.parse_args([option.option_string])
                 self.assertEqual(getattr(namespace, option.dest), option.value)
 
-            with self.assertRaises(ParserError):
+            with self.assertRaises(ArgParserError):
                 self.parse_args([option.option_string, 'foo'])
 
         return test
@@ -151,7 +151,7 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_set_true_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 # TODO: Move to unit-tests for the action class
                 namespace = self.parse_args([])
                 self.assertFalse(getattr(namespace, option.dest))
@@ -164,7 +164,7 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_set_false_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 # TODO: Move to unit-tests for the action class
                 namespace = self.parse_args([])
                 self.assertTrue(getattr(namespace, option.dest))
@@ -177,7 +177,7 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_enable_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 # TODO: Move to unit-tests for the action class
                 # Test parsing True values
                 self.parse_args([option.option_string, '1'])
@@ -210,7 +210,7 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_disable_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 # TODO: Move to unit-tests for the action class
                 # Test parsing True values
                 self.parse_args([option.option_string, '1'])
@@ -243,13 +243,13 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_choices_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 for choice in option.choices:
                     namespace = self.parse_args(
                         [option.option_string, str(choice)])
                     self.assertEqual(getattr(namespace, option.dest), choice)
 
-            with self.assertRaises(ParserError):
+            with self.assertRaises(ArgParserError):
                 self.parse_args([option.option_string, 'INVALID'])
 
         return test
@@ -257,13 +257,13 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_int_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 for i in [0, 1, 42]:
                     namespace = self.parse_args([option.option_string, str(i)])
                     self.assertEqual(int(getattr(namespace, option.dest)), i)
 
             # FIXME: int-type options should not accept non-int strings
-            # with self.assertRaises(ParserError):
+            # with self.assertRaises(ArgParserError):
             #     self.parse_args([option.option_string, str(0.0)])
             #     self.parse_args([option.option_string, str(1.0)])
             #     self.parse_args([option.option_string, str(3.14)])
@@ -274,7 +274,7 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_str_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 self.parse_args([option.option_string, 'foo'])
 
         return test
@@ -282,11 +282,11 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_path_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 self.parse_args([option.option_string, sys.executable])
 
             # FIXME: path-type options should not accept non-path inputs
-            # with self.assertRaises(ParserError):
+            # with self.assertRaises(ArgParserError):
             #     self.parse_args([option.option_string, 'foo'])
 
         return test
@@ -294,7 +294,7 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_append_option_test(cls, option):
         def test(self):
-            with self.assertNotRaises(ParserError):
+            with self.assertNotRaises(ArgParserError):
                 # Range size is arbitrary, just needs to be more than once
                 for i in range(1, 4):
                     namespace = self.parse_args(
@@ -307,7 +307,7 @@ class TestDriverArgumentParserMeta(type):
     @classmethod
     def _generate_unsupported_option_test(cls, option):
         def test(self):
-            with self.assertRaises(ParserError):
+            with self.assertRaises(ArgParserError):
                 self.parse_args([option.option_string])
 
         return test
@@ -345,16 +345,18 @@ class TestDriverArgumentParserMeta(type):
         def test(self):
             try:
                 self.parse_default_args(preset_args, check_impl_args=True)
-            except ParserError as e:
+            except ArgParserError as e:
                 self.fail('failed to parse preset "{}": {}'.format(
                     preset_name, e))
 
         return test
 
 
-class TestDriverArgumentParser(unittest.TestCase):
-
-    __metaclass__ = TestDriverArgumentParserMeta
+# This unusual declaration replaces the usage of Python 2's __metaclass__ and
+# Python 3's metaclass= with a construct which works correctly in both.
+class TestDriverArgumentParser(type.__new__(
+    TestDriverArgumentParserMeta, TestDriverArgumentParserMeta.__name__,
+    (unittest.TestCase,), {})):
 
     @contextmanager
     def _quiet_output(self):
@@ -366,7 +368,7 @@ class TestDriverArgumentParser(unittest.TestCase):
         try:
             return migration.parse_args(self.parser, args)
         except (SystemExit, ValueError) as e:
-            raise ParserError('failed to parse arguments: ' +
+            raise ArgParserError('failed to parse arguments: ' +
                               str(args), e)
 
     def _check_impl_args(self, namespace):
@@ -376,7 +378,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             migration.check_impl_args(BUILD_SCRIPT_IMPL,
                                       namespace.build_script_impl_args)
         except (SystemExit, ValueError) as e:
-            raise ParserError('failed to parse impl arguments: ' +
+            raise ArgParserError('failed to parse impl arguments: ' +
                               str(namespace.build_script_impl_args), e)
 
     def parse_args(self, args, namespace=None):
@@ -389,10 +391,10 @@ class TestDriverArgumentParser(unittest.TestCase):
                     super(self.parser.__class__, self.parser)\
                     .parse_known_args(args, namespace)
             except (SystemExit, argparse.ArgumentError) as e:
-                raise ParserError('failed to parse arguments: ' + str(args), e)
+                raise ArgParserError('failed to parse arguments: ' + str(args), e)
 
         if unknown_args:
-            raise ParserError('unknown arguments: ' + str(unknown_args))
+            raise ArgParserError('unknown arguments: ' + str(unknown_args))
 
         return namespace
 
@@ -468,12 +470,12 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_option_clang_compiler_version(self):
         option_string = '--clang-compiler-version'
 
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             self.parse_default_args([option_string, '5.0.0'])
             self.parse_default_args([option_string, '5.0.1'])
             self.parse_default_args([option_string, '5.0.0.1'])
 
-        with self.assertRaises(ParserError):
+        with self.assertRaises(ArgParserError):
             self.parse_default_args([option_string, '1'])
             self.parse_default_args([option_string, '1.2'])
             self.parse_default_args([option_string, '0.0.0.0.1'])
@@ -481,12 +483,12 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_option_clang_user_visible_version(self):
         option_string = '--clang-user-visible-version'
 
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             self.parse_default_args([option_string, '5.0.0'])
             self.parse_default_args([option_string, '5.0.1'])
             self.parse_default_args([option_string, '5.0.0.1'])
 
-        with self.assertRaises(ParserError):
+        with self.assertRaises(ArgParserError):
             self.parse_default_args([option_string, '1'])
             self.parse_default_args([option_string, '1.2'])
             self.parse_default_args([option_string, '0.0.0.0.1'])
@@ -494,48 +496,48 @@ class TestDriverArgumentParser(unittest.TestCase):
     def test_option_swift_compiler_version(self):
         option_string = '--swift-compiler-version'
 
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             self.parse_default_args([option_string, '4.1'])
             self.parse_default_args([option_string, '4.0.1'])
             self.parse_default_args([option_string, '200.99.1'])
 
-        with self.assertRaises(ParserError):
+        with self.assertRaises(ArgParserError):
             self.parse_default_args([option_string, '1'])
             self.parse_default_args([option_string, '0.0.0.1'])
 
     def test_option_swift_user_visible_version(self):
         option_string = '--swift-user-visible-version'
 
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             self.parse_default_args([option_string, '4.1'])
             self.parse_default_args([option_string, '4.0.1'])
             self.parse_default_args([option_string, '200.99.1'])
 
-        with self.assertRaises(ParserError):
+        with self.assertRaises(ArgParserError):
             self.parse_default_args([option_string, '1'])
             self.parse_default_args([option_string, '0.0.0.1'])
 
     def test_option_I(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ArgParserError):
             self.parse_default_args(['-I'])
 
     def test_option_ios_all(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ArgParserError):
             self.parse_default_args(['--ios-all'])
 
     def test_option_tvos_all(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ArgParserError):
             self.parse_default_args(['--tvos-all'])
 
     def test_option_watchos_all(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ArgParserError):
             self.parse_default_args(['--watchos-all'])
 
     # -------------------------------------------------------------------------
     # Implied defaults tests
 
     def test_implied_defaults_assertions(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--assertions'])
 
             self.assertTrue(namespace.cmark_assertions)
@@ -544,21 +546,21 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertTrue(namespace.swift_stdlib_assertions)
 
     def test_implied_defaults_cmark_build_variant(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--debug-cmark'])
             self.assertTrue(namespace.build_cmark)
 
     def test_implied_defaults_lldb_build_variant(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--debug-lldb'])
             self.assertTrue(namespace.build_lldb)
 
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--lldb-assertions'])
             self.assertTrue(namespace.build_lldb)
 
     def test_implied_defaults_build_variant(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--debug'])
 
             self.assertEqual(namespace.cmark_build_variant, 'Debug')
@@ -571,7 +573,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertEqual(namespace.swift_stdlib_build_variant, 'Debug')
 
     def test_implied_defaults_skip_build(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--skip-build'])
 
             self.assertFalse(namespace.build_benchmarks)
@@ -596,7 +598,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.build_xctest)
 
     def test_implied_defaults_skip_build_ios(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--skip-build-ios'])
             self.assertFalse(namespace.build_ios_device)
             self.assertFalse(namespace.build_ios_simulator)
@@ -606,7 +608,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.test_ios_simulator)
 
     def test_implied_defaults_skip_build_tvos(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--skip-build-tvos'])
             self.assertFalse(namespace.build_tvos_device)
             self.assertFalse(namespace.build_tvos_simulator)
@@ -616,7 +618,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.test_tvos_simulator)
 
     def test_implied_defaults_skip_build_watchos(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--skip-build-watchos'])
             self.assertFalse(namespace.build_watchos_device)
             self.assertFalse(namespace.build_watchos_simulator)
@@ -626,22 +628,22 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.test_watchos_simulator)
 
     def test_implied_defaults_validation_test(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--validation-test'])
             self.assertTrue(namespace.test)
 
     def test_implied_defaults_test_optimized(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--test-optimized'])
             self.assertTrue(namespace.test)
 
     def test_implied_defaults_test_optimize_for_size(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--test-optimize-for-size'])
             self.assertTrue(namespace.test)
 
     def test_implied_defaults_skip_all_tests(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args([
                 '--test', '0',
                 '--validation-test', '0',
@@ -658,34 +660,34 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.test_watchos)
 
     def test_implied_defaults_skip_test_ios(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--skip-test-ios'])
             self.assertFalse(namespace.test_ios_host)
             self.assertFalse(namespace.test_ios_simulator)
 
     def test_implied_defaults_skip_test_tvos(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--skip-test-tvos'])
             self.assertFalse(namespace.test_tvos_host)
             self.assertFalse(namespace.test_tvos_simulator)
 
     def test_implied_defaults_skip_test_watchos(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--skip-test-watchos'])
             self.assertFalse(namespace.test_watchos_host)
             self.assertFalse(namespace.test_watchos_simulator)
 
     def test_implied_defaults_skip_build_android(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--android', '0'])
             self.assertFalse(namespace.test_android_host)
 
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--skip-build-android'])
             self.assertFalse(namespace.test_android_host)
 
     def test_implied_defaults_host_test(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--host-test', '0'])
             self.assertFalse(namespace.test_ios_host)
             self.assertFalse(namespace.test_tvos_host)
@@ -694,7 +696,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.build_libparser_only)
 
     def test_build_lib_swiftsyntaxparser_only(self):
-        with self.assertNotRaises(ParserError):
+        with self.assertNotRaises(ArgParserError):
             namespace = self.parse_default_args(['--build-libparser-only'])
             self.assertTrue(namespace.build_libparser_only)
 

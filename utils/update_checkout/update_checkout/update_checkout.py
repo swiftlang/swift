@@ -18,16 +18,17 @@ import re
 import sys
 import traceback
 
+
+SCRIPT_FILE = os.path.abspath(__file__)
+SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
+sys.path.append(os.path.dirname(os.path.dirname(SCRIPT_DIR)))
+
 from functools import reduce
 from multiprocessing import freeze_support
 
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support.SwiftBuildSupport import \
     SWIFT_SOURCE_ROOT
-
-
-SCRIPT_FILE = os.path.abspath(__file__)
-SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
 
 
 def confirm_tag_in_repo(tag, repo_name):

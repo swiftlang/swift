@@ -64,7 +64,7 @@ def _repr(cls, args):
     """
 
     _args = []
-    for key, value in args.viewitems():
+    for key, value in args.items():
         _args.append('{}={}'.format(key, repr(value)))
 
     return '{}({})'.format(type(cls).__name__, ', '.join(_args))
@@ -172,7 +172,7 @@ class ClangVersionType(RegexType):
 
     def __call__(self, value):
         matches = super(ClangVersionType, self).__call__(value)
-        components = filter(lambda x: x is not None, matches.group(1, 2, 3, 5))
+        components = list(filter(lambda x: x is not None, matches.group(1, 2, 3, 5)))
 
         return CompilerVersion(components)
 
@@ -192,7 +192,7 @@ class SwiftVersionType(RegexType):
 
     def __call__(self, value):
         matches = super(SwiftVersionType, self).__call__(value)
-        components = filter(lambda x: x is not None, matches.group(1, 2, 4))
+        components = list(filter(lambda x: x is not None, matches.group(1, 2, 4)))
 
         return CompilerVersion(components)
 

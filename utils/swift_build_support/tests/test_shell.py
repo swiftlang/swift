@@ -73,7 +73,7 @@ class ShellTestCase(unittest.TestCase):
 
         self.assertEqual(
             shell.capture(["sh", "-c", "echo foo && false"],
-                          allow_non_zero_exit=True), "foo\n")
+                          allow_non_zero_exit=True).decode('ascii'), "foo\n")
 
         with self.assertRaises(SystemExit):
             shell.capture(["**not-a-command**"], optional=False)
