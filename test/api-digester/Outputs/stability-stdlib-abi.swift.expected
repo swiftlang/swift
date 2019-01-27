@@ -10,8 +10,16 @@ Class _RawSetStorage has been renamed to Class __RawSetStorage
 Class _SetStorage has changed its super class from _RawSetStorage to __RawSetStorage
 Constructor Dictionary._Variant.init(cocoa:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
 Constructor Dictionary.init(_cocoa:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
+Constructor Int.init(truncatingBitPattern:) has been removed
+Constructor Int16.init(truncatingBitPattern:) has been removed
+Constructor Int32.init(truncatingBitPattern:) has been removed
+Constructor Int8.init(truncatingBitPattern:) has been removed
 Constructor Set._Variant.init(cocoa:) has parameter 0 type change from _CocoaSet to __CocoaSet
 Constructor Set.init(_cocoa:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Constructor UInt.init(truncatingBitPattern:) has been removed
+Constructor UInt16.init(truncatingBitPattern:) has been removed
+Constructor UInt32.init(truncatingBitPattern:) has been removed
+Constructor UInt8.init(truncatingBitPattern:) has been removed
 Constructor _CocoaDictionary.init(_:) has return type change from _CocoaDictionary to __CocoaDictionary
 Constructor _CocoaSet.init(_:) has return type change from _CocoaSet to __CocoaSet
 Constructor _NativeDictionary.init(_:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
@@ -20,7 +28,73 @@ Constructor _NativeDictionary.init(_:capacity:) has parameter 0 type change from
 Constructor _NativeSet.init(_:) has parameter 0 type change from _CocoaSet to __CocoaSet
 Constructor _NativeSet.init(_:) has parameter 0 type change from _RawSetStorage to __RawSetStorage
 Constructor _NativeSet.init(_:capacity:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Func BinaryInteger.addWithOverflow(_:_:) has been removed
+Func BinaryInteger.divideWithOverflow(_:_:) has been removed
+Func BinaryInteger.multiplyWithOverflow(_:_:) has been removed
+Func BinaryInteger.remainderWithOverflow(_:_:) has been removed
+Func BinaryInteger.subtractWithOverflow(_:_:) has been removed
+Func FixedWidthInteger.<<(_:_:) has been removed
+Func FixedWidthInteger.<<=(_:_:) has been removed
+Func FixedWidthInteger.>>(_:_:) has been removed
+Func FixedWidthInteger.>>=(_:_:) has been removed
+Func FixedWidthInteger.addWithOverflow(_:_:) has been removed
+Func FixedWidthInteger.divideWithOverflow(_:_:) has been removed
+Func FixedWidthInteger.multiplyWithOverflow(_:_:) has been removed
+Func FixedWidthInteger.remainderWithOverflow(_:_:) has been removed
+Func FixedWidthInteger.subtractWithOverflow(_:_:) has been removed
+Func Int.<<(_:_:) has been removed
+Func Int.<<=(_:_:) has been removed
+Func Int.>>(_:_:) has been removed
+Func Int.>>=(_:_:) has been removed
+Func Int.toUIntMax() has been removed
+Func Int16.<<(_:_:) has been removed
+Func Int16.<<=(_:_:) has been removed
+Func Int16.>>(_:_:) has been removed
+Func Int16.>>=(_:_:) has been removed
+Func Int16.toUIntMax() has been removed
+Func Int32.<<(_:_:) has been removed
+Func Int32.<<=(_:_:) has been removed
+Func Int32.>>(_:_:) has been removed
+Func Int32.>>=(_:_:) has been removed
+Func Int32.toUIntMax() has been removed
+Func Int64.<<(_:_:) has been removed
+Func Int64.<<=(_:_:) has been removed
+Func Int64.>>(_:_:) has been removed
+Func Int64.>>=(_:_:) has been removed
+Func Int64.toUIntMax() has been removed
+Func Int8.<<(_:_:) has been removed
+Func Int8.<<=(_:_:) has been removed
+Func Int8.>>(_:_:) has been removed
+Func Int8.>>=(_:_:) has been removed
+Func Int8.toUIntMax() has been removed
 Func Set._Variant._migrateToNative(_:removing:) has parameter 0 type change from _CocoaSet to __CocoaSet
+Func SignedInteger.&+(_:_:) has been removed
+Func SignedInteger.&-(_:_:) has been removed
+Func UInt.<<(_:_:) has been removed
+Func UInt.<<=(_:_:) has been removed
+Func UInt.>>(_:_:) has been removed
+Func UInt.>>=(_:_:) has been removed
+Func UInt.toIntMax() has been removed
+Func UInt16.<<(_:_:) has been removed
+Func UInt16.<<=(_:_:) has been removed
+Func UInt16.>>(_:_:) has been removed
+Func UInt16.>>=(_:_:) has been removed
+Func UInt16.toIntMax() has been removed
+Func UInt32.<<(_:_:) has been removed
+Func UInt32.<<=(_:_:) has been removed
+Func UInt32.>>(_:_:) has been removed
+Func UInt32.>>=(_:_:) has been removed
+Func UInt32.toIntMax() has been removed
+Func UInt64.<<(_:_:) has been removed
+Func UInt64.<<=(_:_:) has been removed
+Func UInt64.>>(_:_:) has been removed
+Func UInt64.>>=(_:_:) has been removed
+Func UInt64.toIntMax() has been removed
+Func UInt8.<<(_:_:) has been removed
+Func UInt8.<<=(_:_:) has been removed
+Func UInt8.>>(_:_:) has been removed
+Func UInt8.>>=(_:_:) has been removed
+Func UInt8.toIntMax() has been removed
 Func _CocoaDictionary.isEqual(to:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
 Func _CocoaSet.isEqual(to:) has parameter 0 type change from _CocoaSet to __CocoaSet
 Func _DictionaryStorage.convert(_:capacity:) has parameter 0 type change from _CocoaDictionary to __CocoaDictionary
@@ -35,8 +109,28 @@ Struct _CocoaDictionary has been renamed to Struct __CocoaDictionary
 Struct _CocoaSet has been renamed to Struct __CocoaSet
 Var Dictionary._Variant.asCocoa has declared type change from _CocoaDictionary to __CocoaDictionary
 Var Dictionary._Variant.object has declared type change from _BridgeStorage<_RawDictionaryStorage> to _BridgeStorage<__RawDictionaryStorage>
+Var Int._sizeInBits has been removed
+Var Int._sizeInBytes has been removed
+Var Int16._sizeInBits has been removed
+Var Int16._sizeInBytes has been removed
+Var Int32._sizeInBits has been removed
+Var Int32._sizeInBytes has been removed
+Var Int64._sizeInBits has been removed
+Var Int64._sizeInBytes has been removed
+Var Int8._sizeInBits has been removed
+Var Int8._sizeInBytes has been removed
 Var Set._Variant.asCocoa has declared type change from _CocoaSet to __CocoaSet
 Var Set._Variant.object has declared type change from _BridgeStorage<_RawSetStorage> to _BridgeStorage<__RawSetStorage>
+Var UInt._sizeInBits has been removed
+Var UInt._sizeInBytes has been removed
+Var UInt16._sizeInBits has been removed
+Var UInt16._sizeInBytes has been removed
+Var UInt32._sizeInBits has been removed
+Var UInt32._sizeInBytes has been removed
+Var UInt64._sizeInBits has been removed
+Var UInt64._sizeInBytes has been removed
+Var UInt8._sizeInBits has been removed
+Var UInt8._sizeInBytes has been removed
 Var _CocoaDictionary.Index.dictionary has declared type change from _CocoaDictionary to __CocoaDictionary
 Var _NativeDictionary._storage has declared type change from _RawDictionaryStorage to __RawDictionaryStorage
 Var _NativeSet._storage has declared type change from _RawSetStorage to __RawSetStorage
@@ -49,3 +143,6 @@ Protocol SIMD has added inherited protocol Decodable
 Protocol SIMD has added inherited protocol Encodable
 Protocol SIMD has generic signature change from <τ_0_0 : CustomStringConvertible, τ_0_0 : ExpressibleByArrayLiteral, τ_0_0 : Hashable, τ_0_0 : SIMDStorage, τ_0_0.MaskStorage : SIMD, τ_0_0.MaskStorage.Scalar : FixedWidthInteger, τ_0_0.MaskStorage.Scalar : SignedInteger> to <τ_0_0 : CustomStringConvertible, τ_0_0 : Decodable, τ_0_0 : Encodable, τ_0_0 : ExpressibleByArrayLiteral, τ_0_0 : Hashable, τ_0_0 : SIMDStorage, τ_0_0.MaskStorage : SIMD, τ_0_0.MaskStorage.Scalar : FixedWidthInteger, τ_0_0.MaskStorage.Scalar : SignedInteger>
 Protocol SIMDStorage has generic signature change from <τ_0_0.Scalar : Hashable> to <τ_0_0.Scalar : Decodable, τ_0_0.Scalar : Encodable, τ_0_0.Scalar : Hashable>
+Func Sequence.flatMap(_:) has been removed
+Subscript String.UnicodeScalarView.subscript(_:) has been removed
+Subscript Substring.subscript(_:) has been removed
