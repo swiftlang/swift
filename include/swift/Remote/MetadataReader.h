@@ -1441,6 +1441,131 @@ private:
     return name;
   }
 
+  /// The kind of mangled name to read.
+  enum class MangledNameKind {
+    Type,
+    Symbol,
+  };
+
+  /// Clone the given demangle node into the demangler \c dem.
+  static Demangle::NodePointer cloneDemangleNode(Demangle::NodePointer node,
+                                                 Demangler &dem) {
+    if (!node)
+      return nullptr;
+
+    Demangle::NodePointer newNode;
+    if (node->hasText())
+      newNode = dem.createNode(node->getKind(), node->getText());
+    else if (node->hasIndex())
+      newNode = dem.createNode(node->getKind(), node->getIndex());
+    else
+      newNode = dem.createNode(node->getKind());
+
+    for (auto child : *node) {
+      newNode->addChild(cloneDemangleNode(child, dem), dem);
+    }
+    return newNode;
+  }
+
+  /// Read a mangled name at the given remote address and return the
+  /// demangle tree.
+  Demangle::NodePointer readMangledName(RemoteAddress address,
+                                        MangledNameKind kind,
+                                        Demangler &dem) {
+    // Read chunks of the mangled name, for which the string can be
+    // prematurely terminated by a symbolic reference.
+    std::string mangledName;
+    RemoteAddress currentAddress = address;
+    unsigned index = 0;
+    while (true) {
+      // Read the next chunk.
+      std::string chunk;
+      if (!Reader->readString(currentAddress, chunk))
+        return nullptr;
+
+      // Move the address forward and add the next chunk.
+      currentAddress =
+        RemoteAddress(currentAddress.getAddressData() + chunk.size() + 1);
+      mangledName += std::move(chunk);
+
+      // Scan through the mangled name to skip over symbolic references.
+      unsigned end = mangledName.size();
+      while (index < end) {
+        char c = mangledName[index];
+
+        // Figure out how far to step in the string.
+        unsigned step = 1;
+        if (c >= '\x01' && c <= '\x17') {
+          step += sizeof(uint32_t);
+        }
+        else if (c >= '\x18' && c <= '\x1F') {
+          step += sizeof(typename Runtime::StoredPointer);
+        }
+
+        // If we would be stepping past the end, break out.
+        if (index + step > end)
+          break;
+
+        index += step;
+      }
+
+      // If we didn't make it to the end, the '\0' is significant. Add it to the
+      // mangled name and
+      if (index < end) {
+        mangledName.push_back('\0');
+        continue;
+      }
+
+      // We're done.
+      break;
+    }
+
+    // Install our own symbolic reference resolver
+    dem.setSymbolicReferenceResolver([&](SymbolicReferenceKind kind,
+                                         Directness directness,
+                                         int32_t offset,
+                                         const void *base) -> NodePointer {
+      // Resolve the reference to a remote address.
+      auto offsetInMangledName = (const char *)base - mangledName.data();
+      auto remoteAddress =
+        address.getAddressData() + offsetInMangledName + offset;
+
+      if (directness == Directness::Indirect) {
+        if (auto indirectAddress = readPointerValue(remoteAddress)) {
+          remoteAddress = *indirectAddress;
+        } else {
+          return nullptr;
+        }
+      }
+
+      switch (kind) {
+      case Demangle::SymbolicReferenceKind::Context: {
+        Demangler innerDemangler;
+        auto result = readDemanglingForContextDescriptor(
+          remoteAddress, innerDemangler);
+
+        return cloneDemangleNode(result, dem);
+      }
+      }
+
+      return nullptr;
+    });
+
+    NodePointer result;
+    switch (kind) {
+    case MangledNameKind::Type:
+      result = dem.demangleType(mangledName);
+      break;
+
+    case MangledNameKind::Symbol:
+      result = dem.demangleSymbol(mangledName);
+      break;
+    }
+
+    dem.setSymbolicReferenceResolver(nullptr);
+    return result;
+  }
+
   /// Read and demangle the name of an anonymous context.
   Demangle::NodePointer demangleAnonymousContextName(
       ContextDescriptorRef contextRef,
@@ -1455,13 +1580,9 @@ private:
     auto mangledContextName = anonymousBuffer->getMangledContextName();
     auto mangledNameAddress = resolveRelativeField(contextRef,
                                                    mangledContextName->name);
-
-    // FIXME: Symbolic references can break this
-    std::string mangledName;
-    if (!Reader->readString(RemoteAddress(mangledNameAddress), mangledName))
-      return nullptr;
-
-    return dem.demangleSymbol(mangledName);
+    return readMangledName(RemoteAddress(mangledNameAddress),
+                           MangledNameKind::Symbol,
+                           dem);
   }
 
   /// If we have a context whose parent context is an anonymous context
@@ -1622,15 +1743,10 @@ private:
       auto extendedContextAddress =
         resolveRelativeField(descriptor, extensionBuffer->ExtendedContext);
 
-      // FIXME: Symbolic references can break this
-      std::string mangledExtendedContext;
-      if (!Reader->readString(RemoteAddress(extendedContextAddress),
-                              mangledExtendedContext))
-        return nullptr;
-
-      auto demangledExtendedContext = dem.demangleType(mangledExtendedContext);
-      if (!demangledExtendedContext)
-        return nullptr;
+      auto demangledExtendedContext =
+        readMangledName(RemoteAddress(extendedContextAddress),
+                        MangledNameKind::Type,
+                        dem);
 
       // FIXME: If there are generic requirements, turn them into a demangle
       // tree.

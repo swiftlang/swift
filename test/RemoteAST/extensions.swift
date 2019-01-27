@@ -11,3 +11,10 @@ extension Int {
 
 // CHECK: Int.Inner
 printType(Int.Inner.self)
+
+extension Int.Inner {
+  struct MoreInner { }
+}
+
+// CHECK: Int.Inner.MoreInner
+printType(Int.Inner.MoreInner.self)
