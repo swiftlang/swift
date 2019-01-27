@@ -69,7 +69,7 @@ FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") 
 FixedPointConversionFailure.test("${Other}To${Self}FailableConversion/dest=${testValue}") {
   // Test that nothing interesting happens and we end up with a non-nil, identical result.
   let input = get${Other}(${testValue})
-  var result = ${Self}(exactly: input)
+  let result = ${Self}(exactly: input)
   expectEqual(${testValue}, result)
 }
 
@@ -81,7 +81,7 @@ FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") 
   // Test that we check if we fail and crash when an integer would be truncated in conversion.
   let input = get${Other}(${testValue})
   expectCrashLater()
-  var result = ${Self}(input)
+  let result = ${Self}(input)
   _blackHole(result)
 }
 
@@ -126,7 +126,7 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
 FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
   let input = get${Other}(${testValue})
   let result = ${Self}(input)
-  var resultConvertedBack = ${Other}(result)
+  let resultConvertedBack = ${Other}(result)
   expectEqual(${testValue}, resultConvertedBack)
 }
 
@@ -151,8 +151,8 @@ FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}
 FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
 %         end
   let input = get${Other}(${testValue})
-  var result = ${Self}(input)
-  var resultConvertedBack = ${Other}(result)
+  let result = ${Self}(input)
+  let resultConvertedBack = ${Other}(result)
   expectNotEqual(input, resultConvertedBack)
 }
 
