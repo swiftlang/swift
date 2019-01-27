@@ -4,7 +4,7 @@ This document describes how to build Swift for Windows natively. See [the
 Windows doc](./Windows.md) for more about what is possible with Swift on
 Windows.
 
-There are two supported ways to build Swift on Windows, they are
+There are two supported ways to build Swift on Windows:
 
 1. Using [`clang-cl`](https://clang.llvm.org/docs/UsersManual.html#clang-cl)
 1. Using the Microsoft Visual C++ compiler (MSVC)
@@ -38,12 +38,13 @@ it provides some of the needed headers and libraries.
 1. Clone `apple/swift-compiler-rt` into a folder named `compiler-rt`
 1. Clone `apple/swift` into a folder named `swift`
 1. Clone `apple/swift-corelibs-libdispatch` into a folder named `swift-corelibs-libdispatch`
-1. Clone `apple/swift-corelibs-foundation` into a folder name `swift-corelibs-foundation`
+1. Clone `apple/swift-corelibs-foundation` into a folder named `swift-corelibs-foundation`
+1. Clone `apple/swift-lldb` into a folder named `lldb`
 
 - Currently, other repositories in the Swift project have not been tested and
   may not be supported.
 
-If your sources live else where, you can create a substitution for this:
+This guide assumes your sources live at the root of `S:`. If your sources live elsewhere, you can create a substitution for this:
 
 ```cmd
 subst S: <path to sources>
@@ -59,11 +60,16 @@ git clone https://github.com/apple/swift-compiler-rt compiler-rt
 git clone https://github.com/apple/swift
 git clone https://github.com/apple/swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation
+git clone https://github.com/apple/swift-lldb lldb
 ```
 
 ### 3. Acquire ICU
 1. Download ICU from [ICU Project](http://site.icu-project.org) for Windows x64 and extract the binaries.
 1. Add the `bin64` folder to your `Path` environment variable.
+
+```cmd
+PATH S:\icu\bin64;%PATH%
+```
 
 ### 4. Get ready
 - From within a **developer** command prompt (not PowerShell nor cmd, but the [Visual Studio Developer Command Prompt](https://msdn.microsoft.com/en-us/library/f35ctcxw.aspx)), execute the following command if you have an x64 PC.
@@ -89,22 +95,24 @@ VsDevCmd -arch=x86
 
 ```cmd
 mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" S:\swift\stdlib\public\Platform\ucrt.modulemap
+mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" S:\swift\stdlib\public\Platform\winsdk.modulemap
 mklink "%VCToolsInstallDir%\include\module.modulemap" S:\swift\stdlib\public\Platform\visualc.modulemap
 mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Platform\visualc.apinotes
-mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" S:\swift\stdlib\public\Platform\winsdk.modulemap
 ```
+
+Warning: Creating the above links usually requires adminstrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
 ### 5. Build CMark
 - This must be done from within a developer command prompt. CMark is a fairly
   small project and should only take a few minutes to build.
 ```cmd
-mkdir S:\build\Ninja-DebugAssert\cmark-windows-amd64"
-pushd S:\build\Ninja-DebugAssert\cmark-windows-amd64" "S:\cmark"
+mkdir "S:\build\Ninja-DebugAssert\cmark-windows-amd64"
+pushd "S:\build\Ninja-DebugAssert\cmark-windows-amd64"
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=Debug^
   -DCMAKE_C_COMPILER=cl^
   -DCMAKE_CXX_COMPILER=cl^
-  S:\cmark
+  S:/cmark
 popd
 cmake --build "S:\build\Ninja-DebugAssert\cmark-windows-amd64"
 ```
@@ -117,15 +125,15 @@ cmake --build "S:\build\Ninja-DebugAssert\cmark-windows-amd64"
 ```cmd
 mkdir "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
 pushd "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
-cmake -G "Ninja"^
+cmake -G Ninja^
  -DCMAKE_BUILD_TYPE=Debug^
  -DCMAKE_C_COMPILER=cl^
  -DCMAKE_CXX_COMPILER=cl^
  -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
- -DLLVM_ENABLE_ASSERTIONS=TRUE^
+ -DLLVM_ENABLE_ASSERTIONS=ON^
  -DLLVM_ENABLE_PROJECTS=clang^
  -DLLVM_TARGETS_TO_BUILD=X86^
- "S:\llvm"
+ S:/llvm
 popd
 cmake --build "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
 ```
@@ -133,7 +141,7 @@ cmake --build "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
 - Update your path to include the LLVM tools.
 
 ```cmd
-set PATH=S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin;%PATH%
+PATH S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin;%PATH%
 ```
 
 ### 7. Build Swift
@@ -144,27 +152,26 @@ set PATH=S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin;%PATH%
 ```cmd
 mkdir "S:\build\Ninja-DebugAssert\swift-windows-amd64"
 pushd "S:\build\inja-DebugAssert\swift-windows-amd64"
-cmake -G "Ninja"^
+cmake -G Ninja^
  -DCMAKE_BUILD_TYPE=Debug^
  -DCMAKE_C_COMPILER=clang-cl^
  -DCMAKE_CXX_COMPILER=clang-cl^
- -DSWIFT_PATH_TO_CMARK_SOURCE="S:\cmark"^
- -DCMAKE_CXX_FLAGS="-Wno-c++98-compat -Wno-c++98-compat-pedantic"^
+ -DCMAKE_CXX_FLAGS:STRING="-Wno-c++98-compat -Wno-c++98-compat-pedantic"^
  -DCMAKE_EXE_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
- -DCMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO"^
- -DSWIFT_INCLUDE_DOCS=NO^
- -DSWIFT_PATH_TO_LLVM_SOURCE="S:\llvm"^
- -DSWIFT_PATH_TO_CLANG_SOURCE="S:\clang"^
- -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
- -DSWIFT_PATH_TO_LLVM_BUILD="S:\build\Ninja-DebugAssert\llvm-windows-amd64"^
- -DSWIFT_PATH_TO_CLANG_BUILD="S:\build\Ninja-DebugAssert\llvm-windows-amd64"^
+ -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
+ -DSWIFT_INCLUDE_DOCS=OFF^
+ -DSWIFT_PATH_TO_CMARK_SOURCE="S:\cmark"^
  -DSWIFT_PATH_TO_CMARK_BUILD="S:\build\Ninja-DebugAssert\cmark-windows-amd64"^
+ -DSWIFT_PATH_TO_LLVM_SOURCE="S:\llvm"^
+ -DSWIFT_PATH_TO_LLVM_BUILD="S:\build\Ninja-DebugAssert\llvm-windows-amd64"^
+ -DSWIFT_PATH_TO_CLANG_SOURCE="S:\clang"^
+ -DSWIFT_PATH_TO_CLANG_BUILD="S:\build\Ninja-DebugAssert\llvm-windows-amd64"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:\icu\include"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC="S:\icu\lib64\icuuc.lib"^
  -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:\icu\include"^
  -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:\icu\lib64\icuin.lib"^
  -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr"^
- "S:\swift"
+ S:/swift
 popd
 cmake --build "S:\build\Ninja-DebugAssert\swift-windows-amd64"
 ```
@@ -177,7 +184,7 @@ cmake --build "S:\build\Ninja-DebugAssert\swift-windows-amd64"
   a file.
 
 ```cmd
-cmake -G "Visual Studio 2017" -DCMAKE_GENERATOR_PLATFORM="x64"^ ...
+cmake -G "Visual Studio 2017" -A x64 -T "host=x64"^ ...
 ```
 
 ### 8. Build lldb
@@ -186,7 +193,7 @@ cmake -G "Visual Studio 2017" -DCMAKE_GENERATOR_PLATFORM="x64"^ ...
 ```cmd
 mkdir "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
 pushd "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
-cmake -G "Ninja" "S:/lldb"^
+cmake -G Ninja
   -DCMAKE_BUILD_TYPE=Debug^
   -DLLDB_PATH_TO_CMARK_SOURCE="S:/cmark"^
   -DLLDB_PATH_TO_LLVM_SOURCE="S:/llvm"^
@@ -196,7 +203,8 @@ cmake -G "Ninja" "S:/lldb"^
   -DLLDB_PATH_TO_CLANG_BUILD="S:/build/Ninja-DebugAssert/llvm-windows-amd64"^
   -DLLDB_PATH_TO_LLVM_BUILD="S:/build/Ninja-DebugAssert/llvm-windows-amd64"^
   -DLLDB_PATH_TO_SWIFT_BUILD="S:/build/Ninja-DebugAssert/swift-windows-amd64"^
-  -DLLVM_ENABLE_ASSERTIONS=YES
+  -DLLVM_ENABLE_ASSERTIONS=ON^
+  S:/lldb
 popd
 cmake --build "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
 ```
@@ -221,14 +229,14 @@ ninja -C "S:/build/Ninja-DebugAssert/swift-windows-amd64" check-swift
 ```cmd
 mkdir "S:/build/Ninja-DebugAssert/swift-corelibs-libdispatch-windows-amd64"
 pushd "S:/build/Ninja-DebugAssert/swift-corelibs-libdispatch-windows-amd64"
-cmake -G "Ninja"^
+cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=Debug^
   -DCMAKE_C_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/bin/clang-cl.exe"^
   -DCMAKE_CXX_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/bin/clang-cl.exe"^
   -DCMAKE_SWIFT_COMPILER="S:/build/Ninja-DebugAssert/swift-windows-amd64/bin/swiftc.exe"^
   -DSwift_DIR="S:/build/Ninja-DebugAssert/swift-windows-amd64/lib/cmake/swift"^
-  -DENABLE_SWIFT=YES^
-  -DENABLE_TESTING=NO^
+  -DENABLE_SWIFT=ON^
+  -DENABLE_TESTING=OFF^
   S:/swift-corelibs-libdispatch
 popd
 cmake --build
@@ -236,21 +244,26 @@ cmake --build
 
 ### 11. Build swift-corelibs-foundation
 
+To build Foundation you will need builds of:
+
+- `libxml2` (http://xmlsoft.org, download and unzip the Windows prebuilt or build your own)
+- `libcurl` (https://curl.haxx.se, download the source, `cd` into `winbuild`, and run `nmake /f Makefile.vc mode=static VC=15 MACHINE=x64`)
+
 ```cmd
 mkdir "S:/build/Ninja-DebugAssert/swift-corelibs-foundation-windows-amd64"
 pushd "S:/build/Ninja-DebugAssert/swift-corelibs-foundation-windows-amd64"
-cmake -G "Ninja"^
+cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=Debug^
   -DCMAKE_C_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/bin/clang-cl.exe"^
   -DCMAKE_SWIFT_COMPILER="S:/build/Ninja-DebugAssert/swift-windows-amd64/bin/swiftc.exe"^
-  -DCURL_LIBRARY="S:/curl/builds/libcurl-VS15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
-  -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-VS15-x64-release-static-ipv6-sspi-winssl/include"^
+  -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
+  -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
   -DICU_ROOT="S:/thirdparty/icu4c-63_1-Win64-MSVC2017"^
   -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE="S:/swift-corelibs-libdispatch"^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD="S:/build/Ninja-DebugAssert/swift-corelibs-libdispatch-windows-amd64"^
-   "S:/swift-corelibs-foundation"
+   S:/swift-corelibs-foundation
  cmake --build "S:/build/Ninja-DebugAssert/swift-corelibs-foundation-windows-amd64"
 
 ```
