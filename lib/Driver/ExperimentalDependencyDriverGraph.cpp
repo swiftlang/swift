@@ -81,14 +81,16 @@ bool ModuleDepGraph::isMarked(const Job *cmd) const {
 
 void ModuleDepGraph::markTransitive(
     SmallVectorImpl<const Job *> &visited, const Job *job,
-    ModuleDepGraph::MarkTracer *visitTracer) {
+    const void *ignored) {
   FrontendStatsTracer tracer(stats, "experimental-dependencies-markTransitive");
   std::unordered_set<const ModuleDepGraphNode *> visitedNodeSet;
   const StringRef swiftDeps = getSwiftDeps(job);
   // Do the traversal.
   for (auto &fileAndNode : nodeMap[swiftDeps]) {
-    checkTransitiveClosureForCascading(visitedNodeSet, fileAndNode.second, visitTracer);
+    assert(isCurrentPathForTracingEmpty());
+    checkTransitiveClosureForCascading(visitedNodeSet, fileAndNode.second);
   }
+  assert(isCurrentPathForTracingEmpty());
   // Copy back visited jobs.
   std::unordered_set<std::string> visitedSwiftDeps;
   for (const ModuleDepGraphNode *n : visitedNodeSet) {
@@ -336,18 +338,24 @@ void ModuleDepGraph::forEachArc(
 // nodes.
 void ModuleDepGraph::checkTransitiveClosureForCascading(
     std::unordered_set<const ModuleDepGraphNode *> &visited,
-    const ModuleDepGraphNode *potentiallyCascadingDef,
-    MarkTracer *tracer
+    const ModuleDepGraphNode *potentiallyCascadingDef
   ) {
   // Cycle recording and check.
   if (!visited.insert(potentiallyCascadingDef).second)
     return;
+  
+  size_t pathLength = currentPathIfTracing.hasValue() ? currentPathIfTracing->size() : 0;
+  if (currentPathIfTracing.hasValue()) {
+    currentPathIfTracing->push_back(potentiallyCascadingDef);
+    const auto &endingSwiftDeps = currentPathIfTracing->back()->getSwiftDeps().getValue();
+    pathsByEndingSwiftDeps.insert(std::make_pair(endingSwiftDeps, currentPathIfTracing.getValue()));
+  }
+  
   // Moved this out of the following loop for effieciency.
   assert(potentiallyCascadingDef->getSwiftDeps().hasValue() &&
          "Should only call me for Decl nodes.");
-  tracer->pushDef(potentiallyCascadingDef);
+
   forEachUseOf(potentiallyCascadingDef, [&](const ModuleDepGraphNode *u) {
-    tracer->foundUse(u);
     if (u->getKey().isInterface() && u->getSwiftDeps().hasValue()) {
       // An interface depends on something. Thus, if that something changes
       // the interface must be recompiled. But if an interface changes, then
@@ -357,11 +365,12 @@ void ModuleDepGraph::checkTransitiveClosureForCascading(
       // (since we don't have interface-specific dependency info as of Dec.
       // 2018) must be recompiled.
       rememberThatJobCascades(u->getSwiftDeps().getValue());
-      tracer->foundCascadingUse(u);
     }
-    checkTransitiveClosureForCascading(visited, u, tracer);
-    tracer->popUse(u);
+    checkTransitiveClosureForCascading(visited, u);
   });
+  if (currentPathIfTracing.hasValue())
+    currentPathIfTracing->pop_back();
+  assert(pathLength == currentPathIfTracing.hasValue() ? currentPathIfTracing->size() : 0 && "Should preserve path length");
 }
 
 // Emitting Dot file for ModuleDepGraph
@@ -497,76 +506,20 @@ bool ModuleDepGraph::emitAndVerify(DiagnosticEngine &diags) {
   return verify();
 }
 
-//==============================================================================
-// MARK: ModuleDepGraph::MarkTracer
-//==============================================================================
-void ModuleDepGraph::PathTracer::pushDef(const ModuleDepGraphNode* def) {
-  if (path.empty()) path.push_back(def);
-  else {assert(path.back() == def); }
-}
-void ModuleDepGraph::PathTracer::foundUse(const ModuleDepGraphNode* use) {
-  path.push_back(use);
-}
-void ModuleDepGraph::PathTracer::foundCascadingUse(const ModuleDepGraphNode* use) {
-  assert(path.back() == use);
-  pathsByJob[job] = path;
-  // copy path for use
-}
-void ModuleDepGraph::PathTracer::popUse(const ModuleDepGraphNode* use) {
-  assert(path.back() == use);
-  path.pop_back();
-}
-
 /// Dump the path that led to \p node.
-void  ModuleDepGraph::PathTracer::printPath(
-                                            raw_ostream &out,
-                                            const driver::Job* jobToBeBuilt,
-                                            llvm::function_ref<void(raw_ostream &, driver::Job*)> printItem
-                                            ) const {
-#error What?!
-//  for (const Entry &entry : Table.lookup(item)) {
-//    out << "\t";
-//    printItem(entry.Node);
-//    if (entry.KindMask.contains(DependencyKind::TopLevelName)) {
-//      out << " provides top-level name '" << entry.Name << "'\n";
-//
-//    } else if (entry.KindMask.contains(DependencyKind::NominalType)) {
-//      SmallString<64> name{entry.Name};
-//      if (name.front() == 'P')
-//        name.push_back('_');
-//      out << " provides type '"
-//      << swift::Demangle::demangleTypeAsString(name.str())
-//      << "'\n";
-//
-//    } else if (entry.KindMask.contains(DependencyKind::NominalTypeMember)) {
-//      SmallString<64> name{entry.Name};
-//      size_t splitPoint = name.find('\0');
-//      assert(splitPoint != StringRef::npos);
-//
-//      StringRef typePart;
-//      if (name.front() == 'P') {
-//        name[splitPoint] = '_';
-//        typePart = name.str().slice(0, splitPoint+1);
-//      } else {
-//        typePart = name.str().slice(0, splitPoint);
-//      }
-//      StringRef memberPart = name.str().substr(splitPoint+1);
-//
-//      if (memberPart.empty()) {
-//        out << " provides non-private members of type '"
-//        << swift::Demangle::demangleTypeAsString(typePart)
-//        << "'\n";
-//      } else {
-//        out << " provides member '" << memberPart << "' of type '"
-//        << swift::Demangle::demangleTypeAsString(typePart)
-//        << "'\n";
-//      }
-//    } else if (entry.KindMask.contains(DependencyKind::DynamicLookupName)) {
-//      out << " provides AnyObject member '" << entry.Name << "'\n";
-//
-//    } else {
-//      llvm_unreachable("not a dependency kind between nodes");
-//    }
-//  }
-}
+void  ModuleDepGraph::printPath(
+                                raw_ostream &out,
+                                const driver::Job* jobToBeBuilt) const {
+  auto const swiftDepsToBeBuilt = getSwiftDeps(jobToBeBuilt);
+  
 
+  std::for_each(pathsByEndingSwiftDeps.find(swiftDepsToBeBuilt), pathsByEndingSwiftDeps.cend(),
+                [&](const std::pair<std::string, std::vector<const ModuleDepGraphNode*>> &iter) {
+                  out << "Dependency path:\n";
+                  for (const auto *n: iter.second) {
+                    out << n->humanReadableName() << "\n";
+                  }
+                  out << "\n";
+                }
+                );
+}
