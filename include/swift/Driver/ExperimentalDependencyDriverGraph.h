@@ -187,12 +187,13 @@ class ModuleDepGraph {
 
   const bool verifyExperimentalDependencyGraphAfterEveryImport;
   const bool emitExperimentalDependencyDotFileAfterEveryImport;
-  
+
   /// If tracing dependencies, holds the current node traversal path
-  Optional<std::vector<const ModuleDepGraphNode*>> currentPathIfTracing;
-  
+  Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
+
   /// If tracing dependencies, record the node sequence
-  std::unordered_multimap<std::string, std::vector<const ModuleDepGraphNode*>> pathsByEndingSwiftDeps;
+  std::unordered_multimap<std::string, std::vector<const ModuleDepGraphNode *>>
+      pathsByEndingSwiftDeps;
 
   /// For helping with performance tuning, may be null:
   UnifiedStatsReporter *const stats;
@@ -253,8 +254,11 @@ public:
       : verifyExperimentalDependencyGraphAfterEveryImport(
             verifyExperimentalDependencyGraphAfterEveryImport),
         emitExperimentalDependencyDotFileAfterEveryImport(
-        emitExperimentalDependencyDotFileAfterEveryImport),
-  currentPathIfTracing(shouldTraceDependencies ? llvm::Optional<std::vector<const ModuleDepGraphNode*>>(): None),
+            emitExperimentalDependencyDotFileAfterEveryImport),
+        currentPathIfTracing(
+            shouldTraceDependencies
+                ? llvm::Optional<std::vector<const ModuleDepGraphNode *>>()
+                : None),
         stats(stats) {
     assert(verify() && "ModuleDepGraph should be fine when created");
   }
@@ -287,9 +291,8 @@ public:
   /// Visit closure of every use of \p job, adding each to visited.
   /// Record any "cascading" nodes visited.
   /// "Cascading" means has a use by an interface in another file.
-  void markTransitive(
-      SmallVectorImpl<const driver::Job *> &visited, const driver::Job *node,
-      const void *ignored = nullptr);
+  void markTransitive(SmallVectorImpl<const driver::Job *> &visited,
+                      const driver::Job *node, const void *ignored = nullptr);
 
   /// "Mark" this node only.
   bool markIntransitive(const driver::Job *);
@@ -434,8 +437,8 @@ private:
 
 public:
   /// Dump the path that led to \p node.
-  void printPath(raw_ostream &out,
-                 const driver::Job* node) const;
+  void printPath(raw_ostream &out, const driver::Job *node) const;
+
 private:
   bool isCurrentPathForTracingEmpty() const {
     return !currentPathIfTracing.hasValue() || currentPathIfTracing->empty();

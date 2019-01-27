@@ -79,9 +79,8 @@ bool ModuleDepGraph::isMarked(const Job *cmd) const {
   return cascadingJobs.count(getSwiftDeps(cmd));
 }
 
-void ModuleDepGraph::markTransitive(
-    SmallVectorImpl<const Job *> &visited, const Job *job,
-    const void *ignored) {
+void ModuleDepGraph::markTransitive(SmallVectorImpl<const Job *> &visited,
+                                    const Job *job, const void *ignored) {
   FrontendStatsTracer tracer(stats, "experimental-dependencies-markTransitive");
   std::unordered_set<const ModuleDepGraphNode *> visitedNodeSet;
   const StringRef swiftDeps = getSwiftDeps(job);
@@ -338,19 +337,21 @@ void ModuleDepGraph::forEachArc(
 // nodes.
 void ModuleDepGraph::checkTransitiveClosureForCascading(
     std::unordered_set<const ModuleDepGraphNode *> &visited,
-    const ModuleDepGraphNode *potentiallyCascadingDef
-  ) {
+    const ModuleDepGraphNode *potentiallyCascadingDef) {
   // Cycle recording and check.
   if (!visited.insert(potentiallyCascadingDef).second)
     return;
-  
-  size_t pathLength = currentPathIfTracing.hasValue() ? currentPathIfTracing->size() : 0;
+
+  size_t pathLength =
+      currentPathIfTracing.hasValue() ? currentPathIfTracing->size() : 0;
   if (currentPathIfTracing.hasValue()) {
     currentPathIfTracing->push_back(potentiallyCascadingDef);
-    const auto &endingSwiftDeps = currentPathIfTracing->back()->getSwiftDeps().getValue();
-    pathsByEndingSwiftDeps.insert(std::make_pair(endingSwiftDeps, currentPathIfTracing.getValue()));
+    const auto &endingSwiftDeps =
+        currentPathIfTracing->back()->getSwiftDeps().getValue();
+    pathsByEndingSwiftDeps.insert(
+        std::make_pair(endingSwiftDeps, currentPathIfTracing.getValue()));
   }
-  
+
   // Moved this out of the following loop for effieciency.
   assert(potentiallyCascadingDef->getSwiftDeps().hasValue() &&
          "Should only call me for Decl nodes.");
@@ -370,7 +371,9 @@ void ModuleDepGraph::checkTransitiveClosureForCascading(
   });
   if (currentPathIfTracing.hasValue())
     currentPathIfTracing->pop_back();
-  assert(pathLength == currentPathIfTracing.hasValue() ? currentPathIfTracing->size() : 0 && "Should preserve path length");
+  assert(pathLength == currentPathIfTracing.hasValue()
+             ? currentPathIfTracing->size()
+             : 0 && "Should preserve path length");
 }
 
 // Emitting Dot file for ModuleDepGraph
@@ -507,19 +510,19 @@ bool ModuleDepGraph::emitAndVerify(DiagnosticEngine &diags) {
 }
 
 /// Dump the path that led to \p node.
-void  ModuleDepGraph::printPath(
-                                raw_ostream &out,
-                                const driver::Job* jobToBeBuilt) const {
+void ModuleDepGraph::printPath(raw_ostream &out,
+                               const driver::Job *jobToBeBuilt) const {
   auto const swiftDepsToBeBuilt = getSwiftDeps(jobToBeBuilt);
-  
 
-  std::for_each(pathsByEndingSwiftDeps.find(swiftDepsToBeBuilt), pathsByEndingSwiftDeps.cend(),
-                [&](const std::pair<std::string, std::vector<const ModuleDepGraphNode*>> &iter) {
-                  out << "Dependency path:\n";
-                  for (const auto *n: iter.second) {
-                    out << n->humanReadableName() << "\n";
-                  }
-                  out << "\n";
-                }
-                );
+  std::for_each(
+      pathsByEndingSwiftDeps.find(swiftDepsToBeBuilt),
+      pathsByEndingSwiftDeps.cend(),
+      [&](const std::pair<std::string, std::vector<const ModuleDepGraphNode *>>
+              &iter) {
+        out << "Dependency path:\n";
+        for (const auto *n : iter.second) {
+          out << n->humanReadableName() << "\n";
+        }
+        out << "\n";
+      });
 }
