@@ -361,8 +361,8 @@ void ModuleDepGraph::findDependentNodesAndRecordCascadingOnes(
       // (since we don't have interface-specific dependency info as of Dec.
       // 2018) must be recompiled.
       rememberThatJobCascades(u->getSwiftDeps().getValue());
+      findDependentNodesAndRecordCascadingOnes(foundDependents, u);
     }
-    findDependentNodesAndRecordCascadingOnes(foundDependents, u);
   });
   traceDeparture(pathLengthAfterArrival);
 }
