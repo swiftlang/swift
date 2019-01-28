@@ -4630,17 +4630,17 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
       Impl->HadAnyError = true;
       
-      bool shouldOfferFixit = false;
+      bool shouldOfferFixIt = false;
       auto DMT = subjectType->getAs<DependentMemberType>();
       auto GTPT = subjectType->getAs<GenericTypeParamType>();
 
       if (GTPT) {
-        shouldOfferFixit = isa<ExtensionDecl>(GTPT->getDecl()
+        shouldOfferFixIt = isa<ExtensionDecl>(GTPT->getDecl()
                                                   ->getDeclContext());
       }
 
       if (DMT) {
-        shouldOfferFixit = isa<ExtensionDecl>(DMT->getRootGenericParam()
+        shouldOfferFixIt = isa<ExtensionDecl>(DMT->getRootGenericParam()
                                                  ->getDecl()
                                                  ->getDeclContext());
       }
@@ -4648,7 +4648,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
                      subjectType, constraintType);
       
-      if (shouldOfferFixit) {
+      if (shouldOfferFixIt) {
         auto subjectTypeName = DMT ? DMT->getName().str().str() :
                                      subjectType.getString();
         Diags.diagnose(source.getLoc(),
