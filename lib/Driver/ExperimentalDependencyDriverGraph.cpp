@@ -275,10 +275,6 @@ void ModuleDepGraph::integrateUsesByDef(const SourceFileDepGraphNode *n,
   auto &uses = usesByDef[def];
   g.forEachUseOf(n, [&](const SourceFileDepGraphNode *useNode) {
     const auto &use = useNode->getKey();
-    auto HERE = useNode->getKey().humanReadableName();
-    if (HERE  == "Foundation.Calendar.*") {
-      llvm::errs() << "HERE 100 " << def.humanReadableName() << " use: " << use.humanReadableName() << " " << (use != def) << "\n";
-    }
     if (use.canDependUpon(def))
       uses.insert(use);
   });

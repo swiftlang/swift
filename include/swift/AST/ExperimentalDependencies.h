@@ -454,17 +454,8 @@ public:
   }
 
   bool operator==(const DependencyKey &rhs) const {
-    auto r = getKind() == rhs.getKind() && getAspect() == rhs.getAspect() &&
+    return getKind() == rhs.getKind() && getAspect() == rhs.getAspect() &&
            getContext() == rhs.getContext() && getName() == rhs.getName();
-//    if (humanReadableName() == "Foundation.Calendar.*"
-//        // && rhs.humanReadableName() == "Foundation.Calendar.*"
-//        ) {
-//      auto HERE2 = rhs.humanReadableName();
-//      llvm::errs() << "HEREsdf <" << HERE2 << "> " << r << "\n";
-//      if (HERE2 == "Foundation.Calendar.*" && !r)
-//        abort();
-//    }
-   return r;
   }
 
   bool operator!=(const DependencyKey &rhs) const { return !(*this == rhs); }
