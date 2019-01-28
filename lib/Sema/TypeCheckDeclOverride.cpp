@@ -540,6 +540,22 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   return true;
 }
 
+/// Returns true if the given declaration is for the `NSObject.hashValue`
+/// property.
+static bool isNSObjectHashValue(ValueDecl *baseDecl) {
+  ASTContext &ctx = baseDecl->getASTContext();
+
+  if (auto baseVar = dyn_cast<VarDecl>(baseDecl)) {
+    if (auto classDecl = baseVar->getDeclContext()->getSelfClassDecl()) {
+      return baseVar->getName() == ctx.Id_hashValue &&
+        classDecl->getName().is("NSObject") &&
+        (classDecl->getModuleContext()->getName() == ctx.Id_Foundation ||
+         classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC);
+    }
+  }
+  return false;
+}
+
 namespace {
   /// Class that handles the checking of a particular declaration against
   /// superclass entities that it could override.
@@ -786,9 +802,15 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       baseDecl->getModuleContext() != decl->getModuleContext() &&
       !isa<ConstructorDecl>(decl) &&
       !isa<ProtocolDecl>(decl->getDeclContext())) {
-    diags.diagnose(decl, diag::override_of_non_open,
-                   decl->getDescriptiveKind());
-
+    // NSObject.hashValue was made non-overridable in Swift 5; one should
+    // override NSObject.hash instead.
+    if (isNSObjectHashValue(baseDecl)) {
+      diags.diagnose(decl, diag::override_nsobject_hashvalue_error)
+        .fixItReplace(SourceRange(decl->getNameLoc()), "hash");
+    } else {
+      diags.diagnose(decl, diag::override_of_non_open,
+                     decl->getDescriptiveKind());
+    }
   } else if (baseHasOpenAccess &&
              classDecl->hasOpenAccess(dc) &&
              decl->getFormalAccess() != AccessLevel::Open &&
@@ -1526,6 +1548,13 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       (isa<ExtensionDecl>(base->getDeclContext()) ||
        isa<ExtensionDecl>(override->getDeclContext())) &&
       !base->isObjC()) {
+    // Suppress this diagnostic for overrides of a non-open NSObject.hashValue
+    // property; these are diagnosed elsewhere. An error message complaining
+    // about extensions would be misleading in this case; the correct fix is to
+    // override NSObject.hash instead.
+    if (isNSObjectHashValue(base) && 
+        !base->hasOpenAccess(override->getDeclContext()))
+      return true;
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
     diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
                    !isa<ExtensionDecl>(base->getDeclContext()));
@@ -1626,15 +1655,12 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
   // Overrides of NSObject.hashValue are deprecated; one should override
   // NSObject.hash instead.
-  if (auto baseVar = dyn_cast<VarDecl>(base)) {
-    if (auto classDecl = baseVar->getDeclContext()->getSelfClassDecl()) {
-      if (baseVar->getName() == ctx.Id_hashValue &&
-          classDecl->getName().is("NSObject") &&
-          (classDecl->getModuleContext()->getName() == ctx.Id_Foundation ||
-           classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC)) {
-        override->diagnose(diag::override_nsobject_hashvalue);
-      }
-    }
+  // FIXME: Remove this when NSObject.hashValue becomes non-open in
+  // swift-corelibs-foundation.
+  if (isNSObjectHashValue(base) &&
+      base->hasOpenAccess(override->getDeclContext())) {
+    override->diagnose(diag::override_nsobject_hashvalue_warning)
+      .fixItReplace(SourceRange(override->getNameLoc()), "hash");
   }
 
   /// Check attributes associated with the base; some may need to merged with
