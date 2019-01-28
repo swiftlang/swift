@@ -4119,7 +4119,7 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
     return vs;
   };
 
-  // Functions' tangent/cotangnet is the same function except the innermost
+  // Functions' tangent/cotangent is the same function except the innermost
   // return type being replaced by its tangent/cotangent.
   if (auto *fnTy = getAs<AnyFunctionType>()) {
     auto resultSpace = fnTy->getResult()->getAutoDiffAssociatedVectorSpace(
