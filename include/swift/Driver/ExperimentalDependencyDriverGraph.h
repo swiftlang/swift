@@ -441,8 +441,6 @@ private:
 
   /// Return true if job did not cascade before
   bool rememberThatJobCascades(StringRef swiftDeps) {
-    if (llvm::sys::path::filename(swiftDeps) == "Calendars.swiftdeps")
-      llvm::errs() << "HERE11\n";
     return cascadingJobs.insert(swiftDeps).second;
   }
 
