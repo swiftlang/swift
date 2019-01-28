@@ -4648,12 +4648,24 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
                      subjectType, constraintType);
       
+      // Remove "Self." from the type name to mske diagnostics look
+      // better (i.e. use 'A == Int' instead of use 'Self.A == Int')
+      auto getNameWithoutSelf = [&](std::string subjectTypeName) {
+        std::string selfSubstring = "Self.";
+        
+        if (subjectTypeName.rfind(selfSubstring, 0) == 0) {
+          return subjectTypeName.erase(0, selfSubstring.length());
+        }
+        
+        return subjectTypeName;
+      };
+      
       if (shouldOfferFixIt) {
-        auto subjectTypeName = DMT ? DMT->getName().str().str() :
-                                     subjectType.getString();
+        auto subjectTypeName = DMT ? DMT->getString() : subjectType.getString();
+        auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
         Diags.diagnose(source.getLoc(),
                        diag::requires_conformance_nonprotocol_fixit,
-                       subjectTypeName, constraintType.getString())
+                       subjectTypeNameWithoutSelf, constraintType.getString())
              .fixItReplace(source.getLoc(), " == ");
       }
     }
