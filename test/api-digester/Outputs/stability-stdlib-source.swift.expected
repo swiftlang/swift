@@ -1,3 +1,4 @@
+Func Sequence.flatMap(_:) has been removed (deprecated)
 Func tryReallocateUniquelyReferenced(buffer:newMinimumCapacity:) has been removed
 Protocol SIMD has added inherited protocol Decodable
 Protocol SIMD has added inherited protocol Encodable
