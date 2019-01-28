@@ -141,7 +141,7 @@ class ModuleDepGraph {
 
   /// Since dependency keys use baseNames, they are coarser than individual
   /// decls. So two decls might map to the same key. Given a use, which is
-  /// denoted by a key, the code needs to find the files to recompile. So, the
+  /// denoted by a node, the code needs to find the files to recompile. So, the
   /// key indexes into the nodeMap, and that yields a submap of nodes keyed by
   /// file. The set of keys in the submap are the files that must be recompiled
   /// for the use.
@@ -150,7 +150,7 @@ class ModuleDepGraph {
   /// source file.)
 
   /// Tracks def-use relationships by DependencyKey.
-  std::unordered_map<DependencyKey, std::unordered_set<DependencyKey>>
+  std::unordered_map<DependencyKey, std::unordered_set<ModuleDepGraphNode>>
       usesByDef;
 
   // Supports requests from the driver to getExternalDependencies.

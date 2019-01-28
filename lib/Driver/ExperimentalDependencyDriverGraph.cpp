@@ -136,15 +136,12 @@ void ModuleDepGraph::markExternal(SmallVectorImpl<const Job *> &uses,
           externalDependency.str());
   // collect answers into useSet
   std::unordered_set<std::string> visitedSet;
-  for (const DependencyKey &keyOfUse : usesByDef[key]) {
-    nodeMap.forEachValueMatching(
-        keyOfUse, [&](const std::string &, ModuleDepGraphNode *n) {
-          const Job *job = getJob(n->getSwiftDeps());
-          if (isMarked(job))
-            return;
-          uses.push_back(job);
-          markTransitive(uses, job);
-        });
+  for (const DependencyKey &use : usesByDef[key]) {
+          const Job *job = getJob(use->getSwiftDeps());
+    if (!isMarked(job))
+      contuine;
+    uses.push_back(job);
+    markTransitive(uses, job);
   }
 }
 
@@ -275,8 +272,9 @@ ModuleDepGraphNode *ModuleDepGraph::integrateByCreatingANewNode(
   return newNode;
 }
 
-void ModuleDepGraph::integrateUsesByDef(const SourceFileDepGraphNode *n,
-                                        const SourceFileDepGraph &g) {
+void ModuleDepGraph::integrateUsesByDef(const SourceFileDepGraphNode *defNode,
+                                        const SourceFileDepGraph &g,
+                                        const ModuleDepGraphNode *usingXXX) {
   const auto &def = n->getKey();
   auto &uses = usesByDef[def];
   g.forEachUseOf(n, [&](const SourceFileDepGraphNode *useNode) {
@@ -301,8 +299,8 @@ void ModuleDepGraph::forEachUseOf(
   auto iter = usesByDef.find(def->getKey());
   if (iter == usesByDef.end())
     return;
-  for (const DependencyKey &useKey : iter->second)
-    forEachMatchingNode(useKey, fn);
+  for (const ModuleDepGraphNode *useNode : iter->second)
+    fn(useNode);
 }
 
 void ModuleDepGraph::forEachNode(
@@ -324,10 +322,8 @@ void ModuleDepGraph::forEachArc(
   /// Use find instead of [] because this is const
   for (const auto &defUse : usesByDef)
     forEachMatchingNode(defUse.first, [&](const ModuleDepGraphNode *defNode) {
-      for (const auto &useKey : defUse.second)
-        forEachMatchingNode(useKey, [&](const ModuleDepGraphNode *useNode) {
+      for (const auto &useNode : defUse.second)
           fn(defNode, useNode);
-        });
     });
 }
 
