@@ -45,10 +45,9 @@ struct State {
   /// The value that we are checking.
   SILValue value;
 
-  /// The behavior of the checker when we detect an error. Can either be
-  /// returning false, returning false with a message emitted to stderr, or an
-  /// assert.
-  ErrorBehaviorKind errorBehavior;
+  /// The result error object that use to signal either that no errors were
+  /// found or if errors are found the specific type of error that was found.
+  LinearLifetimeError error;
 
   /// The blocks that we have already visited.
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
@@ -76,8 +75,8 @@ struct State {
   State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
         ErrorBehaviorKind errorBehavior,
         SmallVectorImpl<SILBasicBlock *> *leakingBlocks)
-      : value(value), errorBehavior(errorBehavior),
-        visitedBlocks(visitedBlocks), leakingBlocks(leakingBlocks) {}
+      : value(value), error(errorBehavior), visitedBlocks(visitedBlocks),
+        leakingBlocks(leakingBlocks) {}
 
   void initializeAllNonConsumingUses(
       ArrayRef<BranchPropagatedUser> nonConsumingUsers);
@@ -115,17 +114,9 @@ struct State {
 
   /// Depending on our initialization, either return false or call Func and
   /// throw an error.
-  bool handleError(llvm::function_ref<void()> &&messagePrinterFunc) const {
-    if (errorBehavior.shouldPrintMessage()) {
-      messagePrinterFunc();
-    }
-
-    if (errorBehavior.shouldReturnFalse()) {
-      return false;
-    }
-
-    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
-    llvm_unreachable("triggering standard assertion failure routine");
+  bool handleError(llvm::function_ref<void()> &&messagePrinterFunc) {
+    error.handleError(std::move(messagePrinterFunc));
+    return false;
   }
 };
 
@@ -406,20 +397,17 @@ bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
     }
 
     // If we are supposed to error on leaks, do so now.
-    if (!errorBehavior.shouldReturnFalseOnLeak()) {
-      return handleError([&] {
-        llvm::errs() << "Function: '" << value->getFunction()->getName()
-                     << "'\n"
-                     << "Error! Found a leak due to a consuming post-dominance "
-                        "failure!\n"
-                     << "    Value: " << *value
-                     << "    Post Dominating Failure Blocks:\n";
-        for (auto *succBlock : successorBlocksThatMustBeVisited) {
-          llvm::errs() << "        bb" << succBlock->getDebugID();
-        }
-        llvm::errs() << '\n';
-      });
-    }
+    error.handleLeakError([&] {
+      llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
+                   << "Error! Found a leak due to a consuming post-dominance "
+                      "failure!\n"
+                   << "    Value: " << *value
+                   << "    Post Dominating Failure Blocks:\n";
+      for (auto *succBlock : successorBlocksThatMustBeVisited) {
+        llvm::errs() << "        bb" << succBlock->getDebugID();
+      }
+      llvm::errs() << '\n';
+    });
 
     // Otherwise... see if we have any other failures. This signals the user
     // wants us to tell it where to insert compensating destroys.
@@ -461,7 +449,7 @@ bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-bool swift::valueHasLinearLifetime(
+LinearLifetimeError swift::valueHasLinearLifetime(
     SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
     ArrayRef<BranchPropagatedUser> nonConsumingUses,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks, DeadEndBlocks &deBlocks,
@@ -496,7 +484,7 @@ bool swift::valueHasLinearLifetime(
   // have been detected by initializing our consuming uses. So we are done.
   if (consumingUses.size() == 1 &&
       consumingUses[0].getParent() == value->getParentBlock()) {
-    return true;
+    return state.error;
   }
 
   // Ok, we may have multiple consuming uses. Add the user block of each of our
@@ -517,7 +505,7 @@ bool swift::valueHasLinearLifetime(
     // Make sure that the predecessor is not in our blocksWithConsumingUses
     // list.
     if (state.checkPredsForDoubleConsume(user, predBlock)) {
-      return state.handleError([] {});
+      return state.error;
     }
 
     if (!state.visitedBlocks.insert(predBlock).second)
@@ -528,9 +516,10 @@ bool swift::valueHasLinearLifetime(
   // Now that our algorithm is completely prepared, run the
   // dataflow... If we find a failure, return false.
   if (!state.performDataflow(deBlocks))
-    return false;
+    return state.error;
 
   // ...and then check that the end state shows that we have a valid linear
   // typed value.
-  return state.checkDataflowEndState(deBlocks);
+  state.checkDataflowEndState(deBlocks);
+  return state.error;
 }

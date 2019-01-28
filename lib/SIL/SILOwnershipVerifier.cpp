@@ -139,9 +139,10 @@ public:
     SmallVector<BranchPropagatedUser, 32> allRegularUsers;
     copy(regularUsers, std::back_inserter(allRegularUsers));
     copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
-    result =
+    auto linearLifetimeResult =
         valueHasLinearLifetime(value, lifetimeEndingUsers, allRegularUsers,
                                visitedBlocks, deadEndBlocks, errorBehavior);
+    result = !linearLifetimeResult.getFoundError();
 
     return result.getValue();
   }
