@@ -8,6 +8,7 @@
 // UNSUPPORTED: OS=linux-gnu
 // UNSUPPORTED: OS=linux-gnueabihf
 // UNSUPPORTED: OS=freebsd
+// UNSUPPORTED: OS=windows-msvc
 
 // MARKER: Contents of (__LLVM,__bitcode) section
 // MARKER-NEXT: 00
