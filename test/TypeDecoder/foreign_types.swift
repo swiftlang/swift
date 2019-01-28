@@ -5,6 +5,7 @@
 // RUN: %lldb-moduleimport-test-with-sdk %t/foreign_types -type-from-mangled=%t/input | %FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: SR9782
 
 import Foundation
 import CoreCooling
