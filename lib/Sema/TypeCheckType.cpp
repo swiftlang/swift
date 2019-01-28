@@ -2275,10 +2275,6 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       variadic = true;
     }
 
-    bool autoclosure = false;
-    if (auto *ATR = dyn_cast<AttributedTypeRepr>(eltTypeRepr))
-      autoclosure = ATR->getAttrs().has(TAK_autoclosure);
-
     Type ty = resolveType(eltTypeRepr, thisElementOptions);
     if (!ty) return true;
 
@@ -2290,6 +2286,16 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     // Parameters of polymorphic functions speak in terms of interface types.
     if (requiresMappingOut) {
       ty = ty->mapTypeOutOfContext();
+    }
+
+    bool autoclosure = false;
+    if (auto *ATR = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
+      // Make sure that parameter itself is of a function type, otherwise
+      // the problem would already be diagnosed by `resolveAttributedType`
+      // but attributes would stay unchanged. So as a recovery let's drop
+      // 'autoclosure' attribute from the resolved parameter.
+      autoclosure =
+          ty->is<FunctionType>() && ATR->getAttrs().has(TAK_autoclosure);
     }
 
     ValueOwnership ownership;
