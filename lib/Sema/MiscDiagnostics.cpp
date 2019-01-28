@@ -1294,11 +1294,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     ///
     /// Or like this if it is any other ExpressibleByNilLiteral type:
     ///
-    ///   (dot_syntax_call_expr implicit type='Int?'
-    ///     (declref_expr implicit decl=Optional.none)
-    ///     (type_expr type=Int?))
+    ///   (nil_literal_expr)
     ///
     bool isTypeCheckedOptionalNil(Expr *E) {
+      if (dyn_cast<NilLiteralExpr>(E)) return true;
+
       auto CE = dyn_cast<ApplyExpr>(E->getSemanticsProvidingExpr());
       if (!CE || !CE->isImplicit())
         return false;
@@ -1306,16 +1306,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // First case -- Optional.none
       if (auto DRE = dyn_cast<DeclRefExpr>(CE->getSemanticFn()))
         return DRE->getDecl() == TC.Context.getOptionalNoneDecl();
-
-      // Second case -- init(nilLiteral:)
-      auto CRCE = dyn_cast<ConstructorRefCallExpr>(CE->getSemanticFn());
-      if (!CRCE || !CRCE->isImplicit()) return false;
-
-      if (auto DRE = dyn_cast<DeclRefExpr>(CRCE->getSemanticFn())) {
-        SmallString<32> NameBuffer;
-        auto name = DRE->getDecl()->getFullName().getString(NameBuffer);
-        return name == "init(nilLiteral:)";
-      }
 
       return false;
     }

@@ -1905,15 +1905,12 @@ namespace {
 
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_nilLiteral });
-      return convertLiteral(expr, type, cs.getType(expr), protocol,
-                            Identifier(), initName,
-                            nullptr, Identifier(),
-                            Identifier(),
-                            [] (Type type) -> bool {
-                              return false;
-                            },
-                            diag::nil_literal_broken_proto,
-                            diag::nil_literal_broken_proto);
+      return convertLiteralInPlace(expr, type, protocol,
+                                   Identifier(), initName,
+                                   nullptr,
+                                   Identifier(),
+                                   diag::nil_literal_broken_proto,
+                                   diag::nil_literal_broken_proto);
     }
 
     
@@ -7099,7 +7096,9 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     return nullptr;
 
   // Set the initializer.
-  if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
+  if (auto nilLiteral = dyn_cast<NilLiteralExpr>(literal))
+    nilLiteral->setInitializer(witness);
+  else if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
     stringLiteral->setInitializer(witness);
   else
     cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(witness);
