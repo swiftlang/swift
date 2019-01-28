@@ -777,8 +777,10 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(LoadInst *li) {
     // no further work to do.
     auto errorKind =
         ownership::ErrorBehaviorKind::ReturnFalseOnLeakAssertOtherwise;
-    if (valueHasLinearLifetime(cvi, consumingUses, {}, visitedBlocks,
-                               deadEndBlocks, errorKind, &leakingBlocks))
+    auto error =
+        valueHasLinearLifetime(cvi, consumingUses, {}, visitedBlocks,
+                               deadEndBlocks, errorKind, &leakingBlocks);
+    if (!error.getFoundError())
       continue;
 
     // Ok, we found some leaking blocks. Insert destroys at the
