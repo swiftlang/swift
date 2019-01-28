@@ -21,14 +21,14 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
-#include <functional>
 
 namespace swift {
   class SourceManager;
 
-/// SourceLoc in swift is just an SMLoc.  We define it as a different type
-/// (instead of as a typedef) just to remove the "getFromPointer" methods and
-/// enforce purity in the Swift codebase.
+/// SourceLoc in swift is an SMLoc and an integer. The integer is used to
+/// represent the locations of synthesized AST nodes as being slotted in
+/// between actual user-written code locations; in SourceLocs representing
+/// actual written source code, it is always zero.
 class SourceLoc {
   friend class SourceManager;
   friend class SourceRange;
@@ -41,12 +41,13 @@ class SourceLoc {
 public:
   SourceLoc() {}
   explicit SourceLoc(llvm::SMLoc Value, uintptr_t SyntheticLocation = 0)
-    : Value(Value), SyntheticLocation(SyntheticLocation) {
-    assert(SyntheticLocation == 0);
-  }
+    : Value(Value), SyntheticLocation(SyntheticLocation) { }
   
   bool isValid() const { return Value.isValid(); }
   bool isInvalid() const { return !isValid(); }
+  
+  bool isPhysical() const { return SyntheticLocation == 0; }
+  bool isSynthetic() const { return !isPhysical(); }
   
   bool operator==(const SourceLoc &RHS) const {
     return RHS.Value == Value && RHS.SyntheticLocation == SyntheticLocation;
@@ -72,6 +73,35 @@ public:
     if (isValid())
       return getAdvancedLoc(ByteOffset);
     return SourceLoc();
+  }
+
+  /// Returns a synthetic \c SourceLoc between \c this and \c Other.
+  /// 
+  /// \c Other must be attached to the same physical location as \c this,
+  /// and must come after \c this.
+  SourceLoc getSyntheticLocBefore(SourceLoc Other) {
+    assert(Value == Other.Value);
+    assert(SyntheticLocation < Other.SyntheticLocation);
+    
+    uintptr_t maxAdvance = Other.SyntheticLocation - SyntheticLocation;
+    
+    // We consume only 1/16 of the remaining space to maximum because, in
+    // typical use, you're a lot more likely to generate SourceLocs after this
+    // one than before it. For the same reason, we also limit the maximum
+    // we will advance in one step to 2^24; 16 million synthetic SourceLocs
+    // between two nodes ought to be enough for anybody.
+    //
+    // FIXME: This is quick and dirty; allocating and subdividing synthetic
+    // offsets requires much more thought and perhaps a bit of a literature.
+    // search.
+    uintptr_t advance = maxAdvance / 16;
+    if (advance > 1 << 24)
+      advance = 1 << 24;
+    
+    uintptr_t newSynLoc = SyntheticLocation + advance;
+    assert(newSynLoc > SyntheticLocation);
+    
+    return SourceLoc(Value, newSynLoc);
   }
 
   const void *getOpaquePointerValue() const { return Value.getPointer(); }

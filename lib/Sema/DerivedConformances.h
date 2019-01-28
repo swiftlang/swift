@@ -30,6 +30,7 @@ class Type;
 class TypeChecker;
 class ValueDecl;
 class VarDecl;
+class SourceLoc;
 
 class DerivedConformance {
 public:
@@ -188,6 +189,26 @@ public:
   ///
   /// \param synthesizing The decl that is being synthesized.
   bool checkAndDiagnoseDisallowedContext(ValueDecl *synthesizing) const;
+  
+  class SourceLocSynthesizer {
+    SourceRange remaining;
+    
+  public:
+    SourceLocSynthesizer(SourceRange remaining)
+      : remaining(remaining) { }
+    
+    SourceLocSynthesizer(Decl *decl, SourceLoc base)
+      : SourceLocSynthesizer(
+          decl->getASTContext().SourceMgr.reserveSyntheticSourceRange(base)
+        )
+    { }
+    
+    SourceLoc makeNext() {
+      auto nextLoc = remaining.Start.getSyntheticLocBefore(remaining.End);
+      remaining.Start = nextLoc;
+      return nextLoc;
+    }
+  };
 };
 }
 
