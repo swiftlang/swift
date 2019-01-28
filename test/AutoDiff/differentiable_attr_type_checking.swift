@@ -418,12 +418,12 @@ protocol DiffReq : Differentiable {
 
 // expected-error @+1 {{does not conform to protocol}}
 struct ConformingWithErrors : DiffReq {
-  // expected-note @+1 {{@differentiable(wrt: (x, self))}}
+  // expected-note @+1 {{@differentiable(wrt: (self, x))}}
   func f1(_ x: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{@differentiable(wrt: (x, y, self))}}
+  // expected-note @+2 {{@differentiable(wrt: (self, x, y))}}
   @differentiable(wrt: (self, x))
   func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
