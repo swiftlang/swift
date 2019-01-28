@@ -397,6 +397,54 @@ public:
         {RemoteAddress(MetadataAddress), RemoteAddress(StartOfValue)});
   }
 
+  /// Read a protocol from a reference to said protocol.
+  template<typename Resolver>
+  typename Resolver::Result readProtocol(
+      const TargetProtocolDescriptorRef<Runtime> &ProtocolAddress,
+      Demangler &dem,
+      Resolver resolver) {
+#if SWIFT_OBJC_INTEROP
+    // Check whether we have an Objective-C protocol.
+    if (ProtocolAddress.isObjC()) {
+      auto Name = readObjCProtocolName(ProtocolAddress.getObjCProtocol());
+      StringRef NameStr(Name);
+
+      // If this is a Swift-defined protocol, demangle it.
+      if (NameStr.startswith("_TtP")) {
+        auto Demangled = dem.demangleSymbol(NameStr);
+        if (!Demangled)
+          return resolver.failure();
+
+        // FIXME: This appears in _swift_buildDemanglingForMetadata().
+        while (Demangled->getKind() == Node::Kind::Global ||
+               Demangled->getKind() == Node::Kind::TypeMangling ||
+               Demangled->getKind() == Node::Kind::Type ||
+               Demangled->getKind() == Node::Kind::ProtocolList ||
+               Demangled->getKind() == Node::Kind::TypeList ||
+               Demangled->getKind() == Node::Kind::Type) {
+          if (Demangled->getNumChildren() != 1)
+            return resolver.failure();
+          Demangled = Demangled->getFirstChild();
+        }
+
+        return resolver.swiftProtocol(Demangled);
+      }
+
+      // Otherwise, this is an imported protocol.
+      return resolver.objcProtocol(NameStr);
+    }
+#endif
+
+    // Swift-native protocol.
+    auto Demangled =
+      readDemanglingForContextDescriptor(ProtocolAddress.getSwiftProtocol(),
+                                         dem);
+    if (!Demangled)
+      return resolver.failure();
+
+    return resolver.swiftProtocol(Demangled);
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType readTypeFromMetadata(StoredPointer MetadataAddress,
                                  bool skipArtificialSubclasses = false) {
@@ -493,64 +541,34 @@ public:
         HasExplicitAnyObject = true;
       }
 
-      std::vector<BuiltProtocolDecl> Protocols;
-      for (auto ProtocolAddress : Exist->getProtocols()) {
+      /// Resolver to turn a protocol reference into a protocol declaration.
+      struct ProtocolResolver {
+        using Result = BuiltProtocolDecl;
+
+        BuilderType &builder;
+
+        BuiltProtocolDecl failure() const {
+          return BuiltProtocolDecl();
+        }
+
+        BuiltProtocolDecl swiftProtocol(Demangle::Node *node) {
+          return builder.createProtocolDecl(node);
+        }
+
 #if SWIFT_OBJC_INTEROP
-        // Check whether we have an Objective-C protocol.
-        if (ProtocolAddress.isObjC()) {
-          auto Name =
-            readObjCProtocolName(ProtocolAddress.getObjCProtocol());
-          StringRef NameStr(Name);
-
-          // If this is a Swift-defined protocol, demangle it.
-          if (NameStr.startswith("_TtP")) {
-            Demangle::Context DCtx;
-            auto Demangled = DCtx.demangleSymbolAsNode(NameStr);
-            if (!Demangled)
-              return BuiltType();
-
-            // FIXME: This appears in _swift_buildDemanglingForMetadata().
-            while (Demangled->getKind() == Node::Kind::Global ||
-                   Demangled->getKind() == Node::Kind::TypeMangling ||
-                   Demangled->getKind() == Node::Kind::Type ||
-                   Demangled->getKind() == Node::Kind::ProtocolList ||
-                   Demangled->getKind() == Node::Kind::TypeList ||
-                   Demangled->getKind() == Node::Kind::Type) {
-              if (Demangled->getNumChildren() != 1)
-                return BuiltType();
-              Demangled = Demangled->getFirstChild();
-            }
-
-            auto Protocol = Builder.createProtocolDecl(Demangled);
-            if (!Protocol)
-              return BuiltType();
-
-            Protocols.push_back(Protocol);
-            continue;
-          }
-
-          // Otherwise, this is an imported protocol.
-          auto Protocol = Builder.createObjCProtocolDecl(NameStr);
-          if (!Protocol)
-            return BuiltType();
-
-          Protocols.push_back(Protocol);
-          continue;
+        BuiltProtocolDecl objcProtocol(StringRef name) {
+          return builder.createObjCProtocolDecl(name);
         }
 #endif
+      } resolver{Builder};
 
-        // Swift-native protocol.
-        Demangle::Demangler Dem;
-        auto Demangled = readDemanglingForContextDescriptor(
-            ProtocolAddress.getSwiftProtocol(), Dem);
-        if (!Demangled)
+      Demangler dem;
+      std::vector<BuiltProtocolDecl> Protocols;
+      for (auto ProtocolAddress : Exist->getProtocols()) {
+        if (auto Protocol = readProtocol(ProtocolAddress, dem, resolver))
+          Protocols.push_back(Protocol);
+        else
           return BuiltType();
-
-        auto Protocol = Builder.createProtocolDecl(Demangled);
-        if (!Protocol)
-          return BuiltType();
-
-        Protocols.push_back(Protocol);
       }
       auto BuiltExist = Builder.createProtocolCompositionType(
         Protocols, SuperclassType, HasExplicitAnyObject);
@@ -1423,6 +1441,132 @@ private:
     return name;
   }
 
+  /// The kind of mangled name to read.
+  enum class MangledNameKind {
+    Type,
+    Symbol,
+  };
+
+  /// Clone the given demangle node into the demangler \c dem.
+  static Demangle::NodePointer cloneDemangleNode(Demangle::NodePointer node,
+                                                 Demangler &dem) {
+    if (!node)
+      return nullptr;
+
+    Demangle::NodePointer newNode;
+    if (node->hasText())
+      newNode = dem.createNode(node->getKind(), node->getText());
+    else if (node->hasIndex())
+      newNode = dem.createNode(node->getKind(), node->getIndex());
+    else
+      newNode = dem.createNode(node->getKind());
+
+    for (auto child : *node) {
+      newNode->addChild(cloneDemangleNode(child, dem), dem);
+    }
+    return newNode;
+  }
+
+  /// Read a mangled name at the given remote address and return the
+  /// demangle tree.
+  Demangle::NodePointer readMangledName(RemoteAddress address,
+                                        MangledNameKind kind,
+                                        Demangler &dem) {
+    // Read chunks of the mangled name, for which the string can be
+    // prematurely terminated by a symbolic reference.
+    std::string mangledName;
+    RemoteAddress currentAddress = address;
+    unsigned index = 0;
+    while (true) {
+      // Read the next chunk.
+      std::string chunk;
+      if (!Reader->readString(currentAddress, chunk))
+        return nullptr;
+
+      // Move the address forward and add the next chunk.
+      currentAddress =
+        RemoteAddress(currentAddress.getAddressData() + chunk.size() + 1);
+      mangledName += std::move(chunk);
+
+      // Scan through the mangled name to skip over symbolic references.
+      unsigned end = mangledName.size();
+      while (index < end) {
+        char c = mangledName[index];
+
+        // Figure out how far to step in the string.
+        unsigned step = 1;
+        if (c >= '\x01' && c <= '\x17') {
+          step += sizeof(uint32_t);
+        }
+        else if (c >= '\x18' && c <= '\x1F') {
+          step += sizeof(typename Runtime::StoredPointer);
+        }
+
+        // If we would be stepping past the end, break out.
+        if (index + step > end)
+          break;
+
+        index += step;
+      }
+
+      // If we didn't make it to the end, the '\0' is significant. Add it to the
+      // mangled name and
+      if (index < end) {
+        mangledName.push_back('\0');
+        continue;
+      }
+
+      // We're done.
+      break;
+    }
+
+    // Install our own symbolic reference resolver
+    auto oldSymbolicReferenceResolver = dem.takeSymbolicReferenceResolver();
+    dem.setSymbolicReferenceResolver([&](SymbolicReferenceKind kind,
+                                         Directness directness,
+                                         int32_t offset,
+                                         const void *base) -> NodePointer {
+      // Resolve the reference to a remote address.
+      auto offsetInMangledName = (const char *)base - mangledName.data();
+      auto remoteAddress =
+        address.getAddressData() + offsetInMangledName + offset;
+
+      if (directness == Directness::Indirect) {
+        if (auto indirectAddress = readPointerValue(remoteAddress)) {
+          remoteAddress = *indirectAddress;
+        } else {
+          return nullptr;
+        }
+      }
+
+      switch (kind) {
+      case Demangle::SymbolicReferenceKind::Context: {
+        Demangler innerDemangler;
+        auto result = readDemanglingForContextDescriptor(
+          remoteAddress, innerDemangler);
+
+        return cloneDemangleNode(result, dem);
+      }
+      }
+
+      return nullptr;
+    });
+
+    NodePointer result;
+    switch (kind) {
+    case MangledNameKind::Type:
+      result = dem.demangleType(mangledName);
+      break;
+
+    case MangledNameKind::Symbol:
+      result = dem.demangleSymbol(mangledName);
+      break;
+    }
+
+    dem.setSymbolicReferenceResolver(std::move(oldSymbolicReferenceResolver));
+    return result;
+  }
+
   /// Read and demangle the name of an anonymous context.
   Demangle::NodePointer demangleAnonymousContextName(
       ContextDescriptorRef contextRef,
@@ -1437,12 +1581,9 @@ private:
     auto mangledContextName = anonymousBuffer->getMangledContextName();
     auto mangledNameAddress = resolveRelativeField(contextRef,
                                                    mangledContextName->name);
-
-    std::string mangledName;
-    if (!Reader->readString(RemoteAddress(mangledNameAddress), mangledName))
-      return nullptr;
-
-    return dem.demangleSymbol(mangledName);
+    return readMangledName(RemoteAddress(mangledNameAddress),
+                           MangledNameKind::Symbol,
+                           dem);
   }
 
   /// If we have a context whose parent context is an anonymous context
@@ -1513,6 +1654,48 @@ private:
 
     // Return the name.
     return nameChild;
+  }
+
+  /// Resolve a relative target protocol descriptor pointer, which uses
+  /// the lowest bit to indicate an indirect vs. direct relative reference and
+  /// the second lowest bit to indicate whether it is an Objective-C protocol.
+  StoredPointer resolveRelativeIndirectProtocol(
+      ContextDescriptorRef descriptor,
+      const RelativeTargetProtocolDescriptorPointer<Runtime> &protocol) {
+    // Map the offset from within our local buffer to the remote address.
+    auto distance = (intptr_t)&protocol - (intptr_t)descriptor.getLocalBuffer();
+    StoredPointer targetAddress(descriptor.getAddress() + distance);
+
+    // Read the relative offset.
+    int32_t relative;
+    if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
+      return StoredPointer();
+
+    // Collect and mask off the 'indirect' and 'isObjC' bits.
+    bool indirect = relative & 1;
+    relative &= ~1u;
+    bool isObjC = relative & 2;
+    relative &= ~2u;
+
+    using SignedPointer = typename std::make_signed<StoredPointer>::type;
+    auto signext = (SignedPointer)(int32_t)relative;
+
+    StoredPointer resultAddress = targetAddress + signext;
+
+    // Low bit set in the offset indicates that the offset leads to the absolute
+    // address in memory.
+    if (indirect) {
+      if (!Reader->readBytes(RemoteAddress(resultAddress),
+                             (uint8_t *)&resultAddress,
+                             sizeof(StoredPointer)))
+        return StoredPointer();
+    }
+
+    // Add back the Objective-C bit.
+    if (isObjC)
+      resultAddress |= 0x1;
+
+    return resultAddress;
   }
 
   Demangle::NodePointer
@@ -1589,10 +1772,162 @@ private:
       nodeKind = Demangle::Node::Kind::Protocol;
       break;
     }
-    case ContextDescriptorKind::Extension:
-      // TODO: Remangle something about the extension context here.
-      return nullptr;
-      
+    case ContextDescriptorKind::Extension: {
+      // There should always be a parent describing where the extension
+      // lives.
+      if (!parentDemangling) {
+        return nullptr;
+      }
+
+      auto extensionBuffer =
+        reinterpret_cast<const TargetExtensionContextDescriptor<Runtime> *>(
+          descriptor.getLocalBuffer());
+
+      auto extendedContextAddress =
+        resolveRelativeField(descriptor, extensionBuffer->ExtendedContext);
+
+      auto demangledExtendedContext =
+        readMangledName(RemoteAddress(extendedContextAddress),
+                        MangledNameKind::Type,
+                        dem);
+
+      auto demangling = dem.createNode(Node::Kind::Extension);
+      demangling->addChild(parentDemangling, dem);
+      demangling->addChild(demangledExtendedContext, dem);
+
+      /// Resolver to turn a protocol reference into a demangling.
+      struct ProtocolResolver {
+        using Result = Demangle::Node *;
+
+        Demangler &dem;
+
+        Result failure() const {
+          return nullptr;
+        }
+
+        Result swiftProtocol(Demangle::Node *node) {
+          return node;
+        }
+
+#if SWIFT_OBJC_INTEROP
+        Result objcProtocol(StringRef name) {
+          // FIXME: Unify this with the runtime's Demangle.cpp
+          auto module = dem.createNode(Node::Kind::Module,
+                                       MANGLING_MODULE_OBJC);
+          auto node = dem.createNode(Node::Kind::Protocol);
+          node->addChild(module, dem);
+          node->addChild(dem.createNode(Node::Kind::Identifier, name),
+                         dem);
+          return node;
+        }
+#endif
+      } protocolResolver{dem};
+
+      // If there are generic requirements, form the generic signature.
+      auto requirements = extensionBuffer->getGenericRequirements();
+      if (!requirements.empty()) {
+        auto signatureNode =
+          dem.createNode(Node::Kind::DependentGenericSignature);
+        bool failed = false;
+        for (const auto &req : requirements) {
+          if (failed)
+            break;
+
+          // Demangle the subject.
+          auto subjectAddress = resolveRelativeField(descriptor, req.Param);
+          NodePointer subject = readMangledName(RemoteAddress(subjectAddress),
+                                                MangledNameKind::Type,
+                                                dem);
+          if (!subject) {
+            failed = true;
+            break;
+          }
+
+          switch (req.Flags.getKind()) {
+          case GenericRequirementKind::Protocol: {
+            auto protocolAddress =
+              resolveRelativeIndirectProtocol(descriptor, req.Protocol);
+            auto protocol = readProtocol(protocolAddress, dem,
+                                         protocolResolver);
+            if (!protocol) {
+              failed = true;
+              break;
+            }
+
+            auto reqNode =
+              dem.createNode(
+                Node::Kind::DependentGenericConformanceRequirement);
+            reqNode->addChild(subject, dem);
+            reqNode->addChild(protocol, dem);
+            signatureNode->addChild(reqNode, dem);
+            break;
+          }
+
+          case GenericRequirementKind::SameType:
+          case GenericRequirementKind::BaseClass: {
+            // Demangle the right-hand type.
+            auto typeAddress = resolveRelativeField(descriptor, req.Type);
+            NodePointer type = readMangledName(RemoteAddress(typeAddress),
+                                               MangledNameKind::Type,
+                                               dem);
+            if (!type) {
+              failed = true;
+              break;
+            }
+
+            Node::Kind nodeKind;
+            if (req.Flags.getKind() == GenericRequirementKind::SameType)
+              nodeKind = Node::Kind::DependentGenericSameTypeRequirement;
+            else
+              nodeKind = Node::Kind::DependentGenericConformanceRequirement;
+
+            auto reqNode = dem.createNode(nodeKind);
+            reqNode->addChild(subject, dem);
+            reqNode->addChild(type, dem);
+            signatureNode->addChild(reqNode, dem);
+            break;
+          }
+
+          case GenericRequirementKind::SameConformance:
+            // Do nothing
+            break;
+
+          case GenericRequirementKind::Layout: {
+            // Map the offset from within our local buffer to the remote
+            // address.
+            auto distance =
+              (intptr_t)&req.Layout - (intptr_t)descriptor.getLocalBuffer();
+            StoredPointer targetAddress(descriptor.getAddress() + distance);
+
+            GenericRequirementLayoutKind kind;
+            if (!Reader->readBytes(RemoteAddress(targetAddress),
+                                   (uint8_t *)&kind, sizeof(kind))) {
+              failed = true;
+              break;
+            }
+
+            if (kind == GenericRequirementLayoutKind::Class) {
+              auto reqNode =
+                dem.createNode(Node::Kind::DependentGenericLayoutRequirement);
+              reqNode->addChild(subject, dem);
+              auto idNode = dem.createNode(Node::Kind::Identifier, "C");
+              reqNode->addChild(idNode, dem);
+              signatureNode->addChild(reqNode, dem);
+            } else {
+              failed = true;
+            }
+            break;
+          }
+          }
+        }
+
+        if (!failed) {
+          demangling->addChild(signatureNode, dem);
+        }
+      }
+      return demangling;
+    }
+
     case ContextDescriptorKind::Anonymous: {
       // Use the remote address to identify the anonymous context.
       char addressBuf[18];
