@@ -4089,6 +4089,21 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// Makes a function with the same generic signature and extinfo as `copy`, but
+// with `params` parameters and `retTy` return type.
+static AnyFunctionType *
+makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
+                 Type retTy, GenericSignature *whereClauseGenSig) {
+  auto genericSignature = whereClauseGenSig;
+  if (!genericSignature)
+    if (auto *genericFunctionType = copy->getAs<GenericFunctionType>())
+      genericSignature = genericFunctionType->getGenericSignature();
+  if (genericSignature)
+    return GenericFunctionType::get(genericSignature, params, retTy,
+                                    copy->getExtInfo());
+  return FunctionType::get(params, retTy, copy->getExtInfo());
+}
+
 Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
     AutoDiffAssociatedVectorSpaceKind kind,
     LookupConformanceFn lookupConformance) {
@@ -4104,7 +4119,19 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
     return vs;
   };
 
-  // Tuples' Tangent/Cotangent is a tuple of each element's Tangent/Cotangent.
+  // Functions' tangent/cotangnet is the same function except the innermost
+  // return type being replaced by its tangent/cotangent.
+  if (auto *fnTy = getAs<AnyFunctionType>()) {
+    auto resultSpace = fnTy->getResult()->getAutoDiffAssociatedVectorSpace(
+        kind, lookupConformance);
+    if (!resultSpace)
+      return cache(None);
+    return VectorSpace::getFunction(
+        makeFunctionType(fnTy, fnTy->getParams(), resultSpace->getType(),
+                         fnTy->getOptGenericSignature()));
+  }
+
+  // Tuples' tangent/cotangent is a tuple of each element's Tangent/Cotangent.
   if (auto *tupleTy = getAs<TupleType>()) {
     SmallVector<TupleTypeElt, 8> newElts;
     for (auto elt : tupleTy->getElements()) {
@@ -4146,21 +4173,6 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
 
   // There is no associated vector space.
   return cache(None);
-}
-
-// Makes a function with the same generic signature and extinfo as `copy`, but
-// with `params` parameters and `retTy` return type.
-static AnyFunctionType *
-makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
-                 Type retTy, GenericSignature *whereClauseGenSig) {
-  auto genericSignature = whereClauseGenSig;
-  if (!genericSignature)
-    if (auto *genericFunctionType = copy->getAs<GenericFunctionType>())
-      genericSignature = genericFunctionType->getGenericSignature();
-  if (genericSignature)
-    return GenericFunctionType::get(genericSignature, params, retTy,
-                                    copy->getExtInfo());
-  return FunctionType::get(params, retTy, copy->getExtInfo());
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(

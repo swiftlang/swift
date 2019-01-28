@@ -359,10 +359,12 @@ class VectorSpace {
 public:
   /// A tangent space kind.
   enum class Kind {
-    /// A type that conforms to `VectorNumeric`.
+    /// A type that conforms to `AdditiveArithmetic`.
     Vector,
     /// A product of vector spaces as a tuple.
     Tuple,
+    /// A function type whose innermost result conforms to `AdditiveArithmetic`.
+    Function
   };
 
 private:
@@ -372,9 +374,12 @@ private:
     Type vectorType;
     // Tuple
     TupleType *tupleType;
+    // Function
+    AnyFunctionType *functionType;
 
     Value(Type vectorType) : vectorType(vectorType) {}
     Value(TupleType *tupleType) : tupleType(tupleType) {}
+    Value(AnyFunctionType *functionType) : functionType(functionType) {}
   } value;
 
   VectorSpace(Kind kind, Value value)
@@ -389,6 +394,9 @@ public:
   static VectorSpace getTuple(TupleType *tupleTy) {
     return {Kind::Tuple, tupleTy};
   }
+  static VectorSpace getFunction(AnyFunctionType *fnTy) {
+    return {Kind::Function, fnTy};
+  }
 
   bool isVector() const { return kind == Kind::Vector; }
   bool isTuple() const { return kind == Kind::Tuple; }
@@ -401,6 +409,10 @@ public:
   TupleType *getTuple() const {
     assert(kind == Kind::Tuple);
     return value.tupleType;
+  }
+  AnyFunctionType *getFunction() const {
+    assert(kind == Kind::Function);
+    return value.functionType;
   }
 
   Type getType() const;
