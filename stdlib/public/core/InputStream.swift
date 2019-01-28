@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -27,45 +27,69 @@ import SwiftShims
 /// - Returns: The string of characters read from standard input. If EOF has
 ///   already been reached when `readLine()` is called, the result is `nil`.
 public func readLine(strippingNewline: Bool = true) -> String? {
-  var linePtrVar: UnsafeMutablePointer<UInt8>?
-  var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)
-  if readBytes == -1 {
+  let bytes: [UInt8] = _readLine()
+  if bytes.isEmpty {
     return nil
   }
-  _internalInvariant(readBytes >= 0,
-    "unexpected return value from swift_stdlib_readLine_stdin")
-  if readBytes == 0 {
-    return ""
+  var result: String = bytes.withUnsafeBufferPointer {
+    String._fromUTF8Repairing($0).result
+  }
+  if strippingNewline, result.last!.isNewline {
+    _ = result.removeLast()
+  }
+  return result
+}
+
+//===----------------------------------------------------------------------===//
+//          | Abbrev |               Alias | Code Point |    UTF-8 |          //
+//          | :----: | ------------------: | :--------: | -------: |          //
+//          |   LF   |           LINE FEED |   U+000A   |       0A |          //
+//          |   VT   | VERTICAL TABULATION |   U+000B   |       0B |          //
+//          |   FF   |           FORM FEED |   U+000C   |       0C |          //
+//          |   CR   |     CARRIAGE RETURN |   U+000D   |       0D |          //
+//          |   NEL  |           NEXT LINE |   U+0085   |    C2 85 |          //
+//          |   LS   |      LINE SEPARATOR |   U+2028   | E2 80 A8 |          //
+//          |   PS   | PARAGRAPH SEPARATOR |   U+2029   | E2 80 A9 |          //
+//===----------------------------------------------------------------------===//
+
+private func _readLine() -> [UInt8] {
+  _swift_stdlib_flockfile_stdin()
+  defer {
+    _swift_stdlib_funlockfile_stdin()
   }
 
-  let linePtr = linePtrVar!
-  if strippingNewline {
-    // FIXME: Unicode conformance.  To fix this, we need to reimplement the
-    // code we call above to get a line, since it will only stop on LF.
-    //
-    // <rdar://problem/20013999> Recognize Unicode newlines in readLine()
-    //
-    // Recognize only LF and CR+LF combinations for now.
-    let cr = UInt8(ascii: "\r")
-    let lf = UInt8(ascii: "\n")
-    if readBytes == 1 && linePtr[0] == lf {
-      return ""
+  var bytes = [UInt8]()
+  while true {
+
+    // ISO C requires the `EOF` (end-of-file) macro to be a negative value.
+    guard let byte = UInt8(exactly: _swift_stdlib_getc_unlocked_stdin()) else {
+      return bytes
     }
-    if readBytes >= 2 {
-      switch (linePtr[readBytes - 2], linePtr[readBytes - 1]) {
-      case (cr, lf):
-        readBytes -= 2
-        break
-      case (_, lf):
-        readBytes -= 1
-        break
-      default:
-        ()
+    bytes.append(byte)
+
+    // The "\r\n" (CRLF) sequence is handled by two iterations of the loop.
+    // Other sequences are searched for in reverse UTF-8 code unit order.
+    switch byte {
+    case 0x0A, 0x0B, 0x0C:
+      return bytes
+    case 0x0D:
+      if _swift_stdlib_ungetc_unlocked_stdin(
+           _swift_stdlib_getc_unlocked_stdin()) != 0x0A {
+        return bytes
       }
+    case 0x85:
+      if bytes.count >= 2,
+         bytes[bytes.count - 2] == 0xC2 {
+        return bytes
+      }
+    case 0xA8, 0xA9:
+      if bytes.count >= 3,
+         bytes[bytes.count - 2] == 0x80,
+         bytes[bytes.count - 3] == 0xE2 {
+        return bytes
+      }
+    default:
+      continue
     }
   }
-  let result = String._fromUTF8Repairing(
-    UnsafeBufferPointer(start: linePtr, count: readBytes)).0
-  _swift_stdlib_free(linePtr)
-  return result
 }

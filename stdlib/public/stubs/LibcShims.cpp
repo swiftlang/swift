@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -37,6 +37,42 @@ using namespace swift;
 static_assert(std::is_same<mode_t, swift::__swift_mode_t>::value,
               "__swift_mode_t must be defined as equivalent to mode_t in LibcShims.h");
 #endif
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_swift_stdlib_flockfile_stdin() {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  _lock_file(stdin);
+#else
+  flockfile(stdin);
+#endif
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_swift_stdlib_funlockfile_stdin() {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  _unlock_file(stdin);
+#else
+  funlockfile(stdin);
+#endif
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int swift::_swift_stdlib_getc_unlocked_stdin() {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  return _fgetc_nolock(stdin);
+#else
+  return getc_unlocked(stdin);
+#endif
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int swift::_swift_stdlib_ungetc_unlocked_stdin(int c) {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  return _ungetc_nolock(c, stdin);
+#else
+  return ungetc(c, stdin);
+#endif
+}
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int swift::_swift_stdlib_putchar_unlocked(int c) {

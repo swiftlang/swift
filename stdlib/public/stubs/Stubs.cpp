@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -274,63 +274,10 @@ uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 
 }
 
-/// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
-/// line.  Can be NULL if no characters were read. This buffer should be
-/// freed by the caller if this function returns a positive value.
-///
-/// \returns Size of character data returned in \c LinePtr, or -1
-/// if an error occurred, or EOF was reached.
+// FIXME: remove `swift_stdlib_readLine_stdin` if possible.
 __swift_ssize_t
-swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
-#if defined(_WIN32)
-  if (LinePtr == nullptr)
-    return -1;
-
-  ssize_t Capacity = 0;
-  ssize_t Pos = 0;
-  unsigned char *ReadBuf = nullptr;
-
-  _lock_file(stdin);
-
-  for (;;) {
-    int ch = _fgetc_nolock(stdin);
-
-    if (ferror(stdin) || (ch == EOF && Pos == 0)) {
-      if (ReadBuf)
-        free(ReadBuf);
-      _unlock_file(stdin);
-      return -1;
-    }
-
-    if (Capacity - Pos <= 1) {
-      // Capacity changes to 128, 128*2, 128*4, 128*8, ...
-      Capacity = Capacity ? Capacity * 2 : 128;
-      unsigned char *NextReadBuf =
-          static_cast<unsigned char *>(realloc(ReadBuf, Capacity));
-      if (NextReadBuf == nullptr) {
-        if (ReadBuf)
-          free(ReadBuf);
-        _unlock_file(stdin);
-        return -1;
-      }
-      ReadBuf = NextReadBuf;
-    }
-
-    if (ch == EOF)
-      break;
-    ReadBuf[Pos++] = ch;
-    if (ch == '\n')
-      break;
-  }
-
-  ReadBuf[Pos] = '\0';
-  *LinePtr = ReadBuf;
-  _unlock_file(stdin);
-  return Pos;
-#else
-  size_t Capacity = 0;
-  return getline((char **)LinePtr, &Capacity, stdin);
-#endif
+swift::swift_stdlib_readLine_stdin(unsigned char **) {
+  return -1;
 }
 
 #if defined(__CYGWIN__) || defined(_WIN32)

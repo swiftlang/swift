@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -27,6 +27,7 @@ namespace swift { extern "C" {
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
+// FIXME: remove `swift_stdlib_readLine_stdin` if possible.
 SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t
 swift_stdlib_readLine_stdin(unsigned char * _Nullable * _Nonnull LinePtr);

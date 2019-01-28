@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -49,6 +49,14 @@ typedef __swift_uint16_t __swift_mode_t;
 
 
 // Input/output <stdio.h>
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_stdlib_flockfile_stdin();
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_stdlib_funlockfile_stdin();
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int _swift_stdlib_getc_unlocked_stdin();
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int _swift_stdlib_ungetc_unlocked_stdin(int c);
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int _swift_stdlib_putchar_unlocked(int c);
 SWIFT_RUNTIME_STDLIB_INTERNAL

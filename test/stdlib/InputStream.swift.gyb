@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,6 +24,52 @@ import Swift
 
 var ReadLineTestSuite = TestSuite("ReadLine")
 
+ReadLineTestSuite.test("UnicodeNewlines/strippingNewline=false")
+.stdin("""
+  LF   \u{000A}\
+  VT   \u{000B}\
+  FF   \u{000C}\
+  CR   \u{000D}\
+  CRLF \u{000D}\u{000A}\
+  NEL  \u{0085}\
+  LS   \u{2028}\
+  PS   \u{2029}
+  """, eof: true)
+.code {
+  expectEqual("LF   \u{000A}",         readLine(strippingNewline: false))
+  expectEqual("VT   \u{000B}",         readLine(strippingNewline: false))
+  expectEqual("FF   \u{000C}",         readLine(strippingNewline: false))
+  expectEqual("CR   \u{000D}",         readLine(strippingNewline: false))
+  expectEqual("CRLF \u{000D}\u{000A}", readLine(strippingNewline: false))
+  expectEqual("NEL  \u{0085}",         readLine(strippingNewline: false))
+  expectEqual("LS   \u{2028}",         readLine(strippingNewline: false))
+  expectEqual("PS   \u{2029}",         readLine(strippingNewline: false))
+  expectNil(                           readLine(strippingNewline: false))
+}
+
+ReadLineTestSuite.test("UnicodeNewlines/strippingNewline=true")
+.stdin("""
+  LF   \u{000A}\
+  VT   \u{000B}\
+  FF   \u{000C}\
+  CR   \u{000D}\
+  CRLF \u{000D}\u{000A}\
+  NEL  \u{0085}\
+  LS   \u{2028}\
+  PS   \u{2029}
+  """, eof: true)
+.code {
+  expectEqual("LF   ", readLine(strippingNewline: true))
+  expectEqual("VT   ", readLine(strippingNewline: true))
+  expectEqual("FF   ", readLine(strippingNewline: true))
+  expectEqual("CR   ", readLine(strippingNewline: true))
+  expectEqual("CRLF ", readLine(strippingNewline: true))
+  expectEqual("NEL  ", readLine(strippingNewline: true))
+  expectEqual("LS   ", readLine(strippingNewline: true))
+  expectEqual("PS   ", readLine(strippingNewline: true))
+  expectNil(           readLine(strippingNewline: true))
+}
+
 % for strip_newline in ['false', 'true']:
 %   newline = '' if strip_newline == 'true' else '\\n'
 
@@ -31,14 +77,6 @@ ReadLineTestSuite.test("EmptyLine/strippingNewline=${strip_newline}")
   .stdin("\n")
   .code {
   expectEqual("${newline}", readLine(strippingNewline: ${strip_newline}))
-}
-
-ReadLineTestSuite.test("Whitespace/strippingNewline=${strip_newline}")
-  .stdin(" \t\u{0b}\u{0c}\u{85}\u{2028}\u{2029}\n")
-  .code {
-  expectEqual(
-    " \t\u{0b}\u{0c}\u{85}\u{2028}\u{2029}${newline}",
-    readLine(strippingNewline: ${strip_newline}))
 }
 
 ReadLineTestSuite.test("ASCII/length=1/strippingNewline=${strip_newline}")
@@ -111,8 +149,7 @@ ReadLineTestSuite.test("strippingNewline=default")
 ReadLineTestSuite.test("StripNewline/JustCR")
   .stdin("\r", eof: true)
   .code {
-  // FIXME: CR by itself is not recognized as a newline.
-  expectEqual("\r", readLine(strippingNewline: true))
+  expectEqual("", readLine(strippingNewline: true))
 }
 
 ReadLineTestSuite.test("StripNewline/JustLF")
@@ -130,8 +167,7 @@ ReadLineTestSuite.test("StripNewline/JustCR+LF")
 ReadLineTestSuite.test("StripNewline/CR")
   .stdin("abcd 123\r", eof: true)
   .code {
-  // FIXME: CR by itself is not recognized as a newline.
-  expectEqual("abcd 123\r", readLine(strippingNewline: true))
+  expectEqual("abcd 123", readLine(strippingNewline: true))
 }
 
 ReadLineTestSuite.test("StripNewline/LF")
