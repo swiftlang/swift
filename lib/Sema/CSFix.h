@@ -104,6 +104,14 @@ enum class FixKind : uint8_t {
   /// fix this issue by pretending that member exists and matches
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
+
+  /// Allow expressions where 'mutating' method is only partially applied,
+  /// which means either not applied at all e.g. `Foo.bar` or only `Self`
+  /// is applied e.g. `foo.bar` or `Foo.bar(&foo)`.
+  ///
+  /// Allow expressions where initializer call (either `self.init` or
+  /// `super.init`) is only partially applied.
+  AllowInvalidPartialApplication,
 };
 
 class ConstraintFix {
@@ -507,6 +515,24 @@ public:
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclName member,
                                         ConstraintLocator *locator);
+};
+
+class AllowInvalidPartialApplication final : public ConstraintFix {
+public:
+  AllowInvalidPartialApplication(bool isWarning, ConstraintSystem &cs,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPartialApplication, locator,
+                      isWarning) {}
+
+  std::string getName() const override {
+    return "allow partially applied 'mutating' method";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInvalidPartialApplication *create(bool isWarning,
+                                                ConstraintSystem &cs,
+                                                ConstraintLocator *locator);
 };
 
 } // end namespace constraints
