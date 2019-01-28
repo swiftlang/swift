@@ -192,8 +192,8 @@ class ModuleDepGraph {
   Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
 
   /// If tracing dependencies, record the node sequence
-  std::unordered_multimap<std::string, std::vector<const ModuleDepGraphNode *>>
-      pathsByEndingSwiftDeps;
+  std::unordered_multimap<const driver::Job*, std::vector<const ModuleDepGraphNode *>>
+      dependencyPathsToJobs;
 
   /// For helping with performance tuning, may be null:
   UnifiedStatsReporter *const stats;
@@ -347,6 +347,14 @@ private:
 
   void verifyCanFindEachJob() const;
   void verifyEachJobIsTracked() const;
+  
+  /// Record a visit to this node for later dependency printing
+  size_t traceArrival(const ModuleDepGraphNode *visitedNode);
+  /// Record end of visit to this node.
+  void traceDeparture(size_t pathLengthAfterArrival);
+  
+  /// For printing why a Job was compiled, record how it was found.
+  void recordDependencyPathToJob(const std::vector<const ModuleDepGraphNode *> &pathToJob, const driver::Job* dependentJob);
 
   static bool mapCorruption(const char *msg) { llvm_unreachable(msg); }
 
