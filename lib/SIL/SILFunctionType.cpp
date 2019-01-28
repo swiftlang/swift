@@ -1240,12 +1240,6 @@ getSILFunctionTypeForAbstractCFunction(SILModule &M,
                                        AnyFunctionType::ExtInfo extInfo,
                                        Optional<SILDeclRef> constant);
 
-/// If EnableGuaranteedNormalArguments is set, return a default convention that
-/// uses guaranteed.
-static DefaultConventions getNormalArgumentConvention(SILModule &M) {
-  return DefaultConventions(NormalParameterConvention::Guaranteed);
-}
-
 static CanSILFunctionType getNativeSILFunctionType(
     SILModule &M, AbstractionPattern origType,
     CanAnyFunctionType substInterfaceType, AnyFunctionType::ExtInfo extInfo,
@@ -1294,11 +1288,12 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::IVarInitializer:
-    case SILDeclRef::Kind::IVarDestroyer:
-      return getSILFunctionType(M, origType, substInterfaceType, extInfo,
-                                getNormalArgumentConvention(M), ForeignInfo(),
-                                origConstant, constant, reqtSubs,
+    case SILDeclRef::Kind::IVarDestroyer: {
+      auto conv = DefaultConventions(NormalParameterConvention::Guaranteed);
+      return getSILFunctionType(M, origType, substInterfaceType, extInfo, conv,
+                                ForeignInfo(), origConstant, constant, reqtSubs,
                                 witnessMethodConformance);
+    }
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
                                 DeallocatorConventions(), ForeignInfo(),
