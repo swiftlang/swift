@@ -273,12 +273,24 @@ void SourceLoc::dump(const SourceManager &SM) const {
 
 void SourceRange::print(raw_ostream &OS, const SourceManager &SM,
                         unsigned &LastBufferID, bool PrintText) const {
+  OS << '[';
+  Start.print(OS, SM, LastBufferID);
+  OS << " - ";
+  End.print(OS, SM, LastBufferID);
+  OS << ']';
+
+  if (Start.isInvalid() || End.isInvalid())
+    return;
+  
   // FIXME: CharSourceRange is a half-open character-based range, while
   // SourceRange is a closed token-based range, so this conversion omits the
   // last token in the range. Unfortunately, we can't actually get to the end
   // of the token without using the Lex library, which would be a layering
   // violation. This is still better than nothing.
-  CharSourceRange(SM, Start, End).print(OS, SM, LastBufferID, PrintText);
+  if (PrintText) {
+    auto charRange = CharSourceRange(SM, Start, End);
+    OS << " RangeText=\"" << SM.extractText(charRange) << '"';
+  }
 }
 
 void SourceRange::dump(const SourceManager &SM) const {
@@ -296,18 +308,7 @@ CharSourceRange::CharSourceRange(const SourceManager &SM, SourceLoc Start,
 
 void CharSourceRange::print(raw_ostream &OS, const SourceManager &SM,
                             unsigned &LastBufferID, bool PrintText) const {
-  OS << '[';
-  Start.print(OS, SM, LastBufferID);
-  OS << " - ";
-  getEnd().print(OS, SM, LastBufferID);
-  OS << ']';
-
-  if (Start.isInvalid() || getEnd().isInvalid())
-    return;
-
-  if (PrintText) {
-    OS << " RangeText=\"" << SM.extractText(*this) << '"';
-  }
+  SourceRange(Start, getEnd()).print(OS, SM, LastBufferID, PrintText);
 }
 
 void CharSourceRange::dump(const SourceManager &SM) const {
