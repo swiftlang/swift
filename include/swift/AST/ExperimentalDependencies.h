@@ -459,12 +459,14 @@ public:
   }
 
   bool operator!=(const DependencyKey &rhs) const { return !(*this == rhs); }
-  
+
   /// Return true if this key can be recorded as a use of def.
   /// If everything is the same except for aspect, it's tricky:
-  /// The implementation does not depend on the interface; it's the other way around.
+  /// The implementation does not depend on the interface; it's the other way
+  /// around.
   bool canDependUpon(const DependencyKey &def) const {
-    if (getKind() != def.getKind() || getContext() != def.getContext() || getName() != def.getName())
+    if (getKind() != def.getKind() || getContext() != def.getContext() ||
+        getName() != def.getName())
       return true;
     if (getAspect() == def.getAspect())
       return false;
@@ -664,7 +666,8 @@ public:
   bool operator==(const SourceFileDepGraphNode &other) const {
     return DepGraphNode::operator==(other) &&
            sequenceNumber == other.sequenceNumber &&
-           defsIDependUpon == other.defsIDependUpon && isProvides == other.isProvides;
+           defsIDependUpon == other.defsIDependUpon &&
+           isProvides == other.isProvides;
   }
 
   size_t getSequenceNumber() const { return sequenceNumber; }
@@ -755,8 +758,9 @@ public:
                                     const SourceFileDepGraphNode *use)>
                       fn) const;
 
-  void forEachDefDependedUponBy(const SourceFileDepGraphNode *n,
-                    function_ref<void(SourceFileDepGraphNode *)> fn) const {
+  void forEachDefDependedUponBy(
+      const SourceFileDepGraphNode *n,
+      function_ref<void(SourceFileDepGraphNode *)> fn) const {
     n->forEachDefIDependUpon([&](size_t useIndex) { fn(getNode(useIndex)); });
   }
 
@@ -773,7 +777,8 @@ public:
   /// \p Use is the Node that must be rebuilt when \p def changes.
   /// Record that fact in the graph.
   void addArc(SourceFileDepGraphNode *def, SourceFileDepGraphNode *use) {
-    getNode(use->getSequenceNumber())->addDefIDependUpon(def->getSequenceNumber());
+    getNode(use->getSequenceNumber())
+        ->addDefIDependUpon(def->getSequenceNumber());
   }
 
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if

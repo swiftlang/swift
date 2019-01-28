@@ -69,7 +69,7 @@ void SourceFileDepGraph::forEachArc(
                       const SourceFileDepGraphNode *use)>
         fn) const {
   forEachNode([&](const SourceFileDepGraphNode *useNode) {
-    forEachDefDependedUponBy(useNode, [&](SourceFileDepGraphNode* defNode) {
+    forEachDefDependedUponBy(useNode, [&](SourceFileDepGraphNode *defNode) {
       fn(defNode, useNode);
     });
   });
@@ -306,7 +306,8 @@ void MappingContextTraits<SourceFileDepGraphNode, SourceFileDepGraph>::mapping(
     IO &io, SourceFileDepGraphNode &node, SourceFileDepGraph &g) {
   MappingTraits<DepGraphNode>::mapping(io, node);
   io.mapRequired("sequenceNumber", node.sequenceNumber);
-  std::vector<size_t> defsIDependUponVec(node.defsIDependUpon.begin(), node.defsIDependUpon.end());
+  std::vector<size_t> defsIDependUponVec(node.defsIDependUpon.begin(),
+                                         node.defsIDependUpon.end());
   io.mapRequired("defsIDependUpon", defsIDependUponVec);
   io.mapRequired("isProvides", node.isProvides);
   if (!io.outputting()) {

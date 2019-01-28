@@ -79,23 +79,26 @@ bool ModuleDepGraph::isMarked(const Job *cmd) const {
   return cascadingJobs.count(getSwiftDeps(cmd));
 }
 
-void ModuleDepGraph::markTransitive(SmallVectorImpl<const Job *> &consequentJobsToRecompile,
-                                    const Job *jobToBeRecompiled, const void *ignored) {
+void ModuleDepGraph::markTransitive(
+    SmallVectorImpl<const Job *> &consequentJobsToRecompile,
+    const Job *jobToBeRecompiled, const void *ignored) {
   FrontendStatsTracer tracer(stats, "experimental-dependencies-markTransitive");
-  
+
   std::unordered_set<const ModuleDepGraphNode *> dependentNodes;
   const StringRef swiftDepsToBeRecompiled = getSwiftDeps(jobToBeRecompiled);
   // Do the traversal.
   for (auto &fileAndNode : nodeMap[swiftDepsToBeRecompiled]) {
     assert(isCurrentPathForTracingEmpty());
-    findDependentNodesAndRecordCascadingOnes(dependentNodes, fileAndNode.second);
+    findDependentNodesAndRecordCascadingOnes(dependentNodes,
+                                             fileAndNode.second);
   }
 
   computeUniqueJobsFromNodes(consequentJobsToRecompile, dependentNodes);
 }
 
-void ModuleDepGraph::computeUniqueJobsFromNodes(SmallVectorImpl<const Job *> &jobs,
-                         const std::unordered_set<const ModuleDepGraphNode *> &nodes) {
+void ModuleDepGraph::computeUniqueJobsFromNodes(
+    SmallVectorImpl<const Job *> &jobs,
+    const std::unordered_set<const ModuleDepGraphNode *> &nodes) {
   std::unordered_set<std::string> swiftDepsOfNodes;
   for (const ModuleDepGraphNode *n : nodes) {
     if (!n->getSwiftDeps().hasValue())
@@ -108,7 +111,6 @@ void ModuleDepGraph::computeUniqueJobsFromNodes(SmallVectorImpl<const Job *> &jo
     }
   }
 }
-
 
 bool ModuleDepGraph::markIntransitive(const Job *node) {
   return rememberThatJobCascades(getSwiftDeps(node));
@@ -162,11 +164,11 @@ LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g) {
   g.forEachNode([&](const SourceFileDepGraphNode *integrand) {
     const auto &key = integrand->getKey();
     auto preexistingMatch = findPreexistingMatch(swiftDeps, integrand);
-    if (preexistingMatch.hasValue() && preexistingMatch.getValue().first == LocationOfPreexistingNode::here)
+    if (preexistingMatch.hasValue() &&
+        preexistingMatch.getValue().first == LocationOfPreexistingNode::here)
       disappearedNodes.erase(key); // Node was and still is. Do not erase it.
-    const bool changed = integrateSourceFileDepGraphNode(g,
-                                                         integrand,
-                                                         preexistingMatch);
+    const bool changed =
+        integrateSourceFileDepGraphNode(g, integrand, preexistingMatch);
     if (changed)
       changedNodes.insert(key);
   });
@@ -182,71 +184,75 @@ LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g) {
                               : LoadResult::AffectsDownstream;
 }
 
-ModuleDepGraph::PreexistingNodeIfAny
-ModuleDepGraph::findPreexistingMatch(
-                                     StringRef swiftDepsOfCompilationToBeIntegrated,
-                                     const SourceFileDepGraphNode *integrand) {
+ModuleDepGraph::PreexistingNodeIfAny ModuleDepGraph::findPreexistingMatch(
+    StringRef swiftDepsOfCompilationToBeIntegrated,
+    const SourceFileDepGraphNode *integrand) {
   const auto &matches = nodeMap[integrand->getKey()];
   const auto &expatsIter = matches.find("");
   if (expatsIter != matches.end()) {
-    assert(matches.size() == 1 && "If an expat exists, then must not be any matches in other files");
-    return std::make_pair(LocationOfPreexistingNode::nowhere, expatsIter->second);
+    assert(matches.size() == 1 &&
+           "If an expat exists, then must not be any matches in other files");
+    return std::make_pair(LocationOfPreexistingNode::nowhere,
+                          expatsIter->second);
   }
   if (integrand->getIsProvides()) {
-    const auto &preexistingNodeInPlaceIter = matches.find(swiftDepsOfCompilationToBeIntegrated);
+    const auto &preexistingNodeInPlaceIter =
+        matches.find(swiftDepsOfCompilationToBeIntegrated);
     if (preexistingNodeInPlaceIter != matches.end())
-      return std::make_pair(LocationOfPreexistingNode::here, preexistingNodeInPlaceIter->second);
+      return std::make_pair(LocationOfPreexistingNode::here,
+                            preexistingNodeInPlaceIter->second);
   }
   if (!matches.empty())
-    return std::make_pair(LocationOfPreexistingNode::elsewhere, matches.begin()->second);
+    return std::make_pair(LocationOfPreexistingNode::elsewhere,
+                          matches.begin()->second);
   return None;
 }
 
-
 bool ModuleDepGraph::integrateSourceFileDepGraphNode(
-                                                     const SourceFileDepGraph &g,
-    const SourceFileDepGraphNode *integrand,
+    const SourceFileDepGraph &g, const SourceFileDepGraphNode *integrand,
     const PreexistingNodeIfAny preexistingMatch) {
 
   // Track externalDependencies so Compilation can check them.
   if (integrand->getKey().getKind() == NodeKind::externalDepend)
     return externalDependencies.insert(integrand->getKey().getName()).second;
-  
+
   if (integrand->isDepends())
     return false; // dependency will be handled by the use node
-  
+
   StringRef swiftDepsOfSourceFileGraph = g.getSwiftDepsFromSourceFileProvide();
-  auto changedAndUseNode = integrateSourceFileDeclNode(integrand, swiftDepsOfSourceFileGraph,
-                                                       preexistingMatch);
+  auto changedAndUseNode = integrateSourceFileDeclNode(
+      integrand, swiftDepsOfSourceFileGraph, preexistingMatch);
   recordWhatUseDependsUpon(g, integrand, changedAndUseNode.second);
   return changedAndUseNode.first;
 }
 
-
-std::pair<bool, ModuleDepGraphNode*> ModuleDepGraph::integrateSourceFileDeclNode(
+std::pair<bool, ModuleDepGraphNode *>
+ModuleDepGraph::integrateSourceFileDeclNode(
     const SourceFileDepGraphNode *integrand,
     StringRef swiftDepsOfSourceFileGraph,
     const PreexistingNodeIfAny preexistingMatch) {
-  
+
   if (!preexistingMatch.hasValue()) {
-    auto *newNode = integrateByCreatingANewNode(integrand, swiftDepsOfSourceFileGraph.str());
+    auto *newNode = integrateByCreatingANewNode(
+        integrand, swiftDepsOfSourceFileGraph.str());
     return std::make_pair(true, newNode); // New node
   }
   const auto where = preexistingMatch.getValue().first;
   auto *match = preexistingMatch.getValue().second;
   switch (where) {
-    case LocationOfPreexistingNode::here:
-      return std::make_pair(match->integrateFingerprintFrom(integrand), match);
-      
-   case LocationOfPreexistingNode::nowhere:
-      // Some other file depended on this, but didn't know where it was.
-      moveNodeToDifferentFile(match, swiftDepsOfSourceFileGraph.str());
-      match->integrateFingerprintFrom(integrand);
-      return std::make_pair(true, match); // New Decl, assume changed
+  case LocationOfPreexistingNode::here:
+    return std::make_pair(match->integrateFingerprintFrom(integrand), match);
 
-    case LocationOfPreexistingNode::elsewhere:
-      auto *newNode = integrateByCreatingANewNode(integrand, swiftDepsOfSourceFileGraph.str());
-      return std::make_pair(true, newNode); // New node;
+  case LocationOfPreexistingNode::nowhere:
+    // Some other file depended on this, but didn't know where it was.
+    moveNodeToDifferentFile(match, swiftDepsOfSourceFileGraph.str());
+    match->integrateFingerprintFrom(integrand);
+    return std::make_pair(true, match); // New Decl, assume changed
+
+  case LocationOfPreexistingNode::elsewhere:
+    auto *newNode = integrateByCreatingANewNode(
+        integrand, swiftDepsOfSourceFileGraph.str());
+    return std::make_pair(true, newNode); // New node;
   }
   llvm_unreachable("impossible");
 }
@@ -261,13 +267,14 @@ ModuleDepGraphNode *ModuleDepGraph::integrateByCreatingANewNode(
   return newNode;
 }
 
-void ModuleDepGraph::recordWhatUseDependsUpon(const SourceFileDepGraph &g,
-                                              const SourceFileDepGraphNode *sourceFileUseNode,
-                                              ModuleDepGraphNode *moduleUseNode) {
+void ModuleDepGraph::recordWhatUseDependsUpon(
+    const SourceFileDepGraph &g,
+    const SourceFileDepGraphNode *sourceFileUseNode,
+    ModuleDepGraphNode *moduleUseNode) {
   g.forEachDefDependedUponBy(sourceFileUseNode,
                              [&](const SourceFileDepGraphNode *def) {
                                usesByDef[def->getKey()].insert(moduleUseNode);
-  });
+                             });
 }
 
 void ModuleDepGraph::removeNode(ModuleDepGraphNode *n) {
@@ -309,7 +316,7 @@ void ModuleDepGraph::forEachArc(
   for (const auto &defUse : usesByDef)
     forEachMatchingNode(defUse.first, [&](const ModuleDepGraphNode *defNode) {
       for (const auto &useNode : defUse.second)
-          fn(defNode, useNode);
+        fn(defNode, useNode);
     });
 }
 
@@ -354,20 +361,23 @@ size_t ModuleDepGraph::traceArrival(const ModuleDepGraphNode *visitedNode) {
     return 0;
   auto &currentPath = currentPathIfTracing.getValue();
   recordDependencyPathToJob(currentPath, getJob(visitedNode->getSwiftDeps()));
-  
+
   currentPath.push_back(visitedNode);
   return currentPath.size();
 }
 
-void ModuleDepGraph::recordDependencyPathToJob(const std::vector<const ModuleDepGraphNode *> &pathToJob, const driver::Job* dependentJob) {
-  dependencyPathsToJobs.insert( std::make_pair(dependentJob, pathToJob) );
+void ModuleDepGraph::recordDependencyPathToJob(
+    const std::vector<const ModuleDepGraphNode *> &pathToJob,
+    const driver::Job *dependentJob) {
+  dependencyPathsToJobs.insert(std::make_pair(dependentJob, pathToJob));
 }
 
 void ModuleDepGraph::traceDeparture(size_t pathLengthAfterArrival) {
   if (!currentPathIfTracing)
     return;
   auto &currentPath = currentPathIfTracing.getValue();
-  assert(pathLengthAfterArrival == currentPath.size() && "Path must be maintained throughout recursive visits.");
+  assert(pathLengthAfterArrival == currentPath.size() &&
+         "Path must be maintained throughout recursive visits.");
   currentPath.pop_back();
 }
 

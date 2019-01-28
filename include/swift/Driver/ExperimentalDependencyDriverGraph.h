@@ -150,7 +150,7 @@ class ModuleDepGraph {
   /// source file.)
 
   /// Tracks def-use relationships by DependencyKey.
-  std::unordered_map<DependencyKey, std::unordered_set<ModuleDepGraphNode*>>
+  std::unordered_map<DependencyKey, std::unordered_set<ModuleDepGraphNode *>>
       usesByDef;
 
   // Supports requests from the driver to getExternalDependencies.
@@ -192,7 +192,8 @@ class ModuleDepGraph {
   Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
 
   /// If tracing dependencies, record the node sequence
-  std::unordered_multimap<const driver::Job*, std::vector<const ModuleDepGraphNode *>>
+  std::unordered_multimap<const driver::Job *,
+                          std::vector<const ModuleDepGraphNode *>>
       dependencyPathsToJobs;
 
   /// For helping with performance tuning, may be null:
@@ -289,13 +290,16 @@ public:
   /// Interface to status quo code in the driver.
   bool isMarked(const driver::Job *) const;
 
-  /// Given a "cascading" job, that is a job whose dependents must be recompiled when this job is recompiled,
-  /// Compute two sets of jobs:
-  /// 1. Return value (via visited) is the set of jobs needing recompilation after this one, and
-  /// 2. Jobs not previously known to need dependencies reexamined after they are recompiled.
-  /// Such jobs are added to the \ref cascadingJobs set, and accessed via \ref isMarked.
-  void markTransitive(SmallVectorImpl<const driver::Job *> &consequentJobsToRecompile,
-                      const driver::Job *jobToBeRecompiled, const void *ignored = nullptr);
+  /// Given a "cascading" job, that is a job whose dependents must be recompiled
+  /// when this job is recompiled, Compute two sets of jobs:
+  /// 1. Return value (via visited) is the set of jobs needing recompilation
+  /// after this one, and
+  /// 2. Jobs not previously known to need dependencies reexamined after they
+  /// are recompiled. Such jobs are added to the \ref cascadingJobs set, and
+  /// accessed via \ref isMarked.
+  void markTransitive(
+      SmallVectorImpl<const driver::Job *> &consequentJobsToRecompile,
+      const driver::Job *jobToBeRecompiled, const void *ignored = nullptr);
 
   /// "Mark" this node only.
   bool markIntransitive(const driver::Job *);
@@ -349,7 +353,7 @@ private:
 
   void verifyCanFindEachJob() const;
   void verifyEachJobInGraphIsTracked() const;
- 
+
   static bool mapCorruption(const char *msg) { llvm_unreachable(msg); }
 
   /// Use the known swiftDeps to find a directory for
@@ -366,44 +370,44 @@ private:
   /// Integrate a SourceFileDepGraph into the receiver.
   /// Integration happens when the driver needs to read SourceFileDepGraph.
   DependencyGraphImpl::LoadResult integrate(const SourceFileDepGraph &);
-  
-  enum class LocationOfPreexistingNode {
-    nowhere, here, elsewhere
-  };
-  
-  typedef Optional<std::pair<LocationOfPreexistingNode, ModuleDepGraphNode *>> PreexistingNodeIfAny;
-  
+
+  enum class LocationOfPreexistingNode { nowhere, here, elsewhere };
+
+  typedef Optional<std::pair<LocationOfPreexistingNode, ModuleDepGraphNode *>>
+      PreexistingNodeIfAny;
+
   /// Find the preexisting node here that best matches the integrand.
   PreexistingNodeIfAny
   findPreexistingMatch(StringRef swiftDepsOfCompilationToBeIntegrated,
                        const SourceFileDepGraphNode *integrand);
 
-
   /// Integrate the \p integrand into the receiver.
   /// Return a bool indicating if this node represents a change that must be
   /// propagated.
-  bool integrateSourceFileDepGraphNode(
-                                       const SourceFileDepGraph &g,
-      const SourceFileDepGraphNode *integrand,
-      const PreexistingNodeIfAny preexistingMatch);
+  bool
+  integrateSourceFileDepGraphNode(const SourceFileDepGraph &g,
+                                  const SourceFileDepGraphNode *integrand,
+                                  const PreexistingNodeIfAny preexistingMatch);
 
   /// Integrate the \p integrand, a node that represents a Decl in the swiftDeps
   /// file being integrated. \p preexistingNodeInPlace holds the node
   /// representing the same Decl that already exists, if there is one. \p
   /// prexisintExpat holds a node with the same key that already exists, but was
-  /// not known to reside in any swiftDeps file. Return a bool indicating if this node represents a change that must be
-  /// propagated, and the integrated ModuleDepGraphNode.
-  std::pair<bool, ModuleDepGraphNode*> integrateSourceFileDeclNode(
-      const SourceFileDepGraphNode *integrand,
-      StringRef swiftDepsOfSourceFileGraph,
-      const PreexistingNodeIfAny preexistingMatch);
+  /// not known to reside in any swiftDeps file. Return a bool indicating if
+  /// this node represents a change that must be propagated, and the integrated
+  /// ModuleDepGraphNode.
+  std::pair<bool, ModuleDepGraphNode *>
+  integrateSourceFileDeclNode(const SourceFileDepGraphNode *integrand,
+                              StringRef swiftDepsOfSourceFileGraph,
+                              const PreexistingNodeIfAny preexistingMatch);
 
-   /// Create a brand-new ModuleDepGraphNode to integrate \p integrand.
+  /// Create a brand-new ModuleDepGraphNode to integrate \p integrand.
   ModuleDepGraphNode *
   integrateByCreatingANewNode(const SourceFileDepGraphNode *integrand,
                               Optional<std::string> swiftDepsForNewNode);
 
-  /// After importing a provides node from the frontend, record its dependencies.
+  /// After importing a provides node from the frontend, record its
+  /// dependencies.
   void recordWhatUseDependsUpon(const SourceFileDepGraph &g,
                                 const SourceFileDepGraphNode *sourceFileUseNode,
                                 ModuleDepGraphNode *moduleUseNode);
@@ -415,24 +419,25 @@ private:
   /// Given a definition node, and a list of already found dependents,
   /// recursively add transitive closure of dependents of the definition
   /// into the already found dependents.
-  /// Also record any dependents that "cascade", i.e. whose dependencies must be recomputed after recompilation so that its dependents can be recompiled.
+  /// Also record any dependents that "cascade", i.e. whose dependencies must be
+  /// recomputed after recompilation so that its dependents can be recompiled.
   void findDependentNodesAndRecordCascadingOnes(
       std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
       const ModuleDepGraphNode *definition);
-  
+
   void computeUniqueJobsFromNodes(
-                                  SmallVectorImpl<const driver::Job *> &uniqueJobs,
-                                  const std::unordered_set<const ModuleDepGraphNode *> &nodes);
-  
-  
+      SmallVectorImpl<const driver::Job *> &uniqueJobs,
+      const std::unordered_set<const ModuleDepGraphNode *> &nodes);
+
   /// Record a visit to this node for later dependency printing
   size_t traceArrival(const ModuleDepGraphNode *visitedNode);
   /// Record end of visit to this node.
   void traceDeparture(size_t pathLengthAfterArrival);
-  
-  /// For printing why a Job was compiled, record how it was found.
-  void recordDependencyPathToJob(const std::vector<const ModuleDepGraphNode *> &pathToJob, const driver::Job* dependentJob);
 
+  /// For printing why a Job was compiled, record how it was found.
+  void recordDependencyPathToJob(
+      const std::vector<const ModuleDepGraphNode *> &pathToJob,
+      const driver::Job *dependentJob);
 
   /// Return true if job did not cascade before
   bool rememberThatJobCascades(StringRef swiftDeps) {

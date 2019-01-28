@@ -311,28 +311,29 @@ void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
   }
 }
 
-  //HERE
+  // HERE
 #include "swift/Driver/Job.h"
-  #include "llvm/Support/Path.h"
 #include "llvm/Option/Arg.h"
-  
+#include "llvm/Support/Path.h"
 
 void
 DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
                                     const void *node, MarkTracerImpl *tracer) {
-  const driver::Job *HERE = (const driver::Job*)node;
-  StringRef HERE1 = llvm::sys::path::filename(HERE->getOutput().getBaseInput(0));
+  const driver::Job *HERE = (const driver::Job *)node;
+  StringRef HERE1 =
+      llvm::sys::path::filename(HERE->getOutput().getBaseInput(0));
   if (HERE1 == "Calendars.swift")
     llvm::errs() << "HERE2\n";
-  const driver::InputAction *IA = dyn_cast<driver::InputAction>(HERE->getSource().getInputs().front());
+  const driver::InputAction *IA =
+      dyn_cast<driver::InputAction>(HERE->getSource().getInputs().front());
   auto HERE2 = llvm::sys::path::filename(IA->getInputArg().getValue());
   if (HERE2 == "Calendars.swift")
     llvm::errs() << "HERE3\n";
-//  StringRef HERE3 = HERE->getInputs().front()->getOutput().getPrimaryOutputFilenames().front();
-//  if (HERE3 == "Calendars.swift")
-//    llvm::errs() << "HERE3\n";
-  
-  
+  //  StringRef HERE3 =
+  //  HERE->getInputs().front()->getOutput().getPrimaryOutputFilenames().front();
+  //  if (HERE3 == "Calendars.swift")
+  //    llvm::errs() << "HERE3\n";
+
   assert(Provides.count(node) && "node is not in the graph");
   llvm::SpecificBumpPtrAllocator<MarkTracerImpl::Entry> scratchAlloc;
 
