@@ -684,6 +684,18 @@ public struct PythonInterface {
   public subscript(dynamicMember name: String) -> PythonObject {
     return builtins[name]
   }
+
+  // The Python runtime version.
+  // Equivalent to `sys.version` in Python.
+  public var version: PythonObject {
+    return self.import("sys").version
+  }
+
+  // The Python runtime version information.
+  // Equivalent to `sys.version_info` in Python.
+  public var versionInfo: PythonObject {
+    return self.import("sys").version_info
+  }
 }
 
 //===----------------------------------------------------------------------===//

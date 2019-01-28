@@ -25,7 +25,7 @@ private let np = Python.import("numpy")
 
 extension ShapedArray : ConvertibleFromNumpyArray
   where Scalar : NumpyScalarCompatible {
-  public init?(numpyArray: PythonObject) {
+  public init?(numpy numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
       return nil
@@ -73,7 +73,7 @@ extension ShapedArray : ConvertibleFromNumpyArray
 
 extension Tensor : ConvertibleFromNumpyArray
   where Scalar : NumpyScalarCompatible {
-  public init?(numpyArray: PythonObject) {
+  public init?(numpy numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
       return nil
