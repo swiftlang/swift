@@ -3799,6 +3799,10 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
     }
     return builder.createTuple(loc, adjointTy, adjElements);
   }
+  case VectorSpace::Kind::Function: {
+    llvm_unreachable(
+      "Unimplemented: Emit thunks for abstracting adjoint accumulation");
+  }
   }
 }
 
@@ -3853,6 +3857,10 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
       accumulateMaterializedAdjointsIndirect(eltAddrLHS, eltAddrRHS, destAddr);
     }
     return;
+  }
+  case VectorSpace::Kind::Function: {
+    llvm_unreachable(
+        "Unimplemented: Emit thunks for abstracting adjoint accumulation");
   }
   }
 }
