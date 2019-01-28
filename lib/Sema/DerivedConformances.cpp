@@ -20,6 +20,7 @@
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "DerivedConformances.h"
+#include "swift/AST/ASTWalker.h"
 
 using namespace swift;
 
@@ -255,11 +256,12 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
 }
 
 DeclRefExpr *
-DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
+DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn,
+                                      SourceLoc nameLoc) {
   ASTContext &C = fn->getASTContext();
 
   auto selfDecl = fn->getImplicitSelfDecl();
-  return new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
+  return new (C) DeclRefExpr(selfDecl, DeclNameLoc(nameLoc), /*implicit*/true);
 }
 
 AccessorDecl *DerivedConformance::
@@ -384,4 +386,98 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   }
 
   return false;
+}
+
+using namespace std::rel_ops;
+
+class SourceLocWalker : public ASTWalker {  
+  SourceLoc upperBound;
+  bool stop = false;
+  
+public:
+  SourceLoc nearest;
+  
+  SourceLocWalker(SourceLoc upperBound) : upperBound(upperBound) { }
+  
+private:
+  /// Updates \c nearest with \c loc if appropriate. Returns true if \c loc is in-bounds
+  /// or false if it's out-of-bounds.
+  bool evaluateLoc(SourceLoc loc) {
+    if (loc > upperBound)
+      return false;
+        
+    if (loc != upperBound && nearest < loc) {
+      assert(!stop && "nearest would have been incorrect if we'd really stopped!");
+      nearest = loc;
+    }
+    
+    return true;
+  }
+  
+  /// Evalutes the start and end of the range to see if it contains the nearest location
+  /// to the upperBound. Returns true if upperBound is inside the range and therefore
+  /// it's worth searching inside.
+  bool evaluateRange(SourceRange range) {
+    if (!evaluateLoc(range.Start)) {
+      stop = true;
+      return false;
+    }
+    
+    return !evaluateLoc(range.End);
+  }
+  
+  template<class Node>
+  std::pair<bool, Node *> evaluateIntoPair(Node *N) {
+    bool skip = evaluateRange(N->getSourceRange());
+#ifdef NDEBUG
+    return { skip, stop ? nullptr : N };
+#else
+    // We want to make sure that it was correct to set `stop`, so keep walking
+    // so the assertion in `evaluateLoc()` will trip.
+    return { skip, N };
+#endif
+  }
+  
+public:
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    return evaluateIntoPair(E);
+  }
+  
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    return evaluateIntoPair(S);
+  }
+  
+  std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+    return evaluateIntoPair(P);
+  }
+  
+  bool walkToDeclPre(Decl *D) override {
+    return evaluateRange(D->getSourceRangeIncludingAttrs());
+  }
+  
+  bool walkToTypeLocPre(TypeLoc &TL) override {
+    return evaluateRange(TL.getSourceRange());
+  }
+  
+  bool walkToTypeReprPre(TypeRepr *T) override {
+    return evaluateRange(T->getSourceRange());
+  }
+  
+  bool shouldWalkIntoGenericParams() override {
+    return true;
+  }
+  
+  bool walkToParameterListPre(ParameterList *PL) override {
+    return evaluateRange(PL->getSourceRange());
+  }
+};
+
+SourceRange
+DerivedConformance::SourceLocSynthesizer::getBounds(ASTNode node, SourceLoc upperBound) {
+  SourceLocWalker walker(upperBound);
+  node.walk(walker);
+//  if (walker.nearest.isValid())
+    return SourceRange(walker.nearest, upperBound);
+//  else
+//    return SourceRange();
 }

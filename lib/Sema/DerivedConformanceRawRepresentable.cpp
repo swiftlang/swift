@@ -27,22 +27,28 @@
 
 using namespace swift;
 
-static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
+static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr,
+                                        DerivedConformance::SourceLocSynthesizer &sourceLocs) {
   LiteralExpr *clone;
   if (auto intLit = dyn_cast<IntegerLiteralExpr>(expr)) {
-    clone = new (C) IntegerLiteralExpr(intLit->getDigitsText(), expr->getLoc(),
+    auto negLoc = intLit->isNegative() ? sourceLocs.makeNext(intLit->getMinusLoc()) : SourceLoc();
+    auto litLoc = sourceLocs.makeNext(intLit->getDigitsLoc());
+    clone = new (C) IntegerLiteralExpr(intLit->getDigitsText(), litLoc,
                                        /*implicit*/ true);
     if (intLit->isNegative())
-      cast<IntegerLiteralExpr>(clone)->setNegative(expr->getLoc());
+      cast<IntegerLiteralExpr>(clone)->setNegative(negLoc);
   } else if (isa<NilLiteralExpr>(expr)) {
-    clone = new (C) NilLiteralExpr(expr->getLoc());
+    clone = new (C) NilLiteralExpr(sourceLocs.makeNext(expr->getLoc()));
   } else if (auto stringLit = dyn_cast<StringLiteralExpr>(expr)) {
-    clone = new (C) StringLiteralExpr(stringLit->getValue(), expr->getLoc());
+    clone = new (C) StringLiteralExpr(stringLit->getValue(),
+                                      sourceLocs.makeNext(stringLit->getLoc()));
   } else if (auto floatLit = dyn_cast<FloatLiteralExpr>(expr)) {
-    clone = new (C) FloatLiteralExpr(floatLit->getDigitsText(), expr->getLoc(),
+    auto negLoc = floatLit->isNegative() ? sourceLocs.makeNext(floatLit->getMinusLoc()) : SourceLoc();
+    auto litLoc = sourceLocs.makeNext(floatLit->getDigitsLoc());
+    clone = new (C) FloatLiteralExpr(floatLit->getDigitsText(), litLoc,
                                      /*implicit*/ true);
     if (floatLit->isNegative())
-      cast<FloatLiteralExpr>(clone)->setNegative(expr->getLoc());
+      cast<FloatLiteralExpr>(clone)->setNegative(negLoc);
   } else {
     llvm_unreachable("invalid raw literal expr");
   }
@@ -73,11 +79,14 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl,
   //     }
   //   }
   // }
-
+  
   auto parentDC = toRawDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
   auto enumDecl = parentDC->getSelfEnumDecl();
+  
+  DerivedConformance::SourceLocSynthesizer
+  sourceLocs(C, enumDecl, enumDecl->getBraces().End);
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
@@ -90,56 +99,98 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl,
     assert(elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy));
   }
 #endif
-
+  
   if (enumDecl->isObjC()) {
     // Special case: ObjC enums are represented by their raw value, so just use
     // a bitcast.
-
+    
+    auto lBraceLoc = sourceLocs.makeNext(),
+         returnLoc = sourceLocs.makeNext(),
+         unsafeBitCastLoc = sourceLocs.makeNext(),
+         lParenLoc = sourceLocs.makeNext(),
+         selfLoc = sourceLocs.makeNext(),
+         toLoc = sourceLocs.makeNext(),
+         typeNameLoc = sourceLocs.makeNext(),
+         typeDotLoc = sourceLocs.makeNext(),
+         typeSelfLoc = sourceLocs.makeNext(),
+         rParenLoc = sourceLocs.makeNext(),
+         rBraceLoc = sourceLocs.makeNext();
+    
     // return unsafeBitCast(self, to: RawType.self)
-    DeclName name(C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
+//    DeclName name(C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
+//    DeclNameLoc nameLoc(C, unsafeBitCastLoc,
+//                        lParenLoc, { SourceLoc(), toLoc }, rParenLoc);
+    DeclName name(C.getIdentifier("unsafeBitCast"));
+    DeclNameLoc nameLoc(unsafeBitCastLoc);
     auto functionRef = new (C) UnresolvedDeclRefExpr(name,
                                                      DeclRefKind::Ordinary,
-                                                     DeclNameLoc());
-    auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
-    auto bareTypeExpr = TypeExpr::createImplicit(rawTy, C);
-    auto typeExpr = new (C) DotSelfExpr(bareTypeExpr, SourceLoc(), SourceLoc());
-    auto call = CallExpr::createImplicit(C, functionRef, {selfRef, typeExpr},
-                                         {Identifier(), C.Id_to});
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), call);
-    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
-                                  SourceLoc());
+                                                     nameLoc);
+    auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl, selfLoc);
+    auto bareTypeExpr = TypeExpr::createImplicitHack(typeNameLoc, rawTy, C);
+    auto typeExpr = new (C) DotSelfExpr(bareTypeExpr, typeDotLoc, typeSelfLoc);
+    auto call = CallExpr::create(C, functionRef, lParenLoc,
+                                 {selfRef, typeExpr},
+                                 {Identifier(), C.Id_to},
+                                 {SourceLoc(), toLoc},
+                                 rParenLoc, nullptr, /*implicit=*/true);
+    auto returnStmt = new (C) ReturnStmt(returnLoc, call);
+    auto body = BraceStmt::create(C, lBraceLoc, ASTNode(returnStmt),
+                                  rBraceLoc);
     toRawDecl->setBody(body);
     return;
   }
 
   Type enumType = parentDC->getDeclaredTypeInContext();
+  
+  auto lBraceLoc = sourceLocs.makeNext(),
+       switchLoc = sourceLocs.makeNext(),
+       selfRefLoc = sourceLocs.makeNext(),
+       lSwitchBraceLoc = sourceLocs.makeNext();
 
   SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(),
-                                          Identifier(), elt, nullptr);
+    auto caseLoc = sourceLocs.makeNext(),
+         typeNameLoc = sourceLocs.makeNext(),
+         dotLoc = sourceLocs.makeNext(),
+         caseNameLoc = sourceLocs.makeNext(),
+         colonLoc = sourceLocs.makeNext(),
+         lCaseBraceLoc = sourceLocs.makeNext(),
+         returnLoc = sourceLocs.makeNext();
+    
+    auto typeLoc = TypeLoc(new (C) FixedTypeRepr(enumType, typeNameLoc));
+    typeLoc.setType(enumType);
+    auto pat = new (C) EnumElementPattern(typeLoc,
+                                          dotLoc, caseNameLoc,
+                                          elt->getName(), elt, nullptr);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);
+    
+    auto returnExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr(), sourceLocs);
+    auto returnStmt = new (C) ReturnStmt(returnLoc, returnExpr);
 
-    auto returnExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
+    // Has to be generated after the cloneRawLiteralExpr()
+    auto rCaseBraceLoc = sourceLocs.makeNext();
+    
+    auto body = BraceStmt::create(C, lCaseBraceLoc,
+                                  ASTNode(returnStmt), rCaseBraceLoc);
 
-    auto body = BraceStmt::create(C, SourceLoc(),
-                                  ASTNode(returnStmt), SourceLoc());
-
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
+    cases.push_back(CaseStmt::create(C, caseLoc, labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     SourceLoc(), body));
+                                     colonLoc, body));
   }
+  
+  auto rSwitchBraceLoc = sourceLocs.makeNext(),
+       rBraceLoc = sourceLocs.makeNext();
 
-  auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
-  auto body = BraceStmt::create(C, SourceLoc(),
+  auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl, selfRefLoc);
+  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), switchLoc, selfRef,
+                                       lSwitchBraceLoc,
+                                       cases,
+                                       rSwitchBraceLoc, C);
+  auto body = BraceStmt::create(C, lBraceLoc,
                                 ASTNode(switchStmt),
-                                SourceLoc());
+                                rBraceLoc);
   toRawDecl->setBody(body);
 }
 
@@ -294,6 +345,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
 
   auto nominalTypeDecl = parentDC->getSelfNominalTypeDecl();
   auto enumDecl = cast<EnumDecl>(nominalTypeDecl);
+  
+  DerivedConformance::SourceLocSynthesizer
+  sourceLocs(C, enumDecl, enumDecl->getBraces().End);
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
@@ -327,7 +381,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
       continue;
 
     // litPat = elt.rawValueExpr as a pattern
-    LiteralExpr *litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
+    LiteralExpr *litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr(), sourceLocs);
     if (isStringEnum) {
       // In case of a string enum we are calling the _findStringSwitchCase
       // function from the library and switching on the returned Int value.

@@ -35,33 +35,48 @@ class SourceLoc {
   friend class CharSourceRange;
   friend class DiagnosticConsumer;
 
+  /// The location in the source buffer of the token in question.
   llvm::SMLoc Value;
-  uintptr_t SyntheticLocation = 0;
+  
+  /// An integer number of "synthetic tokens" this SourceLoc is
+  /// located at before the physical location identified by \c Value.
+  ///
+  /// A SourceLoc where this field is 0 represents the physical token
+  /// present in the source code; one where this field is greater than
+  /// zero represents a virtual or synthetic location between this token
+  /// and the token before it. The values of this field are typically spaced
+  /// out so that additional synthetic locations can be inserted between
+  /// if needed later.
+  uint64_t SyntheticPredecessor = 0;
   
 public:
   SourceLoc() {}
-  explicit SourceLoc(llvm::SMLoc Value, uintptr_t SyntheticLocation = 0)
-    : Value(Value), SyntheticLocation(SyntheticLocation) { }
+  explicit SourceLoc(llvm::SMLoc Value, uint64_t SyntheticPredecessor = 0)
+    : Value(Value), SyntheticPredecessor(SyntheticPredecessor) { }
   
   bool isValid() const { return Value.isValid(); }
   bool isInvalid() const { return !isValid(); }
   
-  bool isPhysical() const { return SyntheticLocation == 0; }
+  bool isPhysical() const { return SyntheticPredecessor == 0; }
   bool isSynthetic() const { return !isPhysical(); }
   
   bool operator==(const SourceLoc &RHS) const {
-    return RHS.Value == Value && RHS.SyntheticLocation == SyntheticLocation;
+    return RHS.Value == Value &&
+              RHS.SyntheticPredecessor == SyntheticPredecessor;
   }
   bool operator!=(const SourceLoc &RHS) const { return !operator==(RHS); }
   
   bool operator<(const SourceLoc &RHS) const {
     if (Value == RHS.Value)
-      return SyntheticLocation < RHS.SyntheticLocation;
+      // Test is reversed because a lower number is closer to the physical
+      // location than a higher number.
+      return SyntheticPredecessor > RHS.SyntheticPredecessor;
     else
       return Value.getPointer() < RHS.Value.getPointer();
   }
   
   /// Return a source location advanced a specified number of bytes.
+  /// This method always returns a physical SourceLoc.
   SourceLoc getAdvancedLoc(int ByteOffset) const {
     assert(isValid() && "Can't advance an invalid location");
     return SourceLoc(
@@ -77,37 +92,44 @@ public:
 
   /// Returns a synthetic \c SourceLoc between \c this and \c Other.
   /// 
-  /// \c Other must be attached to the same physical location as \c this,
-  /// and must come after \c this.
-  SourceLoc getSyntheticLocBefore(SourceLoc Other) {
+  /// The token returned will have have the same \c Value as \c Other,
+  /// but will have a lower (that is, later) \c SyntheticPredecessor.
+  SourceLoc getSyntheticLocBefore(SourceLoc Other) const {
+    assert(*this < Other);
+    
+    // If this and Other are tied to different physical locations, perform
+    // the calculation from the earliest possible synthetic predecessor of
+    // Other.
+    if (Value != Other.Value)
+      return SourceLoc(Other.Value, std::numeric_limits<uint64_t>::max())
+          .getSyntheticLocBefore(Other);
+    
     assert(Value == Other.Value);
-    assert(SyntheticLocation < Other.SyntheticLocation);
+
+    // Calculate the available space between the two synthetic locations.
+    uint64_t maxAdvance = SyntheticPredecessor - Other.SyntheticPredecessor;
     
-    uintptr_t maxAdvance = Other.SyntheticLocation - SyntheticLocation;
-    
-    // We consume only 1/16 of the remaining space to maximum because, in
+    // We consume only 1/16 of the space available because, in
     // typical use, you're a lot more likely to generate SourceLocs after this
     // one than before it. For the same reason, we also limit the maximum
     // we will advance in one step to 2^24; 16 million synthetic SourceLocs
     // between two nodes ought to be enough for anybody.
     //
     // FIXME: This is quick and dirty; allocating and subdividing synthetic
-    // offsets requires much more thought and perhaps a bit of a literature.
+    // offsets requires much more thought and perhaps a bit of a literature
     // search.
-    uintptr_t advance = maxAdvance / 16;
-    if (advance > 1 << 24)
-      advance = 1 << 24;
+    uint64_t advance = std::min(maxAdvance / 16,
+                                 static_cast<uint64_t>(1 << 24));
+    assert(advance > 0);
+    uint64_t newBefore = SyntheticPredecessor - advance;
     
-    uintptr_t newSynLoc = SyntheticLocation + advance;
-    assert(newSynLoc > SyntheticLocation);
-    
-    return SourceLoc(Value, newSynLoc);
+    return SourceLoc(Other.Value, newBefore);
   }
 
   const void *getOpaquePointerValue() const { return Value.getPointer(); }
   
-  uintptr_t getSyntheticLocation() const {
-    return SyntheticLocation;
+  uint64_t getSyntheticPredecessor() const {
+    return SyntheticPredecessor;
   }
 
   /// Print out the SourceLoc.  If this location is in the same buffer
@@ -279,7 +301,7 @@ template <> struct DenseMapInfo<swift::SourceLoc> {
   static unsigned getHashValue(const swift::SourceLoc &Val) {
     return hash_combine( 
       DenseMapInfo<const void *>::getHashValue(Val.getOpaquePointerValue()),
-      DenseMapInfo<uintptr_t>::getHashValue(Val.getSyntheticLocation())
+      DenseMapInfo<uint64_t>::getHashValue(Val.getSyntheticPredecessor())
     );
   }
 

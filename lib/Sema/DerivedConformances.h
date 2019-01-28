@@ -182,7 +182,8 @@ public:
                                                     Type propertyContextType);
 
   /// Build a reference to the 'self' decl of a derived function.
-  static DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);
+  static DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn,
+                                        SourceLoc nameLoc = SourceLoc());
 
   /// Returns true if this derivation is trying to use a context that isn't
   /// appropriate for deriving.
@@ -191,22 +192,33 @@ public:
   bool checkAndDiagnoseDisallowedContext(ValueDecl *synthesizing) const;
   
   class SourceLocSynthesizer {
-    SourceRange remaining;
+    ASTContext &C;
+    
+    /// Both bounds.Start and bounds.End are SourceLocs that have been
+    /// used; the SourceLocs between these two are available and some
+    /// will be returned by makeNext().
+    SourceRange bounds;
+    
+    /// Returns a SourceRange ending at \c upperBound and starting at the closest
+    /// SourceLoc to \c upperBound used in \c node or any of its descendants.
+    static SourceRange getBounds(ASTNode node, SourceLoc upperBound);
     
   public:
-    SourceLocSynthesizer(SourceRange remaining)
-      : remaining(remaining) { }
+    SourceLocSynthesizer(ASTContext &C, SourceRange bounds)
+      : C(C), bounds(bounds) { }
     
-    SourceLocSynthesizer(Decl *decl, SourceLoc base)
-      : SourceLocSynthesizer(
-          decl->getASTContext().SourceMgr.reserveSyntheticSourceRange(base)
-        )
+    SourceLocSynthesizer(ASTContext &C, ASTNode node, SourceLoc upperBound)
+      : C(C), bounds(getBounds(node, upperBound))
     { }
     
-    SourceLoc makeNext() {
-      auto nextLoc = remaining.Start.getSyntheticLocBefore(remaining.End);
-      remaining.Start = nextLoc;
-      return nextLoc;
+    /// Fetches an unused SourceLoc within the bounds, then adjusts the
+    /// bounds so that future SourceLocs will be between the returned
+    /// SourceLoc and the upperBound.
+    SourceLoc makeNext(SourceLoc diagnosticLoc = SourceLoc()) {
+      bounds.Start = bounds.Start.getSyntheticLocBefore(bounds.End);
+      if (diagnosticLoc.isValid())
+        C.SourceMgr.setDiagnosticLocation(diagnosticLoc, bounds.Start);
+      return bounds.Start;
     }
   };
 };

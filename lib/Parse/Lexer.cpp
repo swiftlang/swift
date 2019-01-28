@@ -2500,7 +2500,7 @@ void Lexer::lexImpl() {
 
 Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
-  if (!Loc.isValid())
+  if (!Loc.isValid() || !Loc.isPhysical())
     return Token();
 
   // Figure out which buffer contains this location.

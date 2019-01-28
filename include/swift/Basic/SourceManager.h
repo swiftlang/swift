@@ -48,7 +48,7 @@ class SourceManager {
   std::map<SourceLoc, VirtualFile> VirtualFiles;
   mutable std::pair<SourceLoc, const VirtualFile*> CachedVFile = {SourceLoc(), nullptr};
   
-  std::map<const void *, uintptr_t> LastUsedSyntheticLocation;
+  llvm::DenseMap<SourceLoc, SourceLoc> diagnosticLocations;
 
 public:
   SourceManager(llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> FS =
@@ -158,20 +158,6 @@ public:
   /// might point at whitespace or a comment.
   CharSourceRange getRangeForBuffer(unsigned BufferID) const;
 
-  /// Allocate a unique range of synthetic SourceLocs attached to the physical
-  /// location of \c BaseLoc.
-  SourceRange reserveSyntheticSourceRange(SourceLoc BaseLoc) {
-    SourceLoc max(BaseLoc.Value, std::numeric_limits<uintptr_t>::max());
-    
-    auto lastUsed = LastUsedSyntheticLocation[BaseLoc.getOpaquePointerValue()];
-    SourceLoc start{BaseLoc.Value, lastUsed + 1};
-    
-    auto end = start.getSyntheticLocBefore(max);
-    LastUsedSyntheticLocation[BaseLoc.getOpaquePointerValue()] = end.SyntheticLocation;
-    
-    return SourceRange(start, end);
-  }
-
   /// Returns the SourceLoc for the beginning of the specified buffer
   /// (at offset zero).
   ///
@@ -247,6 +233,18 @@ public:
     auto Offset = resolveFromLineCol(BufferId, Line, Col);
     return Offset.hasValue() ? getLocForOffset(BufferId, Offset.getValue()) :
                                SourceLoc();
+  }
+  
+  SourceLoc getDiagnosticLocation(SourceLoc astLoc) const {
+    auto entry = diagnosticLocations.find(astLoc);
+    if (entry != diagnosticLocations.end())
+      return entry->second;
+    else
+      return astLoc;
+  }
+  
+  void setDiagnosticLocation(SourceLoc diagnosticLoc, SourceLoc astLoc) {
+    diagnosticLocations[astLoc] = diagnosticLoc;
   }
 
 private:

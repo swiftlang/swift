@@ -705,12 +705,12 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     return;
 
   // Figure out the source location.
-  SourceLoc loc = diagnostic.getLoc();
+  SourceLoc loc = SourceMgr.getDiagnosticLocation(diagnostic.getLoc());
   if (loc.isInvalid() && diagnostic.getDecl()) {
     const Decl *decl = diagnostic.getDecl();
     // If a declaration was provided instead of a location, and that declaration
     // has a location we can point to, use that location.
-    loc = decl->getLoc();
+    loc = SourceMgr.getDiagnosticLocation(decl->getLoc());
 
     if (loc.isInvalid()) {
       // There is no location we can point to. Pretty-print the declaration

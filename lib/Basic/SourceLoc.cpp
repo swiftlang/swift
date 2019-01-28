@@ -240,8 +240,8 @@ void SourceLoc::printLineAndColumn(raw_ostream &OS, const SourceManager &SM,
 
   auto LineAndCol = SM.getLineAndColumn(*this, BufferID);
   OS << "line:" << LineAndCol.first << ':' << LineAndCol.second;
-  if (SyntheticLocation) {
-    OS << '(' << SyntheticLocation << ')';
+  if (SyntheticPredecessor) {
+    OS << "(-" << SyntheticPredecessor << ')';
   }
 }
 
@@ -262,8 +262,8 @@ void SourceLoc::print(raw_ostream &OS, const SourceManager &SM,
 
   auto LineAndCol = SM.getLineAndColumn(*this, BufferID);
   OS << ':' << LineAndCol.first << ':' << LineAndCol.second;
-  if (SyntheticLocation) {
-    OS << '(' << SyntheticLocation << ')';
+  if (SyntheticPredecessor) {
+    OS << "(-" << SyntheticPredecessor << ')';
   }
 }
 

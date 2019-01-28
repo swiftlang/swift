@@ -94,7 +94,7 @@ protected:
   /// Return the given value for the 'implicit' flag if present, or if None,
   /// return true if the location is invalid.
   static bool getDefaultImplicitFlag(Optional<bool> implicit, SourceLoc keyLoc){
-    return implicit.hasValue() ? *implicit : keyLoc.isInvalid();
+    return implicit.hasValue() ? *implicit : (keyLoc.isInvalid() || keyLoc.isSynthetic());
   }
   
 public:
