@@ -105,7 +105,7 @@ void ModuleDepGraph::markTransitive(SmallVectorImpl<const Job *> &visited,
 }
 
 bool ModuleDepGraph::markIntransitive(const Job *node) {
-  return cascadingJobs.insert(getSwiftDeps(node)).second;
+  return rememberThatJobCascades(getSwiftDeps(node));
 }
 
 void ModuleDepGraph::addIndependentNode(const Job *job) {
@@ -275,7 +275,11 @@ void ModuleDepGraph::integrateUsesByDef(const SourceFileDepGraphNode *n,
   auto &uses = usesByDef[def];
   g.forEachUseOf(n, [&](const SourceFileDepGraphNode *useNode) {
     const auto &use = useNode->getKey();
-    if (use != def)
+    auto HERE = useNode->getKey().humanReadableName();
+    if (HERE  == "Foundation.Calendar.*") {
+      llvm::errs() << "HERE 100 " << def.humanReadableName() << " use: " << use.humanReadableName() << " " << (use != def) << "\n";
+    }
+    if (use.canDependUpon(def))
       uses.insert(use);
   });
 }
@@ -517,15 +521,24 @@ void ModuleDepGraph::printPath(raw_ostream &out,
          "Cannot print paths of paths weren't tracked.");
   auto const swiftDepsToBeBuilt = getSwiftDeps(jobToBeBuilt);
 
-  std::for_each(
-      pathsByEndingSwiftDeps.find(swiftDepsToBeBuilt),
-      pathsByEndingSwiftDeps.cend(),
-      [&](const std::pair<std::string, std::vector<const ModuleDepGraphNode *>>
-              &iter) {
-        out << "Dependency path:\n";
-        for (const auto *n : iter.second) {
-          out << n->humanReadableName() << "\n";
-        }
-        out << "\n";
-      });
+  auto const allPaths = pathsByEndingSwiftDeps.find(swiftDepsToBeBuilt);
+  if (allPaths == pathsByEndingSwiftDeps.cend())
+    return;
+  out << "Dependency path:\n";
+  for (const auto *n : allPaths->second) {
+    out << n->humanReadableName() << "\n";
+  }
+  out << "\n";
+
+//  std::for_each(
+//                pathsByEndingSwiftDeps.find(swiftDepsToBeBuilt),
+//                pathsByEndingSwiftDeps.cend(),
+//                [&](const std::pair<std::string, std::vector<const ModuleDepGraphNode *>>
+//                    &iter) {
+//                  out << "Dependency path:\n";
+//                  for (const auto *n : iter.second) {
+//                    out << n->humanReadableName() << "\n";
+//                  }
+//                  out << "\n";
+//                });
 }

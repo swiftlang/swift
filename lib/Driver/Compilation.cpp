@@ -413,6 +413,8 @@ namespace driver {
                              int ReturnCode,
                              SmallVector<const Job *, N> &Dependents,
                              DependencyGraphT &DepGraph) {
+      
+      
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
           Output.getAdditionalOutputForType(file_types::TY_SwiftDeps);
@@ -437,6 +439,12 @@ namespace driver {
           // things that do not need to be marked. Unecessary compilation would
           // result if that were the case.
           bool wasCascading = DepGraph.isMarked(FinishedCmd);
+          if (wasCascading &&  Comp.getShowIncrementalBuildDecisions())
+            llvm::outs() << "HERE cascading: " << LogJob(FinishedCmd) << "\n";
+          const driver::Job *HERE = (const driver::Job*)FinishedCmd;
+          StringRef HERE1 = llvm::sys::path::filename(HERE->getOutput().getBaseInput(0));
+          if (HERE1 == "Calendars.swift")
+            llvm::errs() << "HERE10\n";
 
           switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile,
                                         Comp.getDiags())) {
@@ -1194,8 +1202,11 @@ namespace driver {
             continue;
 
           bool isCascading = true;
-          if (Comp.getIncrementalBuildEnabled())
+          if (Comp.getIncrementalBuildEnabled()) {
             isCascading = DepGraph.isMarked(Cmd);
+            if (isCascading && Comp.getShowIncrementalBuildDecisions())
+              llvm::outs() << "HERE is Cascading: " << LogJob(Cmd) << "\n";
+          }
           UnfinishedCommands.insert({Cmd, isCascading});
         }
       }

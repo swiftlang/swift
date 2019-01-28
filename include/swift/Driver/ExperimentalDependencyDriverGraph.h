@@ -420,8 +420,11 @@ private:
       std::unordered_set<const ModuleDepGraphNode *> &visited,
       const ModuleDepGraphNode *potentiallyCascadingDef);
 
-  void rememberThatJobCascades(StringRef swiftDeps) {
-    cascadingJobs.insert(swiftDeps);
+  /// Return true if job did not cascade before
+  bool rememberThatJobCascades(StringRef swiftDeps) {
+    if (llvm::sys::path::filename(swiftDeps) == "Calendars.swiftdeps")
+      llvm::errs() << "HERE11\n";
+    return cascadingJobs.insert(swiftDeps).second;
   }
 
   /// For debugging, write out the graph to a dot file.

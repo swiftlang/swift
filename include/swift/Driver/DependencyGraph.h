@@ -161,6 +161,11 @@ protected:
                       const void *node, MarkTracerImpl *tracer = nullptr);
   bool markIntransitive(const void *node) {
     assert(Provides.count(node) && "node is not in the graph");
+//    const driver::Job *HERE = (const driver::Job*)node;
+//    StringRef HERE1 = llvm::sys::path::filename(HERE->getOutput().getBaseInput(0));
+//    if (HERE1 == "Calendars.swift")
+//      llvm::errs() << "HERE10\n";
+
     return Marked.insert(node).second;
   }
   void markExternal(SmallVectorImpl<const void *> &visited,

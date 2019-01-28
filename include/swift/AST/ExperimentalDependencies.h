@@ -454,11 +454,33 @@ public:
   }
 
   bool operator==(const DependencyKey &rhs) const {
-    return getKind() == rhs.getKind() && getAspect() == rhs.getAspect() &&
+    auto r = getKind() == rhs.getKind() && getAspect() == rhs.getAspect() &&
            getContext() == rhs.getContext() && getName() == rhs.getName();
+//    if (humanReadableName() == "Foundation.Calendar.*"
+//        // && rhs.humanReadableName() == "Foundation.Calendar.*"
+//        ) {
+//      auto HERE2 = rhs.humanReadableName();
+//      llvm::errs() << "HEREsdf <" << HERE2 << "> " << r << "\n";
+//      if (HERE2 == "Foundation.Calendar.*" && !r)
+//        abort();
+//    }
+   return r;
   }
 
   bool operator!=(const DependencyKey &rhs) const { return !(*this == rhs); }
+  
+  /// Return true if this key can be recorded as a use of def.
+  /// If everything is the same except for aspect, it's tricky:
+  /// The implementation does not depend on the interface; it's the other way around.
+  bool canDependUpon(const DependencyKey &def) const {
+    if (getKind() != def.getKind() || getContext() != def.getContext() || getName() != def.getName())
+      return true;
+    if (getAspect() == def.getAspect())
+      return false;
+    if (getAspect() == DeclAspect::implementation)
+      return false;
+    return true;
+  }
 
   size_t hash() const {
     return llvm::hash_combine(kind, aspect, name, context);
