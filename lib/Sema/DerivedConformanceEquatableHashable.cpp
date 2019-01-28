@@ -78,7 +78,8 @@ static bool allStoredPropertiesConformToProtocol(DeclContext *DC,
     if (!propertyDecl->hasType())
       return false;
 
-    auto type = propertyDecl->getType()->mapTypeOutOfContext();
+    auto type = propertyDecl->getValueInterfaceType();
+
     if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
                                          protocol, DC,
                                          ConformanceCheckFlags::Used)) {
