@@ -67,6 +67,44 @@ struct ErrorBehaviorKind {
 
 } // end namespace ownership
 
+class LinearLifetimeError {
+  ownership::ErrorBehaviorKind errorBehavior;
+  bool foundError = false;
+
+public:
+  LinearLifetimeError(ownership::ErrorBehaviorKind errorBehavior)
+      : errorBehavior(errorBehavior) {}
+
+  bool getFoundError() const { return foundError; }
+
+  void handleLeakError(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundError = true;
+
+    if (errorBehavior.shouldPrintMessage())
+      messagePrinterFunc();
+
+    if (errorBehavior.shouldReturnFalseOnLeak())
+      return;
+
+    // We already printed out our error if we needed to, so don't pass it along.
+    handleError([]() {});
+  }
+
+  void handleError(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundError = true;
+
+    if (errorBehavior.shouldPrintMessage())
+      messagePrinterFunc();
+
+    if (errorBehavior.shouldReturnFalse()) {
+      return;
+    }
+
+    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
+    llvm_unreachable("triggering standard assertion failure routine");
+  }
+};
+
 /// Returns true if:
 ///
 /// 1. No consuming uses are reachable from any other consuming use, from any
@@ -82,7 +120,7 @@ struct ErrorBehaviorKind {
 /// error.
 /// \p leakingBlocks If non-null a list of blocks where the value was detected
 /// to leak. Can be used to insert missing destroys.
-bool valueHasLinearLifetime(
+LinearLifetimeError valueHasLinearLifetime(
     SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
     ArrayRef<BranchPropagatedUser> nonConsumingUses,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
