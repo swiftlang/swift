@@ -531,10 +531,19 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
       return CanGenericSignature();
     auto subjectType = swift::Demangle::decodeMangledType(
         *this, child->getChild(0));
-    auto constraintType = swift::Demangle::decodeMangledType(
-        *this, child->getChild(1));
-    if (!subjectType || !constraintType)
+    if (!subjectType)
       return CanGenericSignature();
+
+    Type constraintType;
+    if (child->getKind() ==
+          Demangle::Node::Kind::DependentGenericConformanceRequirement ||
+        child->getKind() ==
+          Demangle::Node::Kind::DependentGenericSameTypeRequirement) {
+      constraintType = swift::Demangle::decodeMangledType(
+        *this, child->getChild(1));
+      if (!constraintType)
+        return CanGenericSignature();
+    }
 
     auto source =
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
@@ -556,6 +565,24 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
           source, nullptr);
       break;
     }
+    case Demangle::Node::Kind::DependentGenericLayoutRequirement: {
+      // FIXME: Other layout constraints
+      LayoutConstraint constraint;
+      auto kindChild = child->getChild(1);
+      if (kindChild->getKind() != Demangle::Node::Kind::Identifier)
+        return CanGenericSignature();
+
+      if (kindChild->getText() == "C") {
+        auto kind = LayoutConstraintKind::Class;
+        auto layout = LayoutConstraint::getLayoutConstraint(kind, Ctx);
+        builder.addRequirement(
+            Requirement(RequirementKind::Layout, subjectType, layout),
+            source, nullptr);
+        break;
+      }
+
+      return CanGenericSignature();
+    }
     default:
       return CanGenericSignature();
     }
@@ -570,6 +597,11 @@ ASTBuilder::findDeclContext(const Demangle::NodePointer &node) {
   switch (node->getKind()) {
   case Demangle::Node::Kind::DeclContext:
   case Demangle::Node::Kind::Type:
+  case Demangle::Node::Kind::BoundGenericClass:
+  case Demangle::Node::Kind::BoundGenericEnum:
+  case Demangle::Node::Kind::BoundGenericProtocol:
+  case Demangle::Node::Kind::BoundGenericStructure:
+  case Demangle::Node::Kind::BoundGenericTypeAlias:
     return findDeclContext(node->getFirstChild());
 
   case Demangle::Node::Kind::Module:
