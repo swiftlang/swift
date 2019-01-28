@@ -6,7 +6,7 @@
 // RUN: %empty-directory(%t)
 
 // First, produce the dependency files and verify their contents.
-// RUN: %target-swift-frontend -emit-reference-dependencies-path %t.swiftdeps -typecheck -primary-file %S/../Inputs/empty\ file.swift
+// RUN: %target-swift-frontend -emit-reference-dependencies-path %t.swiftdeps -typecheck -primary-file "%S/../Inputs/empty file.swift"
 // RUN: %FileCheck -check-prefix=CHECK %s < %t.swiftdeps
 
 // CHECK-LABEL: provides-top-level:
