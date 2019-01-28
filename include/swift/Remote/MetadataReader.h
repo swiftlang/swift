@@ -1521,6 +1521,7 @@ private:
     }
 
     // Install our own symbolic reference resolver
+    auto oldSymbolicReferenceResolver = dem.takeSymbolicReferenceResolver();
     dem.setSymbolicReferenceResolver([&](SymbolicReferenceKind kind,
                                          Directness directness,
                                          int32_t offset,
@@ -1562,7 +1563,7 @@ private:
       break;
     }
 
-    dem.setSymbolicReferenceResolver(nullptr);
+    dem.setSymbolicReferenceResolver(std::move(oldSymbolicReferenceResolver));
     return result;
   }
 
