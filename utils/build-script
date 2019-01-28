@@ -962,10 +962,6 @@ class BuildScriptInvocation(object):
             for product_class in impl_product_classes:
                 execute_one_impl_action(host_target, product_class, "install")
 
-        # Extract symbols...
-        for host_target in all_hosts:
-            execute_one_impl_action(host_target, name="extractsymbols")
-
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
         for host_target in [self.args.host_target]:
@@ -987,8 +983,6 @@ class BuildScriptInvocation(object):
         for host_target in all_hosts:
             execute_one_impl_action(host_target, name="extractsymbols")
 
->>>>>>> 8d087efc77... [build-script] build and test indexstore-db and sourcekit-lsp
->>>>>>> [build-script] build and test indexstore-db and sourcekit-lsp
         # Package...
         for host_target in all_hosts:
             execute_one_impl_action(host_target, name="package")
