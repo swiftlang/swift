@@ -68,8 +68,8 @@ void SourceFileDepGraph::forEachArc(
     function_ref<void(const SourceFileDepGraphNode *def,
                       const SourceFileDepGraphNode *use)>
         fn) const {
-  forEachNode([&](const SourceFileDepGraphNode *defNode) {
-    forEachUseOf(defNode, [&](SourceFileDepGraphNode *useNode) {
+  forEachNode([&](const SourceFileDepGraphNode *useNode) {
+    forEachDefDependedUponBy(useNode, [&](SourceFileDepGraphNode* defNode) {
       fn(defNode, useNode);
     });
   });
@@ -140,8 +140,8 @@ bool SourceFileDepGraph::verify() const {
       llvm_unreachable("duplicate frontend keys");
     }
 
-    forEachUseOf(n, [&](SourceFileDepGraphNode *use) {
-      assert(use != n && "Uses should be irreflexive.");
+    forEachDefDependedUponBy(n, [&](SourceFileDepGraphNode *def) {
+      assert(def != n && "Uses should be irreflexive.");
     });
   });
   return true;
@@ -306,12 +306,12 @@ void MappingContextTraits<SourceFileDepGraphNode, SourceFileDepGraph>::mapping(
     IO &io, SourceFileDepGraphNode &node, SourceFileDepGraph &g) {
   MappingTraits<DepGraphNode>::mapping(io, node);
   io.mapRequired("sequenceNumber", node.sequenceNumber);
-  std::vector<size_t> usesOfMeVec(node.usesOfMe.begin(), node.usesOfMe.end());
-  io.mapRequired("usesOfMe", usesOfMeVec);
+  std::vector<size_t> defsIDependUponVec(node.defsIDependUpon.begin(), node.defsIDependUpon.end());
+  io.mapRequired("defsIDependUpon", defsIDependUponVec);
   io.mapRequired("isProvides", node.isProvides);
   if (!io.outputting()) {
-    for (size_t u : usesOfMeVec)
-      node.usesOfMe.insert(u);
+    for (size_t u : defsIDependUponVec)
+      node.defsIDependUpon.insert(u);
   }
   assert(g.getNode(node.sequenceNumber) && "Bad sequence number");
 }

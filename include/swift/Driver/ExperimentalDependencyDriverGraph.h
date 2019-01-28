@@ -381,10 +381,10 @@ private:
 
   /// Integrate the \p integrand into the receiver.
   /// Return a bool indicating if this node represents a change that must be
-  /// propagated, and the integrated ModuleDepGraphNode.
-  std::pair<bool, ModuleDepGraphNode*> integrateSourceFileDepGraphNode(
+  /// propagated.
+  bool integrateSourceFileDepGraphNode(
+                                       const SourceFileDepGraph &g,
       const SourceFileDepGraphNode *integrand,
-      StringRef swiftDepsOfSourceFileGraph,
       const PreexistingNodeIfAny preexistingMatch);
 
   /// Integrate the \p integrand, a node that represents a Decl in the swiftDeps
@@ -393,33 +393,20 @@ private:
   /// prexisintExpat holds a node with the same key that already exists, but was
   /// not known to reside in any swiftDeps file. Return a bool indicating if this node represents a change that must be
   /// propagated, and the integrated ModuleDepGraphNode.
-  std::pair<bool, ModuleDepGraphNode*> integrateFrontendDeclNode(
+  std::pair<bool, ModuleDepGraphNode*> integrateSourceFileDeclNode(
       const SourceFileDepGraphNode *integrand,
       StringRef swiftDepsOfSourceFileGraph,
       const PreexistingNodeIfAny preexistingMatch);
 
-  /// Integrate the \p integrand, a node that was not known to reside in any
-  /// swiftDeps file. \p preexistingNodeInSameFile holds the node representing
-  /// the same Decl that already exists, if there is one. \p prexisintExpat
-  /// holds a node with the same key that already exists, but was not known to
-  /// reside in any swiftDeps file. \p dupsExistInOtherFiles is true if there
-  /// exists a node with the same key that is known to reside in some other
-  /// swiftDeps file. Return a bool indicating if this node represents a change that must be
-  /// propagated, and the integrated ModuleDepGraphNode.
-  std::pair<bool, ModuleDepGraphNode*> integrateFrontendExpatNode(
-      const SourceFileDepGraphNode *integrand,
-      const PreexistingNodeIfAny preexistingMatch);
-
-  /// Create a brand-new ModuleDepGraphNode to integrate \p integrand.
+   /// Create a brand-new ModuleDepGraphNode to integrate \p integrand.
   ModuleDepGraphNode *
   integrateByCreatingANewNode(const SourceFileDepGraphNode *integrand,
                               Optional<std::string> swiftDepsForNewNode);
 
-  /// Integrate the dependencies of \p integrand which resides in \p
-  /// integrandGraph into \p this.
-  void integrateUsesByDef(const SourceFileDepGraphNode *integrand,
-                          ModuleDepGraphNode *integratedNode,
-                          const SourceFileDepGraph &integrandGraph);
+  /// After importing a provides node from the frontend, record its dependencies.
+  void recordWhatUseDependsUpon(const SourceFileDepGraph &g,
+                                const SourceFileDepGraphNode *sourceFileUseNode,
+                                ModuleDepGraphNode *moduleUseNode);
 
   /// If the programmer removes a Decl from a source file, the corresponding
   /// ModuleDepGraphNode needs to be removed.

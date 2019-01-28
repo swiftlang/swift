@@ -633,8 +633,8 @@ class SourceFileDepGraphNode : public DepGraphNode {
   /// refer to the node.
   size_t sequenceNumber = ~0;
 
-  /// Holds the sequence numbers of my uses.
-  std::unordered_set<size_t> usesOfMe;
+  /// Holds the sequence numbers of definitions I depend upon.
+  std::unordered_set<size_t> defsIDependUpon;
 
   /// True iff a Decl exists for this node.
   /// If a provides and a depends in the existing system both have the same key,
@@ -656,7 +656,7 @@ public:
     assert(key.verify());
   }
 
-  bool isDepends() const { return !usesOfMe.empty(); }
+  bool isDepends() const { return !getIsProvides(); }
 
   bool getIsProvides() const { return isProvides; }
   void setIsProvides() { isProvides = true; }
@@ -664,7 +664,7 @@ public:
   bool operator==(const SourceFileDepGraphNode &other) const {
     return DepGraphNode::operator==(other) &&
            sequenceNumber == other.sequenceNumber &&
-           usesOfMe == other.usesOfMe && isProvides == other.isProvides;
+           defsIDependUpon == other.defsIDependUpon && isProvides == other.isProvides;
   }
 
   size_t getSequenceNumber() const { return sequenceNumber; }
@@ -672,14 +672,14 @@ public:
 
   /// In the frontend, def-use links are kept in the def node.
   /// Call \p fn with the sequence number of each use.
-  void forEachUseOfMe(function_ref<void(size_t)> fn) const {
-    std::for_each(usesOfMe.begin(), usesOfMe.end(), fn);
+  void forEachDefIDependUpon(function_ref<void(size_t)> fn) const {
+    std::for_each(defsIDependUpon.begin(), defsIDependUpon.end(), fn);
   }
 
   /// Record the sequence number, \p n, of another use.
-  void addUseOfMe(size_t n) {
+  void addDefIDependUpon(size_t n) {
     if (n != getSequenceNumber())
-      usesOfMe.insert(n);
+      defsIDependUpon.insert(n);
   }
   void dump() const { DepGraphNode::dump(); }
 
@@ -755,9 +755,9 @@ public:
                                     const SourceFileDepGraphNode *use)>
                       fn) const;
 
-  void forEachUseOf(const SourceFileDepGraphNode *n,
+  void forEachDefDependedUponBy(const SourceFileDepGraphNode *n,
                     function_ref<void(SourceFileDepGraphNode *)> fn) const {
-    n->forEachUseOfMe([&](size_t useIndex) { fn(getNode(useIndex)); });
+    n->forEachDefIDependUpon([&](size_t useIndex) { fn(getNode(useIndex)); });
   }
 
   /// The frontend creates a pair of nodes for every tracked Decl and the source
@@ -773,7 +773,7 @@ public:
   /// \p Use is the Node that must be rebuilt when \p def changes.
   /// Record that fact in the graph.
   void addArc(SourceFileDepGraphNode *def, SourceFileDepGraphNode *use) {
-    getNode(def->getSequenceNumber())->addUseOfMe(use->getSequenceNumber());
+    getNode(use->getSequenceNumber())->addDefIDependUpon(def->getSequenceNumber());
   }
 
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
