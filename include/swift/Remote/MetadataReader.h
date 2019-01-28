@@ -1621,7 +1621,7 @@ private:
       return nullptr;
 
     // Dig out the name of the entity.
-    NodePointer nameChild = mangledNode->getChild(1);
+    swift::Demangle::NodePointer nameChild = mangledNode->getChild(1);
     if ((nameChild->getKind() != Node::Kind::PrivateDeclName &&
          nameChild->getKind() != Node::Kind::LocalDeclName) ||
         nameChild->getNumChildren() < 2)
