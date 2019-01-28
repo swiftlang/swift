@@ -1910,6 +1910,12 @@ void Remangler::mangleGenericArgs(Node *node, EntityContext &ctx) {
     break;
   }
 
+  case Node::Kind::AnonymousContext:
+    if (node->getNumChildren() > 1) {
+      mangleGenericArgs(node->getChild(1), ctx);
+    }
+    break;
+
   case Node::Kind::Extension: {
     mangleGenericArgs(node->getChild(1), ctx);
     break;
