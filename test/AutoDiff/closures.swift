@@ -28,5 +28,5 @@ public func closureCaptureMutable() {
 // CHECK:   [[PRIMAL:%.*]] = function_ref @AD__{{.*}}closureCaptureMutable{{.*}}___primal_src_0_wrt_0
 // CHECK:   {{.*}} = apply [[PRIMAL]]({{.*}}, [[BOXED_ARG]])
 // CHECK:   [[ADJOINT:%.*]] = function_ref @AD__{{.*}}closureCaptureMutabley{{.*}}___adjoint_src_0_wrt_0
-// CHECK:   {{.*}} = partial_apply [callee_guaranteed] [[ADJOINT]]({{.*}}, {{.*}}, {{.*}}, [[BOXED_ARG]])
+// CHECK:   {{.*}} = partial_apply [callee_guaranteed] [[ADJOINT]]({{.*}})
 

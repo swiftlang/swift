@@ -48,7 +48,7 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // The adjoint should not release primal values because they are passed in as @guaranteed.
 //
 // CHECK-VJP-LABEL: @{{.*}}testOwnedVector{{.*}}__adjoint_src_0_wrt_0
-// CHECK-VJP: bb0({{%.*}} : $Vector, [[PRIMAL_VALUES:%.*]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, {{%.*}} : $Vector, {{%.*}} : $Vector):
+// CHECK-VJP: bb0({{%.*}} : $Vector, [[PRIMAL_VALUES:%.*]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0):
 // CHECK-VJP:   [[PULLBACK0:%.*]] = struct_extract [[PRIMAL_VALUES]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0.pullback_0
 // CHECK-VJP-NOT:   release_value [[PULLBACK0]]
 // CHECK-VJP-NOT:   release_value [[PRIMAL_VALUES]]
@@ -62,7 +62,7 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // The adjoint should not release primal values because they are passed in as @guaranteed.
 //
 // CHECK-NOVJP-LABEL: @{{.*}}testOwnedVector{{.*}}__adjoint_src_0_wrt_0
-// CHECK-NOVJP: bb0({{%.*}} : $Vector, [[PRIMAL_VALUES:%.*]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, {{%.*}} : $Vector, {{%.*}} : $Vector):
+// CHECK-NOVJP: bb0({{%.*}} : $Vector, [[PRIMAL_VALUES:%.*]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0):
 // CHECK-NOVJP:   [[PV0:%.*]] = struct_extract [[PRIMAL_VALUES]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0.v_0
 // CHECK-NOVJP-NOT:   release_value [[PV0]]
 // CHECK-NOVJP-NOT:   release_value [[PRIMAL_VALUES]]
