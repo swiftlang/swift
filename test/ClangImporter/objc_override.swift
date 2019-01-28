@@ -110,7 +110,8 @@ class CallbackSubC : CallbackBase {
 
 //
 class MyHashableNSObject: NSObject {
-  override var hashValue: Int { // expected-error{{overriding non-open property outside of its defining module}} expected-error{{overriding non-@objc declarations from extensions is not supported}}
+  override var hashValue: Int {
+    // expected-error@-1 {{'NSObject.hashValue' is not overridable; did you mean to override 'NSObject.hash'?}}
     return 0
   }
 }
