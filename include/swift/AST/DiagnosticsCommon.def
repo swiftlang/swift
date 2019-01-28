@@ -136,6 +136,10 @@ ERROR(circular_class_inheritance,none,
 ERROR(circular_enum_inheritance,none,
       "%0 has a raw type that depends on itself", (Identifier))
 
+NOTE(diagnostic_in_synthesized_code,none,
+     "previous diagnostic occurs in code synthesized by the compiler; "
+     "please file a bug report with your project", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

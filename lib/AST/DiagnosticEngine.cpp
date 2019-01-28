@@ -27,6 +27,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h" // bad dependency
+#include "swift/AST/DiagnosticsCommon.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
@@ -827,6 +828,24 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior),
                                diagnosticStringFor(Info.ID),
                                diagnostic.getArgs(), Info);
+  }
+  
+  // If it had a synthetic location, note that fact. We do this by hand to
+  // avoid emitting this note for itself.
+  if (loc.isSynthetic()) {
+    Diagnostic diagnostic(diag::diagnostic_in_synthesized_code);
+    diagnostic.setLoc(loc);
+    auto behavior = state.determineBehavior(diagnostic.getID());
+    
+    DiagnosticInfo Info;
+    Info.ID = diagnostic.getID();
+    Info.Ranges = diagnostic.getRanges();
+    
+    for (auto &Consumer : Consumers) {
+      Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior),
+                                 diagnosticStringFor(Info.ID),
+                                 diagnostic.getArgs(), Info);
+    }
   }
 }
 
