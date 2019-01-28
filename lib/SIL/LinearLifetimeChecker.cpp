@@ -111,13 +111,6 @@ struct State {
   /// for validity. If this is a linear typed value, return true. Return false
   /// otherwise.
   bool checkDataflowEndState(DeadEndBlocks &deBlocks);
-
-  /// Depending on our initialization, either return false or call Func and
-  /// throw an error.
-  bool handleError(llvm::function_ref<void()> &&messagePrinterFunc) {
-    error.handleError(std::move(messagePrinterFunc));
-    return false;
-  }
 };
 
 } // end anonymous namespace
@@ -210,7 +203,7 @@ void State::initializeConsumingUse(BranchPropagatedUser consumingUser,
   if (blocksWithConsumingUses.insert(userBlock).second)
     return;
 
-  handleError([&] {
+  error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                  << "Found over consume?!\n"
                  << "Value: " << *value << "User: " << *consumingUser
@@ -235,7 +228,7 @@ void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
   // always consider the non-consuming use to be a use after free since
   // the cond branch user is in a previous block. So just bail early.
   if (consumingUser.isCondBranchUser()) {
-    handleError([&]() {
+    error.handleUseAfterFree([&]() {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free?!\n"
                    << "Value: " << *value
@@ -262,7 +255,7 @@ void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                    [&nonConsumingUser](const SILInstruction &i) -> bool {
                      return nonConsumingUser == &i;
                    }) != userBlock->end()) {
-    handleError([&] {
+    error.handleUseAfterFree([&] {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free?!\n"
                    << "Value: " << *value
@@ -283,24 +276,29 @@ bool State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
   if (!blocksWithConsumingUses.count(userBlock))
     return false;
 
-  return !handleError([&] {
+  error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                  << "Found over consume?!\n"
                  << "Value: " << *value << "User: " << *consumingUser
                  << "Block: bb" << userBlock->getDebugID() << "\n\n";
   });
+
+  // If we reached this point, then we did not assert, but we did flag an
+  // error. Return true so we continue the walk.
+  return true;
 }
 
 bool State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
   if (!blocksWithConsumingUses.count(userBlock))
     return false;
 
-  return !handleError([&] {
+  error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                  << "Found over consume?!\n"
                  << "Value: " << *value << "Block: bb"
                  << userBlock->getDebugID() << "\n\n";
   });
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -367,8 +365,11 @@ bool State::performDataflow(DeadEndBlocks &deBlocks) {
     //
     // 2. We add the predecessor to the worklist if we have not visited it yet.
     for (auto *predBlock : block->getPredecessorBlocks()) {
+      // Check if we have an over consume.
       if (checkPredsForDoubleConsume(predBlock)) {
-        return handleError([] {});
+        // If we were to assert, it is handled inside check preds for double
+        // consume. So just return false so that we bail.
+        return false;
       }
 
       if (visitedBlocks.count(predBlock)) {
@@ -397,7 +398,7 @@ bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
     }
 
     // If we are supposed to error on leaks, do so now.
-    error.handleLeakError([&] {
+    error.handleLeak([&] {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Error! Found a leak due to a consuming post-dominance "
                       "failure!\n"
@@ -427,7 +428,7 @@ bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
       continue;
     }
 
-    return handleError([&] {
+    error.handleUseAfterFree([&] {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free due to unvisited non lifetime "
                       "ending uses?!\n"
@@ -438,6 +439,7 @@ bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
       }
       llvm::errs() << "\n";
     });
+    return false;
   }
 
   // If all of our remaining blocks were dead uses, then return true. We are
