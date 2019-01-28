@@ -5516,6 +5516,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AutoClosureForwarding:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
+  case FixKind::AllowInvalidPartialApplication:
     llvm_unreachable("handled elsewhere");
   }
 

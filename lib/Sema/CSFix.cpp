@@ -261,3 +261,16 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
   return new (cs.getAllocator())
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
+
+bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
+  auto failure = PartialApplicationFailure(root, isWarning(),
+                                           getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidPartialApplication *
+AllowInvalidPartialApplication::create(bool isWarning, ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidPartialApplication(isWarning, cs, locator);
+}

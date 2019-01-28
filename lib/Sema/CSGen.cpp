@@ -1633,7 +1633,7 @@ namespace {
                                      expr->getFunctionRefKind(),
                                      expr->getOuterAlternatives());
     }
-    
+
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = CS.getType(expr->getSubExpr());
       

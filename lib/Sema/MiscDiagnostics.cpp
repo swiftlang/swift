@@ -100,92 +100,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       unsigned level : 29;
     };
 
-    // Partial applications of functions that are not permitted.  This is
-    // tracked in post-order and unraveled as subsequent applications complete
-    // the call (or not).
-    llvm::SmallDenseMap<Expr*, PartialApplication,2> InvalidPartialApplications;
-
-    ~DiagnoseWalker() override {
-      for (auto &unapplied : InvalidPartialApplications) {
-        unsigned kind = unapplied.second.kind;
-        if (unapplied.second.compatibilityWarning) {
-          TC.diagnose(unapplied.first->getLoc(),
-                      diag::partial_application_of_function_invalid_swift4,
-                      kind);
-        } else {
-          TC.diagnose(unapplied.first->getLoc(),
-                      diag::partial_application_of_function_invalid,
-                      kind);
-        }
-      }
-    }
-
-    /// methods are fully applied when they can't support partial application.
-    void checkInvalidPartialApplication(Expr *E) {
-      if (auto AE = dyn_cast<ApplyExpr>(E)) {
-        Expr *fnExpr = AE->getSemanticFn();
-        if (auto forceExpr = dyn_cast<ForceValueExpr>(fnExpr))
-          fnExpr = forceExpr->getSubExpr()->getSemanticsProvidingExpr();
-        if (auto dotSyntaxExpr = dyn_cast<DotSyntaxBaseIgnoredExpr>(fnExpr))
-          fnExpr = dotSyntaxExpr->getRHS();
-
-        // Check to see if this is a potentially unsupported partial
-        // application of a constructor delegation.
-        if (isa<OtherConstructorDeclRefExpr>(fnExpr)) {
-          auto kind = AE->getArg()->isSuperExpr()
-                    ? PartialApplication::SuperInit
-                    : PartialApplication::SelfInit;
-
-          // Partial applications of delegated initializers aren't allowed, and
-          // don't really make sense to begin with.
-          InvalidPartialApplications.insert(
-            {E, {PartialApplication::Error, kind, 1}});
-          return;
-        }
-
-        // If this is adding a level to an active partial application, advance
-        // it to the next level.
-        auto foundApplication = InvalidPartialApplications.find(fnExpr);
-        if (foundApplication == InvalidPartialApplications.end())
-          return;
-
-        unsigned level = foundApplication->second.level;
-        auto kind = foundApplication->second.kind;
-        assert(level > 0);
-        InvalidPartialApplications.erase(foundApplication);
-        if (level > 1) {
-          // We have remaining argument clauses.
-          // Partial applications were always diagnosed in Swift 4 and before,
-          // so there's no need to preserve the compatibility warning bit.
-          InvalidPartialApplications.insert(
-            {AE, {PartialApplication::Error, kind, level - 1}});
-        }
-        return;
-      }
-      
-      /// If this is a reference to a mutating method, it cannot be partially
-      /// applied or even referenced without full application, so arrange for
-      /// us to check that it gets fully applied.
-      auto fnDeclRef = dyn_cast<DeclRefExpr>(E);
-      if (!fnDeclRef)
-        return;
-
-      auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
-      if (!fn || !fn->isInstanceMember() || !fn->isMutating())
-        return;
-
-      // Swift 4 and earlier failed to diagnose a reference to a mutating method
-      // without any applications at all, which would get miscompiled into a
-      // function with undefined behavior. Warn for source compatibility.
-      auto errorBehavior = TC.Context.LangOpts.isSwiftVersionAtLeast(5)
-        ? PartialApplication::Error
-        : PartialApplication::CompatibilityWarning;
-
-      InvalidPartialApplications.insert(
-        {fnDeclRef, {errorBehavior,
-                     PartialApplication::MutatingMethod, 2}});
-    }
-
     // Not interested in going outside a basic expression.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       return { false, S };
@@ -461,11 +375,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           break;
       }
       return arg;
-    }
-
-    Expr *walkToExprPost(Expr *E) override {
-      checkInvalidPartialApplication(E);
-      return E;
     }
 
     void checkConvertedPointerArgument(ConcreteDeclRef callee,
