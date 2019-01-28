@@ -28,6 +28,7 @@ struct ComplexStruct {
 
 sil @inout_builtinobject_user : $@convention(thin) (@inout Builtin.NativeObject) -> ()
 sil @get_builtin_object : $@convention(thin) () -> @owned Builtin.NativeObject
+sil @guaranteed_object_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
 ///////////
 // Tests //
@@ -984,6 +985,96 @@ bb0(%0 : @owned $NativeObjectPair, %1 : @owned $Builtin.NativeObject):
   destroy_value %4 : $Builtin.NativeObject
   destroy_addr %2 : $*NativeObjectPair
   dealloc_stack %2 : $*NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Loop case.
+// CHECK-LABEL: sil [ossa] @promote_with_loop_1 : $@convention(thin) (@owned NativeObjectPair) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'promote_with_loop_1'
+sil [ossa] @promote_with_loop_1 : $@convention(thin) (@owned NativeObjectPair) -> () {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = alloc_stack $NativeObjectPair
+  store %0 to [init] %1 : $*NativeObjectPair
+  %2 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.x
+  br bb2
+
+bb2:
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  %4 = function_ref @guaranteed_object_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  br bb2
+}
+
+// CHECK-LABEL: sil [ossa] @promote_with_loop_2 : $@convention(thin) (@owned NativeObjectPair) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'promote_with_loop_2'
+sil [ossa] @promote_with_loop_2 : $@convention(thin) (@owned NativeObjectPair) -> () {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = alloc_stack $NativeObjectPair
+  store %0 to [init] %1 : $*NativeObjectPair
+  %2 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.x
+  br bb2
+
+bb2:
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  %4 = function_ref @guaranteed_object_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb2
+
+bb4:
+  destroy_addr %1 : $*NativeObjectPair
+  dealloc_stack %1 : $*NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @two_backedge_loop : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'two_backedge_loop'
+sil [ossa] @two_backedge_loop : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  br bb1
+
+bb1:
+  br bb2
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  %2 = load [copy] %1 : $*Builtin.NativeObject
+  destroy_value %2 : $Builtin.NativeObject
+  cond_br undef, bb5, bb6
+
+bb4:
+  %3 = load [copy] %1 : $*Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  cond_br undef, bb7, bb8
+
+bb5:
+  br bb2
+
+bb6:
+  br bb9
+
+bb7:
+  br bb2
+
+bb8:
+  br bb9
+
+bb9:
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }

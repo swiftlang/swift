@@ -98,19 +98,19 @@ struct State {
                                      SILBasicBlock *userBlock);
 
   /// Once we have marked all of our producing blocks.
-  bool checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
+  void checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
                                   SILBasicBlock *userBlock);
-  bool checkPredsForDoubleConsume(SILBasicBlock *userBlock);
+  void checkPredsForDoubleConsume(SILBasicBlock *userBlock);
 
   /// Once we have setup all of our consuming/non-consuming blocks and have
   /// validated that all intra-block dataflow is safe, perform the inter-block
   /// dataflow.
-  bool performDataflow(DeadEndBlocks &deBlocks);
+  void performDataflow(DeadEndBlocks &deBlocks);
 
   /// After we have performed the dataflow, check the end state of our dataflow
   /// for validity. If this is a linear typed value, return true. Return false
   /// otherwise.
-  bool checkDataflowEndState(DeadEndBlocks &deBlocks);
+  void checkDataflowEndState(DeadEndBlocks &deBlocks);
 };
 
 } // end anonymous namespace
@@ -166,8 +166,7 @@ void State::initializeAllNonConsumingUses(
 
 void State::initializeAllConsumingUses(
     ArrayRef<BranchPropagatedUser> consumingUses,
-    SmallVectorImpl<std::pair<BranchPropagatedUser, SILBasicBlock *>>
-        &predsToAddToWorklist) {
+    SmallVectorImpl<BrPropUserAndBlockPair> &predsToAddToWorklist) {
   for (BranchPropagatedUser user : consumingUses) {
     SILBasicBlock *userBlock = user.getParent();
 
@@ -271,10 +270,21 @@ void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
   return;
 }
 
-bool State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
+void State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
                                        SILBasicBlock *userBlock) {
   if (!blocksWithConsumingUses.count(userBlock))
-    return false;
+    return;
+
+  // Check if this is a block that we have already visited. This means that we
+  // had a back edge of some sort. Double check that we haven't missed any
+  // successors.
+  if (visitedBlocks.count(userBlock)) {
+    for (auto *succ : userBlock->getSuccessorBlocks()) {
+      if (!visitedBlocks.count(succ)) {
+        successorBlocksThatMustBeVisited.insert(succ);
+      }
+    }
+  }
 
   error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
@@ -282,15 +292,22 @@ bool State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
                  << "Value: " << *value << "User: " << *consumingUser
                  << "Block: bb" << userBlock->getDebugID() << "\n\n";
   });
-
-  // If we reached this point, then we did not assert, but we did flag an
-  // error. Return true so we continue the walk.
-  return true;
 }
 
-bool State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
+void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
   if (!blocksWithConsumingUses.count(userBlock))
-    return false;
+    return;
+
+  // Check if this is a block that we have already visited. This means that we
+  // had a back edge of some sort. Double check that we haven't missed any
+  // successors.
+  if (visitedBlocks.count(userBlock)) {
+    for (auto *succ : userBlock->getSuccessorBlocks()) {
+      if (!visitedBlocks.count(succ)) {
+        successorBlocksThatMustBeVisited.insert(succ);
+      }
+    }
+  }
 
   error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
@@ -298,14 +315,13 @@ bool State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
                  << "Value: " << *value << "Block: bb"
                  << userBlock->getDebugID() << "\n\n";
   });
-  return true;
 }
 
 //===----------------------------------------------------------------------===//
 //                                  Dataflow
 //===----------------------------------------------------------------------===//
 
-bool State::performDataflow(DeadEndBlocks &deBlocks) {
+void State::performDataflow(DeadEndBlocks &deBlocks) {
   LLVM_DEBUG(llvm::dbgs() << "    Beginning to check dataflow constraints\n");
   // Until the worklist is empty...
   while (!worklist.empty()) {
@@ -366,11 +382,7 @@ bool State::performDataflow(DeadEndBlocks &deBlocks) {
     // 2. We add the predecessor to the worklist if we have not visited it yet.
     for (auto *predBlock : block->getPredecessorBlocks()) {
       // Check if we have an over consume.
-      if (checkPredsForDoubleConsume(predBlock)) {
-        // If we were to assert, it is handled inside check preds for double
-        // consume. So just return false so that we bail.
-        return false;
-      }
+      checkPredsForDoubleConsume(predBlock);
 
       if (visitedBlocks.count(predBlock)) {
         continue;
@@ -380,15 +392,9 @@ bool State::performDataflow(DeadEndBlocks &deBlocks) {
       worklist.push_back(predBlock);
     }
   }
-
-  return true;
 }
 
-bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
-  // Make sure that we visited all successor blocks that we needed to visit to
-  // make sure we didn't leak.
-  bool doesntHaveAnyLeaks = true;
-
+void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
   if (!successorBlocksThatMustBeVisited.empty()) {
     // If we are asked to store any leaking blocks, put them in the leaking
     // blocks array.
@@ -412,13 +418,12 @@ bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
 
     // Otherwise... see if we have any other failures. This signals the user
     // wants us to tell it where to insert compensating destroys.
-    doesntHaveAnyLeaks = false;
   }
 
   // Make sure that we do not have any lifetime ending uses left to visit that
   // are not transitively unreachable blocks.... so return early.
   if (blocksWithNonConsumingUses.empty()) {
-    return doesntHaveAnyLeaks;
+    return;
   }
 
   // If we do have remaining blocks, then these non lifetime ending uses must be
@@ -439,12 +444,7 @@ bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
       }
       llvm::errs() << "\n";
     });
-    return false;
   }
-
-  // If all of our remaining blocks were dead uses, then return true. We are
-  // good.
-  return doesntHaveAnyLeaks;
 }
 
 //===----------------------------------------------------------------------===//
@@ -506,19 +506,17 @@ LinearLifetimeError swift::valueHasLinearLifetime(
 
     // Make sure that the predecessor is not in our blocksWithConsumingUses
     // list.
-    if (state.checkPredsForDoubleConsume(user, predBlock)) {
-      return state.error;
-    }
+    state.checkPredsForDoubleConsume(user, predBlock);
 
     if (!state.visitedBlocks.insert(predBlock).second)
       continue;
+
     state.worklist.push_back(predBlock);
   }
 
   // Now that our algorithm is completely prepared, run the
   // dataflow... If we find a failure, return false.
-  if (!state.performDataflow(deBlocks))
-    return state.error;
+  state.performDataflow(deBlocks);
 
   // ...and then check that the end state shows that we have a valid linear
   // typed value.
