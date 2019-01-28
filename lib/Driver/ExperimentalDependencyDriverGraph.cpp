@@ -79,30 +79,36 @@ bool ModuleDepGraph::isMarked(const Job *cmd) const {
   return cascadingJobs.count(getSwiftDeps(cmd));
 }
 
-void ModuleDepGraph::markTransitive(SmallVectorImpl<const Job *> &visited,
-                                    const Job *job, const void *ignored) {
+void ModuleDepGraph::markTransitive(SmallVectorImpl<const Job *> &consequentJobsToRecompile,
+                                    const Job *jobToBeRecompiled, const void *ignored) {
   FrontendStatsTracer tracer(stats, "experimental-dependencies-markTransitive");
-  std::unordered_set<const ModuleDepGraphNode *> visitedNodeSet;
-  const StringRef swiftDeps = getSwiftDeps(job);
+  
+  std::unordered_set<const ModuleDepGraphNode *> dependentNodes;
+  const StringRef swiftDepsToBeRecompiled = getSwiftDeps(jobToBeRecompiled);
   // Do the traversal.
-  for (auto &fileAndNode : nodeMap[swiftDeps]) {
+  for (auto &fileAndNode : nodeMap[swiftDepsToBeRecompiled]) {
     assert(isCurrentPathForTracingEmpty());
-    checkTransitiveClosureForCascading(visitedNodeSet, fileAndNode.second);
+    findDependentNodesAndRecordCascadingOnes(dependentNodes, fileAndNode.second);
   }
-  assert(isCurrentPathForTracingEmpty());
-  // Copy back visited jobs.
-  std::unordered_set<std::string> visitedSwiftDeps;
-  for (const ModuleDepGraphNode *n : visitedNodeSet) {
+
+  computeUniqueJobsFromNodes(consequentJobsToRecompile, dependentNodes);
+}
+
+void ModuleDepGraph::computeUniqueJobsFromNodes(SmallVectorImpl<const Job *> &jobs,
+                         const std::unordered_set<const ModuleDepGraphNode *> &nodes) {
+  std::unordered_set<std::string> swiftDepsOfNodes;
+  for (const ModuleDepGraphNode *n : nodes) {
     if (!n->getSwiftDeps().hasValue())
       continue;
     const std::string &swiftDeps = n->getSwiftDeps().getValue();
-    if (visitedSwiftDeps.insert(swiftDeps).second) {
+    if (swiftDepsOfNodes.insert(swiftDeps).second) {
       assert(n->assertImplementationMustBeInAFile());
       ensureJobIsTracked(swiftDeps);
-      visited.push_back(getJob(swiftDeps));
+      jobs.push_back(getJob(swiftDeps));
     }
   }
 }
+
 
 bool ModuleDepGraph::markIntransitive(const Job *node) {
   return rememberThatJobCascades(getSwiftDeps(node));
@@ -331,24 +337,21 @@ void ModuleDepGraph::forEachArc(
 
 // Could be faster by passing in a file, not a node, but we are trying for
 // generality.
-// The status quo system doesn't traverse past "Marked" nodes.
-// I'm not sure that will be safe when we get fingerprints.
-// Seems like no harm, just more time spent, by traversing through "Marked"
-// nodes.
-void ModuleDepGraph::checkTransitiveClosureForCascading(
-    std::unordered_set<const ModuleDepGraphNode *> &visited,
-    const ModuleDepGraphNode *potentiallyCascadingDef) {
+
+void ModuleDepGraph::findDependentNodesAndRecordCascadingOnes(
+    std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
+    const ModuleDepGraphNode *definition) {
   // Cycle recording and check.
-  if (!visited.insert(potentiallyCascadingDef).second)
+  if (!foundDependents.insert(definition).second)
     return;
 
-  size_t pathLengthAfterArrival = traceArrival(potentiallyCascadingDef);
+  size_t pathLengthAfterArrival = traceArrival(definition);
 
   // Moved this out of the following loop for effieciency.
-  assert(potentiallyCascadingDef->getSwiftDeps().hasValue() &&
+  assert(definition->getSwiftDeps().hasValue() &&
          "Should only call me for Decl nodes.");
 
-  forEachUseOf(potentiallyCascadingDef, [&](const ModuleDepGraphNode *u) {
+  forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
     if (u->getKey().isInterface() && u->getSwiftDeps().hasValue()) {
       // An interface depends on something. Thus, if that something changes
       // the interface must be recompiled. But if an interface changes, then
@@ -359,7 +362,7 @@ void ModuleDepGraph::checkTransitiveClosureForCascading(
       // 2018) must be recompiled.
       rememberThatJobCascades(u->getSwiftDeps().getValue());
     }
-    checkTransitiveClosureForCascading(visited, u);
+    findDependentNodesAndRecordCascadingOnes(foundDependents, u);
   });
   traceDeparture(pathLengthAfterArrival);
 }
@@ -424,7 +427,7 @@ bool ModuleDepGraph::verify() const {
   FrontendStatsTracer tracer(stats, "experimental-dependencies-verify");
   verifyNodeMapEntries();
   verifyCanFindEachJob();
-  verifyEachJobIsTracked();
+  verifyEachJobInGraphIsTracked();
 
   return true;
 }
@@ -504,7 +507,7 @@ void ModuleDepGraph::verifyCanFindEachJob() const {
   }
 }
 
-void ModuleDepGraph::verifyEachJobIsTracked() const {
+void ModuleDepGraph::verifyEachJobInGraphIsTracked() const {
   FrontendStatsTracer tracer(
       stats, "experimental-dependencies-verifyEachJobIsTracked");
   nodeMap.forEachKey1(

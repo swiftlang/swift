@@ -289,11 +289,13 @@ public:
   /// Interface to status quo code in the driver.
   bool isMarked(const driver::Job *) const;
 
-  /// Visit closure of every use of \p job, adding each to visited.
-  /// Record any "cascading" nodes visited.
-  /// "Cascading" means has a use by an interface in another file.
-  void markTransitive(SmallVectorImpl<const driver::Job *> &visited,
-                      const driver::Job *node, const void *ignored = nullptr);
+  /// Given a "cascading" job, that is a job whose dependents must be recompiled when this job is recompiled,
+  /// Compute two sets of jobs:
+  /// 1. Return value (via visited) is the set of jobs needing recompilation after this one, and
+  /// 2. Jobs not previously known to need dependencies reexamined after they are recompiled.
+  /// Such jobs are added to the \ref cascadingJobs set, and accessed via \ref isMarked.
+  void markTransitive(SmallVectorImpl<const driver::Job *> &consequentJobsToRecompile,
+                      const driver::Job *jobToBeRecompiled, const void *ignored = nullptr);
 
   /// "Mark" this node only.
   bool markIntransitive(const driver::Job *);
@@ -346,16 +348,8 @@ private:
   void verifyExternalDependencyUniqueness(const DependencyKey &) const;
 
   void verifyCanFindEachJob() const;
-  void verifyEachJobIsTracked() const;
-  
-  /// Record a visit to this node for later dependency printing
-  size_t traceArrival(const ModuleDepGraphNode *visitedNode);
-  /// Record end of visit to this node.
-  void traceDeparture(size_t pathLengthAfterArrival);
-  
-  /// For printing why a Job was compiled, record how it was found.
-  void recordDependencyPathToJob(const std::vector<const ModuleDepGraphNode *> &pathToJob, const driver::Job* dependentJob);
-
+  void verifyEachJobInGraphIsTracked() const;
+ 
   static bool mapCorruption(const char *msg) { llvm_unreachable(msg); }
 
   /// Use the known swiftDeps to find a directory for
@@ -421,12 +415,27 @@ private:
   /// ModuleDepGraphNode needs to be removed.
   void removeNode(ModuleDepGraphNode *);
 
-  /// Starting with the uses of \p potentiallyCascadingDef,
-  /// find any newly-cascading jobs.
-  /// TODO: stop at marked jobs
-  void checkTransitiveClosureForCascading(
-      std::unordered_set<const ModuleDepGraphNode *> &visited,
-      const ModuleDepGraphNode *potentiallyCascadingDef);
+  /// Given a definition node, and a list of already found dependents,
+  /// recursively add transitive closure of dependents of the definition
+  /// into the already found dependents.
+  /// Also record any dependents that "cascade", i.e. whose dependencies must be recomputed after recompilation so that its dependents can be recompiled.
+  void findDependentNodesAndRecordCascadingOnes(
+      std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
+      const ModuleDepGraphNode *definition);
+  
+  void computeUniqueJobsFromNodes(
+                                  SmallVectorImpl<const driver::Job *> &uniqueJobs,
+                                  const std::unordered_set<const ModuleDepGraphNode *> &nodes);
+  
+  
+  /// Record a visit to this node for later dependency printing
+  size_t traceArrival(const ModuleDepGraphNode *visitedNode);
+  /// Record end of visit to this node.
+  void traceDeparture(size_t pathLengthAfterArrival);
+  
+  /// For printing why a Job was compiled, record how it was found.
+  void recordDependencyPathToJob(const std::vector<const ModuleDepGraphNode *> &pathToJob, const driver::Job* dependentJob);
+
 
   /// Return true if job did not cascade before
   bool rememberThatJobCascades(StringRef swiftDeps) {
