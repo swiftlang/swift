@@ -150,7 +150,7 @@ class ModuleDepGraph {
   /// source file.)
 
   /// Tracks def-use relationships by DependencyKey.
-  std::unordered_map<DependencyKey, std::unordered_set<ModuleDepGraphNode>>
+  std::unordered_map<DependencyKey, std::unordered_set<ModuleDepGraphNode*>>
       usesByDef;
 
   // Supports requests from the driver to getExternalDependencies.
@@ -366,26 +366,37 @@ private:
   /// Integrate a SourceFileDepGraph into the receiver.
   /// Integration happens when the driver needs to read SourceFileDepGraph.
   DependencyGraphImpl::LoadResult integrate(const SourceFileDepGraph &);
+  
+  enum class LocationOfPreexistingNode {
+    nowhere, here, elsewhere
+  };
+  
+  typedef Optional<std::pair<LocationOfPreexistingNode, ModuleDepGraphNode *>> PreexistingNodeIfAny;
+  
+  /// Find the preexisting node here that best matches the integrand.
+  PreexistingNodeIfAny
+  findPreexistingMatch(StringRef swiftDepsOfCompilationToBeIntegrated,
+                       const SourceFileDepGraphNode *integrand);
+
 
   /// Integrate the \p integrand into the receiver.
   /// Return a bool indicating if this node represents a change that must be
-  /// propagated.
-  bool integrateSourceFileDepGraphNode(
+  /// propagated, and the integrated ModuleDepGraphNode.
+  std::pair<bool, ModuleDepGraphNode*> integrateSourceFileDepGraphNode(
       const SourceFileDepGraphNode *integrand,
       StringRef swiftDepsOfSourceFileGraph,
-      Optional<ModuleDepGraphNode *> preexistingNodeInPlace);
+      const PreexistingNodeIfAny preexistingMatch);
 
   /// Integrate the \p integrand, a node that represents a Decl in the swiftDeps
   /// file being integrated. \p preexistingNodeInPlace holds the node
   /// representing the same Decl that already exists, if there is one. \p
   /// prexisintExpat holds a node with the same key that already exists, but was
-  /// not known to reside in any swiftDeps file. Return a bool indicating if
-  /// this node represents a change that must be propagated.
-  bool integrateFrontendDeclNode(
+  /// not known to reside in any swiftDeps file. Return a bool indicating if this node represents a change that must be
+  /// propagated, and the integrated ModuleDepGraphNode.
+  std::pair<bool, ModuleDepGraphNode*> integrateFrontendDeclNode(
       const SourceFileDepGraphNode *integrand,
       StringRef swiftDepsOfSourceFileGraph,
-      Optional<ModuleDepGraphNode *> preexistingNodeInSameFile,
-      Optional<ModuleDepGraphNode *> preexistingExpat);
+      const PreexistingNodeIfAny preexistingMatch);
 
   /// Integrate the \p integrand, a node that was not known to reside in any
   /// swiftDeps file. \p preexistingNodeInSameFile holds the node representing
@@ -393,13 +404,11 @@ private:
   /// holds a node with the same key that already exists, but was not known to
   /// reside in any swiftDeps file. \p dupsExistInOtherFiles is true if there
   /// exists a node with the same key that is known to reside in some other
-  /// swiftDeps file. Return a bool indicating if this node represents a change
-  /// that must be propagated.
-  bool integrateFrontendExpatNode(
+  /// swiftDeps file. Return a bool indicating if this node represents a change that must be
+  /// propagated, and the integrated ModuleDepGraphNode.
+  std::pair<bool, ModuleDepGraphNode*> integrateFrontendExpatNode(
       const SourceFileDepGraphNode *integrand,
-      Optional<ModuleDepGraphNode *> preexistingNodeInSameFile,
-      Optional<ModuleDepGraphNode *> preexistingExpat,
-      bool dupsExistInOtherFiles);
+      const PreexistingNodeIfAny preexistingMatch);
 
   /// Create a brand-new ModuleDepGraphNode to integrate \p integrand.
   ModuleDepGraphNode *
@@ -409,6 +418,7 @@ private:
   /// Integrate the dependencies of \p integrand which resides in \p
   /// integrandGraph into \p this.
   void integrateUsesByDef(const SourceFileDepGraphNode *integrand,
+                          ModuleDepGraphNode *integratedNode,
                           const SourceFileDepGraph &integrandGraph);
 
   /// If the programmer removes a Decl from a source file, the corresponding

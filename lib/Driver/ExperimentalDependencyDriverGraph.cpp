@@ -136,10 +136,10 @@ void ModuleDepGraph::markExternal(SmallVectorImpl<const Job *> &uses,
           externalDependency.str());
   // collect answers into useSet
   std::unordered_set<std::string> visitedSet;
-  for (const DependencyKey &use : usesByDef[key]) {
-          const Job *job = getJob(use->getSwiftDeps());
+  for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
+    const Job *job = getJob(useNode->getSwiftDeps());
     if (!isMarked(job))
-      contuine;
+      continue;
     uses.push_back(job);
     markTransitive(uses, job);
   }
@@ -160,16 +160,17 @@ LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g) {
   auto changedNodes = std::unordered_set<DependencyKey>();
 
   g.forEachNode([&](const SourceFileDepGraphNode *integrand) {
-    integrateUsesByDef(integrand, g);
     const auto key = integrand->getKey();
-    Optional<ModuleDepGraphNode *> preexistingNodeInPlace =
-        integrand->getIsProvides() ? nodeMap.find(swiftDeps, key) : None;
-    if (preexistingNodeInPlace)
+    auto preexistingMatch = findPreexistingMatch(swiftDeps, integrand);
+    if (preexistingMatch.hasValue() && preexistingMatch.getValue().first == LocationOfPreexistingNode::here)
       disappearedNodes.erase(key);
-    const bool changed = integrateSourceFileDepGraphNode(
-        integrand, swiftDeps, preexistingNodeInPlace);
+    const auto changedAndNode = integrateSourceFileDepGraphNode(
+        integrand, swiftDeps, preexistingMatch);
+    const bool changed = changedAndNode.first;
+    auto *integratedNode = changedAndNode.second;
     if (changed)
       changedNodes.insert(key);
+    integrateUsesByDef(integrand, integratedNode, g);
 
     // Track externalDependencies so Compilation can check them.
     if (integrand->getKey().getKind() == NodeKind::externalDepend)
@@ -187,79 +188,95 @@ LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g) {
                               : LoadResult::AffectsDownstream;
 }
 
-bool ModuleDepGraph::integrateSourceFileDepGraphNode(
+ModuleDepGraph::PreexistingNodeIfAny
+ModuleDepGraph::findPreexistingMatch(
+                                     StringRef swiftDepsOfCompilationToBeIntegrated,
+                                     const SourceFileDepGraphNode *integrand) {
+  const auto &matches = nodeMap[integrand->getKey()];
+  const auto &expatsIter = matches.find("");
+  if (expatsIter != matches.end()) {
+    assert(matches.size() == 1 && "If an expat exists, then must not be any matches in other files");
+    return std::make_pair(LocationOfPreexistingNode::nowhere, expatsIter->second);
+  }
+  if (integrand->getIsProvides()) {
+    const auto &preexistingNodeInPlaceIter = matches.find(swiftDepsOfCompilationToBeIntegrated);
+    if (preexistingNodeInPlaceIter != matches.end())
+      return std::make_pair(LocationOfPreexistingNode::here, preexistingNodeInPlaceIter->second);
+  }
+  if (!matches.empty())
+    return std::make_pair(LocationOfPreexistingNode::elsewhere, matches.begin()->second);
+  return None;
+}
+
+
+std::pair<bool, ModuleDepGraphNode*> ModuleDepGraph::integrateSourceFileDepGraphNode(
     const SourceFileDepGraphNode *integrand,
     StringRef swiftDepsOfSourceFileGraph,
-    const Optional<ModuleDepGraphNode *> preexistingNodeInPlace) {
-
-  const auto key = integrand->getKey();
-
-  const Optional<ModuleDepGraphNode *> preexistingExpat =
-      preexistingNodeInPlace ? None : nodeMap.find("", key);
-
-  const size_t preexistingCount = nodeMap[key].size();
-
-  assert((!preexistingExpat || preexistingCount == 1) &&
-         "If there is an expat, must not be any Decls in files.");
-
-  const bool dupsExistInOtherFiles =
-      !preexistingNodeInPlace && !preexistingExpat && preexistingCount;
+    const PreexistingNodeIfAny preexistingMatch) {
 
   return integrand->getIsProvides()
              ? integrateFrontendDeclNode(integrand, swiftDepsOfSourceFileGraph,
-                                         preexistingNodeInPlace,
-                                         preexistingExpat)
-             : integrateFrontendExpatNode(integrand, preexistingNodeInPlace,
-                                          preexistingExpat,
-                                          dupsExistInOtherFiles);
+                                         preexistingMatch)
+             : integrateFrontendExpatNode(integrand, preexistingMatch);
 }
 
-bool ModuleDepGraph::integrateFrontendDeclNode(
+
+std::pair<bool, ModuleDepGraphNode*> ModuleDepGraph::integrateFrontendDeclNode(
     const SourceFileDepGraphNode *integrand,
     StringRef swiftDepsOfSourceFileGraph,
-    const Optional<ModuleDepGraphNode *> preexistingNodeInPlace,
-    const Optional<ModuleDepGraphNode *> preexistingExpat) {
-
-  const auto key = integrand->getKey();
-  if (preexistingNodeInPlace)
-    return preexistingNodeInPlace.getValue()->integrateFingerprintFrom(
-        integrand);
-
-  if (preexistingExpat) {
-    // Some other file depended on this, but didn't know where it was.
-    moveNodeToDifferentFile(preexistingExpat.getValue(),
-                            swiftDepsOfSourceFileGraph.str());
-    preexistingExpat.getValue()->integrateFingerprintFrom(integrand);
-    return true; // New Decl, assume changed
+    const PreexistingNodeIfAny preexistingMatch) {
+  
+  if (!preexistingMatch.hasValue()) {
+    auto *newNode = integrateByCreatingANewNode(integrand, swiftDepsOfSourceFileGraph.str());
+    return std::make_pair(true, newNode); // New node
   }
-  integrateByCreatingANewNode(integrand, swiftDepsOfSourceFileGraph.str());
-  return true; // New node
+  const auto where = preexistingMatch.getValue().first;
+  auto *match = preexistingMatch.getValue().second;
+  switch (where) {
+    case LocationOfPreexistingNode::here:
+      return std::make_pair(match->integrateFingerprintFrom(integrand), match);
+      
+   case LocationOfPreexistingNode::nowhere:
+      // Some other file depended on this, but didn't know where it was.
+      moveNodeToDifferentFile(match, swiftDepsOfSourceFileGraph.str());
+      match->integrateFingerprintFrom(integrand);
+      return std::make_pair(true, match); // New Decl, assume changed
+
+    case LocationOfPreexistingNode::elsewhere:
+      auto *newNode = integrateByCreatingANewNode(integrand, swiftDepsOfSourceFileGraph.str());
+      return std::make_pair(true, newNode); // New node;
+  }
+  llvm_unreachable("impossible");
 }
 
-bool ModuleDepGraph::integrateFrontendExpatNode(
+std::pair<bool, ModuleDepGraphNode*> ModuleDepGraph::integrateFrontendExpatNode(
     const SourceFileDepGraphNode *integrand,
-    const Optional<ModuleDepGraphNode *> preexistingNodeInPlace,
-    const Optional<ModuleDepGraphNode *> preexistingExpat,
-    bool dupsExistInOtherFiles) {
-
-  const auto key = integrand->getKey();
-
-  if (dupsExistInOtherFiles || preexistingExpat) {
-    // Integrand is a dependency from another file, and we already have a def
-    // node for that. Nothing to be done.
-    assert(!integrand->getFingerprint().hasValue() &&
-           "If extra-file dependencies were to have fingerprints, would need "
-           "to do something more.");
-    return false;
+    const PreexistingNodeIfAny preexistingMatch) {
+  
+  if (!preexistingMatch.hasValue())
+    return std::make_pair(true, integrateByCreatingANewNode(integrand, None));
+  // FOLD INTO CALLER
+  const auto where = preexistingMatch.getValue().first;
+  auto *match = preexistingMatch.getValue().second;
+  
+  switch (where) {
+    case LocationOfPreexistingNode::here:
+      // Something was deleted from this file, but it still depends on that
+      // (baseName). Also, at this point there is no other matching node.
+      match->integrateFingerprintFrom(integrand);
+      moveNodeToDifferentFile(match, None);
+      return std::make_pair(true, match); // today won't have frontend deps with deps on them
+      
+    case LocationOfPreexistingNode::nowhere:
+    case LocationOfPreexistingNode::elsewhere:
+      // Integrand is a dependency from another file, and we already have a def
+      // node for that. Nothing to be done.
+      assert(!integrand->getFingerprint().hasValue() &&
+             "If extra-file dependencies were to have fingerprints, would need "
+             "to do something more.");
+      return std::make_pair(false, match);
   }
-  if (preexistingNodeInPlace) {
-    // Something was deleted from this file, but it still depends on that
-    // (baseName). Also, at this point there is no other matching node.
-    preexistingNodeInPlace.getValue()->integrateFingerprintFrom(integrand);
-    moveNodeToDifferentFile(preexistingNodeInPlace.getValue(), None);
-  } else
-    integrateByCreatingANewNode(integrand, None);
-  return true;
+  llvm_unreachable("impossible");
 }
 
 ModuleDepGraphNode *ModuleDepGraph::integrateByCreatingANewNode(
@@ -272,15 +289,15 @@ ModuleDepGraphNode *ModuleDepGraph::integrateByCreatingANewNode(
   return newNode;
 }
 
-void ModuleDepGraph::integrateUsesByDef(const SourceFileDepGraphNode *defNode,
-                                        const SourceFileDepGraph &g,
-                                        const ModuleDepGraphNode *usingXXX) {
-  const auto &def = n->getKey();
+void ModuleDepGraph::integrateUsesByDef(const SourceFileDepGraphNode *integrand,
+                                        ModuleDepGraphNode *integratedNode,
+                                        const SourceFileDepGraph &integrandGraph) {
+  const auto &def = integrand->getKey();
   auto &uses = usesByDef[def];
-  g.forEachUseOf(n, [&](const SourceFileDepGraphNode *useNode) {
+  integrandGraph.forEachUseOf(integrand, [&](const SourceFileDepGraphNode *useNode) {
     const auto &use = useNode->getKey();
     if (use.canDependUpon(def))
-      uses.insert(use);
+      uses.insert(integratedNode);
   });
 }
 
