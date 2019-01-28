@@ -3432,6 +3432,17 @@ public:
     void checkSourceRanges(Expr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ranges", E);
 
+      if (E->getStartLoc().isValid() != E->getEndLoc().isValid()) {
+        Out << "StartLoc and EndLoc validity do not match for expression: ";
+        E->dump(Out);
+        Out << "\nStartLoc: ";
+        E->getStartLoc().printLineAndColumn(Out, Ctx.SourceMgr);
+        Out << ", EndLoc: ";
+        E->getEndLoc().printLineAndColumn(Out, Ctx.SourceMgr);
+        Out << "\n";
+        abort();
+      }
+
       if (!E->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated
         // expressions.
@@ -3457,6 +3468,17 @@ public:
 
     void checkSourceRanges(Stmt *S) {
       PrettyStackTraceStmt debugStack(Ctx, "verifying ranges", S);
+
+      if (S->getStartLoc().isValid() != S->getEndLoc().isValid()) {
+        Out << "StartLoc and EndLoc validity do not match for statement: ";
+        S->dump(Out);
+        Out << "\nStartLoc: ";
+        S->getStartLoc().printLineAndColumn(Out, Ctx.SourceMgr);
+        Out << ", EndLoc: ";
+        S->getEndLoc().printLineAndColumn(Out, Ctx.SourceMgr);
+        Out << "\n";
+        abort();
+      }
 
       if (!S->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated
@@ -3544,6 +3566,17 @@ public:
     void checkSourceRanges(Pattern *P) {
       PrettyStackTracePattern debugStack(Ctx, "verifying ranges", P);
 
+      if (P->getStartLoc().isValid() != P->getEndLoc().isValid()) {
+        Out << "StartLoc and EndLoc validity do not match for expression: ";
+        P->print(Out);
+        Out << "\nStartLoc: ";
+        P->getStartLoc().printLineAndColumn(Out, Ctx.SourceMgr);
+        Out << ", EndLoc: ";
+        P->getEndLoc().printLineAndColumn(Out, Ctx.SourceMgr);
+        Out << "\n";
+        abort();
+      }
+
       // We don't care about source ranges on implicitly-generated
       // patterns.
       if (P->isImplicit())
@@ -3581,6 +3614,17 @@ public:
 
     void checkSourceRanges(Decl *D) {
       PrettyStackTraceDecl debugStack("verifying ranges", D);
+
+      if (D->getStartLoc().isValid() != D->getEndLoc().isValid()) {
+        Out << "StartLoc and EndLoc validity do not match for expression: ";
+        D->dump(Out);
+        Out << "\nStartLoc: ";
+        D->getStartLoc().printLineAndColumn(Out, Ctx.SourceMgr);
+        Out << ", EndLoc: ";
+        D->getEndLoc().printLineAndColumn(Out, Ctx.SourceMgr);
+        Out << "\n";
+        abort();
+      }
 
       if (!D->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated
