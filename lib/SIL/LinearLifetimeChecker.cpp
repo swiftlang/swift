@@ -81,22 +81,21 @@ struct State {
 
   void initializeAllNonConsumingUses(
       ArrayRef<BranchPropagatedUser> nonConsumingUsers);
-  bool initializeAllConsumingUses(
+  void initializeAllConsumingUses(
       ArrayRef<BranchPropagatedUser> consumingUsers,
       SmallVectorImpl<BrPropUserAndBlockPair> &predsToAddToWorklist);
 
-  /// Initializes state for a consuming use. Returns true if we have not yet
-  /// seen a consuming use in the same block yet. Returns false if detect such a
-  /// condition so users know that a use-after-free was detected.
-  bool initializeConsumingUse(BranchPropagatedUser consumingUser,
+  /// Initializes state for a consuming use.
+  ///
+  /// If we are already tracking a consuming use for the block, this emits a
+  /// double consume checker error.
+  void initializeConsumingUse(BranchPropagatedUser consumingUser,
                               SILBasicBlock *userBlock);
 
-  /// Returns true if the given block contains a non-consuming use that is
-  /// strictly later in the block than a consuming use. If all
-  /// non-consuming uses are before the consuming use, the block is
-  /// removed from the blocksWithNonConsumingUses map to show that the uses
-  /// were found to properly be post-dominated by a consuming use.
-  bool checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
+  /// Check that this newly initialized consuming user does not have any
+  /// non-consuming uses after it. If the checker finds one, it emits a checker
+  /// error.
+  void checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                                      SILBasicBlock *userBlock);
 
   /// Once we have marked all of our producing blocks.
@@ -181,27 +180,22 @@ void State::initializeAllNonConsumingUses(
 //                        Consuming Use Initialization
 //===----------------------------------------------------------------------===//
 
-bool State::initializeAllConsumingUses(
+void State::initializeAllConsumingUses(
     ArrayRef<BranchPropagatedUser> consumingUses,
     SmallVectorImpl<std::pair<BranchPropagatedUser, SILBasicBlock *>>
         &predsToAddToWorklist) {
-  bool noErrors = true;
   for (BranchPropagatedUser user : consumingUses) {
     SILBasicBlock *userBlock = user.getParent();
 
-    // First initialize our state for the consuming user. This returns false if
-    // we found another consuming instruction associated with userBlock and true
-    // if we successfully associated user with userBlock.
-    if (!initializeConsumingUse(user, userBlock)) {
-      // We already handled the error.
-      noErrors &= handleError([] {});
-    }
+    // First initialize our state for the consuming user.
+    //
+    // If we find another consuming instruction associated with userBlock this
+    // will emit a checker error.
+    initializeConsumingUse(user, userBlock);
 
-    // Then check if the given block has a use after free.
-    if (checkForSameBlockUseAfterFree(user, userBlock)) {
-      // We already handled the error.
-      noErrors &= handleError([] {});
-    }
+    // Then check if the given block has a use after free and emit an error if
+    // we find one.
+    checkForSameBlockUseAfterFree(user, userBlock);
 
     // If this user is in the same block as the value, do not visit
     // predecessors. We must be extra tolerant here since we allow for
@@ -216,18 +210,16 @@ bool State::initializeAllConsumingUses(
       predsToAddToWorklist.push_back({user, pred});
     }
   }
-
-  return noErrors;
 }
 
-bool State::initializeConsumingUse(BranchPropagatedUser consumingUser,
+void State::initializeConsumingUse(BranchPropagatedUser consumingUser,
                                    SILBasicBlock *userBlock) {
   // Map this user to the block. If we already have a value for the block, then
   // we have a double consume and need to fail.
   if (blocksWithConsumingUses.insert(userBlock).second)
-    return true;
+    return;
 
-  return handleError([&] {
+  handleError([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                  << "Found over consume?!\n"
                  << "Value: " << *value << "User: " << *consumingUser
@@ -235,13 +227,13 @@ bool State::initializeConsumingUse(BranchPropagatedUser consumingUser,
   });
 }
 
-bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
+void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                                           SILBasicBlock *userBlock) {
   // If we do not have any consuming uses in the same block as our
   // consuming user, then we can not have a same block use-after-free.
   auto iter = blocksWithNonConsumingUses.find(userBlock);
   if (iter == blocksWithNonConsumingUses.end())
-    return false;
+    return;
 
   BranchPropagatedUser nonConsumingUser = iter->second;
 
@@ -252,7 +244,7 @@ bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
   // always consider the non-consuming use to be a use after free since
   // the cond branch user is in a previous block. So just bail early.
   if (consumingUser.isCondBranchUser()) {
-    return !handleError([&]() {
+    handleError([&]() {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free?!\n"
                    << "Value: " << *value
@@ -260,6 +252,7 @@ bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                    << "Non Consuming User: " << *iter->second << "Block: bb"
                    << userBlock->getDebugID() << "\n\n";
     });
+    return;
   }
 
   // Ok. At this point, we know that our consuming user is not a cond branch
@@ -268,7 +261,7 @@ bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
   // consuming use. and continue.
   if (nonConsumingUser.isCondBranchUser()) {
     blocksWithNonConsumingUses.erase(iter);
-    return false;
+    return;
   }
 
   // Otherwise, we know that both of our users are non-cond branch users and
@@ -278,7 +271,7 @@ bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                    [&nonConsumingUser](const SILInstruction &i) -> bool {
                      return nonConsumingUser == &i;
                    }) != userBlock->end()) {
-    return !handleError([&] {
+    handleError([&] {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free?!\n"
                    << "Value: " << *value
@@ -286,11 +279,12 @@ bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                    << "Non Consuming User: " << *iter->second << "Block: bb"
                    << userBlock->getDebugID() << "\n\n";
     });
+    return;
   }
 
   // Erase the use since we know that it is properly joint post-dominated.
   blocksWithNonConsumingUses.erase(iter);
-  return false;
+  return;
 }
 
 bool State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
