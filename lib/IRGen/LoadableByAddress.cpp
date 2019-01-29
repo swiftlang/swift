@@ -1317,19 +1317,22 @@ void LoadableStorageAllocation::allocateLoadableStorage() {
 SILArgument *LoadableStorageAllocation::replaceArgType(SILBuilder &argBuilder,
                                                        SILArgument *arg,
                                                        SILType newSILType) {
-  CopyValueInst *copyArg = argBuilder.createCopyValue(
-      RegularLocation(const_cast<ValueDecl *>(arg->getDecl())),
-      SILUndef::get(newSILType, pass.F->getModule()));
+  SILValue undef = SILUndef::get(newSILType, pass.F->getModule());
+  SmallVector<Operand *, 8> useList(arg->use_begin(), arg->use_end());
+  for (auto *use : useList) {
+    use->set(undef);
+  }
 
-  arg->replaceAllUsesWith(copyArg);
+  // Make sure that this is an argument we want to replace.
   assert(std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
                    arg) == pass.largeLoadableArgs.end());
 
   arg = arg->getParent()->replaceFunctionArgument(
       arg->getIndex(), newSILType, ValueOwnershipKind::Any, arg->getDecl());
 
-  copyArg->replaceAllUsesWith(arg);
-  copyArg->eraseFromParent();
+  for (auto *use : useList) {
+    use->set(arg);
+  }
 
   return arg;
 }
@@ -1384,16 +1387,17 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
 
 static void convertBBArgType(SILBuilder &argBuilder, SILType newSILType,
                              SILArgument *arg) {
-  CopyValueInst *copyArg = argBuilder.createCopyValue(
-      RegularLocation(const_cast<ValueDecl *>(arg->getDecl())),
-      SILUndef::get(newSILType, arg->getFunction()->getModule()));
+  SILValue undef = SILUndef::get(newSILType, argBuilder.getModule());
+  SmallVector<Operand *, 8> useList(arg->use_begin(), arg->use_end());
+  for (auto *use : useList) {
+    use->set(undef);
+  }
 
-  arg->replaceAllUsesWith(copyArg);
   arg = arg->getParent()->replacePhiArgument(arg->getIndex(), newSILType,
                                              arg->getOwnershipKind());
-
-  copyArg->replaceAllUsesWith(arg);
-  copyArg->eraseFromParent();
+  for (auto *use : useList) {
+    use->set(arg);
+  }
 }
 
 void LoadableStorageAllocation::convertApplyResults() {
