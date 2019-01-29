@@ -497,8 +497,6 @@ Type ASTBuilder::createDependentMemberType(StringRef member,
 
 #define REF_STORAGE(Name, ...) \
 Type ASTBuilder::create##Name##StorageType(Type base) { \
-  if (!base->allowsOwnership()) \
-    return Type(); \
   return Name##StorageType::get(base, Ctx); \
 }
 #include "swift/AST/ReferenceStorage.def"

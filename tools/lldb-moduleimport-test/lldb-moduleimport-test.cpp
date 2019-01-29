@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTDemangler.h"
+#include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
@@ -99,7 +100,9 @@ static void resolveTypeFromMangledNameList(
     if (!ResolvedType) {
       llvm::outs() << "Can't resolve type of " << Mangled << "\n";
     } else {
-      ResolvedType->print(llvm::outs());
+      swift::PrintOptions PO;
+      PO.PrintStorageRepresentationAttrs = true;
+      ResolvedType->print(llvm::outs(), PO);
       llvm::outs() << "\n";
     }
   }
@@ -114,7 +117,9 @@ static void resolveTypeFromMangledNameListOld(
     if (!ResolvedType) {
       llvm::errs() << "Can't resolve type of " << Mangled << "\n";
     } else {
-      ResolvedType->print(llvm::errs());
+      swift::PrintOptions PO;
+      PO.PrintStorageRepresentationAttrs = true;
+      ResolvedType->print(llvm::errs(), PO);
       llvm::errs() << "\n";
     }
   }
