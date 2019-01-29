@@ -92,7 +92,6 @@ void ModuleDepGraph::markTransitive(
     findDependentNodesAndRecordCascadingOnes(dependentNodes,
                                              fileAndNode.second);
   }
-
   computeUniqueJobsFromNodes(consequentJobsToRecompile, dependentNodes);
 }
 
@@ -330,17 +329,17 @@ void ModuleDepGraph::forEachArc(
 void ModuleDepGraph::findDependentNodesAndRecordCascadingOnes(
     std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
     const ModuleDepGraphNode *definition) {
-  // Cycle recording and check.
-  if (!foundDependents.insert(definition).second)
-    return;
 
-  size_t pathLengthAfterArrival = traceArrival(definition);
+    size_t pathLengthAfterArrival = traceArrival(definition);
 
   // Moved this out of the following loop for effieciency.
   assert(definition->getSwiftDeps().hasValue() &&
          "Should only call me for Decl nodes.");
 
   forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
+    // Cycle recording and check.
+    if (!foundDependents.insert(u).second)
+      return;
     if (u->getKey().isInterface() && u->getSwiftDeps().hasValue()) {
       // An interface depends on something. Thus, if that something changes
       // the interface must be recompiled. But if an interface changes, then
