@@ -66,26 +66,26 @@ public extension PublicStruct {
 
 internal extension PublicStruct {
   // CHECK-DAG: sil hidden [ossa] @$s22accessibility_warnings12PublicStructV17extMemberInternalyyF
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
+  public func extMemberInternal() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'internal'}} {{3-10=}}
   // CHECK-DAG: sil private [ossa] @$s22accessibility_warnings12PublicStructV15extImplInternal33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplInternal() {}
 }
 private extension PublicStruct {
   // CHECK-DAG: sil private [ossa] @$s22accessibility_warnings12PublicStructV16extMemberPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  public func extMemberPrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'private'}} {{3-10=}}
   // CHECK-DAG: sil private [ossa] @$s22accessibility_warnings12PublicStructV14extImplPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPrivate() {}
 }
 
 internal extension InternalStruct {
   // CHECK-DAG: sil hidden [ossa] @$s22accessibility_warnings14InternalStructV09extMemberC0yyF
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
+  public func extMemberInternal() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'internal'}} {{3-10=}}
   // CHECK-DAG: sil private [ossa] @$s22accessibility_warnings14InternalStructV07extImplC033_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplInternal() {}
 }
 private extension InternalStruct {
   // CHECK-DAG: sil private [ossa] @$s22accessibility_warnings14InternalStructV16extMemberPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  public func extMemberPrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'private'}} {{3-10=}}
   // CHECK-DAG: sil private [ossa] @$s22accessibility_warnings14InternalStructV14extImplPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPrivate() {}
 }
@@ -93,7 +93,7 @@ private extension InternalStruct {
 
 private extension PrivateStruct {
   // CHECK-DAG: sil private [ossa] @$s22accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV09extMemberC0yyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  public func extMemberPrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'private'}} {{3-10=}}
   // CHECK-DAG: sil private [ossa] @$s22accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV07extImplC0yyF
   private func extImplPrivate() {}
 }

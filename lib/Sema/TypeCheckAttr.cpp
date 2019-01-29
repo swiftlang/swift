@@ -1640,7 +1640,6 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
         auto diag = TC.diagnose(attr->getLocation(),
                                 diag::access_control_ext_member_more,
                                 attr->getAccess(),
-                                D->getDescriptiveKind(),
                                 extAttr->getAccess());
         swift::fixItAccess(diag, cast<ValueDecl>(D), defaultAccess, false,
                            true);
