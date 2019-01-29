@@ -322,8 +322,21 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
 
   case MappedCTypeKind::VaList:
-    if (ClangTypeSize != ClangCtx.getTypeSize(ClangCtx.VoidPtrTy))
-      return std::make_pair(Type(), "");
+    switch (ClangCtx.getTargetInfo().getBuiltinVaListKind()) {
+      case clang::TargetInfo::CharPtrBuiltinVaList:
+      case clang::TargetInfo::VoidPtrBuiltinVaList:
+      case clang::TargetInfo::PowerABIBuiltinVaList:
+      case clang::TargetInfo::AAPCSABIBuiltinVaList:
+        assert(ClangCtx.getTypeSize(ClangCtx.VoidPtrTy) == ClangTypeSize &&
+               "expected va_list type to be sizeof(void *)");
+        break;
+      case clang::TargetInfo::AArch64ABIBuiltinVaList:
+        break;
+      case clang::TargetInfo::PNaClABIBuiltinVaList:
+      case clang::TargetInfo::SystemZBuiltinVaList:
+      case clang::TargetInfo::X86_64ABIBuiltinVaList:
+        return std::make_pair(Type(), "");
+    }
     break;
 
   case MappedCTypeKind::ObjCBool:
