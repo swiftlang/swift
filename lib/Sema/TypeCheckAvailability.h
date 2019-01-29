@@ -17,6 +17,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 
@@ -33,6 +34,13 @@ namespace swift {
 void diagAvailability(TypeChecker &TC, const Expr *E,
                       DeclContext *DC);
 
+enum class DeclAvailabilityFlag : uint8_t {
+  AllowPotentiallyUnavailableProtocol = 1 << 0,
+  ContinueOnPotentialUnavailability = 1 << 1,
+  ForInout = 1 << 2,
+};
+using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
+
 /// Run the Availability-diagnostics algorithm otherwise used in an expr
 /// context, but for non-expr contexts such as TypeDecls referenced from
 /// TypeReprs.
@@ -40,9 +48,7 @@ bool diagnoseDeclAvailability(const ValueDecl *Decl,
                               TypeChecker &TC,
                               DeclContext *DC,
                               SourceRange R,
-                              bool AllowPotentiallyUnavailableProtocol,
-                              bool SignalOnPotentialUnavailability,
-                              bool ForInout);
+                              DeclAvailabilityFlags Options);
 
 void diagnoseUnavailableOverride(ValueDecl *override,
                                  const ValueDecl *base,

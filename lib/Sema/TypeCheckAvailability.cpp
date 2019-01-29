@@ -2368,9 +2368,7 @@ public:
 
   bool diagAvailability(const ValueDecl *D, SourceRange R,
                         const ApplyExpr *call = nullptr,
-                        bool AllowPotentiallyUnavailableProtocol = false,
-                        bool SignalOnPotentialUnavailability = true,
-                        bool ForInout = false);
+                        DeclAvailabilityFlags flags = None);
 
 private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
@@ -2504,20 +2502,20 @@ private:
     switch (AccessContext) {
     case MemberAccessContext::Getter:
       diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,
-                               /*ForInout=*/false);
+                               None);
       break;
 
     case MemberAccessContext::Setter:
       diagAccessorAvailability(D->getSetter(), ReferenceRange, ReferenceDC,
-                               /*ForInout=*/false);
+                               None);
       break;
 
     case MemberAccessContext::InOut:
       diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,
-                               /*ForInout=*/true);
+                               DeclAvailabilityFlag::ForInout);
 
       diagAccessorAvailability(D->getSetter(), ReferenceRange, ReferenceDC,
-                               /*ForInout=*/true);
+                               DeclAvailabilityFlag::ForInout);
       break;
     }
   }
@@ -2525,13 +2523,13 @@ private:
   /// Emit a diagnostic, if necessary for a potentially unavailable accessor.
   void diagAccessorAvailability(AccessorDecl *D, SourceRange ReferenceRange,
                                 const DeclContext *ReferenceDC,
-                                bool ForInout) const {
+                                DeclAvailabilityFlags Flags) const {
+    Flags &= DeclAvailabilityFlag::ForInout;
+    Flags |= DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
     if (diagnoseDeclAvailability(D, TC,
                                  const_cast<DeclContext*>(ReferenceDC),
                                  ReferenceRange,
-                                 /*AllowPotentiallyUnavailableProtocol*/false,
-                                 /*SignalOnPotentialUnavailability*/false,
-                                 ForInout))
+                                 Flags))
       return;
   }
 };
@@ -2539,11 +2537,10 @@ private:
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
-bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
-                                          const ApplyExpr *call,
-                                          bool AllowPotentiallyUnavailableProtocol,
-                                          bool SignalOnPotentialUnavailability,
-                                          bool ForInout) {
+bool
+AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
+                                     const ApplyExpr *call,
+                                     DeclAvailabilityFlags Flags) {
   if (!D)
     return false;
 
@@ -2582,20 +2579,22 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
   if (!isAccessorWithDeprecatedStorage)
     TC.diagnoseIfDeprecated(R, DC, D, call);
 
-  if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(D))
+  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
+        && isa<ProtocolDecl>(D))
     return false;
 
   // Diagnose (and possibly signal) for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
   if (maybeUnavail.hasValue()) {
     if (accessor) {
+      bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
       TC.diagnosePotentialAccessorUnavailability(accessor, R, DC,
                                                  maybeUnavail.getValue(),
-                                                 ForInout);
+                                                 forInout);
     } else {
       TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
     }
-    if (SignalOnPotentialUnavailability)
+    if (!Flags.contains(DeclAvailabilityFlag::ContinueOnPotentialUnavailability))
       return true;
   }
   return false;
@@ -2769,13 +2768,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
                                      TypeChecker &TC,
                                      DeclContext *DC,
                                      SourceRange R,
-                                     bool AllowPotentiallyUnavailableProtocol,
-                                     bool SignalOnPotentialUnavailability,
-                                     bool ForInout)
+                                     DeclAvailabilityFlags Flags)
 {
   AvailabilityWalker AW(TC, DC);
-  return AW.diagAvailability(Decl, R, nullptr,
-                             AllowPotentiallyUnavailableProtocol,
-                             SignalOnPotentialUnavailability,
-                             ForInout);
+  return AW.diagAvailability(Decl, R, nullptr, Flags);
 }
