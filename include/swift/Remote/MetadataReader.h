@@ -1706,7 +1706,7 @@ private:
 
     // If the parent is an anonymous context that provides a complete
     // name for this node, note that.
-    NodePointer demangledParentNode = nullptr;
+    Demangle::NodePointer demangledParentNode = nullptr;
     auto nameNode = adoptAnonymousContextName(
         descriptor, parentDescriptorResult, dem, demangledParentNode);
 
@@ -1835,9 +1835,9 @@ private:
 
           // Demangle the subject.
           auto subjectAddress = resolveRelativeField(descriptor, req.Param);
-          NodePointer subject = readMangledName(RemoteAddress(subjectAddress),
-                                                MangledNameKind::Type,
-                                                dem);
+          auto subject = readMangledName(RemoteAddress(subjectAddress),
+                                         MangledNameKind::Type,
+                                         dem);
           if (!subject) {
             failed = true;
             break;
@@ -1867,9 +1867,9 @@ private:
           case GenericRequirementKind::BaseClass: {
             // Demangle the right-hand type.
             auto typeAddress = resolveRelativeField(descriptor, req.Type);
-            NodePointer type = readMangledName(RemoteAddress(typeAddress),
-                                               MangledNameKind::Type,
-                                               dem);
+            auto type = readMangledName(RemoteAddress(typeAddress),
+                                        MangledNameKind::Type,
+                                        dem);
             if (!type) {
               failed = true;
               break;
