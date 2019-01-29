@@ -162,8 +162,7 @@ public:
 
   std::string mangleBareProtocol(const ProtocolDecl *Decl) {
     beginMangling();
-    appendProtocolName(Decl, /*allowStandardSubstitution=*/false);
-    appendOperator("P");
+    appendAnyGenericType(Decl);
     return finalize();
   }
 
