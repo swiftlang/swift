@@ -69,16 +69,26 @@ struct ErrorBehaviorKind {
 
 class LinearLifetimeError {
   ownership::ErrorBehaviorKind errorBehavior;
-  bool foundError = false;
+  bool foundUseAfterFree = false;
+  bool foundLeak = false;
+  bool foundOverConsume = false;
 
 public:
   LinearLifetimeError(ownership::ErrorBehaviorKind errorBehavior)
       : errorBehavior(errorBehavior) {}
 
-  bool getFoundError() const { return foundError; }
+  bool getFoundError() const {
+    return foundUseAfterFree || foundLeak || foundOverConsume;
+  }
 
-  void handleLeakError(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundError = true;
+  bool getFoundLeak() const { return foundLeak; }
+
+  bool getFoundUseAfterFree() const { return foundUseAfterFree; }
+
+  bool getFoundOverConsume() const { return foundOverConsume; }
+
+  void handleLeak(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundLeak = true;
 
     if (errorBehavior.shouldPrintMessage())
       messagePrinterFunc();
@@ -90,9 +100,18 @@ public:
     handleError([]() {});
   }
 
-  void handleError(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundError = true;
+  void handleOverConsume(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundOverConsume = true;
+    handleError(std::move(messagePrinterFunc));
+  }
 
+  void handleUseAfterFree(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundUseAfterFree = true;
+    handleError(std::move(messagePrinterFunc));
+  }
+
+private:
+  void handleError(llvm::function_ref<void()> &&messagePrinterFunc) {
     if (errorBehavior.shouldPrintMessage())
       messagePrinterFunc();
 
