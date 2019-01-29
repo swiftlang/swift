@@ -1640,11 +1640,11 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
         auto diag = TC.diagnose(attr->getLocation(),
                                 diag::access_control_ext_member_more,
                                 attr->getAccess(),
-                                D->getDescriptiveKind(),
                                 extAttr->getAccess());
-        swift::fixItAccess(diag, cast<ValueDecl>(D), defaultAccess, false,
-                           true);
-        return;
+        // Don't try to fix this one; it's just a warning, and fixing it can
+        // lead to diagnostic fights between this and "declaration must be at
+        // least this accessible" checking for overrides and protocol
+        // requirements.
       } else if (attr->getAccess() == defaultAccess) {
         TC.diagnose(attr->getLocation(),
                     diag::access_control_ext_member_redundant,
@@ -1652,7 +1652,6 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
                     D->getDescriptiveKind(),
                     extAttr->getAccess())
           .fixItRemove(attr->getRange());
-        return;
       }
     }
   }

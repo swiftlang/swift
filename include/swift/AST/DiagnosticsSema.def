@@ -1210,9 +1210,10 @@ WARNING(access_control_setter_redundant,none,
       "%1",
       (AccessLevel, DescriptiveDeclKind, AccessLevel))
 WARNING(access_control_ext_member_more,none,
-    "declaring %select{%error|a fileprivate|an internal|a public|open}0 %1 in "
-    "%select{a private|a fileprivate|an internal|a public|%error}2 extension",
-    (AccessLevel, DescriptiveDeclKind, AccessLevel))
+    "'%select{%error|fileprivate|internal|public|open}0' modifier conflicts "
+    "with extension's default access of "
+    "'%select{private|fileprivate|internal|public|%error}1'",
+    (AccessLevel, AccessLevel))
 WARNING(access_control_ext_member_redundant,none,
     "'%select{%error|fileprivate|internal|public|%error}0' modifier is redundant "
     "for %1 declared in %select{a private (equivalent to fileprivate)|a fileprivate"
