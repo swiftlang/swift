@@ -282,3 +282,8 @@ completion(a: 1) { (x: Any, y: Int) -> Int in
 // CHECK: <call><name>completion</name>(<arg><name>a</name>: 1</arg>) <arg><closure>{ (<param>x: <type>Any</type></param>, <param>y: <type>Int</type></param>) -> <type>Int</type> in
 // CHECK:    return x as! Int + y
 // CHECK: }</closure></arg></call>
+
+myFunc(foo: 0,
+       bar: baz == 0)
+// CHECK: <call><name>myFunc</name>(<arg><name>foo</name>: 0</arg>,
+// CHECK:        <arg><name>bar</name>: baz == 0</arg>)</call>
