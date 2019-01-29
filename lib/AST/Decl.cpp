@@ -4273,58 +4273,159 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
   }
 }
 
-bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
+bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl,
+                                            bool skipAssocTypes) const {
   // If the member type uses 'Self' in non-covariant position,
   // we cannot use the existential type.
   auto selfKind = findProtocolSelfReferences(decl,
                                              /*allowCovariantParameters=*/true,
-                                             /*skipAssocTypes=*/false);
+                                             /*skipAssocTypes=*/skipAssocTypes);
   if (selfKind.parameter || selfKind.other)
     return false;
 
   return true;
 }
 
-bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
+void ProtocolDecl::getAssociatedTypeFreedomMapRec(
+                       AssociatedTypeFreedomMap &map) {
+  for (auto *proto: getInheritedProtocols())
+    proto->getAssociatedTypeFreedomMapRec(map);
+
+  for (auto *assoc: getAssociatedTypeMembers())
+    map.insert({assoc, false});
+
+  if (!isRequirementSignatureComputed())
+    computeRequirementSignature();
+
+  for (auto &req : getRequirementSignature()) {
+    if (req.getKind() != RequirementKind::SameType ||
+        req.getSecondType()->getKind() == TypeKind::DependentMember)
+      continue;
+
+    if (auto assoc = req.getFirstType()->getAs<DependentMemberType>()) {
+      // Only update the record if it exists and the types match.
+      // This ensures we have indeed encountered an inherited
+      // associated type rather than a nested one i.e. Assoc.Assoc == Int.
+      auto assocTyDecl = assoc->getAssocType();
+      if (map.count(assocTyDecl) &&
+          assoc->isEqual(assocTyDecl->getDeclaredInterfaceType()))
+        map[assocTyDecl] = /*isConstrainedToConrete*/ true;
+    }
+  }
+}
+
+ExistentialSupportKind
+ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver,
+                                           AssociatedTypeFreedomMap &map) {
+  if (Bits.ProtocolDecl.ExistentialTypeSupportedValid) {
+    auto supportKd = getExistentialSupportKind();
+    // This function recurses up the protocol hierarchy. If not
+    // supported due to free associated type member, we must let the
+    // inheriting protocol know about it.
+    if (supportKd == ExistentialSupportKind::UnsupportedAssoc)
+      getAssociatedTypeFreedomMapRec(map);
+    return supportKd;
+  }
+
+  auto setSupportKind = [&](ExistentialSupportKind ESK) {
+    Bits.ProtocolDecl.ExistentialTypeSupported = static_cast<unsigned>(ESK);
+  };
   // Assume for now that the existential type is supported; this
   // prevents circularity issues.
   Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
-  Bits.ProtocolDecl.ExistentialTypeSupported = true;
+  setSupportKind(ExistentialSupportKind::Supported);
 
-  // ObjC protocols can always be existential.
+  // ObjC protocols can always be existential and never have
+  // associated type members.
   if (isObjC())
-    return true;
+    return ExistentialSupportKind::Supported;
 
+  bool hasAssoc = false;
   for (auto member : getMembers()) {
-    // Check for associated types.
-    if (isa<AssociatedTypeDecl>(member)) {
-      // An existential type cannot be used if the protocol has an
-      // associated type.
-      Bits.ProtocolDecl.ExistentialTypeSupported = false;
-      return false;
+    if (auto assocDecl = dyn_cast<AssociatedTypeDecl>(member)) {
+      // Mark that we found an associated type and collect it.
+      hasAssoc = true;
+      map[assocDecl] = /*isConstrainedToConrete*/ false;
+      continue;
     }
 
-    // For value members, look at their type signatures.
+    // For value members, look for Self references in their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
       if (resolver && !valueMember->hasInterfaceType())
         resolver->resolveDeclSignature(valueMember);
 
-      if (!isAvailableInExistential(valueMember)) {
-        Bits.ProtocolDecl.ExistentialTypeSupported = false;
-        return false;
+      // A protocol with a Self reference in non-covariant position
+      // cannot be used as an existential, alongside any inheriting
+      // protocol.
+      if (!isAvailableInExistential(valueMember, /*skipAssocTypes*/ true)) {
+        setSupportKind(ExistentialSupportKind::UnsupportedSelf);
+        return ExistentialSupportKind::UnsupportedSelf;
       }
     }
   }
 
+  bool allInheritedSupported = true;
   // Check whether all of the inherited protocols can have existential
   // types themselves.
   for (auto proto : getInheritedProtocols()) {
-    if (!proto->existentialTypeSupported(resolver)) {
-      Bits.ProtocolDecl.ExistentialTypeSupported = false;
-      return false;
+    auto supportKd = proto->existentialTypeSupportedSlow(resolver, map);
+
+    if (supportKd == ExistentialSupportKind::UnsupportedSelf) {
+      setSupportKind(supportKd);
+      return supportKd;
+    }
+    if (supportKd != ExistentialSupportKind::Supported)
+      allInheritedSupported = false;
+  }
+
+  if (allInheritedSupported && !hasAssoc)
+    return ExistentialSupportKind::Supported;
+
+  // At this point, it is known the protocol doesn't declare associated type
+  // members and doen't have or inherit requirements with 'Self' references
+  // in contravariant position. But we still might have collected inherited
+  // associated type members.
+  // Record if any same-type constraints between an inherited associated
+  // type and a concrete type.
+  if (!isRequirementSignatureComputed())
+    computeRequirementSignature();
+
+  for (auto &req : getRequirementSignature()) {
+    if (req.getKind() != RequirementKind::SameType ||
+        req.getSecondType()->getKind() == TypeKind::DependentMember)
+      continue;
+
+    if (auto assoc = req.getFirstType()->getAs<DependentMemberType>()) {
+      // Only update the record if it exists and the types match.
+      // This ensures we have indeed encountered an inherited
+      // associated type rather than a nested one i.e. Assoc.Assoc == Int.
+      auto assocTyDecl = assoc->getAssocType();
+      if (map.count(assocTyDecl) &&
+          assoc->isEqual(assocTyDecl->getDeclaredInterfaceType()))
+        map[assocTyDecl] = /*isConstrainedToConrete*/ true;
     }
   }
-  return true;
+
+  if (hasAssoc) {
+    setSupportKind(ExistentialSupportKind::UnsupportedAssoc);
+    return ExistentialSupportKind::UnsupportedAssoc;
+  }
+
+  auto hasFreeAssoc = [&]() -> bool {
+    for (auto &pair: map) {
+      if (!pair.getSecond())
+        return true;
+    }
+    return false;
+  };
+
+  // If all inherited associated type members are constrained to
+  // concrete types, the protocol is supported.
+  if (!hasFreeAssoc())
+    return ExistentialSupportKind::Supported;
+
+  setSupportKind(ExistentialSupportKind::UnsupportedAssoc);
+  return ExistentialSupportKind::UnsupportedAssoc;
 }
 
 StringRef ProtocolDecl::getObjCRuntimeName(

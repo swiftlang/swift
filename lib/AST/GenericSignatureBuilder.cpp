@@ -2900,10 +2900,21 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
 void ArchetypeType::resolveNestedType(
                                     std::pair<Identifier, Type> &nested) const {
-  auto genericEnv = getPrimary()->getGenericEnvironment();
+  GenericEnvironment *genericEnv = nullptr;
+  Type interfaceType = getInterfaceType();
+
+  // Handle opened existentials.
+  if (auto openedArchTy = dyn_cast<OpenedArchetypeType>(this)) {
+    auto exist = openedArchTy->getOpenedExistentialType();
+    if (auto proto = exist->getAs<ProtocolType>()) {
+      genericEnv = proto->getDecl()->getGenericEnvironment();
+      interfaceType = proto->getDecl()->getSelfInterfaceType();
+    }
+  } else {
+    genericEnv = getPrimary()->getGenericEnvironment();
+  }
   auto &builder = *genericEnv->getGenericSignatureBuilder();
 
-  Type interfaceType = getInterfaceType();
   Type memberInterfaceType =
     DependentMemberType::get(interfaceType, nested.first);
   auto equivClass =

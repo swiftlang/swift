@@ -493,7 +493,7 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+2+1+2+1+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -510,7 +510,7 @@ protected:
     ExistentialTypeSupportedValid : 1,
 
     /// Whether the existential of this protocol can be represented.
-    ExistentialTypeSupported : 1,
+    ExistentialTypeSupported : 2,
 
     /// True if the protocol has requirements that cannot be satisfied (e.g.
     /// because they could not be imported from Objective-C).
@@ -3880,6 +3880,32 @@ private:
       other(other) { }
 };
 
+/// Used to optimize algorithms that compute support kinds
+/// and provide better diagnostics on the reason an existential
+/// type is not supported. For example, the knowledge that an
+/// inherited protocol is unsupported due to a \c Self reference
+/// saves us from searching for associated types and same-type
+/// constraints.
+enum class ExistentialSupportKind {
+  /// The existential type is supported.
+  Supported,
+
+  /// The existential type is not supported because
+  /// it declares or inherits a member containing a
+  /// \c Self reference in contravariant position.
+  UnsupportedSelf,
+
+  /// The existential type is not supported because it
+  /// declared or inherits a free associated type member.
+  UnsupportedAssoc,
+};
+
+/// A mapping from associated type members to whether they are free or
+/// constrained to a concrete type.
+using AssociatedTypeFreedomMap =
+  llvm::SmallDenseMap<AssociatedTypeDecl *,
+                      /*isConstrainedToConcrete*/ bool>;
+
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
@@ -3916,7 +3942,15 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   bool existentialConformsToSelfSlow();
 
-  bool existentialTypeSupportedSlow(LazyResolver *resolver);
+  /// \brief Determine whether we are allowed to use this protocol as an
+  /// existential type.
+  ExistentialSupportKind existentialTypeSupportedSlow(
+                           LazyResolver *resolver, AssociatedTypeFreedomMap &map);
+
+  ExistentialSupportKind getExistentialSupportKind() const {
+    return static_cast<ExistentialSupportKind>(
+             Bits.ProtocolDecl.ExistentialTypeSupported);
+  }
 
   ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
 
@@ -4031,26 +4065,34 @@ public:
   /// conforming to this protocol. This is only permitted if the type of
   /// the member does not contain any associated types, and does not
   /// contain 'Self' in 'parameter' or 'other' position.
-  bool isAvailableInExistential(const ValueDecl *decl) const;
+  bool isAvailableInExistential(const ValueDecl *decl,
+                                bool skipAssocTypes) const;
 
-  /// Determine whether we are allowed to refer to an existential type
-  /// conforming to this protocol. This is only permitted if the types of
-  /// all the members do not contain any associated types, and do not
-  /// contain 'Self' in 'parameter' or 'other' position.
-  bool existentialTypeSupported(LazyResolver *resolver) const {
+  /// Compute an associated type freedom map for this protocol hierarchy.
+  void getAssociatedTypeFreedomMapRec(AssociatedTypeFreedomMap &map);
+
+  /// \brief Determine whether we are allowed to use this protocol as an
+  /// existential type. This is only permitted if \em all associated type
+  /// members are constrained to concrete types and neither of the members
+  /// it declares or inherits contain \c Self in contravariant position.
+  ExistentialSupportKind existentialTypeSupported(
+                           LazyResolver *resolver) const {
     if (Bits.ProtocolDecl.ExistentialTypeSupportedValid)
-      return Bits.ProtocolDecl.ExistentialTypeSupported;
+      return getExistentialSupportKind();
+
+    AssociatedTypeFreedomMap newMap;
 
     return const_cast<ProtocolDecl *>(this)
-             ->existentialTypeSupportedSlow(resolver);
+        ->existentialTypeSupportedSlow(resolver, newMap);
   }
 
   /// Explicitly set the existentialTypeSupported flag, without computing
   /// it from members. Only called from deserialization, where the flag
   /// was stored in the serialized record.
-  void setExistentialTypeSupported(bool supported) {
-    Bits.ProtocolDecl.ExistentialTypeSupported = supported;
+  void setExistentialSupportKind(ExistentialSupportKind supportKd) {
     Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
+    Bits.ProtocolDecl.ExistentialTypeSupported =
+        static_cast<unsigned>(supportKd);
   }
 
   /// If this is known to be a compiler-known protocol, returns the kind.

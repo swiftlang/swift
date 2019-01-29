@@ -2719,8 +2719,32 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
   // Error recovery path.
   // FIXME: Generalized existentials will look here.
-  if (substBase->isOpenedExistential())
+  if (substBase->isOpenedExistential()) {
+    if (auto arch = substBase->getAs<ArchetypeType>()) {
+      if (arch->hasNestedType(name))
+        return arch->getNestedType(name);
+    }
     return failed();
+  }
+
+  // An existential substitute, the nested type
+  // might still be concrete.
+  if (substBase->isExistentialType()) {
+    ArchetypeType *archTy;
+    if (auto *proto = substBase->getAs<ProtocolType>()) {
+      auto protoDecl = proto->getDecl();
+      auto selfTy = protoDecl->getSelfInterfaceType();
+      archTy = protoDecl->mapTypeIntoContext(selfTy)->castTo<ArchetypeType>();
+    } else {
+      archTy = OpenedArchetypeType::get(substBase);
+    }
+    auto resolved = archTy->getNestedType(name);
+    // If we ended up with a child archetype, give up on concrete types.
+    if (resolved->is<ArchetypeType>())
+      return getDependentMemberType(substBase);
+    else
+      return resolved;
+  }
 
   // If the parent is an archetype, extract the child archetype with the
   // given name.

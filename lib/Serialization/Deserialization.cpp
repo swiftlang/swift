@@ -2033,6 +2033,19 @@ static Optional<swift::AccessLevel> getActualAccessLevel(uint8_t raw) {
   return None;
 }
 
+static Optional<swift::ExistentialSupportKind>
+getActualExistentialSupportKind(uint8_t raw) {
+  switch (serialization::ExistentialSupportKind(raw)) {
+    case serialization::ExistentialSupportKind::Supported:
+      return swift::ExistentialSupportKind::Supported;
+    case serialization::ExistentialSupportKind::UnsupportedSelf:
+      return swift::ExistentialSupportKind::UnsupportedSelf;
+    case serialization::ExistentialSupportKind::UnsupportedAssoc:
+      return swift::ExistentialSupportKind::UnsupportedAssoc;
+  }
+  return None;
+}
+
 static Optional<swift::OptionalTypeKind>
 getActualOptionalTypeKind(uint8_t raw) {
   switch (serialization::OptionalTypeKind(raw)) {
@@ -3411,15 +3424,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
   case decls_block::PROTOCOL_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isClassBounded, isObjC, existentialTypeSupported;
+    bool isImplicit, isClassBounded, isObjC;
     GenericEnvironmentID genericEnvID;
     TypeID superclassID;
-    uint8_t rawAccessLevel;
+    uint8_t rawAccessLevel, rawExistSupportKd;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
-                                            existentialTypeSupported,
+                                            rawExistSupportKd,
                                             genericEnvID, superclassID,
                                             rawAccessLevel, rawInheritedIDs);
 
@@ -3434,10 +3447,16 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     proto->setSuperclass(getType(superclassID));
     proto->setRequiresClass(isClassBounded);
-    proto->setExistentialTypeSupported(existentialTypeSupported);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       proto->setAccess(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
+
+    if (auto supportKd = getActualExistentialSupportKind(rawExistSupportKd)) {
+      proto->setExistentialSupportKind(*supportKd);
     } else {
       error();
       return nullptr;

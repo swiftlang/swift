@@ -138,3 +138,66 @@ struct BadSubscript {
     set {}
   }
 }
+
+
+protocol TrivialProto {}
+class TrivialClass {}
+
+protocol ProtAssocHasSelf {
+  associatedtype Assoc
+  func unsupportedSelfWeirdReturnTy(arg: Self) -> ([Assoc?]) -> ()
+}
+
+protocol ProtAssocConcreteHasSelf: ProtAssocHasSelf where Assoc == Bool {}
+
+protocol ProtAssoc {
+  associatedtype Assoc
+  func foo(arg: Assoc) -> Assoc
+}
+protocol ProtAssocInt: ProtAssoc where Assoc == Int {}
+
+protocol ProtBssoc: ProtAssocInt {
+  associatedtype Bssoc
+  func supportedSelf(arg: Bssoc) -> Self
+}
+protocol ProtAssocBssocConcrete: ProtBssoc where Bssoc == Assoc.Magnitude {}
+
+protocol ProtAssoc2 {
+  associatedtype Assoc
+  func bar(arg: Assoc)
+}
+protocol ProtMergeAssocInt: ProtAssocInt, ProtAssoc2 {}
+
+func testExistential1(arg: ProtAssocInt) {} // Ok
+func testExistential2(arg: ProtAssocBssocConcrete) {} // Ok
+func testExistential3(arg: ProtMergeAssocInt) {} // Ok
+
+func testExistential4(arg: ProtAssocConcreteHasSelf) {}
+// expected-error@-1 {{protocol 'ProtAssocConcreteHasSelf' can only be used}}
+
+// Test various edge cases and expressions.
+class Conforming: EdgeCase1, EdgeCase2 {
+  typealias Assoc = Conforming
+
+  func simpleAliasToAssoc(arg: SimpleAlias) -> Assoc { return arg }
+}
+protocol EdgeCase1 {
+  associatedtype Assoc: EdgeCase1
+}
+protocol EdgeCaseSub1: EdgeCase1 where Assoc.Assoc == Conforming {}
+
+protocol EdgeCase2 {
+  associatedtype Assoc: EdgeCase2 where Assoc == Assoc.Assoc
+  typealias SimpleAlias = Assoc.Assoc.Assoc
+  typealias ComplexAlias = ([Assoc?]) -> Assoc.Assoc
+
+  func simpleAliasToAssoc(arg: SimpleAlias) -> Assoc
+}
+protocol EdgeCaseSub2: EdgeCase2 where Assoc.Assoc == Conforming {}
+
+func testExistential11(arg: EdgeCaseSub1) {}
+// expected-error@-1 {{protocol 'EdgeCaseSub1' can only be used}}
+func testExistential12(arg1: EdgeCaseSub2) {
+
+  let _: Conforming = arg1.simpleAliasToAssoc(arg: Conforming())
+}

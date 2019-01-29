@@ -2125,6 +2125,21 @@ static uint8_t getRawStableAccessLevel(swift::AccessLevel access) {
   llvm_unreachable("Unhandled AccessLevel in switch.");
 }
 
+static uint8_t
+getRawStableExistentialSupportKind(swift::ExistentialSupportKind ESK) {
+  switch (ESK) {
+#define CASE(NAME) \
+  case swift::ExistentialSupportKind::NAME: \
+    return static_cast<uint8_t>(serialization::ExistentialSupportKind::NAME);
+  CASE(Supported)
+  CASE(UnsupportedSelf)
+  CASE(UnsupportedAssoc)
+#undef CASE
+  }
+
+  llvm_unreachable("Unhandled ExistentialSupportKind in switch.");
+}
+
 static serialization::SelfAccessKind
 getStableSelfAccessKind(swift::SelfAccessKind MM) {
   switch (MM) {
@@ -3159,6 +3174,8 @@ void Serializer::writeDecl(const Decl *D) {
     }
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(proto->getFormalAccess());
+    uint8_t rawExistentialSupportKd = getRawStableExistentialSupportKind(
+        proto->existentialTypeSupported(/*resolver=*/nullptr));
 
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolLayout::Code];
     ProtocolLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3168,8 +3185,7 @@ void Serializer::writeDecl(const Decl *D) {
                                const_cast<ProtocolDecl *>(proto)
                                  ->requiresClass(),
                                proto->isObjC(),
-                               proto->existentialTypeSupported(
-                                 /*resolver=*/nullptr),
+                               rawExistentialSupportKd,
                                addGenericEnvironmentRef(
                                                 proto->getGenericEnvironment()),
                                addTypeRef(proto->getSuperclass()),

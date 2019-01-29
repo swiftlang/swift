@@ -403,6 +403,15 @@ using AccessLevelField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
+enum class ExistentialSupportKind : uint8_t {
+  Supported = 0,
+  UnsupportedSelf,
+  UnsupportedAssoc,
+};
+using ExistentialSupportKindField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
 enum class OptionalTypeKind : uint8_t {
   None,
   Optional,
@@ -952,7 +961,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit flag
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
-    BCFixed<1>,             // existential-type-supported?
+    ExistentialSupportKindField, // existential-type-supported?
     GenericEnvironmentIDField, // generic environment
     TypeIDField,            // superclass
     AccessLevelField,       // access level

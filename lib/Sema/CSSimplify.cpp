@@ -3347,6 +3347,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (!decl->hasInterfaceType())
       return;
 
+    auto outerBaseTy = baseTy;
     // Dig out the instance type and figure out what members of the instance type
     // we are going to see.
     auto baseTy = candidate.getBaseType();
@@ -3402,11 +3403,29 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       return;
     }
 
-    // If our base is an existential type, we can't make use of any
-    // member whose signature involves associated types.
+    // If our base is an unsupported existential type, we can't make use of any
+    // member whose signature involves associated types or non-covariant Self.
     if (instanceTy->isExistentialType()) {
+      bool supported = false;
+
+      // It is important to check existential support against the original
+      // base type, since the support value of a supertype doesn't necessarily
+      // match that of the subtype. For example, an inheriting protocol could
+      // introduce an associated type or, conversely, specialize an inherited
+      // associated type that would otherwise prevent the protocol from
+      // being supported.
+
+      // Make sure the candidate belongs to a protocol.
       if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
-        if (!proto->isAvailableInExistential(decl)) {
+        // Determine existential support relative to the original base type.
+        if (auto *protoTy = outerBaseTy->getAs<ProtocolType>()) {
+          supported = protoTy->getDecl()->existentialTypeSupported(&TC)
+              == ExistentialSupportKind::Supported;
+        }
+        supported = proto->isAvailableInExistential(
+                               decl, /*skipAssocTypes=*/supported);
+
+        if (!supported) {
           result.addUnviable(candidate,
                              MemberLookupResult::UR_UnavailableInExistential);
           return;

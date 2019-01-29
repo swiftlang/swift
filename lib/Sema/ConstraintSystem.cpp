@@ -1347,24 +1347,24 @@ ConstraintSystem::getTypeOfMemberReference(
   // When accessing protocol members with an existential base, replace
   // the 'Self' type parameter with the existential type, since formally
   // the access will operate on existentials and not type parameters.
-  if (!isDynamicResult &&
-      baseObjTy->isExistentialType() &&
-      outerDC->getSelfProtocolDecl()) {
-    auto selfTy = replacements[
-      cast<GenericTypeParamType>(outerDC->getSelfInterfaceType()
-                                 ->getCanonicalType())];
-    type = type.transform([&](Type t) -> Type {
-      if (auto *selfTy = t->getAs<DynamicSelfType>())
-        t = selfTy->getSelfType();
-      if (t->is<TypeVariableType>())
-        if (t->isEqual(selfTy))
-          return baseObjTy;
-      if (auto *metatypeTy = t->getAs<MetatypeType>())
-        if (metatypeTy->getInstanceType()->isEqual(selfTy))
-          return ExistentialMetatypeType::get(baseObjTy);
-      return t;
-    });
-  }
+//  if (!isDynamicResult &&
+//      baseObjTy->isExistentialType() &&
+//      outerDC->getSelfProtocolDecl()) {
+//    auto selfTy = replacements[
+//      cast<GenericTypeParamType>(outerDC->getSelfInterfaceType()
+//                                 ->getCanonicalType())];
+//    type = type.transform([&](Type t) -> Type {
+//      if (auto *selfTy = t->getAs<DynamicSelfType>())
+//        t = selfTy->getSelfType();
+//      if (t->is<TypeVariableType>())
+//        if (t->isEqual(selfTy))
+//          return baseObjTy;
+//      if (auto *metatypeTy = t->getAs<MetatypeType>())
+//        if (metatypeTy->getInstanceType()->isEqual(selfTy))
+//          return ExistentialMetatypeType::get(baseObjTy);
+//      return t;
+//    });
+//  }
 
   // If we opened up any type variables, record the replacements.
   recordOpenedTypes(locator, replacements);
