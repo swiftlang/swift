@@ -1924,7 +1924,6 @@ function set_lldb_xcodebuild_options() {
         LLDB_PATH_TO_LLVM_BUILD="${llvm_build_dir}"
         LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
         LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
-        LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
         LLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
         LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
         SYMROOT="${lldb_build_dir}"
@@ -2470,7 +2469,6 @@ for host in "${ALL_HOSTS[@]}"; do
                             -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
                             -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                             -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
@@ -2497,7 +2495,6 @@ for host in "${ALL_HOSTS[@]}"; do
                                 -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
                                 -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                                 -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                                -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
 				-DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
                                 -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                                 -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
