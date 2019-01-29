@@ -2458,68 +2458,47 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Get the build date
                 LLDB_BUILD_DATE=$(date +%Y-%m-%d)
 
-                case "${host}" in
-                    cygwin-*|freebsd-*|haiku-*|linux-*)
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                            -DLLDB_ALLOW_STATIC_BINDINGS=1
-                        )
-                        ;;
-                    macosx-*)
-                        if [[ "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
-                            # Set up flags to pass to xcodebuild
-                            set_lldb_xcodebuild_options
-                            set_lldb_build_mode
-                            with_pushd ${source_dir} \
-                                call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
-                            continue
-		        else
-                            cmake_options=(
-                                "${cmake_options[@]}"
-                                -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                                -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                                -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                                -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                                -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                                -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                                -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                                -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                                -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                                -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-				-DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
-                                -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                                -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                                -DLLDB_ALLOW_STATIC_BINDINGS=1
-                                -DLLDB_CODESIGN_IDENTITY=""
-                            )
+                using_xcodebuild="FALSE"
+                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                    using_xcodebuild="TRUE"
+                fi
 
-                            if [[ "${ENABLE_ASAN}" ]] ; then
-                                # Limit the number of parallel tests.
-                                LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --threads=$(sysctl hw.physicalcpu | awk '{print $2}')"
-                            fi
-                        fi
-                        ;;
-                esac
-                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
-                    cmake_options+=(
-                        -DLLDB_INCLUDE_TESTS=NO
-                        )
+                if [[ "${using_xcodebuild}" == "TRUE" ]] ; then
+                  # Set up flags to pass to xcodebuild
+                  set_lldb_xcodebuild_options
+                  set_lldb_build_mode
+                  with_pushd ${source_dir} \
+                      call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
+                  continue
                 else
+                  cmake_options=(
+                      "${cmake_options[@]}"
+                      -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                      -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                      -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
+                      -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                      -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                      -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                      -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                      -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                      -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                      -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
+                      -DLLDB_IS_BUILDBOT_BUILD:BOOL="${LLDB_IS_BUILDBOT_BUILD}"
+                      -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                      -DLLDB_ALLOW_STATIC_BINDINGS:BOOL=1
+                      -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
+                  )
+
+                  if [[ ${LLDB_BUILD_ON_MACOS} ]] ; then
                     cmake_options+=(
-                        -DLLDB_INCLUDE_TESTS=YES
+                      -DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
+                      -DLLDB_CODESIGN_IDENTITY=""
                     )
+                    if "${ENABLE_ASAN}" ]] ; then
+                      # Limit the number of parallel tests
+                      LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --threads=$(sysctl hw.physicalcpu | awk '{ print $2 }')"
+                    fi
+                  fi
                 fi
                 ;;
             llbuild)
