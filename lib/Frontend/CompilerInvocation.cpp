@@ -914,6 +914,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      : "-gdwarf_types");
   }
 
+  // This flags aids debugging. The OptMode is initialized by ParseSILGenArgs().
+  if (Opts.OptMode == OptimizationMode::NoOptimization)
+    Opts.EnableAnonymousContextMangledNames = true;
+  
   for (auto A : Args.getAllArgValues(options::OPT_debug_prefix_map)) {
     auto SplitMap = StringRef(A).split('=');
     Opts.DebugPrefixMap.addMapping(SplitMap.first, SplitMap.second);

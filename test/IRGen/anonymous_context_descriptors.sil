@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -enable-anonymous-context-mangled-names %s | %FileCheck %s -check-prefix CHECK-MANGLED
+// RUN: %target-swift-frontend -emit-ir -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -Onone %s | %FileCheck %s -check-prefix CHECK-MANGLED
+// RUN: %target-swift-frontend -emit-ir -O -enable-anonymous-context-mangled-names %s | %FileCheck %s -check-prefix CHECK-MANGLED
 
 import Builtin
 import Swift
