@@ -489,6 +489,10 @@ mapParsedParameters(Parser &parser,
       // belongs to both type flags and declaration.
       if (auto *ATR = dyn_cast<AttributedTypeRepr>(type)) {
         auto &attrs = ATR->getAttrs();
+        // At this point we actually don't know if that's valid to mark
+        // this parameter declaration as `autoclosure` because type has
+        // not been resolved yet - it should either be a function type
+        // or typealias with underlying function type.
         param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
       }
     } else if (paramContext != Parser::ParameterContextKind::Closure) {
