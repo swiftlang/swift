@@ -45,4 +45,30 @@ CustomDerivativesTests.test("differentiableFunction-binary") {
   expectEqual((20, 10), gradient(at: 5, 10, in: { diffableBinary($0, $1) * 2 }))
 }
 
+CustomDerivativesTests.test("Checkpointing") {
+  var count = 0
+  func f(_ x: Float) -> Float {
+    count += 1
+    return x * x * x
+  }
+  // Test the top-level function variant of the checkpointing API.
+  expectEqual(324, gradient(at: 3) { (x: Float) -> Float in
+    expectEqual(0, count)
+    let y = withRecomputationInPullbacks(f)(x)
+    expectEqual(1, count)
+    return y * 3 * x
+  })
+  expectEqual(2, count)
+  // Reset and test the method variant.
+  // FIXME: The method variant produces a zero cotangent. Need to investigate.
+  // count = 0
+  // expectEqual(324, gradient(at: 3) { (x: Float) -> Float in
+  //   expectEqual(0, count)
+  //   let y = x.withRecomputationInPullbacks(f)
+  //   expectEqual(1, count)
+  //   return y * 3 * x
+  // })
+  // expectEqual(2, count)
+}
+
 runAllTests()
