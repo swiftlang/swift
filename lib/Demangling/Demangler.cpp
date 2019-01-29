@@ -1802,6 +1802,8 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::ClassMetadataBaseOffset);
     case 'p':
       return createWithChild(Node::Kind::ProtocolDescriptor, popProtocol());
+    case 'Q':
+      return createWithPoppedType(Node::Kind::OpaqueTypeDescriptor);
     case 'S':
       return createWithChild(Node::Kind::ProtocolSelfConformanceDescriptor,
                              popProtocol());
@@ -1897,23 +1899,40 @@ NodePointer Demangler::demangleArchetype() {
       addSubstitution(AssocTy);
       return AssocTy;
     }
+    case 'O': {
+      auto definingContext = popContext();
+      return createType(
+              createWithChild(Node::Kind::OpaqueReturnTypeOf, definingContext));
+    }
+    case 'o': {
+      auto GenericArgs = popNode(/*Node::Kind::BoundGenericArgs*/);
+      auto Name = popNode();
+      return createType(
+                 createWithChildren(Node::Kind::OpaqueType, Name, GenericArgs));
+    }
+    case 'r': {
+      return createType(createNode(Node::Kind::OpaqueReturnType));
+    }
     case 'y': {
       NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
       addSubstitution(T);
       return T;
     }
     case 'z': {
-      NodePointer T = demangleAssociatedTypeSimple(getDependentGenericParamType(0, 0));
+      NodePointer T = demangleAssociatedTypeSimple(
+                                            getDependentGenericParamType(0, 0));
       addSubstitution(T);
       return T;
     }
     case 'Y': {
-      NodePointer T = demangleAssociatedTypeCompound(demangleGenericParamIndex());
+      NodePointer T = demangleAssociatedTypeCompound(
+                                                   demangleGenericParamIndex());
       addSubstitution(T);
       return T;
     }
     case 'Z': {
-      NodePointer T = demangleAssociatedTypeCompound(getDependentGenericParamType(0, 0));
+      NodePointer T = demangleAssociatedTypeCompound(
+                                            getDependentGenericParamType(0, 0));
       addSubstitution(T);
       return T;
     }

@@ -413,6 +413,7 @@ private:
     case Node::Kind::ObjCBlock:
     case Node::Kind::ObjCMetadataUpdateFunction:
     case Node::Kind::ObjCResilientClassStub:
+    case Node::Kind::OpaqueTypeDescriptor:
     case Node::Kind::Owned:
     case Node::Kind::OwningAddressor:
     case Node::Kind::OwningMutableAddressor:
@@ -510,6 +511,9 @@ private:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
+    case Node::Kind::OpaqueType:
+    case Node::Kind::OpaqueReturnType:
+    case Node::Kind::OpaqueReturnTypeOf:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1719,6 +1723,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "nominal type descriptor for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::OpaqueTypeDescriptor:
+    Printer << "opaque type descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::CoroutineContinuationPrototype:
     Printer << "coroutine continuation prototype for ";
     print(Node->getChild(0));
@@ -2244,6 +2252,17 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "(";
     print(Node->getChild(0));
     Printer << ")";
+    return nullptr;
+  case Node::Kind::OpaqueReturnType:
+    Printer << "__opaque";
+    return nullptr;
+  case Node::Kind::OpaqueReturnTypeOf:
+    Printer << "<<opaque return type of ";
+    printChildren(Node);
+    Printer << ">>";
+    return nullptr;
+  case Node::Kind::OpaqueType:
+    printChildren(Node);
     return nullptr;
   }
   printer_unreachable("bad node kind!");
