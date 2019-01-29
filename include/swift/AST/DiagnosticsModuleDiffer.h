@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief This file defines diagnostics for the Swift module differ.
+/// This file defines diagnostics for the Swift module differ.
 //
 //===----------------------------------------------------------------------===//
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-ptrsize-simulator-%target-is-simulator
+// RUN: %target-swift-frontend %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-ptrsize-simulator-%target-is-simulator
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
@@ -127,6 +127,3 @@ b:
 x:
   return undef : $()
 }
-
-// Weak existentials allow extra inhabitants if not @objc, therefore StructWithWeakVar must emit:
-// CHECK: define linkonce_odr hidden void @"$s9enum_objc17StructWithWeakVarVwxs"

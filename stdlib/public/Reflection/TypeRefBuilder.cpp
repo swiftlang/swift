@@ -124,6 +124,9 @@ lookupSuperclass(const TypeRef *TR) {
   if (FD.first == nullptr)
     return nullptr;
 
+  if (!FD.first->hasSuperclass())
+    return nullptr;
+
   auto TypeRefOffset = FD.second->Field.SectionOffset
                      - FD.second->TypeReference.SectionOffset;
   auto Demangled = Dem.demangleType(FD.first->getSuperclass(TypeRefOffset));
@@ -233,7 +236,7 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
                             - Info.TypeReference.SectionOffset;
     for (auto &BuiltinTypeDescriptor : Info.Builtin.Metadata) {
       assert(BuiltinTypeDescriptor.Size > 0);
-      assert(BuiltinTypeDescriptor.Alignment > 0);
+      assert(BuiltinTypeDescriptor.getAlignment() > 0);
       assert(BuiltinTypeDescriptor.Stride > 0);
       if (!BuiltinTypeDescriptor.hasMangledTypeName())
         continue;
@@ -387,9 +390,10 @@ void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &OS) {
 
       OS << "\n- " << typeName << ":\n";
       OS << "Size: " << descriptor.Size << "\n";
-      OS << "Alignment: " << descriptor.Alignment << "\n";
+      OS << "Alignment: " << descriptor.getAlignment() << "\n";
       OS << "Stride: " << descriptor.Stride << "\n";
       OS << "NumExtraInhabitants: " << descriptor.NumExtraInhabitants << "\n";
+      OS << "BitwiseTakable: " << descriptor.isBitwiseTakable() << "\n";
     }
   }
 }

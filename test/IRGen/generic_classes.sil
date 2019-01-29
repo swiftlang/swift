@@ -28,7 +28,7 @@ import Swift
 // --       num fields
 // CHECK-SAME:   i32 3,
 // --       field offset vector offset
-// CHECK-SAME:   i32 15,
+// CHECK-SAME:   i32 11,
 // --       template instantiation cache
 // CHECK-SAME:   [16 x i8*]* @"$s15generic_classes11RootGenericCMI"
 // --       template instantiation pattern
@@ -36,7 +36,7 @@ import Swift
 // --       generic parameters, requirements, key arguments, extra arguments
 // CHECK-SAME:   i16 1, i16 0, i16 1, i16 0
 // --       vtable offset
-// CHECK-SAME:   i32 11,
+// CHECK-SAME:   i32 14,
 // --       vtable size
 // CHECK-SAME:   i32 4
 // CHECK-SAME: }
@@ -86,7 +86,7 @@ import Swift
 // --       num fields
 // CHECK-SAME:   i32 3,
 // --       -- field offset vector offset
-// CHECK-SAME:   i32 11,
+// CHECK-SAME:   i32 10,
 // CHECK-SAME: }>
 
 // CHECK: @"$s15generic_classes14RootNonGenericCMf" = internal global <{ {{.*}} }> <{
@@ -264,7 +264,7 @@ entry:
 // RootGeneric.x has fixed layout
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @RootGeneric_concrete_fragile_dependent_member_access_x
 // CHECK:   getelementptr inbounds [[ROOTGENERIC]], [[ROOTGENERIC]]* %0, i32 0, i32 1
-sil @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> (RootGeneric<F>) -> UInt8 {
+sil [ossa] @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> (RootGeneric<F>) -> UInt8 {
 entry(%c : @unowned $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.x
   %x = load_borrow %p : $*UInt8
@@ -274,13 +274,13 @@ entry(%c : @unowned $RootGeneric<F>):
 // RootGeneric.y has dependent layout; load the offset from the metadata
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @RootGeneric_concrete_fragile_dependent_member_access_y
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i64*
-// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 16
+// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 12
 // CHECK:   [[Y_OFFSET:%.*]] = load i64, i64* [[Y_OFFSET_ADDR]], align 8
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
 // CHECK:   bitcast i8* [[Y_ADDR]] to %swift.opaque*
-sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (RootGeneric<F>) -> @out F {
-entry(%z : @trivial $*F, %c : @unowned $RootGeneric<F>):
+sil [ossa] @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (RootGeneric<F>) -> @out F {
+entry(%z : $*F, %c : @unowned $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*F
   %t = tuple ()
@@ -290,8 +290,8 @@ entry(%z : @trivial $*F, %c : @unowned $RootGeneric<F>):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @RootGeneric_subst_concrete_fragile_dependent_member_access_y
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds {{.*}}, {{.*}}* %1, i32 0, i32 3
 // CHECK:   bitcast %TSi* [[Y_ADDR]] to i8*
-sil @RootGeneric_subst_concrete_fragile_dependent_member_access_y : $(RootGeneric<Int>) -> @out Int {
-entry(%z : @trivial $*Int, %c : @unowned $RootGeneric<Int>):
+sil [ossa] @RootGeneric_subst_concrete_fragile_dependent_member_access_y : $(RootGeneric<Int>) -> @out Int {
+entry(%z : $*Int, %c : @unowned $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*Int
   %t = tuple ()
@@ -301,12 +301,12 @@ entry(%z : @trivial $*Int, %c : @unowned $RootGeneric<Int>):
 // RootGeneric.z has dependent layout; load the offset from the metadata
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @RootGeneric_concrete_fragile_dependent_member_access_z
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i64*
-// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 17
+// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 13
 // CHECK:   [[Z_OFFSET:%.*]] = load i64, i64* [[Z_OFFSET_ADDR]], align 8
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Z_OFFSET]]
 // CHECK:   bitcast i8* [[Z_ADDR]] to %Ts5UInt8V*
-sil @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> (RootGeneric<F>) -> UInt8 {
+sil [ossa] @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> (RootGeneric<F>) -> UInt8 {
 entry(%c : @unowned $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.z
   %z = load_borrow %p : $*UInt8
@@ -317,7 +317,7 @@ entry(%c : @unowned $RootGeneric<F>):
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds {{.*}}, {{.*}}* %0, i32 0, i32 4
 // CHECK:   [[T0:%.*]] = getelementptr inbounds %Ts5UInt8V, %Ts5UInt8V* [[Z_ADDR]], i32 0, i32 0
 // CHECK:   load i8, i8* [[T0]], align
-sil @RootGeneric_subst_concrete_fragile_dependent_member_access_z : $(RootGeneric<Int>) -> UInt8 {
+sil [ossa] @RootGeneric_subst_concrete_fragile_dependent_member_access_z : $(RootGeneric<Int>) -> UInt8 {
 entry(%c : @unowned $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.z
   %z = load_borrow %p : $*UInt8
@@ -371,7 +371,7 @@ entry(%c : $RootGeneric<Int32>):
 
 //   Initialize our own dependent field offsets.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
-// CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i64 23
+// CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i64 20
 // CHECK:   [[FIELDS_ADDR:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %classFields, i32 0, i32 0
 // CHECK:   [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState(i64 319, %swift.type* %B)
 // CHECK:   [[B_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0

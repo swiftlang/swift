@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 protocol UID {
     func uid() -> Int
@@ -25,7 +25,7 @@ extension ObjectUID {
 
 class Base {}
 
-// CHECK-LABEL: sil hidden @$s25protocol_class_refinement12getObjectUID{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s25protocol_class_refinement12getObjectUID{{[_0-9a-zA-Z]*}}F
 func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ObjectUID> { var τ_0_0 } <T>
@@ -79,7 +79,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @$s25protocol_class_refinement16getBaseObjectUID{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s25protocol_class_refinement16getBaseObjectUID{{[_0-9a-zA-Z]*}}F
 func getBaseObjectUID<T: UID>(x: T) -> (Int, Int, Int) where T: Base {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : Base, τ_0_0 : UID> { var τ_0_0 } <T>

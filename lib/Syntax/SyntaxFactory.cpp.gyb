@@ -90,7 +90,7 @@ SyntaxFactory::countChildren(SyntaxKind Kind){
 }
 
 bool SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
-                                                  const RC<RawSyntax> &Member) {
+                                                  SyntaxKind MemberKind) {
   switch (CollectionKind) {
 % for node in SYNTAX_NODES:
 %   if node.is_syntax_collection():
@@ -98,17 +98,22 @@ bool SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
 %     if node.collection_element_choices:
 %       element_checks = []
 %       for choice in node.collection_element_choices:
-%         element_checks.append("" + choice + "Syntax::kindof(Member->getKind())")
+%         element_checks.append("" + choice + "Syntax::kindof(MemberKind)")
 %       end
     return ${' || '.join(element_checks)};
 %     else:
-    return ${node.collection_element_type}::kindof(Member->getKind());
+    return ${node.collection_element_type}::kindof(MemberKind);
 %     end
 %   end
 % end
   default:
     llvm_unreachable("Not collection kind.");
   }
+}
+
+bool SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
+                                                  const RC<RawSyntax> &Member) {
+  return canServeAsCollectionMemberRaw(CollectionKind, Member->getKind());
 }
 
 bool SyntaxFactory::

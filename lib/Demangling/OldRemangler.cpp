@@ -586,7 +586,7 @@ void Remangler::mangleSpecializationPassID(Node *node) {
   Out << node->getIndex();
 }
 
-void Remangler::mangleSpecializationIsFragile(Node *node) {
+void Remangler::mangleIsSerialized(Node *node) {
   Out << "q";
 }
 
@@ -680,7 +680,15 @@ void Remangler::mangleRetroactiveConformance(Node *node) {
   unreachable("Retroactive conformances aren't in the old mangling");
 }
 
-void Remangler::mangleProtocolConformanceRef(Node *node) {
+void Remangler::mangleProtocolConformanceRefInTypeModule(Node *node) {
+  unreachable("Protocol conformance references aren't in the old mangling");
+}
+
+void Remangler::mangleProtocolConformanceRefInProtocolModule(Node *node) {
+  unreachable("Protocol conformance references aren't in the old mangling");
+}
+
+void Remangler::mangleProtocolConformanceRefInOtherModule(Node *node) {
   unreachable("Protocol conformance references aren't in the old mangling");
 }
 
@@ -818,6 +826,11 @@ void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   mangleProtocolConformance(node->begin()[0]);
 }
 
+void Remangler::mangleProtocolSelfConformanceDescriptor(Node *node) {
+  Out << "MS";
+  mangleProtocol(node->begin()[0]);
+}
+
 void Remangler::manglePartialApplyForwarder(Node *node) {
   Out << "PA__T";
   mangleSingleChildNode(node); // global
@@ -830,6 +843,18 @@ void Remangler::manglePartialApplyObjCForwarder(Node *node) {
 
 void Remangler::mangleMergedFunction(Node *node) {
   Out << "Tm";
+}
+
+void Remangler::mangleDynamicallyReplaceableFunctionImpl(Node *node) {
+  Out << "TI";
+}
+
+void Remangler::mangleDynamicallyReplaceableFunctionKey(Node *node) {
+  Out << "Tx";
+}
+
+void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
+  Out << "TX";
 }
 
 void Remangler::mangleDirectness(Node *node) {
@@ -871,6 +896,11 @@ void Remangler::mangleFieldOffset(Node *node) {
 void Remangler::mangleEnumCase(Node *node) {
   Out << "WC";
   mangleSingleChildNode(node); // enum case
+}
+
+void Remangler::mangleProtocolSelfConformanceWitnessTable(Node *node) {
+  Out << "WS";
+  mangleSingleChildNode(node); // protocol
 }
 
 void Remangler::mangleProtocolWitnessTable(Node *node) {
@@ -920,6 +950,10 @@ void Remangler::mangleDefaultAssociatedConformanceAccessor(Node *node) {
   Out << "<default-associated-conformance-descriptor>";
 }
 
+void Remangler::mangleBaseConformanceDescriptor(Node *node) {
+  Out << "<base-conformance-descriptor>";
+}
+
 void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {
   Out << "Wt";
   mangleChildNodes(node); // protocol conformance, identifier
@@ -933,8 +967,12 @@ void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
   Out << "WT";
   assert(node->getNumChildren() == 3);
   mangleChildNode(node, 0); // protocol conformance
-  mangleChildNode(node, 1); // identifier
+  mangleChildNode(node, 1); // type
   mangleProtocolWithoutPrefix(node->begin()[2]); // type
+}
+
+void Remangler::mangleBaseWitnessTableAccessor(Node *node) {
+  Out << "<base-witness-table-accessor>";
 }
 
 void Remangler::mangleReabstractionThunkHelper(Node *node) {
@@ -947,6 +985,11 @@ void Remangler::mangleReabstractionThunk(Node *node) {
   Out << "Tr";
   if (node->getNumChildren() == 3) Out << 'G';
   mangleChildNodes(node); // generic signature?, type, type
+}
+
+void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {
+  Out << "TS";
+  mangleSingleChildNode(node); // entity
 }
 
 void Remangler::mangleProtocolWitness(Node *node) {
@@ -1194,6 +1237,20 @@ void Remangler::mangleEntityContext(Node *node, EntityContext &ctx) {
   // Remember that we're mangling a context.
   EntityContext::ManglingContextRAII raii(ctx);
 
+  // Deal with bound generic types.
+  switch (node->getKind()) {
+    case Node::Kind::BoundGenericStructure:
+    case Node::Kind::BoundGenericEnum:
+    case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericOtherNominalType:
+    case Node::Kind::BoundGenericTypeAlias:
+      mangleAnyNominalType(node, ctx);
+      return;
+
+    default:
+      break;
+  }
+
   switch (node->getKind()) {
 #define NODE(ID)                                \
   case Node::Kind::ID:
@@ -1293,7 +1350,7 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Out << 'w';
   } else if (stripPrefix(text, "Builtin.Int")) {
     Out << 'i' << text << '_';
-  } else if (stripPrefix(text, "Builtin.Float")) {
+  } else if (stripPrefix(text, "Builtin.FPIEEE")) {
     Out << 'f' << text << '_';
   } else if (stripPrefix(text, "Builtin.Vec")) {
     // Avoid using StringRef::split because its definition is not
@@ -1704,6 +1761,7 @@ void Remangler::mangleExtension(Node *node, EntityContext &ctx) {
   if (node->getNumChildren() == 3) {
     mangleDependentGenericSignature(node->begin()[2]); // generic sig
   }
+
   mangleEntityContext(node->begin()[1], ctx); // context
 }
 
@@ -1849,6 +1907,12 @@ void Remangler::mangleGenericArgs(Node *node, EntityContext &ctx) {
     mangleGenericArgs(parentOrModule, ctx);
 
     mangleTypeList(node->getChild(1));
+    break;
+  }
+
+  case Node::Kind::AnonymousContext:
+  case Node::Kind::Extension: {
+    mangleGenericArgs(node->getChild(1), ctx);
     break;
   }
 

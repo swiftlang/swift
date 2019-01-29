@@ -30,6 +30,7 @@ import ArraySubscript
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
+import Breadcrumbs
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
@@ -43,6 +44,7 @@ import CharacterLiteralsSmall
 import CharacterProperties
 import Chars
 import ClassArrayGetter
+import Codable
 import Combos
 import CountAlgo
 import DataBenchmarks
@@ -195,6 +197,7 @@ registerBenchmark(BinaryFloatingPointPropertiesBinade)
 registerBenchmark(BinaryFloatingPointPropertiesNextUp)
 registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
+registerBenchmark(Breadcrumbs)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
 registerBenchmark(COWArrayGuaranteedParameterOverhead)
@@ -212,6 +215,7 @@ registerBenchmark(CharacterPropertiesStashed)
 registerBenchmark(CharacterPropertiesStashedMemo)
 registerBenchmark(CharacterPropertiesPrecomputed)
 registerBenchmark(Chars)
+registerBenchmark(Codable)
 registerBenchmark(Combos)
 registerBenchmark(CountAlgo)
 registerBenchmark(ClassArrayGetter)
@@ -266,7 +270,6 @@ registerBenchmark(NSErrorTest)
 registerBenchmark(NSStringConversion)
 registerBenchmark(NibbleSort)
 registerBenchmark(NopDeinit)
-registerBenchmark(NormalizedIterator)
 registerBenchmark(ObjectAllocation)
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 registerBenchmark(ObjectiveCBridging)
@@ -328,6 +331,7 @@ registerBenchmark(StringInterpolation)
 registerBenchmark(StringInterpolationSmall)
 registerBenchmark(StringInterpolationManySmallSegments)
 registerBenchmark(StringMatch)
+registerBenchmark(StringNormalization)
 registerBenchmark(StringRemoveDupes)
 registerBenchmark(StringTests)
 registerBenchmark(StringWalk)

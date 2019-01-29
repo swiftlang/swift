@@ -45,13 +45,17 @@ struct State {
   /// The value that we are checking.
   SILValue value;
 
-  /// The behavior of the checker when we detect an error. Can either be
-  /// returning false, returning false with a message emitted to stderr, or an
-  /// assert.
-  ErrorBehaviorKind errorBehavior;
+  /// The result error object that use to signal either that no errors were
+  /// found or if errors are found the specific type of error that was found.
+  LinearLifetimeError error;
 
   /// The blocks that we have already visited.
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
+
+  /// If non-null a list that we should place any detected leaking blocks for
+  /// our caller. The intention is that this can be used in a failing case to
+  /// put in missing destroys.
+  SmallVectorImpl<SILBasicBlock *> *leakingBlocks;
 
   /// The set of blocks with consuming uses.
   SmallPtrSet<SILBasicBlock *, 8> blocksWithConsumingUses;
@@ -66,31 +70,31 @@ struct State {
 
   /// A list of successor blocks that we must visit by the time the algorithm
   /// terminates.
-  SmallPtrSet<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
+  SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
   State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        ErrorBehaviorKind errorBehavior)
-      : value(value), errorBehavior(errorBehavior),
-        visitedBlocks(visitedBlocks) {}
+        ErrorBehaviorKind errorBehavior,
+        SmallVectorImpl<SILBasicBlock *> *leakingBlocks)
+      : value(value), error(errorBehavior), visitedBlocks(visitedBlocks),
+        leakingBlocks(leakingBlocks) {}
 
   void initializeAllNonConsumingUses(
       ArrayRef<BranchPropagatedUser> nonConsumingUsers);
-  bool initializeAllConsumingUses(
+  void initializeAllConsumingUses(
       ArrayRef<BranchPropagatedUser> consumingUsers,
       SmallVectorImpl<BrPropUserAndBlockPair> &predsToAddToWorklist);
 
-  /// Initializes state for a consuming use. Returns true if we have not yet
-  /// seen a consuming use in the same block yet. Returns false if detect such a
-  /// condition so users know that a use-after-free was detected.
-  bool initializeConsumingUse(BranchPropagatedUser consumingUser,
+  /// Initializes state for a consuming use.
+  ///
+  /// If we are already tracking a consuming use for the block, this emits a
+  /// double consume checker error.
+  void initializeConsumingUse(BranchPropagatedUser consumingUser,
                               SILBasicBlock *userBlock);
 
-  /// Returns true if the given block contains a non-consuming use that is
-  /// strictly later in the block than a consuming use. If all
-  /// non-consuming uses are before the consuming use, the block is
-  /// removed from the blocksWithNonConsumingUses map to show that the uses
-  /// were found to properly be post-dominated by a consuming use.
-  bool checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
+  /// Check that this newly initialized consuming user does not have any
+  /// non-consuming uses after it. If the checker finds one, it emits a checker
+  /// error.
+  void checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                                      SILBasicBlock *userBlock);
 
   /// Once we have marked all of our producing blocks.
@@ -107,21 +111,6 @@ struct State {
   /// for validity. If this is a linear typed value, return true. Return false
   /// otherwise.
   bool checkDataflowEndState(DeadEndBlocks &deBlocks);
-
-  /// Depending on our initialization, either return false or call Func and
-  /// throw an error.
-  bool handleError(llvm::function_ref<void()> &&messagePrinterFunc) const {
-    if (errorBehavior.shouldPrintMessage()) {
-      messagePrinterFunc();
-    }
-
-    if (errorBehavior.shouldReturnFalse()) {
-      return false;
-    }
-
-    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
-    llvm_unreachable("triggering standard assertion failure routine");
-  }
 };
 
 } // end anonymous namespace
@@ -175,27 +164,22 @@ void State::initializeAllNonConsumingUses(
 //                        Consuming Use Initialization
 //===----------------------------------------------------------------------===//
 
-bool State::initializeAllConsumingUses(
+void State::initializeAllConsumingUses(
     ArrayRef<BranchPropagatedUser> consumingUses,
     SmallVectorImpl<std::pair<BranchPropagatedUser, SILBasicBlock *>>
         &predsToAddToWorklist) {
-  bool noErrors = true;
   for (BranchPropagatedUser user : consumingUses) {
     SILBasicBlock *userBlock = user.getParent();
 
-    // First initialize our state for the consuming user. This returns false if
-    // we found another consuming instruction associated with userBlock and true
-    // if we successfully associated user with userBlock.
-    if (!initializeConsumingUse(user, userBlock)) {
-      // We already handled the error.
-      noErrors &= handleError([] {});
-    }
+    // First initialize our state for the consuming user.
+    //
+    // If we find another consuming instruction associated with userBlock this
+    // will emit a checker error.
+    initializeConsumingUse(user, userBlock);
 
-    // Then check if the given block has a use after free.
-    if (checkForSameBlockUseAfterFree(user, userBlock)) {
-      // We already handled the error.
-      noErrors &= handleError([] {});
-    }
+    // Then check if the given block has a use after free and emit an error if
+    // we find one.
+    checkForSameBlockUseAfterFree(user, userBlock);
 
     // If this user is in the same block as the value, do not visit
     // predecessors. We must be extra tolerant here since we allow for
@@ -210,18 +194,16 @@ bool State::initializeAllConsumingUses(
       predsToAddToWorklist.push_back({user, pred});
     }
   }
-
-  return noErrors;
 }
 
-bool State::initializeConsumingUse(BranchPropagatedUser consumingUser,
+void State::initializeConsumingUse(BranchPropagatedUser consumingUser,
                                    SILBasicBlock *userBlock) {
   // Map this user to the block. If we already have a value for the block, then
   // we have a double consume and need to fail.
   if (blocksWithConsumingUses.insert(userBlock).second)
-    return true;
+    return;
 
-  return handleError([&] {
+  error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                  << "Found over consume?!\n"
                  << "Value: " << *value << "User: " << *consumingUser
@@ -229,13 +211,13 @@ bool State::initializeConsumingUse(BranchPropagatedUser consumingUser,
   });
 }
 
-bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
+void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                                           SILBasicBlock *userBlock) {
   // If we do not have any consuming uses in the same block as our
   // consuming user, then we can not have a same block use-after-free.
   auto iter = blocksWithNonConsumingUses.find(userBlock);
   if (iter == blocksWithNonConsumingUses.end())
-    return false;
+    return;
 
   BranchPropagatedUser nonConsumingUser = iter->second;
 
@@ -246,7 +228,7 @@ bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
   // always consider the non-consuming use to be a use after free since
   // the cond branch user is in a previous block. So just bail early.
   if (consumingUser.isCondBranchUser()) {
-    return !handleError([&]() {
+    error.handleUseAfterFree([&]() {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free?!\n"
                    << "Value: " << *value
@@ -254,6 +236,7 @@ bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                    << "Non Consuming User: " << *iter->second << "Block: bb"
                    << userBlock->getDebugID() << "\n\n";
     });
+    return;
   }
 
   // Ok. At this point, we know that our consuming user is not a cond branch
@@ -262,7 +245,7 @@ bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
   // consuming use. and continue.
   if (nonConsumingUser.isCondBranchUser()) {
     blocksWithNonConsumingUses.erase(iter);
-    return false;
+    return;
   }
 
   // Otherwise, we know that both of our users are non-cond branch users and
@@ -272,7 +255,7 @@ bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                    [&nonConsumingUser](const SILInstruction &i) -> bool {
                      return nonConsumingUser == &i;
                    }) != userBlock->end()) {
-    return !handleError([&] {
+    error.handleUseAfterFree([&] {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free?!\n"
                    << "Value: " << *value
@@ -280,11 +263,12 @@ bool State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                    << "Non Consuming User: " << *iter->second << "Block: bb"
                    << userBlock->getDebugID() << "\n\n";
     });
+    return;
   }
 
   // Erase the use since we know that it is properly joint post-dominated.
   blocksWithNonConsumingUses.erase(iter);
-  return false;
+  return;
 }
 
 bool State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
@@ -292,24 +276,29 @@ bool State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
   if (!blocksWithConsumingUses.count(userBlock))
     return false;
 
-  return !handleError([&] {
+  error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                  << "Found over consume?!\n"
                  << "Value: " << *value << "User: " << *consumingUser
                  << "Block: bb" << userBlock->getDebugID() << "\n\n";
   });
+
+  // If we reached this point, then we did not assert, but we did flag an
+  // error. Return true so we continue the walk.
+  return true;
 }
 
 bool State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
   if (!blocksWithConsumingUses.count(userBlock))
     return false;
 
-  return !handleError([&] {
+  error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                  << "Found over consume?!\n"
                  << "Value: " << *value << "Block: bb"
                  << userBlock->getDebugID() << "\n\n";
   });
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -331,7 +320,7 @@ bool State::performDataflow(DeadEndBlocks &deBlocks) {
     // First remove BB from the SuccessorBlocksThatMustBeVisited list. This
     // ensures that when the algorithm terminates, we know that BB was not the
     // beginning of a non-covered path to the exit.
-    successorBlocksThatMustBeVisited.erase(block);
+    successorBlocksThatMustBeVisited.remove(block);
 
     // Then remove BB from BlocksWithNonLifetimeEndingUses so we know that
     // this block was properly joint post-dominated by our lifetime ending
@@ -376,8 +365,11 @@ bool State::performDataflow(DeadEndBlocks &deBlocks) {
     //
     // 2. We add the predecessor to the worklist if we have not visited it yet.
     for (auto *predBlock : block->getPredecessorBlocks()) {
+      // Check if we have an over consume.
       if (checkPredsForDoubleConsume(predBlock)) {
-        return handleError([] {});
+        // If we were to assert, it is handled inside check preds for double
+        // consume. So just return false so that we bail.
+        return false;
       }
 
       if (visitedBlocks.count(predBlock)) {
@@ -395,23 +387,38 @@ bool State::performDataflow(DeadEndBlocks &deBlocks) {
 bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
   // Make sure that we visited all successor blocks that we needed to visit to
   // make sure we didn't leak.
+  bool doesntHaveAnyLeaks = true;
+
   if (!successorBlocksThatMustBeVisited.empty()) {
-    return handleError([&] {
-      llvm::errs()
-          << "Function: '" << value->getFunction()->getName() << "'\n"
-          << "Error! Found a leak due to a consuming post-dominance failure!\n"
-          << "    Value: " << *value << "    Post Dominating Failure Blocks:\n";
+    // If we are asked to store any leaking blocks, put them in the leaking
+    // blocks array.
+    if (leakingBlocks) {
+      copy(successorBlocksThatMustBeVisited,
+           std::back_inserter(*leakingBlocks));
+    }
+
+    // If we are supposed to error on leaks, do so now.
+    error.handleLeak([&] {
+      llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
+                   << "Error! Found a leak due to a consuming post-dominance "
+                      "failure!\n"
+                   << "    Value: " << *value
+                   << "    Post Dominating Failure Blocks:\n";
       for (auto *succBlock : successorBlocksThatMustBeVisited) {
         llvm::errs() << "        bb" << succBlock->getDebugID();
       }
       llvm::errs() << '\n';
     });
+
+    // Otherwise... see if we have any other failures. This signals the user
+    // wants us to tell it where to insert compensating destroys.
+    doesntHaveAnyLeaks = false;
   }
 
   // Make sure that we do not have any lifetime ending uses left to visit that
   // are not transitively unreachable blocks.... so return early.
   if (blocksWithNonConsumingUses.empty()) {
-    return true;
+    return doesntHaveAnyLeaks;
   }
 
   // If we do have remaining blocks, then these non lifetime ending uses must be
@@ -421,7 +428,7 @@ bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
       continue;
     }
 
-    return handleError([&] {
+    error.handleUseAfterFree([&] {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free due to unvisited non lifetime "
                       "ending uses?!\n"
@@ -432,25 +439,27 @@ bool State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
       }
       llvm::errs() << "\n";
     });
+    return false;
   }
 
   // If all of our remaining blocks were dead uses, then return true. We are
   // good.
-  return true;
+  return doesntHaveAnyLeaks;
 }
 
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-bool swift::valueHasLinearLifetime(
+LinearLifetimeError swift::valueHasLinearLifetime(
     SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
     ArrayRef<BranchPropagatedUser> nonConsumingUses,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks, DeadEndBlocks &deBlocks,
-    ErrorBehaviorKind errorBehavior) {
+    ErrorBehaviorKind errorBehavior,
+    SmallVectorImpl<SILBasicBlock *> *leakingBlocks) {
   assert(!consumingUses.empty() && "Must have at least one consuming user?!");
 
-  State state(value, visitedBlocks, errorBehavior);
+  State state(value, visitedBlocks, errorBehavior, leakingBlocks);
 
   // First add our non-consuming uses and their blocks to the
   // blocksWithNonConsumingUses map. While we do this, if we have multiple uses
@@ -477,7 +486,7 @@ bool swift::valueHasLinearLifetime(
   // have been detected by initializing our consuming uses. So we are done.
   if (consumingUses.size() == 1 &&
       consumingUses[0].getParent() == value->getParentBlock()) {
-    return true;
+    return state.error;
   }
 
   // Ok, we may have multiple consuming uses. Add the user block of each of our
@@ -498,7 +507,7 @@ bool swift::valueHasLinearLifetime(
     // Make sure that the predecessor is not in our blocksWithConsumingUses
     // list.
     if (state.checkPredsForDoubleConsume(user, predBlock)) {
-      return state.handleError([] {});
+      return state.error;
     }
 
     if (!state.visitedBlocks.insert(predBlock).second)
@@ -509,9 +518,10 @@ bool swift::valueHasLinearLifetime(
   // Now that our algorithm is completely prepared, run the
   // dataflow... If we find a failure, return false.
   if (!state.performDataflow(deBlocks))
-    return false;
+    return state.error;
 
   // ...and then check that the end state shows that we have a valid linear
   // typed value.
-  return state.checkDataflowEndState(deBlocks);
+  state.checkDataflowEndState(deBlocks);
+  return state.error;
 }

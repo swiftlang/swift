@@ -12,4 +12,4 @@ func bar<T, U>(_ x: T, y: U) { markUsed("bar") }
 // prologue and the beginning of the function body.
 // CHECK-NOT: callq	*
 // CHECK: .loc	[[F]] [[@LINE-6]] {{.}}
-// CHECK: callq	{{.*}}builtinStringLiteral
+// CHECK: {{callq	.*builtinStringLiteral|movq __imp_.*builtinStringLiteral}}

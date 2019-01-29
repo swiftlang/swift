@@ -31,6 +31,7 @@ namespace clang {
 
 namespace swift {
   class AnyFunctionRef;
+  enum class Bridgeability : unsigned;
   class ForeignErrorConvention;
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
@@ -147,6 +148,12 @@ enum IsReferenceCounted_t : bool {
   IsReferenceCounted = true
 };
 
+/// Is this type address only because it's resilient?
+enum IsResilient_t : bool {
+  IsNotResilient = false,
+  IsResilient = true
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -156,6 +163,7 @@ public:
       NonTrivialFlag     = 1 << 0,
       NonFixedABIFlag    = 1 << 1,
       AddressOnlyFlag    = 1 << 2,
+      ResilientFlag      = 1 << 3,
     };
 
     uint8_t Flags;
@@ -166,17 +174,23 @@ public:
 
     constexpr RecursiveProperties(IsTrivial_t isTrivial,
                                   IsFixedABI_t isFixedABI,
-                                  IsAddressOnly_t isAddressOnly)
+                                  IsAddressOnly_t isAddressOnly,
+                                  IsResilient_t isResilient = IsNotResilient)
       : Flags((isTrivial ? 0U : NonTrivialFlag) | 
               (isAddressOnly ? AddressOnlyFlag : 0U) |
-              (isFixedABI ? 0U : NonFixedABIFlag)) {}
+              (isFixedABI ? 0U : NonFixedABIFlag) |
+              (isResilient ? ResilientFlag : 0U)) {}
 
     static constexpr RecursiveProperties forReference() {
-      return {IsNotTrivial, IsFixedABI, IsNotAddressOnly};
+      return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient };
     }
 
     static constexpr RecursiveProperties forOpaque() {
-      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly};
+      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient};
+    }
+
+    static constexpr RecursiveProperties forResilient() {
+      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsResilient};
     }
 
     void addSubobject(RecursiveProperties other) {
@@ -192,6 +206,9 @@ public:
     IsAddressOnly_t isAddressOnly() const {
       return IsAddressOnly_t((Flags & AddressOnlyFlag) != 0);
     }
+    IsResilient_t isResilient() const {
+      return IsResilient_t((Flags & ResilientFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
@@ -205,7 +222,16 @@ private:
   RecursiveProperties Properties;
   unsigned ReferenceCounted : 1;
 
-protected:  
+public:
+  /// The resilience expansion for this type lowering.
+  /// If the type is not resilient at all, this is always Minimal.
+  ResilienceExpansion forExpansion = ResilienceExpansion::Minimal;
+
+  /// A single linked list of lowerings for different resilience expansions.
+  /// The first lowering is always for ResilientExpansion::Minimal.
+  mutable const TypeLowering *nextExpansion = nullptr;
+
+protected:
   TypeLowering(SILType type, RecursiveProperties properties,
                IsReferenceCounted_t isRefCounted)
     : LoweredType(type), Properties(properties),
@@ -217,13 +243,13 @@ public:
 
   virtual ~TypeLowering() {}
 
-  /// \brief Are r-values of this type passed as arguments indirectly by formal
+  /// Are r-values of this type passed as arguments indirectly by formal
   /// convention?
   ///
   /// This is independent of whether the SIL argument is address type.
   bool isFormallyPassedIndirectly() const { return isAddressOnly(); }
 
-  /// \brief Are r-values of this type returned indirectly by formal convention?
+  /// Are r-values of this type returned indirectly by formal convention?
   ///
   /// This is independent of whether the SIL result is address type.
   bool isFormallyReturnedIndirectly() const { return isAddressOnly(); }
@@ -274,6 +300,10 @@ public:
   /// Returns true if the SIL type is an address.
   bool isAddress() const {
     return LoweredType.isAddress();
+  }
+
+  bool isResilient() const {
+    return Properties.isResilient();
   }
 
   /// Return the semantic type.
@@ -669,7 +699,8 @@ class TypeConverter {
   Optional<CanType> BridgedType##Ty;
 #include "swift/SIL/BridgedTypes.def"
 
-  const TypeLowering &getTypeLoweringForLoweredType(TypeKey key);
+  const TypeLowering &
+  getTypeLoweringForLoweredType(TypeKey key, ResilienceExpansion forExpansion);
   const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
 
 public:
@@ -745,7 +776,9 @@ public:
   /// Returns the SIL TypeLowering for an already lowered SILType. If the
   /// SILType is an address, returns the TypeLowering for the pointed-to
   /// type.
-  const TypeLowering &getTypeLowering(SILType t);
+  const TypeLowering &
+  getTypeLowering(SILType t, ResilienceExpansion forExpansion =
+                               ResilienceExpansion::Minimal);
 
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(Type t) {
@@ -851,6 +884,7 @@ public:
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.
   Type getLoweredBridgedType(AbstractionPattern pattern, Type t,
+                             Bridgeability bridging,
                              SILFunctionTypeRepresentation rep,
                              BridgedTypePurpose purpose);
 
@@ -871,7 +905,8 @@ public:
   /// Given a function type, yield its bridged formal type.
   CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
                                             CanAnyFunctionType fnType,
-                                            AnyFunctionType::ExtInfo extInfo);
+                                            AnyFunctionType::ExtInfo extInfo,
+                                            Bridgeability bridging);
 
   /// Given a referenced value and the substituted formal type of a
   /// resulting l-value expression, produce the substituted formal
@@ -931,7 +966,7 @@ public:
     NeedsThunk
   };
   
-  /// \brief Test if type1 is ABI compatible with type2, and can be converted
+  /// Test if type1 is ABI compatible with type2, and can be converted
   /// with a trivial bitcast.
   ///
   /// Note that type1 and type2 must be lowered types, and type1 must be a
@@ -943,7 +978,7 @@ public:
   ABIDifference checkForABIDifferences(SILType type1, SILType type2,
                                        bool thunkOptionals = true);
 
-  /// \brief Same as above but for SIL function types.
+  /// Same as above but for SIL function types.
   ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
                                                SILFunctionType *fnTy2);
 
@@ -971,28 +1006,30 @@ public:
   CanSILBoxType getBoxTypeForEnumElement(SILType enumType,
                                          EnumElementDecl *elt);
 
-  bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl);
-  
 private:
   CanType getLoweredRValueType(AbstractionPattern origType, CanType substType);
 
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
-                              bool canBridgeBool,
-                              bool bridgedCollectionsAreOptional);
+                              Bridgeability bridging,
+                              SILFunctionTypeRepresentation rep,
+                              BridgedTypePurpose purpose);
 
   AnyFunctionType::Param
   getBridgedParam(SILFunctionTypeRepresentation rep,
                   AbstractionPattern pattern,
-                  AnyFunctionType::Param param);
+                  AnyFunctionType::Param param,
+                  Bridgeability bridging);
 
   void getBridgedParams(SILFunctionTypeRepresentation rep,
                         AbstractionPattern pattern,
                         ArrayRef<AnyFunctionType::Param> params,
-                        SmallVectorImpl<AnyFunctionType::Param> &bridged);
+                        SmallVectorImpl<AnyFunctionType::Param> &bridged,
+                        Bridgeability bridging);
 
   CanType getBridgedResultType(SILFunctionTypeRepresentation rep,
                                AbstractionPattern pattern,
                                CanType result,
+                               Bridgeability bridging,
                                bool suppressOptional);
 };
 

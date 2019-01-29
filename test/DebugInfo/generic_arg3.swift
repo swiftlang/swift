@@ -6,7 +6,7 @@ public func f<Type>(_ value : Type)
 {
   // CHECK: define {{.*}}$s12generic_arg31fyyxlFxxXEfU_
   // CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %[[ALLOCA:[^,]+]],
-  // CHECK-SAME:       metadata ![[ARG:.*]], metadata !DIExpression())
+  // CHECK-SAME: metadata ![[ARG:.*]], metadata !DIExpression(DW_OP_deref))
   // CHECK: store %swift.opaque* %1, %swift.opaque** %[[ALLOCA]], align
   // No deref here.
   // CHECK: ![[TY:.*]] = !DICompositeType({{.*}}identifier: "$sxD"

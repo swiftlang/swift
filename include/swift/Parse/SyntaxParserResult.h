@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_PARSE_SYNTAXPARSERRESULT_H
+#define SWIFT_PARSE_SYNTAXPARSERRESULT_H
+
 #include "llvm/ADT/Optional.h"
 #include "swift/Parse/ParserResult.h"
 
@@ -94,3 +97,5 @@ makeSyntaxCodeCompletionResult(AST *Result = nullptr) {
 }
 
 } // namespace swift
+
+#endif

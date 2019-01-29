@@ -932,17 +932,11 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   }
 
   // If there is a generic parameter of the named type, use that.
-  if (auto gpList = dc->getGenericParamsOfContext()) {
-    GenericTypeParamDecl *foundGP = nullptr;
-    for (auto gp : *gpList) {
-      if (gp->getName() == assocType->getName()) {
-        foundGP = gp;
-        break;
-      }
+  if (auto *genericSig = dc->getGenericSignatureOfContext()) {
+    for (auto gp : genericSig->getInnermostGenericParams()) {
+      if (gp->getName() == assocType->getName())
+        return dc->mapTypeIntoContext(gp);
     }
-
-    if (foundGP)
-      return dc->mapTypeIntoContext(foundGP->getDeclaredInterfaceType());
   }
 
   return Type();
@@ -2083,38 +2077,8 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     }
   }
 
-  // Try to resolve the witness via explicit definitions.
-  switch (resolveWitnessViaLookup(requirement)) {
-  case ResolveWitnessResult::Success:
-    return;
-
-  case ResolveWitnessResult::ExplicitFailed:
-    Conformance->setInvalid();
-    recordInvalidWitness(requirement);
-    return;
-
-  case ResolveWitnessResult::Missing:
-    // Continue trying below.
-    break;
-  }
-
-  // Try to resolve the witness via derivation.
-  switch (resolveWitnessViaDerivation(requirement)) {
-  case ResolveWitnessResult::Success:
-    return;
-
-  case ResolveWitnessResult::ExplicitFailed:
-    Conformance->setInvalid();
-    recordInvalidWitness(requirement);
-    return;
-
-  case ResolveWitnessResult::Missing:
-    // Continue trying below.
-    break;
-  }
-
-  // Try to resolve the witness via defaults.
-  switch (resolveWitnessViaDefault(requirement)) {
+  // Try to resolve the witness.
+  switch (resolveWitnessTryingAllStrategies(requirement)) {
   case ResolveWitnessResult::Success:
     return;
 
@@ -2125,6 +2089,5 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 
   case ResolveWitnessResult::Missing:
     llvm_unreachable("Should have failed");
-    break;
   }
 }

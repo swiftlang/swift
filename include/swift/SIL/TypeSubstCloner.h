@@ -30,7 +30,7 @@
 
 namespace swift {
 
-/// \brief A utility class for cloning code while remapping types.
+/// A utility class for cloning code while remapping types.
 ///
 /// \tparam FunctionBuilderTy Function builder type injected by
 /// subclasses. Used to break a circular dependency from SIL <=>
@@ -215,8 +215,8 @@ protected:
     PartialApplyInst *N = getBuilder().createPartialApply(
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(), ParamConvention,
-        GenericSpecializationInformation::create(
-          Inst, getBuilder()));
+        Inst->isOnStack(),
+        GenericSpecializationInformation::create(Inst, getBuilder()));
     recordClonedInstruction(Inst, N);
   }
 
@@ -353,8 +353,9 @@ protected:
       ParentFunction = FuncBuilder.getOrCreateFunction(
           ParentFunction->getLocation(), MangledName, SILLinkage::Shared,
           ParentFunction->getLoweredFunctionType(), ParentFunction->isBare(),
-          ParentFunction->isTransparent(), ParentFunction->isSerialized(), 0,
-          ParentFunction->isThunk(), ParentFunction->getClassSubclassScope());
+          ParentFunction->isTransparent(), ParentFunction->isSerialized(),
+          IsNotDynamic, 0, ParentFunction->isThunk(),
+          ParentFunction->getClassSubclassScope());
       // Increment the ref count for the inlined function, so it doesn't
       // get deleted before we can emit abstract debug info for it.
       if (!ParentFunction->isZombie()) {

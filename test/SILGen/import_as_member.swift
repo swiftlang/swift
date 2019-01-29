@@ -18,7 +18,7 @@ public func returnGlobalVar() -> Double {
 public func returnStringGlobalVar() -> String {
   return Panda.cutenessFactor
 }
-// CHECK-LABEL: sil {{.*}}returnStringGlobalVar{{.*}} () -> @owned String {
+// CHECK-LABEL: sil [ossa] {{.*}}returnStringGlobalVar{{.*}} () -> @owned String {
 // CHECK:   %0 = global_addr @PKPandaCutenessFactor : $*NSString
 // CHECK:   [[VAL:%.*]] = load [copy] %0 : $*NSString
 // CHECK:   [[BRIDGE:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
@@ -29,7 +29,7 @@ public func returnStringGlobalVar() -> String {
 public func returnNullableStringGlobalVar() -> String? {
   return Panda.cuddlynessFactor
 }
-// CHECK-LABEL: sil {{.*}}returnNullableStringGlobalVar{{.*}} () -> @owned Optional<String> {
+// CHECK-LABEL: sil [ossa] {{.*}}returnNullableStringGlobalVar{{.*}} () -> @owned Optional<String> {
 // CHECK:   %0 = global_addr @PKPandaCuddlynessFactor : $*NSString
 // CHECK:   [[VAL:%.*]] = load [copy] %0 : $*NSString
 // CHECK:   [[BRIDGE:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
@@ -39,7 +39,7 @@ public func returnNullableStringGlobalVar() -> String? {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil {{.*}}useClass{{.*}}
-// CHECK: bb0([[D:%[0-9]+]] : @trivial $Double, [[OPTS:%[0-9]+]] : @trivial $SomeClass.Options):
+// CHECK: bb0([[D:%[0-9]+]] : $Double, [[OPTS:%[0-9]+]] : $SomeClass.Options):
 public func useClass(d: Double, opts: SomeClass.Options) {
   // CHECK: [[CTOR:%[0-9]+]] = function_ref @MakeIAMSomeClass : $@convention(c) (Double) -> @autoreleased SomeClass
   // CHECK: [[OBJ:%[0-9]+]] = apply [[CTOR]]([[D]])
@@ -54,8 +54,8 @@ public func useClass(d: Double, opts: SomeClass.Options) {
 }
 
 extension SomeClass {
-  // CHECK-LABEL: sil hidden @$sSo12IAMSomeClassC16import_as_memberE6doubleABSd_tcfC
-  // CHECK: bb0([[DOUBLE:%[0-9]+]] : @trivial $Double
+  // CHECK-LABEL: sil hidden [ossa] @$sSo12IAMSomeClassC16import_as_memberE6doubleABSd_tcfC
+  // CHECK: bb0([[DOUBLE:%[0-9]+]] : $Double
   // CHECK-NOT: value_metatype
   // CHECK: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass
   // CHECK: apply [[FNREF]]([[DOUBLE]])

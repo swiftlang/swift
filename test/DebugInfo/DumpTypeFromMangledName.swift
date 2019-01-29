@@ -8,7 +8,7 @@
 
 // RUN: %target-build-swift -emit-executable %s -g -o %t/TypeReconstr -emit-module
 // RUN: %lldb-moduleimport-test %t/TypeReconstr \
-// RUN:   -type-from-mangled=%t.input > %t.output 2>&1
+// RUN:   -type-from-mangled-old=%t.input > %t.output 2>&1
 // RUN: diff %t.check %t.output
 
 // REQUIRES: executable_test
@@ -53,9 +53,7 @@ let _ = main()
 public struct tinky : Equatable, Hashable {
   internal let _value: Int
 
-  public var hashValue: Int {
-    return 0
-  }
+  public func hash(into hasher: inout Hasher) {}
 }
 
 public func == (lhs: tinky, rhs: tinky) -> Bool {

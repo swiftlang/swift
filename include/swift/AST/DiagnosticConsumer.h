@@ -25,10 +25,11 @@
 
 namespace swift {
   class DiagnosticArgument;
+  class DiagnosticEngine;
   class SourceManager;
   enum class DiagID : uint32_t;
 
-/// \brief Describes the kind of diagnostic.
+/// Describes the kind of diagnostic.
 ///
 enum class DiagnosticKind : uint8_t {
   Error,
@@ -37,7 +38,7 @@ enum class DiagnosticKind : uint8_t {
   Note
 };
 
-/// \brief Extra information carried along with a diagnostic, which may or
+/// Extra information carried along with a diagnostic, which may or
 /// may not be of interest to a given diagnostic consumer.
 struct DiagnosticInfo {
   DiagID ID = DiagID(0);
@@ -55,14 +56,14 @@ struct DiagnosticInfo {
     StringRef getText() const { return Text; }
   };
 
-  /// \brief Extra source ranges that are attached to the diagnostic.
+  /// Extra source ranges that are attached to the diagnostic.
   ArrayRef<CharSourceRange> Ranges;
 
-  /// \brief Extra source ranges that are attached to the diagnostic.
+  /// Extra source ranges that are attached to the diagnostic.
   ArrayRef<FixIt> FixIts;
 };
   
-/// \brief Abstract interface for classes that present diagnostics to the user.
+/// Abstract interface for classes that present diagnostics to the user.
 class DiagnosticConsumer {
 protected:
   static llvm::SMLoc getRawLoc(SourceLoc Loc);
@@ -79,7 +80,7 @@ protected:
 public:
   virtual ~DiagnosticConsumer();
   
-  /// \brief Invoked whenever the frontend emits a diagnostic.
+  /// Invoked whenever the frontend emits a diagnostic.
   ///
   /// \param SM The source manager associated with the source locations in
   /// this diagnostic.
@@ -112,7 +113,7 @@ public:
   virtual void informDriverOfIncompleteBatchModeCompilation() {}
 };
   
-/// \brief DiagnosticConsumer that discards all diagnostics.
+/// DiagnosticConsumer that discards all diagnostics.
 class NullDiagnosticConsumer : public DiagnosticConsumer {
 public:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
@@ -122,7 +123,20 @@ public:
                         const DiagnosticInfo &Info) override;
 };
 
-/// \brief DiagnosticConsumer that funnels diagnostics in certain files to
+/// DiagnosticConsumer that forwards diagnostics to the consumers of
+// another DiagnosticEngine.
+class ForwardingDiagnosticConsumer : public DiagnosticConsumer {
+  DiagnosticEngine &TargetEngine;
+public:
+  ForwardingDiagnosticConsumer(DiagnosticEngine &Target);
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
+                        const DiagnosticInfo &Info) override;
+};
+
+/// DiagnosticConsumer that funnels diagnostics in certain files to
 /// particular sub-consumers.
 ///
 /// The intended use case for such a consumer is "batch mode" compilations,

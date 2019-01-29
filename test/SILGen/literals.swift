@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 func takesOptionalFunction(_: (() -> ())?) {}
 
@@ -8,7 +8,7 @@ struct CustomNull : ExpressibleByNilLiteral {
 
 func takesANull(_: CustomNull) {}
 
-// CHECK-LABEL: sil hidden @$s8literals4testyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s8literals4testyyF : $@convention(thin) () -> ()
 func test() {
   // CHECK: [[NIL:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
   // CHECK: [[FN:%.*]] = function_ref @$s8literals21takesOptionalFunctionyyyycSgF
@@ -31,7 +31,7 @@ class CustomStringClass : ExpressibleByStringLiteral {
 
 class CustomStringSubclass : CustomStringClass {}
 
-// CHECK-LABEL: sil hidden @$s8literals27returnsCustomStringSubclassAA0cdE0CyF : $@convention(thin) () -> @owned CustomStringSubclass
+// CHECK-LABEL: sil hidden [ossa] @$s8literals27returnsCustomStringSubclassAA0cdE0CyF : $@convention(thin) () -> @owned CustomStringSubclass
 // CHECK: [[METATYPE:%.*]] = metatype $@thick CustomStringSubclass.Type
 // CHECK: [[UPCAST:%.*]] = upcast [[METATYPE]] : $@thick CustomStringSubclass.Type to $@thick CustomStringClass.Type
 // CHECK: [[CTOR:%.*]] = class_method [[UPCAST]] : $@thick CustomStringClass.Type, #CustomStringClass.init!allocator.1 : (CustomStringClass.Type) -> (String) -> CustomStringClass, $@convention(method) (@owned String, @thick CustomStringClass.Type) -> @owned CustomStringClass

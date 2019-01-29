@@ -94,6 +94,8 @@ enum class FileUnitKind {
   SerializedAST,
   /// An imported Clang module.
   ClangModule,
+  /// A Clang module imported from DWARF.
+  DWARFModule
 };
 
 enum class SourceFileKind {
@@ -283,6 +285,23 @@ public:
     Bits.ModuleDecl.TestingEnabled = enabled;
   }
 
+  // Returns true if this module is compiled with implicit dynamic.
+  bool isImplicitDynamicEnabled() const {
+    return Bits.ModuleDecl.ImplicitDynamicEnabled;
+  }
+  void setImplicitDynamicEnabled(bool enabled = true) {
+    Bits.ModuleDecl.ImplicitDynamicEnabled = enabled;
+  }
+
+  /// Returns true if this module was or is begin compile with
+  /// `-enable-private-imports`.
+  bool arePrivateImportsEnabled() const {
+    return Bits.ModuleDecl.PrivateImportsEnabled;
+  }
+  void setPrivateImportsEnabled(bool enabled = true) {
+    Bits.ModuleDecl.PrivateImportsEnabled = true;
+  }
+
   /// Returns true if there was an error trying to load this module.
   bool failedToLoad() const {
     return Bits.ModuleDecl.FailedToLoad;
@@ -367,6 +386,17 @@ public:
   /// ProtocolConformanceRef if it does conform.
   Optional<ProtocolConformanceRef>
   lookupConformance(Type type, ProtocolDecl *protocol);
+
+  /// Look for the conformance of the given existential type to the given
+  /// protocol.
+  Optional<ProtocolConformanceRef>
+  lookupExistentialConformance(Type type, ProtocolDecl *protocol);
+
+  /// Exposes TypeChecker functionality for querying protocol conformance.
+  /// Returns a valid ProtocolConformanceRef only if all conditional
+  /// requirements are successfully resolved.
+  Optional<ProtocolConformanceRef>
+  conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol);
 
   /// Find a member named \p name in \p container that was declared in this
   /// module.
@@ -492,7 +522,7 @@ public:
   /// Source locations are ignored here.
   static bool isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs);
 
-  /// \brief Get the path for the file that this module came from, or an empty
+  /// Get the path for the file that this module came from, or an empty
   /// string if this is not applicable.
   StringRef getModuleFilename() const;
 
@@ -844,11 +874,29 @@ public:
 
     /// This source file has access to testable declarations in the imported
     /// module.
-    Testable = 0x2
+    Testable = 0x2,
+
+    /// This source file has access to private declarations in the imported
+    /// module.
+    PrivateImport = 0x4,
   };
 
   /// \see ImportFlags
   using ImportOptions = OptionSet<ImportFlags>;
+
+  typedef std::pair<ImportOptions, StringRef> ImportOptionsAndFilename;
+
+  struct ImportedModuleDesc {
+    ModuleDecl::ImportedModule module;
+    ImportOptions importOptions;
+    StringRef filename;
+
+    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options)
+        : module(module), importOptions(options) {}
+    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
+                       StringRef filename)
+        : module(module), importOptions(options), filename(filename) {}
+  };
 
 private:
   std::unique_ptr<LookupCache> Cache;
@@ -857,7 +905,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
+  ArrayRef<ImportedModuleDesc> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -883,7 +931,7 @@ private:
   /// We only collect interface hash for primary input files.
   llvm::Optional<llvm::MD5> InterfaceHash;
 
-  /// \brief The ID for the memory buffer containing this file's source.
+  /// The ID for the memory buffer containing this file's source.
   ///
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
@@ -961,10 +1009,20 @@ public:
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false);
 
-  void
-  addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
+  void addImports(ArrayRef<ImportedModuleDesc> IM);
 
-  bool hasTestableImport(const ModuleDecl *module) const;
+  enum ImportQueryKind {
+    /// Return the results for testable or private imports.
+    TestableAndPrivate,
+    /// Return the results only for testable imports.
+    TestableOnly,
+    /// Return the results only for private imports.
+    PrivateOnly
+  };
+
+  bool
+  hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
+                             ImportQueryKind kind = TestableAndPrivate) const;
 
   void clearLookupCache();
 
@@ -993,6 +1051,8 @@ public:
 
   virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &results) const override;
+
+  virtual TypeDecl *lookupLocalType(llvm::StringRef MangledName) const override;
 
   virtual void
   getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;
@@ -1048,7 +1108,7 @@ public:
 
   void createReferencedNameTracker();
 
-  /// \brief The buffer ID for the file that was imported, or None if there
+  /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
   Optional<unsigned> getBufferID() const {
     if (BufferID == -1)
@@ -1066,7 +1126,7 @@ public:
   void dump() const;
   void dump(raw_ostream &os) const;
 
-  /// \brief Pretty-print the contents of this source file.
+  /// Pretty-print the contents of this source file.
   ///
   /// \param Printer The AST printer used for printing the contents.
   /// \param PO Options controlling the printing process.
@@ -1163,6 +1223,8 @@ public:
 
   bool shouldBuildSyntaxTree() const;
 
+  bool canBeParsedInFull() const;
+
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
@@ -1224,11 +1286,28 @@ protected:
     assert(classof(this) && "invalid kind");
   }
 
+  /// A map from private/fileprivate decls to the file they were defined in.
+  llvm::DenseMap<const ValueDecl *, Identifier> FilenameForPrivateDecls;
+
 public:
+
   /// Returns an arbitrary string representing the storage backing this file.
   ///
   /// This is usually a filesystem path.
   virtual StringRef getFilename() const;
+
+  void addFilenameForPrivateDecl(const ValueDecl *decl, Identifier id) {
+    assert(!FilenameForPrivateDecls.count(decl) ||
+           FilenameForPrivateDecls[decl] == id);
+    FilenameForPrivateDecls[decl] = id;
+  }
+
+  StringRef getFilenameForPrivateDecl(const ValueDecl *decl) {
+    auto it = FilenameForPrivateDecls.find(decl);
+    if (it == FilenameForPrivateDecls.end())
+      return StringRef();
+    return it->second.str();
+  }
 
   /// Look up an operator declaration.
   ///
@@ -1246,6 +1325,9 @@ public:
     return nullptr;
   }
 
+  /// Returns the Swift module that overlays a Clang module.
+  virtual ModuleDecl *getAdapterModule() const { return nullptr; }
+
   virtual bool isSystemModule() const { return false; }
 
   /// Retrieve the set of generic signatures stored within this module.
@@ -1259,7 +1341,8 @@ public:
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||
-           file->getKind() == FileUnitKind::ClangModule;
+           file->getKind() == FileUnitKind::ClangModule ||
+           file->getKind() == FileUnitKind::DWARFModule;
   }
   static bool classof(const DeclContext *DC) {
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));

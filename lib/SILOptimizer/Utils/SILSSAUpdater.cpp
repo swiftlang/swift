@@ -34,9 +34,9 @@ void SILSSAUpdater::deallocateSentinel(SILUndef *D) {
   AlignedFree(D);
 }
 
-SILSSAUpdater::SILSSAUpdater(SmallVectorImpl<SILPhiArgument *> *PHIs)
+SILSSAUpdater::SILSSAUpdater(SILModule &M, SmallVectorImpl<SILPhiArgument *> *PHIs)
     : AV(nullptr), PHISentinel(nullptr, deallocateSentinel),
-      InsertedPHIs(PHIs) {}
+      InsertedPHIs(PHIs), M(M) {}
 
 SILSSAUpdater::~SILSSAUpdater() = default;
 
@@ -44,7 +44,7 @@ void SILSSAUpdater::Initialize(SILType Ty) {
   ValType = Ty;
 
   PHISentinel = std::unique_ptr<SILUndef, void (*)(SILUndef *)>(
-      SILUndef::getSentinelValue(Ty, this), SILSSAUpdater::deallocateSentinel);
+      SILUndef::getSentinelValue(Ty, M, this), SILSSAUpdater::deallocateSentinel);
 
   if (!AV)
     AV.reset(new AvailableValsTy());
@@ -107,6 +107,20 @@ void SILSSAUpdater::RewriteUse(Operand &Op) {
            "The function_refs need to have the same value");
     SILInstruction *User = Op.getUser();
     auto *NewFR = cast<FunctionRefInst>(FR->clone(User));
+    Op.set(NewFR);
+    return;
+  } else if (auto *FR = dyn_cast<PreviousDynamicFunctionRefInst>(Op.get())) {
+    assert(areIdentical(*AV) &&
+           "The function_refs need to have the same value");
+    SILInstruction *User = Op.getUser();
+    auto *NewFR = cast<PreviousDynamicFunctionRefInst>(FR->clone(User));
+    Op.set(NewFR);
+    return;
+  } else if (auto *FR = dyn_cast<DynamicFunctionRefInst>(Op.get())) {
+    assert(areIdentical(*AV) &&
+           "The function_refs need to have the same value");
+    SILInstruction *User = Op.getUser();
+    auto *NewFR = cast<DynamicFunctionRefInst>(FR->clone(User));
     Op.set(NewFR);
     return;
   } else if (auto *IL = dyn_cast<IntegerLiteralInst>(Op.get()))
@@ -376,7 +390,7 @@ SILValue SILSSAUpdater::GetValueAtEndOfBlockInternal(SILBasicBlock *BB){
   return Impl.GetValue(BB);
 }
 
-/// \brief Construct a use wrapper. For branches we store information so that we
+/// Construct a use wrapper. For branches we store information so that we
 /// can reconstruct the use after the branch has been modified.
 ///
 /// When a branch is modified existing pointers to the operand

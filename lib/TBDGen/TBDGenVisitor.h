@@ -67,6 +67,7 @@ private:
   void addProtocolRequirementsBaseDescriptor(ProtocolDecl *proto);
   void addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType);
   void addAssociatedConformanceDescriptor(AssociatedConformance conformance);
+  void addBaseConformanceDescriptor(BaseConformance conformance);
 
 public:
   TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
@@ -85,7 +86,7 @@ public:
       addSymbol("main");
   }
 
-  /// \brief Adds the global symbols associated with the first file.
+  /// Adds the global symbols associated with the first file.
   void addFirstFileSymbols();
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);

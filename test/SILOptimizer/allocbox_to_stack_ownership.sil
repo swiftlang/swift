@@ -12,9 +12,9 @@ struct Bool {
 
 protocol Error {}
 
-// CHECK-LABEL: sil @simple_promotion
-sil @simple_promotion : $@convention(thin) (Int) -> Int {
-bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @simple_promotion
+sil [ossa] @simple_promotion : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
   store %0 to [trivial] %1a : $*Int
@@ -28,9 +28,9 @@ bb0(%0 : @trivial $Int):
 // CHECK: return
 }
 
-// CHECK-LABEL: sil @double_project_box
-sil @double_project_box : $@convention(thin) (Int) -> (Int, Int) {
-bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @double_project_box
+sil [ossa] @double_project_box : $@convention(thin) (Int) -> (Int, Int) {
+bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
   store %0 to [trivial] %1a : $*Int
@@ -48,8 +48,8 @@ bb0(%0 : @trivial $Int):
 // CHECK-NOT: destroy_value
 // CHECK: return
 }
-// CHECK-LABEL: sil @init_var
-sil @init_var : $@convention(thin) () -> Int {
+// CHECK-LABEL: sil [ossa] @init_var
+sil [ossa] @init_var : $@convention(thin) () -> Int {
 bb0:
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
@@ -65,8 +65,8 @@ bb0:
 // CHECK: return
 }
 
-// CHECK-LABEL: sil @multi_destroy_value
-sil @multi_destroy_value : $@convention(thin) () -> Int {
+// CHECK-LABEL: sil [ossa] @multi_destroy_value
+sil [ossa] @multi_destroy_value : $@convention(thin) () -> Int {
 bb0:
   %1 = alloc_box ${ var Int }
   %1a = mark_uninitialized [rootself] %1 : ${ var Int }
@@ -90,9 +90,9 @@ struct TestStruct {
   var Elt : Int
 }
 
-// CHECK-LABEL: sil @struct_tuple_element_addr
-sil @struct_tuple_element_addr : $@convention(thin) (Int) -> Int {
-bb1(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @struct_tuple_element_addr
+sil [ossa] @struct_tuple_element_addr : $@convention(thin) (Int) -> Int {
+bb1(%0 : $Int):
 // CHECK-DAG: [[STRUCT:%.*]] = alloc_stack $TestStruct
 // CHECK-DAG: [[TUPLE:%.*]] = alloc_stack $(Int, Int)
   %1 = alloc_box ${ var TestStruct }
@@ -118,10 +118,10 @@ bb1(%0 : @trivial $Int):
 // CHECK: return
 }
 
-sil @callee : $@convention(thin) (@inout Int) -> ()
+sil [ossa] @callee : $@convention(thin) (@inout Int) -> ()
 
-// CHECK-LABEL: sil @inout_nocapture
-sil @inout_nocapture : $@convention(thin) () -> Int {
+// CHECK-LABEL: sil [ossa] @inout_nocapture
+sil [ossa] @inout_nocapture : $@convention(thin) () -> Int {
 bb0:
   // CHECK: alloc_stack
   %1 = alloc_box ${ var Int }
@@ -140,10 +140,10 @@ bb0:
 protocol P {
 }
 
-sil @returns_protocol : $@convention(thin) () -> @out P
+sil [ossa] @returns_protocol : $@convention(thin) () -> @out P
 
-// CHECK-LABEL: sil @test_indirect_return
-sil @test_indirect_return : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @test_indirect_return
+sil [ossa] @test_indirect_return : $@convention(thin) () -> () {
 bb0:
   // CHECK: alloc_stack
   %1 = function_ref @returns_protocol : $@convention(thin) () -> @out P
@@ -158,8 +158,8 @@ bb0:
 
 class SomeClass {}
 
-// CHECK-LABEL: sil @class_promotion
-sil @class_promotion : $@convention(thin) (@owned SomeClass) -> @owned SomeClass {
+// CHECK-LABEL: sil [ossa] @class_promotion
+sil [ossa] @class_promotion : $@convention(thin) (@owned SomeClass) -> @owned SomeClass {
 bb0(%0 : @owned $SomeClass):
   %1 = alloc_box ${ var SomeClass }
   %1a = project_box %1 : ${ var SomeClass }, 0
@@ -180,8 +180,8 @@ protocol LogicValue {
 }
 
 // CHECK-LABEL: @protocols
-sil @protocols : $@convention(thin) (@in LogicValue, @thin Bool.Type) -> Bool {
-bb0(%0 : @trivial $*LogicValue, %1 : @trivial $@thin Bool.Type):
+sil [ossa] @protocols : $@convention(thin) (@in LogicValue, @thin Bool.Type) -> Bool {
+bb0(%0 : $*LogicValue, %1 : $@thin Bool.Type):
   %2 = alloc_box ${ var LogicValue }
   %2a = project_box %2 : ${ var LogicValue }, 0
 // CHECK:  %2 = alloc_stack $LogicValue
@@ -200,8 +200,8 @@ bb0(%0 : @trivial $*LogicValue, %1 : @trivial $@thin Bool.Type):
 // Generics test, which is address-only.
 class Generic<T> {}
 
-// CHECK-LABEL: sil @dealloc_box_test
-sil @dealloc_box_test : $@convention(thin) <T> () -> () {
+// CHECK-LABEL: sil [ossa] @dealloc_box_test
+sil [ossa] @dealloc_box_test : $@convention(thin) <T> () -> () {
 bb0:  // CHECK-NEXT: bb0:
       // CHECK-NEXT: alloc_stack
   %1 = alloc_box $<τ_0_0> { var Generic<τ_0_0> } <T>
@@ -220,11 +220,11 @@ enum SomeUnion {
 
 
 
-sil @$s1t9SomeUnionO1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
-sil @$s1t9SomeClassCCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
+sil [ossa] @$s1t9SomeUnionO1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
+sil [ossa] @$s1t9SomeClassCCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
 
-// CHECK-LABEL: sil @union_test
-sil @union_test : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @union_test
+sil [ossa] @union_test : $@convention(thin) () -> () {
 bb0:
 // CHECK: [[UNION:%.*]] = alloc_stack
   %1 = alloc_box ${ var SomeUnion }
@@ -244,9 +244,9 @@ bb0:
 // CHECK-NEXT:  return [[T0]] : $()
 }
 
-// CHECK-LABEL: sil @multiple_destroy_test
-sil @multiple_destroy_test : $@convention(thin) (Bool) -> Bool {
-bb0(%0 : @trivial $Bool):
+// CHECK-LABEL: sil [ossa] @multiple_destroy_test
+sil [ossa] @multiple_destroy_test : $@convention(thin) (Bool) -> Bool {
+bb0(%0 : $Bool):
   %1 = alloc_box ${ var Bool }
   %1a = project_box %1 : ${ var Bool }, 0
   store %0 to [trivial] %1a : $*Bool
@@ -270,8 +270,8 @@ bb0(%0 : @trivial $Bool):
 // Make sure that we can promote this box and dealloc_stack
 // on each path.
 //
-// CHECK-LABEL: sil @box_reachable_from_destroy_test
-sil @box_reachable_from_destroy_test : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @box_reachable_from_destroy_test
+sil [ossa] @box_reachable_from_destroy_test : $@convention(thin) () -> () {
 bb0:
   br bb1
 
@@ -298,7 +298,7 @@ bb3:
 
 
 
-sil @useSomeClass : $@convention(thin) (@owned SomeClass) -> ()
+sil [ossa] @useSomeClass : $@convention(thin) (@owned SomeClass) -> ()
 
 
 // <rdar://problem/16382973> DI misses destroy_addr because allocbox_to_stack isn't preserving mark_uninitialized invariants
@@ -310,9 +310,9 @@ public protocol My_Incrementable { }
 
 extension Int : My_Incrementable { }
 
-// CHECK-LABEL: sil @test_mui
-sil @test_mui : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+// CHECK-LABEL: sil [ossa] @test_mui
+sil [ossa] @test_mui : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
   %2 = alloc_box ${ var SomeClass }
   %2a = mark_uninitialized [var] %2 : ${ var SomeClass }
   %3 = project_box %2a : ${ var SomeClass }, 0
@@ -348,9 +348,9 @@ bb3:
   br bb2
 }
 
-// CHECK-LABEL: sil @$s6struct5apply1fS2iyc_tF
+// CHECK-LABEL: sil [ossa] @$s6struct5apply1fS2iyc_tF
 // struct.apply (f : () -> Swift.Int) -> Swift.Int
-sil @$s6struct5apply1fS2iyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> Int {
+sil [ossa] @$s6struct5apply1fS2iyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> Int {
 bb0(%0 : @owned $@callee_owned () -> Int):
   debug_value %0 : $@callee_owned () -> Int, let, name "f" // id: %1
   %1 = copy_value %0 : $@callee_owned () -> Int     // id: %2
@@ -359,18 +359,18 @@ bb0(%0 : @owned $@callee_owned () -> Int):
   return %3 : $Int                                // id: %5
 }
 
-// CHECK-LABEL: sil @$s6struct6escape1fSiycSiyc_tF
+// CHECK-LABEL: sil [ossa] @$s6struct6escape1fSiycSiyc_tF
 // struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
-sil @$s6struct6escape1fSiycSiyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int {
+sil [ossa] @$s6struct6escape1fSiycSiyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int {
 bb0(%0 : @owned $@callee_owned () -> Int):
   debug_value %0 : $@callee_owned () -> Int, let, name "f" // id: %1
   return %0 : $@callee_owned () -> Int            // id: %2
 }
 
-// CHECK-LABEL: sil @$s6struct8useStack1tySi_tF
+// CHECK-LABEL: sil [ossa] @$s6struct8useStack1tySi_tF
 // struct.useStack (t : Swift.Int) -> ()
-sil @$s6struct8useStack1tySi_tF : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @$s6struct8useStack1tySi_tF : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   debug_value %0 : $Int, let, name "t" // id: %1
   // CHECK: alloc_stack
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>, var, name "s"                   // users: %3, %6, %7, %7, %9
@@ -390,10 +390,10 @@ bb0(%0 : @trivial $Int):
   return %10 : $()                                // id: %11
 }
 
-// CHECK-LABEL: sil shared @$s6struct8useStack1tySi_tFSiycfU_Tf0s_n
-// CHECK-LABEL: sil private @$s6struct8useStack1tySi_tFSiycfU_
+// CHECK-LABEL: sil shared [ossa] @$s6struct8useStack1tySi_tFSiycfU_Tf0s_n
+// CHECK-LABEL: sil private [ossa] @$s6struct8useStack1tySi_tFSiycfU_
 // struct.(useStack (t : Swift.Int) -> ()).(closure #1)
-sil private @$s6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+sil private [ossa] @$s6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
@@ -409,10 +409,10 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
 // Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
 sil [transparent] @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0
 
-// CHECK-LABEL: sil @$s6struct6useBox1tySi_tF
+// CHECK-LABEL: sil [ossa] @$s6struct6useBox1tySi_tF
 // struct.useBox (t : Swift.Int) -> ()
-sil @$s6struct6useBox1tySi_tF : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @$s6struct6useBox1tySi_tF : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   debug_value %0 : $Int, let, name "t" // id: %1
   // CHECK: alloc_box
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>, var, name "s"                   // users: %3, %6, %7, %7, %10
@@ -431,9 +431,9 @@ bb0(%0 : @trivial $Int):
   return %11 : $()                                // id: %12
 }
 
-// CHECK-LABEL: sil private @$s6struct6useBox1tySi_tFSiycfU_
+// CHECK-LABEL: sil private [ossa] @$s6struct6useBox1tySi_tFSiycfU_
 // struct.(useBox (t : Swift.Int) -> ()).(closure #1)
-sil private @$s6struct6useBox1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+sil private [ossa] @$s6struct6useBox1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
@@ -449,9 +449,9 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
 // CHECK-LABEL: sil @closure
 sil @closure : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
 
-// CHECK-LABEL: sil @no_final_destroy
-sil @no_final_destroy : $@convention(thin) (Int) -> Bool {
-bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @no_final_destroy
+sil [ossa] @no_final_destroy : $@convention(thin) (Int) -> Bool {
+bb0(%0 : $Int):
   // This is not destroyed, but the unreachable makes the verifier not trip.
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
@@ -466,8 +466,8 @@ bb0(%0 : @trivial $Int):
   unreachable
 }
 
-// CHECK-LABEL: sil [transparent] [serialized] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> ()
-sil [transparent] [serialized] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> () {
+// CHECK-LABEL: sil [transparent] [serialized] [ossa] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> ()
+sil [transparent] [serialized] [ossa] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> () {
 // CHECK: bb0
 bb0(%0 : @owned $@callee_owned () -> @out U):
   debug_value %0 : $@callee_owned () -> @out U
@@ -482,10 +482,10 @@ bb0(%0 : @owned $@callee_owned () -> @out U):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil @callWithAutoclosure
-sil @callWithAutoclosure : $@convention(thin) <T where T : P> (@in T) -> () {
+// CHECK-LABEL: sil [ossa] @callWithAutoclosure
+sil [ossa] @callWithAutoclosure : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK: bb0
-bb0(%0 : @trivial $*T):
+bb0(%0 : $*T):
   // CHECK: debug_value_addr
   debug_value_addr %0 : $*T
   // CHECK: function_ref @mightApply
@@ -509,10 +509,10 @@ bb0(%0 : @trivial $*T):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil shared @$s21closure_to_specializeTf0ns_n : $@convention(thin) <T where T : P> (@inout_aliasable T) -> @out T
-sil shared @closure_to_specialize : $@convention(thin) <T where T : P> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
+// CHECK-LABEL: sil shared [ossa] @$s21closure_to_specializeTf0ns_n : $@convention(thin) <T where T : P> (@inout_aliasable T) -> @out T
+sil shared [ossa] @closure_to_specialize : $@convention(thin) <T where T : P> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
 // CHECK: bb0
-bb0(%0 : @trivial $*T, %1 : @owned $<τ_0_0> { var τ_0_0 } <T>):
+bb0(%0 : $*T, %1 : @owned $<τ_0_0> { var τ_0_0 } <T>):
   %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
   // CHECK-NEXT: copy_addr
   copy_addr %2 to [initialization] %0 : $*T
@@ -533,14 +533,14 @@ struct Q : Count {
 }
 
 struct S<T : Count> {
-  @sil_stored var t: T
+  @_hasStorage var t: T
   var count: Int { get }
   func test(i: Int) -> Bool
   init(t: T)
 }
 
-// CHECK-LABEL: sil [noinline] @inner
-sil [noinline] @inner : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool {
+// CHECK-LABEL: sil [noinline] [ossa] @inner
+sil [noinline] [ossa] @inner : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool {
 // CHECK: bb0
 bb0(%0 : @owned $@callee_owned () -> Bool):
   debug_value %0 : $@callee_owned () -> Bool
@@ -551,8 +551,8 @@ bb0(%0 : @owned $@callee_owned () -> Bool):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil [noinline] @outer
-sil [noinline] @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool {
+// CHECK-LABEL: sil [noinline] [ossa] @outer
+sil [noinline] [ossa] @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool {
 // CHECK: bb0
 bb0(%0 : @owned $@callee_owned () -> Bool):
   debug_value %0 : $@callee_owned () -> Bool
@@ -566,10 +566,10 @@ bb0(%0 : @owned $@callee_owned () -> Bool):
 // CHECK-LABEL: sil @get
 sil @get : $@convention(method) <T where T : Count> (@in S<T>) -> Int
 
-// CHECK-LABEL: sil shared @specialized
-sil shared @specialized : $@convention(method) (Int, @in S<Q>) -> Bool {
+// CHECK-LABEL: sil shared [ossa] @specialized
+sil shared [ossa] @specialized : $@convention(method) (Int, @in S<Q>) -> Bool {
 // CHECK: bb0
-bb0(%0 : @trivial $Int, %1 : @trivial $*S<Q>):
+bb0(%0 : $Int, %1 : $*S<Q>):
   debug_value %0 : $Int
   debug_value_addr %1 : $*S<Q>
   %4 = function_ref @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
@@ -584,10 +584,10 @@ bb0(%0 : @trivial $Int, %1 : @trivial $*S<Q>):
   return %9 : $Bool
 }
 
-// CHECK-LABEL: sil @unspecialized
-sil @unspecialized : $@convention(method) <T where T : Count> (Int, @in S<T>) -> Bool {
+// CHECK-LABEL: sil [ossa] @unspecialized
+sil [ossa] @unspecialized : $@convention(method) <T where T : Count> (Int, @in S<T>) -> Bool {
 // CHECK: bb0
-bb0(%0 : @trivial $Int, %1 : @trivial $*S<T>):
+bb0(%0 : $Int, %1 : $*S<T>):
   debug_value %0 : $Int
   debug_value_addr %1 : $*S<T>
   %4 = function_ref @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
@@ -602,10 +602,10 @@ bb0(%0 : @trivial $Int, %1 : @trivial $*S<T>):
   return %9 : $Bool
 }
 
-// CHECK-LABEL: sil shared @closure1
-sil shared @closure1 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
+// CHECK-LABEL: sil shared [ossa] @closure1
+sil shared [ossa] @closure1 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
 // CHECK: bb0
-bb0(%0 : @trivial $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
+bb0(%0 : $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
   %2 = project_box %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>, 0
   %3 = function_ref @inner : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   %4 = function_ref @closure2 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <τ_0_0>) -> Bool
@@ -619,15 +619,15 @@ bb0(%0 : @trivial $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_
   return %8 : $Bool
 }
 
-// CHECK-LABEL: sil shared @$s8closure2Tf0ns_n
+// CHECK-LABEL: sil shared [ossa] @$s8closure2Tf0ns_n
 // CHECK: bb0
 // CHECK: return
 // CHECK-NOT: bb1
 
-// CHECK-LABEL: sil shared @closure2
-sil shared @closure2 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
+// CHECK-LABEL: sil shared [ossa] @closure2
+sil shared [ossa] @closure2 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
 // CHECK: bb0
-bb0(%0 : @trivial $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
+bb0(%0 : $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
   %2 = project_box %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>, 0
   %3 = function_ref @binary : $@convention(thin) (Int, Int) -> Bool
   %4 = alloc_stack $S<T>
@@ -644,10 +644,10 @@ bb0(%0 : @trivial $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_
 // CHECK-LABEL: sil [transparent] [serialized] @binary
 sil [transparent] [serialized] @binary : $@convention(thin) (Int, Int) -> Bool
 
-// CHECK-LABEL: sil @destroy_stack_value_after_closure
-sil @destroy_stack_value_after_closure : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK-LABEL: sil [ossa] @destroy_stack_value_after_closure
+sil [ossa] @destroy_stack_value_after_closure : $@convention(thin) <T> (@in T) -> @out T {
 // CHECK: bb0
-bb0(%0 : @trivial $*T, %1 : @trivial $*T):
+bb0(%0 : $*T, %1 : $*T):
   // CHECK: [[STACK:%.*]] = alloc_stack
   // CHECK: copy_addr %1 to [initialization] [[STACK]]
   // CHECK: [[APPLIED:%.*]] = function_ref
@@ -673,7 +673,7 @@ bb0(%0 : @trivial $*T, %1 : @trivial $*T):
   return %13 : $()
 }
 
-sil @applied : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <T>) -> () {
+sil [ossa] @applied : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <T>) -> () {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <T>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <T>, 0
   %2 = function_ref @consume : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
@@ -687,7 +687,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <T>):
 }
 
 sil hidden [noinline] @consume : $@convention(thin) <T> (@in T) -> () {
-bb0(%0 : @trivial $*T):
+bb0(%0 : $*T):
   debug_value_addr %0 : $*T
   destroy_addr %0 : $*T
   %3 = tuple ()
@@ -703,13 +703,13 @@ class ThrowDerivedClass : ThrowBaseClass {
   //final init(failBeforeFullInitialization: Int) throws
 }
 
-sil @throwing_unwrap : $@convention(thin) (Int) -> (Int, @error Error)
-sil @fake_throwing_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error)
+sil [ossa] @throwing_unwrap : $@convention(thin) (Int) -> (Int, @error Error)
+sil [ossa] @fake_throwing_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error)
 
-sil hidden @try_apply_during_chaining_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+sil hidden [ossa] @try_apply_during_chaining_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
 // %0                                             // users: %11, %5
 // %1                                             // user: %7
-bb0(%0 : @trivial $Int, %1 : @owned $ThrowDerivedClass):
+bb0(%0 : $Int, %1 : @owned $ThrowDerivedClass):
   %2 = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   %3 = mark_uninitialized [delegatingself] %2 : ${ var ThrowDerivedClass }
   %4 = project_box %3 : ${ var ThrowDerivedClass }, 0
@@ -720,7 +720,7 @@ bb0(%0 : @trivial $Int, %1 : @owned $ThrowDerivedClass):
   try_apply %10(%0) : $@convention(thin) (Int) -> (Int, @error Error), normal bb1, error bb3
 
 // %12                                            // user: %13
-bb1(%12 : @trivial $Int):                                  // Preds: bb0
+bb1(%12 : $Int):                                  // Preds: bb0
   try_apply %9(%12, %8) : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error), normal bb2, error bb4
 
 // %14                                            // user: %15
@@ -745,8 +745,8 @@ bb5(%25 : @owned $Error):                                // Preds: bb4 bb3
   throw %25 : $Error
 }
 
-// CHECK-LABEL: sil @deal_with_wrong_nesting
-// CHECK:      bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @deal_with_wrong_nesting
+// CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:      bb1:
@@ -761,8 +761,8 @@ bb5(%25 : @owned $Error):                                // Preds: bb4 bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-sil @deal_with_wrong_nesting : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @deal_with_wrong_nesting : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   %as1 = alloc_stack $Bool
   %1 = alloc_box ${ var Int }
   cond_br undef, bb1, bb2
@@ -787,8 +787,8 @@ bb3:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @wrong_nesting_with_alloc_ref
-// CHECK:      bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @wrong_nesting_with_alloc_ref
+// CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[REF:%[0-9]+]] = alloc_ref [stack] $SomeClass
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:        store
@@ -796,8 +796,8 @@ bb3:
 // CHECK-NEXT:   dealloc_ref [stack] [[REF]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-sil @wrong_nesting_with_alloc_ref : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @wrong_nesting_with_alloc_ref : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   %as1 = alloc_ref [stack] $SomeClass
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
@@ -809,11 +809,13 @@ bb0(%0 : @trivial $Int):
   return %r : $()
 }
 
-// CHECK-LABEL: sil @nesting_and_unreachable1
-// CHECK:      bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @nesting_and_unreachable1
+// CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:      bb1:
+// CHECK-NEXT:   dealloc_stack [[BOX]]
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
 // CHECK-NEXT:   unreachable
@@ -823,8 +825,8 @@ bb0(%0 : @trivial $Int):
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-sil @nesting_and_unreachable1 : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @nesting_and_unreachable1 : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   %as1 = alloc_stack $Bool
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
@@ -844,8 +846,8 @@ bb2:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @nesting_and_unreachable2
-// CHECK:      bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @nesting_and_unreachable2
+// CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:      bb1:
@@ -860,8 +862,8 @@ bb2:
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-sil @nesting_and_unreachable2 : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @nesting_and_unreachable2 : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   %as1 = alloc_stack $Bool
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
@@ -882,8 +884,8 @@ bb2:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @nesting_and_unreachable3
-// CHECK:      bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @nesting_and_unreachable3
+// CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT:   [[STACK:%[0-9]+]] = alloc_stack $Bool
 // CHECK:      bb1:
@@ -896,8 +898,8 @@ bb2:
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-sil @nesting_and_unreachable3 : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @nesting_and_unreachable3 : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %as1 = alloc_stack $Bool
   %1a = project_box %1 : ${ var Int }, 0
@@ -916,8 +918,8 @@ bb2:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @nesting_and_unreachable4
-// CHECK:      bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @nesting_and_unreachable4
+// CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:      bb1:
 // CHECK-NEXT:   unreachable
@@ -926,8 +928,8 @@ bb2:
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-sil @nesting_and_unreachable4 : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @nesting_and_unreachable4 : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
   cond_br undef, bb1, bb2
@@ -943,10 +945,11 @@ bb2:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @nesting_and_unreachable5
-// CHECK:      bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @nesting_and_unreachable5
+// CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:      bb1:
+// CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   {{.*}} = alloc_stack $Bool
 // CHECK-NEXT:   {{.*}} = alloc_stack $Bool
 // CHECK-NEXT:   unreachable
@@ -955,8 +958,8 @@ bb2:
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-sil @nesting_and_unreachable5 : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @nesting_and_unreachable5 : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
   cond_br undef, bb1, bb2
@@ -974,8 +977,8 @@ bb2:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @nesting_and_unreachable_critical_edge
-// CHECK:      bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @nesting_and_unreachable_critical_edge
+// CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   cond_br
@@ -999,8 +1002,8 @@ bb2:
 // CHECK:      bb5:
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   unreachable
-sil @nesting_and_unreachable_critical_edge : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @nesting_and_unreachable_critical_edge : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %as1 = alloc_stack $Bool
   %1a = project_box %1 : ${ var Int }, 0
@@ -1029,8 +1032,8 @@ bb3:
 // is folded into
 //  begin_access [deinit], copy_addr [take], end_access
 //
-// CHECK-LABEL: sil @deinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
-// CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $*T, %2 : @trivial $*T):
+// CHECK-LABEL: sil [ossa] @deinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
+// CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK: [[STK:%.*]] = alloc_stack $T, var, name "x"
 // CHECK: copy_addr %2 to [initialization] [[STK]] : $*T
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*T
@@ -1044,7 +1047,7 @@ bb3:
 // CHECK: destroy_addr %2 : $*T
 // CHECK: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'deinit_access'
-sil @deinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
+sil [ossa] @deinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
 bb0(%0 : @owned $*T, %1 : @owned $*T, %2 : @owned $*T):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>, var, name "x"
   %5 = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
@@ -1066,8 +1069,8 @@ bb0(%0 : @owned $*T, %1 : @owned $*T, %2 : @owned $*T):
 // is *not* folded into
 //  begin_access [deinit], copy_addr [take], end_access
 //
-// CHECK-LABEL: sil @nodeinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
-// CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $*T, %2 : @trivial $*T):
+// CHECK-LABEL: sil [ossa] @nodeinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
+// CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK: [[STK:%.*]] = alloc_stack $T, var, name "x"
 // CHECK: copy_addr %2 to [initialization] [[STK]] : $*T
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*T
@@ -1083,7 +1086,7 @@ bb0(%0 : @owned $*T, %1 : @owned $*T, %2 : @owned $*T):
 // CHECK: destroy_addr %2 : $*T
 // CHECK: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'nodeinit_access'
-sil @nodeinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
+sil [ossa] @nodeinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
 bb0(%0 : @owned $*T, %1 : @owned $*T, %2 : @owned $*T):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>, var, name "x"
   %5 = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0

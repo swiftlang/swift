@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 //
 // REQUIRES: CPU=i386 || CPU=x86_64
+// UNSUPPORTED: OS=windows-msvc
 //
 // These are tests for diagnostics produced by constant propagation pass
 // on floating-point operations that are specific to x86 architectures,

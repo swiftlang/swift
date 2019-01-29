@@ -30,7 +30,7 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   case 4:
     _debugPreconditionFailure("cannot happen")
   case 5:
-    _sanityCheckFailure("cannot happen")
+    _internalInvariantFailure("cannot happen")
 
   default:
     return 0
@@ -196,26 +196,26 @@ Assert.test("_debugPreconditionFailure")
   _debugPreconditionFailure("this should fail")
 }
 
-Assert.test("_sanityCheck")
+Assert.test("_internalInvariant")
   .xfail(.custom(
     { !_isStdlibInternalChecksEnabled() },
-    reason: "sanity checks are disabled in this build of stdlib"))
+    reason: "internal invariant checks are disabled in this build of stdlib"))
   .crashOutputMatches("this should fail")
   .code {
   var x = 2
-  _sanityCheck(x * 21 == 42, "should not fail")
+  _internalInvariant(x * 21 == 42, "should not fail")
   expectCrashLater()
-  _sanityCheck(x == 42, "this should fail")
+  _internalInvariant(x == 42, "this should fail")
 }
 
-Assert.test("_sanityCheckFailure")
+Assert.test("_internalInvariantFailure")
   .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches("this should fail")
   .code {
   expectCrashLater()
-  _sanityCheckFailure("this should fail")
+  _internalInvariantFailure("this should fail")
 }
 
 runAllTests()

@@ -29,7 +29,7 @@ struct ParseableInterfaceOptions {
   std::string ParseableInterfaceFlags;
 };
 
-llvm::Regex getSwiftInterfaceToolsVersionRegex();
+llvm::Regex getSwiftInterfaceFormatVersionRegex();
 llvm::Regex getSwiftInterfaceModuleFlagsRegex();
 
 /// Emit a stable, parseable interface for \p M, which can be used by a client
@@ -49,6 +49,11 @@ bool emitParseableInterface(raw_ostream &out,
                             ParseableInterfaceOptions const &Opts,
                             ModuleDecl *M);
 
+/// Extract the specified-or-defaulted -module-cache-path that winds up in
+/// the clang importer, for reuse as the .swiftmodule cache path when
+/// building a ParseableInterfaceModuleLoader.
+std::string
+getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and \c
 /// CompilerInstance to convert .swiftinterface files to .swiftmodule
@@ -56,33 +61,56 @@ bool emitParseableInterface(raw_ostream &out,
 /// directory, and loading the serialized .swiftmodules from there.
 class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   explicit ParseableInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
-                                          DependencyTracker *tracker)
-    : SerializedModuleLoaderBase(ctx, tracker),
-      CacheDir(cacheDir)
+                                          StringRef prebuiltCacheDir,
+                                          DependencyTracker *tracker,
+                                          ModuleLoadingMode loadMode)
+    : SerializedModuleLoaderBase(ctx, tracker, loadMode),
+      CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir)
   {}
 
   std::string CacheDir;
+  std::string PrebuiltCacheDir;
 
-  void
-  configureSubInvocationAndOutputPaths(CompilerInvocation &SubInvocation,
-                                       StringRef InPath,
-                                       llvm::SmallString<128> &OutPath,
-                                       llvm::SmallString<128> &DepPath);
+  /// Wire up the SubInvocation's InputsAndOutputs to contain both input and
+  /// output filenames.
+  ///
+  /// This is a method rather than a helper function in the implementation file
+  /// because it accesses non-public bits of FrontendInputsAndOutputs.
+  static void configureSubInvocationInputsAndOutputs(
+    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath);
 
-  std::error_code
-  openModuleFiles(StringRef DirName, StringRef ModuleFilename,
-                  StringRef ModuleDocFilename,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-                  llvm::SmallVectorImpl<char> &Scratch) override;
+  static bool buildSwiftModuleFromSwiftInterface(
+    clang::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
+    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
+    StringRef ModuleCachePath, DependencyTracker *OuterTracker,
+    bool ShouldSerializeDeps);
+
+  std::error_code findModuleFilesInDirectory(
+      AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
+      StringRef ModuleDocFilename,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
 
 public:
   static std::unique_ptr<ParseableInterfaceModuleLoader>
-  create(ASTContext &ctx, StringRef cacheDir,
-         DependencyTracker *tracker = nullptr) {
+  create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
+         DependencyTracker *tracker, ModuleLoadingMode loadMode) {
     return std::unique_ptr<ParseableInterfaceModuleLoader>(
-        new ParseableInterfaceModuleLoader(ctx, cacheDir, tracker));
+        new ParseableInterfaceModuleLoader(ctx, cacheDir, prebuiltCacheDir,
+                                           tracker, loadMode));
   }
+
+  /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
+  /// a swiftmodule file).
+  ///
+  /// A simplified version of the core logic in #openModuleFiles, mostly for
+  /// testing purposes.
+  static bool buildSwiftModuleFromSwiftInterface(ASTContext &Ctx,
+                                                 StringRef CacheDir,
+                                                 StringRef PrebuiltCacheDir,
+                                                 StringRef ModuleName,
+                                                 StringRef InPath,
+                                                 StringRef OutPath);
 };
 
 

@@ -23,7 +23,7 @@
 
 using namespace swift;
 
-/// \brief Return true if the operand of the cond_fail instruction looks like
+/// Return true if the operand of the cond_fail instruction looks like
 /// the overflow bit of an arithmetic instruction.
 static bool hasOverflowConditionOperand(CondFailInst *CFI) {
   if (auto *TEI = dyn_cast<TupleExtractInst>(CFI->getOperand()))
@@ -84,7 +84,7 @@ public:
     }
   }
 
-  /// \brief Try to merge the cond_fail instructions. Returns true if any could
+  /// Try to merge the cond_fail instructions. Returns true if any could
   /// be merge.
   bool mergeCondFails(SmallVectorImpl<CondFailInst *> &CondFailToMerge) {
     assert(CondFailToMerge.size() > 1 &&

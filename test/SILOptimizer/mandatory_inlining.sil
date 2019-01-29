@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -module-name mandatory_inlining -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
 import Builtin
 import Swift
@@ -17,7 +17,7 @@ extension P2 {
 
 struct L {
   var start: Int32 { get }
-  @sil_stored let o: P2
+  @_hasStorage let o: P2
   init(o: P2)
 }
 
@@ -353,19 +353,13 @@ sil @inline_test_control_flow : $@convention(thin) (Float) -> Float {
 
 // CHECK: [[BB5]]:
   // CHECK: [[VAL50:%.*]] = load [[PB16]]
-  // CHECK: br [[BB6:.*]]([[VAL50]]
-
-// CHECK: [[BB6]]([[VAL52:%.*]] : $Float):
   // CHECK: strong_release [[VAL16]]
   // CHECK: strong_release [[VAL15]]
-  // CHECK: br [[BB7:.*]]([[VAL52]]
-
-// CHECK: [[BB7]]([[VAL56:%.*]] : $Float):
   // CHECK: [[VAL57:%.*]] = function_ref @convertFromBuiltinFloatLiteral
   // CHECK: [[VAL58:%.*]] = metatype $@thin Float.Type
   // CHECK: [[VAL59:%.*]] = float_literal $Builtin.FPIEEE64, 0x4008000000000000
   // CHECK: [[VAL60:%.*]] = apply [[VAL57]]([[VAL59]], [[VAL58]])
-  // CHECK: [[VAL61:%.*]] = apply [[VAL3]]([[VAL56]], [[VAL60]])
+  // CHECK: [[VAL61:%.*]] = apply [[VAL3]]([[VAL50]], [[VAL60]])
   // CHECK: strong_release [[VAL1]]
   // CHECK: return [[VAL61]]
 
@@ -512,22 +506,12 @@ bb0(%0 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeOb
 // CHECK-LABEL: sil [transparent] @test_partial_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
 // CHECK:   [[FN:%.*]] = function_ref @test_partial_nativeobject_baz :
-// CHECK:   br bb1
-//
-// CHECK: bb1:
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   strong_retain [[ARG]]
 // CHECK:   [[PAI:%.*]] = partial_apply [[FN]]([[ARG]])
-// CHECK:   br bb2
-//
-// CHECK: bb2:
 // CHECK:   strong_retain [[ARG]]
-// CHECK:   strong_retain [[PAI]]
-// CHECK:   strong_retain [[ARG]]
-// CHECK:   strong_release [[PAI]]
 // CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
 // CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG]], [[ARG]])
-//
-// CHECK: bb3:
 // CHECK:   strong_retain [[PAI]]
 // CHECK:   [[OPAQUE_FN:%.*]] = function_ref @partial_apply_user
 // CHECK:   apply [[OPAQUE_FN]]([[PAI]])
@@ -611,7 +595,6 @@ bb0(%0 : ${ var Bool }):
 sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
 
 // CHECK-LABEL: sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
-
   // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 
 // CHECK: bb1:
@@ -622,18 +605,14 @@ sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: strong_retain [[OLD_CALLEE]]
   // Separation marker
   // CHECK: integer_literal $Builtin.Int32, 3
-  // CHECK: strong_retain [[VAL4:%[0-9]*]]
-  // CHECK: strong_release [[OLD_CALLEE]]
-  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
+  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4:%.*]] :
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
   // CHECK: strong_release [[VAL4]]
+  // CHECK: strong_release [[OLD_CALLEE]]
   // CHECK: br [[BB3]](
 
 // CHECK: [[BB3]](
-  // CHECK: br [[BB4:.*]](
-
-// CHECK: [[BB4]](
   // CHECK: strong_release [[VAL4]]
   // CHECK: return {{.*}}
 
@@ -672,18 +651,14 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: strong_retain [[OLD_CALLEE]]
   // Marker -
   // CHECK: integer_literal $Builtin.Int32, 3
-  // CHECK: strong_retain [[VAL4:%[0-9]*]]
-  // CHECK: strong_release [[OLD_CALLEE]]
-  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
+  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4:%[0-9]+]]
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
   // CHECK: strong_release [[VAL4]]
+  // CHECK: strong_release [[OLD_CALLEE]]
   // CHECK: br [[BB3]](
 
 // CHECK: [[BB3]](
-  // CHECK: br [[BB4:.*]](
-
-// CHECK: [[BB4]](
   // CHECK: strong_release [[VAL3]]
   // CHECK: return {{.*}}
 
@@ -1107,10 +1082,10 @@ bb0(%0 : $C):
 // CHECK-LABEL: sil @test_guaranteed_closure_capture
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK:   strong_retain [[ARG]] : $C
-// @guaranteed closure captures *don't* release the capture in the closure implementation.
-// CHECK-NOT:   strong_retain [[ARG]] : $C
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
 // CHECK:   apply [[F]]([[ARG]])
+// CHECK:   strong_release [[ARG]]
 // CHECK:   strong_release [[ARG]]
 // CHECK:   return
 sil @test_guaranteed_closure_capture : $@convention(thin) (@guaranteed C) -> () {
@@ -1126,12 +1101,12 @@ bb0(%0: $C):
 
 // CHECK-LABEL: sil @test_guaranteed_closure_capture2
 // CHECK: bb0([[ARG:%.*]] : $C):
-// @guaranteed closure captures *don't* release the capture in the closure implementation.
 // CHECK:   strong_retain [[ARG]] : $C
-// CHECK:   strong_release [[ARG]] : $C
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
 // CHECK:   apply [[F]]([[ARG]])
-// CHECK-NOT:   strong_release [[ARG]]
+// CHECK:   strong_release [[ARG]] : $C
+// CHECK:   strong_release [[ARG]] : $C
 // CHECK:   return
 sil @test_guaranteed_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0: $C):
@@ -1146,11 +1121,11 @@ bb0(%0: $C):
 // CHECK-LABEL: sil @test_unowned_closure_capture2
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK:   strong_retain [[ARG]]
-// CHECK:   strong_release [[ARG]]
-// CHECK-NOT: strong_release [[ARG]]
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c_unowned
 // CHECK:   apply [[F]]([[ARG]]) : $@convention(thin) (C) -> ()
-// CHECK-NOT: strong_release [[ARG]]
+// CHECK:   strong_release [[ARG]]
+// CHECK:   strong_release [[ARG]]
 // CHECK:   return
 sil @test_unowned_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0: $C):
@@ -1203,4 +1178,23 @@ bb0:
   %2 = thin_to_thick_function %1 : $@convention(thin) @noescape () -> Builtin.Int32 to $@noescape () -> Builtin.Int32
   %3 = apply %2() : $@noescape () -> Builtin.Int32
   return %3 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @test_guaranteed_on_stack_closure
+// CHECK:  strong_retain %0 : $C
+// CHECK:  [[F:%.*]] = function_ref @use_c : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:  apply [[F]](%0) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:  strong_release %0 : $C
+// CHECK: return
+sil @test_guaranteed_on_stack_closure : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [on_stack] [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  %closure2 = mark_dependence %closure : $@noescape @callee_guaranteed () -> () on %0 : $C
+  apply %closure2() : $@noescape @callee_guaranteed () -> ()
+  strong_release %0: $C
+  dealloc_stack %closure : $@noescape @callee_guaranteed () -> ()
+  %tuple = tuple()
+  return %tuple : $()
 }

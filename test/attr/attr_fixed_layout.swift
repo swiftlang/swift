@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -typecheck -swift-version 4.2 -verify -dump-ast -enable-resilience %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-ON %s
-// RUN: %target-swift-frontend -typecheck -swift-version 4.2 -verify -dump-ast -enable-resilience -enable-testing %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-ON %s
-// RUN: not %target-swift-frontend -typecheck -swift-version 4.2 -dump-ast %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-OFF %s
-// RUN: not %target-swift-frontend -typecheck -swift-version 4.2 -dump-ast %s -enable-testing 2>&1 | %FileCheck --check-prefix=RESILIENCE-OFF %s
+// RUN: %target-swift-frontend -typecheck -swift-version 4.2 -verify -dump-ast -enable-resilience %s | %FileCheck --check-prefix=RESILIENCE-ON %s
+// RUN: %target-swift-frontend -typecheck -swift-version 4.2 -verify -dump-ast -enable-resilience -enable-testing %s | %FileCheck --check-prefix=RESILIENCE-ON %s
+// RUN: not %target-swift-frontend -typecheck -swift-version 4.2 -dump-ast %s | %FileCheck --check-prefix=RESILIENCE-OFF %s
+// RUN: not %target-swift-frontend -typecheck -swift-version 4.2 -dump-ast %s -enable-testing | %FileCheck --check-prefix=RESILIENCE-OFF %s
 
 //
 // Public types with @_fixed_layout are always fixed layout
@@ -70,23 +70,23 @@ struct Rectangle {
 
 
 @_fixed_layout public struct BadFields1 {
-  private var field: PrivateStruct // expected-error {{type referenced from a stored property in a @_fixed_layout struct must be '@usableFromInline' or public}}
+  private var field: PrivateStruct // expected-error {{type referenced from a stored property in a '@_fixed_layout' struct must be '@usableFromInline' or public}}
 }
 
 @_fixed_layout public struct BadFields2 {
-  private var field: PrivateStruct? // expected-error {{type referenced from a stored property in a @_fixed_layout struct must be '@usableFromInline' or public}}
+  private var field: PrivateStruct? // expected-error {{type referenced from a stored property in a '@_fixed_layout' struct must be '@usableFromInline' or public}}
 }
 
 @_fixed_layout public struct BadFields3 {
-  internal var field: InternalStruct? // expected-error {{type referenced from a stored property in a @_fixed_layout struct must be '@usableFromInline' or public}}
+  internal var field: InternalStruct? // expected-error {{type referenced from a stored property in a '@_fixed_layout' struct must be '@usableFromInline' or public}}
 }
 
 @_fixed_layout @usableFromInline struct BadFields4 {
-  internal var field: InternalStruct? // expected-error {{type referenced from a stored property in a @_fixed_layout struct must be '@usableFromInline' or public}}
+  internal var field: InternalStruct? // expected-error {{type referenced from a stored property in a '@_fixed_layout' struct must be '@usableFromInline' or public}}
 }
 
 @_fixed_layout public struct BadFields5 {
-  private var field: PrivateStruct? { // expected-error {{type referenced from a stored property in a @_fixed_layout struct must be '@usableFromInline' or public}}
+  private var field: PrivateStruct? { // expected-error {{type referenced from a stored property in a '@_fixed_layout' struct must be '@usableFromInline' or public}}
     didSet {}
   }
 }
@@ -94,7 +94,7 @@ struct Rectangle {
 // expected-warning@+1 {{the result of a '@usableFromInline' function should be '@usableFromInline' or public}}
 @usableFromInline func notReallyUsableFromInline() -> InternalStruct? { return nil }
 @_fixed_layout public struct BadFields6 {
-  private var field = notReallyUsableFromInline() // expected-error {{type referenced from a stored property with inferred type 'InternalStruct?' in a @_fixed_layout struct must be '@usableFromInline' or public}}
+  private var field = notReallyUsableFromInline() // expected-error {{type referenced from a stored property with inferred type 'InternalStruct?' in a '@_fixed_layout' struct must be '@usableFromInline' or public}}
 }
 
 @_fixed_layout public struct OKFields {

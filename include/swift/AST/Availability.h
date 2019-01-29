@@ -329,11 +329,11 @@ public:
 
   static AvailabilityContext inferForType(Type t);
 
-  /// \brief Returns the context where a declaration is available
+  /// Returns the context where a declaration is available
   ///  We assume a declaration without an annotation is always available.
   static AvailabilityContext availableRange(const Decl *D, ASTContext &C);
 
-  /// \brief Returns the context for which the declaration
+  /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.
   static Optional<AvailabilityContext> annotatedAvailableRange(const Decl *D,

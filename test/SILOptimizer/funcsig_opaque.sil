@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -assume-parsing-unqualified-ownership-sil -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-opaque-values -function-signature-opts %s | %FileCheck %s
 
 import Builtin
 

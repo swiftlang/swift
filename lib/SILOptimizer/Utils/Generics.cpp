@@ -364,10 +364,17 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
 // ReabstractionInfo
 // =============================================================================
 
-static bool shouldNotSpecializeCallee(SILFunction *Callee,
-                                      SubstitutionMap Subs = {}) {
+static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
+                                SubstitutionMap Subs = {}) {
   if (Callee->hasSemanticsAttr("optimize.sil.specialize.generic.never"))
     return true;
+
+  if (Caller &&
+      Caller->getEffectiveOptimizationMode() == OptimizationMode::ForSize &&
+      Callee->hasSemanticsAttr("optimize.sil.specialize.generic.size.never")) {
+    return true;
+  }
+
 
   if (Subs.hasAnySubstitutableParams() &&
       Callee->hasSemanticsAttr("optimize.sil.specialize.generic.partial.never"))
@@ -383,7 +390,7 @@ static bool shouldNotSpecializeCallee(SILFunction *Callee,
 bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                                         SubstitutionMap ParamSubs,
                                         OptRemark::Emitter *ORE) {
-  if (shouldNotSpecializeCallee(Callee))
+  if (shouldNotSpecialize(Callee, Apply ? Apply.getFunction() : nullptr))
     return false;
 
   SpecializedGenericEnv = nullptr;
@@ -489,7 +496,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
       return false;
 
     // Bail if the callee should not be partially specialized.
-    if (shouldNotSpecializeCallee(Callee, ParamSubs))
+    if (shouldNotSpecialize(Callee, Apply.getFunction(), ParamSubs))
       return false;
   }
 
@@ -1763,7 +1770,7 @@ checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
 /// This constructor is used when processing @_specialize.
 ReabstractionInfo::ReabstractionInfo(SILFunction *Callee,
                                      ArrayRef<Requirement> Requirements) {
-  if (shouldNotSpecializeCallee(Callee))
+  if (shouldNotSpecialize(Callee, nullptr))
     return;
 
   // Perform some sanity checks for the requirements.
@@ -1867,7 +1874,7 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
           SpecializedF->getGenericEnvironment()) ||
          (!SpecializedF->getLoweredFunctionType()->isPolymorphic() &&
           !SpecializedF->getGenericEnvironment()));
-  assert(!SpecializedF->hasQualifiedOwnership());
+  assert(!SpecializedF->hasOwnership());
   // Check if this specialization should be linked for prespecialization.
   linkSpecialization(M, SpecializedF);
   // Store the meta-information about how this specialization was created.
@@ -2026,7 +2033,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
     auto *NewPAI = Builder.createPartialApply(
         Loc, Callee, Subs, Arguments,
-        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
+        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+        PAI->isOnStack());
     PAI->replaceAllUsesWith(NewPAI);
     return NewPAI;
   }
@@ -2097,7 +2105,7 @@ protected:
 SILFunction *ReabstractionThunkGenerator::createThunk() {
   SILFunction *Thunk = FunctionBuilder.getOrCreateSharedFunction(
       Loc, ThunkName, ReInfo.getSubstitutedType(), IsBare, IsTransparent,
-      Serialized, ProfileCounter(), IsThunk);
+      Serialized, ProfileCounter(), IsThunk, IsNotDynamic);
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
@@ -2120,8 +2128,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
   // inline qualified into unqualified functions /or/ have the
   // OwnershipModelEliminator run as part of the normal compilation pipeline
   // (which we are not doing yet).
-  if (!SpecializedFunc->hasQualifiedOwnership()) {
-    Thunk->setUnqualifiedOwnership();
+  if (!SpecializedFunc->hasOwnership()) {
+    Thunk->setOwnershipEliminated();
   }
 
   if (!SILModuleConventions(M).useLoweredAddresses()) {
@@ -2281,7 +2289,7 @@ void swift::trySpecializeApplyOfGeneric(
   if (F->isSerialized() && !RefF->hasValidLinkageForFragileInline())
       return;
 
-  if (shouldNotSpecializeCallee(RefF))
+  if (shouldNotSpecialize(RefF, F))
     return;
 
   // If the caller and callee are both fragile, preserve the fragility when
@@ -2358,7 +2366,7 @@ void swift::trySpecializeApplyOfGeneric(
                             << SpecializedF->getName() << "\n"
                             << "Specialized function type: "
                             << SpecializedF->getLoweredFunctionType() << "\n");
-    assert(!SpecializedF->hasQualifiedOwnership());
+    assert(!SpecializedF->hasOwnership());
     NewFunctions.push_back(SpecializedF);
   }
 
@@ -2397,7 +2405,8 @@ void swift::trySpecializeApplyOfGeneric(
     auto Subs = ReInfo.getCallerParamSubstitutionMap();
     auto *NewPAI = Builder.createPartialApply(
         PAI->getLoc(), FRI, Subs, Arguments,
-        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
+        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+        PAI->isOnStack());
     PAI->replaceAllUsesWith(NewPAI);
     DeadApplies.insert(PAI);
     return;

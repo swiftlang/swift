@@ -30,6 +30,6 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenStmt.cpp
   SILGenThunk.cpp
   SILGenType.cpp
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftSIL
 )

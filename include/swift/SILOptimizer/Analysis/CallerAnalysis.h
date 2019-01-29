@@ -25,7 +25,7 @@
 
 namespace swift {
 
-/// \brief A lazy caller analysis that works by only recomputing its state upon
+/// A lazy caller analysis that works by only recomputing its state upon
 /// an ask for information.
 ///
 /// This laziness is implemented by the pass invalidating its internal state for

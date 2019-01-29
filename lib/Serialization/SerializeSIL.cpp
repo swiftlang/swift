@@ -385,6 +385,15 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (F.hasClangNode())
     clangNodeOwnerID = S.addDeclRef(F.getClangNodeOwner());
 
+  IdentifierID replacedFunctionID = 0;
+  if (auto *fun = F.getDynamicallyReplacedFunction()) {
+    addReferencedSILFunction(fun, true);
+    replacedFunctionID = S.addUniquedStringRef(fun->getName());
+  }
+  else if (F.hasObjCReplacement()) {
+    replacedFunctionID =
+        S.addUniquedStringRef(F.getObjCReplacement().str());
+  }
   unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
@@ -392,8 +401,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
-      (unsigned)numSpecAttrs, (unsigned)F.hasQualifiedOwnership(),
-      F.isWeakLinked(), FnID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
+      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(), FnID,
+      replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
@@ -1291,6 +1301,34 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
+  case SILInstructionKind::DynamicFunctionRefInst: {
+    // Use SILOneOperandLayout to specify the function type and the function
+    // name (IdentifierID).
+    const auto *FRI = cast<DynamicFunctionRefInst>(&SI);
+    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(), 0,
+        S.addTypeRef(FRI->getType().getASTType()),
+        (unsigned)FRI->getType().getCategory(),
+        addSILFunctionRef(ReferencedFunction));
+
+    break;
+  }
+  case SILInstructionKind::PreviousDynamicFunctionRefInst: {
+    // Use SILOneOperandLayout to specify the function type and the function
+    // name (IdentifierID).
+    const auto *FRI = cast<PreviousDynamicFunctionRefInst>(&SI);
+    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(), 0,
+        S.addTypeRef(FRI->getType().getASTType()),
+        (unsigned)FRI->getType().getCategory(),
+        addSILFunctionRef(ReferencedFunction));
+
+    break;
+  }
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::MarkDependenceInst:
@@ -1451,8 +1489,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (SI.getKind() == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       if (cast<ConvertEscapeToNoEscapeInst>(SI).isLifetimeGuaranteed())
         attrs |= 0x01;
-      if (cast<ConvertEscapeToNoEscapeInst>(SI).isEscapedByUser())
-        attrs |= 0x02;
     }
     if (SI.getKind() == SILInstructionKind::ConvertFunctionInst) {
       if (cast<ConvertFunctionInst>(SI).withoutActuallyEscaping())
@@ -2052,8 +2088,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
-  case SILInstructionKind::MarkUninitializedBehaviorInst:
-    llvm_unreachable("todo");
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {
@@ -2386,6 +2420,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // decl blocks and sil blocks.
   registerSILAbbr<decls_block::AbstractProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
+  registerSILAbbr<decls_block::SelfProtocolConformanceLayout>();
   registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceIdLayout>();

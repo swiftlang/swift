@@ -688,9 +688,9 @@ private:
                               Node::Kind::GenericSpecializationNotReAbstracted :
                               Node::Kind::GenericSpecialization);
 
-      // Create a node if the specialization is externally inlinable.
+      // Create a node if the specialization is serialized.
       if (Mangled.nextIf("q")) {
-        auto kind = Node::Kind::SpecializationIsFragile;
+        auto kind = Node::Kind::IsSerialized;
         spec->addChild(Factory.createNode(kind), Factory);
       }
 
@@ -705,9 +705,9 @@ private:
       auto spec =
           Factory.createNode(Node::Kind::FunctionSignatureSpecialization);
 
-      // Create a node if the specialization is externally inlinable.
+      // Create a node if the specialization is serialized.
       if (Mangled.nextIf("q")) {
-        auto kind = Node::Kind::SpecializationIsFragile;
+        auto kind = Node::Kind::IsSerialized;
         spec->addChild(Factory.createNode(kind), Factory);
       }
 
@@ -1810,7 +1810,7 @@ private:
         if (demangleBuiltinSize(size)) {
           return Factory.createNode(
               Node::Kind::BuiltinTypeName,
-              std::move(DemanglerPrinter() << "Builtin.Float" << size).str());
+              std::move(DemanglerPrinter() << "Builtin.FPIEEE" << size).str());
         }
       }
       if (c == 'i') {

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-resilience -emit-module -o %t/ExternalKeyPaths.swiftmodule -module-name ExternalKeyPaths %S/Inputs/ExternalKeyPaths.swift
-// RUN: %target-swift-emit-silgen -swift-version 5 -enable-key-path-resilience -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 5 -I %t %s | %FileCheck %s
 
 import ExternalKeyPaths
 
@@ -9,7 +9,7 @@ struct Local {
   var y: String
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}16externalKeyPaths
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}16externalKeyPaths
 func externalKeyPaths<T: Hashable, U>(_ x: T, _ y: U, _ z: Int) {
   // CHECK: keypath $WritableKeyPath<External<Int>, Int>, (root $External<Int>; {{.*}} external #External.property<Int>)
   _ = \External<Int>.property
@@ -68,7 +68,7 @@ func externalKeyPaths<T: Hashable, U>(_ x: T, _ y: U, _ z: Int) {
   _ = \External<Int>.[privateSet: 0]
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}testProtocolRequirement
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testProtocolRequirement
 func testProtocolRequirement<T: ExternalProto>(_: T.Type) {
   // CHECK: keypath $WritableKeyPath<T, Int>,
   // CHECK-NOT: external #ExternalProto.protoReqt

@@ -123,20 +123,33 @@ Type DeclContext::getDeclaredInterfaceType() const {
   return Type();
 }
 
-GenericParamList *DeclContext::getGenericParamsOfContext() const {
+void DeclContext::forEachGenericContext(
+    llvm::function_ref<void (GenericParamList *)> fn) const {
   auto dc = this;
   do {
     if (auto decl = dc->getAsDecl()) {
-      if (auto GC = decl->getAsGenericContext()) {
-        auto GP = GC->getGenericParams();
-        // Extensions do not capture outer generic parameters.
-        if (GP != nullptr || isa<ExtensionDecl>(decl))
-          return GP;
+      // Extensions do not capture outer generic parameters.
+      if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
+        for (auto *gpList = ext->getGenericParams();
+             gpList != nullptr;
+             gpList = gpList->getOuterParameters()) {
+          fn(gpList);
+        }
+
+        return;
       }
+
+      if (auto genericCtx = decl->getAsGenericContext())
+        if (auto *gpList = genericCtx->getGenericParams())
+          fn(gpList);
     }
   } while ((dc = dc->getParent()));
+}
 
-  return nullptr;
+unsigned DeclContext::getGenericContextDepth() const {
+  unsigned depth = -1;
+  forEachGenericContext([&](GenericParamList *) { ++depth; });
+  return depth;
 }
 
 GenericSignature *DeclContext::getGenericSignatureOfContext() const {
@@ -275,7 +288,21 @@ DeclContext *DeclContext::getModuleScopeContext() const {
 
 /// Determine whether the given context is generic at any level.
 bool DeclContext::isGenericContext() const {
-  return getGenericParamsOfContext() != nullptr;
+  auto dc = this;
+  do {
+    if (auto decl = dc->getAsDecl()) {
+      if (auto GC = decl->getAsGenericContext()) {
+        if (GC->getGenericParams())
+          return true;
+
+        // Extensions do not capture outer generic parameters.
+        if (isa<ExtensionDecl>(decl))
+          break;
+      }
+    }
+  } while ((dc = dc->getParent()));
+
+  return false;
 }
 
 /// Get the most optimal resilience expansion for the body of this function.
@@ -323,17 +350,12 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       if (!funcAccess.isPublic())
         break;
 
-      // Bodies of public transparent and always-inline functions are
-      // serialized, so use conservative access patterns.
+      // If the function is public, @_transparent implies @inlinable.
       if (AFD->isTransparent())
         return ResilienceExpansion::Minimal;
 
       if (AFD->getAttrs().hasAttribute<InlinableAttr>())
         return ResilienceExpansion::Minimal;
-
-      if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
-        if (attr->getKind() == InlineKind::Always)
-          return ResilienceExpansion::Minimal;
 
       // If a property or subscript is @inlinable, the accessors are
       // @inlinable also.
@@ -381,6 +403,9 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
     break;
 
   case DeclContextKind::SubscriptDecl:
+    break;
+
+  case DeclContextKind::EnumElementDecl:
     break;
 
   case DeclContextKind::Module:
@@ -439,6 +464,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return cast<AbstractFunctionDecl>(this)->walk(Walker);
   case DeclContextKind::SubscriptDecl:
     return cast<SubscriptDecl>(this)->walk(Walker);
+  case DeclContextKind::EnumElementDecl:
+    return cast<EnumElementDecl>(this)->walk(Walker);
   case DeclContextKind::SerializedLocal:
     llvm_unreachable("walk is unimplemented for deserialized contexts");
   case DeclContextKind::Initializer:
@@ -498,10 +525,12 @@ static unsigned getLineNumber(DCType *DC) {
   return ctx.SourceMgr.getLineAndColumn(loc).first;
 }
 
-unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
+unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
+                                   const bool onlyAPartialLine) const {
   unsigned Depth = 0;
-  if (auto *P = getParent())
-    Depth = P->printContext(OS, indent);
+  if (!onlyAPartialLine)
+    if (auto *P = getParent())
+      Depth = P->printContext(OS, indent);
 
   const char *Kind;
   switch (getContextKind()) {
@@ -525,6 +554,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     Kind = "AbstractFunctionDecl";
     break;
   case DeclContextKind::SubscriptDecl:    Kind = "SubscriptDecl"; break;
+  case DeclContextKind::EnumElementDecl:  Kind = "EnumElementDecl"; break;
   }
   OS.indent(Depth*2 + indent) << (void*)this << " " << Kind;
 
@@ -542,6 +572,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
       break;
     case FileUnitKind::SerializedAST:
     case FileUnitKind::ClangModule:
+    case FileUnitKind::DWARFModule:
       OS << " file=\"" << cast<LoadedFile>(this)->getFilename() << "\"";
       break;
     }
@@ -574,6 +605,15 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     OS << " name=" << SD->getBaseName();
     if (SD->hasInterfaceType())
       OS << " : " << SD->getInterfaceType();
+    else
+      OS << " : (no type set)";
+    break;
+  }
+  case DeclContextKind::EnumElementDecl: {
+    auto *EED = cast<EnumElementDecl>(this);
+    OS << " name=" << EED->getBaseName();
+    if (EED->hasInterfaceType())
+      OS << " : " << EED->getInterfaceType();
     else
       OS << " : (no type set)";
     break;
@@ -620,7 +660,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   }
   }
 
-  OS << "\n";
+  if (!onlyAPartialLine)
+    OS << "\n";
   return Depth + 1;
 }
 
@@ -816,6 +857,11 @@ bool AccessScope::isFileScope() const {
   return DC && isa<FileUnit>(DC);
 }
 
+bool AccessScope::isInternal() const {
+  auto DC = getDeclContext();
+  return DC && isa<ModuleDecl>(DC);
+}
+
 AccessLevel AccessScope::accessLevelForDiagnostics() const {
   if (isPublic())
     return AccessLevel::Public;
@@ -892,6 +938,8 @@ DeclContextKind DeclContext::getContextKind() const {
       return DeclContextKind::TopLevelCodeDecl;
     case DeclKind::Subscript:
       return DeclContextKind::SubscriptDecl;
+    case DeclKind::EnumElement:
+      return DeclContextKind::EnumElementDecl;
     case DeclKind::Extension:
       return DeclContextKind::ExtensionDecl;
     default:

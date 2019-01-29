@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -Osize -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -sil-verify-all -module-name=test -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -Osize -sil-verify-all -module-name=test -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 public struct TestOptions: OptionSet {

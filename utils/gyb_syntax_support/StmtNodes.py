@@ -326,4 +326,18 @@ STMT_NODES = [
                    is_optional=True),
              Child('Body', kind='CodeBlock'),
          ]),
+
+    # e.g. #assert(1 == 2)
+    Node('PoundAssertStmt', kind='Stmt',
+         children=[
+             Child('PoundAssert', kind='PoundAssertToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Condition', kind='Expr',
+                   description='The assertion condition.'),
+             Child('Comma', kind='CommaToken', is_optional=True,
+                   description='The comma after the assertion condition.'),
+             Child('Message', kind='StringLiteralToken', is_optional=True,
+                   description='The assertion message.'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
 ]

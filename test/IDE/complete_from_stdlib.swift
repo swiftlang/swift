@@ -52,7 +52,7 @@
 // RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_10 < %t.members10.txt
 // RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members10.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURNS_ANY_SEQUENCE | %FileCheck %s -check-prefix=RETURNS_ANY_SEQUENCE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURNS_DROPFIRST_SEQUENCE | %FileCheck %s -check-prefix=RETURNS_DROPFIRST_SEQUENCE
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_1 | %FileCheck %s -check-prefix=POSTFIX_RVALUE_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_2 | %FileCheck %s -check-prefix=POSTFIX_LVALUE_INT
@@ -148,7 +148,7 @@ func testArchetypeReplacement2<BAR : Equatable>(_ a: [BAR]) {
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): Equatable#})[#Void#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): Equatable#}, {#at: Int#})[#Void#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropFirst()[#ArraySlice<Equatable>#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropLast()[#ArraySlice<Equatable>#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropLast()[#[Equatable]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         enumerated()[#EnumeratedSequence<[Equatable]>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         min({#by: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         max({#by: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
@@ -218,9 +218,9 @@ func testArchetypeReplacement6() {
 
 // rdar://problem/22334700
 struct Test1000 : Sequence {
-  func #^RETURNS_ANY_SEQUENCE^#
+  func #^RETURNS_DROPFIRST_SEQUENCE^#
 }
-// RETURNS_ANY_SEQUENCE: Decl[InstanceMethod]/Super:         dropFirst(_ k: Int)
+// RETURNS_DROPFIRST_SEQUENCE: Decl[InstanceMethod]/Super: dropFirst(_ k: Int = 1) -> DropFirstSequence<Test1000>
 
 func testPostfixOperator1(_ x: Int) {
   x#^POSTFIX_INT_1^#
@@ -282,7 +282,7 @@ func testInfixOperator4(_ x: String) {
 }
 // INFIX_EXT_STRING: Begin completions
 // INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#String#}[#String#]
-// INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Bool#}[#Bool#]
 // INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  || {#Bool#}[#Bool#]
 // INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  && {#Bool#}[#Bool#]
+// INFIX_EXT_STRING-NOT: ==
 // INFIX_EXT_STRING: End completions

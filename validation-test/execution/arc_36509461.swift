@@ -9,6 +9,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
+// rdar://problem/47367694 tracks re-enabling this test for backward deployment.
+// UNSUPPORTED: remote_run
+
 import Foundation
 
 struct FakeUUID {

@@ -1,3 +1,6 @@
+// Batch-mode is not supported on Windows yet
+// XFAIL: win32
+//
 // When multiple additional-outputs on the same command-line are no longer
 // supported (i.e. when we've moved to mandatory use of output file maps for
 // communicating multiple additional-outputs to frontends) this test will no
@@ -12,9 +15,9 @@
 //
 // Each batch should get 3 primaries; check that each has 3 modules _in the same numeric order_.
 //
-// CHECK: {{.*}}/swift {{.*}}-primary-file {{[^ ]*}}/file-[[A1:[0-9]+]].swift {{.*}}-primary-file {{[^ ]*}}/file-[[A2:[0-9]+]].swift {{.*}}-primary-file {{[^ ]*}}/file-[[A3:[0-9]+]].swift
-// CHECK-SAME: -o {{.*}}/file-[[A1]]-{{[a-z0-9]+}}.swiftmodule -o {{.*}}/file-[[A2]]-{{[a-z0-9]+}}.swiftmodule -o {{.*}}/file-[[A3]]-{{[a-z0-9]+}}.swiftmodule
-// CHECK: {{.*}}/swift {{.*}}-primary-file {{[^ ]*}}/file-[[B1:[0-9]+]].swift {{.*}}-primary-file {{[^ ]*}}/file-[[B2:[0-9]+]].swift {{.*}}-primary-file {{[^ ]*}}/file-[[B3:[0-9]+]].swift
-// CHECK-SAME: -o {{.*}}/file-[[B1]]-{{[a-z0-9]+}}.swiftmodule -o {{.*}}/file-[[B2]]-{{[a-z0-9]+}}.swiftmodule -o {{.*}}/file-[[B3]]-{{[a-z0-9]+}}.swiftmodule
-// CHECK: {{.*}}/swift {{.*}}-primary-file {{[^ ]*}}/file-[[C1:[0-9]+]].swift {{.*}}-primary-file {{[^ ]*}}/file-[[C2:[0-9]+]].swift {{.*}}-primary-file {{[^ ]*}}/file-[[C3:[0-9]+]].swift
-// CHECK-SAME: -o {{.*}}/file-[[C1]]-{{[a-z0-9]+}}.swiftmodule -o {{.*}}/file-[[C2]]-{{[a-z0-9]+}}.swiftmodule -o {{.*}}/file-[[C3]]-{{[a-z0-9]+}}.swiftmodule
+// CHECK: {{.*[\\/]}}swift{{c?(\.EXE)?"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[A1:[0-9]+]].swift{{"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[A2:[0-9]+]].swift{{"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[A3:[0-9]+]].swift{{"?}}
+// CHECK-SAME: -o {{.*[\\/]}}file-[[A1]]-{{[a-z0-9]+}}.swiftmodule{{"?}} -o {{.*[\\/]}}file-[[A2]]-{{[a-z0-9]+}}.swiftmodule{{"?}} -o {{.*[\\/]}}file-[[A3]]-{{[a-z0-9]+}}.swiftmodule{{"?}}
+// CHECK: {{.*[\\/]}}swift{{c?(\.EXE)?"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[B1:[0-9]+]].swift{{"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[B2:[0-9]+]].swift{{"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[B3:[0-9]+]].swift{{"?}}
+// CHECK-SAME: -o {{.*[\\/]}}file-[[B1]]-{{[a-z0-9]+}}.swiftmodule{{"?}} -o {{.*[\\/]}}file-[[B2]]-{{[a-z0-9]+}}.swiftmodule{{"?}} -o {{.*[\\/]}}file-[[B3]]-{{[a-z0-9]+}}.swiftmodule{{"?}}
+// CHECK: {{.*[\\/]}}swift{{c?(\.EXE)?"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[C1:[0-9]+]].swift{{"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[C2:[0-9]+]].swift{{"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[C3:[0-9]+]].swift{{"?}}
+// CHECK-SAME: -o {{.*[\\/]}}file-[[C1]]-{{[a-z0-9]+}}.swiftmodule{{"?}} -o {{.*[\\/]}}file-[[C2]]-{{[a-z0-9]+}}.swiftmodule{{"?}} -o {{.*[\\/]}}file-[[C3]]-{{[a-z0-9]+}}.swiftmodule{{"?}}

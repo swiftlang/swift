@@ -79,8 +79,8 @@ extension Character {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    _sanityCheck(_str.count == 1)
-    _sanityCheck(_str._guts.isFastUTF8)
+    _internalInvariant(_str.count == 1)
+    _internalInvariant(_str._guts.isFastUTF8)
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }

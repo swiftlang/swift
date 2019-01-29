@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=checked -enable-sil-verify-all %s -licm | %FileCheck %s
+// RUN: %target-sil-opt -enforce-exclusivity=checked -enable-sil-verify-all %s -licm | %FileCheck %s
 
 sil_stage canonical
 
@@ -7,7 +7,7 @@ import Builtin
 import Swift
 
 struct X {
-  @sil_stored var i: Int64 { get set }
+  @_hasStorage var i: Int64 { get set }
   init(i: Int64)
   init()
 }

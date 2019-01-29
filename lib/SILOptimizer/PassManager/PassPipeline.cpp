@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 ///  \file
-///  \brief This file provides implementations of a few helper functions
+///  This file provides implementations of a few helper functions
 ///  which provide abstracted entrypoints to the SILPasses stage.
 ///
 ///  \note The actual SIL passes should be implemented in per-pass source files,
@@ -82,9 +82,6 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
                                     const SILOptions &Options) {
   P.startPipeline("Guaranteed Passes");
-  if (Options.EnableMandatorySemanticARCOpts) {
-    P.addSemanticARCOpts();
-  }
   P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
 
@@ -95,16 +92,34 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
+  // Only run semantic arc opts if we are optimizing and if mandatory semantic
+  // arc opts is explicitly enabled.
+  //
+  // NOTE: Eventually this pass will be split into a mandatory/more aggressive
+  // pass. This will happen when OSSA is no longer eliminated before the
+  // optimizer pipeline is run implying we can put a pass that requires OSSA
+  // there.
+  if (Options.EnableMandatorySemanticARCOpts && Options.shouldOptimize()) {
+    P.addSemanticARCOpts();
+  }
   P.addClosureLifetimeFixup();
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
-  P.addPredictableMemoryOptimizations();
+
+  // Promote loads as necessary to ensure we have enough SSA formation to emit
+  // SSA based diagnostics.
+  P.addPredictableMemoryAccessOptimizations();
 
   // Diagnostic ConstantPropagation must be rerun on deserialized functions
   // because it is sensitive to the assert configuration.
   // Consequently, certain optimization passes beyond this point will also rerun.
   P.addDiagnosticConstantPropagation();
+
+  // Now that we have emitted constant propagation diagnostics, try to eliminate
+  // dead allocations.
+  P.addPredictableDeadAllocationElimination();
+
   P.addGuaranteedARCOpts();
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
@@ -225,7 +240,8 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
 }
 
 // Perform classic SSA optimizations.
-void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
+void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel,
+                  bool stopAfterSerialization = false) {
   // Promote box allocations to stack allocations.
   P.addAllocBoxToStack();
 
@@ -240,10 +256,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
 
   // Split up operations on stack-allocated aggregates (struct, tuple).
   P.addSROA();
-
-  // Re-run predictable memory optimizations, since previous optimization
-  // passes sometimes expose oppotunities here.
-  P.addPredictableMemoryOptimizations();
 
   // Promote stack allocations to values.
   P.addMem2Reg();
@@ -282,6 +294,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
     // which reduces the ability of the compiler to optimize clients
     // importing this module.
     P.addSerializeSILPass();
+    if (stopAfterSerialization)
+      return;
+
     // Does inline semantics-functions (except "availability"), but not
     // global-init functions.
     P.addPerfInliner();
@@ -384,9 +399,12 @@ static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
   P.addStackPromotion();
 }
 
-static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
+static bool addMidLevelPassPipeline(SILPassPipelinePlan &P,
+                                    bool stopAfterSerialization) {
   P.startPipeline("MidLevel");
-  addSSAPasses(P, OptimizationLevelKind::MidLevel);
+  addSSAPasses(P, OptimizationLevelKind::MidLevel, stopAfterSerialization);
+  if (stopAfterSerialization)
+    return true;
 
   // Specialize partially applied functions with dead arguments as a preparation
   // for CapturePropagation.
@@ -395,11 +413,13 @@ static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
   // Run loop unrolling after inlining and constant propagation, because loop
   // trip counts may have became constant.
   P.addLoopUnroll();
+  return false;
 }
 
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionElimination();
+  P.addDeadStoreElimination();
   P.addDeadObjectElimination();
 
   // These few passes are needed to cleanup between loop unrolling and GlobalOpt.
@@ -574,7 +594,8 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   addMidModulePassesStackPromotePassPipeline(P);
 
   // Run an iteration of the mid-level SSA passes.
-  addMidLevelPassPipeline(P);
+  if (addMidLevelPassPipeline(P, Options.StopOptimizationAfterSerialization))
+    return P;
 
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);
@@ -617,6 +638,9 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
 
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();
+
+  // Finally serialize the SIL if we are asked to.
+  P.addSerializeSILPass();
 
   return P;
 }

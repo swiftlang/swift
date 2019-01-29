@@ -13,10 +13,7 @@ class AnotherClass : AProtocol {
   func f() -> String { return "B" }
 }
 
-// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "$sq_D",{{.*}} elements: ![[PROTOS:[0-9]+]]
-// CHECK-DAG: ![[PROTOS]] = !{![[INHERIT:.*]]}
-// CHECK-DAG: ![[INHERIT]] = !DIDerivedType(tag: DW_TAG_inheritance,{{.*}} baseType: ![[PROTOCOL:[0-9]+]]
-// CHECK-DAG: ![[PROTOCOL]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s12generic_args9AProtocol_pmD",
+// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "$sq_D",{{.*}}
 // CHECK-DAG: !DILocalVariable(name: "x", arg: 1,{{.*}} type: ![[T:.*]])
 // CHECK-DAG: ![[T]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sxD"
 // CHECK-DAG: !DILocalVariable(name: "y", arg: 2,{{.*}} type: ![[Q:.*]])

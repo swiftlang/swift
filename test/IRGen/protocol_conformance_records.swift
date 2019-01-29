@@ -119,7 +119,7 @@ extension NativeGenericType : Spoon where T: Spoon {
 // -- nominal type descriptor
 // CHECK-SAME:           @"{{got.|__imp_}}$sSiMn"
 // -- witness table pattern
-// CHECK-SAME:           @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsWp"
+// CHECK-SAME:           i32 0,
 // -- flags
 // CHECK-SAME:           i32 131144,
 // -- module context for retroactive conformance

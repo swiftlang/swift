@@ -366,11 +366,11 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   llvm::StringSet<> OverridingRemoveNames;
 
   /// For a given expression, check whether the type of this expression is
-  /// name alias type, and the name alias type is known to change to raw
+  /// type alias type, and the type alias type is known to change to raw
   /// representable type.
   bool isRecognizedTypeAliasChange(Expr *E) {
     if (auto Ty = E->getType()) {
-      if (auto *NT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+      if (auto *NT = dyn_cast<TypeAliasType>(Ty.getPointer())) {
         for (auto Item: getRelatedDiffItems(NT->getDecl())) {
           if (auto CI = dyn_cast<CommonDiffItem>(Item)) {
             if (CI->DiffKind == NodeAnnotation::TypeAliasDeclToRawRepresentable) {
@@ -1077,6 +1077,31 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return false;
   }
 
+  void handleResultTypeChange(ValueDecl *FD, Expr *Call) {
+    Optional<NodeAnnotation> ChangeKind;
+
+    // look for related change item for the function decl.
+    for (auto Item: getRelatedDiffItems(FD)) {
+      if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+        // check if the function's return type has been changed from nonnull
+        // to nullable.
+        if (CI->DiffKind == NodeAnnotation::WrapOptional &&
+            CI->getChildIndices().size() == 1 &&
+            CI->getChildIndices().front() == 0) {
+          ChangeKind = NodeAnnotation::WrapOptional;
+          break;
+        }
+      }
+    }
+    if (!ChangeKind.hasValue())
+      return;
+    // If a function's return type has been changed from nonnull to nullable,
+    // append ! to the original call expression.
+    if (*ChangeKind == NodeAnnotation::WrapOptional) {
+      Editor.insertAfterToken(Call->getSourceRange().End, "!");
+    }
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (E->getSourceRange().isInvalid())
       return false;
@@ -1100,6 +1125,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           handleTypeHoist(FD, CE, Args);
           handleSpecialCases(FD, CE, Args);
           handleStringRepresentableArg(FD, Args, CE);
+          handleResultTypeChange(FD, CE);
         }
         break;
       }
@@ -1110,15 +1136,16 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           handleFunctionCallToPropertyChange(FD, DSC->getFn(), Args);
           handleSpecialCases(FD, CE, Args);
           handleStringRepresentableArg(FD, Args, CE);
+          handleResultTypeChange(FD, CE);
         }
         break;
       }
       case ExprKind::ConstructorRefCall: {
         auto CCE = cast<ConstructorRefCallExpr>(Fn);
         if (auto FD = CCE->getFn()->getReferencedDecl().getDecl()) {
-          auto *CE = CCE->getFn();
           handleFuncRename(FD, CE, Args);
           handleStringRepresentableArg(FD, Args, CE);
+          handleResultTypeChange(FD, CE);
         }
         break;
       }
@@ -1402,6 +1429,19 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         // Remove super-dot call.
         SuperRemoval Removal(Editor, OverridingRemoveNames);
         D->walk(Removal);
+      }
+    }
+
+    // Handle property overriding migration.
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      for (auto *Item: getRelatedDiffItems(VD)) {
+        if (auto *CD = dyn_cast<CommonDiffItem>(Item)) {
+          // If the overriden property has been renamed, we should rename
+          // this property decl as well.
+          if (CD->isRename() && VD->getNameLoc().isValid()) {
+            Editor.replaceToken(VD->getNameLoc(), CD->getNewName());
+          }
+        }
       }
     }
     return true;

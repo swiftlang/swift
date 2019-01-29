@@ -20,7 +20,7 @@ struct Indirect<T: AnyObject> {
 
 sil @make_indirect : $<T: SomeClass> () -> (@out Indirect<T>)
 
-sil [transparent] @test_one_yield : $@yield_once <C: SomeClass> () -> (@yields @in Indirect<C>) {
+sil [transparent] [ossa] @test_one_yield : $@yield_once <C: SomeClass> () -> (@yields @in Indirect<C>) {
 entry:
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %1000 = integer_literal $Builtin.Int32, 1000
@@ -45,7 +45,7 @@ unwind:
 }
 
 // CHECK-LABEL: sil @test_simple_call
-// CHECK: bb0(%0 : @trivial $Builtin.Int1):
+// CHECK: bb0(%0 : $Builtin.Int1):
 // CHECK:  [[MARKER:%.*]] = function_ref @marker
 // CHECK:  [[MARKER2:%.*]] = function_ref @marker
 // CHECK:  [[I:%.*]] = integer_literal $Builtin.Int32, 1000
@@ -54,46 +54,34 @@ unwind:
 // CHECK:  [[MK_IND:%.*]] = function_ref @make_indirect
 // CHECK:  apply [[MK_IND]]<SomeSubclass>([[TEMP]])
 // CHECK:  destroy_addr [[TEMP]] : $*Indirect<SomeSubclass>
-// CHECK:  cond_br %0, bb3, bb5
+// CHECK:  cond_br %0, bb1, bb2
 
-// CHECK:bb1:
+// CHECK: bb1:
+// CHECK:   [[I4:%.*]] = integer_literal $Builtin.Int32, 10
+// CHECK:   apply [[MARKER]]([[I4]])
 // CHECK:  [[I2:%.*]] = integer_literal $Builtin.Int32, 2000
 // CHECK:  apply [[MARKER2]]([[I2]])
 // CHECK:  dealloc_stack [[TEMP]] : $*Indirect<SomeSubclass>
-// CHECK:  br bb4
+// CHECK:   [[I5:%.*]] = integer_literal $Builtin.Int32, 20
+// CHECK:   apply [[MARKER]]([[I5]])
+// CHECK:  br bb3
 
 // CHECK: bb2:
+// CHECK:   [[I6:%.*]] = integer_literal $Builtin.Int32, 11
+// CHECK:   apply [[MARKER]]([[I6]])
 // CHECK:  [[I3:%.*]] = integer_literal $Builtin.Int32, 3000
 // CHECK:  apply [[MARKER2]]([[I3]])
 // CHECK:  dealloc_stack [[TEMP]] : $*Indirect<SomeSubclass>
-// CHECK:  br bb6
-
-// CHECK: bb3:
-// CHECK:   [[I4:%.*]] = integer_literal $Builtin.Int32, 10
-// CHECK:   apply [[MARKER]]([[I4]])
-// CHECK:   br bb1
-
-// CHECK: bb4:
-// CHECK:   [[I5:%.*]] = integer_literal $Builtin.Int32, 20
-// CHECK:   apply [[MARKER]]([[I5]])
-// CHECK:  br bb7
-
-// CHECK: bb5:
-// CHECK:   [[I6:%.*]] = integer_literal $Builtin.Int32, 11
-// CHECK:   apply [[MARKER]]([[I6]])
-// CHECK:   br bb2
-
-// CHECK: bb6:
 // CHECK:   [[I7:%.*]] = integer_literal $Builtin.Int32, 21
 // CHECK:   [[MARKER]]([[I7]])
-// CHECK:  br bb7
+// CHECK:  br bb3
 
-// CHECK:bb7:
+// CHECK:bb3:
 // CHECK:  return
 // CHECK:}
 
 sil @test_simple_call : $(Builtin.Int1) -> () {
-entry(%flag : @trivial $Builtin.Int1):
+entry(%flag : $Builtin.Int1):
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %0 = function_ref @test_one_yield : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
   (%value, %token) = begin_apply %0<SomeSubclass>() : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
@@ -121,8 +109,8 @@ cont:
   return %ret : $()
 }
 
-sil [transparent] @test_two_yield : $@yield_once <C: SomeClass> (Builtin.Int1) -> (@yields @in Indirect<C>, @yields Builtin.Int64) {
-entry(%0 : @trivial $Builtin.Int1):
+sil [transparent] [ossa] @test_two_yield : $@yield_once <C: SomeClass> (Builtin.Int1) -> (@yields @in Indirect<C>, @yields Builtin.Int64) {
+entry(%0 : $Builtin.Int1):
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %1000 = integer_literal $Builtin.Int32, 1000
   apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
@@ -166,12 +154,12 @@ unwind:
 
 // We don't support inlining functions with multiple yields yet.
 // CHECK-LABEL: sil @test_simple_call_two_yields : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
-// CHECK: bb0(%0 : @trivial $Builtin.Int1, %1 : @trivial $Builtin.Int1):
+// CHECK: bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
 // CHECK:   begin_apply
 // CHECK:   return
 
 sil @test_simple_call_two_yields : $(Builtin.Int1, Builtin.Int1) -> () {
-entry(%flag : @trivial $Builtin.Int1, %flag2 : @trivial $Builtin.Int1):
+entry(%flag : $Builtin.Int1, %flag2 : $Builtin.Int1):
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %0 = function_ref @test_two_yield : $@convention(thin) @yield_once <T: SomeClass> (Builtin.Int1) -> (@yields @in Indirect<T>, @yields Builtin.Int64)
   (%value, %value2, %token) = begin_apply %0<SomeSubclass>(%flag) : $@convention(thin) @yield_once <T: SomeClass> (Builtin.Int1) -> (@yields @in Indirect<T>, @yields Builtin.Int64)
@@ -191,44 +179,29 @@ cont:
   return %ret : $()
 }
 
-// CHECK-LABEL: sil @test_simple_call_yield_owned : $@convention(thin) (Builtin.Int1, @owned SomeClass) -> () {
-// CHECK:      bb0(%0 : @trivial $Builtin.Int1, %1 : @owned $SomeClass):
+// CHECK-LABEL: sil [ossa] @test_simple_call_yield_owned : $@convention(thin) (Builtin.Int1, @owned SomeClass) -> () {
+// CHECK:      bb0(%0 : $Builtin.Int1, %1 : @owned $SomeClass):
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:   %2 = function_ref @marker
 // CHECK-NEXT:   %3 = integer_literal $Builtin.Int32, 1000
 // CHECK-NEXT:   %4 = apply %2(%3)
-// CHECK-NEXT:   cond_br %0, bb3, bb5
-
+// CHECK-NEXT:   cond_br %0, bb1, bb2
 // CHECK:      bb1:
 // CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int32, 2000
 // CHECK-NEXT:   apply %2([[T0]])
 // CHECK-NEXT:   destroy_value %1 : $SomeClass
 // CHECK-NEXT:   tuple ()
-// CHECK-NEXT:   br bb4
-
+// CHECK-NEXT:   br bb3
 // CHECK:      bb2:
 // CHECK-NEXT:   [[T1:%.*]] = integer_literal $Builtin.Int32, 3000
 // CHECK-NEXT:   apply %2([[T1]])
 // CHECK-NEXT:   destroy_value %1 : $SomeClass
-// CHECK-NEXT:   br bb6
-
+// CHECK-NEXT:   br bb3
 // CHECK:      bb3:
-// CHECK-NEXT:   br bb1
-
-// CHECK:      bb4:
-// CHECK-NEXT:   br bb7
-
-// CHECK:      bb5:
-// CHECK-NEXT:   br bb2
-
-// CHECK:      bb6:
-// CHECK-NEXT:   br bb7
-
-// CHECK:      bb7:
 // CHECK-NEXT:   [[T0:%.*]] = tuple ()
 // CHECK-NEXT:   return [[T0]] : $()
 
-sil [transparent] @yield_owned : $@yield_once(@owned SomeClass) -> (@yields @owned SomeClass) {
+sil [transparent] [ossa] [ossa] @yield_owned : $@yield_once(@owned SomeClass) -> (@yields @owned SomeClass) {
 entry(%0 : @owned $SomeClass):
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %1000 = integer_literal $Builtin.Int32, 1000
@@ -249,8 +222,8 @@ unwind:
   unwind
 }
 
-sil @test_simple_call_yield_owned : $(Builtin.Int1, @owned SomeClass) -> () {
-entry(%flag : @trivial $Builtin.Int1, %c: @owned $SomeClass):
+sil [ossa] @test_simple_call_yield_owned : $(Builtin.Int1, @owned SomeClass) -> () {
+entry(%flag : $Builtin.Int1, %c: @owned $SomeClass):
   %0 = function_ref @yield_owned : $@convention(thin) @yield_once(@owned SomeClass) -> (@yields @owned SomeClass)
   (%value, %token) = begin_apply %0(%c) : $@convention(thin) @yield_once(@owned SomeClass) -> (@yields @owned SomeClass)
   cond_br %flag, yes, no
@@ -270,7 +243,7 @@ cont:
 
 sil @use : $@convention(thin) (@in Builtin.Int8) -> ()
 
-sil [transparent] @yield_inout : $@yield_once() -> (@yields @inout Builtin.Int8) {
+sil [transparent] [ossa] [ossa] @yield_inout : $@yield_once() -> (@yields @inout Builtin.Int8) {
 entry:
   %addr = alloc_stack $Builtin.Int8
   %8 = integer_literal $Builtin.Int8, 8
@@ -293,20 +266,22 @@ unwind:
 }
 
 
-// CHECK-LABEL: sil @test_simple_call_yield_inout : $@convention(thin) (Builtin.Int1) -> () {
-// CHECK:      bb0(%0 : @trivial $Builtin.Int1):
+// CHECK-LABEL: sil [ossa] @test_simple_call_yield_inout : $@convention(thin) (Builtin.Int1) -> () {
+// CHECK:      bb0(%0 : $Builtin.Int1):
 // CHECK-NEXT:   %1 = alloc_stack $Builtin.Int8
 // CHECK-NEXT:   %2 = integer_literal $Builtin.Int8, 8
 // CHECK-NEXT:   store %2 to [trivial] %1 : $*Builtin.Int8
-// CHECK-NEXT:   cond_br %0, bb3, bb5
+// CHECK-NEXT:   cond_br %0, bb1, bb2
 
 // CHECK:      bb1:
+// CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int8, 8
+// CHECK-NEXT:   store [[T0]] to [trivial] %1 : $*Builtin.Int8
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:   [[USE:%.*]] = function_ref @use : $@convention(thin) (@in Builtin.Int8) -> ()
 // CHECK-NEXT:   apply [[USE]](%1) : $@convention(thin) (@in Builtin.Int8) -> ()
 // CHECK-NEXT:   dealloc_stack %1 : $*Builtin.Int8
 // CHECK-NEXT:   tuple ()
-// CHECK-NEXT:   br bb4
+// CHECK-NEXT:   br bb3
 
 // CHECK:      bb2:
 // CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int32, 3000
@@ -314,29 +289,15 @@ unwind:
 // CHECK-NEXT:   [[MARKER:%.*]] = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT:   apply [[MARKER]]([[T0]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT:   dealloc_stack %1 : $*Builtin.Int8
-// CHECK-NEXT:   br bb6
+// CHECK-NEXT:   br bb3
 
 // CHECK:      bb3:
-// CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int8, 8
-// CHECK-NEXT:   store [[T0]] to [trivial] %1 : $*Builtin.Int8
-// CHECK-NEXT:   br bb1
-
-// CHECK:      bb4:
-// CHECK-NEXT:   br bb7
-
-// CHECK:      bb5:
-// CHECK-NEXT:   br bb2
-
-// CHECK:      bb6:
-// CHECK-NEXT:   br bb7
-
-// CHECK:      bb7:
 // CHECK-NEXT:   [[T0:%.*]] = tuple ()
 // CHECK-NEXT:   return [[T0]] : $()
 // CHECK:      }
 
-sil @test_simple_call_yield_inout : $(Builtin.Int1) -> () {
-entry(%flag : @trivial $Builtin.Int1):
+sil [ossa] @test_simple_call_yield_inout : $(Builtin.Int1) -> () {
+entry(%flag : $Builtin.Int1):
   %0 = function_ref @yield_inout : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
   (%addr, %token) = begin_apply %0() : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
   cond_br %flag, yes, no
@@ -357,11 +318,11 @@ cont:
 }
 
 //   We can't inline yet if there are multiple ends.
-// CHECK-LABEL: sil @test_multi_end_yield_inout : $@convention(thin) (Builtin.Int1) -> () {
+// CHECK-LABEL: sil [ossa] @test_multi_end_yield_inout : $@convention(thin) (Builtin.Int1) -> () {
 // CHECK:       [[T0:%.*]] = function_ref @yield_inout
 // CHECK:       begin_apply [[T0]]
-sil @test_multi_end_yield_inout : $(Builtin.Int1) -> () {
-entry(%flag : @trivial $Builtin.Int1):
+sil [ossa] @test_multi_end_yield_inout : $(Builtin.Int1) -> () {
+entry(%flag : $Builtin.Int1):
   %0 = function_ref @yield_inout : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
   (%addr, %token) = begin_apply %0() : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
   cond_br %flag, yes, no
@@ -380,11 +341,11 @@ cont:
 }
 
 //   We can't inline yet if there are multiple aborts.
-// CHECK-LABEL: sil @test_multi_abort_yield_inout : $@convention(thin) (Builtin.Int1) -> () {
+// CHECK-LABEL: sil [ossa] @test_multi_abort_yield_inout : $@convention(thin) (Builtin.Int1) -> () {
 // CHECK:       [[T0:%.*]] = function_ref @yield_inout
 // CHECK:       begin_apply [[T0]]
-sil @test_multi_abort_yield_inout : $(Builtin.Int1) -> () {
-entry(%flag : @trivial $Builtin.Int1):
+sil [ossa] @test_multi_abort_yield_inout : $(Builtin.Int1) -> () {
+entry(%flag : $Builtin.Int1):
   %0 = function_ref @yield_inout : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
   (%addr, %token) = begin_apply %0() : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
   cond_br %flag, yes, no
@@ -402,7 +363,7 @@ cont:
   return %ret : $()
 }
 
-sil [transparent] @no_yields : $@yield_once () -> (@yields @inout Builtin.Int8) {
+sil [transparent] [ossa] @no_yields : $@yield_once () -> (@yields @inout Builtin.Int8) {
 entry:
   %3000 = integer_literal $Builtin.Int32, 3000
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
@@ -410,7 +371,7 @@ entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @test_simple_call_no_yields : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @test_simple_call_no_yields : $@convention(thin) () -> () {
 // CHECK:      bb0:
 // CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int32, 3000
 // CHECK-NEXT:   // function_ref
@@ -426,7 +387,7 @@ entry:
 // CHECK-NEXT:   [[T0:%.*]] = tuple ()
 // CHECK-NEXT:   return [[T0]] : $()
 // CHECK:      }
-sil @test_simple_call_no_yields : $() -> () {
+sil [ossa] @test_simple_call_no_yields : $() -> () {
 entry:
   %0 = function_ref @no_yields : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int8)
   (%addr, %token) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int8)
@@ -437,7 +398,7 @@ entry:
   return %ret : $()
 }
 
-sil [transparent] @stack_overlap : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32) {
+sil [transparent] [ossa] @stack_overlap : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32) {
 entry:
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %temp = alloc_stack $Builtin.Int32
@@ -461,7 +422,7 @@ unwind:
   unwind
 }
 
-// CHECK-LABEL: sil @test_stack_overlap_dealloc
+// CHECK-LABEL: sil [ossa] @test_stack_overlap_dealloc
 // CHECK:       bb0:
 // CHECK-NEXT:    [[A16:%.*]] = alloc_stack $Builtin.Int16
 // CHECK-NEXT:    // function_ref
@@ -471,8 +432,6 @@ unwind:
 // CHECK-NEXT:    store [[I1000]] to [trivial] [[A32]]
 // CHECK-NEXT:    [[I2000:%.*]] = integer_literal $Builtin.Int32, 2000
 // CHECK-NEXT:    apply [[MARKER]]([[I2000]])
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    [[I3000:%.*]] = integer_literal $Builtin.Int32, 3000
 // CHECK-NEXT:    apply [[MARKER]]([[I3000]])
 // CHECK-NEXT:    dealloc_stack [[A32]] : $*Builtin.Int32
@@ -481,12 +440,10 @@ unwind:
 // CHECK-NEXT:    [[I4000:%.*]] = integer_literal $Builtin.Int32, 4000
 // CHECK-NEXT:    apply [[MARKER]]([[I4000]])
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    br [[END:bb[0-9]+]]
-// CHECK:       [[END]]:
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 // CHECK-LABEL: // end sil function 'test_stack_overlap_dealloc'
-sil @test_stack_overlap_dealloc : $() -> () {
+sil [ossa] @test_stack_overlap_dealloc : $() -> () {
 bb0:
   %stack = alloc_stack $Builtin.Int16
   %0 = function_ref @stack_overlap : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
@@ -497,7 +454,7 @@ bb0:
   return %ret : $()
 }
 
-// CHECK-LABEL: sil @test_stack_overlap_alloc
+// CHECK-LABEL: sil [ossa] @test_stack_overlap_alloc
 // CHECK:       bb0:
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[MARKER:%.*]] = function_ref @marker
@@ -507,22 +464,18 @@ bb0:
 // CHECK-NEXT:    [[I2000:%.*]] = integer_literal $Builtin.Int32, 2000
 // CHECK-NEXT:    apply [[MARKER]]([[I2000]])
 // CHECK-NEXT:    [[A16:%.*]] = alloc_stack $Builtin.Int16
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    [[I3000:%.*]] = integer_literal $Builtin.Int32, 3000
 // CHECK-NEXT:    apply [[MARKER]]([[I3000]])
 // CHECK-NEXT:    [[I4000:%.*]] = integer_literal $Builtin.Int32, 4000
 // CHECK-NEXT:    apply [[MARKER]]([[I4000]])
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    br [[END:bb[0-9]+]]
-// CHECK:       [[END]]:
 // CHECK-NEXT:    dealloc_stack [[A16]] : $*Builtin.Int16
 //   Note that this has been delayed to follow stack discipline.
 // CHECK-NEXT:    dealloc_stack [[A32]] : $*Builtin.Int32
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 // CHECK-LABEL: // end sil function 'test_stack_overlap_alloc'
-sil @test_stack_overlap_alloc : $() -> () {
+sil [ossa] @test_stack_overlap_alloc : $() -> () {
 bb0:
   %0 = function_ref @stack_overlap : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
   (%value, %token) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)

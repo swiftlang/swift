@@ -39,7 +39,7 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
 }
 
 /// Derive the implementation of allCases for a "simple" no-payload enum.
-void deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl) {
+void deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto *parentEnum = parentDC->getSelfEnumDecl();
   auto enumTy = parentDC->getDeclaredTypeInContext();

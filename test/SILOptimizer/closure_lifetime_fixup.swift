@@ -1,4 +1,10 @@
-// RUN: %target-swift-frontend %s -sil-verify-all -enable-sil-ownership -emit-sil -o - | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-resilience -emit-module -emit-module-path %t/resilient_struct.swiftmodule
+// RUN: %target-swift-frontend %S/../Inputs/resilient_enum.swift -I %t -enable-resilience -emit-module -emit-module-path %t/resilient_enum.swiftmodule
+// RUN: %target-swift-frontend %s -sil-verify-all -enable-sil-ownership -emit-sil -I %t -o - | %FileCheck %s --check-prefix=CHECK --check-prefix=%target-os
+
+import resilient_struct
+import resilient_enum
 
 func use_closure(_ c : () -> () ) {
   c()
@@ -17,14 +23,13 @@ public class C {
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK: [[F:%.*]]  = function_ref @$s22closure_lifetime_fixup10testSimple1cyAA1CC_tFyyXEfU_
 // CHECK-NEXT:  strong_retain [[ARG]] : $C
-// CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> ()
-// CHECK-NEXT: strong_retain [[PA]] : $@callee_guaranteed () -> ()
-// CHECK-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:  [[CL:%.*]] = mark_dependence [[PA]] : $@noescape @callee_guaranteed () -> () on [[ARG]] : $C
 // CHECK-NEXT:  // function_ref use_closure(_:)
 // CHECK-NEXT:  [[F2:%.*]] = function_ref @$s22closure_lifetime_fixup04use_A0yyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-// CHECK-NEXT:  apply [[F2]]([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-// CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> ()
-// CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> ()
+// CHECK-NEXT:  apply [[F2]]([[CL]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK-NEXT:  dealloc_stack [[PA]] : $@noescape @callee_guaranteed () -> ()
+// CHECK-NEXT:  strong_release [[ARG]] : $C
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return {{.*}} : $()
 public func testSimple(c: C) {
@@ -35,19 +40,17 @@ public func testSimple(c: C) {
 // CHECK:bb0([[ARG:%.*]] : $C):
 // CHECK:  [[F:%.*]] = function_ref @$s22closure_lifetime_fixup11testGeneric1cyAA1CC_tFSiyXEfU_ : $@convention(thin) (@guaranteed C) -> Int
 // CHECK-NEXT:  strong_retain [[ARG]] : $C
-// CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> Int
-// CHECK-NEXT:  strong_retain [[PA]] : $@callee_guaranteed () -> Int
-// CHECK-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> Int
+// CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> Int
+// CHECK-NEXT:  [[MD:%.*]] = mark_dependence [[PA]] : $@noescape @callee_guaranteed () -> Int on [[ARG]] : $C
 // CHECK-NEXT:  // function_ref thunk for @callee_guaranteed () -> (@unowned Int)
 // CHECK-NEXT:  [[F:%.*]] = function_ref @$sSiIgd_SiIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
-// CHECK-NEXT:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [[F]]([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
-// CHECK-NEXT:  [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> @out Int to $@noescape @callee_guaranteed () -> @out Int
-// CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> Int
+// CHECK-NEXT:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[F]]([[MD]]) : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
 // CHECK-NEXT:  // function_ref use_closureGeneric<A>(_:)
 // CHECK-NEXT:  [[F2:%.*]] = function_ref @$s22closure_lifetime_fixup04use_A7GenericyyxyXElF : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed () -> @out τ_0_0) -> ()
-// CHECK-NEXT:  %12 = apply [[F2]]<Int>([[CVT2]]) : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed () -> @out τ_0_0) -> ()
-// CHECK-NEXT:  strong_release [[PA2]] : $@callee_guaranteed () -> @out Int
-// CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> Int
+// CHECK-NEXT:  apply [[F2]]<Int>([[PA2]]) : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed () -> @out τ_0_0) -> ()
+// CHECK-NEXT:  dealloc_stack [[PA2]]
+// CHECK-NEXT:  dealloc_stack [[PA]]
+// CHECK-NEXT:  strong_release [[ARG]]
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return {{.*}} : $()
 
@@ -89,4 +92,361 @@ public func dontCrash<In, Out>(test: Bool, body: @escaping ((In) -> Out, In) -> 
     return r
   }
   return result
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup28to_stack_of_convert_function1pySvSg_tF
+// CHECK:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  [[MD:%.*]] = mark_dependence [[PA]]
+// CHECK:  [[CVT:%.*]] = convert_function [[MD]]
+// CHECK:  [[REABSTRACT:%.*]] = function_ref @$sSvSSs5Error_pIgyozo_SvSSsAA_pIegnrzo_TR
+// CHECK:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[REABSTRACT]]([[CVT]])
+// CHECK:  [[MAP:%.*]] = function_ref @$sSq3mapyqd__Sgqd__xKXEKlF
+// CHECK:  try_apply [[MAP]]<UnsafeMutableRawPointer, String>({{.*}}, [[PA2]], {{.*}})
+public func to_stack_of_convert_function(p: UnsafeMutableRawPointer?) {
+  _ = p.map(String.init(describing:))
+}
+
+
+public func no_dealloc_stack_before_unreachable(_ message: String, fileName: StaticString = #file, lineNumber: Int = #line) -> Never  {
+  Swift.fatalError(message, file: fileName, line: UInt(lineNumber))
+}
+
+// Make sure closures are allocated on the stack.
+func useClosure(_ c: () -> ()) {
+}
+func useClosureThrowing(_ c: () throws -> ()) throws {
+}
+func useGenericClosure<T, V>(_ c : (T) -> V) {
+}
+func useGenericClosureThrowing<T, V>(_ c: (T) throws -> V) throws {
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup12captureClass1c1dyAA1CC_AFtKF
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$s22closure_lifetime_fixup10useClosureyyyyXEF
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$s22closure_lifetime_fixup18useClosureThrowingyyyyKXEKF
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$sIg_ytytIegnr_TR
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$s22closure_lifetime_fixup17useGenericClosureyyq_xXEr0_lF
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$ss5Error_pIgzo_ytytsAA_pIegnrzo_TR
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$s22closure_lifetime_fixup25useGenericClosureThrowingyyq_xKXEKr0_l
+public func captureClass(c: C, d: C) throws {
+  useClosure {
+    c.doIt()
+    d.doIt()
+  }
+
+  try useClosureThrowing {
+    c.doIt()
+    d.doIt()
+  }
+
+  useGenericClosure {
+    c.doIt()
+    d.doIt()
+  }
+
+  try useGenericClosureThrowing {
+    c.doIt()
+    d.doIt()
+  }
+}
+
+public protocol DoIt {
+  func doIt()
+}
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup14captureGeneric1c1dyx_q_tKAA4DoItRzAaER_r0_lF
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$s22closure_lifetime_fixup10useClosureyyyyXEF
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$s22closure_lifetime_fixup18useClosureThrowingyyyyKXEKF
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$sIg_ytytIegnr_TR
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$s22closure_lifetime_fixup17useGenericClosureyyq_xXEr0_lF
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$ss5Error_pIgzo_ytytsAA_pIegnrzo_TR
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$s22closure_lifetime_fixup25useGenericClosureThrowingyyq_xKXEKr0_lF
+public func captureGeneric<C :DoIt,D: DoIt>(c: C, d: D) throws {
+  useClosure {
+    c.doIt()
+    d.doIt()
+  }
+
+  try useClosureThrowing {
+    c.doIt()
+    d.doIt()
+  }
+
+  useGenericClosure {
+    c.doIt()
+    d.doIt()
+  }
+
+  try useGenericClosureThrowing {
+    c.doIt()
+    d.doIt()
+  }
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup14captureClosure1c1d1tyq_xXE_q_xXExtKr0_lF
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  function_ref @$s22closure_lifetime_fixup10useClosureyyyyXEF
+
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  function_ref @$s22closure_lifetime_fixup18useClosureThrowingyyyyKXEKF
+
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$sIg_ytytIegnr_TR
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: function_ref @$s22closure_lifetime_fixup17useGenericClosureyyq_xXEr0_lF
+
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  function_ref @$ss5Error_pIgzo_ytytsAA_pIegnrzo_TR
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  function_ref @$s22closure_lifetime_fixup25useGenericClosureThrowingyyq_xKXEKr0_lF
+public func captureClosure<T, V>(c : (T) ->V, d: (T) -> V, t: T) throws {
+  useClosure {
+    c(t)
+    d(t)
+  }
+
+  try useClosureThrowing {
+    c(t)
+    d(t)
+  }
+
+  useGenericClosure {
+    c(t)
+    d(t)
+  }
+
+  try useGenericClosureThrowing {
+    c(t)
+    d(t)
+  }
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup16captureResilient
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+
+public func captureResilient(c: Size) throws {
+  useClosure {
+    c.method()
+  }
+
+  try useClosureThrowing {
+    c.method()
+  }
+
+  useGenericClosure {
+    c.method()
+  }
+
+  try useGenericClosureThrowing {
+    c.method()
+  }
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup10capturePOD1cy16resilient_struct5PointV_tKF
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+public func capturePOD(c: Point) throws {
+  useClosure {
+    c.method()
+  }
+
+  try useClosureThrowing {
+    c.method()
+  }
+
+  useGenericClosure {
+    c.method()
+  }
+
+  try useGenericClosureThrowing {
+    c.method()
+  }
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup11captureEnum
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+public func captureEnum(c: FullyFixedLayout, d: CustomColor) throws {
+  useClosure {
+     _ = c
+     _ = d
+  }
+
+  try useClosureThrowing {
+     _ = c
+     _ = d
+  }
+
+  useGenericClosure {
+     _ = c
+     _ = d
+  }
+
+  try useGenericClosureThrowing {
+     _ = c
+     _ = d
+  }
+}
+
+public protocol EmptyP {}
+
+public struct AddressOnlyStruct : EmptyP {}
+
+public enum AddressOnlyEnum {
+  case nought
+  case mere(EmptyP)
+  case phantom(AddressOnlyStruct)
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup22captureAddressOnlyEnum
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+public func captureAddressOnlyEnum(c: AddressOnlyEnum, d: AddressOnlyEnum) throws {
+  useClosure {
+     _ = c
+     _ = d
+  }
+
+  try useClosureThrowing {
+     _ = c
+     _ = d
+  }
+
+  useGenericClosure {
+     _ = c
+     _ = d
+  }
+
+  try useGenericClosureThrowing {
+     _ = c
+     _ = d
+  }
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup15captureProtocol
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+public func captureProtocol(c: EmptyP, d: EmptyP) throws {
+  useClosure {
+     _ = c
+     _ = d
+  }
+
+  try useClosureThrowing {
+     _ = c
+     _ = d
+  }
+
+  useGenericClosure { () -> Int in
+     _ = c
+     _ = d
+     return 0
+  }
+
+  try useGenericClosureThrowing { () -> Int in
+     _ = c
+     _ = d
+     return 0
+  }
+}
+
+public protocol Q {
+  associatedtype Element
+  func test<U>(_ c: (Element) -> U) throws
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup0A18WithAssociatedType1c1eyx_7ElementQztKAA1QRzlF
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK: try_apply
+public func closureWithAssociatedType<C : Q> (c: C, e: C.Element) throws {
+  try c.test( { _ in _ = e })
+}
+
+
+public class F<T> {
+   func test<V>(_ c: (V) throws -> T) {}
+   let t : T? = nil
+}
+
+// CHECK-LABEL: s22closure_lifetime_fixup22testClosureMethodParam1fyAA1FCyxG_tKlF
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  partial_apply [callee_guaranteed] [on_stack]
+// CHECK: apply
+public func testClosureMethodParam<T>(f: F<T>) throws {
+  try f.test { return f.t! }
 }

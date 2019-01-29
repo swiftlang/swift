@@ -19,14 +19,20 @@ import Foundation
 import TestsUtils
 
 public let RGBHistogram = [
-  BenchmarkInfo(name: "RGBHistogram", runFunction: run_RGBHistogram, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "RGBHistogramOfObjects", runFunction: run_RGBHistogramOfObjects, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "RGBHistogram",
+    runFunction: run_RGBHistogram,
+    tags: [.validation, .algorithm],
+    legacyFactor: 10),
+  BenchmarkInfo(name: "RGBHistogramOfObjects",
+    runFunction: run_RGBHistogramOfObjects,
+    tags: [.validation, .algorithm],
+    legacyFactor: 100),
 ]
 
 @inline(never)
 public func run_RGBHistogram(_ N: Int) {
     var histogram = [(key: rrggbb_t, value: Int)]()
-    for _ in 1...100*N {
+    for _ in 1...10*N {
         histogram = createSortedSparseRGBHistogram(samples)
         if !isCorrectHistogram(histogram) {
             break
@@ -164,7 +170,7 @@ func createSortedSparseRGBHistogramOfObjects<S : Sequence>(
 @inline(never)
 public func run_RGBHistogramOfObjects(_ N: Int) {
     var histogram = [(key: Box<rrggbb_t>, value: Box<Int>)]()
-    for _ in 1...100*N {
+    for _ in 1...N {
         histogram = createSortedSparseRGBHistogramOfObjects(samples)
         if !isCorrectHistogramOfObjects(histogram) {
             break
@@ -172,5 +178,3 @@ public func run_RGBHistogramOfObjects(_ N: Int) {
     }
     CheckResults(isCorrectHistogramOfObjects(histogram))
 }
-
-

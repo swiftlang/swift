@@ -42,6 +42,7 @@ set(SWIFT_BENCH_MODULES
     single-source/BinaryFloatingPointConversionFromBinaryInteger
     single-source/BinaryFloatingPointProperties
     single-source/BitCount
+    single-source/Breadcrumbs
     single-source/ByteSwap
     single-source/COWTree
     single-source/COWArrayGuaranteedParameterOverhead
@@ -55,6 +56,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CharacterProperties
     single-source/Chars
     single-source/ClassArrayGetter
+    single-source/Codable
     single-source/Combos
     single-source/CountAlgo
     single-source/DataBenchmarks

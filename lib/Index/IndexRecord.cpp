@@ -406,6 +406,7 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
       case FileUnitKind::Builtin:
         break;
       case FileUnitKind::SerializedAST:
+      case FileUnitKind::DWARFModule:
       case FileUnitKind::ClangModule: {
         auto *LFU = cast<LoadedFile>(FU);
         if (auto *F = fileMgr.getFile(LFU->getFilename())) {

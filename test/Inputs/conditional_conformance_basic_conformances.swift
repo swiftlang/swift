@@ -238,44 +238,6 @@ public func double_concrete_concrete() {
 // CHECK-NEXT:  }
 
 
-// # Witness table instantiators
-
-// witness table instantiator for Single : P1
-
-// CHECK-LABEL: define internal void @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWI"(i8**, %swift.type* %"Single<A>", i8**)
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TABLES:%.*]] = bitcast i8** %1 to i8***
-
-// CHECK-NEXT:    [[A_P2_SRC:%.*]] = getelementptr inbounds i8**, i8*** [[TABLES]], i32 0
-// CHECK-NEXT:    [[A_P2_DEST:%.*]] = getelementptr inbounds i8*, i8** %0, i32 -1
-// CHECK-NEXT:    [[A_P2:%.*]] = load i8**, i8*** [[A_P2_SRC]], align 8
-// CHECK-NEXT:    [[CAST_A_P2_DEST:%.*]] = bitcast i8** [[A_P2_DEST]] to i8***
-// CHECK-NEXT:    store i8** [[A_P2]], i8*** [[CAST_A_P2_DEST]], align 8
-
-// CHECK-NEXT:    ret void
-// CHECK-NEXT:  }
-
-// witness table instantiator for Double : P1
-
-// CHECK-LABEL: define internal void @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWI"(i8**, %swift.type* %"Double<B, C>", i8**)
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TABLES:%.*]] = bitcast i8** %1 to i8***
-
-// CHECK-NEXT:    [[B_P2_SRC:%.*]] = getelementptr inbounds i8**, i8*** [[TABLES]], i32 0
-// CHECK-NEXT:    [[B_P2_DEST:%.*]] = getelementptr inbounds i8*, i8** %0, i32 -1
-// CHECK-NEXT:    [[B_P2:%.*]] = load i8**, i8*** [[B_P2_SRC]], align 8
-// CHECK-NEXT:    [[CAST_B_P2_DEST:%.*]] = bitcast i8** [[B_P2_DEST]] to i8***
-// CHECK-NEXT:    store i8** [[B_P2]], i8*** [[CAST_B_P2_DEST]], align 8
-
-// CHECK-NEXT:    [[C_P3_SRC:%.*]] = getelementptr inbounds i8**, i8*** [[TABLES]], i32 1
-// CHECK-NEXT:    [[C_P3_DEST:%.*]] = getelementptr inbounds i8*, i8** %0, i32 -2
-// CHECK-NEXT:    [[C_P3:%.*]] = load i8**, i8*** [[C_P3_SRC]], align 8
-// CHECK-NEXT:    [[CAST_C_P3_DEST:%.*]] = bitcast i8** [[C_P3_DEST]] to i8***
-// CHECK-NEXT:    store i8** [[C_P3]], i8*** [[CAST_C_P3_DEST]], align 8
-
-// CHECK-NEXT:    ret void
-// CHECK-NEXT:  }
-
 func dynamicCastToP1(_ value: Any) -> P1? {
   return value as? P1
 }

@@ -134,7 +134,7 @@ static bool sameDecl(Decl *decl1, Decl *decl2) {
   return false;
 }
 
-/// \brief Compare two overload choices for equality.
+/// Compare two overload choices for equality.
 static bool sameOverloadChoice(const OverloadChoice &x,
                                const OverloadChoice &y) {
   if (x.getKind() != y.getKind())
@@ -257,7 +257,7 @@ computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
   return {SelfTypeRelationship::ConformsTo, conformance};
 }
 
-/// \brief Given two generic function declarations, signal if the first is more
+/// Given two generic function declarations, signal if the first is more
 /// "constrained" than the second by comparing the number of constraints
 /// applied to each type parameter.
 /// Note that this is not a subtype or conversion check - that takes place
@@ -357,13 +357,10 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
 /// Retrieve the adjusted parameter type for overloading purposes.
 static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
-  if (auto funcTy = param.getOldType()->getAs<FunctionType>()) {
-    if (funcTy->isAutoClosure()) {
-      return funcTy->getResult();
-    }
-  }
-
-  return param.getOldType();
+  auto type = param.getOldType();
+  if (param.isAutoClosure())
+    return type->castTo<FunctionType>()->getResult();
+  return type;
 }
 
 // Is a particular parameter of a function or subscript declaration
@@ -384,7 +381,7 @@ static bool paramIsIUO(Decl *decl, int paramNum) {
   return index->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 }
 
-/// \brief Determine whether the first declaration is as "specialized" as
+/// Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
 /// "Specialized" is essentially a form of subtyping, defined below.
@@ -595,7 +592,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         break;
 
       case SelfTypeRelationship::Equivalent:
-        cs.addConstraint(ConstraintKind::Equal, selfTy1, selfTy2, locator);
+        cs.addConstraint(ConstraintKind::Bind, selfTy1, selfTy2, locator);
         break;
 
       case SelfTypeRelationship::Subclass:
@@ -775,7 +772,7 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2,
-    llvm::DenseMap<Expr *, unsigned> &weights) {
+    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights) {
   if (cs.TC.getLangOpts().DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     log.indent(cs.solverState->depth * 2)
@@ -809,7 +806,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (auto *anchor = locator->getAnchor()) {
       auto weight = weights.find(anchor);
       if (weight != weights.end())
-        return weight->getSecond() + 1;
+        return weight->getSecond().first + 1;
     }
 
     return 1;
@@ -1066,7 +1063,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         auto param2 = params[1].getOldType()->castTo<AnyFunctionType>();
 
         assert(param1->getOptionalObjectType());
-        assert(param2->isAutoClosure());
+        assert(params[1].isAutoClosure());
         assert(param2->getResult()->getOptionalObjectType());
 
         (void) param1;
@@ -1135,17 +1132,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
     // The systems are not considered equivalent.
     identical = false;
-
-    // If one type is convertible to of the other, but not vice-versa.
-    type1Better = tc.isConvertibleTo(type1, type2, cs.DC);
-    type2Better = tc.isConvertibleTo(type2, type1, cs.DC);
-    if (type1Better || type2Better) {
-      if (type1Better)
-        ++score1;
-      if (type2Better)
-        ++score2;
-      continue;
-    }
 
     // A concrete type is better than an archetype.
     // FIXME: Total hack.
@@ -1226,7 +1212,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
 Optional<unsigned>
 ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
-                                   llvm::DenseMap<Expr *, unsigned> &weights,
                                    bool minimize) {
   if (viable.empty())
     return None;
@@ -1250,7 +1235,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   SmallVector<bool, 16> losers(viable.size(), false);
   unsigned bestIdx = 0;
   for (unsigned i = 1, n = viable.size(); i != n; ++i) {
-    switch (compareSolutions(*this, viable, diff, i, bestIdx, weights)) {
+    switch (compareSolutions(*this, viable, diff, i, bestIdx, ExprWeights)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1274,7 +1259,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     if (i == bestIdx)
       continue;
 
-    switch (compareSolutions(*this, viable, diff, bestIdx, i, weights)) {
+    switch (compareSolutions(*this, viable, diff, bestIdx, i, ExprWeights)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1326,7 +1311,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       if (losers[j])
         continue;
 
-      switch (compareSolutions(*this, viable, diff, i, j, weights)) {
+      switch (compareSolutions(*this, viable, diff, i, j, ExprWeights)) {
       case SolutionCompareResult::Identical:
         // FIXME: Dub one of these the loser arbitrarily?
         break;

@@ -1,4 +1,5 @@
 import Swift
+import SwiftPrivate
 import Darwin
 import StdlibUnittest
 import Foundation
@@ -32,7 +33,7 @@ func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(type(of: d)) as NSString
   return [
     "_SwiftDeferredNSDictionary",
-    "_EmptyDictionarySingleton",
+    "__EmptyDictionarySingleton",
     "_DictionaryStorage"].contains {
     className.range(of: $0).length > 0
   }
@@ -234,6 +235,10 @@ var _bridgedKeyBridgeOperations = _stdlib_AtomicInt(0)
 
 struct TestBridgedKeyTy
   : Equatable, Hashable, CustomStringConvertible, _ObjectiveCBridgeable {
+  var value: Int
+  var _hashValue: Int
+  var serial: Int
+
   static var bridgeOperations: Int {
     get {
       return _bridgedKeyBridgeOperations.load()
@@ -256,6 +261,10 @@ struct TestBridgedKeyTy
 
   var hashValue: Int {
     return _hashValue
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(_hashValue)
   }
 
   func _bridgeToObjectiveC() -> TestObjCKeyTy {
@@ -285,10 +294,6 @@ struct TestBridgedKeyTy
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
-
-  var value: Int
-  var _hashValue: Int
-  var serial: Int
 }
 
 func == (lhs: TestBridgedKeyTy, rhs: TestBridgedKeyTy) -> Bool {

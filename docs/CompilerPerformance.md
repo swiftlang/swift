@@ -695,7 +695,7 @@ files in `<directory>`.
 
 This option also provides _some_ high-level counters that are "always available"
 regardless of whether you're using an assert or release build, though assert
-builds still get _more_ counters (all of those available thorugh
+builds still get _more_ counters (all of those available through
 `-print-stats`). If you are using a new-enough compiler, `-stats-output-dir`
 often simplifies analysis, since its output is machine-readable and aggregates
 all the jobs in a multi-job compilation, and there's a post-processing script
@@ -1322,7 +1322,7 @@ internals of the compiler, just time and patience.
 
   - Add Open Source projects to the
     [source-compatibility testsuite](https://swift.org/source-compatibility/).
-    Apple's internal CI infastructure is now tracking selected non-assert-build
+    Apple's internal CI infrastructure is now tracking selected non-assert-build
     `UnifiedStatsReporter` counters on those projects, and the team is far
     more likely to catch a regression if it's shown by a project in the testsuite.
 

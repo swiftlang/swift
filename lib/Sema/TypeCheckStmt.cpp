@@ -31,6 +31,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/TopCollection.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Syntax/TokenKinds.h"
@@ -284,7 +285,7 @@ class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
   TypeChecker &TC;
 
-  /// \brief This is the current function or closure being checked.
+  /// This is the current function or closure being checked.
   /// This is null for top level code.
   Optional<AnyFunctionRef> TheFunc;
   
@@ -471,6 +472,8 @@ public:
       tryDiagnoseUnnecessaryCastOverOptionSet(TC.Context, E, ResultTy,
                                               DC->getParentModule());
     }
+    while (auto ICE = dyn_cast<ImplicitConversionExpr>(E))
+      E = ICE->getSubExpr();
     if (auto DRE = dyn_cast<DeclRefExpr>(E))
       if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl()))
         TC.addEscapingFunctionAsReturnValue(FD, RS);
@@ -552,6 +555,13 @@ public:
     TS->setSubExpr(E);
     
     return TS;
+  }
+
+  Stmt *visitPoundAssertStmt(PoundAssertStmt *PA) {
+    Expr *C = PA->getCondition();
+    TC.typeCheckCondition(C, DC);
+    PA->setCondition(C);
+    return PA;
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
@@ -778,6 +788,7 @@ public:
 
   Stmt *visitBreakStmt(BreakStmt *S) {
     LabeledStmt *Target = nullptr;
+    TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
     // Pick the nearest break target that matches the specified name.
     if (S->getTargetName().empty()) {
       for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
@@ -797,31 +808,39 @@ public:
         if (S->getTargetName() == (*I)->getLabelInfo().Name) {
           Target = *I;
           break;
+        } else {
+          unsigned distance =
+            TC.getCallEditDistance(S->getTargetName(), (*I)->getLabelInfo().Name,
+                                   TypeChecker::UnreasonableCallEditDistance);
+          if (distance < TypeChecker::UnreasonableCallEditDistance)
+            labelCorrections.insert(distance, std::move(*I));
         }
       }
+      labelCorrections.filterMaxScoreRange(
+        TypeChecker::MaxCallEditDistanceFromBestCandidate);
     }
     
     if (!Target) {
       // If we're in a defer, produce a tailored diagnostic.
       if (isInDefer()) {
         TC.diagnose(S->getLoc(), diag::jump_out_of_defer, "break");
-        return nullptr;
+      } else if (S->getTargetName().empty()) {
+        // If we're dealing with an unlabeled break inside of an 'if' or 'do'
+        // statement, produce a more specific error.
+        if (std::any_of(ActiveLabeledStmts.rbegin(),
+                        ActiveLabeledStmts.rend(),
+                        [&](Stmt *S) -> bool {
+                          return isa<IfStmt>(S) || isa<DoStmt>(S);
+                        })) {
+          TC.diagnose(S->getLoc(), diag::unlabeled_break_outside_loop);
+        } else {
+          // Otherwise produce a generic error.
+          TC.diagnose(S->getLoc(), diag::break_outside_loop);
+        }
+      } else {
+        emitUnresolvedLabelDiagnostics(TC, S->getTargetLoc(), S->getTargetName(),
+                                       labelCorrections);
       }
-      
-      auto diagid = diag::break_outside_loop;
-
-      // If someone is using an unlabeled break inside of an 'if' or 'do'
-      // statement, produce a more specific error.
-      if (S->getTargetName().empty() &&
-          std::any_of(ActiveLabeledStmts.rbegin(),
-                      ActiveLabeledStmts.rend(),
-                      [&](Stmt *S) -> bool {
-                        return isa<IfStmt>(S) || isa<DoStmt>(S);
-                      })) {
-        diagid = diag::unlabeled_break_outside_loop;
-      }
-
-      TC.diagnose(S->getLoc(), diagid);
       return nullptr;
     }
     S->setTarget(Target);
@@ -830,6 +849,7 @@ public:
 
   Stmt *visitContinueStmt(ContinueStmt *S) {
     LabeledStmt *Target = nullptr;
+    TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
     // Scan to see if we are in any non-switch labeled statements (loops).  Scan
     // inside out.
     if (S->getTargetName().empty()) {
@@ -849,30 +869,67 @@ public:
         if (S->getTargetName() == (*I)->getLabelInfo().Name) {
           Target = *I;
           break;
+        } else {
+          unsigned distance =
+            TC.getCallEditDistance(S->getTargetName(), (*I)->getLabelInfo().Name,
+                                   TypeChecker::UnreasonableCallEditDistance);
+          if (distance < TypeChecker::UnreasonableCallEditDistance)
+            labelCorrections.insert(distance, std::move(*I));
         }
       }
+      labelCorrections.filterMaxScoreRange(
+        TypeChecker::MaxCallEditDistanceFromBestCandidate);
     }
 
-    if (!Target) {
+    if (Target) {
+      // Continue cannot be used to repeat switches, use fallthrough instead.
+      if (!Target->isPossibleContinueTarget()) {
+        TC.diagnose(S->getLoc(), diag::continue_not_in_this_stmt,
+                    isa<SwitchStmt>(Target) ? "switch" : "if");
+        return nullptr;
+      }
+    } else {
       // If we're in a defer, produce a tailored diagnostic.
       if (isInDefer()) {
         TC.diagnose(S->getLoc(), diag::jump_out_of_defer, "break");
-        return nullptr;
+      } else if (S->getTargetName().empty()) {
+        // If we're dealing with an unlabeled continue, produce a generic error.
+        TC.diagnose(S->getLoc(), diag::continue_outside_loop);
+      } else {
+        emitUnresolvedLabelDiagnostics(TC, S->getTargetLoc(), S->getTargetName(),
+                                       labelCorrections);
       }
-
-      TC.diagnose(S->getLoc(), diag::continue_outside_loop);
       return nullptr;
     }
-
-    // Continue cannot be used to repeat switches, use fallthrough instead.
-    if (!Target->isPossibleContinueTarget()) {
-      TC.diagnose(S->getLoc(), diag::continue_not_in_this_stmt,
-                  isa<SwitchStmt>(Target) ? "switch" : "if");
-      return nullptr;
-    }
-
     S->setTarget(Target);
     return S;
+  }
+
+  static void
+  emitUnresolvedLabelDiagnostics(TypeChecker &tc, SourceLoc targetLoc, Identifier targetName,
+                                 TopCollection<unsigned, LabeledStmt *> corrections) {
+    // If an unresolved label was used, but we have a single correction,
+    // produce the specific diagnostic and fixit.
+    if (corrections.size() == 1) {
+      tc.diagnose(targetLoc, diag::unresolved_label_corrected,
+                  targetName, corrections.begin()->Value->getLabelInfo().Name)
+        .highlight(SourceRange(targetLoc))
+        .fixItReplace(SourceRange(targetLoc),
+                      corrections.begin()->Value->getLabelInfo().Name.str());
+      tc.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
+                  diag::identifier_declared_here,
+                  corrections.begin()->Value->getLabelInfo().Name);
+    } else {
+      // If we have multiple corrections or none, produce a generic diagnostic
+      // and all corrections available.
+      tc.diagnose(targetLoc, diag::unresolved_label, targetName)
+        .highlight(SourceRange(targetLoc));
+      for (auto &entry : corrections)
+        tc.diagnose(entry.Value->getLabelInfo().Loc, diag::note_typo_candidate,
+                    entry.Value->getLabelInfo().Name.str())
+          .fixItReplace(SourceRange(targetLoc),
+                        entry.Value->getLabelInfo().Name.str());
+    }
   }
   
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
@@ -1303,6 +1360,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       return checkIgnoredExpr(IIO->getSubExpr());
     if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr()))
       return checkIgnoredExpr(C);
+    if (auto *OE = dyn_cast<OpenExistentialExpr>(OEE->getSubExpr()))
+      return checkIgnoredExpr(OE);
   }
 
   if (auto *LE = dyn_cast<LiteralExpr>(valueE)) {
@@ -1515,12 +1574,12 @@ void TypeChecker::checkDefaultArguments(ParameterList *params,
       continue;
 
     Expr *e = param->getDefaultValue();
-    auto initContext = param->getDefaultArgumentInitContext();
+    auto *initContext = param->getDefaultArgumentInitContext();
 
-    // Type-check the initializer, then flag that we did so.
-    auto resultTy = typeCheckExpression(
-        e, initContext, TypeLoc::withoutLoc(param->getType()),
-        CTP_DefaultParameter);
+    auto resultTy =
+        typeCheckParameterDefault(e, initContext, param->getType(),
+                                  /*isAutoClosure=*/param->isAutoClosure());
+
     if (resultTy) {
       param->setDefaultValue(e);
     } else {

@@ -172,6 +172,11 @@ def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, Par
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
+def package_description_version: Separate<["-"], "package-description-version">,
+  Flags<[FrontendOption, HelpHidden, ParseableInterfaceOption]>,
+  HelpText<"The version number to be applied on the input for the PackageDescription availability kind">,
+  MetaVarName<"<vers>">;
+
 def tools_directory : Separate<["-"], "tools-directory">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
@@ -273,12 +278,20 @@ def emit_tbd_path_EQ : Joined<["-"], "emit-tbd-path=">,
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Serialize diagnostics in a binary format">;
+def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
+  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Emit a serialized diagnostics file to <path>">,
+  MetaVarName<"<path>">;
+def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
+  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Alias<serialize_diagnostics_path>;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang module cache path">;
 
-def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption, ParseableInterfaceOption]>,
+def module_name : Separate<["-"], "module-name">,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
@@ -464,17 +477,20 @@ def Xlinker : Separate<["-"], "Xlinker">,
 
 def O_Group : OptionGroup<"<optimization level options>">;
 
-def Onone : Flag<["-"], "Onone">, Group<O_Group>, Flags<[FrontendOption]>,
+def Onone : Flag<["-"], "Onone">, Group<O_Group>,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Compile without any optimization">;
-def O : Flag<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>,
+def O : Flag<["-"], "O">, Group<O_Group>,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Compile with optimizations">;
-def Osize : Flag<["-"], "Osize">, Group<O_Group>, Flags<[FrontendOption]>,
+def Osize : Flag<["-"], "Osize">, Group<O_Group>,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Compile with optimizations and target small code size">;
 def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Compile with optimizations and remove runtime safety checks">;
 def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
-  Flags<[HelpHidden, FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
@@ -748,6 +764,9 @@ def Xcc : Separate<["-"], "Xcc">, Flags<[FrontendOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
+def Xclang_linker : Separate<["-"], "Xclang-linker">, Flags<[HelpHidden]>,
+  MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is use for linking.">;
+
 def Xllvm : Separate<["-"], "Xllvm">,
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to LLVM.">;
@@ -790,6 +809,10 @@ def embed_bitcode_marker : Flag<["-"], "embed-bitcode-marker">,
 def enable_testing : Flag<["-"], "enable-testing">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allows this module's internal API to be accessed for testing">;
+
+def enable_private_imports : Flag<["-"], "enable-private-imports">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Allows this module's internal and private API to be accessed">;
 
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,

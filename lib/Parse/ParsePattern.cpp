@@ -21,9 +21,9 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/SyntaxKind.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -31,7 +31,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-/// \brief Determine the kind of a default argument given a parsed
+/// Determine the kind of a default argument given a parsed
 /// expression that has not yet been type-checked.
 static DefaultArgumentKind getDefaultArgKind(Expr *init) {
   if (!init)
@@ -483,6 +483,14 @@ mapParsedParameters(Parser &parser,
                                                              parsingEnumElt);
       }
       param->getTypeLoc() = TypeLoc(type);
+
+      // If there is `@autoclosure` attribute associated with the type
+      // let's mark that in the declaration as well, because it
+      // belongs to both type flags and declaration.
+      if (auto *ATR = dyn_cast<AttributedTypeRepr>(type)) {
+        auto &attrs = ATR->getAttrs();
+        param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+      }
     } else if (paramContext != Parser::ParameterContextKind::Closure) {
       // Non-closure parameters require a type.
       if (!param->isInvalid())
@@ -1129,8 +1137,8 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     return status;
 
   if (SyntaxContext->isEnabled()) {
-    if (auto UPES = PatternCtx.popIf<UnresolvedPatternExprSyntax>()) {
-      PatternCtx.addSyntax(UPES->getPattern());
+    if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
+      PatternCtx.addSyntax(UPES->getDeferredPattern());
     } else {
       PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
     }

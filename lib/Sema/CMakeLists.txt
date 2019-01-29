@@ -29,6 +29,7 @@ add_swift_host_library(swiftSema STATIC
   DerivedConformanceRawRepresentable.cpp
   DerivedConformances.cpp
   InstrumenterSupport.cpp
+  LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
   NameBinding.cpp
   PCMacro.cpp
@@ -58,7 +59,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
   TypeChecker.cpp
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftParse
     swiftAST
     swiftSerialization

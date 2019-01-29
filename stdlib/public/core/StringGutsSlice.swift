@@ -16,22 +16,18 @@
 
 // A sliced _StringGuts, convenient for unifying String/Substring comparison,
 // hashing, and RRC.
-@_fixed_layout
-@usableFromInline
 internal struct _StringGutsSlice {
-  @usableFromInline
   internal var _guts: _StringGuts
 
-  @usableFromInline
   internal var _offsetRange: Range<Int>
 
-  @inlinable @inline(__always)
+  @inline(__always)
   internal init(_ guts: _StringGuts) {
     self._guts = guts
     self._offsetRange = 0..<self._guts.count
   }
 
-  @inlinable @inline(__always)
+  @inline(__always)
   internal init(_ guts: _StringGuts, _ offsetRange: Range<Int>) {
     self._guts = guts
     self._offsetRange = offsetRange
@@ -83,7 +79,7 @@ internal struct _StringGutsSlice {
     }
   }
 
-  @inlinable @inline(__always)
+  @inline(__always)
   internal func withFastUTF8<R>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {

@@ -53,6 +53,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_case:
   case tok::kw_default:
   case tok::kw_yield:
+  case tok::pound_assert:
   case tok::pound_if:
   case tok::pound_warning:
   case tok::pound_error:
@@ -265,8 +266,12 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind Kind,
                                      BraceItemListKind ConditionalBlockKind) {
+  bool isRootCtx = SyntaxContext->isRoot();
   SyntaxParsingContext ItemListContext(SyntaxContext,
                                        SyntaxKind::CodeBlockItemList);
+  if (isRootCtx) {
+    ItemListContext.setTransparent();
+  }
 
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
                     (Kind == BraceItemListKind::TopLevelLibrary);
@@ -636,6 +641,10 @@ ParserResult<Stmt> Parser::parseStmt() {
     return makeParserResult(
         new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough)));
   }
+  case tok::pound_assert:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    return parseStmtPoundAssert();
   }
 }
 
@@ -665,7 +674,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   if (parseMatchingToken(tok::r_brace, RBLoc,
                          diag::expected_rbrace_in_brace_stmt, LBLoc)) {
     // Synthesize a r-brace if the source doesn't have any.
-    LocalContext.synthesize(tok::r_brace);
+    LocalContext.synthesize(tok::r_brace, LBLoc.getAdvancedLoc(1));
   }
 
   return makeParserResult(Status,
@@ -1183,9 +1192,10 @@ static void validateAvailabilitySpecList(Parser &P,
   bool HasOtherPlatformSpec = false;
 
   if (Specs.size() == 1 &&
-      isa<LanguageVersionConstraintAvailabilitySpec>(Specs[0])) {
-    // @available(swift N) is allowed only in isolation; it cannot
-    // be combined with other availability specs in a single list.
+      isa<PlatformAgnosticVersionConstraintAvailabilitySpec>(Specs[0])) {
+    // @available(swift N) and @available(_PackageDescription N) are allowed 
+    // only in isolation; they cannot be combined with other availability specs
+    // in a single list.
     return;
   }
 
@@ -1195,10 +1205,11 @@ static void validateAvailabilitySpecList(Parser &P,
       continue;
     }
 
-    if (auto *LangSpec =
-        dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
-      P.diagnose(LangSpec->getSwiftLoc(),
-                 diag::availability_swift_must_occur_alone);
+    if (auto *PlatformAgnosticSpec =
+        dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
+      P.diagnose(PlatformAgnosticSpec->getPlatformAgnosticNameLoc(),
+                 diag::availability_must_occur_alone,
+                 PlatformAgnosticSpec->isLanguageVersionSpecific() ? "swift" : "_PackageDescription");
       continue;
     }
 
@@ -1245,10 +1256,12 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   ParserStatus Status = parseAvailabilitySpecList(Specs);
 
   for (auto *Spec : Specs) {
-    if (auto *Lang =
-        dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
-      diagnose(Lang->getSwiftLoc(),
-               diag::pound_available_swift_not_allowed);
+    if (auto *PlatformAgnostic =
+        dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
+        diagnose(PlatformAgnostic->getPlatformAgnosticNameLoc(),
+                 PlatformAgnostic->isLanguageVersionSpecific() ?
+                   diag::pound_available_swift_not_allowed :
+                   diag::pound_available_package_description_not_allowed);
       Status.setIsParseError();
     }
   }
@@ -2399,4 +2412,54 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
       Status, CaseStmt::create(Context, CaseLoc, CaseLabelItems,
                                !BoundDecls.empty(), UnknownAttrLoc, ColonLoc,
                                Body));
+}
+
+/// stmt-pound-assert:
+///   '#assert' '(' expr (',' string_literal)? ')'
+ParserResult<Stmt> Parser::parseStmtPoundAssert() {
+  SyntaxContext->setCreateSyntax(SyntaxKind::PoundAssertStmt);
+
+  SourceLoc startLoc = consumeToken(tok::pound_assert);
+  SourceLoc endLoc;
+
+  if (Tok.isNot(tok::l_paren)) {
+    diagnose(Tok, diag::pound_assert_expected_lparen);
+    return makeParserError();
+  }
+  SourceLoc LBLoc = consumeToken(tok::l_paren);
+
+  auto conditionExprResult = parseExpr(diag::pound_assert_expected_expression);
+  if (conditionExprResult.isParseError())
+    return ParserStatus(conditionExprResult);
+
+  StringRef message;
+  if (consumeIf(tok::comma)) {
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Tok.getLoc(), diag::pound_assert_expected_string_literal);
+      return makeParserError();
+    }
+
+    auto messageOpt = getStringLiteralIfNotInterpolated(Tok.getLoc(),
+                                                        "'#assert' message");
+    consumeToken();
+    if (!messageOpt)
+      return makeParserError();
+
+    message = *messageOpt;
+  }
+
+  if (parseMatchingToken(tok::r_paren, endLoc,
+                         diag::pound_assert_expected_rparen, LBLoc)) {
+    return makeParserError();
+  }
+
+  // We check this after consuming everything, so that the SyntaxContext
+  // understands this statement even when the feature is disabled.
+  if (!Context.LangOpts.EnableExperimentalStaticAssert) {
+    diagnose(startLoc, diag::pound_assert_disabled);
+    return makeParserError();
+  }
+
+  return makeParserResult<Stmt>(new (Context) PoundAssertStmt(
+      SourceRange(startLoc, endLoc), conditionExprResult.get(), message));
 }

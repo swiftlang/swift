@@ -1,4 +1,4 @@
-// RUN: %swiftc_driver -g -debug-prefix-map %S=/var/empty %s -emit-ir -o - | %FileCheck %s
+// RUN: %swiftc_driver -g -debug-prefix-map %/S=/var/empty %/s -emit-ir -o - | %FileCheck %s
 
 func square(_ n: Int) -> Int {
   return n * n

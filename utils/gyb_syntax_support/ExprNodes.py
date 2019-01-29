@@ -210,15 +210,6 @@ EXPR_NODES = [
              Child('RightSquare', kind='RightSquareBracketToken'),
          ]),
 
-    # .foo
-    Node('ImplicitMemberExpr', kind='Expr',
-         children=[
-             Child("Dot", kind='PrefixPeriodToken'),
-             Child("Name", kind='Token'),
-             Child('DeclNameArguments', kind='DeclNameArguments',
-                   is_optional=True),
-         ]),
-
     # function-call-argument -> label? ':'? expression ','?
     Node('FunctionCallArgument', kind='Syntax',
          traits=['WithTrailingComma'],
@@ -297,27 +288,20 @@ EXPR_NODES = [
              Child("SecondChoice", kind='Expr')
          ]),
 
-    # a.b
+    # expr?.name
     Node('MemberAccessExpr', kind='Expr',
          children=[
              # The base needs to be optional to parse expressions in key paths
              # like \.a
              Child("Base", kind='Expr', is_optional=True),
-             Child("Dot", kind='PeriodToken'),
-             Child("Name", kind='Token'),
-             Child('DeclNameArguments', kind='DeclNameArguments',
-                   is_optional=True),
-         ]),
-
-    # dot-self-expr -> expr '.' 'self'
-    Node('DotSelfExpr', kind='Expr',
-         children=[
-             Child('Expression', kind='Expr'),
-             Child('Dot', kind='Token',
+             Child("Dot", kind='Token',
                    token_choices=[
                        'PeriodToken', 'PrefixPeriodToken'
                    ]),
-             Child('SelfKeyword', kind='SelfToken'),
+             # Name could be 'self'
+             Child("Name", kind='Token'),
+             Child('DeclNameArguments', kind='DeclNameArguments',
+                   is_optional=True),
          ]),
 
     # is TypeName
@@ -473,7 +457,7 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('LeftParen', kind='LeftParenToken', 
+             Child('LeftParen', kind='LeftParenToken',
                    classification='StringInterpolationAnchor',
                    force_classification=True),
              Child('Expression', kind='Expr'),
@@ -500,17 +484,17 @@ EXPR_NODES = [
     Node('KeyPathExpr', kind='Expr',
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('RootExpr', kind='Expr', is_optional=True, 
+             Child('RootExpr', kind='Expr', is_optional=True,
                    node_choices=[
                        Child('IdentifierExpr', kind='IdentifierExpr'),
                        Child('SpecializeExpr', kind='SpecializeExpr')
-                   ]), 
+                   ]),
              Child('Expression', kind='Expr'),
          ]),
 
-    # The period in the key path serves as the base on which the 
+    # The period in the key path serves as the base on which the
     # right-hand-side of the key path is evaluated
-    Node('KeyPathBaseExpr', kind='Expr', 
+    Node('KeyPathBaseExpr', kind='Expr',
          children=[
              Child('Period', kind='PeriodToken'),
          ]),

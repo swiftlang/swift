@@ -13,6 +13,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -125,12 +126,12 @@ Optional<Type> SuperclassTypeRequest::getCachedResult() const {
   auto nominalDecl = std::get<0>(getStorage());
 
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    if (classDecl->LazySemanticInfo.Superclass.getInt())
-      return classDecl->LazySemanticInfo.Superclass.getPointer();
+    if (classDecl->LazySemanticInfo.SuperclassType.getInt())
+      return classDecl->LazySemanticInfo.SuperclassType.getPointer();
 
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
-    if (protocolDecl->LazySemanticInfo.Superclass.getInt())
-      return protocolDecl->LazySemanticInfo.Superclass.getPointer();
+    if (protocolDecl->LazySemanticInfo.SuperclassType.getInt())
+      return protocolDecl->LazySemanticInfo.SuperclassType.getPointer();
 
   return None;
 }
@@ -139,10 +140,10 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
   auto nominalDecl = std::get<0>(getStorage());
 
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    classDecl->LazySemanticInfo.Superclass.setPointerAndInt(value, true);
+    classDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
-    protocolDecl->LazySemanticInfo.Superclass.setPointerAndInt(value, true);
+    protocolDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 }
 
 //----------------------------------------------------------------------------//
@@ -428,4 +429,70 @@ void USRGenerationRequest::noteCycleStep(DiagnosticEngine &diags) const {
   const auto &storage = getStorage();
   auto &d = std::get<0>(storage);
   diags.diagnose(d, diag::circular_reference);
+}
+
+//----------------------------------------------------------------------------//
+// DefaultTypeRequest.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const KnownProtocolKind kind) {
+  out << getProtocolName(kind);
+}
+
+void DefaultTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  diags.diagnose(SourceLoc(), diag::circular_reference);
+}
+
+void DefaultTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  diags.diagnose(SourceLoc(), diag::circular_reference_through);
+}
+
+//----------------------------------------------------------------------------//
+// DefaultTypeRequest caching.
+//----------------------------------------------------------------------------//
+
+SourceFile *DefaultTypeRequest::getSourceFile() const {
+  return getDeclContext()->getParentSourceFile();
+}
+
+Type &DefaultTypeRequest::getCache() const {
+  return getDeclContext()->getASTContext().getDefaultTypeRequestCache(
+      getSourceFile(), getKnownProtocolKind());
+}
+
+Optional<Type> DefaultTypeRequest::getCachedResult() const {
+  auto const &cachedType = getCache();
+  return cachedType ? Optional<Type>(cachedType) : None;
+}
+
+void DefaultTypeRequest::cacheResult(Type value) const { getCache() = value; }
+
+const char *
+DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
+  switch (knownProtocolKind) {
+
+// clang-format off
+    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
+      case KnownProtocolKind::Id: return typeName;
+    # include "swift/AST/KnownProtocols.def"
+    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+    //clang-format on
+      
+    default: return nullptr;
+  }
+}
+
+bool DefaultTypeRequest::getPerformLocalLookup(const KnownProtocolKind knownProtocolKind) {
+  switch (knownProtocolKind) {
+      
+    // clang-format off
+    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
+      case KnownProtocolKind::Id: return performLocalLookup;
+    # include "swift/AST/KnownProtocols.def"
+    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+    //clang-format on
+      
+    default: return false;
+  }
 }

@@ -1,5 +1,3 @@
-.. @raise litre.TestsAreMissing
-
 Logical Objects
 ===============
 

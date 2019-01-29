@@ -140,7 +140,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
   // If the method is dynamic, access it through runtime-hookable virtual
   // dispatch (viz. objc_msgSend for now).
   if (methodConstant.hasDecl()
-      && methodConstant.getDecl()->isDynamic()) {
+      && methodConstant.getDecl()->isObjCDynamic()) {
     methodValue = emitDynamicMethodRef(
                       loc, methodConstant,
                       SGM.Types.getConstantInfo(methodConstant).SILFnType)
@@ -495,7 +495,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   ctx);
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
-        NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized);
+        NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized,
+        IsNotDynamic);
     auto NSStringFromClass = B.createFunctionRef(mainClass, NSStringFromClassFn);
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
@@ -584,7 +585,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     SILGenFunctionBuilder builder(SGM);
     auto NSApplicationMainFn = builder.getOrCreateFunction(
         mainClass, "NSApplicationMain", SILLinkage::PublicExternal,
-        NSApplicationMainType, IsBare, IsTransparent, IsNotSerialized);
+        NSApplicationMainType, IsBare, IsTransparent, IsNotSerialized,
+        IsNotDynamic);
 
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
@@ -684,4 +686,20 @@ Optional<ASTNode> SILGenFunction::getPGOParent(ASTNode Node) const {
   if (SILProfiler *SP = F.getProfiler())
     return SP->getPGOParent(Node);
   return None;
+}
+
+SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,
+                                                 SILValue value) {
+  // This is a loop because we want to handle types that wrap integer types,
+  // like ObjCBool (which may be Bool or Int8).
+  while (!value->getType().is<BuiltinIntegerType>()) {
+    auto structDecl = value->getType().getStructOrBoundGenericStruct();
+    assert(structDecl && "value for error result wasn't of struct type!");
+    assert(std::next(structDecl->getStoredProperties().begin())
+           == structDecl->getStoredProperties().end());
+    auto property = *structDecl->getStoredProperties().begin();
+    value = B.createStructExtract(loc, value, property);
+  }
+
+  return value;
 }

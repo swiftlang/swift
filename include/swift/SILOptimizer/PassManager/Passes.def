@@ -232,8 +232,10 @@ PASS(PerfInliner, "inline",
      "Performance Function Inlining")
 PASS(PerformanceConstantPropagation, "performance-constant-propagation",
      "Constant Propagation for Performance without Diagnostics")
-PASS(PredictableMemoryOptimizations, "predictable-memopt",
-     "Predictable Memory Optimization for Diagnostics")
+PASS(PredictableMemoryAccessOptimizations, "predictable-memaccess-opts",
+     "Predictable Memory Access Optimizations for Diagnostics")
+PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
+     "Eliminate dead temporary allocations after diagnostics")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",

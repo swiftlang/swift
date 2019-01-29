@@ -1671,3 +1671,18 @@ do {
   func h(_: ()) {} // expected-note {{'h' declared here}}
   h() // expected-error {{missing argument for parameter #1 in call}}
 }
+
+// https://bugs.swift.org/browse/SR-7191
+class Mappable<T> {
+  init(_: T) { }
+  func map<U>(_ body: (T) -> U) -> U { fatalError() }
+}
+
+let x = Mappable(())
+_ = x.map { (_: Void) in return () }
+
+// https://bugs.swift.org/browse/SR-9470
+do {
+  func f(_: Int...) {}
+  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot invoke 'map' with an argument list of type '((Int...) -> ())'}}
+}

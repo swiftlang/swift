@@ -18,11 +18,19 @@ extension Double : P2 {
   typealias AssocType = Double
 }
 
-extension X<Int, Double, String> { } // expected-error{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
+extension X<Int, Double, String> {
+// expected-error@-1{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
+  let x = 0
+  // expected-error@-1 {{extensions must not contain stored properties}}
+  static let x = 0
+  // expected-error@-1 {{static stored properties not supported in generic types}}
+  func f() -> Int {}
+  class C<T> {}
+}
 
 typealias GGG = X<Int, Double, String>
 
-extension GGG { } // expected-error{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
+extension GGG { } // okay through a typealias
 
 // Lvalue check when the archetypes are not the same.
 struct LValueCheck<T> {
@@ -173,5 +181,45 @@ func foo() {
   extension Array where Element : P1 {
   // expected-error@-1 {{declaration is only valid at file scope}}
     func foo() -> Element.AssocType {}
+  }
+}
+
+// Deeply nested
+protocol P6 {
+  associatedtype Assoc1
+  associatedtype Assoc2
+}
+
+struct A<T, U, V> {
+  struct B<W, X, Y> {
+    struct C<Z: P6> {
+    }
+  }
+}
+
+extension A.B.C where T == V, X == Z.Assoc2 {
+  func f() { }
+}
+
+// Extensions of nested non-generics within generics.
+extension A.B {
+  struct D { }
+}
+
+extension A.B.D {
+  func g() { }
+}
+
+// rdar://problem/43955962
+struct OldGeneric<T> {}
+typealias NewGeneric<T> = OldGeneric<T>
+
+extension NewGeneric {
+  static func oldMember() -> OldGeneric {
+    return OldGeneric()
+  }
+
+  static func newMember() -> NewGeneric {
+    return NewGeneric()
   }
 }

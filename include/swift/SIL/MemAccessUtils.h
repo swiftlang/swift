@@ -106,15 +106,11 @@ public:
   /// Enumerate over all valid begin_access bases. Clients can use a covered
   /// switch to warn if findAccessedAddressBase ever adds a case.
   enum Kind : uint8_t {
-    Box,
-    Stack,
-    Global,
-    Class,
-    Argument,
-    Yield,
-    Nested,
-    Unidentified,
-    NumKindBits = countBitsUsed(static_cast<unsigned>(Unidentified))
+#define ACCESSED_STORAGE(Name) Name,
+#define ACCESSED_STORAGE_RANGE(Name, Start, End)                               \
+  First_##Name = Start, Last_##Name = End,
+#include "swift/SIL/AccessedStorage.def"
+    NumKindBits = countBitsUsed(unsigned(Last_AccessedStorageKind))
   };
 
   static const char *getKindName(Kind k);
@@ -314,6 +310,51 @@ private:
   bool operator==(const AccessedStorage &) const = delete;
   bool operator!=(const AccessedStorage &) const = delete;
 };
+
+/// Return true if the given storage objects have identical storage locations.
+///
+/// This compares only the AccessedStorage base class bits, ignoring the
+/// subclass bits.
+inline bool accessingIdenticalLocations(AccessedStorage LHS,
+                                        AccessedStorage RHS) {
+  if (LHS.getKind() != RHS.getKind())
+    return false;
+
+  switch (LHS.getKind()) {
+  case swift::AccessedStorage::Box:
+  case swift::AccessedStorage::Stack:
+  case swift::AccessedStorage::Nested:
+  case swift::AccessedStorage::Yield:
+  case swift::AccessedStorage::Unidentified:
+    return LHS.getValue() == RHS.getValue();
+  case swift::AccessedStorage::Argument:
+    return LHS.getParamIndex() == RHS.getParamIndex();
+  case swift::AccessedStorage::Global:
+    return LHS.getGlobal() == RHS.getGlobal();
+  case swift::AccessedStorage::Class:
+    return LHS.getObjectProjection() == RHS.getObjectProjection();
+  }
+}
+
+template <class ImplTy, class ResultTy = void, typename... ArgTys>
+class AccessedStorageVisitor {
+  ImplTy &asImpl() { return static_cast<ImplTy &>(*this); }
+
+public:
+#define ACCESSED_STORAGE(Name)                                                 \
+  ResultTy visit##Name(const AccessedStorage &storage, ArgTys &&... args);
+#include "swift/SIL/AccessedStorage.def"
+
+  ResultTy visit(const AccessedStorage &storage, ArgTys &&... args) {
+    switch (storage.getKind()) {
+#define ACCESSED_STORAGE(Name)                                                 \
+  case AccessedStorage::Name:                                                  \
+    return asImpl().visit##Name(storage, std::forward<ArgTys>(args)...);
+#include "swift/SIL/AccessedStorage.def"
+    }
+  }
+};
+
 } // end namespace swift
 
 namespace llvm {
@@ -355,24 +396,7 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
   }
 
   static bool isEqual(swift::AccessedStorage LHS, swift::AccessedStorage RHS) {
-    if (LHS.getKind() != RHS.getKind())
-      return false;
-
-    switch (LHS.getKind()) {
-    case swift::AccessedStorage::Box:
-    case swift::AccessedStorage::Stack:
-    case swift::AccessedStorage::Nested:
-    case swift::AccessedStorage::Yield:
-    case swift::AccessedStorage::Unidentified:
-      return LHS.getValue() == RHS.getValue();
-    case swift::AccessedStorage::Argument:
-      return LHS.getParamIndex() == RHS.getParamIndex();
-    case swift::AccessedStorage::Global:
-      return LHS.getGlobal() == RHS.getGlobal();
-    case swift::AccessedStorage::Class:
-        return LHS.getObjectProjection() == RHS.getObjectProjection();
-    }
-    llvm_unreachable("Unhandled AccessedStorageKind");
+    return swift::accessingIdenticalLocations(LHS, RHS);
   }
 };
 

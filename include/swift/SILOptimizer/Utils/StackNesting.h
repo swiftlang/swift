@@ -84,12 +84,8 @@ class StackNesting {
     /// The bit-set of alive stack locations at the block entry.
     BitVector AliveStackLocsAtEntry;
 
-    /// True if there is a path from this block to a function-exit.
-    ///
-    /// In other words: this block does not end in an unreachable-instruction.
-    /// This flag is only used for verifying that the lifetime of a stack
-    /// location does not end at the end of a block.
-    bool ExitReachable = false;
+    /// The bit-set of alive stack locations at the block exit.
+    BitVector AliveStackLocsAtExit;
 
     BlockInfo(SILBasicBlock *Block) : Block(Block) { }
   };
@@ -98,10 +94,10 @@ class StackNesting {
   ///
   /// Each stack location is allocated by a single allocation instruction.
   struct StackLoc {
-    StackLoc(AllocationInst *Alloc) : Alloc(Alloc) { }
+    StackLoc(SingleValueInstruction *Alloc) : Alloc(Alloc) { }
 
     /// Back-link to the allocation instruction.
-    AllocationInst *Alloc;
+    SingleValueInstruction *Alloc;
 
     /// Bit-set which represents all alive locations at this allocation.
     /// It obviously includes this location itself. And it includes all "outer"
@@ -164,6 +160,19 @@ private:
   bool insertDeallocs(const BitVector &AliveBefore, const BitVector &AliveAfter,
                       SILInstruction *InsertionPoint,
                       Optional<SILLocation> Location);
+
+  /// Reeturns the location bit number for a stack allocation instruction.
+  int bitNumberForAlloc(SILInstruction *AllocInst) {
+    assert(AllocInst->isAllocatingStack());
+    return StackLoc2BitNumbers[cast<SingleValueInstruction>(AllocInst)];
+  }
+
+  /// Reeturns the location bit number for a stack deallocation instruction.
+  int bitNumberForDealloc(SILInstruction *DeallocInst) {
+    assert(DeallocInst->isDeallocatingStack());
+    auto *AllocInst = cast<SingleValueInstruction>(DeallocInst->getOperand(0));
+    return bitNumberForAlloc(AllocInst);
+  }
 
   /// Modifies the SIL to end up with a correct stack nesting.
   ///

@@ -103,6 +103,7 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
 std::string toolchains::GenericUnix::getDefaultLinker() const {
   switch (getTriple().getArch()) {
   case llvm::Triple::arm:
+  case llvm::Triple::aarch64:
   case llvm::Triple::armeb:
   case llvm::Triple::thumb:
   case llvm::Triple::thumbeb:
@@ -301,9 +302,13 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
       if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
 
+      if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
+        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "ubsan", *this);
+
       if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
         addLinkRuntimeLib(context.Args, Arguments,
                           sanitizerRuntimeLibName("fuzzer"));
+
     }
   }
 
@@ -328,6 +333,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   // These custom arguments should be right before the object file at the end.
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
+  context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");

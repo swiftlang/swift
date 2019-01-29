@@ -111,11 +111,6 @@ DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
                llvm::cl::init(false),
                llvm::cl::desc("Do not dump AST."));
 
-static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
-    "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden,
-    llvm::cl::init(false),
-    llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
-
 static llvm::cl::opt<bool>
 DisableSILLinking("disable-sil-linking",
                   llvm::cl::init(true),
@@ -264,10 +259,6 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
     exit(-1);
   }
-
-  SILOptions &SILOpts = Invocation.getSILOptions();
-  SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
-      AssumeUnqualifiedOwnershipWhenParsing;
 
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;

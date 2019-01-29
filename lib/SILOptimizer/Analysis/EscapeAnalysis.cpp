@@ -65,6 +65,8 @@ static SingleValueInstruction *isProjection(SILNode *node) {
 static bool isNonWritableMemoryAddress(SILNode *V) {
   switch (V->getKind()) {
   case SILNodeKind::FunctionRefInst:
+  case SILNodeKind::DynamicFunctionRefInst:
+  case SILNodeKind::PreviousDynamicFunctionRefInst:
   case SILNodeKind::WitnessMethodInst:
   case SILNodeKind::ClassMethodInst:
   case SILNodeKind::SuperMethodInst:
@@ -105,7 +107,8 @@ void EscapeAnalysis::ConnectionGraph::clear() {
 
 EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::
 getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded) {
-  if (isa<FunctionRefInst>(V))
+  if (isa<FunctionRefInst>(V) || isa<DynamicFunctionRefInst>(V) ||
+      isa<PreviousDynamicFunctionRefInst>(V))
     return nullptr;
   
   if (!EA->isPointer(V))
@@ -1612,7 +1615,8 @@ bool EscapeAnalysis::deinitIsKnownToNotCapture(SILValue V) {
     if (V->getType().is<SILBoxType>())
       return true;
 
-    if (isa<FunctionRefInst>(V))
+    if (isa<FunctionRefInst>(V) || isa<DynamicFunctionRefInst>(V) ||
+        isa<PreviousDynamicFunctionRefInst>(V))
       return true;
 
     // Check all operands of a partial_apply

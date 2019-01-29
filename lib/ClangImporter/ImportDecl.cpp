@@ -165,7 +165,6 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
     return AccessorDecl::create(ctx, funcLoc,
                                 /*accessorKeywordLoc*/ SourceLoc(),
                                 accessorInfo->Kind,
-                                AddressorKind::NotAddressor,
                                 accessorInfo->Storage,
                                 /*StaticLoc*/SourceLoc(),
                                 StaticSpellingKind::None,
@@ -204,7 +203,7 @@ static bool verifyNameMapping(MappedTypeNameKind NameMapping,
 }
 #endif
 
-/// \brief Map a well-known C type to a swift type from the standard library.
+/// Map a well-known C type to a swift type from the standard library.
 ///
 /// \param IsError set to true when we know the corresponding swift type name,
 /// but we could not find it.  (For example, the type was not defined in the
@@ -323,8 +322,21 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
 
   case MappedCTypeKind::VaList:
-    if (ClangTypeSize != ClangCtx.getTypeSize(ClangCtx.VoidPtrTy))
-      return std::make_pair(Type(), "");
+    switch (ClangCtx.getTargetInfo().getBuiltinVaListKind()) {
+      case clang::TargetInfo::CharPtrBuiltinVaList:
+      case clang::TargetInfo::VoidPtrBuiltinVaList:
+      case clang::TargetInfo::PowerABIBuiltinVaList:
+      case clang::TargetInfo::AAPCSABIBuiltinVaList:
+        assert(ClangCtx.getTypeSize(ClangCtx.VoidPtrTy) == ClangTypeSize &&
+               "expected va_list type to be sizeof(void *)");
+        break;
+      case clang::TargetInfo::AArch64ABIBuiltinVaList:
+        break;
+      case clang::TargetInfo::PNaClABIBuiltinVaList:
+      case clang::TargetInfo::SystemZBuiltinVaList:
+      case clang::TargetInfo::X86_64ABIBuiltinVaList:
+        return std::make_pair(Type(), "");
+    }
     break;
 
   case MappedCTypeKind::ObjCBool:
@@ -505,7 +517,6 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      rawValueDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -586,7 +597,6 @@ static AccessorDecl *makeStructRawValueGetter(
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      computedVar,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -652,7 +662,6 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/importedFieldDecl->getLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      importedFieldDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -689,7 +698,6 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Set,
-                     AddressorKind::NotAddressor,
                      importedFieldDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -1189,7 +1197,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   return constructor;
 }
 
-/// \brief Create a constructor that initializes a struct from its members.
+/// Create a constructor that initializes a struct from its members.
 static ConstructorDecl *
 createValueConstructor(ClangImporter::Implementation &Impl,
                        StructDecl *structDecl, ArrayRef<VarDecl *> members,
@@ -1555,7 +1563,6 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/loc,
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -1612,7 +1619,6 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      /*FuncLoc=*/setter->getLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Set,
-                     AddressorKind::NotAddressor,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -1784,7 +1790,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      errorDomainPropertyDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -2010,7 +2015,7 @@ namespace {
     }
   };
 
-  /// \brief Convert Clang declarations into the corresponding Swift
+  /// Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
     : public clang::ConstDeclVisitor<SwiftDeclConverter, Decl *>
@@ -2098,7 +2103,7 @@ namespace {
       return alternateName;
     }
 
-    /// \brief Create a declaration name for anonymous enums, unions and
+    /// Create a declaration name for anonymous enums, unions and
     /// structs.
     ///
     /// Since Swift does not natively support these features, we fake them by
@@ -2411,7 +2416,7 @@ namespace {
             // the name in the imported module and the same name in the
             // standard library.
             if (auto *NAT =
-                  dyn_cast<NameAliasType>(SwiftType.getPointer()))
+                  dyn_cast<TypeAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
             auto *NTD = SwiftType->getAnyNominal();
@@ -4115,7 +4120,7 @@ namespace {
     /// Record the function or initializer overridden by the given Swift method.
     void recordObjCOverride(AbstractFunctionDecl *decl);
 
-    /// \brief Given an imported method, try to import it as a constructor.
+    /// Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
     /// constructors in Swift, enabling object construction syntax, e.g.,
@@ -4141,7 +4146,7 @@ namespace {
                                const clang::ObjCMethodDecl *objcMethod,
                                CtorInitializerKind kind);
 
-    /// \brief Given an imported method, try to import it as a constructor.
+    /// Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
     /// constructors in Swift, enabling object construction syntax, e.g.,
@@ -4166,7 +4171,7 @@ namespace {
 
     void recordObjCOverride(SubscriptDecl *subscript);
 
-    /// \brief Given either the getter or setter for a subscript operation,
+    /// Given either the getter or setter for a subscript operation,
     /// create the Swift subscript declaration.
     SubscriptDecl *importSubscript(Decl *decl,
                                    const clang::ObjCMethodDecl *objcMethod);
@@ -4204,7 +4209,7 @@ namespace {
     importObjCGenericParams(const clang::ObjCInterfaceDecl *decl,
                             DeclContext *dc);
 
-    /// \brief Import the members of all of the protocols to which the given
+    /// Import the members of all of the protocols to which the given
     /// Objective-C class, category, or extension explicitly conforms into
     /// the given list of members, so long as the method was not already
     /// declared in the class.
@@ -4225,7 +4230,7 @@ namespace {
                                   MutableArrayRef<MirroredMethodEntry> entries,
                                   SmallVectorImpl<Decl *> &newMembers);
 
-    /// \brief Import constructors from our superclasses (and their
+    /// Import constructors from our superclasses (and their
     /// categories/extensions), effectively "inheriting" constructors.
     void importInheritedConstructors(ClassDecl *classDecl,
                                      SmallVectorImpl<Decl *> &newMembers);
@@ -4256,36 +4261,10 @@ namespace {
 
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
-        // Clone generic parameters.
-        SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
-        for (auto fromGP : *objcClass->getGenericParams()) {
-          // Create the new generic parameter.
-          auto toGP = new (Impl.SwiftContext) GenericTypeParamDecl(
-              result, fromGP->getName(), SourceLoc(), fromGP->getDepth(),
-              fromGP->getIndex());
-          toGP->setImplicit(true);
-          toGP->setInherited(
-              Impl.SwiftContext.AllocateCopy(fromGP->getInherited()));
-          // Record new generic parameter.
-          toGenericParams.push_back(toGP);
-        }
+        result->createGenericParamsIfMissing(objcClass);
 
-        auto genericParams = GenericParamList::create(Impl.SwiftContext,
-            SourceLoc(), toGenericParams, SourceLoc());
-        result->setGenericParams(genericParams);
-
-        auto *env = Impl.buildGenericEnvironment(genericParams, result);
+        auto *env = objcClass->getGenericEnvironment();
         result->setGenericEnvironment(env);
-
-        // Calculate the correct bound-generic extended type.
-        SmallVector<Type, 2> genericArgs;
-        for (auto paramTy :
-             env->getGenericSignature()->getInnermostGenericParams()) {
-          genericArgs.push_back(paramTy);
-        }
-        Type extendedType =
-          BoundGenericClassType::get(objcClass, nullptr, genericArgs);
-        result->getExtendedTypeLoc().setType(extendedType);
       }
 
       // Create the extension declaration and record it.
@@ -4437,9 +4416,6 @@ namespace {
       // Compute the requirement signature.
       if (!result->isRequirementSignatureComputed())
         result->computeRequirementSignature();
-
-      auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
-      result->setGenericEnvironment(env);
 
       result->setMemberLoader(&Impl, 0);
 
@@ -6010,7 +5986,7 @@ bool SwiftDeclConverter::existingConstructorIsWorse(
   return false;
 }
 
-/// \brief Given an imported method, try to import it as a constructor.
+/// Given an imported method, try to import it as a constructor.
 ///
 /// Objective-C methods in the 'init' family are imported as
 /// constructors in Swift, enabling object construction syntax, e.g.,
@@ -6368,7 +6344,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   }
 }
 
-/// \brief Given either the getter or setter for a subscript operation,
+/// Given either the getter or setter for a subscript operation,
 /// create the Swift subscript declaration.
 SubscriptDecl *
 SwiftDeclConverter::importSubscript(Decl *decl,
@@ -7048,7 +7024,7 @@ void SwiftDeclConverter::importInheritedConstructors(
 
   auto curObjCClass = cast<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
 
-  auto inheritConstructors = [&](ArrayRef<ValueDecl *> members,
+  auto inheritConstructors = [&](TinyPtrVector<ValueDecl *> members,
                                  Optional<CtorInitializerKind> kind) {
     const auto &languageVersion =
         Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
@@ -7424,13 +7400,9 @@ void ClangImporter::Implementation::importAttributes(
       return;
     }
 
-    // Map Clang's swift_objc_members attribute to @objcMembers. Also handle
-    // inheritance of @objcMembers by looking at the superclass.
-    if (ID->hasAttr<clang::SwiftObjCMembersAttr>() ||
-        (isa<ClassDecl>(MappedDecl) &&
-         cast<ClassDecl>(MappedDecl)->hasSuperclass() &&
-         cast<ClassDecl>(MappedDecl)->getSuperclassDecl()
-           ->getAttrs().hasAttribute<ObjCMembersAttr>())) {
+    // Map Clang's swift_objc_members attribute to @objcMembers.
+    if (ID->hasAttr<clang::SwiftObjCMembersAttr>() &&
+        isa<ClassDecl>(MappedDecl)) {
       if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
         auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
         MappedDecl->getAttrs().add(attr);
@@ -7796,9 +7768,8 @@ void ClangImporter::Implementation::finishNormalConformance(
   (void)unused;
 
   auto *proto = conformance->getProtocol();
-  PrettyStackTraceType trace(SwiftContext, "completing conformance for",
-                             conformance->getType());
-  PrettyStackTraceDecl traceTo("... to", proto);
+  PrettyStackTraceConformance trace(SwiftContext, "completing import of",
+                                    conformance);
 
   if (!proto->isRequirementSignatureComputed())
     proto->computeRequirementSignature();
@@ -7954,11 +7925,8 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
   GenericSignatureBuilder builder(SwiftContext);
-  SmallVector<GenericTypeParamType *, 4> allGenericParams;
   for (auto param : *genericParams) {
     builder.addGenericParameter(param);
-    allGenericParams.push_back(
-      param->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
   }
   for (auto param : *genericParams) {
     bool result = builder.addGenericParameterRequirements(param);
@@ -8059,10 +8027,8 @@ ClangImporter::Implementation::importDeclContextOf(
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
   if (auto protoDecl = ext->getExtendedProtocolDecl()) {
-    ext->setGenericParams(protoDecl->createGenericParams(ext));
-
-    auto *env = buildGenericEnvironment(ext->getGenericParams(), ext);
-    ext->setGenericEnvironment(env);
+    ext->createGenericParamsIfMissing(protoDecl);
+    ext->setGenericEnvironment(protoDecl->getGenericEnvironment());
   }
 
   // Add the extension to the nominal type.
@@ -8185,7 +8151,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      AccessorKind::Get,
-                     AddressorKind::NotAddressor,
                      var,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
@@ -8253,7 +8218,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   return var;
 }
 
-/// \brief Create a decl with error type and an "unavailable" attribute on it
+/// Create a decl with error type and an "unavailable" attribute on it
 /// with the specified message.
 void ClangImporter::Implementation::
 markUnavailable(ValueDecl *decl, StringRef unavailabilityMsgRef) {
@@ -8264,7 +8229,7 @@ markUnavailable(ValueDecl *decl, StringRef unavailabilityMsgRef) {
   decl->getAttrs().add(ua);
 }
 
-/// \brief Create a decl with error type and an "unavailable" attribute on it
+/// Create a decl with error type and an "unavailable" attribute on it
 /// with the specified message.
 ValueDecl *ClangImporter::Implementation::
 createUnavailableDecl(Identifier name, DeclContext *dc, Type type,

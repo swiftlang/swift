@@ -19,7 +19,7 @@ Currently there are three supported ways to build Swift for Windows.
 `clang-cl` is recommended over MSVC for building Swift on Windows.
 Although it is possible to build the compiler and the standard library with
 MSVC to use those built products to compile a Swift program, it won't be
-possible to run the binary without seperately obtaining the Swift runtime. On
+possible to run the binary without separately obtaining the Swift runtime. On
 the other hand, `clang-cl` is able to build the runtime, which makes it
 possible to build and run all the components required for Swift natively on
 Windows.

@@ -16,7 +16,7 @@ add_swift_host_library(swiftClangImporter STATIC
   ImportName.cpp
   ImportType.cpp
   SwiftLookupTable.cpp
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftAST
     swiftParse
 )

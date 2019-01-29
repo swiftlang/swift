@@ -69,7 +69,7 @@ TypeAccessScopeChecker::TypeAccessScopeChecker(const DeclContext *useDC,
 TypeWalker::Action
 TypeAccessScopeChecker::walkToTypePre(Type T) {
   ValueDecl *VD;
-  if (auto *BNAD = dyn_cast<NameAliasType>(T.getPointer()))
+  if (auto *BNAD = dyn_cast<TypeAliasType>(T.getPointer()))
     VD = BNAD->getDecl();
   else if (auto *NTD = T->getAnyNominal())
     VD = NTD;

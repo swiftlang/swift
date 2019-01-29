@@ -37,10 +37,11 @@ using namespace irgen;
 /// Emit a global variable.
 void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   auto &ti = getTypeInfo(var->getLoweredType());
-  
-  // If the variable is empty in all resilience domains, don't actually emit it;
-  // just return undef.
-  if (ti.isKnownEmpty(ResilienceExpansion::Minimal)) {
+  auto expansion = getResilienceExpansionForLayout(var);
+
+  // If the variable is empty in all resilience domains that can access this
+  // variable directly, don't actually emit it; just return undef.
+  if (ti.isKnownEmpty(expansion)) {
     if (DebugInfo && var->getDecl()) {
       auto DbgTy = DebugTypeInfo::getGlobal(var, Int8Ty, Size(0), Alignment(1));
       DebugInfo->emitGlobalVariableDeclaration(

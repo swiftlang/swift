@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true %s | %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all=true %s | %target-sil-opt -enable-objc-interop -enable-sil-verify-all=true | %FileCheck %s
 
 sil_stage raw // CHECK: sil_stage raw
 
@@ -9,7 +9,7 @@ import Swift
 sil_global private @globalinit_token0 : $Builtin.Word
 
 class TestArrayStorage {
-  @sil_stored var count: Int32
+  @_hasStorage var count: Int32
   init()
 }
 
@@ -1344,15 +1344,11 @@ entry(%0 : $@convention(thin) (AnyObject) -> Optional<AnyObject>):
 // CHECK-LABEL: sil @convert_function_trivial
 // CHECK:  %1 = convert_escape_to_noescape %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
 // CHECK:  %2 = convert_escape_to_noescape [not_guaranteed] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
-// CHECK:  %3 = convert_escape_to_noescape [escaped] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
-// CHECK:  %4 = convert_escape_to_noescape [not_guaranteed] [escaped] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
 // CHECK: return
 sil @convert_function_trivial : $@convention(thin) (@owned @callee_guaranteed (AnyObject) -> Optional<AnyObject>) -> () {
 entry(%0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject>):
   %1 = convert_escape_to_noescape %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
   %2 = convert_escape_to_noescape [not_guaranteed] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
-  %3 = convert_escape_to_noescape [escaped] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
-  %4 = convert_escape_to_noescape [not_guaranteed] [escaped] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
   return undef : $()
 }
 
@@ -1519,60 +1515,6 @@ else:
 }
 // CHECK: } // end sil function 'value_names'
 
-class Resource {}
-struct Value { var x: Resource }
-struct Storage { var y: Resource }
-class ParentClass { var storage: Storage; init() }
-struct ParentStruct { var storage: Storage }
-
-sil @init_storage : $@convention(thin) (@owned Value) -> @owned Storage
-sil @init_storage_indirect : $@convention(thin) (@owned Value) -> @out Storage
-
-sil @set_class_property : $@convention(thin) (@owned Value, @guaranteed ParentClass) -> ()
-sil @set_struct_property : $@convention(thin) (@owned Value, @inout ParentStruct) -> ()
-
-sil @init_storage_generic : $@convention(thin) <T, U> (@in T) -> @out U
-sil @set_class_property_generic : $@convention(thin) <V, W: AnyObject> (@in V, @guaranteed W) -> ()
-
-sil @mutate_value : $@convention(thin) (@inout Value) -> ()
-
-// CHECK-LABEL: sil @mark_uninitialized_behavior
-sil @mark_uninitialized_behavior : $@convention(thin) (@owned ParentClass, @inout ParentStruct) -> () {
-entry(%a : $ParentClass, %b : $*ParentStruct):
-  // CHECK: [[INIT_STORAGE:%.*]] = function_ref @init_storage
-  %c = function_ref @init_storage : $@convention(thin) (@owned Value) -> @owned Storage
-  // CHECK: [[SET_CLASS_PROP:%.*]] = function_ref @set_class_property
-  %d = function_ref @set_class_property : $@convention(thin) (@owned Value, @guaranteed ParentClass) -> ()
-  // CHECK: [[CLASS_STORAGE:%.*]] = ref_element_addr [[CLASS_SELF:%.*]] :
-  %e = ref_element_addr %a : $ParentClass, #ParentClass.storage
-  // CHECK: mark_uninitialized_behavior [[INIT_STORAGE]]([[CLASS_STORAGE]]) : $@convention(thin) (@owned Value) -> @owned Storage, [[SET_CLASS_PROP]]([[CLASS_SELF]]) : $@convention(thin) (@owned Value, @guaranteed ParentClass) -> ()
-  %f = mark_uninitialized_behavior %c(%e) : $@convention(thin) (@owned Value) -> @owned Storage,
-                                   %d(%a) : $@convention(thin) (@owned Value, @guaranteed ParentClass) -> ()
-
-  %g = function_ref @mutate_value : $@convention(thin) (@inout Value) -> ()
-  apply %g(%f) : $@convention(thin) (@inout Value) -> ()
-
-  // CHECK: [[INIT_STORAGE:%.*]] = function_ref @init_storage_indirect
-  %h = function_ref @init_storage_indirect : $@convention(thin) (@owned Value) -> @out Storage
-  // CHECK: [[SET_PROP:%.*]] = function_ref @set_struct_property
-  %i = function_ref @set_struct_property : $@convention(thin) (@owned Value, @inout ParentStruct) -> ()
-  // CHECK: [[STORAGE:%.*]] = struct_element_addr [[SELF:%.*]] :
-  %j = struct_element_addr %b : $*ParentStruct, #ParentStruct.storage
-  // CHECK: mark_uninitialized_behavior [[INIT_STORAGE]]([[STORAGE]]) : $@convention(thin) (@owned Value) -> @out Storage, [[SET_PROP]]([[SELF]]) : $@convention(thin) (@owned Value, @inout ParentStruct) -> ()
-  %k = mark_uninitialized_behavior %h(%j) : $@convention(thin) (@owned Value) -> @out Storage,
-                                   %i(%b) : $@convention(thin) (@owned Value, @inout ParentStruct) -> ()
-
-  // CHECK: [[INIT_STORAGE:%.*]] = function_ref @init_storage_generic
-  %l = function_ref @init_storage_generic : $@convention(thin) <T, U> (@in T) -> @out U
-  // CHECK: [[SET_PROP:%.*]] = function_ref @set_class_property_generic
-  %m = function_ref @set_class_property_generic : $@convention(thin) <V, W: AnyObject> (@in V, @guaranteed W) -> ()
-  // CHECK: mark_uninitialized_behavior [[INIT_STORAGE]]<Value, Storage>([[CLASS_STORAGE]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @out τ_0_1, [[SET_PROP]]<Value, ParentClass>([[CLASS_SELF]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : AnyObject> (@in τ_0_0, @guaranteed τ_0_1) -> ()
-  %n = mark_uninitialized_behavior %l<Value, Storage>(%e) : $@convention(thin) <T, U> (@in T) -> @out U,
-                                   %m<Value, ParentClass>(%a) : $@convention(thin) <V, W: AnyObject> (@in V, @guaranteed W) -> ()
-
-  unreachable
-}
-
 // CHECK-LABEL: sil @test_pointer_to_address
 sil @test_pointer_to_address : $(Builtin.RawPointer, X) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $X):
@@ -1622,7 +1564,7 @@ bb0(%0 : $(Builtin.NativeObject, Builtin.Int32), %1 : $TestArray2):
 }
 
 class A {
-  @sil_stored var property: Any { get set }
+  @_hasStorage var property: Any { get set }
   deinit
   init()
 }
@@ -1677,6 +1619,20 @@ bb0(%0 : $A):
   dealloc_stack %1 : $*Any
   %20 = tuple ()
   return %20 : $()
+}
+
+// CHECK-LABEL: sil [dynamically_replacable] @test_dynamically_replaceable
+sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_dynamic_replacement_for
+sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_dynamic_replacement_for : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
 }
 
 struct EmptyStruct {}

@@ -24,7 +24,7 @@
 namespace swift {
 class CaptureInfo;
 
-/// \brief A universal function reference -- can wrap all AST nodes that
+/// A universal function reference -- can wrap all AST nodes that
 /// represent functions and exposes a common interface to them.
 class AnyFunctionRef {
   PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *> TheFunction;

@@ -50,7 +50,7 @@ UID_KEYS = [
     KEY('SourceText', 'key.sourcetext'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
     KEY('SyntaxTreeTransferMode', 'key.syntaxtreetransfermode'),
-    KEY('SyntaxTreeSerializationFormat', 
+    KEY('SyntaxTreeSerializationFormat',
         'key.syntax_tree_serialization_format'),
     KEY('EnableStructure', 'key.enablesubstructure'),
     KEY('Description', 'key.description'),
@@ -59,6 +59,8 @@ UID_KEYS = [
     KEY('SelectorName', 'key.selector_name'),
     KEY('AnnotatedDecl', 'key.annotated_decl'),
     KEY('FullyAnnotatedDecl', 'key.fully_annotated_decl'),
+    KEY('FullyAnnotatedGenericSignature',
+        'key.fully_annotated_generic_signature'),
     KEY('DocBrief', 'key.doc.brief'),
     KEY('Context', 'key.context'),
     KEY('ModuleImportDepth', 'key.moduleimportdepth'),
@@ -157,6 +159,7 @@ UID_KEYS = [
     KEY('ActionUnavailableReason', 'key.actionunavailablereason'),
     KEY('CompileID', 'key.compileid'),
     KEY('CompilerArgsString', 'key.compilerargs-string'),
+    KEY('ImplicitMembers', 'key.implicitmembers'),
 ]
 
 
@@ -176,6 +179,7 @@ UID_REQUESTS = [
     REQUEST('CodeCompleteSetPopularAPI',
             'source.request.codecomplete.setpopularapi'),
     REQUEST('CodeCompleteSetCustom', 'source.request.codecomplete.setcustom'),
+    REQUEST('TypeContextInfo', 'source.request.typecontextinfo'),
     REQUEST('CursorInfo', 'source.request.cursorinfo'),
     REQUEST('RangeInfo', 'source.request.rangeinfo'),
     REQUEST('RelatedIdents', 'source.request.relatedidents'),
@@ -413,8 +417,8 @@ UID_KINDS = [
     KIND('SyntaxTreeOff', 'source.syntaxtree.transfer.off'),
     KIND('SyntaxTreeIncremental', 'source.syntaxtree.transfer.incremental'),
     KIND('SyntaxTreeFull', 'source.syntaxtree.transfer.full'),
-    KIND('SyntaxTreeSerializationJSON', 
+    KIND('SyntaxTreeSerializationJSON',
          'source.syntaxtree.serialization.format.json'),
-    KIND('SyntaxTreeSerializationByteTree', 
+    KIND('SyntaxTreeSerializationByteTree',
          'source.syntaxtree.serialization.format.bytetree'),
 ]

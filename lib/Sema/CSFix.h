@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -80,6 +81,37 @@ enum class FixKind : uint8_t {
   /// and assume that types are related.
   SkipSuperclassRequirement,
 
+  /// Fix up one of the sides of conversion to make it seem
+  /// like the types are aligned.
+  ContextualMismatch,
+
+  /// Fix up @autoclosure argument to the @autoclosure parameter,
+  /// to for a call to be able to foward it properly, since
+  /// @autoclosure conversions are unsupported starting from
+  /// Swift version 5.
+  AutoClosureForwarding,
+
+  /// Remove `!` or `?` because base is not an optional type.
+  RemoveUnwrap,
+
+  /// Add explicit `()` at the end of function or member to call it.
+  InsertCall,
+
+  /// Instead of spelling out `subscript` directly, use subscript operator.
+  UseSubscriptOperator,
+
+  /// Requested name is not associated with a give base type,
+  /// fix this issue by pretending that member exists and matches
+  /// given arguments/result types exactly.
+  DefineMemberBasedOnUse,
+
+  /// Allow expressions where 'mutating' method is only partially applied,
+  /// which means either not applied at all e.g. `Foo.bar` or only `Self`
+  /// is applied e.g. `foo.bar` or `Foo.bar(&foo)`.
+  ///
+  /// Allow expressions where initializer call (either `self.init` or
+  /// `super.init`) is only partially applied.
+  AllowInvalidPartialApplication,
 };
 
 class ConstraintFix {
@@ -87,13 +119,20 @@ class ConstraintFix {
   FixKind Kind;
   ConstraintLocator *Locator;
 
+  /// Determines whether this fix is simplify a warning which doesn't
+  /// require immediate source changes.
+  bool IsWarning;
+
 public:
-  ConstraintFix(ConstraintSystem &cs, FixKind kind, ConstraintLocator *locator)
-      : CS(cs), Kind(kind), Locator(locator) {}
+  ConstraintFix(ConstraintSystem &cs, FixKind kind, ConstraintLocator *locator,
+                bool warning = false)
+      : CS(cs), Kind(kind), Locator(locator), IsWarning(warning) {}
 
   virtual ~ConstraintFix();
 
   FixKind getKind() const { return Kind; }
+
+  bool isWarning() const { return IsWarning; }
 
   virtual std::string getName() const = 0;
 
@@ -135,16 +174,24 @@ public:
 
 /// Introduce a '!' to force an optional unwrap.
 class ForceOptional final : public ConstraintFix {
-  ForceOptional(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ForceOptional, locator) {}
+  Type BaseType;
+  Type UnwrappedType;
+
+  ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
+                ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
+        UnwrappedType(unwrappedType) {
+    assert(baseType && "Base type must not be null");
+    assert(unwrappedType && "Unwrapped type must not be null");
+  }
 
 public:
   std::string getName() const override { return "force optional"; }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static ForceOptional *create(ConstraintSystem &cs,
-                               ConstraintLocator *locator);
+  static ForceOptional *create(ConstraintSystem &cs, Type baseType,
+                               Type unwrappedType, ConstraintLocator *locator);
 };
 
 /// Unwrap an optional base when we have a member access.
@@ -345,6 +392,147 @@ public:
 
   static SkipSuperclassRequirement *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
+};
+
+/// For example: Sometimes type returned from the body of the
+/// closure doesn't match expected contextual type:
+///
+/// func foo(_: () -> Int) {}
+/// foo { "ultimate question" }
+///
+/// Body of the closure produces `String` type when `Int` is expected
+/// by the context.
+class ContextualMismatch : public ConstraintFix {
+  Type LHS, RHS;
+
+protected:
+  ContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                     ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
+        RHS(rhs) {}
+
+public:
+  std::string getName() const override { return "fix contextual mismatch"; }
+
+  Type getFromType() const { return LHS; }
+  Type getToType() const { return RHS; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                    ConstraintLocator *locator);
+};
+
+/// Detect situations when argument of the @autoclosure parameter is itself
+/// marked as @autoclosure and is not applied. Form a fix which suggests a
+/// proper way to forward such arguments, e.g.:
+///
+/// ```swift
+/// func foo(_ fn: @autoclosure () -> Int) {}
+/// func bar(_ fn: @autoclosure () -> Int) {
+///   foo(fn) // error - fn should be called
+/// }
+/// ```
+class AutoClosureForwarding final : public ConstraintFix {
+public:
+  AutoClosureForwarding(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AutoClosureForwarding, locator) {}
+
+  std::string getName() const override { return "fix @autoclosure forwarding"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AutoClosureForwarding *create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator);
+};
+
+class RemoveUnwrap final : public ConstraintFix {
+  Type BaseType;
+
+public:
+  RemoveUnwrap(ConstraintSystem &cs, Type baseType, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveUnwrap, locator), BaseType(baseType) {}
+
+  std::string getName() const override {
+    return "remove unwrap operator `!` or `?`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveUnwrap *create(ConstraintSystem &cs, Type baseType,
+                              ConstraintLocator *locator);
+};
+
+class InsertExplicitCall final : public ConstraintFix {
+public:
+  InsertExplicitCall(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::InsertCall, locator) {}
+
+  std::string getName() const override {
+    return "insert explicit `()` to make a call";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static InsertExplicitCall *create(ConstraintSystem &cs,
+                                    ConstraintLocator *locator);
+};
+
+class UseSubscriptOperator final : public ConstraintFix {
+public:
+  UseSubscriptOperator(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UseSubscriptOperator, locator) {}
+
+  std::string getName() const override {
+    return "replace '.subscript(...)' with subscript operator";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static UseSubscriptOperator *create(ConstraintSystem &cs,
+                                      ConstraintLocator *locator);
+};
+
+class DefineMemberBasedOnUse final : public ConstraintFix {
+  Type BaseType;
+  DeclName Name;
+
+public:
+  DefineMemberBasedOnUse(ConstraintSystem &cs, Type baseType, DeclName member,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::DefineMemberBasedOnUse, locator),
+        BaseType(baseType), Name(member) {}
+
+  std::string getName() const override {
+    llvm::SmallVector<char, 16> scratch;
+    auto memberName = Name.getString(scratch);
+    return "define missing member named '" + memberName.str() +
+           "' based on its use";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
+                                        DeclName member,
+                                        ConstraintLocator *locator);
+};
+
+class AllowInvalidPartialApplication final : public ConstraintFix {
+public:
+  AllowInvalidPartialApplication(bool isWarning, ConstraintSystem &cs,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPartialApplication, locator,
+                      isWarning) {}
+
+  std::string getName() const override {
+    return "allow partially applied 'mutating' method";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInvalidPartialApplication *create(bool isWarning,
+                                                ConstraintSystem &cs,
+                                                ConstraintLocator *locator);
 };
 
 } // end namespace constraints

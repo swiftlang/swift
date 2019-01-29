@@ -259,7 +259,7 @@ public:
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
     // Check for a cycle.
-    if (checkDependency(AnyRequest(request))) {
+    if (checkDependency(getCanonicalRequest(request))) {
       return llvm::Error(
         llvm::make_unique<CyclicalRequestError<Request>>(request, *this));
     }
@@ -293,6 +293,17 @@ public:
   void clearCache() { cache.clear(); }
 
 private:
+  template <typename Request>
+  const AnyRequest &getCanonicalRequest(const Request &request) {
+    // FIXME: DenseMap ought to let us do this with one hash lookup.
+    auto iter = dependencies.find_as(request);
+    if (iter != dependencies.end())
+      return iter->first;
+    auto insertResult = dependencies.insert({AnyRequest(request), {}});
+    assert(insertResult.second && "just checked if the key was already there");
+    return insertResult.first->first;
+  }
+
   /// Diagnose a cycle detected in the evaluation of the given
   /// request.
   void diagnoseCycle(const AnyRequest &request);
@@ -335,7 +346,7 @@ private:
   getResultUncached(const Request &request) {
     // Clear out the dependencies on this request; we're going to recompute
     // them now anyway.
-    dependencies[AnyRequest(request)].clear();
+    dependencies.find_as(request)->second.clear();
 
     PrettyStackTraceRequest<Request> prettyStackTrace(request);
 
@@ -377,7 +388,6 @@ private:
       typename std::enable_if<!Request::hasExternalCache>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   getResultCached(const Request &request) {
-    AnyRequest anyRequest{request};
     // If we already have an entry for this request in the cache, return it.
     auto known = cache.find_as(request);
     if (known != cache.end()) {
@@ -390,7 +400,7 @@ private:
       return result;
 
     // Cache the result.
-    cache.insert({AnyRequest(request), *result});
+    cache.insert({getCanonicalRequest(request), *result});
     return result;
   }
 

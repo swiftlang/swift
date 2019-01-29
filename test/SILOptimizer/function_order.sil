@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -function-order-printer -o /dev/null | %FileCheck --check-prefix=CHECK %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -function-order-printer -o /dev/null | %FileCheck --check-prefix=CHECK %s
 
 sil_stage canonical
 

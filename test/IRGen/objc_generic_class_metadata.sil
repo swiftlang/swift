@@ -39,7 +39,7 @@ entry:
   %b = metatype $@thick GenericClass<NSObject>.Type
   apply %z<GenericClass<NSObject>>(%b) : $@convention(thin) <T> (@thick T.Type) -> ()
 
-  // CHECK: [[T0:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_GenericClass",
+  // CHECK: [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
   // CHECK: [[OBJC_CLASS:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
   // CHECK: call swiftcc void @objc_class_sink(%objc_class* [[OBJC_CLASS]], %swift.type* [[METADATA]])
   %c = metatype $@objc_metatype GenericClass<NSString>.Type
@@ -59,27 +59,27 @@ entry:
 }
 
 sil @$s27objc_generic_class_metadata8SubclassC5thingACSgSo8NSStringCSg_tcfcTo : $@convention(objc_method) (Optional<NSString>, @owned Subclass) -> @owned Optional<Subclass> {
-entry(%0 : @unowned $Optional<NSString>, %1 : @owned $Subclass):
+entry(%0 : $Optional<NSString>, %1 : $Subclass):
   unreachable
 }
 
 sil @$s27objc_generic_class_metadata8SubclassC13arrayOfThingsACSgSaySo8NSStringCG_tcfcTo : $@convention(objc_method) (NSArray, @owned Subclass) -> @owned Optional<Subclass> {
-entry(%0 : @unowned $NSArray, %1 : @owned $Subclass):
+entry(%0 : $NSArray, %1 : $Subclass):
   unreachable
 }
 
 sil @$s27objc_generic_class_metadata8SubclassCACycfcTo : $@convention(objc_method) (@owned Subclass) -> @owned Subclass {
-entry(%0 : @owned $Subclass):
+entry(%0 : $Subclass):
   unreachable
 }
 
 sil @$s27objc_generic_class_metadata8SubclassC7optionsACSgSDySo13GenericOptionaypGSg_tcfcTo : $@convention(objc_method) (@owned Subclass, @owned NSDictionary) -> @owned Subclass {
-entry(%0: @owned $Subclass, %1: @owned $NSDictionary):
+entry(%0 : $Subclass, %1 : $NSDictionary):
   unreachable
 }
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo12GenericClassCMa"(
-// CHECK:         [[T0:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_GenericClass",
+// CHECK:         [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
 // CHECK:         call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSaySo12GenericClassC_SitGMa"

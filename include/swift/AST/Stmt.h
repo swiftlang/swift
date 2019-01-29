@@ -106,17 +106,17 @@ public:
 
   StmtKind getKind() const { return StmtKind(Bits.Stmt.Kind); }
 
-  /// \brief Retrieve the name of the given statement kind.
+  /// Retrieve the name of the given statement kind.
   ///
   /// This name should only be used for debugging dumps and other
   /// developer aids, and should never be part of a diagnostic or exposed
   /// to the user of the compiler in any way.
   static StringRef getKindName(StmtKind kind);
 
-  /// \brief Return the location of the start of the statement.
+  /// Return the location of the start of the statement.
   SourceLoc getStartLoc() const;
   
-  /// \brief Return the location of the end of the statement.
+  /// Return the location of the end of the statement.
   SourceLoc getEndLoc() const;
   
   SourceRange getSourceRange() const;
@@ -307,7 +307,7 @@ public:
 };
 
   
-/// \brief An expression that guards execution based on whether the run-time
+/// An expression that guards execution based on whether the run-time
 /// configuration supports a given API, e.g.,
 /// #available(OSX >= 10.9, iOS >= 7.0).
 class alignas(8) PoundAvailableInfo final :
@@ -1222,6 +1222,31 @@ public:
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Throw;
+  }
+};
+
+/// PoundAssertStmt - Asserts that a condition is true, at compile time.
+class PoundAssertStmt : public Stmt {
+  SourceRange Range;
+  Expr *Condition;
+  StringRef Message;
+
+ public:
+  PoundAssertStmt(SourceRange Range, Expr *condition, StringRef message)
+      : Stmt(StmtKind::PoundAssert, /*Implicit=*/false),
+        Range(Range),
+        Condition(condition),
+        Message(message) {}
+
+  SourceRange getSourceRange() const { return Range; }
+
+  Expr *getCondition() const { return Condition; }
+  StringRef getMessage() const { return Message; }
+
+  void setCondition(Expr *condition) { Condition = condition; }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::PoundAssert;
   }
 };
 

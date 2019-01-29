@@ -453,6 +453,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     AutoreleasingUnsafeMutablePointer,
     Unmanaged,
     CFunctionPointer,
+    SIMD,
   } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
     .Case("UnsafeMutablePointer", StructKind::UnsafeMutablePointer)
     .Case("UnsafePointer", StructKind::UnsafePointer)
@@ -461,6 +462,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
         StructKind::AutoreleasingUnsafeMutablePointer)
     .Case("Unmanaged", StructKind::Unmanaged)
     .Case("CFunctionPointer", StructKind::CFunctionPointer)
+    .StartsWith("SIMD", StructKind::SIMD)
     .Default(StructKind::Invalid);
   
   auto args = type.getGenericArgs();
@@ -472,7 +474,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   case StructKind::Invalid:
     llvm_unreachable("Unexpected non-pointer generic struct type in imported"
                      " Clang module!");
-      
+    
   case StructKind::UnsafeMutablePointer:
   case StructKind::Unmanaged:
   case StructKind::AutoreleasingUnsafeMutablePointer: {
@@ -498,6 +500,19 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     }
     auto fnPtrTy = clangCtx.getPointerType(functionTy);
     return getCanonicalType(fnPtrTy);
+  }
+    
+  case StructKind::SIMD: {
+    clang::QualType scalarTy = Converter.convert(IGM, loweredArgTy);
+    auto numEltsString = swiftStructDecl->getName().str();
+    numEltsString.consume_front("SIMD");
+    unsigned numElts;
+    bool failedParse = numEltsString.getAsInteger<unsigned>(10, numElts);
+    assert(!failedParse && "SIMD type name didn't end in count?");
+    (void) failedParse;
+    auto vectorTy = getClangASTContext().getVectorType(scalarTy, numElts,
+      clang::VectorType::VectorKind::GenericVector);
+    return getCanonicalType(vectorTy);
   }
   }
 

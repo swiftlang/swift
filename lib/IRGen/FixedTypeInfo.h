@@ -167,9 +167,9 @@ public:
   
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.
-  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src, SILType T,
-                                       bool isOutlined) const override {
+  virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                               Address src, SILType T,
+                                               bool isOutlined) const {
     return getSpareBitExtraInhabitantIndex(IGF, src);
   }
   
@@ -180,10 +180,10 @@ public:
   
   /// Store the extra inhabitant representation indexed by a 31-bit identifier
   /// to memory.
-  void storeExtraInhabitant(IRGenFunction &IGF,
-                            llvm::Value *index,
-                            Address dest, SILType T,
-                            bool isOutlined) const override {
+  virtual void storeExtraInhabitant(IRGenFunction &IGF,
+                                    llvm::Value *index,
+                                    Address dest, SILType T,
+                                    bool isOutlined) const {
     storeSpareBitExtraInhabitant(IGF, index, dest);
   }
   
@@ -236,15 +236,29 @@ public:
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                        llvm::Value *numEmptyCases,
                                        Address enumAddr,
-                                       SILType T) const override;
+                                       SILType T,
+                                       bool isOutlined) const override;
 
   void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
                                  llvm::Value *numEmptyCases, Address enumAddr,
-                                 SILType T) const override;
+                                 SILType T, bool isOutlined) const override;
 
   static bool classof(const FixedTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }
 };
+
+llvm::Value *getFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
+                                              const FixedTypeInfo &fixedTI,
+                                              llvm::Value *numEmptyCases,
+                                              Address enumAddr,
+                                              SILType T, bool isOutlined);
+
+void storeFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
+                                        const FixedTypeInfo &fixedTI,
+                                        llvm::Value *index,
+                                        llvm::Value *numEmptyCases,
+                                        Address enumAddr,
+                                        SILType T, bool isOutlined);
 
 }
 }

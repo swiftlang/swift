@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name indirect_enum -Xllvm -sil-print-debuginfo %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name indirect_enum -Xllvm -sil-print-debuginfo %s | %FileCheck %s
 
 indirect enum TreeA<T> {
   case Nil
@@ -7,9 +7,9 @@ indirect enum TreeA<T> {
   case Branch(left: TreeA<T>, right: TreeA<T>)
 }
 
-// CHECK-LABEL: sil hidden @$s13indirect_enum11TreeA_cases_1l1ryx_AA0C1AOyxGAGtlF : $@convention(thin) <T> (@in_guaranteed T, @guaranteed TreeA<T>, @guaranteed TreeA<T>) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum11TreeA_cases_1l1ryx_AA0C1AOyxGAGtlF : $@convention(thin) <T> (@in_guaranteed T, @guaranteed TreeA<T>, @guaranteed TreeA<T>) -> () {
 func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
-// CHECK: bb0([[ARG1:%.*]] : @trivial $*T, [[ARG2:%.*]] : @guaranteed $TreeA<T>, [[ARG3:%.*]] : @guaranteed $TreeA<T>):
+// CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : @guaranteed $TreeA<T>, [[ARG3:%.*]] : @guaranteed $TreeA<T>):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
 // CHECK-NEXT:    [[NIL:%.*]] = enum $TreeA<T>, #TreeA.Nil!enumelt
 // CHECK-NOT:     destroy_value [[NIL]]
@@ -40,7 +40,7 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 // CHECK: // end sil function '$s13indirect_enum11TreeA_cases_1l1ryx_AA0C1AOyxGAGtlF'
 
 
-// CHECK-LABEL: sil hidden @$s13indirect_enum16TreeA_reabstractyyS2icF : $@convention(thin) (@guaranteed @callee_guaranteed (Int) -> Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum16TreeA_reabstractyyS2icF : $@convention(thin) (@guaranteed @callee_guaranteed (Int) -> Int) -> () {
 func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (Int) -> Int):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<(Int) -> Int>.Type
@@ -63,7 +63,7 @@ enum TreeB<T> {
   indirect case Branch(left: TreeB<T>, right: TreeB<T>)
 }
 
-// CHECK-LABEL: sil hidden @$s13indirect_enum11TreeB_cases_1l1ryx_AA0C1BOyxGAGtlF
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum11TreeB_cases_1l1ryx_AA0C1BOyxGAGtlF
 func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeB<T>.Type
@@ -101,9 +101,9 @@ func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 
 }
 
-// CHECK-LABEL: sil hidden @$s13indirect_enum13TreeInt_cases_1l1rySi_AA0cD0OAFtF : $@convention(thin) (Int, @guaranteed TreeInt, @guaranteed TreeInt) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum13TreeInt_cases_1l1rySi_AA0cD0OAFtF : $@convention(thin) (Int, @guaranteed TreeInt, @guaranteed TreeInt) -> ()
 func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
-// CHECK: bb0([[ARG1:%.*]] : @trivial $Int, [[ARG2:%.*]] : @guaranteed $TreeInt, [[ARG3:%.*]] : @guaranteed $TreeInt):
+// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @guaranteed $TreeInt, [[ARG3:%.*]] : @guaranteed $TreeInt):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeInt.Type
 // CHECK-NEXT:    [[NIL:%.*]] = enum $TreeInt, #TreeInt.Nil!enumelt
 // CHECK-NOT:     destroy_value [[NIL]]
@@ -146,7 +146,7 @@ func b<T>(_ x: T) {}
 func c<T>(_ x: T, _ y: T) {}
 func d() {}
 
-// CHECK-LABEL: sil hidden @$s13indirect_enum11switchTreeAyyAA0D1AOyxGlF : $@convention(thin) <T> (@guaranteed TreeA<T>) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum11switchTreeAyyAA0D1AOyxGlF : $@convention(thin) <T> (@guaranteed TreeA<T>) -> () {
 func switchTreeA<T>(_ x: TreeA<T>) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $TreeA<T>):
   // --           x +0
@@ -212,7 +212,7 @@ func switchTreeA<T>(_ x: TreeA<T>) {
 }
 // CHECK: } // end sil function '$s13indirect_enum11switchTreeAyyAA0D1AOyxGlF'
 
-// CHECK-LABEL: sil hidden @$s13indirect_enum11switchTreeB{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum11switchTreeB{{[_0-9a-zA-Z]*}}F
 func switchTreeB<T>(_ x: TreeB<T>) {
   // CHECK:       copy_addr %0 to [initialization] [[SCRATCH:%.*]] :
   // CHECK:       switch_enum_addr [[SCRATCH]]
@@ -308,7 +308,7 @@ func switchTreeB<T>(_ x: TreeB<T>) {
 
 // Make sure that switchTreeInt obeys ownership invariants.
 //
-// CHECK-LABEL: sil hidden @$s13indirect_enum13switchTreeInt{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum13switchTreeInt{{[_0-9a-zA-Z]*}}F
 func switchTreeInt(_ x: TreeInt) {
   switch x {
 
@@ -327,7 +327,7 @@ func switchTreeInt(_ x: TreeInt) {
 }
 // CHECK: } // end sil function '$s13indirect_enum13switchTreeInt{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @$s13indirect_enum10guardTreeA{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum10guardTreeA{{[_0-9a-zA-Z]*}}F
 func guardTreeA<T>(_ tree: TreeA<T>) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $TreeA<T>):
   do {
@@ -409,7 +409,7 @@ func guardTreeA<T>(_ tree: TreeA<T>) {
   // CHECK: [[NO1]]([[ORIGINAL_VALUE:%.*]] : @owned $TreeA<T>):
   // CHECK:   destroy_value [[ORIGINAL_VALUE]]
 }
-// CHECK-LABEL: sil hidden @$s13indirect_enum10guardTreeB{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum10guardTreeB{{[_0-9a-zA-Z]*}}F
 func guardTreeB<T>(_ tree: TreeB<T>) {
   do {
     // CHECK:   copy_addr %0 to [initialization] [[TMP1:%.*]] :
@@ -499,7 +499,7 @@ func guardTreeB<T>(_ tree: TreeB<T>) {
 
 // Just run guardTreeInt through the ownership verifier
 //
-// CHECK-LABEL: sil hidden @$s13indirect_enum12guardTreeInt{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum12guardTreeInt{{[_0-9a-zA-Z]*}}F
 func guardTreeInt(_ tree: TreeInt) {
   do {
     guard case .Nil = tree else { return }
@@ -517,7 +517,7 @@ func guardTreeInt(_ tree: TreeInt) {
 }
 
 // SEMANTIC ARC TODO: This test needs to be made far more comprehensive.
-// CHECK-LABEL: sil hidden @$s13indirect_enum35dontDisableCleanupOfIndirectPayloadyyAA010TrivialButG0OF : $@convention(thin) (@guaranteed TrivialButIndirect) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum35dontDisableCleanupOfIndirectPayloadyyAA010TrivialButG0OF : $@convention(thin) (@guaranteed TrivialButIndirect) -> () {
 func dontDisableCleanupOfIndirectPayload(_ x: TrivialButIndirect) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $TrivialButIndirect):
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -525,14 +525,14 @@ func dontDisableCleanupOfIndirectPayload(_ x: TrivialButIndirect) {
   //
   guard case .Direct(let foo) = x else { return }
 
-  // CHECK: [[YES]]({{%.*}} : @trivial $Int):
+  // CHECK: [[YES]]({{%.*}} : $Int):
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   switch_enum [[ARG_COPY]] : $TrivialButIndirect, case #TrivialButIndirect.Indirect!enumelt.1:  [[YES:bb[0-9]+]], case #TrivialButIndirect.Direct!enumelt.1: [[NO2:bb[0-9]+]]
 
   // CHECK: [[YES]]([[BOX:%.*]] : @owned ${ var Int }):
   // CHECK:   destroy_value [[BOX]]
 
-  // CHECK: [[NO2]]({{%.*}} : @trivial $Int):
+  // CHECK: [[NO2]]({{%.*}} : $Int):
   // CHECK-NOT: destroy_value
 
   // CHECK: [[NO]]([[PAYLOAD:%.*]] : @owned ${ var Int }):

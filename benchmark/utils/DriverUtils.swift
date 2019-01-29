@@ -198,23 +198,24 @@ struct TestConfig {
       """)
     }
 
-    if verbose {
-      let testList = tests.map({ $0.1.name }).joined(separator: ", ")
-      print("""
-            --- CONFIG ---
-            NumSamples: \(numSamples ?? 0)
-            Verbose: \(verbose)
-            LogMemory: \(logMemory)
-            SampleTime: \(sampleTime)
-            NumIters: \(numIters ?? 0)
-            Quantile: \(quantile ?? 0)
-            Delimiter: \(String(reflecting: delim))
-            Tests Filter: \(c.tests ?? [])
-            Tests to run: \(testList)
+    // We always prepare the configuration string and call the print to have
+    // the same memory usage baseline between verbose and normal mode.
+    let testList = tests.map({ $0.1.name }).joined(separator: ", ")
+    let configuration = """
+        --- CONFIG ---
+        NumSamples: \(numSamples ?? 0)
+        Verbose: \(verbose)
+        LogMemory: \(logMemory)
+        SampleTime: \(sampleTime)
+        NumIters: \(numIters ?? 0)
+        Quantile: \(quantile ?? 0)
+        Delimiter: \(String(reflecting: delim))
+        Tests Filter: \(c.tests ?? [])
+        Tests to run: \(testList)
 
-            --- DATA ---\n
-            """)
-    }
+        --- DATA ---\n
+        """
+    print(verbose ? configuration : "", terminator:"")
   }
 
   /// Returns the list of tests to run.
@@ -513,7 +514,7 @@ final class TestRunner {
       Int.max / 10_000, // by the inner loop multiplier inside the `testFn`.
       c.numIters ?? calibrateMeasurements())
 
-    let numSamples = c.numSamples ?? min(2000, // Cap the number of samples
+    let numSamples = c.numSamples ?? min(200, // Cap the number of samples
       c.numIters == nil ? 1 : calibrateMeasurements())
 
     samples.reserveCapacity(numSamples)
@@ -524,6 +525,10 @@ final class TestRunner {
     }
 
     test.tearDownFunction?()
+    if let lf = test.legacyFactor {
+      logVerbose("    Applying legacy factor: \(lf)")
+      samples = samples.map { $0 * lf }
+    }
 
     return BenchResults(samples, maxRSS: measureMemoryUsage())
   }

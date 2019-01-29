@@ -144,3 +144,20 @@ case #selector(SR1827.bar)?:
 default:
   break
 }
+
+// SR-9391
+
+protocol SomeProtocol {
+  func someFunction()
+  func anotherFunction()
+}
+
+extension SomeProtocol {
+  func someFunction() {
+    let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector because protocol 'SomeProtocol' is not exposed to Objective-C}} {{none}}
+  }
+
+  func anotherFunction() { 
+    print("Hello world!")
+ }
+}

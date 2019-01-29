@@ -295,6 +295,29 @@ namespace {
                                             SILType T) const {
       return TupleNonFixedOffsets(T);
     }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address structAddr,
+                                         SILType structType,
+                                         bool isOutlined) const override {
+      // The runtime will overwrite this with a concrete implementation
+      // in the value witness table.
+      return emitGetEnumTagSinglePayloadCall(IGF, structType, numEmptyCases,
+                                             structAddr);
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *index,
+                                   llvm::Value *numEmptyCases,
+                                   Address structAddr,
+                                   SILType structType,
+                                   bool isOutlined) const override {
+      // The runtime will overwrite this with a concrete implementation
+      // in the value witness table.
+      emitStoreEnumTagSinglePayloadCall(IGF, structType, index,
+                                        numEmptyCases, structAddr);
+    }
   };
 
   class TupleTypeBuilder :

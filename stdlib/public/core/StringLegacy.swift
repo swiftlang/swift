@@ -64,10 +64,10 @@ extension StringProtocol {
   ///     print(cafe.hasPrefix("café"))
   ///     // Prints "false"
   ///
-  /// The Unicode-safe comparison matches Unicode scalar values rather than the
-  /// code points used to compose them. The example below uses two strings
-  /// with different forms of the `"é"` character---the first uses the composed
-  /// form and the second uses the decomposed form.
+  /// The Unicode-safe comparison matches Unicode extended grapheme clusters
+  /// rather than the code points used to compose them. The example below uses
+  /// two strings with different forms of the `"é"` character---the first uses
+  /// the composed form and the second uses the decomposed form.
   ///
   ///     // Unicode safe
   ///     let composedCafe = "Café"
@@ -98,10 +98,10 @@ extension StringProtocol {
   ///     print(plans.hasSuffix("Café"))
   ///     // Prints "false"
   ///
-  /// The Unicode-safe comparison matches Unicode scalar values rather than the
-  /// code points used to compose them. The example below uses two strings
-  /// with different forms of the `"é"` character---the first uses the composed
-  /// form and the second uses the decomposed form.
+  /// The Unicode-safe comparison matches Unicode extended grapheme clusters
+  /// rather than the code points used to compose them. The example below uses
+  /// two strings with different forms of the `"é"` character---the first uses
+  /// the composed form and the second uses the decomposed form.
   ///
   ///     // Unicode safe
   ///     let composedCafe = "café"
@@ -181,7 +181,6 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
-  @inlinable // FIXME(sil-serialize-all)
   public init<T : BinaryInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {

@@ -104,12 +104,28 @@ module ucrt [system] {
     }
   }
 
+  module process {
+    header "process.h"
+    export *
+  }
+
   module corecrt {
     header "corecrt.h"
+    header "corecrt_stdio_config.h"
     export *
 
     module io {
       header "corecrt_io.h"
+      export *
+    }
+
+    module math {
+      header "corecrt_math.h"
+      export *
+    }
+
+    module stdio {
+      header "corecrt_wstdio.h"
       export *
     }
   }

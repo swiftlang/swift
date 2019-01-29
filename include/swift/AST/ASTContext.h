@@ -52,6 +52,7 @@ namespace swift {
   enum class Associativity : unsigned char;
   class BoundGenericType;
   class ClangNode;
+  class ConstructorDecl;
   class Decl;
   class DeclContext;
   class DefaultArgumentInitializer;
@@ -84,6 +85,7 @@ namespace swift {
   class NominalTypeDecl;
   class NormalProtocolConformance;
   class InheritedProtocolConformance;
+  class SelfProtocolConformance;
   class SpecializedProtocolConformance;
   enum class ProtocolConformanceState;
   class Pattern;
@@ -110,16 +112,16 @@ namespace syntax {
   class SyntaxArena;
 }
 
-/// \brief The arena in which a particular ASTContext allocation will go.
+/// The arena in which a particular ASTContext allocation will go.
 enum class AllocationArena {
-  /// \brief The permanent arena, which is tied to the lifetime of
+  /// The permanent arena, which is tied to the lifetime of
   /// the ASTContext.
   ///
   /// All global declarations and types need to be allocated into this arena.
   /// At present, everything that is not a type involving a type variable is
   /// allocated in this arena.
   Permanent,
-  /// \brief The constraint solver's temporary arena, which is tied to the
+  /// The constraint solver's temporary arena, which is tied to the
   /// lifetime of a particular instance of the constraint solver.
   ///
   /// Any type involving a type variable is allocated in this arena.
@@ -142,14 +144,14 @@ enum class KnownFoundationEntity {
 /// entity name.
 Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 
-/// \brief Introduces a new constraint checker arena, whose lifetime is
+/// Introduces a new constraint checker arena, whose lifetime is
 /// tied to the lifetime of this RAII object.
 class ConstraintCheckerArenaRAII {
   ASTContext &Self;
   void *Data;
 
 public:
-  /// \brief Introduces a new constraint checker arena, supplanting any
+  /// Introduces a new constraint checker arena, supplanting any
   /// existing constraint checker arena.
   ///
   /// \param self The ASTContext into which this constraint checker arena
@@ -214,13 +216,13 @@ public:
   /// it before being set to null.
   UnifiedStatsReporter *Stats = nullptr;
 
-  /// \brief The language options used for translation.
+  /// The language options used for translation.
   LangOptions &LangOpts;
 
-  /// \brief The search path options used by this AST context.
+  /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
 
-  /// \brief The source manager object.
+  /// The source manager object.
   SourceManager &SourceMgr;
 
   /// Diags - The diagnostics engine.
@@ -250,7 +252,7 @@ public:
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
 
-  /// \brief The list of external definitions imported by this context.
+  /// The list of external definitions imported by this context.
   llvm::SetVector<Decl *> ExternalDefinitions;
 
   /// FIXME: HACK HACK HACK
@@ -268,7 +270,7 @@ public:
   llvm::StringMap<Type> RemappedTypes;
 
 private:
-  /// \brief The current generation number, which reflects the number of
+  /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.
   ///
   /// Various places in the AST, such as the set of extensions associated with
@@ -287,7 +289,7 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
-  /// \brief Retrieve the allocator for the given arena.
+  /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
@@ -482,7 +484,7 @@ public:
 
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \
-  FuncDecl *get##Name(LazyResolver *resolver) const;
+  FuncDecl *get##Name() const;
 #include "swift/AST/KnownDecls.def"
 
   /// Get the '+' function on two RangeReplaceableCollection.
@@ -496,24 +498,24 @@ public:
   ///
   /// If this is true, the four methods above all promise to return
   /// non-null.
-  bool hasOptionalIntrinsics(LazyResolver *resolver) const;
+  bool hasOptionalIntrinsics() const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for UnsafeMutablePointer<T> function arguments.
   ///
   /// If this is true, the methods getConvert*ToPointerArgument
   /// all promise to return non-null.
-  bool hasPointerArgumentIntrinsics(LazyResolver *resolver) const;
+  bool hasPointerArgumentIntrinsics() const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for array literals.
   ///
   /// If this is true, the method getAllocateUninitializedArray
   /// promises to return non-null.
-  bool hasArrayLiteralIntrinsics(LazyResolver *resolver) const;
+  bool hasArrayLiteralIntrinsics() const;
 
-  /// Retrieve the declaration of Swift._getBool.
-  FuncDecl *getGetBoolDecl(LazyResolver *resolver) const;
+  /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
+  ConstructorDecl *getBoolBuiltinInitDecl() const;
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
@@ -529,13 +531,13 @@ public:
   FuncDecl *getArrayReserveCapacityDecl() const;
 
   /// Retrieve the declaration of Swift._unimplementedInitializer.
-  FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
+  FuncDecl *getUnimplementedInitializerDecl() const;
 
   /// Retrieve the declaration of Swift._undefined.
-  FuncDecl *getUndefinedDecl(LazyResolver *resolver) const;
+  FuncDecl *getUndefinedDecl() const;
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
-  FuncDecl *getIsOSVersionAtLeastDecl(LazyResolver *resolver) const;
+  FuncDecl *getIsOSVersionAtLeastDecl() const;
   
   /// Look for the declaration with the given name within the
   /// Swift module.
@@ -628,7 +630,7 @@ public:
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
   void addSearchPath(StringRef searchPath, bool isFramework, bool isSystem);
 
-  /// \brief Adds a module loader to this AST context.
+  /// Adds a module loader to this AST context.
   ///
   /// \param loader The new module loader, which will be added after any
   ///               existing module loaders.
@@ -638,7 +640,7 @@ public:
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                        bool isClang = false);
 
-  /// \brief Load extensions to the given nominal type from the external
+  /// Load extensions to the given nominal type from the external
   /// module loaders.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.
@@ -648,7 +650,7 @@ public:
   /// one.
   void loadExtensions(NominalTypeDecl *nominal, unsigned previousGeneration);
 
-  /// \brief Load the methods within the given class that produce
+  /// Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.
   ///
   /// \param classDecl The class in which we are searching for @objc methods.
@@ -673,7 +675,7 @@ public:
                        unsigned previousGeneration,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
 
-  /// \brief Retrieve the Clang module loader for this ASTContext.
+  /// Retrieve the Clang module loader for this ASTContext.
   ///
   /// If there is no Clang module loader, returns a null pointer.
   /// The loader is owned by the AST context.
@@ -684,7 +686,7 @@ public:
   /// Does nothing in non-asserts (NDEBUG) builds.
   void verifyAllLoadedModules() const;
 
-  /// \brief Check whether the module with a given name can be imported without
+  /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
   /// Note that even if this check succeeds, errors may still occur if the
@@ -698,7 +700,7 @@ public:
 
   ModuleDecl *getLoadedModule(Identifier ModuleName) const;
 
-  /// \brief Attempts to load a module into this ASTContext.
+  /// Attempts to load a module into this ASTContext.
   ///
   /// If a module by this name has already been loaded, the existing module will
   /// be returned.
@@ -718,7 +720,7 @@ public:
     return const_cast<ASTContext *>(this)->getStdlibModule(false);
   }
 
-  /// \brief Retrieve the current generation number, which reflects the
+  /// Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
   /// lookup tables.
   ///
@@ -727,14 +729,14 @@ public:
   /// with a nominal type.
   unsigned getCurrentGeneration() const { return CurrentGeneration; }
 
-  /// \brief Increase the generation number, implying that various lookup
+  /// Increase the generation number, implying that various lookup
   /// tables have been significantly altered by the introduction of a new
   /// module import.
   ///
   /// \returns the previous generation number.
   unsigned bumpGeneration() { return CurrentGeneration++; }
 
-  /// \brief Produce a "normal" conformance for a nominal type.
+  /// Produce a "normal" conformance for a nominal type.
   NormalProtocolConformance *
   getConformance(Type conformingType,
                  ProtocolDecl *protocol,
@@ -742,13 +744,9 @@ public:
                  DeclContext *dc,
                  ProtocolConformanceState state);
 
-  /// Produce a new normal conformance for a property behavior.
-  NormalProtocolConformance *
-  getBehaviorConformance(Type conformingType,
-                         ProtocolDecl *protocol,
-                         SourceLoc loc,
-                         AbstractStorageDecl *storage,
-                         ProtocolConformanceState state);
+  /// Produce a self-conformance for the given protocol.
+  SelfProtocolConformance *
+  getSelfConformance(ProtocolDecl *protocol);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the
@@ -759,6 +757,10 @@ public:
     std::function<void()> Callback;
     bool IsError;
   };
+
+  /// Check whether current context has any errors associated with
+  /// ill-formed protocol conformances which haven't been produced yet.
+  bool hasDelayedConformanceErrors() const;
 
   /// Add a delayed diagnostic produced while type-checking a
   /// particular protocol conformance.
@@ -779,7 +781,7 @@ public:
   std::vector<ValueDecl*>
   takeDelayedMissingWitnesses(NormalProtocolConformance *conformance);
 
-  /// \brief Produce a specialized conformance, which takes a generic
+  /// Produce a specialized conformance, which takes a generic
   /// conformance and substitutions written in terms of the generic
   /// conformance's signature.
   ///
@@ -794,7 +796,7 @@ public:
                             ProtocolConformance *generic,
                             SubstitutionMap substitutions);
 
-  /// \brief Produce an inherited conformance, for subclasses of a type
+  /// Produce an inherited conformance, for subclasses of a type
   /// that already conforms to a protocol.
   ///
   /// \param type The type for which we are retrieving the conformance.
@@ -842,10 +844,10 @@ public:
                                               const IterableDeclContext *idc,
                                               LazyMemberLoader *lazyLoader);
 
-  /// \brief Returns memory usage of this ASTContext.
+  /// Returns memory usage of this ASTContext.
   size_t getTotalMemory() const;
   
-  /// \brief Returns memory used exclusively by constraint solver.
+  /// Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
   /// Complain if @objc or dynamic is used without importing Foundation.
@@ -933,6 +935,15 @@ public:
   bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
     return LangOpts.isSwiftVersionAtLeast(major, minor);
   }
+
+  /// Check whether it's important to respect access control restrictions
+  /// in current context.
+  bool isAccessControlDisabled() const {
+    return !LangOpts.EnableAccessControl;
+  }
+
+  /// Each kind and SourceFile has its own cache for a Type.
+  Type &getDefaultTypeRequestCache(SourceFile *, KnownProtocolKind);
 
 private:
   friend Decl;

@@ -49,7 +49,7 @@ internal struct _SmallString {
 
   @inlinable @inline(__always)
   internal init(_ object: _StringObject) {
-    _sanityCheck(object.isSmall)
+    _internalInvariant(object.isSmall)
     self.init(raw: object.rawBits)
   }
 
@@ -72,18 +72,9 @@ extension _SmallString {
     }
   }
 
-  @inlinable
-  internal var discriminator: _StringObject.Discriminator {
-    @inline(__always) get {
-      let value = _storage.1 &>> _StringObject.Nibbles.discriminatorShift
-      return _StringObject.Discriminator(UInt8(truncatingIfNeeded: value))
-    }
-    @inline(__always) set {
-      _storage.1 &= _StringObject.Nibbles.largeAddressMask
-      _storage.1 |= (
-        UInt64(truncatingIfNeeded: newValue._value)
-          &<< _StringObject.Nibbles.discriminatorShift)
-    }
+  @inlinable @inline(__always)
+  internal var rawDiscriminatedObject: UInt64 {
+    return _storage.1
   }
 
   @inlinable
@@ -96,7 +87,7 @@ extension _SmallString {
   @inlinable
   internal var count: Int {
     @inline(__always) get {
-      return discriminator.smallCount
+      return _StringObject.getSmallCount(fromRaw: rawDiscriminatedObject)
     }
   }
 
@@ -108,27 +99,22 @@ extension _SmallString {
   @inlinable
   internal var isASCII: Bool {
     @inline(__always) get {
-      return discriminator.smallIsASCII
+      return _StringObject.getSmallIsASCII(fromRaw: rawDiscriminatedObject)
     }
   }
 
   // Give raw, nul-terminated code units. This is only for limited internal
   // usage: it always clears the discriminator and count (in case it's full)
-  @inlinable
+  @inlinable @inline(__always)
   internal var zeroTerminatedRawCodeUnits: RawBitPattern {
-    @inline(__always) get {
-      return (
-        self._storage.0,
-        self._storage.1 & _StringObject.Nibbles.largeAddressMask)
-    }
+    let smallStringCodeUnitMask: UInt64 = 0x00FF_FFFF_FFFF_FFFF
+    return (self._storage.0, self._storage.1 & smallStringCodeUnitMask)
   }
 
-  @inlinable
   internal func computeIsASCII() -> Bool {
-    // TODO(String micro-performance): Evaluate other expressions, e.g. | first
     let asciiMask: UInt64 = 0x8080_8080_8080_8080
     let raw = zeroTerminatedRawCodeUnits
-    return (raw.0 & asciiMask == 0) && (raw.1 & asciiMask == 0)
+    return (raw.0 | raw.1) & asciiMask == 0
   }
 }
 
@@ -139,8 +125,8 @@ extension _SmallString {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    _sanityCheck(count <= _SmallString.capacity)
-    _sanityCheck(isASCII == computeIsASCII())
+    _internalInvariant(count <= _SmallString.capacity)
+    _internalInvariant(isASCII == computeIsASCII())
   }
   #endif // INTERNAL_CHECKS_ENABLED
 
@@ -175,7 +161,7 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
   @inlinable
   internal subscript(_ idx: Int) -> UInt8 {
     @inline(__always) get {
-      _sanityCheck(idx >= 0 && idx <= 15)
+      _internalInvariant(idx >= 0 && idx <= 15)
       if idx < 8 {
         return leadingRawBits._uncheckedGetByte(at: idx)
       } else {
@@ -183,7 +169,7 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
       }
     }
     @inline(__always) set {
-      _sanityCheck(idx >= 0 && idx <= 15)
+      _internalInvariant(idx >= 0 && idx <= 15)
       if idx < 8 {
         leadingRawBits._uncheckedSetByte(at: idx, to: newValue)
       } else {
@@ -192,7 +178,8 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
     }
   }
 
-  @usableFromInline // testable
+  @inlinable // FIXME(inline-always) was usableFromInline
+  // testable
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
     @inline(__always) get {
       // TODO(String performance): In-vector-register operation
@@ -219,7 +206,7 @@ extension _SmallString {
 
   // Overwrite stored code units, including uninitialized. `f` should return the
   // new count.
-  @inlinable @inline(__always)
+  @inline(__always)
   internal mutating func withMutableCapacity(
     _ f: (UnsafeMutableBufferPointer<UInt8>) throws -> Int
   ) rethrows {
@@ -230,14 +217,28 @@ extension _SmallString {
       return try f(UnsafeMutableBufferPointer(
         start: ptr, count: _SmallString.capacity))
     }
+    _internalInvariant(len <= _SmallString.capacity)
 
-    _sanityCheck(len <= _SmallString.capacity)
-    discriminator = .small(withCount: len, isASCII: self.computeIsASCII())
+    let (leading, trailing) = self.zeroTerminatedRawCodeUnits
+    self = _SmallString(leading: leading, trailing: trailing, count: len)
   }
 }
 
 // Creation
 extension _SmallString {
+  @inlinable @inline(__always)
+  internal init(leading: UInt64, trailing: UInt64, count: Int) {
+    _internalInvariant(count <= _SmallString.capacity)
+
+    let isASCII = (leading | trailing) & 0x8080_8080_8080_8080 == 0
+    let countAndDiscriminator = UInt64(truncatingIfNeeded: count) &<< 56
+                              | _StringObject.Nibbles.small(isASCII: isASCII)
+    _internalInvariant(trailing & countAndDiscriminator == 0)
+
+    self.init(raw: (leading, trailing | countAndDiscriminator))
+    _internalInvariant(self.count == count)
+  }
+
   // Direct from UTF-8
   @inlinable @inline(__always)
   internal init?(_ input: UnsafeBufferPointer<UInt8>) {
@@ -250,11 +251,7 @@ extension _SmallString {
     let leading = _bytesToUInt64(ptr, Swift.min(input.count, 8))
     let trailing = count > 8 ? _bytesToUInt64(ptr + 8, count &- 8) : 0
 
-    let isASCII = (leading | trailing) & 0x8080_8080_8080_8080 == 0
-    let discriminator = _StringObject.Discriminator.small(
-      withCount: count,
-      isASCII: isASCII)
-    self.init(raw: (leading, trailing | discriminator.rawBits))
+    self.init(leading: leading, trailing: trailing, count: count)
   }
 
   @usableFromInline // @testable
@@ -270,15 +267,10 @@ extension _SmallString {
       result[writeIdx] = other[readIdx]
       writeIdx &+= 1
     }
-    _sanityCheck(writeIdx == totalCount)
-
-    let isASCII = base.isASCII && other.isASCII
-    let discriminator = _StringObject.Discriminator.small(
-      withCount: totalCount,
-      isASCII: isASCII)
+    _internalInvariant(writeIdx == totalCount)
 
     let (leading, trailing) = result.zeroTerminatedRawCodeUnits
-    self.init(raw: (leading, trailing | discriminator.rawBits))
+    self.init(leading: leading, trailing: trailing, count: totalCount)
   }
 }
 
@@ -293,7 +285,7 @@ extension _SmallString {
     self.init()
     self.withMutableCapacity {
       let len = _bridgeTagged(cocoa, intoUTF8: $0)
-      _sanityCheck(len != nil && len! < _SmallString.capacity,
+      _internalInvariant(len != nil && len! < _SmallString.capacity,
         "Internal invariant violated: large tagged NSStrings")
       return len._unsafelyUnwrappedUnchecked
     }
@@ -308,7 +300,7 @@ extension UInt64 {
   // TODO: endianess awareness day
   @inlinable @inline(__always)
   internal func _uncheckedGetByte(at i: Int) -> UInt8 {
-    _sanityCheck(i >= 0 && i < MemoryLayout<UInt64>.stride)
+    _internalInvariant(i >= 0 && i < MemoryLayout<UInt64>.stride)
     let shift = UInt64(truncatingIfNeeded: i) &* 8
     return UInt8(truncatingIfNeeded: (self &>> shift))
   }
@@ -318,7 +310,7 @@ extension UInt64 {
   // TODO: endianess awareness day
   @inlinable @inline(__always)
   internal mutating func _uncheckedSetByte(at i: Int, to value: UInt8) {
-    _sanityCheck(i >= 0 && i < MemoryLayout<UInt64>.stride)
+    _internalInvariant(i >= 0 && i < MemoryLayout<UInt64>.stride)
     let shift = UInt64(truncatingIfNeeded: i) &* 8
     let valueMask: UInt64 = 0xFF &<< shift
     self = (self & ~valueMask) | (UInt64(truncatingIfNeeded: value) &<< shift)

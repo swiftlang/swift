@@ -20,7 +20,7 @@ import Builtin
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
 // CHECK: Block: bb0
-sil @test1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @test1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
@@ -41,7 +41,7 @@ bb2:
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Block: bb1
-sil @test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
 
@@ -63,7 +63,7 @@ bb2:
 // CHECK: Consuming User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
 // CHECK: Non Consuming User:   end_borrow %3 : $Builtin.NativeObject
 // CHECK: Block: bb1
-sil @test3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @test3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
 

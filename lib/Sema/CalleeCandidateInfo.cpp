@@ -26,7 +26,7 @@
 using namespace swift;
 using namespace constraints;
 
-/// \brief Determine whether one type would be a valid substitution for an
+/// Determine whether one type would be a valid substitution for an
 /// archetype.
 ///
 /// \param type The potential type.
@@ -464,7 +464,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
             allGenericSubstitutions[archetype] = substitution;
             
             // Not yet handling nested archetypes.
-            if (!archetype->isPrimary())
+            if (!isa<PrimaryArchetypeType>(archetype))
               return { CC_ArgumentMismatch, {}};
             
             if (!isSubstitutableFor(substitution, archetype, CS.DC)) {
@@ -933,8 +933,7 @@ operator=(const CalleeCandidateInfo &CCI) {
 /// arguments, emit a diagnostic indicating any partially matching overloads.
 void CalleeCandidateInfo::
 suggestPotentialOverloads(SourceLoc loc, bool isResult) {
-  std::string suggestionText = "";
-  std::set<std::string> dupes;
+  std::set<std::string> sorted;
   
   // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
   // the LHS and one using the RHS type for T's.
@@ -947,18 +946,20 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
     // If we've already seen this (e.g. decls overridden on the result type),
     // ignore this one.
     auto name = isResult ? type->getString() : getTypeListString(type);
-    if (!dupes.insert(name).second)
-      continue;
-    
+    sorted.insert(name);
+  }
+
+  if (sorted.empty())
+    return;
+
+  std::string suggestionText = "";
+  for (auto name : sorted) {
     if (!suggestionText.empty())
       suggestionText += ", ";
     suggestionText += name;
   }
-  
-  if (suggestionText.empty())
-    return;
-  
-  if (dupes.size() == 1) {
+
+  if (sorted.size() == 1) {
     CS.TC.diagnose(loc, diag::suggest_expected_match, isResult, suggestionText);
   } else {
     CS.TC.diagnose(loc, diag::suggest_partial_overloads, isResult, declName,

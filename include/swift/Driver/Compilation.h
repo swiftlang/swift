@@ -389,7 +389,7 @@ public:
   }
 
 private:
-  /// \brief Perform all jobs.
+  /// Perform all jobs.
   ///
   /// \param[out] abnormalExit Set to true if any job exits abnormally (i.e.
   /// crashes).
@@ -399,7 +399,7 @@ private:
   /// crashes during execution, a negative value will be returned.
   int performJobsImpl(bool &abnormalExit, std::unique_ptr<sys::TaskQueue> &&TQ);
 
-  /// \brief Performs a single Job by executing in place, if possible.
+  /// Performs a single Job by executing in place, if possible.
   ///
   /// \param Cmd the Job which should be performed.
   ///

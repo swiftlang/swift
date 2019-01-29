@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -closure-specialize %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialize %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -478,6 +478,46 @@ bb0(%0 : $Builtin.Int32, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
   return %7 : $()
 }
 
+// Check that we don't crash with this:
+// CHECK-LABEL: sil @test_box_with_named_elements_tuple
+sil @test_box_with_named_elements_tuple: $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = alloc_box ${ let (first: Builtin.Int32, second: Builtin.Int32) }
+  %0p = project_box %0 : ${ let (first: Builtin.Int32, second: Builtin.Int32) }, 0
+  %0a = tuple_element_addr %0p : $*(first: Builtin.Int32, second: Builtin.Int32), 0
+  %0b = tuple_element_addr %0p : $*(first: Builtin.Int32, second: Builtin.Int32), 1
+  %1 = integer_literal $Builtin.Int32, 0
+  store %1 to %0a : $*Builtin.Int32
+  store %1 to %0b : $*Builtin.Int32
+  %4 = function_ref @closure_with_named_elements_tuple : $@convention(thin) (Builtin.Int32, @owned { let (first: Builtin.Int32, second: Builtin.Int32) }) -> ()
+  strong_retain %0 : ${ let (first: Builtin.Int32, second: Builtin.Int32) }
+  %6 = partial_apply %4(%0) : $@convention(thin) (Builtin.Int32, @owned { let (first: Builtin.Int32, second: Builtin.Int32) }) -> ()
+  %7 = alloc_stack $Builtin.Int32
+  %9 = integer_literal $Builtin.Int32, 1
+  store %9 to %7 : $*Builtin.Int32
+  %12 = function_ref @$s4main5inneryys5Int32Vz_yADctF: $@convention(thin) (@inout Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> ()) -> ()
+  strong_retain %6 : $@callee_owned (Builtin.Int32) -> ()
+  %14 = apply %12(%7, %6) : $@convention(thin) (@inout Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> ()) -> ()
+  strong_release %6 : $@callee_owned (Builtin.Int32) -> ()
+  %16 = tuple ()
+  dealloc_stack %7 : $*Builtin.Int32
+  %18 = load %0a : $*Builtin.Int32
+  strong_release %0 : ${ let (first: Builtin.Int32, second: Builtin.Int32) }
+  return %18 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil shared @closure_with_named_elements_tuple
+sil shared @closure_with_named_elements_tuple : $@convention(thin) (Builtin.Int32, @owned { let (first: Builtin.Int32, second: Builtin.Int32) }) -> () {
+bb0(%0 : $Builtin.Int32, %1 : ${ let (first: Builtin.Int32, second: Builtin.Int32) }):
+  %3 = project_box %1 : ${ let (first: Builtin.Int32, second: Builtin.Int32) }, 0
+  %4 = tuple_element_addr %3 : $*(first: Builtin.Int32, second: Builtin.Int32), 0
+  store %0 to %4 : $*Builtin.Int32
+  strong_release %1 : ${ let (first: Builtin.Int32, second: Builtin.Int32) }
+  %7 = tuple ()
+  return %7 : $()
+}
+
+
 // The specialized function should always be a thin function, regardless of the
 // representation of the original function.
 
@@ -767,4 +807,24 @@ bb2:
 bb3:
   release_value %2 : $@callee_guaranteed () -> Int
   return %value : $Int
+}
+// CHECK-LABEL: sil @reabstractionTest_on_stack
+// CHECK: bb0([[A:%.*]] : $Int):
+// CHECK:  [[R:%.*]] = alloc_stack $Int
+// CHECK:  [[F:%.*]] = function_ref @$s25testClosureThunkNoEscape20aB14ConvertHelper2SiTf1nc_n
+// CHECK: apply [[F]]([[R]], [[A]])
+sil @reabstractionTest_on_stack : $(Int) -> () {
+bb0(%0 : $Int):
+  %48 = alloc_stack $Int
+  %49 = function_ref @testClosureConvertHelper2 : $@convention(thin) (Int) -> Int
+  %50 = partial_apply [callee_guaranteed] [on_stack] %49(%0) : $@convention(thin) (Int) -> Int
+  %52 = function_ref @reabstractionThunk : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
+  %53 = partial_apply [callee_guaranteed] [on_stack] %52(%50) : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
+  %55 = function_ref @testClosureThunkNoEscape2 : $@convention(thin) (@noescape @callee_guaranteed () -> @out Int) -> @out Int
+  apply %55(%48, %53) : $@convention(thin) (@noescape @callee_guaranteed () -> @out Int) -> @out Int
+  dealloc_stack %53 : $@noescape @callee_guaranteed () -> @out Int
+  dealloc_stack %50 : $@noescape @callee_guaranteed () -> Int
+  dealloc_stack %48 : $*Int
+  %empty = tuple ()
+  return %empty : $()
 }

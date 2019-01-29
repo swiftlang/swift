@@ -11,8 +11,8 @@ import Swift
 sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
 sil @makesInt : $@convention(thin) () -> Int
 
-// CHECK-LABEL: sil @use_before_init
-sil @use_before_init : $@convention(thin) () -> Int {
+// CHECK-LABEL: sil [ossa] @use_before_init
+sil [ossa] @use_before_init : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
@@ -23,7 +23,7 @@ bb0:
 }
 
 // CHECK-LABEL: @inout_uninit
-sil @inout_uninit : $@convention(thin) () -> () {
+sil [ossa] @inout_uninit : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
@@ -44,9 +44,9 @@ bb0:
 //  takes_Int_inout(&a)
 //  return (t, a)
 //}
-// CHECK-LABEL: sil @used_by_inout
-sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
-bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @used_by_inout
+sil [ossa] @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
+bb0(%0 : $Int):
   %91 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %91a = project_box %91 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %1 = mark_uninitialized [var] %91a : $*Int
@@ -67,11 +67,11 @@ struct AddressOnlyStruct {
 }
 
 /// returns_generic_struct - This returns a struct by reference.
-sil @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
+sil [ossa] @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
 
 // There should be no error in this function.
-// CHECK-LABEL: sil @call_struct_return_function
-sil @call_struct_return_function : $@convention(thin) () -> Int {
+// CHECK-LABEL: sil [ossa] @call_struct_return_function
+sil [ossa] @call_struct_return_function : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_box $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>
   %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>, 0
@@ -85,9 +85,9 @@ bb0:
   return %5 : $Int
 }
 
-// CHECK-LABEL: sil @tuple_elements1
-sil @tuple_elements1 : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @tuple_elements1
+sil [ossa] @tuple_elements1 : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>, 0
   %3 = mark_uninitialized [var] %2a : $*(Int, Int) // expected-note {{variable defined here}}
@@ -102,9 +102,9 @@ bb0(%0 : @trivial $Int):
   return %99 : $()
 }
 
-// CHECK-LABEL: sil @tuple_elements2
-sil @tuple_elements2 : $@convention(thin) (Int) -> (Int, Int) {
-bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @tuple_elements2
+sil [ossa] @tuple_elements2 : $@convention(thin) (Int) -> (Int, Int) {
+bb0(%0 : $Int):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>, 0
   %3 = mark_uninitialized [var] %2a : $*(Int, Int) // expected-note {{variable defined here}}
@@ -118,9 +118,9 @@ bb0(%0 : @trivial $Int):
   return %23 : $(Int, Int)
 }
 
-// CHECK-LABEL: sil @copy_addr1
-sil @copy_addr1 : $@convention(thin) <T> (@in T) -> @out T {
-bb0(%0 : @trivial $*T, %1 : @trivial $*T):
+// CHECK-LABEL: sil [ossa] @copy_addr1
+sil [ossa] @copy_addr1 : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
   %4 = mark_uninitialized [var] %3a : $*T
@@ -131,9 +131,9 @@ bb0(%0 : @trivial $*T, %1 : @trivial $*T):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil @copy_addr2
-sil @copy_addr2 : $@convention(thin) <T> (@in T) -> @out T {
-bb0(%0 : @trivial $*T, %1 : @trivial $*T):
+// CHECK-LABEL: sil [ossa] @copy_addr2
+sil [ossa] @copy_addr2 : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
   %4 = mark_uninitialized [var] %3a : $*T // expected-note {{variable defined here}}
@@ -143,11 +143,11 @@ bb0(%0 : @trivial $*T, %1 : @trivial $*T):
   return %9 : $()
 }
 
-sil @takes_closure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-sil @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
+sil [ossa] @takes_closure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+sil [ossa] @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
 
-// CHECK-LABEL: sil @closure_test
-sil @closure_test : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @closure_test
+sil [ossa] @closure_test : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
@@ -168,13 +168,13 @@ bb0:
 
 class SomeClass {}
 
-sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
-sil @getSomeOptionalClass : $@convention(thin) () -> @owned Optional<SomeClass>
+sil [ossa] @getSomeClass : $@convention(thin) () -> @owned SomeClass
+sil [ossa] @getSomeOptionalClass : $@convention(thin) () -> @owned Optional<SomeClass>
 
 
-// CHECK-LABEL: sil @assign_test_trivial
-sil @assign_test_trivial : $@convention(thin) (Int) -> Int {
-bb0(%0 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @assign_test_trivial
+sil [ossa] @assign_test_trivial : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
   %7 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %7a = project_box %7 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %1 = mark_uninitialized [var] %7a : $*Int
@@ -191,8 +191,8 @@ bb0(%0 : @trivial $Int):
   return %2 : $Int
 }
 
-// CHECK-LABEL: sil @assign_test_nontrivial
-sil @assign_test_nontrivial : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @assign_test_nontrivial
+sil [ossa] @assign_test_nontrivial : $@convention(thin) () -> () {
 bb0:
   // Assignments of nontrivial types.  The first becomes an initialize (i.e.,
   // lone store), the second becomes an assignment (retain/release dance).
@@ -225,9 +225,9 @@ bb0:
   return %11 : $()
 }
 
-// CHECK-LABEL: sil @assign_test_addressonly
-sil @assign_test_addressonly : $@convention(thin) <T> (@in T) -> @out T {
-bb0(%0 : @trivial $*T, %1 :@trivial  $*T):
+// CHECK-LABEL: sil [ossa] @assign_test_addressonly
+sil [ossa] @assign_test_addressonly : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <T>, 0
   %2 = mark_uninitialized [var] %ba : $*T
@@ -252,19 +252,15 @@ bb0(%0 : @trivial $*T, %1 :@trivial  $*T):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil @assign_test_weak
-sil @assign_test_weak : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @assign_test_weak
+sil [ossa] @assign_test_weak : $@convention(thin) () -> () {
 bb0:
   // Assignments of weak pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<SomeClass>>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<SomeClass>>, 0
-  %c = mark_uninitialized [var] %ba : $*@sil_weak Optional<SomeClass> // expected-note {{variable defined here}}
-
-  // Invalid load to keep the alloc_box around so we can check init semantics.
-  %c_loaded = load_weak %c : $*@sil_weak Optional<SomeClass>    // expected-error {{used before being initialized}}
-  destroy_value %c_loaded : $Optional<SomeClass>
+  %c = mark_uninitialized [var] %ba : $*@sil_weak Optional<SomeClass>
 
   %f = function_ref @getSomeOptionalClass : $@convention(thin) () -> @owned Optional<SomeClass>
 
@@ -293,8 +289,8 @@ bb0:
   return %11 : $()
 }
 
-// CHECK-LABEL: sil @assign_test_unowned
-sil @assign_test_unowned : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @assign_test_unowned
+sil [ossa] @assign_test_unowned : $@convention(thin) () -> () {
 bb0:
   // Assignments of unowned pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
@@ -347,8 +343,8 @@ struct ContainsNativeObject {
   var y : Builtin.NativeObject
 }
 
-sil @test_struct : $@convention(thin) (@inout ContainsNativeObject) -> () {
-bb0(%0 : @trivial $*ContainsNativeObject):
+sil [ossa] @test_struct : $@convention(thin) (@inout ContainsNativeObject) -> () {
+bb0(%0 : $*ContainsNativeObject):
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>, 0
   %c = mark_uninitialized [var] %ba : $*ContainsNativeObject
@@ -360,23 +356,23 @@ bb0(%0 : @trivial $*ContainsNativeObject):
   return %x : $()
 }
 
-// CHECK-LABEL: sil @non_box_assign_trivial
+// CHECK-LABEL: sil [ossa] @non_box_assign_trivial
 // CHECK-NOT: load
 // CHECK: assign
 // CHECK: return
-sil @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
-bb0(%0 : @trivial $*Bool, %1 : @trivial $Bool):
+sil [ossa] @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
+bb0(%0 : $*Bool, %1 : $Bool):
   assign %1 to %0 : $*Bool
   %9 = tuple ()
   return %9 : $()
 }
 
-// CHECK-LABEL: sil @non_box_assign
+// CHECK-LABEL: sil [ossa] @non_box_assign
 // CHECK-NOT: load
 // CHECK: assign
 // CHECK: return
-sil @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
-bb0(%0 : @trivial $*SomeClass, %1 : @owned $SomeClass):
+sil [ossa] @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
+bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
   assign %1 to %0 : $*SomeClass
   %9 = tuple ()
   return %9 : $()
@@ -384,10 +380,10 @@ bb0(%0 : @trivial $*SomeClass, %1 : @owned $SomeClass):
 
 sil_global @int_global : $Int
 
-// CHECK-LABEL: sil @test_tlc
+// CHECK-LABEL: sil [ossa] @test_tlc
 // CHECK-NOT: mark_uninitialized
 // CHECK: return
-sil @test_tlc : $() -> () {
+sil [ossa] @test_tlc : $() -> () {
   %0 = global_addr @int_global : $*Int
   %1 = mark_uninitialized [var] %0 : $*Int
   %9 = tuple ()
@@ -395,14 +391,14 @@ sil @test_tlc : $() -> () {
 }
 
 struct XYStruct { var x, y : Int }
-sil @init_xy_struct : $@convention(thin) () -> XYStruct
+sil [ossa] @init_xy_struct : $@convention(thin) () -> XYStruct
 
 protocol P {}
 class C : P {}
-sil @use : $@convention(thin) (@in P) -> ()
+sil [ossa] @use : $@convention(thin) (@in P) -> ()
 
-// CHECK-LABEL: sil @release_not_constructed
-sil @release_not_constructed : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @release_not_constructed
+sil [ossa] @release_not_constructed : $@convention(thin) () -> () {
 bb0:  // CHECK: bb0:
   %3 = alloc_stack $SomeClass
   // CHECK-NEXT: alloc_stack
@@ -420,8 +416,8 @@ bb0:  // CHECK: bb0:
   return %15 : $()
 }
 
-// CHECK-LABEL: sil @release_some_constructed
-sil @release_some_constructed : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @release_some_constructed
+sil [ossa] @release_some_constructed : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   %b = alloc_stack $(SomeClass, SomeClass)
@@ -446,9 +442,9 @@ bb0:
 }
 
 // rdar://15379013
-// CHECK-LABEL: sil @init_existential_with_class
-sil @init_existential_with_class : $@convention(thin) (@inout C) -> () {
-entry(%a : @trivial $*C):
+// CHECK-LABEL: sil [ossa] @init_existential_with_class
+sil [ossa] @init_existential_with_class : $@convention(thin) (@inout C) -> () {
+entry(%a : $*C):
   %p = alloc_stack $P
   %b = mark_uninitialized [var] %p : $*P
 
@@ -463,13 +459,13 @@ entry(%a : @trivial $*C):
   return %z : $()
 }
 
-// CHECK-LABEL: sil @conditional_init
+// CHECK-LABEL: sil [ossa] @conditional_init
 // This test checks conditional destruction logic.  Because the value is only
 // initialized on some paths, we need to either hoist up the destroy_addr or
 // emit a boolean control value to make sure the value is only destroyed if
 //  actually initialized.
-sil @conditional_init : $@convention(thin) (Bool) -> () {
-bb0(%0 : @trivial $Bool):
+sil [ossa] @conditional_init : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
   %2 = alloc_stack $SomeClass
   %3 = mark_uninitialized [var] %2 : $*SomeClass
 
@@ -496,9 +492,9 @@ bb2:
   return %14 : $()
 }
 
-// CHECK-LABEL: sil @conditionalInitOrAssign
-sil @conditionalInitOrAssign : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+// CHECK-LABEL: sil [ossa] @conditionalInitOrAssign
+sil [ossa] @conditionalInitOrAssign : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
   // CHECK: [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
   // CHECK: [[CLASSVAL:%[0-9]+]] = alloc_stack $SomeClass
   // CHECK: integer_literal $Builtin.Int1, 0
@@ -546,7 +542,7 @@ bb2:
 
 // Make sure that we use a dealloc_box on the path where we do not assign.
 //
-// CHECK-LABEL: sil @conditionalInitOrAssignAllocBox : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @conditionalInitOrAssignAllocBox : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK: [[BOX:%.*]] = alloc_box
 //
@@ -562,7 +558,7 @@ bb2:
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'conditionalInitOrAssignAllocBox'
-sil @conditionalInitOrAssignAllocBox : $@convention(thin) () -> () {
+sil [ossa] @conditionalInitOrAssignAllocBox : $@convention(thin) () -> () {
 bb0:
   %box = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>
   %5 = project_box %box : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
@@ -589,11 +585,11 @@ bb3:
 // LLDB uses mark_uninitialized [var] in an unsupported way via an address to
 // pointer. LLDB shouldn't do this, but until it is removed and validated we
 // need a test for this.
-// CHECK-LABEL: sil @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
+// CHECK-LABEL: sil [ossa] @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
 // CHECK-NOT: mark_uninitialized [var]
 // CHECK: } // end sil function 'lldb_unsupported_markuninitialized_testcase'
-sil @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
-bb0(%0 : @trivial $UnsafeMutablePointer<Any>):
+sil [ossa] @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
+bb0(%0 : $UnsafeMutablePointer<Any>):
   %2 = struct_extract %0 : $UnsafeMutablePointer<Any>, #UnsafeMutablePointer._rawValue
   %3 = integer_literal $Builtin.Int64, 8
   %4 = index_raw_pointer %2 : $Builtin.RawPointer, %3 : $Builtin.Int64

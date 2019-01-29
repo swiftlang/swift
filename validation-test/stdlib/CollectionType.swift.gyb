@@ -670,16 +670,6 @@ extension Collection {
 }
 
 //===----------------------------------------------------------------------===//
-// Collection.split()
-//===----------------------------------------------------------------------===//
-
-CollectionTypeTests.test("Collection/split/dispatch") {
-  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.split { $0.value == 1 }
-  expectCustomizable(tester, tester.log.split)
-}
-
-//===----------------------------------------------------------------------===//
 // MutableCollection
 //===----------------------------------------------------------------------===//
 
@@ -701,6 +691,16 @@ CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") 
   var tester = MutableCollectionLog.dispatchTester([OpaqueValue(1)])
   _ = tester._withUnsafeMutableBufferPointerIfSupported { _ in () }
   expectCustomizable(tester, tester.log._withUnsafeMutableBufferPointerIfSupported)
+}
+
+//===----------------------------------------------------------------------===//
+// withContiguousMutableStorageIfAvailable()
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("withContiguousMutableStorageIfAvailable/dispatch") {
+  var tester = MutableCollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.withContiguousMutableStorageIfAvailable { _ in () }
+  expectCustomizable(tester, tester.log.withContiguousMutableStorageIfAvailable)
 }
 
 

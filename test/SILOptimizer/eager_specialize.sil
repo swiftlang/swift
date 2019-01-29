@@ -1,7 +1,7 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -sil-deadfuncelim  %s | %FileCheck --check-prefix=CHECK-DEADFUNCELIM %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -sil-inline-generics=true -inline %s | %FileCheck --check-prefix=CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE %s
+// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer -sil-deadfuncelim  %s | %FileCheck --check-prefix=CHECK-DEADFUNCELIM %s
+// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN %s
+// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer -sil-inline-generics=true -inline %s | %FileCheck --check-prefix=CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE %s
 
 sil_stage canonical
 
@@ -18,13 +18,13 @@ public protocol HasElt {
 }
 
 struct X : AnElt {
-  @sil_stored var i: Int { get set }
+  @_hasStorage var i: Int { get set }
   init(i: Int)
 }
 
 struct S : HasElt {
   typealias Elt = X
-  @sil_stored var e: X { get set }
+  @_hasStorage var e: X { get set }
   init(e: Elt)
 }
 
@@ -40,7 +40,7 @@ public func getGenericContainer<T>(g: G<T>, e: T.Elt) -> T where T.Elt : AnElt
 
 enum ArithmeticError : Error {
   case DivByZero
-  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
   var _code: Int { get }
 }
 

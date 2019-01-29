@@ -32,7 +32,7 @@
 using namespace swift;
 using namespace swift::constraints;
 
-/// \brief Find the declaration directly referenced by this expression.
+/// Find the declaration directly referenced by this expression.
 static std::pair<ValueDecl *, FunctionRefKind>
 findReferencedDecl(Expr *expr, DeclNameLoc &loc) {
   do {
@@ -127,14 +127,20 @@ namespace {
   class LinkedExprCollector : public ASTWalker {
     
     llvm::SmallVectorImpl<Expr*> &LinkedExprs;
+    ConstraintSystem &CS;
 
   public:
-    
-    LinkedExprCollector(llvm::SmallVectorImpl<Expr*> &linkedExprs) :
-        LinkedExprs(linkedExprs) {}
-    
+    LinkedExprCollector(llvm::SmallVectorImpl<Expr *> &linkedExprs,
+                        ConstraintSystem &cs)
+        : LinkedExprs(linkedExprs), CS(cs) {}
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
+
       // Store top-level binary exprs for further analysis.
       if (isa<BinaryExpr>(expr) ||
           
@@ -164,20 +170,20 @@ namespace {
       return expr;
     }
     
-    /// \brief Ignore statements.
+    /// Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
     
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
 
-    /// \brief Ignore patterns.
+    /// Ignore patterns.
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
       return { false, pat };
     }
 
-    /// \brief Ignore types.
+    /// Ignore types.
     bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
@@ -195,6 +201,11 @@ namespace {
         LTI(lti), CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
       
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
@@ -327,20 +338,20 @@ namespace {
       return { true, expr };
     }
     
-    /// \brief Ignore statements.
+    /// Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
     
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
 
-    /// \brief Ignore patterns.
+    /// Ignore patterns.
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
       return { false, pat };
     }
 
-    /// \brief Ignore types.
+    /// Ignore types.
     bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
@@ -934,6 +945,11 @@ namespace {
       CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
       
       if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
         if (isa<PrefixUnaryExpr>(applyExpr) ||
@@ -965,12 +981,12 @@ namespace {
       return expr;
     }
     
-    /// \brief Ignore statements.
+    /// Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
     
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 } // end anonymous namespace
@@ -992,7 +1008,7 @@ namespace {
       = { nullptr, nullptr };
     unsigned currentEditorPlaceholderVariable = 0;
 
-    /// \brief Add constraints for a reference to a named member of the given
+    /// Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, DeclName name,
                                  FunctionRefKind functionRefKind,
@@ -1014,7 +1030,7 @@ namespace {
       return tv;
     }
 
-    /// \brief Add constraints for a reference to a specific member of the given
+    /// Add constraints for a reference to a specific member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl,
                                  FunctionRefKind functionRefKind) {
@@ -1038,7 +1054,7 @@ namespace {
       return tv;
     }
 
-    /// \brief Add constraints for a subscript operation.
+    /// Add constraints for a subscript operation.
     Type addSubscriptConstraints(Expr *anchor, Type baseTy, Expr *index,
                                  ValueDecl *declOrNull,
                                  ConstraintLocator *locator = nullptr) {
@@ -1306,7 +1322,7 @@ namespace {
       // use the right labels before forming the call to the initializer.
       DeclName constrName = tc.getObjectLiteralConstructorName(expr);
       assert(constrName);
-      ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
+      auto constrs = protocol->lookupDirect(constrName);
       if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front())) {
         tc.diagnose(protocol, diag::object_literal_broken_proto);
         return nullptr;
@@ -1563,6 +1579,11 @@ namespace {
       if (typeOperation != TypeOperation::None)
         return CS.getASTContext().TheAnyType;
 
+      // If this is `Builtin.trigger_fallback_diagnostic()`, fail
+      // without producing any diagnostics, in order to test fallback error.
+      if (isTriggerFallbackDiagnosticBuiltin(expr, CS.getASTContext()))
+        return Type();
+
       // Open a member constraint for constructor delegations on the
       // subexpr type.
       if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)) {
@@ -1589,6 +1610,7 @@ namespace {
               CS.getConstraintLocator(expr,
                                       ConstraintLocator::ApplyArgument),
               (TVO_CanBindToLValue |
+               TVO_CanBindToInOut |
                TVO_PrefersSubtypeBinding));
           CS.addConstraint(
               ConstraintKind::FunctionInput, methodTy, argTy,
@@ -1611,7 +1633,7 @@ namespace {
                                      expr->getFunctionRefKind(),
                                      expr->getOuterAlternatives());
     }
-    
+
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = CS.getType(expr->getSubExpr());
       
@@ -1657,7 +1679,7 @@ namespace {
                                 options))
               return Type();
 
-            CS.addConstraint(ConstraintKind::Equal,
+            CS.addConstraint(ConstraintKind::Bind,
                              typeVars[i], specializations[i].getType(),
                              locator);
           }
@@ -1709,9 +1731,18 @@ namespace {
       if (!optTy)
         return Type();
 
-      CS.addConstraint(ConstraintKind::OptionalObject,
-                       optTy, CS.getType(expr->getSubExpr()),
-                       CS.getConstraintLocator(expr));
+      // Prior to Swift 5, 'try?' always adds an additional layer of optionality,
+      // even if the sub-expression was already optional.
+      if (CS.getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5)) {
+        CS.addConstraint(ConstraintKind::Conversion,
+                         CS.getType(expr->getSubExpr()), optTy,
+                         CS.getConstraintLocator(expr));
+      }
+      else {
+        CS.addConstraint(ConstraintKind::OptionalObject,
+                         optTy, CS.getType(expr->getSubExpr()),
+                         CS.getConstraintLocator(expr));
+      }
       return optTy;
     }
 
@@ -2048,7 +2079,7 @@ namespace {
       });
     }
 
-    /// \brief Produces a type for the given pattern, filling in any missing
+    /// Produces a type for the given pattern, filling in any missing
     /// type information with fresh type variables.
     ///
     /// \param pattern The pattern.
@@ -2159,7 +2190,7 @@ namespace {
       return CS.getType(expr->getClosureBody());
     }
 
-    /// \brief Walk a closure body to determine if it's possible for
+    /// Walk a closure body to determine if it's possible for
     /// it to return with a non-void result.
     static bool closureHasNoResult(ClosureExpr *expr) {
       // A walker that looks for 'return' statements that aren't
@@ -2208,7 +2239,7 @@ namespace {
       return finder.hasNoResult();
     }
     
-    /// \brief Walk a closure AST to determine if it can throw.
+    /// Walk a closure AST to determine if it can throw.
     bool closureCanThrow(ClosureExpr *expr) {
       // A walker that looks for 'try' or 'throw' expressions
       // that aren't nested within closures, nested declarations,
@@ -2893,7 +2924,9 @@ namespace {
     }
 
     Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
-      return expr->getType();
+      auto type = expr->getType();
+      assert(type && "LazyInitializerExpr should always have type set");
+      return type;
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
@@ -3086,6 +3119,11 @@ namespace {
     }
 
     Type visitTapExpr(TapExpr *expr) {
+      DeclContext *varDC = expr->getVar()->getDeclContext();
+      assert(varDC == CS.DC || (varDC && isa<AbstractClosureExpr>(varDC) &&
+              cast<AbstractClosureExpr>(varDC)->hasSingleExpressionBody()) &&
+             "TapExpr var should be in the same DeclContext we're checking it in!");
+      
       auto locator = CS.getConstraintLocator(expr);
       auto tv = CS.createTypeVariable(locator);
 
@@ -3095,6 +3133,19 @@ namespace {
       }
 
       return tv;
+    }
+
+    static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,
+                                                   ASTContext &Context) {
+      auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase());
+      if (!DRE)
+        return false;
+
+      if (DRE->getDecl() != Context.TheBuiltinModule)
+        return false;
+
+      auto member = UDE->getName().getBaseName().userFacingName();
+      return member.equals("trigger_fallback_diagnostic");
     }
 
     enum class TypeOperation { None,
@@ -3207,7 +3258,7 @@ namespace {
     }
   };
 
-  /// \brief AST walker that "sanitizes" an expression for the
+  /// AST walker that "sanitizes" an expression for the
   /// constraint-based type checker.
   ///
   /// This is necessary because Sema fills in too much type information before
@@ -3226,6 +3277,12 @@ namespace {
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       while (true) {
+
+        // If we should reuse pre-checked types, don't sanitize the expression
+        // if it's already type-checked.
+        if (CS.shouldReusePrecheckedType() && expr->getType())
+          return { false, expr };
+
         // OpenExistentialExpr contains OpaqueValueExpr in its sub expression.
         if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
           auto archetypeVal = OOE->getOpaqueValue();
@@ -3277,22 +3334,6 @@ namespace {
           continue;
         }
 
-        // Strip off 'Bool' to 'Builtin.Int1' conversion. Otherwise, we'll have
-        // to handle multiple ways of type-checking.
-        if (expr->isImplicit()) {
-          if (auto call = dyn_cast<CallExpr>(expr)) {
-            if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(call->getFn())) {
-              auto RefD = DSCE->getFn()->getReferencedDecl().getDecl();
-              if (RefD->getBaseName() == TC.Context.Id_getBuiltinLogicValue &&
-                  RefD->getDeclContext()->getSelfNominalTypeDecl() ==
-                      TC.Context.getBoolDecl()) {
-                expr = DSCE->getBase();
-                continue;
-              }
-            }
-          }
-        }
-
         // Remove any semantic expression injected by typechecking.
         if (auto CE = dyn_cast<CollectionExpr>(expr)) {
           CE->setSemanticExpr(nullptr);
@@ -3314,10 +3355,8 @@ namespace {
         Type type = CS.getType(expr);
         if (type->hasOpenedExistential()) {
           type = type.transform([&](Type type) -> Type {
-            if (auto archetype = type->getAs<ArchetypeType>())
-              if (auto existentialType = archetype->getOpenedExistentialType())
-                return existentialType;
-
+            if (auto archetype = type->getAs<OpenedArchetypeType>())
+              return archetype->getOpenedExistentialType();
             return type;
           });
           CS.setType(expr, type);
@@ -3332,6 +3371,20 @@ namespace {
       assert(!isa<ImplicitConversionExpr>(expr) &&
              "ImplicitConversionExpr should be eliminated in walkToExprPre");
 
+      auto buildMemberRef = [&](Type memberType, Expr *base, SourceLoc dotLoc,
+                                ConcreteDeclRef member, DeclNameLoc memberLoc,
+                                bool implicit) -> Expr * {
+        auto *memberRef = new (TC.Context)
+            MemberRefExpr(base, dotLoc, member, memberLoc, implicit);
+
+        if (memberType) {
+          memberRef->setType(memberType);
+          return CS.cacheType(memberRef);
+        }
+
+        return memberRef;
+      };
+
       // A DotSyntaxCallExpr is a member reference that has already been
       // type-checked down to a call; turn it back into an overloaded
       // member reference expression.
@@ -3341,21 +3394,23 @@ namespace {
                                                        memberLoc);
         if (memberAndFunctionRef.first) {
           assert(!isa<ImplicitConversionExpr>(dotCall->getBase()));
-          return new (TC.Context) MemberRefExpr(dotCall->getBase(),
-                                                dotCall->getDotLoc(),
-                                                memberAndFunctionRef.first,
-                                                memberLoc, expr->isImplicit());
+          return buildMemberRef(dotCall->getType(),
+                                dotCall->getBase(),
+                                dotCall->getDotLoc(),
+                                memberAndFunctionRef.first,
+                                memberLoc, expr->isImplicit());
         }
       }
 
       if (auto *dynamicMember = dyn_cast<DynamicMemberRefExpr>(expr)) {
         if (auto memberRef = dynamicMember->getMember()) {
           assert(!isa<ImplicitConversionExpr>(dynamicMember->getBase()));
-          return new (TC.Context) MemberRefExpr(dynamicMember->getBase(),
-                                                dynamicMember->getDotLoc(),
-                                                memberRef,
-                                                dynamicMember->getNameLoc(),
-                                                expr->isImplicit());
+          return buildMemberRef(dynamicMember->getType(),
+                                dynamicMember->getBase(),
+                                dynamicMember->getDotLoc(),
+                                memberRef,
+                                dynamicMember->getNameLoc(),
+                                expr->isImplicit());
         }
       }
 
@@ -3369,16 +3424,17 @@ namespace {
                                                        memberLoc);
         if (memberAndFunctionRef.first) {
           assert(!isa<ImplicitConversionExpr>(dotIgnored->getLHS()));
-          return new (TC.Context) MemberRefExpr(dotIgnored->getLHS(),
-                                                dotIgnored->getDotLoc(),
-                                                memberAndFunctionRef.first,
-                                                memberLoc, expr->isImplicit());
+          return buildMemberRef(dotIgnored->getType(),
+                                dotIgnored->getLHS(),
+                                dotIgnored->getDotLoc(),
+                                memberAndFunctionRef.first,
+                                memberLoc, expr->isImplicit());
         }
       }
       return expr;
     }
 
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
 
     // Don't walk into statements.  This handles the BraceStmt in
@@ -3395,6 +3451,15 @@ namespace {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
+        if (expr->getType()) {
+          assert(!expr->getType()->hasTypeVariable());
+          CG.getConstraintSystem().cacheType(expr);
+          return { false, expr };
+        }
+      }
+
       // Note that the subexpression of a #selector expression is
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
@@ -3445,7 +3510,7 @@ namespace {
       return { true, expr };
     }
 
-    /// \brief Once we've visited the children of the given expression,
+    /// Once we've visited the children of the given expression,
     /// generate constraints from the expression.
     Expr *walkToExprPost(Expr *expr) override {
 
@@ -3520,12 +3585,12 @@ namespace {
       return nullptr;
     }
 
-    /// \brief Ignore statements.
+    /// Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
 
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
@@ -3615,7 +3680,7 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   SmallVector<Expr *, 16> linkedExprs;
   
   // Collect any linked expressions.
-  LinkedExprCollector collector(linkedExprs);
+  LinkedExprCollector collector(linkedExprs, *this);
   e->walk(collector);
   
   // Favor types, as appropriate.
@@ -3640,6 +3705,7 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
     return true;
 
   TypeChecker *TC = &createTypeChecker(DC.getASTContext());
+  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
 
   ConstraintSystemOptions Options;
   ConstraintSystem CS(*TC, &DC, Options);
@@ -3671,7 +3737,7 @@ static bool canSatisfy(Type type1, Type type2, bool openArchetypes,
 }
 
 bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, true, ConstraintKind::Equal, &DC);
+  return canSatisfy(T1, T2, true, ConstraintKind::Bind, &DC);
 }
 
 bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {

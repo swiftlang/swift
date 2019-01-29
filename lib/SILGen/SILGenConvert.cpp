@@ -214,7 +214,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
 
   // Call the standard library implementation of _diagnoseUnexpectedNilOptional.
   if (auto diagnoseFailure =
-        getASTContext().getDiagnoseUnexpectedNilOptional(nullptr)) {
+        getASTContext().getDiagnoseUnexpectedNilOptional()) {
     auto args = emitSourceLocationArgs(loc.getSourceLoc(), loc);
     
     auto i1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
@@ -481,7 +481,7 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
                                      CanType inputType,
                                      CanType outputType,
                                      SGFContext C) {
-  auto converter = getASTContext().getConvertPointerToPointerArgument(nullptr);
+  auto converter = getASTContext().getConvertPointerToPointerArgument();
 
   auto origValue = input;
   if (silConv.useLoweredAddresses()) {

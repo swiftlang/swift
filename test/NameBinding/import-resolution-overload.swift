@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_vars.swift
 // RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -verify
 
-// RUN: not %target-swift-frontend -dump-ast %s -I %t -sdk "" > %t.astdump 2>&1
+// RUN: not %target-swift-frontend -dump-ast %s -I %t -sdk "" > %t.astdump
 // RUN: %FileCheck %s < %t.astdump
 
 import overload_intFunctions

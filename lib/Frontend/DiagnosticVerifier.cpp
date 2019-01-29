@@ -199,7 +199,7 @@ static std::string renderFixits(ArrayRef<llvm::SMFixIt> fixits,
   return OS.str();
 }
 
-/// \brief After the file has been processed, check to see if we got all of
+/// After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
 bool DiagnosticVerifier::verifyFile(unsigned BufferID,

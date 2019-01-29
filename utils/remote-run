@@ -14,7 +14,8 @@
 from __future__ import print_function
 
 import argparse
-import os.path
+import os
+import posixpath
 import subprocess
 import sys
 
@@ -28,7 +29,7 @@ class CommandRunner(object):
 
     @staticmethod
     def _dirnames(files):
-        return sorted(set(os.path.dirname(f) for f in files))
+        return sorted(set(posixpath.dirname(f) for f in files))
 
     def popen(self, command, **kwargs):
         if self.verbose:
@@ -136,8 +137,8 @@ class LocalCommandRunner(CommandRunner):
         return ['/usr/bin/sftp', '-b', '-', '-q', '-D', self.sftp_server_path]
 
 def find_transfers(args, source_prefix, dest_prefix):
-    if source_prefix.endswith(os.path.sep):
-        source_prefix = source_prefix[:-len(os.path.sep)]
+    if source_prefix.endswith(posixpath.sep):
+        source_prefix = source_prefix[:-len(posixpath.sep)]
     return dict((arg, dest_prefix + arg[len(source_prefix):])
                 for arg in args if arg.startswith(source_prefix))
 
@@ -202,14 +203,14 @@ def main():
     remote_test_specific_dir = None
     if args.input_prefix:
         assert not args.remote_input_prefix.startswith("..")
-        remote_dir = os.path.join(args.remote_dir, args.remote_input_prefix)
+        remote_dir = posixpath.join(args.remote_dir, args.remote_input_prefix)
         input_files = find_transfers(args.command, args.input_prefix, 
                                      remote_dir)
         assert not any(upload_files.has_key(f) for f in input_files)
         upload_files.update(input_files)
     if args.output_prefix:
         assert not args.remote_output_prefix.startswith("..")
-        remote_dir = os.path.join(args.remote_dir, args.remote_output_prefix)
+        remote_dir = posixpath.join(args.remote_dir, args.remote_output_prefix)
         test_files = find_transfers(args.command, args.output_prefix, 
                                     remote_dir)
         assert not any(upload_files.has_key(f) for f in test_files)

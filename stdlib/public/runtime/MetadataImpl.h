@@ -71,8 +71,8 @@ namespace metadataimpl {
 //   static T *assignWithCopy(T *dest, T *src);
 //   static T *assignWithTake(T *dest, T *src);
 //   // Only if numExtraInhabitants is non-zero:
-//   static void storeExtraInhabitant(T *dest, int index);
-//   static int getExtraInhabitantIndex(const T *src);
+//   static void storeExtraInhabitantTag(T *dest, unsigned index);
+//   static unsigned getExtraInhabitantTag(const T *src);
 // };
 
 /// A box class implemented in terms of C/C++ primitive operations.
@@ -178,12 +178,12 @@ template <class Impl, class T> struct RetainableBoxBase {
   static constexpr unsigned numExtraInhabitants =
     swift_getHeapObjectExtraInhabitantCount();
 
-  static void storeExtraInhabitant(T *dest, int index) {
-    swift_storeHeapObjectExtraInhabitant((HeapObject**) dest, index);
+  static void storeExtraInhabitantTag(T *dest, unsigned tag) {
+    swift_storeHeapObjectExtraInhabitant((HeapObject**) dest, tag - 1);
   }
 
-  static int getExtraInhabitantIndex(const T *src) {
-    return swift_getHeapObjectExtraInhabitantIndex((HeapObject* const *) src);
+  static unsigned getExtraInhabitantTag(const T *src) {
+    return swift_getHeapObjectExtraInhabitantIndex((HeapObject* const *) src) +1;
   }
 };
 
@@ -233,13 +233,13 @@ struct SwiftUnownedRetainableBox :
   // disabled.
   static constexpr unsigned numExtraInhabitants = 1;
 
-  static void storeExtraInhabitant(HeapObject **dest, int index) {
-    assert(index == 0);
+  static void storeExtraInhabitant(HeapObject **dest, unsigned index) {
+    assert(index == 1);
     *dest = nullptr;
   }
 
-  static int getExtraInhabitantIndex(const HeapObject * const *src) {
-    return (*src == nullptr ? 0 : -1);
+  static unsigned getExtraInhabitantTag(const HeapObject * const *src) {
+    return (*src == nullptr ? 1 : 0);
   }
 #endif
 };
@@ -311,12 +311,12 @@ struct ObjCUnownedRetainableBox
     : WeakRetainableBoxBase<ObjCUnownedRetainableBox, UnownedReference> {
 
   static constexpr unsigned numExtraInhabitants = 1;
-  static void storeExtraInhabitant(UnownedReference *dest, int index) {
-    assert(index == 0);
+  static void storeExtraInhabitantTag(UnownedReference *dest, unsigned index) {
+    assert(index == 1);
     dest->Value = nullptr;
   }
-  static int getExtraInhabitantIndex(const UnownedReference *src) {
-    return (src->Value == nullptr ? 0 : -1);
+  static unsigned getExtraInhabitantTag(const UnownedReference *src) {
+    return (src->Value == nullptr ? 1 : 0);
   }
 
   static void destroy(UnownedReference *ref) {
@@ -407,23 +407,12 @@ struct UnknownObjectRetainableBox
 /// A box implementation class for BridgeObject.
 struct BridgeObjectBox :
     RetainableBoxBase<BridgeObjectBox, void*> {
-  // TODO: Enable the nil extra inhabitant.
-  static constexpr unsigned numExtraInhabitants = 1;
-      
   static void *retain(void *obj) {
     return swift_bridgeObjectRetain(obj);
   }
 
   static void release(void *obj) {
     swift_bridgeObjectRelease(obj);
-  }
-      
-  static void storeExtraInhabitant(void **dest, int index) {
-    *dest = nullptr;
-  }
-
-  static int getExtraInhabitantIndex(void* const *src) {
-    return *src == nullptr ? 0 : -1;
   }
 };
   
@@ -435,12 +424,12 @@ struct PointerPointerBox : NativeBox<void**> {
   static constexpr unsigned numExtraInhabitants =
     swift_getHeapObjectExtraInhabitantCount();
 
-  static void storeExtraInhabitant(void ***dest, int index) {
-    swift_storeHeapObjectExtraInhabitant((HeapObject**) dest, index);
+  static void storeExtraInhabitantTag(void ***dest, unsigned tag) {
+    swift_storeHeapObjectExtraInhabitant((HeapObject**) dest, tag - 1);
   }
 
-  static int getExtraInhabitantIndex(void ** const *src) {
-    return swift_getHeapObjectExtraInhabitantIndex((HeapObject* const *) src);
+  static unsigned getExtraInhabitantTag(void ** const *src) {
+    return swift_getHeapObjectExtraInhabitantIndex((HeapObject* const *) src)+1;
   }
 };
 
@@ -451,12 +440,13 @@ struct PointerPointerBox : NativeBox<void**> {
 struct RawPointerBox : NativeBox<void*> {
   static constexpr unsigned numExtraInhabitants = 1;
 
-  static void storeExtraInhabitant(void **dest, int index) {
+  static void storeExtraInhabitantTag(void **dest, unsigned tag) {
+    assert(tag == 1);
     *dest = nullptr;
   }
 
-  static int getExtraInhabitantIndex(void* const *src) {
-    return *src == nullptr ? 0 : -1;
+  static unsigned getExtraInhabitantTag(void* const *src) {
+    return *src == nullptr ? 1 : 0;
   }
 };
 
@@ -467,12 +457,12 @@ struct FunctionPointerBox : NativeBox<void*> {
   static constexpr unsigned numExtraInhabitants =
     swift_getFunctionPointerExtraInhabitantCount();
 
-  static void storeExtraInhabitant(void **dest, int index) {
-    swift_storeFunctionPointerExtraInhabitant(dest, index);
+  static void storeExtraInhabitantTag(void **dest, unsigned tag) {
+    swift_storeFunctionPointerExtraInhabitant(dest, tag - 1);
   }
 
-  static int getExtraInhabitantIndex(void * const *src) {
-    return swift_getFunctionPointerExtraInhabitantIndex(src);
+  static unsigned getExtraInhabitantTag(void * const *src) {
+    return swift_getFunctionPointerExtraInhabitantIndex(src) + 1;
   }
 };
 
@@ -720,8 +710,8 @@ struct FixedSizeBufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
                                           unsigned numEmptyCases,
                                           const Metadata *self) {
     return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, Size,
-                                       Impl::numExtraInhabitants,
-                                       Impl::getExtraInhabitantIndex);
+                                       Impl::extraInhabitantCount,
+                                       Impl::getExtraInhabitantTag);
   }
 
   static void storeEnumTagSinglePayload(OpaqueValue *enumAddr,
@@ -729,8 +719,8 @@ struct FixedSizeBufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
                                         unsigned numEmptyCases,
                                         const Metadata *self) {
     return storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases,
-                                         self, Size, Impl::numExtraInhabitants,
-                                         Impl::storeExtraInhabitant);
+                                         self, Size, Impl::extraInhabitantCount,
+                                         Impl::storeExtraInhabitantTag);
   }
 };
 
@@ -779,16 +769,13 @@ struct ValueWitnesses
   static constexpr size_t alignment = Box::alignment;
   static constexpr bool isPOD = Box::isPOD;
   static constexpr bool isBitwiseTakable = Box::isBitwiseTakable;
-  static constexpr unsigned numExtraInhabitants = Box::numExtraInhabitants;
-  static constexpr bool hasExtraInhabitants = (numExtraInhabitants != 0);
+  static constexpr unsigned extraInhabitantCount = Box::numExtraInhabitants;
+  static constexpr bool hasExtraInhabitants = (extraInhabitantCount != 0);
   static constexpr ValueWitnessFlags flags =
     ValueWitnessFlags().withAlignmentMask(alignment - 1)
                        .withInlineStorage(Base::isInline && isBitwiseTakable)
                        .withPOD(isPOD)
-                       .withBitwiseTakable(isBitwiseTakable)
-                       .withExtraInhabitants(hasExtraInhabitants);
-  static constexpr ExtraInhabitantFlags extraInhabitantFlags =
-    ExtraInhabitantFlags().withNumExtraInhabitants(numExtraInhabitants);
+                       .withBitwiseTakable(isBitwiseTakable);
 
   static void destroy(OpaqueValue *value, const Metadata *self) {
     return Box::destroy((typename Box::type*) value);
@@ -821,14 +808,17 @@ struct ValueWitnesses
   // These should not get instantiated if the type doesn't have extra
   // inhabitants.
 
-  static void storeExtraInhabitant(OpaqueValue *dest, int index,
-                                   const Metadata *self) {
-    Box::storeExtraInhabitant((typename Box::type*) dest, index);
+  SWIFT_CC(swift)
+  static void storeExtraInhabitantTag(OpaqueValue *dest, unsigned tag,
+                                      unsigned xiCount, const Metadata *self) {
+    Box::storeExtraInhabitantTag((typename Box::type*) dest, tag);
   }
 
-  static int getExtraInhabitantIndex(const OpaqueValue *src,
-                                     const Metadata *self) {
-    return Box::getExtraInhabitantIndex((typename Box::type const *) src);
+  SWIFT_CC(swift)
+  static unsigned getExtraInhabitantTag(const OpaqueValue *src,
+                                        unsigned xiCount,
+                                        const Metadata *self) {
+    return Box::getExtraInhabitantTag((typename Box::type const *) src);
   }
 };
 
@@ -850,8 +840,6 @@ struct NonFixedValueWitnesses :
 
   static constexpr unsigned numExtraInhabitants = Box::numExtraInhabitants;
   static constexpr bool hasExtraInhabitants = (numExtraInhabitants != 0);
-  static constexpr ExtraInhabitantFlags extraInhabitantFlags =
-    ExtraInhabitantFlags().withNumExtraInhabitants(numExtraInhabitants);
 
   static void destroy(OpaqueValue *value, const Metadata *self) {
     return Box::destroy((typename Box::type*) value, self);
@@ -890,12 +878,11 @@ struct NonFixedValueWitnesses :
                                           const Metadata *self) {
     auto *payloadWitnesses = self->getValueWitnesses();
     auto size = payloadWitnesses->getSize();
-    auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(payloadWitnesses);
-    auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
+    auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
 
     return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
                                        numExtraInhabitants,
-                                       getExtraInhabitantIndex);
+                                       getExtraInhabitantTag);
   }
 
   static void storeEnumTagSinglePayload(OpaqueValue *enumAddr,
@@ -905,50 +892,34 @@ struct NonFixedValueWitnesses :
     auto *payloadWitnesses = self->getValueWitnesses();
     auto size = payloadWitnesses->getSize();
     auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
-    auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(payloadWitnesses);
-    auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
     storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self,
                                   size, numExtraInhabitants,
-                                  storeExtraInhabitant);
+                                  storeExtraInhabitantTag);
   }
 
   // These should not get instantiated if the type doesn't have extra
   // inhabitants.
 
-  static void storeExtraInhabitant(OpaqueValue *dest, int index,
-                                   const Metadata *self) {
-    Box::storeExtraInhabitant((typename Box::type*) dest, index);
+  SWIFT_CC(swift)
+  static void storeExtraInhabitantTag(OpaqueValue *dest, unsigned tag,
+                                      unsigned xiCount, const Metadata *self) {
+    Box::storeExtraInhabitantTag((typename Box::type*) dest, tag);
   }
 
-  static int getExtraInhabitantIndex(const OpaqueValue *src,
-                                     const Metadata *self) {
-    return Box::getExtraInhabitantIndex((typename Box::type const *) src);
+  SWIFT_CC(swift)
+  static unsigned getExtraInhabitantTag(const OpaqueValue *src,
+                                        unsigned xiCount,
+                                        const Metadata *self) {
+    return Box::getExtraInhabitantTag((typename Box::type const *) src);
   }
 };
 
 /// A class which defines a ValueWitnessTable.
-template <class Witnesses,
-          bool HasExtraInhabitants = Witnesses::hasExtraInhabitants>
-struct ValueWitnessTableGenerator;
-
-template <class Witnesses> struct ValueWitnessTableGenerator<Witnesses, false> {
+template <class Witnesses>
+struct ValueWitnessTableGenerator {
   static constexpr const ValueWitnessTable table = {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
-#define VALUE_WITNESS(LOWER_ID, UPPER_ID) Witnesses::LOWER_ID,
-#include "swift/ABI/ValueWitness.def"
-  };
-};
-
-/// A class which defines an ExtraInhabitantsValueWitnessTable.
-template <class Witnesses> struct ValueWitnessTableGenerator<Witnesses, true> {
-  static constexpr const ExtraInhabitantsValueWitnessTable table = {
-    {
-#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
-#define VALUE_WITNESS(LOWER_ID, UPPER_ID) Witnesses::LOWER_ID,
-#include "swift/ABI/ValueWitness.def"
-    },
-#define WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) Witnesses::LOWER_ID,
 #include "swift/ABI/ValueWitness.def"
   };

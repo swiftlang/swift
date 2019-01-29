@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 enum MyError : Error {
   case A, B
@@ -6,7 +6,7 @@ enum MyError : Error {
 
 throw MyError.A
 
-// CHECK: sil @main
+// CHECK: sil [ossa] @main
 // CHECK: [[T0:%.*]] = enum $MyError, #MyError.A!enumelt
 // CHECK: [[ERR:%.*]] = alloc_existential_box $Error, $MyError
 // CHECK: [[ADDR:%.*]] = project_existential_box $MyError in [[ERR]] : $Error
@@ -16,7 +16,7 @@ throw MyError.A
 // CHECK: builtin "willThrow"([[ERR2]] : $Error)
 // CHECK: br bb2([[ERR2]] : $Error)
 
-// CHECK: bb1([[T0:%.*]] : @trivial $Int32):
+// CHECK: bb1([[T0:%.*]] : $Int32):
 // CHECK: return [[T0]] : $Int32
 
 // CHECK: bb2([[T0:%.*]] : @owned $Error):

@@ -17,6 +17,7 @@
 #include "CSDiagnostics.h"
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
+#include "TypoCorrection.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -78,6 +79,10 @@ FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
   return cs.TC.diagnose(std::forward<ArgTypes>(Args)...);
 }
 
+Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
+  return E ? E->getParentMap()[subExpr] : nullptr;
+}
+
 Type RequirementFailure::getOwnerType() const {
   return getType(getAnchor())->getInOutObjectType()->getMetatypeInstanceType();
 }
@@ -119,6 +124,10 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     ConstraintLocatorBuilder subscript(locator);
     locator = cs.getConstraintLocator(
         subscript.withPathElement(PathEltKind::SubscriptMember));
+  } else if (isa<MemberRefExpr>(anchor)) {
+    ConstraintLocatorBuilder memberRef(locator);
+    locator =
+        cs.getConstraintLocator(memberRef.withPathElement(PathEltKind::Member));
   }
 
   auto overload = getOverloadChoiceIfAvailable(locator);
@@ -126,7 +135,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return overload->choice.getDecl();
 
   auto ownerType = getOwnerType();
-  if (auto *NA = dyn_cast<NameAliasType>(ownerType.getPointer()))
+  if (auto *NA = dyn_cast<TypeAliasType>(ownerType.getPointer()))
     return NA->getDecl();
 
   return ownerType->getAnyGeneric();
@@ -501,12 +510,18 @@ public:
   int referencesCount() { return count; }
 };
 
-static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
-  Type unwrappedType = type->getOptionalObjectType();
-  if (!unwrappedType)
+static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type baseType,
+                           Type unwrappedType) {
+
+  assert(!baseType->hasTypeVariable() &&
+         "Base type must not be a type variable");
+  assert(!unwrappedType->hasTypeVariable() &&
+         "Unwrapped type must not be a type variable");
+
+  if (!baseType->getOptionalObjectType())
     return false;
 
-  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
+  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, baseType,
                  unwrappedType);
 
   // If the expression we're unwrapping is the only reference to a
@@ -532,7 +547,8 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
         Expr *initializer = varDecl->getParentInitializer();
         if (auto declRefExpr = dyn_cast<DeclRefExpr>(initializer)) {
           if (declRefExpr->getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer, type);
+            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer,
+                           baseType);
           }
         }
 
@@ -574,8 +590,21 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   auto type = getType(anchor)->getRValueType();
 
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
-  if (!tryExpr)
-    return diagnoseUnwrap(getConstraintSystem(), unwrapped, type);
+  if (!tryExpr) {
+    return diagnoseUnwrap(getConstraintSystem(), unwrapped, getBaseType(),
+                          getUnwrappedType());
+  }
+
+  bool isSwift5OrGreater = getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5);
+  auto subExprType = getType(tryExpr->getSubExpr());
+  bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
+  
+  
+  if (isSwift5OrGreater && subExpressionIsOptional) {
+    // Using 'try!' won't change the type for a 'try?' with an optional sub-expr
+    // under Swift 5+, so just report that a missing unwrap can't be handled here.
+    return false;
+  }
 
   emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
       .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
@@ -664,7 +693,8 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     }
 
     if (auto resolvedOverload = getResolvedOverload(getLocator()))
-      if (resolvedOverload->Choice.getKind() == OverloadChoiceKind::DynamicMemberLookup)
+      if (resolvedOverload->Choice.getKind() ==
+          OverloadChoiceKind::DynamicMemberLookup)
         subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
   } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
@@ -1105,4 +1135,374 @@ Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
   }
 
   return diag::assignment_lhs_is_immutable_variable;
+}
+
+bool ContextualFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto path = getLocator()->getPath();
+
+  assert(!path.empty());
+
+  if (diagnoseMissingFunctionCall())
+    return true;
+
+  Diag<Type, Type> diagnostic;
+  switch (path.back().getKind()) {
+  case ConstraintLocator::ClosureResult: {
+    diagnostic = diag::cannot_convert_closure_result;
+    break;
+  }
+
+  default:
+    return false;
+  }
+
+  auto diag = emitDiagnostic(anchor->getLoc(), diagnostic, FromType, ToType);
+  diag.highlight(anchor->getSourceRange());
+
+  (void)trySequenceSubsequenceFixIts(diag, getConstraintSystem(), FromType,
+                                     ToType, anchor);
+  return true;
+}
+
+bool ContextualFailure::diagnoseMissingFunctionCall() const {
+  auto &TC = getTypeChecker();
+
+  auto *srcFT = FromType->getAs<FunctionType>();
+  if (!srcFT || !srcFT->getParams().empty())
+    return false;
+
+  if (ToType->is<AnyFunctionType>() ||
+      !TC.isConvertibleTo(srcFT->getResult(), ToType, getDC()))
+    return false;
+
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::missing_nullary_call,
+                 srcFT->getResult())
+      .highlight(anchor->getSourceRange())
+      .fixItInsertAfter(anchor->getEndLoc(), "()");
+  return true;
+}
+
+bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
+                                                     ConstraintSystem &CS,
+                                                     Type fromType, Type toType,
+                                                     Expr *expr) {
+  if (!CS.TC.Context.getStdlibModule())
+    return false;
+
+  auto String = CS.TC.getStringType(CS.DC);
+  auto Substring = CS.TC.getSubstringType(CS.DC);
+
+  if (!String || !Substring)
+    return false;
+
+  /// FIXME: Remove this flag when void subscripts are implemented.
+  /// Make this unconditional and remove the if statement.
+  if (CS.TC.getLangOpts().FixStringToSubstringConversions) {
+    // String -> Substring conversion
+    // Add '[]' void subscript call to turn the whole String into a Substring
+    if (fromType->isEqual(String)) {
+      if (toType->isEqual(Substring)) {
+        diag.fixItInsertAfter(expr->getEndLoc(), "[]");
+        return true;
+      }
+    }
+  }
+
+  // Substring -> String conversion
+  // Wrap in String.init
+  if (fromType->isEqual(Substring)) {
+    if (toType->isEqual(String)) {
+      auto range = expr->getSourceRange();
+      diag.fixItInsert(range.Start, "String(");
+      diag.fixItInsertAfter(range.End, ")");
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool AutoClosureForwardingFailure::diagnoseAsError() {
+  auto path = getLocator()->getPath();
+  assert(!path.empty());
+
+  auto &last = path.back();
+  assert(last.getKind() == ConstraintLocator::ApplyArgToParam);
+
+  // We need a raw anchor here because `getAnchor()` is simplified
+  // to the argument expression.
+  auto *argExpr = getArgumentExpr(getRawAnchor(), last.getValue());
+  emitDiagnostic(argExpr->getLoc(), diag::invalid_autoclosure_forwarding)
+      .highlight(argExpr->getSourceRange())
+      .fixItInsertAfter(argExpr->getEndLoc(), "()");
+  return true;
+}
+
+bool NonOptionalUnwrapFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+
+  auto diagnostic = diag::invalid_optional_chain;
+  if (isa<ForceValueExpr>(anchor))
+    diagnostic = diag::invalid_force_unwrap;
+
+  emitDiagnostic(anchor->getLoc(), diagnostic, BaseType)
+      .highlight(anchor->getSourceRange())
+      .fixItRemove(anchor->getEndLoc());
+
+  return true;
+}
+
+bool MissingCallFailure::diagnoseAsError() {
+  auto *baseExpr = getAnchor();
+  SourceLoc insertLoc = baseExpr->getEndLoc();
+
+  if (auto *FVE = dyn_cast<ForceValueExpr>(baseExpr))
+    baseExpr = FVE->getSubExpr();
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
+    emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function,
+                   DRE->getDecl()->getBaseName().getIdentifier())
+        .fixItInsertAfter(insertLoc, "()");
+    return true;
+  }
+
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(baseExpr)) {
+    emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_method,
+                   UDE->getName().getBaseIdentifier())
+        .fixItInsertAfter(insertLoc, "()");
+    return true;
+  }
+
+  if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(baseExpr)) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+      emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_method,
+                     DRE->getDecl()->getBaseName().getIdentifier())
+          .fixItInsertAfter(insertLoc, "()");
+      return true;
+    }
+  }
+
+  emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function_value)
+      .fixItInsertAfter(insertLoc, "()");
+  return true;
+}
+
+bool SubscriptMisuseFailure::diagnoseAsError() {
+  auto &sourceMgr = getASTContext().SourceMgr;
+
+  auto *memberExpr = cast<UnresolvedDotExpr>(getRawAnchor());
+  auto *baseExpr = getAnchor();
+
+  auto memberRange = baseExpr->getSourceRange();
+  (void)simplifyLocator(getConstraintSystem(), getLocator(), memberRange);
+
+  auto nameLoc = DeclNameLoc(memberRange.Start);
+
+  auto diag = emitDiagnostic(baseExpr->getLoc(),
+                             diag::could_not_find_subscript_member_did_you_mean,
+                             getType(baseExpr));
+
+  diag.highlight(memberRange).highlight(nameLoc.getSourceRange());
+
+  auto *parentExpr = findParentExpr(memberExpr);
+  assert(parentExpr && "Couldn't find a parent expression for a member call?!");
+
+  auto *argExpr = cast<ApplyExpr>(parentExpr)->getArg();
+
+  auto toCharSourceRange = Lexer::getCharSourceRangeFromSourceRange;
+  auto lastArgSymbol = toCharSourceRange(sourceMgr, argExpr->getEndLoc());
+
+  diag.fixItReplace(SourceRange(argExpr->getStartLoc()),
+                    getTokenText(tok::l_square));
+  diag.fixItRemove(nameLoc.getSourceRange());
+  diag.fixItRemove(SourceRange(memberExpr->getDotLoc()));
+
+  if (sourceMgr.extractText(lastArgSymbol) == getTokenText(tok::r_paren))
+    diag.fixItReplace(SourceRange(argExpr->getEndLoc()),
+                      getTokenText(tok::r_square));
+  else
+    diag.fixItInsertAfter(argExpr->getEndLoc(), getTokenText(tok::r_square));
+
+  diag.flush();
+  if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
+    emitDiagnostic(overload->choice.getDecl(), diag::kind_declared_here,
+                   DescriptiveDeclKind::Subscript);
+  }
+
+  return true;
+}
+
+bool SubscriptMisuseFailure::diagnoseAsNote() {
+  if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
+    emitDiagnostic(overload->choice.getDecl(), diag::found_candidate);
+    return true;
+  }
+  return false;
+}
+
+/// When a user refers a enum case with a wrong member name, we try to find a
+/// enum element whose name differs from the wrong name only in convention;
+/// meaning their lower case counterparts are identical.
+///   - DeclName is valid when such a correct case is found; invalid otherwise.
+DeclName MissingMemberFailure::findCorrectEnumCaseName(
+    Type Ty, TypoCorrectionResults &corrections, DeclName memberName) {
+  if (memberName.isSpecial() || !memberName.isSimpleName())
+    return DeclName();
+  if (!Ty->getEnumOrBoundGenericEnum())
+    return DeclName();
+  auto candidate =
+      corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
+        return (isa<EnumElementDecl>(candidate) &&
+                candidate->getFullName().getBaseIdentifier().str().equals_lower(
+                    memberName.getBaseIdentifier().str()));
+      });
+  return (candidate ? candidate->getFullName() : DeclName());
+}
+
+bool MissingMemberFailure::diagnoseAsError() {
+  auto &TC = getTypeChecker();
+  auto *anchor = getRawAnchor();
+  auto *baseExpr = getAnchor();
+
+  if (!anchor || !baseExpr)
+    return false;
+
+  if (auto *typeVar = BaseType->getAs<TypeVariableType>()) {
+    auto &CS = getConstraintSystem();
+    auto *memberLoc = typeVar->getImpl().getLocator();
+    // Don't try to diagnose anything besides first missing
+    // member in the chain. e.g. `x.foo().bar()` let's make
+    // sure to diagnose only `foo()` as missing because we
+    // don't really know much about what `bar()` is supposed
+    // to be.
+    if (CS.MissingMembers.count(memberLoc))
+      return false;
+  }
+
+  auto baseType = resolveType(BaseType)->getWithoutSpecifierType();
+
+  DeclNameLoc nameLoc(anchor->getStartLoc());
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    nameLoc = UDE->getNameLoc();
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    nameLoc = UME->getNameLoc();
+  }
+
+  auto emitBasicError = [&](Type baseType) {
+    auto diagnostic = diag::could_not_find_value_member;
+
+    if (auto *metatype = baseType->getAs<MetatypeType>()) {
+      baseType = metatype->getInstanceType();
+      diagnostic = diag::could_not_find_type_member;
+    }
+
+    if (baseType->is<TupleType>())
+      diagnostic = diag::could_not_find_tuple_member;
+
+    emitDiagnostic(anchor->getLoc(), diagnostic, baseType, Name)
+        .highlight(baseExpr->getSourceRange())
+        .highlight(nameLoc.getSourceRange());
+  };
+
+  TypoCorrectionResults corrections(TC, Name, nameLoc);
+  auto tryTypoCorrection = [&] {
+    TC.performTypoCorrection(getDC(), DeclRefKind::Ordinary, baseType,
+                             defaultMemberLookupOptions, corrections);
+  };
+
+  if (Name.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
+    emitDiagnostic(anchor->getLoc(), diag::could_not_find_value_subscript,
+                   baseType)
+        .highlight(baseExpr->getSourceRange());
+  } else if (Name.getBaseName() == "deinit") {
+    // Specialised diagnostic if trying to access deinitialisers
+    emitDiagnostic(anchor->getLoc(), diag::destructor_not_accessible)
+        .highlight(baseExpr->getSourceRange());
+  } else if (auto metatypeTy = baseType->getAs<MetatypeType>()) {
+    auto instanceTy = metatypeTy->getInstanceType();
+    tryTypoCorrection();
+
+    if (DeclName rightName =
+            findCorrectEnumCaseName(instanceTy, corrections, Name)) {
+      emitDiagnostic(anchor->getLoc(), diag::could_not_find_enum_case,
+                     instanceTy, Name, rightName)
+          .fixItReplace(nameLoc.getBaseNameLoc(),
+                        rightName.getBaseIdentifier().str());
+      return true;
+    }
+
+    if (auto correction = corrections.claimUniqueCorrection()) {
+      auto diagnostic = emitDiagnostic(
+          anchor->getLoc(), diag::could_not_find_type_member_corrected,
+          instanceTy, Name, correction->CorrectedName);
+      diagnostic.highlight(baseExpr->getSourceRange())
+          .highlight(nameLoc.getSourceRange());
+      correction->addFixits(diagnostic);
+    } else {
+      emitBasicError(baseType);
+    }
+  } else if (auto moduleTy = baseType->getAs<ModuleType>()) {
+    emitDiagnostic(baseExpr->getLoc(), diag::no_member_of_module,
+                   moduleTy->getModule()->getName(), Name)
+        .highlight(baseExpr->getSourceRange())
+        .highlight(nameLoc.getSourceRange());
+    return true;
+  } else {
+    // Check for a few common cases that can cause missing members.
+    auto *ED = baseType->getEnumOrBoundGenericEnum();
+    if (ED && Name.isSimpleName("rawValue")) {
+      auto loc = ED->getNameLoc();
+      if (loc.isValid()) {
+        emitBasicError(baseType);
+        emitDiagnostic(loc, diag::did_you_mean_raw_type);
+        return true;
+      }
+    } else if (baseType->isAny()) {
+      emitBasicError(baseType);
+      emitDiagnostic(anchor->getLoc(), diag::any_as_anyobject_fixit)
+          .fixItInsert(baseExpr->getStartLoc(), "(")
+          .fixItInsertAfter(baseExpr->getEndLoc(), " as AnyObject)");
+      return true;
+    }
+
+    tryTypoCorrection();
+
+    if (auto correction = corrections.claimUniqueCorrection()) {
+      auto diagnostic = emitDiagnostic(
+          anchor->getLoc(), diag::could_not_find_value_member_corrected,
+          baseType, Name, correction->CorrectedName);
+      diagnostic.highlight(baseExpr->getSourceRange())
+          .highlight(nameLoc.getSourceRange());
+      correction->addFixits(diagnostic);
+    } else {
+      emitBasicError(baseType);
+    }
+  }
+
+  // Note all the correction candidates.
+  corrections.noteAllCandidates();
+  return true;
+}
+
+bool PartialApplicationFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
+  auto *anchor = cast<UnresolvedDotExpr>(getRawAnchor());
+
+  RefKind kind = RefKind::MutatingMethod;
+
+  // If this is initializer delegation chain, we have a tailored message.
+  if (getOverloadChoiceIfAvailable(cs.getConstraintLocator(
+          anchor, ConstraintLocator::ConstructorMember))) {
+    kind = anchor->getBase()->isSuperExpr() ? RefKind::SuperInit
+                                            : RefKind::SelfInit;
+  }
+
+  auto diagnostic = CompatibilityWarning
+                        ? diag::partial_application_of_function_invalid_swift4
+                        : diag::partial_application_of_function_invalid;
+
+  emitDiagnostic(anchor->getNameLoc(), diagnostic, kind);
+  return true;
 }

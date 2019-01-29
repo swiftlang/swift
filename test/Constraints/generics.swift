@@ -52,7 +52,7 @@ func generic_metatypes<T : SomeProtocol>(_ x: T)
 }
 
 // Inferring a variable's type from a call to a generic.
-struct Pair<T, U> { } // expected-note 4 {{'T' declared as parameter to type 'Pair'}} expected-note {{'U' declared as parameter to type 'Pair'}}
+struct Pair<T, U> { } // expected-note 3 {{'T' declared as parameter to type 'Pair'}} expected-note 2 {{'U' declared as parameter to type 'Pair'}}
 
 func pair<T, U>(_ x: T, _ y: U) -> Pair<T, U> { }
 
@@ -364,7 +364,7 @@ func testFixItCasting(x: Any) {
 
 func testFixItContextualKnowledge() {
   // FIXME: These could propagate backwards.
-  let _: Int = Pair().first // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
+  let _: Int = Pair().first // expected-error {{generic parameter 'U' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
   let _: Int = Pair().second // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
 }
 
@@ -622,7 +622,7 @@ func rdar40537858() {
   let _: E = .bar([s]) // expected-error {{enum case 'bar' requires that 'S' conform to 'P'}}
 }
 
-// SR-8934
+// https://bugs.swift.org/browse/SR-8934
 struct BottleLayout {
     let count : Int
 }
@@ -631,3 +631,10 @@ let layout = BottleLayout(count:1)
 let ix = arr.firstIndex(of:layout) // expected-error {{argument type 'BottleLayout' does not conform to expected type 'Equatable'}}
 
 let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{initializer 'init(_:)' requires that 'Unicode.Scalar' conform to 'BinaryInteger'}}
+
+// https://bugs.swift.org/browse/SR-9068
+func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
+  -> Bool where C.Element == (key: Key, value: Value)
+{
+  _ = Dictionary(uniqueKeysWithValues: Array(c))
+}

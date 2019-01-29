@@ -38,6 +38,11 @@ constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
 /// The Mach-O section name for the section containing type references.
 /// This lives within SEG_TEXT.
 constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
+/// The Mach-O section name for the section containing dynamic replacements.
+/// This lives within SEG_TEXT.
+constexpr const char DynamicReplacementSection[] = "__swift5_replace";
+
+constexpr const char TextSegment[] = SEG_TEXT;
 
 #if __POINTER_WIDTH__ == 64
 using mach_header_platform = mach_header_64;
@@ -47,7 +52,7 @@ using mach_header_platform = mach_header;
 
 extern "C" void *_NSGetMachExecuteHeader();
 
-template<const char *SECTION_NAME,
+template <const char *SEGMENT_NAME, const char *SECTION_NAME,
          void CONSUME_BLOCK(const void *start, uintptr_t size)>
 void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
 #if __POINTER_WIDTH__ == 64
@@ -58,7 +63,7 @@ void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
   unsigned long size;
   const uint8_t *section =
   getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
-                 SEG_TEXT, SECTION_NAME,
+                 SEGMENT_NAME, SECTION_NAME,
                  &size);
   
   if (!section)
@@ -71,20 +76,25 @@ void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
 
 void swift::initializeProtocolLookup() {
   _dyld_register_func_for_add_image(
-    addImageCallback<ProtocolsSection,
+    addImageCallback<TextSegment, ProtocolsSection,
                      addImageProtocolsBlockCallback>);
 }
 
 void swift::initializeProtocolConformanceLookup() {
   _dyld_register_func_for_add_image(
-    addImageCallback<ProtocolConformancesSection,
+    addImageCallback<TextSegment, ProtocolConformancesSection,
                      addImageProtocolConformanceBlockCallback>);
 }
 void swift::initializeTypeMetadataRecordLookup() {
   _dyld_register_func_for_add_image(
-    addImageCallback<TypeMetadataRecordSection,
+    addImageCallback<TextSegment, TypeMetadataRecordSection,
                      addImageTypeMetadataRecordBlockCallback>);
-  
+}
+
+void swift::initializeDynamicReplacementLookup() {
+  _dyld_register_func_for_add_image(
+      addImageCallback<TextSegment, DynamicReplacementSection,
+                       addImageDynamicReplacementBlockCallback>);
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {

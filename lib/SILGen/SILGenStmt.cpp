@@ -232,15 +232,14 @@ Condition SILGenFunction::emitCondition(Expr *E, bool invertValue,
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
 
-  // Sema forces conditions to have Builtin.i1 type, which guarantees this.
+  // Sema forces conditions to have Bool type, which guarantees this.
   SILValue V;
   {
     FullExpr Scope(Cleanups, CleanupLocation(E));
     V = emitRValue(E).forwardAsSingleValue(*this, E);
   }
-  assert(V->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
-
-  return emitCondition(V, E, invertValue, contArgs, NumTrueTaken,
+  auto i1Value = emitUnwrapIntegerResult(E, V);
+  return emitCondition(i1Value, E, invertValue, contArgs, NumTrueTaken,
                        NumFalseTaken);
 }
 
@@ -318,6 +317,16 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       } else {
         diagnose(getASTContext(), ESD.getStartLoc(),
                  diag::unreachable_code);
+        if (!S->getElements().empty()) {
+          for (auto *arg : SGF.getFunction().getArguments()) {
+            if (arg->getType().getASTType()->isStructurallyUninhabited()) {
+              diagnose(getASTContext(), S->getStartLoc(),
+                       diag::unreachable_code_uninhabited_param_note,
+                       arg->getDecl()->getBaseName().userFacingName());
+              break;
+            }
+          }
+        }
       }
       return;
     }
@@ -505,6 +514,26 @@ void StmtEmitter::visitYieldStmt(YieldStmt *S) {
   FullExpr fullExpr(SGF.Cleanups, CleanupLocation(S));
 
   SGF.emitYield(S, sources, origTypes, SGF.CoroutineUnwindDest);
+}
+
+void StmtEmitter::visitPoundAssertStmt(PoundAssertStmt *stmt) {
+  SILValue condition;
+  {
+    FullExpr scope(SGF.Cleanups, CleanupLocation(stmt));
+    condition =
+        SGF.emitRValueAsSingleValue(stmt->getCondition()).getUnmanagedValue();
+  }
+
+  // Extract the i1 from the Bool struct.
+  auto i1Value = SGF.emitUnwrapIntegerResult(stmt, condition);
+
+  SILValue message = SGF.B.createStringLiteral(
+      stmt, stmt->getMessage(), StringLiteralInst::Encoding::UTF8);
+
+  auto resultType = SGF.getASTContext().TheEmptyTupleType;
+  SGF.B.createBuiltin(
+      stmt, SGF.getASTContext().getIdentifier("poundAssert"),
+      SGF.getLoweredType(resultType), {}, {i1Value, message});
 }
 
 namespace {

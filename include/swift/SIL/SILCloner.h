@@ -67,6 +67,10 @@ private:
   /// Set of basic blocks where unreachable was inserted.
   SmallPtrSet<SILBasicBlock *, 32> BlocksWithUnreachables;
 
+  // Keep track of the last cloned block in function order. For single block
+  // regions, this will be the start block.
+  SILBasicBlock *lastClonedBB = nullptr;
+
 public:
   using SILInstructionVisitor<ImplClass>::asImpl;
 
@@ -101,6 +105,10 @@ public:
   }
 
   SILBuilder &getBuilder() { return Builder; }
+
+  // After cloning, returns a non-null pointer to the last cloned block in
+  // function order. For single block regions, this will be the start block.
+  SILBasicBlock *getLastClonedBB() { return lastClonedBB; }
 
   /// Visit all blocks reachable from the given `StartBB` and all instructions
   /// in those blocks.
@@ -245,9 +253,9 @@ public:
     return asImpl().remapASTType(ty);
   }
 
-  void remapOpenedType(CanArchetypeType archetypeTy) {
+  void remapOpenedType(CanOpenedArchetypeType archetypeTy) {
     auto existentialTy = archetypeTy->getOpenedExistentialType()->getCanonicalType();
-    auto replacementTy = ArchetypeType::getOpened(getOpASTType(existentialTy));
+    auto replacementTy = OpenedArchetypeType::get(getOpASTType(existentialTy));
     registerOpenedExistentialRemapping(archetypeTy, replacementTy);
   }
 
@@ -390,7 +398,7 @@ private:
   void doFixUp(SILFunction *F);
 };
 
-/// \brief A SILBuilder that automatically invokes postprocess on each
+/// A SILBuilder that automatically invokes postprocess on each
 /// inserted instruction.
 template<class SomeSILCloner, unsigned N = 4>
 class SILBuilderWithPostProcess : public SILBuilder {
@@ -655,7 +663,7 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
   // order they are created, which differs from the order they are
   // cloned. Blocks are created in BFS order but cloned in DFS preorder (when no
   // critical edges are present).
-  SILBasicBlock *lastClonedBB = BBMap[startBB];
+  lastClonedBB = BBMap[startBB];
   while (!dfsWorklist.empty()) {
     auto *BB = dfsWorklist.pop_back_val();
     preorderBlocks.push_back(BB);
@@ -703,7 +711,7 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
   }
 }
 
-/// \brief Clean-up after cloning.
+/// Clean-up after cloning.
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::doFixUp(SILFunction *F) {
@@ -870,6 +878,7 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
                 getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
                 Inst->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+                Inst->isOnStack(),
                 GenericSpecializationInformation::create(Inst, getBuilder())));
 }
 
@@ -910,6 +919,24 @@ SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
   SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createFunctionRef(
+                                    getOpLocation(Inst->getLoc()), OpFunction));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitDynamicFunctionRefInst(DynamicFunctionRefInst *Inst) {
+  SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createDynamicFunctionRef(
+                                    getOpLocation(Inst->getLoc()), OpFunction));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitPreviousDynamicFunctionRefInst(
+    PreviousDynamicFunctionRefInst *Inst) {
+  SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createPreviousDynamicFunctionRef(
                                     getOpLocation(Inst->getLoc()), OpFunction));
 }
 
@@ -1084,21 +1111,6 @@ SILCloner<ImplClass>::visitMarkUninitializedInst(MarkUninitializedInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitMarkUninitializedBehaviorInst(
-                                          MarkUninitializedBehaviorInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst,
-      getBuilder().createMarkUninitializedBehavior(
-          getOpLocation(Inst->getLoc()), getOpValue(Inst->getInitStorageFunc()),
-          getOpSubstitutionMap(Inst->getInitStorageSubstitutions()),
-          getOpValue(Inst->getStorage()), getOpValue(Inst->getSetterFunc()),
-          getOpSubstitutionMap(Inst->getSetterSubstitutions()),
-          getOpValue(Inst->getSelf()), getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *Inst){
   auto OpElements = getOpValueArray<8>(Inst->getElements());
   auto OpLoc = getOpLocation(Inst->getLoc());
@@ -1256,8 +1268,7 @@ void SILCloner<ImplClass>::visitConvertEscapeToNoEscapeInst(
   recordClonedInstruction(
       Inst, getBuilder().createConvertEscapeToNoEscape(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                getOpType(Inst->getType()), Inst->isEscapedByUser(),
-                Inst->isLifetimeGuaranteed()));
+                getOpType(Inst->getType()), Inst->isLifetimeGuaranteed()));
 }
 
 template<typename ImplClass>
@@ -1867,7 +1878,7 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapOpenedType(Inst->getType().castTo<ArchetypeType>());
+  remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -1880,7 +1891,7 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitOpenExistentialValueInst(
     OpenExistentialValueInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapOpenedType(Inst->getType().castTo<ArchetypeType>());
+  remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createOpenExistentialValue(
@@ -1900,7 +1911,7 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
     exType = exMetatype.getInstanceType();
     openedType = cast<MetatypeType>(openedType).getInstanceType();
   }
-  remapOpenedType(cast<ArchetypeType>(openedType));
+  remapOpenedType(cast<OpenedArchetypeType>(openedType));
 
   if (!Inst->getOperand()->getType().canUseExistentialRepresentation(
           Inst->getModule(), ExistentialRepresentation::Class)) {
@@ -1924,7 +1935,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapOpenedType(Inst->getType().castTo<ArchetypeType>());
+  remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createOpenExistentialRef(
@@ -1938,7 +1949,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialBoxInst(OpenExistentialBoxInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapOpenedType(Inst->getType().castTo<ArchetypeType>());
+  remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createOpenExistentialBox(
@@ -1952,7 +1963,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapOpenedType(Inst->getType().castTo<ArchetypeType>());
+  remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createOpenExistentialBoxValue(
@@ -2104,8 +2115,8 @@ void SILCloner<ImplClass>::visitUncheckedOwnershipConversionInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   ValueOwnershipKind Kind = SILValue(Inst).getOwnershipKind();
   if (getOpValue(Inst->getOperand()).getOwnershipKind() ==
-      ValueOwnershipKind::Trivial) {
-    Kind = ValueOwnershipKind::Trivial;
+      ValueOwnershipKind::Any) {
+    Kind = ValueOwnershipKind::Any;
   }
   recordClonedInstruction(Inst, getBuilder().createUncheckedOwnershipConversion(
                                     getOpLocation(Inst->getLoc()),

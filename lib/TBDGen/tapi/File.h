@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief TAPI File abstraction.
+/// TAPI File abstraction.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -26,43 +26,43 @@ TAPI_NAMESPACE_INTERNAL_BEGIN
 
 // clang-format off
 enum FileType : unsigned {
-  /// \brief Invalid file type.
+  /// Invalid file type.
   Invalid                   = 0U,
 
-  /// \brief TAPI Configuration file.
+  /// TAPI Configuration file.
   TAPI_Configuration_V1     = 1U <<  0,
 
-  /// \brief MachO Dynamic Library file.
+  /// MachO Dynamic Library file.
   MachO_DynamicLibrary      = 1U <<  1,
 
-  /// \brief MachO Dynamic Library Stub file.
+  /// MachO Dynamic Library Stub file.
   MachO_DynamicLibrary_Stub = 1U <<  2,
 
-  /// \brief MachO Bundle file.
+  /// MachO Bundle file.
   MachO_Bundle              = 1U <<  3,
 
-  /// \brief Text-based stub file (.tbd) version 1.0
+  /// Text-based stub file (.tbd) version 1.0
   TBD_V1                    = 1U <<  4,
 
-  /// \brief Text-based stub file (.tbd) version 2.0
+  /// Text-based stub file (.tbd) version 2.0
   TBD_V2                    = 1U <<  5,
 
-  /// \brief Text-based stub file (.tbd) version 3.0
+  /// Text-based stub file (.tbd) version 3.0
   TBD_V3                    = 1U <<  6,
 
-  /// \brief JSON Header List
+  /// JSON Header List
   JSON_V1                   = 1U <<  7,
 
-  /// \brief LD64 re-export file
+  /// LD64 re-export file
   ReexportFile              = 1U <<  8,
 
-  /// \brief Text-based API file (.api) version 1.0
+  /// Text-based API file (.api) version 1.0
   API_V1                    = 1U <<  9,
 
-  /// \brief Text-based SPI file (.spi) version 1.0
+  /// Text-based SPI file (.spi) version 1.0
   SPI_V1                    = 1U << 10,
 
-  /// \brief SDKDB file (.sdkdb) version 1.0
+  /// SDKDB file (.sdkdb) version 1.0
   SDKDB_V1                  = 1U << 11,
 
   All                       = ~0U,
@@ -79,7 +79,7 @@ inline FileType operator|(const FileType lhs, const FileType rhs) {
                                static_cast<unsigned>(rhs));
 }
 
-/// \brief Abstract TAPI file.
+/// Abstract TAPI file.
 class File {
 public:
   enum class Kind : unsigned {

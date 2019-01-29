@@ -15,8 +15,14 @@ public protocol P {
   associatedtype T
 }
 
+enum E {
+  case a
+  case b
+}
+
 public struct S : P {
   public typealias T = Optional<S>
+  var e = E.a
 }
 
 var gg = S()

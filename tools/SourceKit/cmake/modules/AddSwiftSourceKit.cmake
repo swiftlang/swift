@@ -11,6 +11,8 @@ function(add_sourcekit_symbol_exports target_name export_file)
     add_custom_target(${target_name}_exports DEPENDS symbol.exports)
     set_property(DIRECTORY APPEND
       PROPERTY ADDITIONAL_MAKE_CLEAN_FILES symbol.exports)
+    set_target_properties(${target_name}_exports PROPERTIES
+      FOLDER "SourceKit libraries")
 
     get_property(srcs TARGET ${target_name} PROPERTY SOURCES)
     foreach(src ${srcs})
@@ -66,25 +68,13 @@ function(add_sourcekit_default_compiler_flags target)
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     RESULT_VAR_NAME link_flags)
 
-  # TODO(compnerd) this should really use target_compile_options but the use
-  # of keyword and non-keyword flags prevents this
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(APPEND c_compile_flags -fblocks)
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    if(SWIFT_COMPILER_IS_MSVC_LIKE)
-      list(APPEND c_compile_flags -Xclang;-fblocks)
-    else()
-      list(APPEND c_compile_flags -fblocks)
-    endif()
-  endif()
-
   # Convert variables to space-separated strings.
   _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
   _list_escape_for_shell("${link_flags}" link_flags)
 
   # Set compilation and link flags.
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags}")
+      COMPILE_FLAGS " ${c_compile_flags} -fblocks")
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
 endfunction()

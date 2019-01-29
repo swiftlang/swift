@@ -1,10 +1,18 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule %S/../Inputs/resilient_class.swift
+
+// Note: we build fixed_layout_class without -enable-resilience, since with
+// -enable-resilience even @_fixed_layout classes have resilient metadata, and
+// we want to test the fragile access pattern here.
+
+// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
+
 // RUN: %target-swift-emit-silgen -module-name super -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
+import fixed_layout_class
 
 public class Parent {
   public final var finalProperty: String {
@@ -32,7 +40,7 @@ public class Parent {
 }
 
 public class Child : Parent {
-  // CHECK-LABEL: sil @$s5super5ChildC8propertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
+  // CHECK-LABEL: sil [ossa] @$s5super5ChildC8propertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
   // CHECK:       bb0([[SELF:%.*]] : @guaranteed $Child):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[CAST_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
@@ -46,7 +54,7 @@ public class Child : Parent {
     return super.property
   }
 
-  // CHECK-LABEL: sil @$s5super5ChildC13otherPropertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
+  // CHECK-LABEL: sil [ossa] @$s5super5ChildC13otherPropertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
   // CHECK:       bb0([[SELF:%.*]] : @guaranteed $Child):
   // CHECK:         [[COPIED_SELF:%.*]] = copy_value [[SELF]]
   // CHECK:         [[CAST_SELF_COPY:%[0-9]+]] = upcast [[COPIED_SELF]] : $Child to $Parent
@@ -62,7 +70,7 @@ public class Child : Parent {
 }
 
 public class Grandchild : Child {
-  // CHECK-LABEL: sil @$s5super10GrandchildC06onlyInB0yyF
+  // CHECK-LABEL: sil [ossa] @$s5super10GrandchildC06onlyInB0yyF
   public func onlyInGrandchild() {
     // CHECK: function_ref @$s5super6ParentC012methodOnlyInB0yyF : $@convention(method) (@guaranteed Parent) -> ()
     super.methodOnlyInParent()
@@ -70,7 +78,7 @@ public class Grandchild : Child {
     super.finalMethodOnlyInParent()
   }
 
-  // CHECK-LABEL: sil @$s5super10GrandchildC6methodyyF
+  // CHECK-LABEL: sil [ossa] @$s5super10GrandchildC6methodyyF
   public override func method() {
     // CHECK: function_ref @$s5super6ParentC6methodyyF : $@convention(method) (@guaranteed Parent) -> ()
     super.method()
@@ -78,7 +86,7 @@ public class Grandchild : Child {
 }
 
 public class GreatGrandchild : Grandchild {
-  // CHECK-LABEL: sil @$s5super15GreatGrandchildC6methodyyF
+  // CHECK-LABEL: sil [ossa] @$s5super15GreatGrandchildC6methodyyF
   public override func method() {
     // CHECK: function_ref @$s5super10GrandchildC6methodyyF : $@convention(method) (@guaranteed Grandchild) -> ()
     super.method()
@@ -86,7 +94,7 @@ public class GreatGrandchild : Grandchild {
 }
 
 public class ChildToResilientParent : ResilientOutsideParent {
-  // CHECK-LABEL: sil @$s5super22ChildToResilientParentC6methodyyF : $@convention(method) (@guaranteed ChildToResilientParent) -> ()
+  // CHECK-LABEL: sil [ossa] @$s5super22ChildToResilientParentC6methodyyF : $@convention(method) (@guaranteed ChildToResilientParent) -> ()
   public override func method() {
     // CHECK: bb0([[SELF:%.*]] : @guaranteed $ChildToResilientParent):
     // CHECK:   [[COPY_SELF:%.*]] = copy_value [[SELF]]
@@ -100,9 +108,9 @@ public class ChildToResilientParent : ResilientOutsideParent {
   }
   // CHECK: } // end sil function '$s5super22ChildToResilientParentC6methodyyF'
 
-  // CHECK-LABEL: sil @$s5super22ChildToResilientParentC11classMethodyyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> ()
+  // CHECK-LABEL: sil [ossa] @$s5super22ChildToResilientParentC11classMethodyyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> ()
   public override class func classMethod() {
-    // CHECK: bb0([[METASELF:%.*]] : @trivial $@thick ChildToResilientParent.Type):
+    // CHECK: bb0([[METASELF:%.*]] : $@thick ChildToResilientParent.Type):
     // CHECK:   [[UPCAST_METASELF:%.*]] = upcast [[METASELF]]
     // CHECK:   [[FUNC:%.*]] = super_method [[SELF]] : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
     // CHECK:   apply [[FUNC]]([[UPCAST_METASELF]])
@@ -110,9 +118,9 @@ public class ChildToResilientParent : ResilientOutsideParent {
   }
   // CHECK: } // end sil function '$s5super22ChildToResilientParentC11classMethodyyFZ'
 
-  // CHECK-LABEL: sil @$s5super22ChildToResilientParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> @owned ChildToResilientParent
+  // CHECK-LABEL: sil [ossa] @$s5super22ChildToResilientParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> @owned ChildToResilientParent
   public class func returnsSelf() -> Self {
-    // CHECK: bb0([[METASELF:%.*]] : @trivial $@thick ChildToResilientParent.Type):
+    // CHECK: bb0([[METASELF:%.*]] : $@thick ChildToResilientParent.Type):
     // CHECK:   [[CAST_METASELF:%.*]] = unchecked_trivial_bit_cast [[METASELF]] : $@thick ChildToResilientParent.Type to $@thick @dynamic_self ChildToResilientParent.Type
     // CHECK:   [[UPCAST_CAST_METASELF:%.*]] = upcast [[CAST_METASELF]] : $@thick @dynamic_self ChildToResilientParent.Type to $@thick ResilientOutsideParent.Type
     // CHECK:   [[FUNC:%.*]] = super_method [[METASELF]] : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> ()
@@ -124,7 +132,7 @@ public class ChildToResilientParent : ResilientOutsideParent {
 }
 
 public class ChildToFixedParent : OutsideParent {
-  // CHECK-LABEL: sil @$s5super18ChildToFixedParentC6methodyyF : $@convention(method) (@guaranteed ChildToFixedParent) -> ()
+  // CHECK-LABEL: sil [ossa] @$s5super18ChildToFixedParentC6methodyyF : $@convention(method) (@guaranteed ChildToFixedParent) -> ()
   public override func method() {
     // CHECK: bb0([[SELF:%.*]] : @guaranteed $ChildToFixedParent):
     // CHECK:   [[COPY_SELF:%.*]] = copy_value [[SELF]]
@@ -138,9 +146,9 @@ public class ChildToFixedParent : OutsideParent {
   }
   // CHECK: } // end sil function '$s5super18ChildToFixedParentC6methodyyF'
 
-  // CHECK-LABEL: sil @$s5super18ChildToFixedParentC11classMethodyyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> ()
+  // CHECK-LABEL: sil [ossa] @$s5super18ChildToFixedParentC11classMethodyyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> ()
   public override class func classMethod() {
-    // CHECK: bb0([[SELF:%.*]] : @trivial $@thick ChildToFixedParent.Type):
+    // CHECK: bb0([[SELF:%.*]] : $@thick ChildToFixedParent.Type):
     // CHECK:   [[UPCAST_SELF:%.*]] = upcast [[SELF]]
     // CHECK:   [[FUNC:%.*]] = super_method [[SELF]] : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> (), $@convention(method) (@thick OutsideParent.Type) -> ()
     // CHECK:   apply [[FUNC]]([[UPCAST_SELF]])
@@ -148,9 +156,9 @@ public class ChildToFixedParent : OutsideParent {
   }
   // CHECK: } // end sil function '$s5super18ChildToFixedParentC11classMethodyyFZ'
 
-  // CHECK-LABEL: sil @$s5super18ChildToFixedParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> @owned ChildToFixedParent
+  // CHECK-LABEL: sil [ossa] @$s5super18ChildToFixedParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> @owned ChildToFixedParent
   public class func returnsSelf() -> Self {
-    // CHECK: bb0([[SELF:%.*]] : @trivial $@thick ChildToFixedParent.Type):
+    // CHECK: bb0([[SELF:%.*]] : $@thick ChildToFixedParent.Type):
     // CHECK:   [[FIRST_CAST:%.*]] = unchecked_trivial_bit_cast [[SELF]]
     // CHECK:   [[SECOND_CAST:%.*]] = upcast [[FIRST_CAST]]
     // CHECK:   [[FUNC:%.*]] = super_method [[SELF]] : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> ()
@@ -177,7 +185,7 @@ public class GenericBase<T> {
 
 public class GenericDerived<T> : GenericBase<T> {
   public override func method() {
-    // CHECK-LABEL: sil private @$s5super14GenericDerivedC6methodyyFyyXEfU_ : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private [ossa] @$s5super14GenericDerivedC6methodyyFyyXEfU_ : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     {
@@ -185,7 +193,7 @@ public class GenericDerived<T> : GenericBase<T> {
     }()
     // CHECK: } // end sil function '$s5super14GenericDerivedC6methodyyFyyXEfU_'
 
-    // CHECK-LABEL: sil private @$s5super14GenericDerivedC6methodyyF13localFunctionL_yylF : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private [ossa] @$s5super14GenericDerivedC6methodyyF13localFunctionL_yylF : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     // CHECK: } // end sil function '$s5super14GenericDerivedC6methodyyF13localFunctionL_yylF'
@@ -194,7 +202,7 @@ public class GenericDerived<T> : GenericBase<T> {
     }
     localFunction()
 
-    // CHECK-LABEL: sil private @$s5super14GenericDerivedC6methodyyF15genericFunctionL_yyqd__r__lF : $@convention(thin) <T><U> (@in_guaranteed U, @guaranteed GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private [ossa] @$s5super14GenericDerivedC6methodyyF15genericFunctionL_yyqd__r__lF : $@convention(thin) <T><U> (@in_guaranteed U, @guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     func genericFunction<U>(_: U) {

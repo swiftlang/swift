@@ -79,7 +79,6 @@ extension String.Index {
   ///   If this index does not have an exact corresponding position in `utf8`,
   ///   this method returns `nil`. For example, an attempt to convert the
   ///   position of a UTF-16 trailing surrogate returns `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   public func samePosition(
     in utf8: String.UTF8View
     ) -> String.UTF8View.Index? {
@@ -108,7 +107,6 @@ extension String.Index {
   ///   index. If this index does not have an exact corresponding position in
   ///   `utf16`, this method returns `nil`. For example, an attempt to convert
   ///   the position of a UTF-8 continuation byte returns `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   public func samePosition(
     in utf16: String.UTF16View
   ) -> String.UTF16View.Index? {

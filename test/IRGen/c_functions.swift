@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/c_functions.h -primary-file %s -emit-ir | %FileCheck %s -check-prefix CHECK -check-prefix %target-cpu
+// RUN: %target-swift-frontend -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/c_functions.h -primary-file %s -emit-ir | %FileCheck %s -check-prefix CHECK -check-prefix %target-cpu
 
 // This is deliberately not a SIL test so that we can test SILGen too.
 
 // CHECK-LABEL: define hidden swiftcc void @"$s11c_functions14testOverloadedyyF"
 func testOverloaded() {
-  // CHECK: call void @{{_Z10overloadedv|"\\01\?overloaded@@\$\$J0YAXXZ"}}()
+  // CHECK: call void @{{_Z10overloadedv|"\?overloaded@@\$\$J0YAXXZ"}}()
   overloaded()
-  // CHECK: call void @{{_Z10overloadedi|"\\01\?overloaded@@\$\$J0YAXH@Z"}}(i32{{( signext)?}} 42)
+  // CHECK: call void @{{_Z10overloadedi|"\?overloaded@@\$\$J0YAXH@Z"}}(i32{{( signext)?}} 42)
   overloaded(42)
   // CHECK: call void @{{.*}}test_my_log
   test_my_log()

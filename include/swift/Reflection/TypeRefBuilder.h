@@ -159,7 +159,7 @@ class TypeRefBuilder {
 
 public:
   using BuiltType = const TypeRef *;
-  using BuiltNominalTypeDecl = Optional<std::string>;
+  using BuiltTypeDecl = Optional<std::string>;
   using BuiltProtocolDecl = Optional<std::pair<std::string, bool /*isObjC*/>>;
 
   TypeRefBuilder();
@@ -205,12 +205,13 @@ public:
   /// Factory methods for all TypeRef kinds
   ///
 
-  const BuiltinTypeRef *createBuiltinType(const std::string &mangledName) {
+  const BuiltinTypeRef *createBuiltinType(const std::string &builtinName,
+                                          const std::string &mangledName) {
     return BuiltinTypeRef::create(*this, mangledName);
   }
 
   Optional<std::string>
-  createNominalTypeDecl(const Demangle::NodePointer &node) {
+  createTypeDecl(const Demangle::NodePointer &node, bool &typeAlias) {
     return Demangle::mangleNode(node);
   }
 
@@ -224,7 +225,8 @@ public:
     return std::make_pair(name, true);
   }
 
-  Optional<std::string> createNominalTypeDecl(std::string &&mangledName) {
+  Optional<std::string> createTypeDecl(std::string &&mangledName,
+                                       bool &typeAlias) {
     return std::move(mangledName);
   }
   
@@ -237,6 +239,13 @@ public:
                                     const Optional<std::string> &mangledName,
                                     const TypeRef *parent) {
     return NominalTypeRef::create(*this, *mangledName, parent);
+  }
+
+  const TypeRef *createTypeAliasType(
+                                    const Optional<std::string> &mangledName,
+                                    const TypeRef *parent) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
   }
 
   const BoundGenericTypeRef *
@@ -302,6 +311,13 @@ public:
 
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member,
+                            const TypeRef *base) {
+    // Should not have unresolved dependent member types here.
+    return nullptr;
+  }
+
+  const DependentMemberTypeRef *
+  createDependentMemberType(const std::string &member,
                             const TypeRef *base,
                             BuiltProtocolDecl protocol) {
     // Objective-C protocols don't have dependent types.
@@ -319,6 +335,11 @@ public:
 
   const SILBoxTypeRef *createSILBoxType(const TypeRef *base) {
     return SILBoxTypeRef::create(*this, base);
+  }
+
+  const TypeRef *createDynamicSelfType(const TypeRef *selfType) {
+    // TypeRefs should not contain DynamicSelfType.
+    return nullptr;
   }
 
   const ObjCClassTypeRef *getUnnamedObjCClassType() {

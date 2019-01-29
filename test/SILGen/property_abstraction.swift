@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name property_abstraction -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name property_abstraction %s | %FileCheck %s
 
 struct Int {
   mutating func foo() {}
@@ -11,7 +11,7 @@ struct Foo<T, U> {
   var g: T
 }
 
-// CHECK-LABEL: sil hidden @$s20property_abstraction4getF{{[_0-9a-zA-Z]*}}Foo{{.*}}F : $@convention(thin) (@guaranteed Foo<Int, Int>) -> @owned @callee_guaranteed (Int) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction4getF{{[_0-9a-zA-Z]*}}Foo{{.*}}F : $@convention(thin) (@guaranteed Foo<Int, Int>) -> @owned @callee_guaranteed (Int) -> Int {
 // CHECK:       bb0([[X_ORIG:%.*]] : @guaranteed $Foo<Int, Int>):
 // CHECK:         [[F_ORIG:%.*]] = struct_extract [[X_ORIG]] : $Foo<Int, Int>, #Foo.f
 // CHECK:         [[F_ORIG_COPY:%.*]] = copy_value [[F_ORIG]]
@@ -23,7 +23,7 @@ func getF(_ x: Foo<Int, Int>) -> (Int) -> Int {
   return x.f
 }
 
-// CHECK-LABEL: sil hidden @$s20property_abstraction4setF{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction4setF{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @$s{{.*}}TR :
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_FN]]({{%.*}})
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
@@ -34,7 +34,7 @@ func setF(_ x: inout Foo<Int, Int>, f: @escaping (Int) -> Int) {
 
 func inOutFunc(_ f: inout ((Int) -> Int)) { }
 
-// CHECK-LABEL: sil hidden @$s20property_abstraction6inOutF{{[_0-9a-zA-Z]*}}F : 
+// CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction6inOutF{{[_0-9a-zA-Z]*}}F : 
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Foo<Int, Int>):
 // CHECK:   [[XBOX:%.*]] = alloc_box ${ var Foo<Int, Int> }, var, name "x"
 // CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]] : ${ var Foo<Int, Int> }, 0
@@ -62,7 +62,7 @@ func inOutF(_ x: Foo<Int, Int>) {
 
 // Don't produce a writeback for generic lvalues when there's no real
 // abstraction difference. <rdar://problem/16530674>
-// CHECK-LABEL: sil hidden @$s20property_abstraction23noAbstractionDifference{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction23noAbstractionDifference{{[_0-9a-zA-Z]*}}F
 func noAbstractionDifference(_ x: Foo<Int, Int>) {
   var x = x
   // CHECK: [[ADDR:%.*]] = struct_element_addr {{%.*}}, #Foo.g
@@ -77,8 +77,8 @@ struct AddressOnlyLet<T> {
   let makeAddressOnly: P
 }
 
-// CHECK-LABEL: sil hidden @$s20property_abstraction34getAddressOnlyReabstractedProperty{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@in_guaranteed AddressOnlyLet<Int>) -> @owned @callee_guaranteed (Int) -> Int
-// CHECK: bb0([[ARG:%.*]] : @trivial $*AddressOnlyLet<Int>):
+// CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction34getAddressOnlyReabstractedProperty{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@in_guaranteed AddressOnlyLet<Int>) -> @owned @callee_guaranteed (Int) -> Int
+// CHECK: bb0([[ARG:%.*]] : $*AddressOnlyLet<Int>):
 // CHECK:   [[CLOSURE_ADDR:%.*]] = struct_element_addr {{%.*}} : $*AddressOnlyLet<Int>, #AddressOnlyLet.f
 // CHECK:   [[CLOSURE_ORIG:%.*]] = load [copy] [[CLOSURE_ADDR]]
 // CHECK:   [[REABSTRACT:%.*]] = function_ref
@@ -114,7 +114,7 @@ typealias Test20341012 = (title: (), action: () -> ())
 struct T20341012 {
     private var options: ArrayLike<Test20341012> { get {} set {} }
 
-    // CHECK-LABEL: sil hidden @$s20property_abstraction9T20341012V1t{{[_0-9a-zA-Z]*}}F
+    // CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction9T20341012V1t{{[_0-9a-zA-Z]*}}F
     // CHECK:         [[TMP1:%.*]] = alloc_stack $(title: (), action: @callee_guaranteed () -> @out ())
     // CHECK:         apply {{.*}}<(title: (), action: () -> ())>([[TMP1]],
     mutating func t() {
@@ -133,8 +133,8 @@ protocol Factory {
 func setBuilder<F: Factory>(_ factory: inout F) where F.Product == MyClass {
   factory.builder = { return MyClass() }
 }
-// CHECK: sil hidden @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}}F : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
-// CHECK: bb0(%0 : @trivial $*F):
+// CHECK: sil hidden [ossa] @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}}F : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
+// CHECK: bb0(%0 : $*F):
 // CHECK:   [[F0:%.*]] = function_ref @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}} : $@convention(thin) () -> @owned MyClass
 // CHECK:   [[F1:%.*]] = thin_to_thick_function [[F0]]
 // CHECK:   [[REABSTRACTOR:%.*]] = function_ref @$s{{.*}}TR :

@@ -1,0 +1,3 @@
+module OldABI {
+  header "OldABI.h"
+}

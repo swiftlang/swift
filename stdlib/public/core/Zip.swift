@@ -144,4 +144,12 @@ extension Zip2Sequence: Sequence {
       _sequence1.makeIterator(),
       _sequence2.makeIterator())
   }
+
+  @inlinable // generic-performance
+  public var underestimatedCount: Int {
+    return Swift.min(
+      _sequence1.underestimatedCount,
+      _sequence2.underestimatedCount
+    )
+  }
 }

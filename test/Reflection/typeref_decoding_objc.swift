@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %S/Inputs/ObjectiveCTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/libTypesToReflect.%target-dylib-extension
-// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
+// RUN: %target-build-swift %S/Inputs/ObjectiveCTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
 // REQUIRES: objc_interop
 
 // Disable asan builds until we build swift-reflection-dump and the reflection library with the same compile: rdar://problem/30406870
@@ -59,12 +59,14 @@
 // CHECK-32: Alignment: 4
 // CHECK-32: Stride: 16
 // CHECK-32: NumExtraInhabitants: 0
+// CHECK-32: BitwiseTakable: 1
 
 // CHECK-64: - __C.CGRect:
 // CHECK-64: Size: 32
 // CHECK-64: Alignment: 8
 // CHECK-64: Stride: 32
 // CHECK-64: NumExtraInhabitants: 0
+// CHECK-64: BitwiseTakable: 1
 
 // CHECK:      CAPTURE DESCRIPTORS:
 // CHECK-NEXT: ====================

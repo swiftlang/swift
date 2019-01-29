@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CAPTURE
 
 // REQUIRES: CPU=x86_64
 
@@ -54,4 +55,13 @@ func captures_tuple<T, U>(x x: (T, U)) -> () -> (T, U) {
   // CHECK: [[ADDR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 1
   // CHECK: bitcast %swift.opaque* [[ADDR]] to <{}>*
   return {x}
+}
+
+class C {}
+
+func useClosure(_ cl : () -> ()) {}
+
+// CAPTURE-NOT: reflection_descriptor{{.*}} = private constant { i32, i32, i32, i32, i32, i32, i32, i32 } { i32 5, i32 0, i32 0
+func no_capture_descriptor(_ c: C, _ d: C, _ e: C, _ f: C, _ g: C) {
+  useClosure( { _ = c ; _ = d ; _ = e ; _ = f ; _ = g })
 }

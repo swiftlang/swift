@@ -198,3 +198,11 @@ protocol ProtocolHasSubscriptFunction {
 class ProtocolHasSubscriptFunctionAdopter: ProtocolHasSubscriptFunction { // expected-error{{type 'ProtocolHasSubscriptFunctionAdopter' does not conform to protocol 'ProtocolHasSubscriptFunction'}}
 
 }
+
+protocol ProtocolHasConsumingRequirement {
+  __consuming func foo() // expected-note {{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}} {{81-81=\n    func foo() {\n        <#code#>\n    \}\n}}
+}
+
+struct ProtocolHasConsumingRequirementAdopter: ProtocolHasConsumingRequirement { // expected-error {{type 'ProtocolHasConsumingRequirementAdopter' does not conform to protocol 'ProtocolHasConsumingRequirement'}}
+
+}

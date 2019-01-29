@@ -562,8 +562,7 @@ private:
   ///
   /// If the record at the cursor is not a generic param list, returns null
   /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC,
-                                     GenericParamList *outerParams = nullptr);
+  GenericParamList *maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
@@ -590,7 +589,8 @@ private:
   /// because it reads from the cursor, it is not possible to reset the cursor
   /// after reading. Nothing should ever follow an XREF record except
   /// XREF_PATH_PIECE records.
-  llvm::Expected<Decl *> resolveCrossReference(ModuleDecl *M, uint32_t pathLen);
+  llvm::Expected<Decl *> resolveCrossReference(serialization::ModuleID MID,
+                                               uint32_t pathLen);
 
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
@@ -703,7 +703,7 @@ public:
   /// Note that this may cause other decls to load as well.
   void loadExtensions(NominalTypeDecl *nominal);
 
-  /// \brief Load the methods within the given class that produce
+  /// Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.
   ///
   /// \param classDecl The class in which we are searching for @objc methods.
@@ -857,7 +857,7 @@ public:
   ///
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
-  ModuleDecl *getModule(ArrayRef<Identifier> name);
+  ModuleDecl *getModule(ArrayRef<Identifier> name, bool allowLoading = false);
 
   /// Returns the generic signature for the given ID.
   GenericSignature *getGenericSignature(serialization::GenericSignatureID ID);

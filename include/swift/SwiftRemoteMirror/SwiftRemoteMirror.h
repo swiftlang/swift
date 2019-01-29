@@ -39,7 +39,7 @@ extern "C" {
 
 /// Get the metadata version supported by the Remote Mirror library.
 SWIFT_REMOTE_MIRROR_LINKAGE
-uint16_t swift_reflection_getSupportedMetadataVersion();
+uint16_t swift_reflection_getSupportedMetadataVersion(void);
 
 /// \returns An opaque reflection context.
 SWIFT_REMOTE_MIRROR_LINKAGE

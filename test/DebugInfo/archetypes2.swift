@@ -4,14 +4,9 @@ func markUsed<T>(_ t: T) {}
 
 class C<A> {
   // CHECK: ![[A:.*]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}}identifier: "$sxD"
-  // CHECK: !DILocalVariable(name: "x", arg: 1,
-  // CHECK-SAME:             line: [[@LINE+7]],
-  // CHECK-SAME:             type: ![[A]]
-  // CHECK: !DILocalVariable(name: "y", arg: 2,
-  // CHECK-SAME:             line: [[@LINE+4]],
-  // CHECK-SAME:             type: ![[B:[0-9]+]]
-  // CHECK: ![[B]] = !DICompositeType(tag: DW_TAG_structure_type,
-  // CHECK-SAME:             identifier: "$sqd__D"
+  // CHECK: ![[B:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}}identifier: "$sqd__D")
+  // CHECK: !DILocalVariable(name: "x", arg: 1,{{.*}}line: [[@LINE+2]],{{.*}}type: ![[A]]
+  // CHECK: !DILocalVariable(name: "y", arg: 2,{{.*}}line: [[@LINE+1]],{{.*}}type: ![[B]])
   func foo<B>(_ x: A, y :B) {
     markUsed("hello world")
   }

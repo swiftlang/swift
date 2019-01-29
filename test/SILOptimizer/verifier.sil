@@ -1,10 +1,12 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s
 
 // REQUIRES: asserts
 
 // This file is meant to pass the verifier.
 
 import Builtin
+
+sil_stage canonical
 
 // Don't fail in the verifier on a shared unreachable exit block of two loops.
 sil @dont_fail: $@convention(thin) (Builtin.Int1) -> () {
@@ -79,4 +81,29 @@ bb8:
 bb4:
   %10 = tuple ()
   return %10 : $()
+}
+
+// Verify that findAccessedStorage handles cyclic phis.
+// <rdar://47059671> swiftc crashes
+class AClass {
+  var aStoredProp: Builtin.Int32
+}
+
+sil @testPhiCycle : $@convention(thin) (@guaranteed AClass) -> () {
+bb0(%0 : $AClass):
+  %accessAddr = ref_element_addr %0 : $AClass, #AClass.aStoredProp
+  br bbloop(%accessAddr : $*Builtin.Int32)
+
+bbloop(%phiAddr : $*Builtin.Int32):
+  %access = begin_access [read] [dynamic] [no_nested_conflict] %phiAddr : $*Builtin.Int32
+  %val = load %access : $*Builtin.Int32
+  end_access %access : $*Builtin.Int32
+  cond_br undef, bbtail, bbreturn
+
+bbtail:
+  br bbloop(%phiAddr : $*Builtin.Int32)
+
+bbreturn:
+  %v = tuple ()
+  return %v : $()
 }

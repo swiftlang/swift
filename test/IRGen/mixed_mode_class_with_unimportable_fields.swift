@@ -79,13 +79,13 @@ public func accessFinalFields(ofSub holder: SubButtHolder) -> (Any, Any, Any) {
 
 // CHECK-LABEL: define {{(protected )?}}{{(dllexport )?}}swiftcc void @"$s4main12invokeMethod2onyAA13SubButtHolderC_tF"
 public func invokeMethod(on holder: SubButtHolder) {
-  // CHECK-64: [[IMPL_ADDR:%.*]] = getelementptr inbounds {{.*}}, [[WORD]] 10
-  // CHECK-32: [[IMPL_ADDR:%.*]] = getelementptr inbounds {{.*}}, [[WORD]] 13
+  // CHECK-64: [[IMPL_ADDR:%.*]] = getelementptr inbounds {{.*}}, [[WORD]] 13
+  // CHECK-32: [[IMPL_ADDR:%.*]] = getelementptr inbounds {{.*}}, [[WORD]] 16
   // CHECK: [[IMPL:%.*]] = load {{.*}} [[IMPL_ADDR]]
   // CHECK: call swiftcc void [[IMPL]]
   holder.virtual()
-  // CHECK-64: [[IMPL_ADDR:%.*]] = getelementptr inbounds {{.*}}, [[WORD]] 15
-  // CHECK-32: [[IMPL_ADDR:%.*]] = getelementptr inbounds {{.*}}, [[WORD]] 18
+  // CHECK-64: [[IMPL_ADDR:%.*]] = getelementptr inbounds {{.*}}, [[WORD]] 16
+  // CHECK-32: [[IMPL_ADDR:%.*]] = getelementptr inbounds {{.*}}, [[WORD]] 19
   // CHECK: [[IMPL:%.*]] = load {{.*}} [[IMPL_ADDR]]
   // CHECK: call swiftcc void [[IMPL]]
   holder.subVirtual()

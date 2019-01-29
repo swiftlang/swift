@@ -35,4 +35,4 @@
 // RUN: %swiftc_driver %t/a.swift %t/b.swift %t/c.swift -num-threads 4 -whole-module-optimization -enable-batch-mode -### >%t/stdout_mt_wmo 2>%t/stderr_mt_wmo
 // RUN: %FileCheck --check-prefix CHECK-WMO %s <%t/stderr_mt_wmo
 // RUN: %FileCheck --check-prefix CHECK-MULTITHREADED-WMO-ARGS %s <%t/stdout_mt_wmo
-// CHECK-MULTITHREADED-WMO-ARGS: -num-threads 4 {{.*}}-o {{.*}}/a-{{[a-z0-9]+}}.o -o {{.*}}/b-{{[a-z0-9]+}}.o -o {{.*}}/c-{{[a-z0-9]+}}.o
+// CHECK-MULTITHREADED-WMO-ARGS: -num-threads 4 {{.*}}-o {{.*(/|\\)}}a-{{[a-z0-9]+}}.o{{"?}} -o {{.*(/|\\)}}b-{{[a-z0-9]+}}.o{{"?}} -o {{.*(/|\\)}}c-{{[a-z0-9]+}}.o{{"?}}

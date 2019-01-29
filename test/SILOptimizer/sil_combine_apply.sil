@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
 import Builtin
 
@@ -570,4 +570,69 @@ bb0:
   strong_release %pa : $@callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
   %999 = tuple ()
   return %999 : $()
+}
+
+// CHECK-LABEL: sil shared @applied_on_stack : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[F:%.*]] = function_ref @indirectClosure : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+// CHECK:   [[STK:%.*]] = alloc_stack $Builtin.Int64
+// CHECK:   [[STK2:%.*]] = alloc_stack $Builtin.Int64
+// CHECK:   [[I:%.*]] = integer_literal $Builtin.Int64, 3
+// CHECK:   store [[I]] to [[STK2]] : $*Builtin.Int64
+// CHECK:   apply [[F]]([[STK]], [[STK2]]) : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+// CHECK:   dealloc_stack [[STK2]] : $*Builtin.Int64
+// CHECK:   dealloc_stack [[STK]] : $*Builtin.Int64
+// CHECK:   return %8 : $()
+
+sil shared @applied_on_stack : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @indirectClosure : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+  %pa = partial_apply [callee_guaranteed] [on_stack] %fn() : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+  %out = alloc_stack $Builtin.Int64
+  %in = alloc_stack $Builtin.Int64
+  %c3 = integer_literal $Builtin.Int64, 3
+  store %c3 to %in : $*Builtin.Int64
+  %call = apply %pa(%out, %in) : $@noescape @callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
+  dealloc_stack %in : $*Builtin.Int64
+  dealloc_stack %out : $*Builtin.Int64
+  dealloc_stack %pa : $@noescape @callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
+  %999 = tuple ()
+  return %999 : $()
+}
+
+sil @guaranteed_closure_throws2 : $@convention(thin) (Builtin.Int32, @guaranteed C) -> @error Error
+
+// CHECK-LABEL: sil @test_guaranteed_closure_try_apply_on_stack
+// CHECK: bb0
+// CHECK: strong_retain
+// CHECK: strong_retain
+// CHECK: try_apply
+// CHECK: bb1
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: br bb3
+// CHECK: bb2
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: br bb3
+sil @test_guaranteed_closure_try_apply_on_stack : $@convention(thin) (@guaranteed C, Builtin.Int32) ->  () {
+bb0(%0: $C, %1: $Builtin.Int32):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_throws2 : $@convention(thin) (Builtin.Int32, @guaranteed C) -> @error Error
+  %closure = partial_apply [callee_guaranteed] [on_stack] %closure_fun(%0) : $@convention(thin) (Builtin.Int32, @guaranteed C) -> @error Error
+  try_apply %closure(%1) : $@noescape @callee_guaranteed (Builtin.Int32) -> @error Error, normal bb7, error bb11
+
+bb7(%callret : $()):
+	dealloc_stack %closure : $@noescape @callee_guaranteed (Builtin.Int32) -> @error Error
+	strong_release %0: $C
+  br bb99
+
+bb11(%128 : $Error):
+	dealloc_stack %closure : $@noescape @callee_guaranteed (Builtin.Int32) -> @error Error
+	strong_release %0: $C
+  br bb99
+
+bb99:
+  %t = tuple()
+  return %t : $()
 }

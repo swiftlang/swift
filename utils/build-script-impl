@@ -83,6 +83,8 @@ KNOWN_SETTINGS=(
     xctest-build-type           "Debug"          "the build variant for xctest"
     swiftpm-build-type          "Debug"          "the build variant for swiftpm"
     swiftsyntax-build-type      "Debug"          "the build variant for swiftSyntax"
+    skstresstester-build-type   "Debug"          "the build variant for the SourceKit stress tester"
+    swiftevolve-build-type      "Debug"          "the build variant for the swift-evolve tool"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
     enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
@@ -101,6 +103,7 @@ KNOWN_SETTINGS=(
     installable-package         ""               "the path to the archive of the installation directory"
     test-installable-package    ""               "whether to run post-packaging tests on the produced package"
     reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
+    build-libparser-only        ""               "only build libSwiftSyntaxParser"
     skip-reconfigure            ""               "set to skip reconfigure"
     swift-primary-variant-sdk   ""               "default SDK for target binaries"
     swift-primary-variant-arch  ""               "default arch for target binaries"
@@ -124,6 +127,8 @@ KNOWN_SETTINGS=(
     skip-build-llbuild          ""               "set to skip building llbuild"
     skip-build-swiftpm          ""               "set to skip building swiftpm"
     skip-build-swiftsyntax      ""               "set to skip building swiftSyntax"
+    skip-build-skstresstester   ""               "set to skip building the SourceKit stress tester"
+    skip-build-swiftevolve      ""               "set to skip building the swift-evolve tool"
     skip-build-xctest           ""               "set to skip building xctest"
     skip-build-foundation       ""               "set to skip building foundation"
     skip-build-libdispatch      ""               "set to skip building libdispatch"
@@ -137,6 +142,8 @@ KNOWN_SETTINGS=(
     skip-test-llbuild           ""               "set to skip testing llbuild"
     skip-test-swiftpm           ""               "set to skip testing swiftpm"
     skip-test-swiftsyntax       ""               "set to skip testing swiftSyntax"
+    skip-test-skstresstester    ""               "set to skip testing the SourceKit stress tester"
+    skip-test-swiftevolve       ""               "set to skip testing the swift-evolve tool"
     skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-libdispatch       ""               "set to skip testing libdispatch"
@@ -193,6 +200,8 @@ KNOWN_SETTINGS=(
     install-swiftpm             ""               "whether to install swiftpm"
     install-swiftsyntax         ""               "whether to install swiftsyntax"
     skip-install-swiftsyntax-module ""           "set to skip installing swiftsyntax modules"
+    install-skstresstester      ""               "whether to install the SourceKit stress tester"
+    install-swiftevolve         ""               "whether to install the swift-evolve tool"
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
     install-libdispatch         ""               "whether to install libdispatch"
@@ -231,11 +240,13 @@ KNOWN_SETTINGS=(
     android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
     android-api-level                  ""        "The Android API level to target when building for Android. Currently only 21 or above is supported"
     android-ndk-gcc-version            ""        "The GCC version to use when building for Android. Currently only 4.9 is supported"
-    android-icu-uc                     ""        "Path to a directory containing libicuuc.so"
+    android-icu-uc                     ""        "Path to libicuuc.so"
     android-icu-uc-include             ""        "Path to a directory containing headers for libicuuc"
-    android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
+    android-icu-i18n                   ""        "Path to libicui18n.so"
     android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
+    android-icu-data                   ""        "Path to libicudata.so"
     android-deploy-device-path         ""        "Path on an Android device to which built Swift stdlib products will be deployed"
+    android-arch                       "armv7"   "The Android target architecture when building for Android"
     check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
     cmark-cmake-options                ""        "CMake options used for all cmark targets"
@@ -255,7 +266,8 @@ KNOWN_SETTINGS=(
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
-    clang-profile-instr-use            ""        "If set, profile file to use for clang PGO"
+    clang-profile-instr-use            ""        "If set, profile file to use for clang PGO while building llvm/clang"
+    swift-profile-instr-use            ""        "If set, profile file to use for clang PGO while building swift"
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
     skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
@@ -323,7 +335,9 @@ function true_false() {
 }
 
 function to_varname() {
-    toupper "${1//-/_}"
+    # Uses `tr` because it is orders of magnitude faster than ${1//-/_} on long
+    # strings, which happens when translating KNOWN_SETTINGS.
+    toupper "$(echo $1 | tr '-' '_')"
 }
 
 function set_lldb_build_mode() {
@@ -748,6 +762,11 @@ function set_build_options_for_host() {
         )
     fi
 
+    if [[ "${SWIFT_PROFILE_INSTR_USE}" ]]; then
+        swift_cmake_options+=(
+            -DSWIFT_PROFDATA_FILE="${SWIFT_PROFILE_INSTR_USE}"
+        )
+    fi
     swift_cmake_options+=(
         -DCOVERAGE_DB="${COVERAGE_DB}"
     )
@@ -1130,7 +1149,6 @@ function get_stdlib_targets_for_host() {
 # and architecture of each stdlib target -- currently it only captures the SDK.
 #
 # We turn these targets in to SWIFT_SDKS in `calculate_targets_for_host()`
-
     if [[ $(is_cross_tools_host $1) ]] ; then
         echo "$1"
     else
@@ -1171,9 +1189,14 @@ LLDB_SOURCE_DIR="${WORKSPACE}/lldb"
 LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
 SWIFTPM_SOURCE_DIR="${WORKSPACE}/swiftpm"
 SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
+STRESSTEST_PACKAGE_DIR="${WORKSPACE}/swift-stress-tester"
+SKSTRESSTESTER_SOURCE_DIR="${STRESSTEST_PACKAGE_DIR}/SourceKitStressTester"
+SWIFTEVOLVE_SOURCE_DIR="${STRESSTEST_PACKAGE_DIR}/SwiftEvolve"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
+FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
+LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 
@@ -1211,13 +1234,20 @@ PRODUCTS=("${PRODUCTS[@]}" swift)
 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" lldb)
 fi
-# LLBuild, SwiftPM, SwiftSyntax and XCTest are dependent on Foundation, so Foundation must be
-# added to the list of build products first.
+# LLBuild, SwiftPM, SwiftSyntax, the SourceKit stress tester and XCTest are
+# dependent on Foundation, so Foundation must be added to the list of build
+# products first.
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
+     if [[ -z "${SKIP_BUILD_SWIFT_STATIC_LIBDISPATCH}" ]] ; then
+       PRODUCTS=("${PRODUCTS[@]}" libdispatch_static)
+     fi
 fi
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
+     if [[ -z "${SKIP_BUILD_STATIC_FOUNDATION}" ]] ; then
+       PRODUCTS=("${PRODUCTS[@]}" foundation_static)
+     fi
 fi
 if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" llbuild)
@@ -1225,18 +1255,26 @@ fi
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" playgroundsupport)
 fi
-# SwiftPM and SwiftSyntax are dependent on XCTest, so XCTest must be added to the list of
-# build products first.
+# SwiftPM, SwiftSyntax and the SourceKit stress tester are dependent on XCTest,
+# so XCTest must be added to the list of build products first.
 if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" xctest)
 fi
-# SwiftSyntax is dependent on SwiftPM, so SwiftPM must be added to the list of
-# build products first.
+# SwiftSyntax and the SourceKit stress tester are dependent on SwiftPM, so
+# SwiftPM must be added to the list of build products first.
 if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
+# The SourceKit stress tester and swift-evolve are dependent on SwiftSyntax, so
+# it must be added to the list of build products first.
 if [[ ! "${SKIP_BUILD_SWIFTSYNTAX}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftsyntax)
+fi
+if [[ ! "${SKIP_BUILD_SKSTRESSTESTER}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" skstresstester)
+fi
+if [[ ! "${SKIP_BUILD_SWIFTEVOLVE}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" swiftevolve)
 fi
 
 # Checks if a given product is enabled (i.e. part of $PRODUCTS array)
@@ -1548,13 +1586,19 @@ function build_directory_bin() {
             swiftsyntax)
                 echo "${root}/${SWIFTSYNTAX_BUILD_TYPE}/bin"
                 ;;
+            skstresstester)
+                echo "${root}/${SKSTRESSTESTER_BUILD_TYPE}/bin"
+                ;;
+            swiftevolve)
+                echo "${root}/${SWIFTEVOLVE_BUILD_TYPE}/bin"
+                ;;
             xctest)
                 echo "${root}/${XCTEST_BUILD_TYPE}/bin"
                 ;;
-            foundation)
+            foundation|foundation_static)
                 echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
             libicu)
@@ -1569,8 +1613,7 @@ function build_directory_bin() {
         esac
     else
         if [[ "${product}" == "swiftpm" ]] ; then
-            # All projects that call this depend on SwiftPM so we know that 
-            # swiftpm_bootstrap_command has already been set
+            set_swiftpm_bootstrap_command
             echo "$(${swiftpm_bootstrap_command[@]} --show-bin-path)"
         else
             echo "${root}/bin"
@@ -1623,6 +1666,9 @@ function common_cross_c_flags() {
             ;;
         android-armv7)
             echo -n " -arch armv7"
+            ;;
+        android-arm64)
+            echo -n " -arch aarch64"
             ;;
     esac
 }
@@ -1687,13 +1733,19 @@ function cmake_config_opt() {
             swiftsyntax)
                 echo "--config ${SWIFTSYNTAX_BUILD_TYPE}"
                 ;;
+            skstresstester)
+                echo "--config ${SKSTRESSTESTER_BUILD_TYPE}"
+                ;;
+            swiftevolve)
+                echo "--config ${SWIFTEVOLVE_BUILD_TYPE}"
+                ;;
             xctest)
                 echo "--config ${XCTEST_BUILD_TYPE}"
                 ;;
-            foundation)
+            foundation|foundation_static)
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 echo "--config ${LIBDISPATCH_BUILD_TYPE}"
                 ;;
             libicu)
@@ -1710,6 +1762,11 @@ function cmake_config_opt() {
 }
 
 function set_swiftpm_bootstrap_command() {
+    if [[ -n "${swiftpm_bootstrap_command[@]}" ]]; then
+        # Already set.
+        return
+    fi
+
     SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
     LLBUILD_BIN="$(build_directory_bin ${LOCAL_HOST} llbuild)/swift-build-tool"
     if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
@@ -1747,7 +1804,7 @@ function set_swiftpm_bootstrap_command() {
     swiftpm_bootstrap_command+=(
         --swiftc="${SWIFTC_BIN}"
         --sbt="${LLBUILD_BIN}"
-        --build="${build_dir}")
+        --build="$(build_directory ${host} swiftpm)")
 
     # Add flags to link llbuild.
     LLBUILD_BUILD_DIR="$(build_directory ${host} llbuild)"
@@ -1770,13 +1827,21 @@ function set_swiftpm_bootstrap_command() {
     fi
 }
 
-function set_swiftsyntax_build_command() {
-    if [ "${SKIP_BUILD_SWIFTPM}" ]; then
-        SWIFT_BUILD="$(xcrun_find_tool swift-build)"
-        SWIFT_TEST="$(xcrun_find_tool swift-test)"
+function swiftpm_find_tool() {
+    tool=$1
+    if [[ "${SKIP_BUILD_SWIFTPM}" || "${BUILD_LIBPARSER_ONLY}" ]]; then
+        echo "$(xcrun_find_tool ${tool})"
     else
-        SWIFT_BUILD="$(build_directory_bin ${LOCAL_HOST} swiftpm)/swift-build"
-        SWIFT_TEST="$(build_directory_bin ${LOCAL_HOST} swiftpm)/swift-test"
+        echo "$(build_directory_bin ${LOCAL_HOST} swiftpm)/${tool}"
+    fi
+}
+
+function set_swiftsyntax_build_command() {
+    if [ "${BUILD_LIBPARSER_ONLY}" ]; then
+        # we don't have a compiler built so we have to use the one in the environment.
+        SWIFTC_BIN="$(xcrun_find_tool swiftc)"
+    else
+        SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
     fi
 
     swiftsyntax_build_command=("${SWIFTSYNTAX_SOURCE_DIR}/build-script.py")
@@ -1788,12 +1853,60 @@ function set_swiftsyntax_build_command() {
         swiftsyntax_build_command+=(-v)
     fi
     swiftsyntax_build_command+=(
-        --build-dir="${build_dir}"
-        --swift-build-exec="${SWIFT_BUILD}"
-        --swift-test-exec="${SWIFT_TEST}"
-        --swiftc-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+        --build-dir="$(build_directory ${host} swiftsyntax)"
+        --swift-build-exec="$(swiftpm_find_tool swift-build)"
+        --swift-test-exec="$(swiftpm_find_tool swift-test)"
+        --swiftc-exec="${SWIFTC_BIN}"
+        --syntax-parser-header-dir="${SWIFT_SOURCE_DIR}/include/swift-c/SyntaxParser"
+        --syntax-parser-lib-dir="$(build_directory ${host} swift)/lib"
         --swift-syntax-test-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swift-syntax-test"
         --filecheck-exec="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck")
+}
+
+function set_stresstester_build_script_helper_command() {
+    local package_name="$1"
+    local package_build_type="$2"
+
+    if [ "${SKIP_BUILD_SWIFTSYNTAX}" ]; then
+        echo "Error: Cannot build $package_name without SwiftSyntax."
+        exit 1
+    fi
+
+    local swiftsyntax_config="debug"
+    if [[ $(is_cmake_release_build_type "${SWIFTSYNTAX_BUILD_TYPE}") ]] ; then
+        swiftsyntax_config="release"
+    fi
+    local config="debug"
+    if [[ $(is_cmake_release_build_type "${package_build_type}") ]] ; then
+        config="release"
+    fi
+
+    stresstester_build_script_helper_command=("${STRESSTEST_PACKAGE_DIR}/build-script-helper.py")
+    if [[ "${VERBOSE_BUILD}" ]] ; then
+        stresstester_build_script_helper_command+=(-v)
+    fi
+
+    stresstester_build_script_helper_command+=(
+        --package-dir="${package_name}"
+        --build-dir="$(build_directory ${host} skstresstester)"
+        --swiftc-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+        --swift-build-exec="$(swiftpm_find_tool swift-build)"
+        --swift-test-exec="$(swiftpm_find_tool swift-test)"
+        --syntax-parser-header-dir="${SWIFT_SOURCE_DIR}/include/swift-c/SyntaxParser"
+        --syntax-parser-lib-dir="$(build_directory ${host} swift)/lib"
+        --sourcekitd-dir="$(build_directory ${host} swift)/lib"
+        --swiftsyntax-dir="$(build_directory ${host} swiftsyntax)/${swiftsyntax_config}"
+        --config="${config}")
+}
+
+function set_skstresstester_build_command() {
+    set_stresstester_build_script_helper_command SourceKitStressTester "${SKSTRESSTESTER_BUILD_TYPE}"
+    skstresstester_build_command=("${stresstester_build_script_helper_command[@]}")
+}
+
+function set_swiftevolve_build_command() {
+    set_stresstester_build_script_helper_command SwiftEvolve "${SWIFTEVOLVE_BUILD_TYPE}"
+    swiftevolve_build_command=("${stresstester_build_script_helper_command[@]}")
 }
 
 # Construct the appropriate options to pass to an Xcode
@@ -2097,12 +2210,13 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
                         -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
                         -DSWIFT_ANDROID_API_LEVEL:STRING="${ANDROID_API_LEVEL}"
-                        -DSWIFT_ANDROID_armv7_ICU_UC:STRING="${ANDROID_ICU_UC}"
-                        -DSWIFT_ANDROID_armv7_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
-                        -DSWIFT_ANDROID_armv7_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
-                        -DSWIFT_ANDROID_armv7_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
-                        -DSWIFT_SDK_ANDROID_ARCHITECTURES:STRING="armv7"
+                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC:STRING="${ANDROID_ICU_UC}"
+                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
+                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
+                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
+                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_DATA:STRING="${ANDROID_ICU_DATA}"
                         -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
+                        -DSWIFT_SDK_ANDROID_ARCHITECTURES:STRING="${ANDROID_ARCH}"
                     )
                 fi
 
@@ -2167,7 +2281,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [ "${SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS}" == "" ] ; then
                     SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS="${SWIFT_STDLIB_ENABLE_ASSERTIONS}"
                 fi
-                        
+
 
                 cmake_options=(
                     "${cmake_options[@]}"
@@ -2233,14 +2347,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
                     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
-                    -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                 )
 
                 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
+                    LIBICU_BUILD_DIR="$(build_directory ${host} libicu)"
+                    ICU_TMPINSTALL=${LIBICU_BUILD_DIR}/tmp_install
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_PATH_TO_LIBICU_SOURCE:PATH="${LIBICU_SOURCE_DIR}"
-                        -DSWIFT_PATH_TO_LIBICU_BUILD:PATH="$(build_directory ${host} libicu)"
+                        -DSWIFT_PATH_TO_LIBICU_BUILD:PATH="${LIBICU_BUILD_DIR}"
+                        -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
+                        -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
+                        -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB:BOOL=TRUE
                     )
                 fi
 
@@ -2289,7 +2407,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=("${build_targets[@]}"
                                    "${SWIFT_BENCHMARK_TARGETS[@]}")
                 fi
-
+                if [ "${BUILD_LIBPARSER_ONLY}" ]; then
+                    build_targets=(libSwiftSyntaxParser)
+                fi
                 skip_build=${SKIP_BUILD_SWIFT}
                 ;;
             lldb)
@@ -2331,64 +2451,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 LLDB_BUILD_DATE=$(date +%Y-%m-%d)
 
                 case "${host}" in
-                    linux-*)
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                            -DLLDB_ALLOW_STATIC_BINDINGS=1
-                        )
-                        ;;
-                    freebsd-*)
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                            -DLLDB_ALLOW_STATIC_BINDINGS=1
-                        )
-                        ;;
-                    cygwin-*)
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                            -DLLDB_ALLOW_STATIC_BINDINGS=1
-                        )
-                        ;;
-                    haiku-*)
+                    cygwin-*|freebsd-*|haiku-*|linux-*)
                         cmake_options=(
                             "${cmake_options[@]}"
                             -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
@@ -2435,6 +2498,11 @@ for host in "${ALL_HOSTS[@]}"; do
                                 -DLLDB_ALLOW_STATIC_BINDINGS=1
                                 -DLLDB_CODESIGN_IDENTITY=""
                             )
+
+                            if [[ "${ENABLE_ASAN}" ]] ; then
+                                # Limit the number of parallel tests.
+                                LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --threads=$(sysctl hw.physicalcpu | awk '{print $2}')"
+                            fi
                         fi
                         ;;
                 esac
@@ -2476,6 +2544,26 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 continue
                 ;;
+            skstresstester)
+                if [[ "$(uname -s)" != "Darwin" ]]; then
+                    echo "error: unable to build swift-stress-tester on this platform"
+                    continue
+                fi
+                set_skstresstester_build_command
+                call "${skstresstester_build_command[@]}"
+
+                continue
+                ;;
+            swiftevolve)
+                if [[ "$(uname -s)" != "Darwin" ]]; then
+                    echo "error: unable to build swift-evolve on this platform"
+                    continue
+                fi
+                set_swiftevolve_build_command
+                call "${swiftevolve_build_command[@]}"
+
+                continue
+                ;;
             xctest)
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
@@ -2514,12 +2602,14 @@ for host in "${ALL_HOSTS[@]}"; do
                   echo "Cleaning the XCTest build directory"
                   call rm -rf "${XCTEST_BUILD_DIR}"
 
+                  LLVM_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
+
                   cmake_options=(
                     ${cmake_options[@]}
                     -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"
-                    -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}"
+                    -DCMAKE_SWIFT_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
@@ -2538,7 +2628,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 esac
 
                 ;;
-            foundation)
+            foundation|foundation_static)
                 # The configuration script requires knowing about XCTest's
                 # location for building and running the tests. Note that XCTest
                 # is not yet built at this point.
@@ -2554,13 +2644,18 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
                     ICU_ROOT=$(build_directory ${host} libicu)/tmp_install
+                    ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                     LIBICU_BUILD_ARGS=(
                         -DICU_ROOT:PATH=${ICU_ROOT}
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
                         -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_I18N_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                         -DICU_I18N_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                     )
                 else
                     LIBICU_BUILD_ARGS=()
@@ -2582,6 +2677,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "Cleaning the Foundation build directory"
                 call rm -rf "${build_dir}"
 
+                # Set the PKG_CONFIG_PATH so that core-foundation can find the libraries and
+                # header files
+                LIBICU_BUILD_DIR="$(build_directory ${host} libicu)"
+                export PKG_CONFIG_PATH="${LIBICU_BUILD_DIR}/config:${PKG_CONFIG_PATH}"
+                export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}":"${LIBICU_BUILD_DIR}/lib"
+
                 cmake_options=(
                   ${cmake_options[@]}
                   -DCMAKE_BUILD_TYPE:STRING=${FOUNDATION_BUILD_TYPE}
@@ -2596,10 +2697,12 @@ for host in "${ALL_HOSTS[@]}"; do
                   # NOTE(compnerd) we disable tests because XCTest is not ready
                   # yet, but we will reconfigure when the time comes.
                   -DENABLE_TESTING:BOOL=NO
+
+                  -DBUILD_SHARED_LIBS=$([[ ${product} == foundation_static ]] && echo "NO" || echo "YES")
                 )
 
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                 SWIFT_BUILD_PATH="$(build_directory ${host} swift)"
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
@@ -2663,6 +2766,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSwift_DIR="${SWIFT_BUILD_PATH}/lib/cmake/swift"
 
                     -DENABLE_TESTING=YES
+                    -DBUILD_SHARED_LIBS=$([[ ${product} == libdispatch_static ]] && echo "NO" || echo "YES")
                   )
                 ;;
                 esac
@@ -2720,18 +2824,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     done
                 fi
 
-                # Set the PKG_CONFIG_PATH so that core-foundation can find the libraries and
-                # header files
-                export PKG_CONFIG_PATH="${LIBICU_BUILD_DIR}/config:${PKG_CONFIG_PATH}"
-                export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}":"${LIBICU_BUILD_DIR}/lib"
-                swift_cmake_options=(
-                    "${swift_cmake_options[@]}"
-                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
-                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
-                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB:BOOL=TRUE
-                    -DICU_UC_LIBDIR:PATH="${LIBICU_BUILD_DIR}/lib"
-                    -DICU_I18N_LIBDIR:PATH="${LIBICU_BUILD_DIR}/lib"
-                )
                 # libicu builds itself and doesn't use cmake
                 continue
                 ;;
@@ -2748,7 +2840,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 pushd "${PLAYGROUNDSUPPORT_SOURCE_DIR}"
                 if [[ $(not ${SKIP_BUILD_OSX}) ]]; then
                     call "xcodebuild" -configuration "${PLAYGROUNDSUPPORT_BUILD_TYPE}" -workspace swift-xcode-playground-support.xcworkspace -scheme BuildScript-macOS -sdk macosx -arch x86_64 -derivedDataPath "${build_dir}"/DerivedData SWIFT_EXEC="${SWIFTC_BIN}" SWIFT_LIBRARY_PATH="${SWIFT_LIB_DIR}/\$(PLATFORM_NAME)" ONLY_ACTIVE_ARCH=NO
-                    
+
                     if [[ $(not ${SKIP_TEST_PLAYGROUNDSUPPORT}) ]]; then
                         # If we're going to end up testing PlaygroundLogger/PlaygroundSupport, then we need to build the tests too.
                         # Note that this *always* needs to run in Debug configuration.
@@ -2855,6 +2947,8 @@ for host in "${ALL_HOSTS[@]}"; do
     # Calculate test targets
     calculate_targets_for_host $host
 
+    set_build_options_for_host $host
+
     # Run the tests for each product
     for product in "${PRODUCTS[@]}"; do
         # Check if we should perform this action.
@@ -2904,9 +2998,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ "${SKIP_TEST_LLDB}" ]]; then
                     continue
                 fi
+                llvm_build_dir=$(build_directory ${host} llvm)
                 lldb_build_dir=$(build_directory ${host} lldb)
+                swift_build_dir=$(build_directory ${host} swift)
+                module_cache="${build_dir}/module-cache"
 
-		using_xcodebuild="FALSE"
+                using_xcodebuild="FALSE"
                 if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
                     using_xcodebuild="TRUE"
                 fi
@@ -2916,6 +3013,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # FIXME: The xcode build project currently doesn't know how to run the lit style tests.
                 if [[ "$using_xcodebuild" == "TRUE" ]] ; then
                     set_lldb_xcodebuild_options
+                    set_lldb_build_mode
                     # Run the LLDB unittests (gtests).
                     with_pushd ${LLDB_SOURCE_DIR} \
                                call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
@@ -2926,7 +3024,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 fi
 
-                swift_build_dir=$(build_directory ${host} swift)
                 # Setup lldb executable path
                 if [[ "$using_xcodebuild" == "TRUE" ]] ; then
                     lldb_executable="${lldb_build_dir}"/${LLDB_BUILD_MODE}/lldb
@@ -2991,6 +3088,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_EXTRA=""
                 else
                     # This assumes that there are no spaces in any on these paths.
+                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
                     FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
                     DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}"
                     DOTEST_EXTRA="-Xcc -F${FOUNDATION_BUILD_DIR}/CoreFoundation-prefix/System/Library/Frameworks"
@@ -3017,7 +3115,8 @@ for host in "${ALL_HOSTS[@]}"; do
                      call ${NINJA_BIN} unittests/LLDBUnitTests
                     with_pushd ${results_dir} \
                           call "${llvm_build_dir}/bin/llvm-lit" \
-                               "${lldb_build_dir}/lit" -sv \
+                               "${lldb_build_dir}/lit" \
+                               ${LLVM_LIT_ARGS} \
                                --xunit-xml-output=${results_dir}/results.xml \
                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -t -E \"${DOTEST_EXTRA}\""
                     if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
@@ -3025,9 +3124,10 @@ for host in "${ALL_HOSTS[@]}"; do
                              "${LLDB_TEST_SWIFT_COMPATIBILITY}"
                         with_pushd ${results_dir} \
                            call "${llvm_build_dir}/bin/llvm-lit" \
-                                "${lldb_build_dir}/lit" -sv \
+                                "${lldb_build_dir}/lit" \
+                                ${LLVM_LIT_ARGS} \
                                 --xunit-xml-output=${results_dir}/results.xml \
-                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\" -t -E \"${DOTEST_EXTRA}\""
+                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\" -t -E \"${DOTEST_EXTRA}\"" --filter=compat
                     fi
                 else
                     with_pushd "${results_dir}" \
@@ -3075,6 +3175,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
+                set_swiftpm_bootstrap_command
                 call "${swiftpm_bootstrap_command[@]}" test --test-parallel
                 # As swiftpm tests itself, we break early here.
                 continue
@@ -3084,8 +3185,26 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
+                set_swiftsyntax_build_command
                 call "${swiftsyntax_build_command[@]}" -t
                 # As swiftSyntax tests itself, we break early here.
+                continue
+                ;;
+            skstresstester)
+                if [[ "${SKIP_TEST_SKSTRESSTESTER}" ]]; then
+                    continue
+                fi
+                echo "--- Running tests for ${product} ---"
+                set_skstresstester_build_command
+                call "${skstresstester_build_command[@]}" test
+                continue
+                ;;
+            swiftevolve)
+                if [[ "${SKIP_TEST_SWIFTEVOLVE}" ]]; then
+                    continue
+                fi
+                echo "--- Running tests for ${product} ---"
+                call "${swiftevolve_build_command[@]}" test
                 continue
                 ;;
             xctest)
@@ -3145,13 +3264,18 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
                     ICU_ROOT=$(build_directory ${host} libicu)/tmp_install
+                    ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                     LIBICU_BUILD_ARGS=(
                         -DICU_ROOT:PATH=${ICU_ROOT}
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
                         -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_I18N_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                         -DICU_I18N_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                     )
                 else
                     LIBICU_BUILD_ARGS=()
@@ -3166,6 +3290,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 else
                     LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
                 fi
+
+                SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+                LLVM_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
 
                 cmake_options=(
                   ${cmake_options[@]}
@@ -3191,6 +3318,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 results_targets=( "test" )
                 executable_target=("TestFoundation")
                 ;;
+            foundation_static)
+              continue
+            ;;
             libdispatch)
                 if [[ "${SKIP_TEST_LIBDISPATCH}" ]]; then
                     continue
@@ -3211,6 +3341,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
                 esac
                 ;;
+            libdispatch_static)
+              # FIXME: merge with libdispatch once the unit tests work with
+              # libdispatch_static
+              continue
+            ;;
             libicu)
                 if [[ "${SKIP_TEST_LIBICU}" ]]; then
                     continue
@@ -3231,7 +3366,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "Skipping PlaygroundLogger tests on non-macOS platform"
                     continue
                 fi
-                
+
                 PLAYGROUNDSUPPORT_BUILD_DIR=$(build_directory ${host} ${product})
                 SWIFTC_BIN="$(build_directory_bin ${host} swift)/swiftc"
                 SWIFT_LIB_DIR="$(build_directory ${host} swift)"/lib/swift/
@@ -3363,6 +3498,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     haiku-*)
                         ;;
                     macosx-*)
+                        set_lldb_xcodebuild_options
                         set_lldb_build_mode
                         with_pushd ${LLDB_SOURCE_DIR} \
                             call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
@@ -3380,6 +3516,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 echo "--- Installing ${product} ---"
+                set_swiftpm_bootstrap_command
                 call "${swiftpm_bootstrap_command[@]}" --prefix="${host_install_destdir}${host_install_prefix}" install
                 # As swiftpm bootstraps the installation itself, we break early here.
                 continue
@@ -3393,14 +3530,64 @@ for host in "${ALL_HOSTS[@]}"; do
                     exit 1
                 fi
                 echo "--- Installing ${product} ---"
-                DYLIB_DIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
-                MODULE_DIR="${DYLIB_DIR}/${SWIFT_HOST_VARIANT_ARCH}"
+                if [ "${BUILD_LIBPARSER_ONLY}" ]; then
+                    # We don't have a toolchain so we should install to the specified dir
+                    DYLIB_DIR="${INSTALL_DESTDIR}"
+                    MODULE_DIR="${INSTALL_DESTDIR}"
+                    # Create the install dir if it doesn't exist
+                    call mkdir -p "${INSTALL_DESTDIR}"
+                    # Install libParser is necessary
+                    rsync -a "$(build_directory ${host} swift)/lib/lib_InternalSwiftSyntaxParser.dylib" "${INSTALL_DESTDIR}"
+                    # Install module map of libParser so client can import SwiftSyntax
+                    rsync -a "${SWIFT_SOURCE_DIR}/include/swift-c/SyntaxParser" "${INSTALL_DESTDIR}"
+                else
+                    # We have a toolchain so install to the toolchain
+                    DYLIB_DIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
+                    MODULE_DIR="${DYLIB_DIR}/${SWIFT_HOST_VARIANT_ARCH}"
+                fi
+
+                set_swiftsyntax_build_command
                 if [[ -z "${SKIP_INSTALL_SWIFTSYNTAX_MODULE}" ]] ; then
                     call "${swiftsyntax_build_command[@]}" --dylib-dir="${DYLIB_DIR}" --swiftmodule-dir "${MODULE_DIR}" --install
                 else
                     call "${swiftsyntax_build_command[@]}" --dylib-dir="${DYLIB_DIR}" --install
                 fi
 
+                continue
+                ;;
+            skstresstester)
+                if [[ -z "${INSTALL_SKSTRESSTESTER}" ]] ; then
+                    continue
+                fi
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "--install-destdir is required to install products."
+                    exit 1
+                fi
+                if [[ -z "${INSTALL_SWIFTSYNTAX}" ]] ; then
+                    echo "--install-swiftsyntax is required to install the SourceKit stress tester"
+                    exit 1
+                fi
+
+                echo "--- Installing ${product} ---"
+                set_skstresstester_build_command
+                call "${skstresstester_build_command[@]}" --prefix="${host_install_destdir}${host_install_prefix}" install
+                continue
+                ;;
+            swiftevolve)
+                if [[ -z "${INSTALL_SWIFTEVOLVE}" ]] ; then
+                    continue
+                fi
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "--install-destdir is required to install products."
+                    exit 1
+                fi
+                if [[ -z "${INSTALL_SWIFTSYNTAX}" ]] ; then
+                    echo "--install-swiftsyntax is required to install swift-evolve"
+                    exit 1
+                fi
+
+                echo "--- Installing ${product} ---"
+                call "${swiftevolve_build_command[@]}" --prefix="${host_install_destdir}${host_install_prefix}" install
                 continue
                 ;;
             xctest)
@@ -3421,7 +3608,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 esac
 
                 ;;
-            foundation)
+            foundation|foundation_static)
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
                     echo "Skipping Foundation on OS X -- use the Xcode project instead"
@@ -3438,7 +3625,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 if [[ -z "${INSTALL_LIBDISPATCH}" ]] ; then
                     continue
                 fi
@@ -3515,11 +3702,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "--install-destdir is required to install products."
                     exit 1
                 fi
-                
+
                 echo "--- Installing ${product} ---"
-                
+
                 PLAYGROUNDSUPPORT_BUILD_DIR=$(build_directory ${host} ${product})
-                
+
                 case "$(uname -s)" in
                     Darwin)
                         pushd "${PLAYGROUNDSUPPORT_SOURCE_DIR}"
@@ -3560,6 +3747,22 @@ for host in "${ALL_HOSTS[@]}"; do
 
         call env DESTDIR="${host_install_destdir}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
     done
+done
+
+for host in "${ALL_HOSTS[@]}"; do
+    # Check if we should perform this action.
+    if ! [[ $(should_execute_action "${host}-extractsymbols") ]]; then
+        continue
+    fi
+
+    # Skip this pass if flag is set and we are cross compiling and it's the local host.
+    if [[ "${SKIP_LOCAL_HOST_INSTALL}" ]] && [[ $(has_cross_compile_hosts) ]] && [[ ${host} == ${LOCAL_HOST} ]]; then
+        continue
+    fi
+
+    # Calculate the directory to install products in to.
+    host_install_destdir=$(get_host_install_destdir ${host})
+    host_install_prefix=$(get_host_install_prefix ${host})
 
     if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] && [[ $(host_has_darwin_symbols ${host}) ]]; then
         echo "--- Extracting symbols ---"
@@ -3659,6 +3862,8 @@ function build_and_test_installable_package() {
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:ENABLE_BITCODE string 'NO'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DISABLE_REQUIRED_ARCLITE string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_LINK_OBJC_RUNTIME string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DEVELOPMENT_TOOLCHAIN string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
           call chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 

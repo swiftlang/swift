@@ -75,7 +75,7 @@ void swift::getAllSubclasses(ClassHierarchyAnalysis *CHA,
   }
 }
 
-/// \brief Returns true, if a method implementation corresponding to
+/// Returns true, if a method implementation corresponding to
 /// the class_method applied to an instance of the class CD is
 /// effectively final, i.e. it is statically known to be not overridden
 /// by any subclasses of the class CD.
@@ -608,7 +608,7 @@ SILFunction *swift::getTargetClassMethod(SILModule &M,
   return M.lookUpFunctionInVTable(CD, Member);
 }
 
-/// \brief Check if it is possible to devirtualize an Apply instruction
+/// Check if it is possible to devirtualize an Apply instruction
 /// and a class member obtained using the class_method instruction into
 /// a direct call to a specific member of a specific class.
 ///
@@ -682,7 +682,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   return true;
 }
 
-/// \brief Devirtualize an apply of a class method.
+/// Devirtualize an apply of a class method.
 ///
 /// \p AI is the apply to devirtualize.
 /// \p ClassOrMetatype is a class value or metatype value that is the
@@ -712,7 +712,7 @@ FullApplySite swift::devirtualizeClassMethod(FullApplySite AI,
 
   SILBuilderWithScope B(AI.getInstruction());
   SILLocation Loc = AI.getLoc();
-  FunctionRefInst *FRI = B.createFunctionRef(Loc, F);
+  auto *FRI = B.createFunctionRefFor(Loc, F);
 
   // Create the argument list for the new apply, casting when needed
   // in order to handle covariant indirect return types and
@@ -883,9 +883,10 @@ getWitnessMethodSubstitutions(
       witnessThunkSig);
 }
 
-static SubstitutionMap
-getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
-                              ProtocolConformanceRef CRef) {
+SubstitutionMap
+swift::getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI,
+                                     SILFunction *F,
+                                     ProtocolConformanceRef CRef) {
   auto witnessFnTy = F->getLoweredFunctionType();
   assert(witnessFnTy->getRepresentation() ==
          SILFunctionTypeRepresentation::WitnessMethod);
@@ -901,9 +902,9 @@ getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
       == CRef.getRequirement());
   auto *classWitness = witnessFnTy->getWitnessMethodClass(*mod);
 
-  return getWitnessMethodSubstitutions(
-      mod, CRef, requirementSig, witnessThunkSig,
-      origSubs, isDefaultWitness, classWitness);
+  return ::getWitnessMethodSubstitutions(mod, CRef, requirementSig,
+                                         witnessThunkSig, origSubs,
+                                         isDefaultWitness, classWitness);
 }
 
 /// Generate a new apply of a function_ref to replace an apply of a
@@ -949,7 +950,7 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // the witness thunk.
   SILBuilderWithScope Builder(AI.getInstruction());
   SILLocation Loc = AI.getLoc();
-  FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
+  auto *FRI = Builder.createFunctionRefFor(Loc, F);
 
   ApplySite SAI = replaceApplySite(Builder, Loc, AI, FRI, SubMap, Arguments,
                                    substConv);

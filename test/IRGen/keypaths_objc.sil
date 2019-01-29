@@ -9,7 +9,7 @@ import Foundation
 
 class C: NSObject {
   @objc dynamic var x: NSString { get }
-  @sil_stored final var stored: Int
+  @_hasStorage final var stored: Int
   override init()
 }
 
@@ -18,9 +18,9 @@ sil_vtable C {}
 sil @x_get : $@convention(thin) (@in_guaranteed C) -> @out NSString
 
 // CHECK: [[KEYPATH_A:@keypath(\..*)?]] = private global
-// --             computed, get-only, indirect identifier
-// CHECK-SAME: <i32 0x0200_0002>,
-// CHECK-SAME: i8** @"\01L_selector(x)"
+// --             computed, get-only, function-instantiated identifier
+// CHECK-SAME: <i32 0x0200_0001>,
+// CHECK-SAME: i8* (i8*)* [[SELECTOR_FN:@[A-Za-z0-9_.]+]] to
 
 // CHECK: [[KEYPATH_B:@keypath(\..*)?]] = private global
 // --             class mutable stored property with indirect offset
@@ -36,15 +36,21 @@ entry:
 }
 
 sil hidden @$s13keypaths_objc1CC1xSo8NSStringCvgTo : $@convention(objc_method) (@guaranteed C) -> NSString {
-entry(%0 : @guaranteed $C):
+entry(%0 : $C):
   unreachable
 }
 
 sil hidden @$s13keypaths_objc1CCACycfcTo : $@convention(objc_method) (@objc_metatype C.Type) -> @owned C {
-entry(%0 : @trivial $@objc_metatype C.Type):
+entry(%0 : $@objc_metatype C.Type):
   unreachable
 }
 
+// CHECK: define private i8* [[SELECTOR_FN]]
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   %1 = load {{.*}}selector(x)
+// CHECK-NEXT:   ret i8* %1
+
+// CHECK-LABEL: define swiftcc void @objc_stored_property()
 sil @objc_stored_property : $@convention(thin) () -> () {
 entry:
   // CHECK: call %swift.refcounted* @swift_getKeyPath({{.*}} [[KEYPATH_B]]

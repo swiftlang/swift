@@ -458,7 +458,7 @@ protected:
   NodePointer getDependentGenericParamType(int depth, int index);
   NodePointer demangleGenericParamIndex();
   NodePointer popProtocolConformance();
-  NodePointer popProtocolConformanceRef();
+  NodePointer demangleRetroactiveProtocolConformanceRef();
   NodePointer popAnyProtocolConformance();
   NodePointer demangleConcreteProtocolConformance();
   NodePointer popDependentProtocolConformance();
@@ -507,7 +507,13 @@ public:
                           std::function<SymbolicReferenceResolver_t> resolver) {
     SymbolicReferenceResolver = resolver;
   }
-  
+
+  /// Take the symbolic reference resolver.
+  std::function<SymbolicReferenceResolver_t> &&
+  takeSymbolicReferenceResolver() {
+    return std::move(SymbolicReferenceResolver);
+  }
+
   /// Demangle the given symbol and return the parse tree.
   ///
   /// \param MangledName The mangled symbol string, which start with the

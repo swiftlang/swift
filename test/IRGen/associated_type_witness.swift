@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir > %t.ll
+// RUN: %target-swift-frontend -primary-file %s -emit-ir > %t.ll
 // RUN: %FileCheck %s -check-prefix=GLOBAL < %t.ll
 // RUN: %FileCheck %s < %t.ll
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -wmo -num-threads 1 > %t.ll.wmo
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -wmo -num-threads 1 > %t.ll.wmo
 // RUN: %FileCheck %s -check-prefix=GLOBAL < %t.ll.wmo
 // RUN: %FileCheck %s < %t.ll.wmo
 // REQUIRES: CPU=x86_64
@@ -36,17 +36,11 @@ protocol HasThreeAssocTypes {
   associatedtype ThreeAssoc
 }
 
-//   Witness table access functions for Universal : P and Universal : Q.
-// CHECK-LABEL: define linkonce_odr hidden i8** @"$s23associated_type_witness9UniversalVAcA1PAAWl"
-// CHECK:         call i8** @swift_getWitnessTable(%swift.protocol_conformance_descriptor* @"$s23associated_type_witness9UniversalVAA1PAAMc"
-// CHECK-LABEL: define linkonce_odr hidden i8** @"$s23associated_type_witness9UniversalVAcA1QAAWl"()
-// CHECK:         call i8** @swift_getWitnessTable(%swift.protocol_conformance_descriptor* @"$s23associated_type_witness9UniversalVAA1QAAMc"
-
 //   Witness table for WithUniversal : Assocked.
 // GLOBAL-LABEL: @"$s23associated_type_witness13WithUniversalVAA8AssockedAAWP" = hidden global [4 x i8*] [
 // GLOBAL-SAME:    @"$s23associated_type_witness13WithUniversalVAA8AssockedAAMc"
-// GLOBAL-SAME:    i8* bitcast (i8** ()* @"$s23associated_type_witness9UniversalVAcA1PAAWl" to i8*) 
-// GLOBAL-SAME:    i8* bitcast (i8** ()* @"$s23associated_type_witness9UniversalVAcA1QAAWl" to i8*)  
+// GLOBAL-SAME:    @"associated conformance 23associated_type_witness13WithUniversalVAA8AssockedAA5AssocAaDP_AA1P",
+// GLOBAL-SAME:    @"associated conformance 23associated_type_witness13WithUniversalVAA8AssockedAA5AssocAaDP_AA1Q"
 // GLOBAL-SAME:    i64 add (i64 ptrtoint (<{ [36 x i8], i8 }>* @"symbolic 23associated_type_witness9UniversalV" to i64), i64 1) to i8*)
 // GLOBAL-SAME:  ]
 struct WithUniversal : Assocked {
@@ -56,8 +50,8 @@ struct WithUniversal : Assocked {
 //   Witness table for GenericWithUniversal : Assocked.
 // GLOBAL-LABEL: @"$s23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAAWP" = hidden global [4 x i8*] [
 // GLOBAL-SAME:    @"$s23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAAMc"
-// GLOBAL-SAME:    i8* bitcast (i8** ()* @"$s23associated_type_witness9UniversalVAcA1PAAWl" to i8*)
-// GLOBAL-SAME:    i8* bitcast (i8** ()* @"$s23associated_type_witness9UniversalVAcA1QAAWl" to i8*)  
+// GLOBAL-SAME:    @"associated conformance 23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAA5Assoc_AA1P"
+// GLOBAL-SAME:    @"associated conformance 23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAA5Assoc_AA1Q"
 // GLOBAL-SAME:    @"symbolic 23associated_type_witness9UniversalV"
 // GLOBAL-SAME:  ]
 struct GenericWithUniversal<T> : Assocked {
@@ -65,10 +59,10 @@ struct GenericWithUniversal<T> : Assocked {
 }
 
 //   Witness table for Fulfilled : Assocked.
-// GLOBAL-LABEL: @"$s23associated_type_witness9FulfilledVyxGAA8AssockedAAWp" = internal constant [4 x i8*] [
+// GLOBAL-LABEL: @"$s23associated_type_witness9FulfilledVyxGAA8AssockedAAWp" = internal global [4 x i8*] [
 // GLOBAL-SAME:    @"$s23associated_type_witness9FulfilledVyxGAA8AssockedAAMc"
-// GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @"$s23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocAaEP_AA1PPWT" to i8*)
-// GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @"$s23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocAaEP_AA1QPWT" to i8*)
+// GLOBAL-SAME:    @"associated conformance 23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocAaEP_AA1P"
+// GLOBAL-SAME:    @"associated conformance 23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocAaEP_AA1Q"
 // GLOBAL-SAME:    @"symbolic x"
 // GLOBAL-SAME:  ]
 struct Fulfilled<T : P & Q> : Assocked {
@@ -92,10 +86,10 @@ struct Fulfilled<T : P & Q> : Assocked {
 struct Pair<T, U> : P, Q {}
 
 //   Generic witness table pattern for Computed : Assocked.
-// GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWp" = internal constant [4 x i8*] [
+// GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWp" = internal global [4 x i8*] [
 // GLOBAL-SAME:    @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc"
-// GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1PPWT" to i8*)
-// GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1QPWT" to i8*)
+// GLOBAL-SAME:    @"associated conformance 23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1P"
+// GLOBAL-SAME:    @"associated conformance 23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1Q"
 // GLOBAL-SAME:    @"symbolic 23associated_type_witness4PairVyxq_G"
 // GLOBAL-SAME:  ]
 
@@ -152,7 +146,7 @@ struct UsesVoid : HasSimpleAssoc {
 //   Protocol conformance descriptor for GenericComputed : DerivedFromSimpleAssoc.
 // GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc" = hidden constant
 // GLOBAL-SAME:    i16 2,
-// GLOBAL-SAME:    i16 0,
+// GLOBAL-SAME:    i16 1,
 
 //   Relative reference to instantiator function
 // GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64),

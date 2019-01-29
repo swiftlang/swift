@@ -1,9 +1,9 @@
 {
-  "id": 39,
+  "id": 37,
   "kind": "SourceFile",
   "layout": [
     {
-      "id": 38,
+      "id": 36,
       "kind": "CodeBlockItemList",
       "layout": [
         {
@@ -11,23 +11,23 @@
           "omitted": true
         },
         {
-          "id": 35,
+          "id": 34,
           "kind": "CodeBlockItem",
           "layout": [
             {
-              "id": 34,
+              "id": 33,
               "kind": "SequenceExpr",
               "layout": [
                 {
-                  "id": 33,
+                  "id": 32,
                   "kind": "ExprList",
                   "layout": [
                     {
-                      "id": 28,
+                      "id": 27,
                       "kind": "DiscardAssignmentExpr",
                       "layout": [
                         {
-                          "id": 27,
+                          "id": 26,
                           "tokenKind": {
                             "kind": "kw__"
                           },
@@ -65,11 +65,11 @@
                       "presence": "Present"
                     },
                     {
-                      "id": 30,
+                      "id": 29,
                       "kind": "AssignmentExpr",
                       "layout": [
                         {
-                          "id": 29,
+                          "id": 28,
                           "tokenKind": {
                             "kind": "equal"
                           },
@@ -86,11 +86,11 @@
                       "presence": "Present"
                     },
                     {
-                      "id": 32,
+                      "id": 31,
                       "kind": "IdentifierExpr",
                       "layout": [
                         {
-                          "id": 31,
+                          "id": 30,
                           "tokenKind": {
                             "kind": "identifier",
                             "text": "xx"
@@ -118,7 +118,7 @@
       "presence": "Present"
     },
     {
-      "id": 37,
+      "id": 35,
       "tokenKind": {
         "kind": "eof",
         "text": ""

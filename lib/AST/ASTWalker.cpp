@@ -75,7 +75,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   ASTWalker &Walker;
   
-  /// \brief RAII object that sets the parent of the walk context 
+  /// RAII object that sets the parent of the walk context 
   /// appropriately.
   class SetParentRAII {
     ASTWalker &Walker;
@@ -1299,6 +1299,14 @@ Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
   return nullptr;
 }
 
+Stmt *Traversal::visitPoundAssertStmt(PoundAssertStmt *S) {
+  if (auto *condition = doIt(S->getCondition())) {
+    S->setCondition(condition);
+  } else {
+    return nullptr;
+  }
+  return S;
+}
 
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {

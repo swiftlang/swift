@@ -541,6 +541,25 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       });
     }
 
+    if (triple.isOSWindows()) {
+      switch (triple.getArch()) {
+      default: llvm_unreachable("unsupported Windows architecture");
+      case llvm::Triple::arm:
+      case llvm::Triple::thumb:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM_"});
+        break;
+      case llvm::Triple::aarch64:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM64_"});
+        break;
+      case llvm::Triple::x86:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_X86_"});
+        break;
+      case llvm::Triple::x86_64:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_AMD64_"});
+        break;
+      }
+    }
+
     // The module map used for Glibc depends on the target we're compiling for,
     // and is not included in the resource directory with the other implicit
     // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
@@ -612,10 +631,12 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   // Enable API notes alongside headers/in frameworks.
   invocationArgStrs.push_back("-fapinotes-modules");
-  invocationArgStrs.push_back("-iapinotes-modules");
-  invocationArgStrs.push_back(searchPathOpts.RuntimeLibraryImportPath);
   invocationArgStrs.push_back("-fapinotes-swift-version=" +
-      languageVersion.asAPINotesVersionString());
+                              languageVersion.asAPINotesVersionString());
+  invocationArgStrs.push_back("-iapinotes-modules");
+  invocationArgStrs.push_back((llvm::Twine(searchPathOpts.RuntimeResourcePath) +
+                               llvm::sys::path::get_separator() +
+                               "apinotes").str());
 }
 
 static void
@@ -1023,6 +1044,7 @@ ClangImporter::create(ASTContext &ctx,
   if (importerOpts.Mode == ClangImporterOptions::Modes::EmbedBitcode)
     return importer;
 
+  instance.getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
   bool canBegin = action->BeginSourceFile(instance,
                                           instance.getFrontendOpts().Inputs[0]);
   if (!canBegin)
@@ -1143,6 +1165,14 @@ ClangImporter::Implementation::getNextIncludeLoc() {
   if (!DummyIncludeBuffer.isValid()) {
     clang::SourceLocation includeLoc =
         srcMgr.getLocForStartOfFile(srcMgr.getMainFileID());
+    // Picking the beginning of the main FileID as include location is also what
+    // the clang PCH mechanism is doing (see
+    // clang::ASTReader::getImportLocation()). Choose the next source location
+    // here to avoid having the exact same import location as the clang PCH.
+    // Otherwise, if we are using a PCH for bridging header, we'll have
+    // problems with source order comparisons of clang source locations not
+    // being deterministic.
+    includeLoc = includeLoc.getLocWithOffset(1);
     DummyIncludeBuffer = srcMgr.createFileID(
         llvm::make_unique<ZeroFilledMemoryBuffer>(
           256*1024, StringRef(moduleImportBufferName)),
@@ -1322,7 +1352,12 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
     return true;
   }
 
-  llvm::SmallString<128> importLine{"#import \""};
+  llvm::SmallString<128> importLine;
+  if (Impl.SwiftContext.LangOpts.EnableObjCInterop)
+    importLine = "#import \"";
+  else
+    importLine = "#include \"";
+
   importLine += header;
   importLine += "\"\n";
 
@@ -1403,6 +1438,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getFrontendOpts().OutputFile = outputPCHPath;
   invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;
   invocation->getPreprocessorOpts().resetNonModularOptions();
+  invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
 
   clang::CompilerInstance emitInstance(
     Impl.Instance->getPCHContainerOperations());
@@ -2021,7 +2057,7 @@ getClangTopLevelOwningModule(ClangNode Node,
 }
 
 static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
-                                const ValueDecl *VD) {
+                                ValueDecl *VD) {
   assert(ModuleFilter);
 
   auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
@@ -2036,24 +2072,34 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
 
   auto ClangNode = VD->getClangNode();
   if (!ClangNode) {
-    // If we synthesized a ValueDecl, it won't have a Clang node. But so far
-    // all the situations where we synthesize top-level declarations are
-    // situations where we don't have to worry about C redeclarations.
-    // We should only consider the declaration visible from its owning module.
+    // If we synthesized a ValueDecl, it won't have a Clang node. Find the
+    // associated declaration that /does/ have a Clang node, and use that.
     auto *SynthesizedTypeAttr =
         VD->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>();
     assert(SynthesizedTypeAttr);
 
-    // When adding new ClangImporterSynthesizedTypeAttr::Kinds, make sure that
-    // the above statement still holds: "we don't want to allow these
-    // declarations to be treated as present in multiple modules".
     switch (SynthesizedTypeAttr->getKind()) {
     case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper:
-    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon:
+    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon: {
+      ASTContext &Ctx = ContainingUnit->getASTContext();
+      auto LookupFlags =
+          NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+      auto WrapperStruct = cast<StructDecl>(VD);
+      TinyPtrVector<ValueDecl *> LookupResults =
+          WrapperStruct->lookupDirect(Ctx.Id_Code, LookupFlags);
+      assert(!LookupResults.empty() && "imported error enum without Code");
+
+      auto CodeEnumIter = llvm::find_if(LookupResults,
+                                        [&](ValueDecl *Member) -> bool {
+        return Member->getDeclContext() == WrapperStruct;
+      });
+      assert(CodeEnumIter != LookupResults.end() &&
+             "could not find Code enum in wrapper struct");
+      assert((*CodeEnumIter)->hasClangNode());
+      ClangNode = (*CodeEnumIter)->getClangNode();
       break;
     }
-
-    return false;
+    }
   }
 
   // Macros can be "redeclared" by putting an equivalent definition in two
@@ -2524,7 +2570,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
 
       // Note: We can't use getAnyGeneric() here because `aliasedTy`
       // might be typealias.
-      if (auto Ty = dyn_cast<NameAliasType>(aliasedTy.getPointer()))
+      if (auto Ty = dyn_cast<TypeAliasType>(aliasedTy.getPointer()))
         importedDecl = Ty->getDecl();
       else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
         importedDecl = Ty->getDecl();

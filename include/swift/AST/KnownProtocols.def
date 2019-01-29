@@ -24,9 +24,11 @@
 #define PROTOCOL_WITH_NAME(Id, Name)
 #endif
 
-/// \def EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name)
+/// \def EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup)
+/// \param typeName supplies the name used for type lookup,
+/// \param performLocalLookup specifies whether to first look in the local context.
 #ifndef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name) \
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
     PROTOCOL_WITH_NAME(Id, Name)
 #endif
 
@@ -41,10 +43,17 @@
 
 #define PROTOCOL(name) PROTOCOL_WITH_NAME(name, #name)
 #define PROTOCOL_(name) PROTOCOL_WITH_NAME(name, "_" #name)
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL(name) \
-    EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, #name)
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_(name) \
-    EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name)
+
+/// \param typeName supplies the name used for type lookup,
+/// \param performLocalLookup specifies whether to first look in the local context.
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL(name, typeName, performLocalLookup) \
+    EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, #name, typeName, performLocalLookup)
+
+/// \param typeName supplies the name used for type lookup,
+/// \param performLocalLookup specifies whether to first look in the local context.
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_(name, typeName, performLocalLookup) \
+    EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name, typeName, performLocalLookup)
+
 #define BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(name) \
     BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name)
 
@@ -72,20 +81,20 @@ PROTOCOL_(DestructorSafeContainer)
 
 PROTOCOL(StringInterpolationProtocol)
 
-EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByExtendedGraphemeClusterLiteral)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByFloatLiteral)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByIntegerLiteral)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringInterpolation)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringLiteral)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByNilLiteral)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral, "Dictionary", false)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByExtendedGraphemeClusterLiteral, "ExtendedGraphemeClusterType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByFloatLiteral, "FloatLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByIntegerLiteral, "IntegerLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringInterpolation, "StringLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringLiteral, "StringLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByNilLiteral, nullptr, false)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "UnicodeScalarType", true)
 
-EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByColorLiteral)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral)
-EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByFileReferenceLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByColorLiteral, "_ColorLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral, "_ImageLiteralType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByFileReferenceLiteral, "_FileReferenceLiteralType", true)
 
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinBooleanLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinExtendedGraphemeClusterLiteral)

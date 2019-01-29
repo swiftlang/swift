@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -431,6 +432,14 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   VD->print(Printer, PO);
 }
 
+void SwiftLangSupport::printFullyAnnotatedGenericReq(
+    const swift::GenericSignature *Sig, llvm::raw_ostream &OS) {
+  assert(Sig);
+  FullyAnnotatedDeclarationPrinter Printer(OS);
+  PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
+  Sig->print(Printer, PO);
+}
+
 void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
     const swift::ValueDecl *VD, TypeOrExtensionDecl Target,
     llvm::raw_ostream &OS) {
@@ -738,7 +747,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   if (VD->hasInterfaceType()) {
     llvm::raw_svector_ostream OS(SS);
     PrintOptions Options;
-    Options.PrintNameAliasUnderlyingType = true;
+    Options.PrintTypeAliasUnderlyingType = true;
     VD->getInterfaceType().print(OS, Options);
   }
   unsigned TypenameEnd = SS.size();

@@ -171,18 +171,17 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
 
   ModuleDecl::ImportedModule ImportOfMostRecentModule{
       /*AccessPath*/{}, MostRecentModule};
-  REPLInputFile.addImports(std::make_pair(ImportOfMostRecentModule,
-                                          SourceFile::ImportOptions()));
+  REPLInputFile.addImports(SourceFile::ImportedModuleDesc(
+      ImportOfMostRecentModule, SourceFile::ImportOptions()));
 
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   MostRecentModule->getImportedModules(Imports,
                                        ModuleDecl::ImportFilter::Private);
   if (!Imports.empty()) {
-    SmallVector<std::pair<ModuleDecl::ImportedModule,
-                          SourceFile::ImportOptions>, 8> ImportsWithOptions;
+    SmallVector<SourceFile::ImportedModuleDesc, 8> ImportsWithOptions;
     for (auto Import : Imports) {
-      ImportsWithOptions.emplace_back(Import,
-                                      SourceFile::ImportFlags::Exported);
+      ImportsWithOptions.emplace_back(SourceFile::ImportedModuleDesc(
+          Import, SourceFile::ImportFlags::Exported));
     }
     REPLInputFile.addImports(ImportsWithOptions);
   }
@@ -1054,7 +1053,7 @@ public:
         unsigned BufferID =
             CI.getSourceMgr().addMemBufferCopy(Line, "<REPL Input>");
         Lexer L(CI.getASTContext().LangOpts,
-                CI.getSourceMgr(), BufferID, nullptr, false /*not SIL*/);
+                CI.getSourceMgr(), BufferID, nullptr, LexerMode::Swift);
         Token Tok;
         L.lex(Tok);
         assert(Tok.is(tok::colon));

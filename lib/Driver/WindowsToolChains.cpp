@@ -122,7 +122,7 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   SmallString<128> swiftrtPath = SharedRuntimeLibPath;
   llvm::sys::path::append(swiftrtPath,
                           swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
+  llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
   Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
@@ -147,6 +147,10 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
     if (context.OI.SelectedSanitizers & SanitizerKind::Address)
       addLinkRuntimeLib(context.Args, Arguments,
                         sanitizerRuntimeLibName("asan"));
+
+    if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
+      addLinkRuntimeLib(context.Args, Arguments,
+                        sanitizerRuntimeLibName("ubsan"));
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
@@ -164,6 +168,7 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
   // Run clang++ in verbose mode if "-v" is set
   if (context.Args.hasArg(options::OPT_v)) {

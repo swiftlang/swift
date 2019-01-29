@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -33,37 +34,37 @@ llvm::cl::opt<bool> DisableConvertEscapeToNoEscapeSwitchEnumPeephole(
 
 using namespace swift;
 
-static SILBasicBlock *getOptionalDiamondSuccessor(SwitchEnumInst *SEI) {
-   auto numSuccs = SEI->getNumSuccessors();
-   if (numSuccs != 2)
-     return nullptr;
-   auto *SuccSome = SEI->getCase(0).second;
-   auto *SuccNone = SEI->getCase(1).second;
-   if (SuccSome->args_size() != 1)
-     std::swap(SuccSome, SuccNone);
+static SILBasicBlock *getOptionalDiamondSuccessor(SwitchEnumInst *sei) {
+  auto numSuccs = sei->getNumSuccessors();
+  if (numSuccs != 2)
+    return nullptr;
+  auto *succSome = sei->getCase(0).second;
+  auto *succNone = sei->getCase(1).second;
+  if (succSome->args_size() != 1)
+    std::swap(succSome, succNone);
 
-   if (SuccSome->args_size() != 1 || SuccNone->args_size() != 0)
-     return nullptr;
+  if (succSome->args_size() != 1 || succNone->args_size() != 0)
+    return nullptr;
 
-   auto *Succ = SuccSome->getSingleSuccessorBlock();
-   if (!Succ)
-     return nullptr;
+  auto *succ = succSome->getSingleSuccessorBlock();
+  if (!succ)
+    return nullptr;
 
-   if (SuccNone == Succ)
-     return Succ;
+  if (succNone == succ)
+    return succ;
 
-   SuccNone = SuccNone->getSingleSuccessorBlock();
-   if (SuccNone == Succ)
-     return Succ;
+  succNone = succNone->getSingleSuccessorBlock();
+  if (succNone == succ)
+    return succ;
 
-   if (SuccNone == nullptr)
-     return nullptr;
+  if (succNone == nullptr)
+    return nullptr;
 
-   SuccNone = SuccNone->getSingleSuccessorBlock();
-   if (SuccNone == Succ)
-     return Succ;
+  succNone = succNone->getSingleSuccessorBlock();
+  if (succNone == succ)
+    return succ;
 
-   return nullptr;
+  return nullptr;
 }
 
 /// Find a safe insertion point for closure destruction. We might create a
@@ -98,7 +99,7 @@ static void extendLifetimeToEndOfFunction(SILFunction &Fn,
 
   SILBuilderWithScope B(Cvt);
   auto NewCvt = B.createConvertEscapeToNoEscape(
-      Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
+      Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), true);
   Cvt->replaceAllUsesWith(NewCvt);
   Cvt->eraseFromParent();
   Cvt = NewCvt;
@@ -186,14 +187,148 @@ static SILInstruction *lookThroughRebastractionUsers(
                                  SingleNonDebugNonRefCountUser, Memoized));
 }
 
+/// Insert a mark_dependence for any non-trivial argument of a partial_apply.
+static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *PAI,
+                                                         SILBuilder &B) {
+  SILValue curr(PAI);
+  // Mark dependence on all non-trivial arguments.
+  for (auto &arg : PAI->getArgumentOperands()) {
+    if (arg.get()->getType().isTrivial(PAI->getModule()))
+      continue;
+    curr = B.createMarkDependence(PAI->getLoc(), curr, arg.get());
+  }
+
+  return curr;
+}
+
+/// Rewrite a partial_apply convert_escape_to_noescape sequence with a single
+/// apply/try_apply user to a partial_apply [stack] terminated with a
+/// dealloc_stack placed after the apply.
+///
+///   %p = partial_apply %f(%a, %b)
+///   %ne = convert_escape_to_noescape %p
+///   apply %f2(%p)
+///   destroy_value %p
+///
+///    =>
+///
+///   %p = partial_apply [stack] %f(%a, %b)
+///   %md = mark_dependence %p on %a
+///   %md2 = mark_dependence %md on %b
+///   apply %f2(%md2)
+///   dealloc_stack %p
+///   destroy_value %a
+///   destroy_value %b
+///
+/// Note: If the rewrite succeeded we have inserted a dealloc_stack. This
+/// dealloc_stack still needs to be balanced with other dealloc_stacks i.e the
+/// caller needs to use the StackNesting utility to update the dealloc_stack
+/// nesting.
+static bool tryRewriteToPartialApplyStack(
+    SILLocation &loc, PartialApplyInst *origPA,
+    ConvertEscapeToNoEscapeInst *cvt, SILInstruction *singleApplyUser,
+    SILBasicBlock::iterator &advanceIfDelete,
+    llvm::DenseMap<SILInstruction *, SILInstruction *> &Memoized) {
+
+  auto *convertOrPartialApply = cast<SingleValueInstruction>(origPA);
+  if (cvt->getOperand() != origPA)
+    convertOrPartialApply = cast<ConvertFunctionInst>(cvt->getOperand());
+
+  // Whenever we delete an instruction advance the iterator and remove the
+  // instruction from the memoized map.
+  auto saveDeleteInst = [&](SILInstruction *I) {
+    if (&*advanceIfDelete == I)
+      advanceIfDelete++;
+    Memoized.erase(I);
+    I->eraseFromParent();
+  };
+
+  // Look for a single non ref count user of the partial_apply.
+  SmallVector<SILInstruction *, 8> refCountInsts;
+  SILInstruction *singleNonDebugNonRefCountUser = nullptr;
+  for (auto *Usr : getNonDebugUses(convertOrPartialApply)) {
+    auto *I = Usr->getUser();
+    if (onlyAffectsRefCount(I)) {
+      refCountInsts.push_back(I);
+      continue;
+    }
+    if (singleNonDebugNonRefCountUser)
+      return false;
+    singleNonDebugNonRefCountUser = I;
+  }
+
+  SILBuilderWithScope B(cvt);
+
+  // The convert_escape_to_noescape is the only user of the partial_apply.
+  // Convert to a partial_apply [stack].
+  SmallVector<SILValue, 8> args;
+  for (auto &arg : origPA->getArgumentOperands())
+    args.push_back(arg.get());
+  auto newPA = B.createPartialApply(
+      origPA->getLoc(), origPA->getCallee(), origPA->getSubstitutionMap(), args,
+      origPA->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      PartialApplyInst::OnStackKind::OnStack);
+
+  // Insert mark_dependence for any non-trivial operand to the partial_apply.
+  auto closure = insertMarkDependenceForCapturedArguments(newPA, B);
+
+  // Optionally, replace the convert_function instruction.
+  if (auto *convert = dyn_cast<ConvertFunctionInst>(convertOrPartialApply)) {
+    auto origTy = convert->getType().castTo<SILFunctionType>();
+    auto origWithNoEscape = SILType::getPrimitiveObjectType(
+        origTy->getWithExtInfo(origTy->getExtInfo().withNoEscape()));
+    closure = B.createConvertFunction(convert->getLoc(), closure, origWithNoEscape, false);
+    convert->replaceAllUsesWith(closure);
+  }
+
+  // Replace the convert_escape_to_noescape uses with the new
+  // partial_apply [stack].
+  cvt->replaceAllUsesWith(closure);
+  saveDeleteInst(cvt);
+
+  // Delete the ref count operations on the original partial_apply.
+  for (auto *refInst : refCountInsts)
+    saveDeleteInst(refInst);
+  convertOrPartialApply->replaceAllUsesWith(newPA);
+  if (convertOrPartialApply != origPA)
+    saveDeleteInst(convertOrPartialApply);
+  saveDeleteInst(origPA);
+
+  // Insert destroys of arguments after the apply and the dealloc_stack.
+  if (auto *Apply = dyn_cast<ApplyInst>(singleApplyUser)) {
+    auto InsertPt = std::next(SILBasicBlock::iterator(Apply));
+    // Don't insert dealloc_stacks at unreachable.
+    if (isa<UnreachableInst>(*InsertPt))
+      return true;
+    SILBuilderWithScope B3(InsertPt);
+    B3.createDeallocStack(loc, newPA);
+    insertDestroyOfCapturedArguments(newPA, B3);
+  } else if (auto *Try = dyn_cast<TryApplyInst>(singleApplyUser)) {
+    for (auto *SuccBB : Try->getSuccessorBlocks()) {
+      SILBuilderWithScope B3(SuccBB->begin());
+      B3.createDeallocStack(loc, newPA);
+      insertDestroyOfCapturedArguments(newPA, B3);
+    }
+  } else {
+    llvm_unreachable("Unknown FullApplySite instruction kind");
+  }
+  return true;
+}
+
+static SILValue skipConvert(SILValue v) {
+  auto cvt = dyn_cast<ConvertFunctionInst>(v);
+  if (!cvt)
+    return v;
+  auto *pa = dyn_cast<PartialApplyInst>(cvt->getOperand());
+  if (!pa || !pa->hasOneUse())
+    return v;
+  return pa;
+}
+
 static bool tryExtendLifetimeToLastUse(
     ConvertEscapeToNoEscapeInst *Cvt,
-    llvm::DenseMap<SILInstruction *, SILInstruction *> &Memoized) {
-  // Don't optimize converts that might have been escaped by the function call
-  // (materializeForSet 'escapes' its arguments into the writeback buffer).
-  if (Cvt->isEscapedByUser())
-    return false;
-
+    llvm::DenseMap<SILInstruction *, SILInstruction *> &Memoized,
+    SILBasicBlock::iterator &AdvanceIfDelete) {
   // If there is a single user that is an apply this is simple: extend the
   // lifetime of the operand until after the apply.
   auto SingleUser = lookThroughRebastractionUsers(Cvt, Memoized);
@@ -208,6 +343,12 @@ static bool tryExtendLifetimeToLastUse(
     }
 
     auto loc = RegularLocation::getAutoGeneratedLocation();
+    auto origPA = dyn_cast<PartialApplyInst>(skipConvert(Cvt->getOperand()));
+    if (origPA && tryRewriteToPartialApplyStack(
+                      loc, origPA, Cvt, SingleApplyUser.getInstruction(),
+                      AdvanceIfDelete,
+                      Memoized))
+      return true;
 
     // Insert a copy at the convert_escape_to_noescape [not_guaranteed] and
     // change the instruction to the guaranteed form.
@@ -215,7 +356,7 @@ static bool tryExtendLifetimeToLastUse(
     {
       SILBuilderWithScope B(Cvt);
       auto NewCvt = B.createConvertEscapeToNoEscape(
-          Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
+          Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), true);
       Cvt->replaceAllUsesWith(NewCvt);
       Cvt->eraseFromParent();
       Cvt = NewCvt;
@@ -264,11 +405,6 @@ static bool tryExtendLifetimeToLastUse(
 ///   diamonds. And a destroy of %closure at the last destroy of
 ///   %convertOptionalBlock.
 static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
-  // Don't optimize converts that might have been escaped by the function call
-  // (materializeForSet 'escapes' its arguments into the writeback buffer).
-  if (Cvt->isEscapedByUser())
-    return false;
-
   auto *blockArg = dyn_cast<SILArgument>(Cvt->getOperand());
   if (!blockArg)
     return false;
@@ -314,7 +450,7 @@ static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
   {
     SILBuilderWithScope B(Cvt);
     auto NewCvt = B.createConvertEscapeToNoEscape(
-        Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
+        Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), true);
     Cvt->replaceAllUsesWith(NewCvt);
     Cvt->eraseFromParent();
   }
@@ -483,7 +619,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB) {
   return true;
 }
 
-static bool fixupClosureLifetimes(SILFunction &Fn) {
+static bool fixupClosureLifetimes(SILFunction &Fn, bool &checkStackNesting) {
   bool Changed = false;
 
   // tryExtendLifetimeToLastUse uses a cache of recursive instruction use
@@ -515,8 +651,9 @@ static bool fixupClosureLifetimes(SILFunction &Fn) {
         continue;
       }
 
-      if (tryExtendLifetimeToLastUse(Cvt, MemoizedQueries)) {
+      if (tryExtendLifetimeToLastUse(Cvt, MemoizedQueries, I)) {
         Changed |= true;
+        checkStackNesting = true;
         continue;
       }
 
@@ -547,8 +684,21 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
 
     // Fixup convert_escape_to_noescape [not_guaranteed] and
     // copy_block_without_escaping instructions.
-    if (fixupClosureLifetimes(*getFunction()))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    bool checkStackNesting = false;
+    bool modifiedCFG = false;
+
+    if (fixupClosureLifetimes(*getFunction(), checkStackNesting)) {
+      if (checkStackNesting){
+        StackNesting SN;
+        modifiedCFG =
+            SN.correctStackNesting(getFunction()) == StackNesting::Changes::CFG;
+      }
+      if (modifiedCFG)
+        invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      else
+        invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+    }
     LLVM_DEBUG(getFunction()->verify());
 
   }

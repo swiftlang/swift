@@ -214,7 +214,7 @@ extension String.UTF8View: BidirectionalCollection {
     @inline(__always) get {
       String(_guts)._boundsCheck(i)
       if _fastPath(_guts.isFastUTF8) {
-        return _guts.withFastUTF8 { utf8 in utf8[i.encodedOffset] }
+        return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i.encodedOffset] }
       }
 
       return _foreignSubscript(position: i)
@@ -415,14 +415,14 @@ extension String.UTF8View {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(after i: Index) -> Index {
-    _sanityCheck(_guts.isForeign)
+    _internalInvariant(_guts.isForeign)
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
       startingAt: i.strippingTranscoding)
     let utf8Len = _numUTF8CodeUnits(scalar)
 
     if utf8Len == 1 {
-      _sanityCheck(i.transcodedOffset == 0)
+      _internalInvariant(i.transcodedOffset == 0)
       return i.nextEncoded
     }
 
@@ -438,9 +438,9 @@ extension String.UTF8View {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(before i: Index) -> Index {
-    _sanityCheck(_guts.isForeign)
+    _internalInvariant(_guts.isForeign)
     if i.transcodedOffset != 0 {
-      _sanityCheck((1...3) ~= i.transcodedOffset)
+      _internalInvariant((1...3) ~= i.transcodedOffset)
       return i.priorTranscoded
     }
 
@@ -453,12 +453,12 @@ extension String.UTF8View {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignSubscript(position i: Index) -> UTF8.CodeUnit {
-    _sanityCheck(_guts.isForeign)
+    _internalInvariant(_guts.isForeign)
 
     let scalar = _guts.foreignErrorCorrectedScalar(
       startingAt: _guts.scalarAlign(i)).0
     let encoded = Unicode.UTF8.encode(scalar)._unsafelyUnwrappedUnchecked
-    _sanityCheck(i.transcodedOffset < 1+encoded.count)
+    _internalInvariant(i.transcodedOffset < 1+encoded.count)
 
     return encoded[
       encoded.index(encoded.startIndex, offsetBy: i.transcodedOffset)]
@@ -467,7 +467,7 @@ extension String.UTF8View {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(_ i: Index, offsetBy n: Int) -> Index {
-    _sanityCheck(_guts.isForeign)
+    _internalInvariant(_guts.isForeign)
     return _index(i, offsetBy: n)
   }
 
@@ -476,21 +476,21 @@ extension String.UTF8View {
   internal func _foreignIndex(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
-    _sanityCheck(_guts.isForeign)
+    _internalInvariant(_guts.isForeign)
     return _index(i, offsetBy: n, limitedBy: limit)
   }
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignDistance(from i: Index, to j: Index) -> Int {
-    _sanityCheck(_guts.isForeign)
+    _internalInvariant(_guts.isForeign)
     return _distance(from: i, to: j)
   }
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignCount() -> Int {
-    _sanityCheck(_guts.isForeign)
+    _internalInvariant(_guts.isForeign)
     return _distance(from: startIndex, to: endIndex)
   }
 }
@@ -499,7 +499,7 @@ extension String.Index {
   @usableFromInline @inline(never) // opaque slow-path
   @_effects(releasenone)
   internal func _foreignIsWithin(_ target: String.UTF8View) -> Bool {
-    _sanityCheck(target._guts.isForeign)
+    _internalInvariant(target._guts.isForeign)
     // Currently, foreign means UTF-16.
 
     // If we're transcoding, we're already a UTF8 view index.
@@ -508,5 +508,15 @@ extension String.Index {
     // Otherwise, we must be scalar-aligned, i.e. not pointing at a trailing
     // surrogate.
     return target._guts.isOnUnicodeScalarBoundary(self)
+  }
+}
+
+extension String.UTF8View {
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    guard _guts.isFastUTF8 else { return nil }
+    return try _guts.withFastUTF8(body)
   }
 }

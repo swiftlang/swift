@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name access_marker_gen -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name access_marker_gen -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked %s | %FileCheck %s
 
 func modify<T>(_ x: inout T) {}
 
@@ -8,7 +8,7 @@ public struct S {
   var o: AnyObject?
 }
 
-// CHECK-LABEL: sil hidden [noinline] @$s17access_marker_gen5initSyAA1SVyXlSgF : $@convention(thin) (@guaranteed Optional<AnyObject>) -> @owned S {
+// CHECK-LABEL: sil hidden [noinline] [ossa] @$s17access_marker_gen5initSyAA1SVyXlSgF : $@convention(thin) (@guaranteed Optional<AnyObject>) -> @owned S {
 // CHECK: bb0(%0 : @guaranteed $Optional<AnyObject>):
 // CHECK: [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK: [[MARKED_BOX:%.*]] = mark_uninitialized [var] [[BOX]] : ${ var S }
@@ -42,7 +42,7 @@ func initS(_ o: AnyObject?) -> S {
 @inline(never)
 func takeS(_ s: S) {}
 
-// CHECK-LABEL: sil @$s17access_marker_gen14modifyAndReadSyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @$s17access_marker_gen14modifyAndReadSyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK: %[[BOX:.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK: %[[ADDRS:.*]] = project_box %[[BOX]] : ${ var S }, 0
@@ -66,7 +66,7 @@ func readGlobal() -> AnyObject? {
   return global.o
 }
 
-// CHECK-LABEL: sil hidden @$s17access_marker_gen10readGlobalyXlSgyF
+// CHECK-LABEL: sil hidden [ossa] @$s17access_marker_gen10readGlobalyXlSgyF
 // CHECK:         [[ADDRESSOR:%.*]] = function_ref @$s17access_marker_gen6globalAA1SVvau :
 // CHECK-NEXT:    [[T0:%.*]] = apply [[ADDRESSOR]]()
 // CHECK-NEXT:    [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*S
@@ -81,7 +81,7 @@ public struct HasTwoStoredProperties {
   var f: Int = 7
   var g: Int = 9
 
-// CHECK-LABEL: sil hidden @$s17access_marker_gen22HasTwoStoredPropertiesV027noOverlapOnAssignFromPropToM0yyF : $@convention(method) (@inout HasTwoStoredProperties) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s17access_marker_gen22HasTwoStoredPropertiesV027noOverlapOnAssignFromPropToM0yyF : $@convention(method) (@inout HasTwoStoredProperties) -> ()
 // CHECK:       [[ACCESS1:%.*]] = begin_access [read] [unknown] [[SELF_ADDR:%.*]] : $*HasTwoStoredProperties
 // CHECK-NEXT:  [[G_ADDR:%.*]] = struct_element_addr [[ACCESS1]] : $*HasTwoStoredProperties, #HasTwoStoredProperties.g
 // CHECK-NEXT:  [[G_VAL:%.*]] = load [trivial] [[G_ADDR]] : $*Int
@@ -104,7 +104,7 @@ func testClassInstanceProperties(c: C) {
   let y = c.x
   c.x = y
 }
-// CHECK-LABEL: sil hidden @$s17access_marker_gen27testClassInstanceProperties1cyAA1CC_tF :
+// CHECK-LABEL: sil hidden [ossa] @$s17access_marker_gen27testClassInstanceProperties1cyAA1CC_tF :
 // CHECK: bb0([[C:%.*]] : @guaranteed $C
 // CHECK-NEXT:  debug_value
 // CHECK-NEXT:  [[CX:%.*]] = ref_element_addr [[C]] : $C, #C.x
@@ -121,7 +121,7 @@ func testClassLetProperty(c: C) -> Int {
   return c.z
 }
 
-// CHECK-LABEL: sil hidden @$s17access_marker_gen20testClassLetProperty1cSiAA1CC_tF : $@convention(thin) (@guaranteed C) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s17access_marker_gen20testClassLetProperty1cSiAA1CC_tF : $@convention(thin) (@guaranteed C) -> Int {
 // CHECK: bb0(%0 : @guaranteed $C):
 // CHECK:   [[ADR:%.*]] = ref_element_addr %{{.*}} : $C, #C.z
 // CHECK-NOT: begin_access
@@ -136,7 +136,7 @@ class D {
 }
 
 //   modify
-// CHECK-LABEL: sil hidden [transparent] @$s17access_marker_gen1DC1xSivM
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17access_marker_gen1DC1xSivM
 // CHECK:       [[T0:%.*]] = ref_element_addr %0 : $D, #D.x
 // CHECK-NEXT:  [[T1:%.*]] = begin_access [modify] [dynamic] [[T0]] : $*Int
 // CHECK:       yield [[T1]] : $*Int
@@ -146,7 +146,7 @@ class D {
 func testDispatchedClassInstanceProperty(d: D) {
   modify(&d.x)
 }
-// CHECK-LABEL: sil hidden @$s17access_marker_gen35testDispatchedClassInstanceProperty1dyAA1DC_tF
+// CHECK-LABEL: sil hidden [ossa] @$s17access_marker_gen35testDispatchedClassInstanceProperty1dyAA1DC_tF
 // CHECK:     bb0([[D:%.*]] : @guaranteed $D
 // CHECK:       [[METHOD:%.*]] = class_method [[D]] : $D, #D.x!modify.1
 // CHECK:       begin_apply [[METHOD]]([[D]])

@@ -17,9 +17,9 @@ case none
 class Klass {
 }
 
-sil @klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+sil [ossa] @klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
 
-sil @guaranteed_is_not_owned_use : $@convention(thin) (@guaranteed Klass) -> () {
+sil [ossa] @guaranteed_is_not_owned_use : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1 = copy_value %0 : $Klass
   %2 = function_ref @klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()

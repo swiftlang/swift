@@ -261,12 +261,12 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   SILOptFunctionBuilder FuncBuilder(*this);
   SILFunction *NewF = FuncBuilder.createFunction(
       SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
-      OrigF->isBare(), OrigF->isTransparent(), Serialized,
+      OrigF->isBare(), OrigF->isTransparent(), Serialized, IsNotDynamic,
       OrigF->getEntryCount(), OrigF->isThunk(), OrigF->getClassSubclassScope(),
       OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
       /*InsertBefore*/ OrigF, OrigF->getDebugScope());
-  if (!OrigF->hasQualifiedOwnership()) {
-    NewF->setUnqualifiedOwnership();
+  if (!OrigF->hasOwnership()) {
+    NewF->setOwnershipEliminated();
   }
   LLVM_DEBUG(llvm::dbgs() << "  Specialize callee as ";
              NewF->printName(llvm::dbgs());
@@ -296,6 +296,11 @@ void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
   auto *T2TF = Builder.createThinToThickFunction(OrigPAI->getLoc(), FuncRef,
                                                  OrigPAI->getType());
   OrigPAI->replaceAllUsesWith(T2TF);
+  // Remove any dealloc_stack users.
+  SmallVector<Operand*, 16> Uses(T2TF->getUses());
+  for (auto *Use : Uses)
+    if (auto *DS = dyn_cast<DeallocStackInst>(Use->getUser()))
+      DS->eraseFromParent();
   recursivelyDeleteTriviallyDeadInstructions(OrigPAI, true);
   LLVM_DEBUG(llvm::dbgs() << "  Rewrote caller:\n" << *T2TF);
 }

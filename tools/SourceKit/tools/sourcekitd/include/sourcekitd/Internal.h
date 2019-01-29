@@ -129,7 +129,7 @@ public:
   Optional<llvm::StringRef> getString(SourceKit::UIdent Key);
   Optional<RequestDict> getDictionary(SourceKit::UIdent Key);
 
-  /// \brief Populate the vector with an array of C strings.
+  /// Populate the vector with an array of C strings.
   /// \param isOptional true if the key is optional. If false and the key is
   /// missing, the function will return true to indicate an error.
   /// \returns true if there is an error, like the key is not of an array type or

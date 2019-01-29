@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-silgen -module-name foo -enable-sil-ownership %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -module-name foo -enable-sil-ownership -verify %s
 
-// CHECK-LABEL: sil @main
+// CHECK-LABEL: sil [ossa] @main
 
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s3foo4flagSbv
 // CHECK: [[MARK:%.*]] = mark_uninitialized [var] [[GLOBAL]]

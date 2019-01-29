@@ -181,7 +181,7 @@ bb0:
 
 // CHECK-LABEL: define swiftcc {{(dllexport )?}}{{(protected )?}}i64 @accessClassWithResilientField(%T31completely_fragile_class_layout23ClassWithResilientFieldC*)
 sil @accessClassWithResilientField : $@convention(thin) (@guaranteed ClassWithResilientField) -> Int {
-bb0(%0 : @guaranteed $ClassWithResilientField):
+bb0(%0 : $ClassWithResilientField):
 
 // CHECK:        [[OFFSET:%.*]] = load i64, i64* @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd", align 8
 // CHECK-NEXT:   [[SELF_ADDR:%.*]] = bitcast %T31completely_fragile_class_layout23ClassWithResilientFieldC* %0 to i8*
@@ -192,7 +192,7 @@ bb0(%0 : @guaranteed $ClassWithResilientField):
   %1 = ref_element_addr %0 : $ClassWithResilientField, #ClassWithResilientField.third
 
 // CHECK-NEXT:   [[VALUE:%.*]] = load i64, i64* [[FIELD_PTR]], align 8
-  %2 = load [trivial] %1 : $*Int
+  %2 = load %1 : $*Int
 
 // CHECK-NEXT:   ret i64 [[VALUE]]
   return %2 : $Int
@@ -216,7 +216,7 @@ bb0(%0 : @guaranteed $ClassWithResilientField):
 // CHECK: entry:
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [3 x i8**]
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* %0 to [[INT]]*
-// CHECK-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] {{11|14}}
+// CHECK-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] {{10|13}}
 // CHECK-NEXT: [[FIELDS_ADDR:%.*]] = bitcast [3 x i8**]* [[FIELDS]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 {{12|24}}, i8* [[FIELDS_ADDR]])
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* [[FIELDS]], i32 0, i32 0

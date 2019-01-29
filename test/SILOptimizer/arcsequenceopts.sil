@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
 
 sil_stage canonical
 
@@ -50,7 +50,7 @@ class C {
 sil @cls_use : $@convention(thin) (@owned Cls) -> ()
 
 class Container {
-  @sil_stored var c : Cls
+  @_hasStorage var c : Cls
   init()
 }
 

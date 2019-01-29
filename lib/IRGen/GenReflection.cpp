@@ -185,6 +185,72 @@ llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
   return getAddrOfStringForTypeRef(SymbolicName, role);
 }
 
+llvm::Constant *IRGenModule::getMangledAssociatedConformance(
+                                  const NormalProtocolConformance *conformance,
+                                  const AssociatedConformance &requirement) {
+  // Figure out the name of the symbol to be used for the conformance.
+  IRGenMangler mangler;
+  auto symbolName =
+    mangler.mangleSymbolNameForAssociatedConformanceWitness(
+      conformance, requirement.getAssociation(),
+      requirement.getAssociatedRequirement());
+
+  // See if we emitted the constant already.
+  auto &entry = StringsForTypeRef[symbolName];
+  if (entry.second) {
+    return entry.second;
+  }
+
+  // Get the accessor for this associated conformance.
+  llvm::Function *accessor;
+  unsigned char kind;
+  if (conformance) {
+    kind = 7;
+    accessor = getAddrOfAssociatedTypeWitnessTableAccessFunction(conformance,
+                                                                requirement);
+  } else {
+    kind = 8;
+    accessor = getAddrOfDefaultAssociatedConformanceAccessor(requirement);
+  }
+
+  // Form the mangled name with its relative reference.
+  ConstantInitBuilder B(*this);
+  auto S = B.beginStruct();
+  S.setPacked(true);
+  S.add(llvm::ConstantInt::get(Int8Ty, 255));
+  S.add(llvm::ConstantInt::get(Int8Ty, kind));
+  S.addRelativeAddress(accessor);
+
+  // And a null terminator!
+  S.addInt(Int8Ty, 0);
+
+  auto finished = S.finishAndCreateFuture();
+  auto var = new llvm::GlobalVariable(Module, finished.getType(),
+                                      /*constant*/ true,
+                                      llvm::GlobalValue::LinkOnceODRLinkage,
+                                      nullptr,
+                                      symbolName);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
+  var->setAlignment(2);
+  setTrueConstGlobal(var);
+  var->setSection(getReflectionTypeRefSectionName());
+
+  finished.installInGlobal(var);
+
+  // Drill down to the i8* at the beginning of the constant.
+  auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
+
+  // Set the low bit.
+  unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
+  auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
+  addr = llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+
+  // Update the entry.
+  entry = {var, addr};
+
+  return addr;
+}
+
 class ReflectionMetadataBuilder {
 protected:
   IRGenModule &IGM;
@@ -426,11 +492,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void layoutProtocol() {
-    auto protocolDecl = cast<ProtocolDecl>(NTD);
+    auto PD = cast<ProtocolDecl>(NTD);
     FieldDescriptorKind Kind;
-    if (protocolDecl->isObjC())
+    if (PD->isObjC())
       Kind = FieldDescriptorKind::ObjCProtocol;
-    else if (protocolDecl->requiresClass())
+    else if (PD->requiresClass())
       Kind = FieldDescriptorKind::ClassProtocol;
     else
       Kind = FieldDescriptorKind::Protocol;
@@ -446,8 +512,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     addNominalRef(NTD);
 
     auto *CD = dyn_cast<ClassDecl>(NTD);
+    auto *PD = dyn_cast<ProtocolDecl>(NTD);
     if (CD && CD->getSuperclass()) {
       addTypeRef(CD->getSuperclass()->getCanonicalType());
+    } else if (PD && PD->getDeclaredType()->getSuperclass()) {
+      addTypeRef(PD->getDeclaredType()->getSuperclass()->getCanonicalType());
     } else {
       B.addInt32(0);
     }
@@ -515,7 +584,13 @@ public:
     addTypeRef(type);
 
     B.addInt32(ti->getFixedSize().getValue());
-    B.addInt32(ti->getFixedAlignment().getValue());
+
+    auto alignment = ti->getFixedAlignment().getValue();
+    unsigned bitwiseTakable =
+      (ti->isBitwiseTakable(ResilienceExpansion::Minimal) == IsBitwiseTakable
+       ? 1 : 0);
+    B.addInt32(alignment | (bitwiseTakable << 16));
+
     B.addInt32(ti->getFixedStride().getValue());
     B.addInt32(ti->getFixedExtraInhabitantCount(IGM));
   }
@@ -791,15 +866,13 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     OS << ".sw5" << FourCC << "$B";
     break;
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     OS << "swift5_" << LongName;
     break;
   case llvm::Triple::MachO:
     assert(LongName.size() <= 7 &&
            "Mach-O section name length must be <= 16 characters");
     OS << "__TEXT,__swift5_" << LongName << ", regular, no_dead_strip";
-    break;
-  case llvm::Triple::Wasm:
-    llvm_unreachable("web assembly object format is not supported.");
     break;
   }
   return OS.str();
@@ -883,7 +956,11 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
 }
 
 void IRGenModule::
-emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
+emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
+  auto normalConf = dyn_cast<NormalProtocolConformance>(conformance);
+  if (!normalConf)
+    return;
+
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
@@ -899,14 +976,14 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
     return false;
   };
 
-  Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
+  normalConf->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
 
   // If there are no associated types, don't bother emitting any
   // metadata.
   if (AssociatedTypes.empty())
     return;
 
-  AssociatedTypeMetadataBuilder builder(*this, Conformance, AssociatedTypes);
+  AssociatedTypeMetadataBuilder builder(*this, normalConf, AssociatedTypes);
   builder.emit();
 }
 
@@ -971,7 +1048,7 @@ void IRGenModule::emitReflectionMetadataVersion() {
                                           llvm::GlobalValue::LinkOnceODRLinkage,
                                           Init,
                                           "__swift_reflection_version");
-  Version->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(Version);
   addUsedGlobal(Version);
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-print-debuginfo -enable-sil-verify-all %s -condition-forwarding | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -condition-forwarding | %FileCheck %s
 
 import Builtin
 import Swift
@@ -10,7 +10,7 @@ enum E { case A, B }
 enum E3 { case A, B, C }
 
 class C {
-  @sil_stored var x : Builtin.Int64
+  @_hasStorage var x : Builtin.Int64
   init()
 }
 

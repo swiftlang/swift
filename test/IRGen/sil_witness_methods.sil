@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 

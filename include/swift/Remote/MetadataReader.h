@@ -98,7 +98,7 @@ template <typename Runtime, typename BuilderType>
 class MetadataReader {
 public:
   using BuiltType = typename BuilderType::BuiltType;
-  using BuiltNominalTypeDecl = typename BuilderType::BuiltNominalTypeDecl;
+  using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
@@ -397,6 +397,54 @@ public:
         {RemoteAddress(MetadataAddress), RemoteAddress(StartOfValue)});
   }
 
+  /// Read a protocol from a reference to said protocol.
+  template<typename Resolver>
+  typename Resolver::Result readProtocol(
+      const TargetProtocolDescriptorRef<Runtime> &ProtocolAddress,
+      Demangler &dem,
+      Resolver resolver) {
+#if SWIFT_OBJC_INTEROP
+    // Check whether we have an Objective-C protocol.
+    if (ProtocolAddress.isObjC()) {
+      auto Name = readObjCProtocolName(ProtocolAddress.getObjCProtocol());
+      StringRef NameStr(Name);
+
+      // If this is a Swift-defined protocol, demangle it.
+      if (NameStr.startswith("_TtP")) {
+        auto Demangled = dem.demangleSymbol(NameStr);
+        if (!Demangled)
+          return resolver.failure();
+
+        // FIXME: This appears in _swift_buildDemanglingForMetadata().
+        while (Demangled->getKind() == Node::Kind::Global ||
+               Demangled->getKind() == Node::Kind::TypeMangling ||
+               Demangled->getKind() == Node::Kind::Type ||
+               Demangled->getKind() == Node::Kind::ProtocolList ||
+               Demangled->getKind() == Node::Kind::TypeList ||
+               Demangled->getKind() == Node::Kind::Type) {
+          if (Demangled->getNumChildren() != 1)
+            return resolver.failure();
+          Demangled = Demangled->getFirstChild();
+        }
+
+        return resolver.swiftProtocol(Demangled);
+      }
+
+      // Otherwise, this is an imported protocol.
+      return resolver.objcProtocol(NameStr);
+    }
+#endif
+
+    // Swift-native protocol.
+    auto Demangled =
+      readDemanglingForContextDescriptor(ProtocolAddress.getSwiftProtocol(),
+                                         dem);
+    if (!Demangled)
+      return resolver.failure();
+
+    return resolver.swiftProtocol(Demangled);
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType readTypeFromMetadata(StoredPointer MetadataAddress,
                                  bool skipArtificialSubclasses = false) {
@@ -493,64 +541,34 @@ public:
         HasExplicitAnyObject = true;
       }
 
-      std::vector<BuiltProtocolDecl> Protocols;
-      for (auto ProtocolAddress : Exist->getProtocols()) {
+      /// Resolver to turn a protocol reference into a protocol declaration.
+      struct ProtocolResolver {
+        using Result = BuiltProtocolDecl;
+
+        BuilderType &builder;
+
+        BuiltProtocolDecl failure() const {
+          return BuiltProtocolDecl();
+        }
+
+        BuiltProtocolDecl swiftProtocol(Demangle::Node *node) {
+          return builder.createProtocolDecl(node);
+        }
+
 #if SWIFT_OBJC_INTEROP
-        // Check whether we have an Objective-C protocol.
-        if (ProtocolAddress.isObjC()) {
-          auto Name =
-            readObjCProtocolName(ProtocolAddress.getObjCProtocol());
-          StringRef NameStr(Name);
-
-          // If this is a Swift-defined protocol, demangle it.
-          if (NameStr.startswith("_TtP")) {
-            Demangle::Context DCtx;
-            auto Demangled = DCtx.demangleSymbolAsNode(NameStr);
-            if (!Demangled)
-              return BuiltType();
-
-            // FIXME: This appears in _swift_buildDemanglingForMetadata().
-            while (Demangled->getKind() == Node::Kind::Global ||
-                   Demangled->getKind() == Node::Kind::TypeMangling ||
-                   Demangled->getKind() == Node::Kind::Type ||
-                   Demangled->getKind() == Node::Kind::ProtocolList ||
-                   Demangled->getKind() == Node::Kind::TypeList ||
-                   Demangled->getKind() == Node::Kind::Type) {
-              if (Demangled->getNumChildren() != 1)
-                return BuiltType();
-              Demangled = Demangled->getFirstChild();
-            }
-
-            auto Protocol = Builder.createProtocolDecl(Demangled);
-            if (!Protocol)
-              return BuiltType();
-
-            Protocols.push_back(Protocol);
-            continue;
-          }
-
-          // Otherwise, this is an imported protocol.
-          auto Protocol = Builder.createObjCProtocolDecl(NameStr);
-          if (!Protocol)
-            return BuiltType();
-
-          Protocols.push_back(Protocol);
-          continue;
+        BuiltProtocolDecl objcProtocol(StringRef name) {
+          return builder.createObjCProtocolDecl(name);
         }
 #endif
+      } resolver{Builder};
 
-        // Swift-native protocol.
-        Demangle::Demangler Dem;
-        auto Demangled = readDemanglingForContextDescriptor(
-            ProtocolAddress.getSwiftProtocol(), Dem);
-        if (!Demangled)
+      Demangler dem;
+      std::vector<BuiltProtocolDecl> Protocols;
+      for (auto ProtocolAddress : Exist->getProtocols()) {
+        if (auto Protocol = readProtocol(ProtocolAddress, dem, resolver))
+          Protocols.push_back(Protocol);
+        else
           return BuiltType();
-
-        auto Protocol = Builder.createProtocolDecl(Demangled);
-        if (!Protocol)
-          return BuiltType();
-
-        Protocols.push_back(Protocol);
       }
       auto BuiltExist = Builder.createProtocolCompositionType(
         Protocols, SuperclassType, HasExplicitAnyObject);
@@ -594,8 +612,8 @@ public:
         return BuiltType();
 
       // Build the demangling tree from the context tree.
-      Demangle::NodeFactory nodeFactory;
-      auto node = buildContextMangling(descriptor, nodeFactory);
+      Demangler dem;
+      auto node = buildContextMangling(descriptor, dem);
       if (!node || node->getKind() != Node::Kind::Type)
         return BuiltType();
 
@@ -608,7 +626,7 @@ public:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
       // Treat these all as Builtin.NativeObject for type lowering purposes.
-      return Builder.createBuiltinType("Bo");
+      return Builder.createBuiltinType("Builtin.NativeObject", "Bo");
     case MetadataKind::Opaque:
     default: {
       auto BuiltOpaque = Builder.getOpaqueType();
@@ -790,7 +808,7 @@ public:
                    const MetadataFn &metadataFn,
                    const ClassNameFn &classNameFn) {
     switch (refKind) {
-    case TypeReferenceKind::IndirectNominalTypeDescriptor: {
+    case TypeReferenceKind::IndirectTypeDescriptor: {
       StoredPointer descriptorAddress = 0;
       if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress))
         return None;
@@ -799,7 +817,7 @@ public:
       LLVM_FALLTHROUGH;
     }
 
-    case TypeReferenceKind::DirectNominalTypeDescriptor: {
+    case TypeReferenceKind::DirectTypeDescriptor: {
       auto descriptor = readContextDescriptor(ref);
       if (!descriptor)
         return None;
@@ -869,10 +887,10 @@ public:
 
   /// Given the address of a nominal type descriptor, attempt to resolve
   /// its nominal type declaration.
-  BuiltNominalTypeDecl readNominalTypeFromDescriptor(StoredPointer address) {
+  BuiltTypeDecl readNominalTypeFromDescriptor(StoredPointer address) {
     auto descriptor = readContextDescriptor(address);
     if (!descriptor)
-      return BuiltNominalTypeDecl();
+      return BuiltTypeDecl();
 
     return buildNominalTypeDecl(descriptor);
   }
@@ -1113,7 +1131,7 @@ protected:
       case MetadataKind::Tuple: {
         auto numElementsAddress = address +
           TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements();
-        uint32_t numElements;
+        StoredSize numElements;
         if (!Reader->readInteger(RemoteAddress(numElementsAddress),
                                  &numElements))
           return nullptr;
@@ -1203,7 +1221,7 @@ private:
     }
   }
 
-  /// Given the address of a nominal type descriptor, attempt to read it.
+  /// Given the address of a context descriptor, attempt to read it.
   ContextDescriptorRef
   readContextDescriptor(StoredPointer address) {
     if (address == 0)
@@ -1248,6 +1266,10 @@ private:
       break;
     case ContextDescriptorKind::Anonymous:
       baseSize = sizeof(TargetAnonymousContextDescriptor<Runtime>);
+      if (AnonymousContextDescriptorFlags(flags.getKindSpecificFlags())
+            .hasMangledName()) {
+        baseSize += sizeof(TargetMangledContextName<Runtime>);
+      }
       break;
     case ContextDescriptorKind::Class:
       baseSize = sizeof(TargetClassDescriptor<Runtime>);
@@ -1352,11 +1374,342 @@ private:
     return false;
   }
 
+  /// Read the name from a module, type, or protocol context descriptor.
+  Optional<std::string> readContextDescriptorName(
+      ContextDescriptorRef descriptor,
+      Optional<TypeImportInfo<std::string>> &importInfo) {
+    std::string name;
+    auto context = descriptor.getLocalBuffer();
+
+    // Read the name of a protocol.
+    if (auto protoBuffer =
+            dyn_cast<TargetProtocolDescriptor<Runtime>>(context)) {
+      auto nameAddress = resolveRelativeField(descriptor, protoBuffer->Name);
+      if (Reader->readString(RemoteAddress(nameAddress), name))
+        return name;
+
+      return None;
+    }
+
+    // Read the name of a module.
+    if (auto moduleBuffer =
+            dyn_cast<TargetModuleContextDescriptor<Runtime>>(context)) {
+      auto nameAddress = resolveRelativeField(descriptor, moduleBuffer->Name);
+      if (Reader->readString(RemoteAddress(nameAddress), name))
+        return name;
+
+      return None;
+    }
+
+    // Only type contexts remain.
+    auto typeBuffer = dyn_cast<TargetTypeContextDescriptor<Runtime>>(context);
+    if (!typeBuffer)
+      return None;
+
+    auto nameAddress = resolveRelativeField(descriptor, typeBuffer->Name);
+    if (!Reader->readString(RemoteAddress(nameAddress), name))
+      return None;
+
+    // Read the TypeImportInfo if present.
+    if (typeBuffer->getTypeContextDescriptorFlags().hasImportInfo()) {
+      importInfo.emplace();
+      nameAddress += name.size() + 1;
+
+      while (true) {
+        // Read the next string.
+        std::string temp;
+        if (!Reader->readString(RemoteAddress(nameAddress), temp))
+          return None;
+
+        // If we read an empty string, we're done.
+        if (temp.empty())
+          break;
+
+        // Advance past the string.
+        nameAddress += temp.size() + 1;
+
+        // Collect the import information.  Ignore anything we don't
+        // understand.
+        importInfo->collect</*asserting*/false>(std::move(temp));
+      }
+
+      // Ignore the original if we have an ABI name override.
+      if (!importInfo->ABIName.empty())
+        name = std::move(importInfo->ABIName);
+    }
+
+    return name;
+  }
+
+  /// The kind of mangled name to read.
+  enum class MangledNameKind {
+    Type,
+    Symbol,
+  };
+
+  /// Clone the given demangle node into the demangler \c dem.
+  static Demangle::NodePointer cloneDemangleNode(Demangle::NodePointer node,
+                                                 Demangler &dem) {
+    if (!node)
+      return nullptr;
+
+    Demangle::NodePointer newNode;
+    if (node->hasText())
+      newNode = dem.createNode(node->getKind(), node->getText());
+    else if (node->hasIndex())
+      newNode = dem.createNode(node->getKind(), node->getIndex());
+    else
+      newNode = dem.createNode(node->getKind());
+
+    for (auto child : *node) {
+      newNode->addChild(cloneDemangleNode(child, dem), dem);
+    }
+    return newNode;
+  }
+
+  /// Read a mangled name at the given remote address and return the
+  /// demangle tree.
+  Demangle::NodePointer readMangledName(RemoteAddress address,
+                                        MangledNameKind kind,
+                                        Demangler &dem) {
+    // Read chunks of the mangled name, for which the string can be
+    // prematurely terminated by a symbolic reference.
+    std::string mangledName;
+    RemoteAddress currentAddress = address;
+    unsigned index = 0;
+    while (true) {
+      // Read the next chunk.
+      std::string chunk;
+      if (!Reader->readString(currentAddress, chunk))
+        return nullptr;
+
+      // Move the address forward and add the next chunk.
+      currentAddress =
+        RemoteAddress(currentAddress.getAddressData() + chunk.size() + 1);
+      mangledName += std::move(chunk);
+
+      // Scan through the mangled name to skip over symbolic references.
+      unsigned end = mangledName.size();
+      while (index < end) {
+        char c = mangledName[index];
+
+        // Figure out how far to step in the string.
+        unsigned step = 1;
+        if (c >= '\x01' && c <= '\x17') {
+          step += sizeof(uint32_t);
+        }
+        else if (c >= '\x18' && c <= '\x1F') {
+          step += sizeof(typename Runtime::StoredPointer);
+        }
+
+        // If we would be stepping past the end, break out.
+        if (index + step > end)
+          break;
+
+        index += step;
+      }
+
+      // If we didn't make it to the end, the '\0' is significant. Add it to the
+      // mangled name and
+      if (index < end) {
+        mangledName.push_back('\0');
+        continue;
+      }
+
+      // We're done.
+      break;
+    }
+
+    // Install our own symbolic reference resolver
+    auto oldSymbolicReferenceResolver = dem.takeSymbolicReferenceResolver();
+    dem.setSymbolicReferenceResolver([&](SymbolicReferenceKind kind,
+                                         Directness directness,
+                                         int32_t offset,
+                                         const void *base) ->
+        swift::Demangle::NodePointer {
+      // Resolve the reference to a remote address.
+      auto offsetInMangledName = (const char *)base - mangledName.data();
+      auto remoteAddress =
+        address.getAddressData() + offsetInMangledName + offset;
+
+      if (directness == Directness::Indirect) {
+        if (auto indirectAddress = readPointerValue(remoteAddress)) {
+          remoteAddress = *indirectAddress;
+        } else {
+          return nullptr;
+        }
+      }
+
+      switch (kind) {
+      case Demangle::SymbolicReferenceKind::Context: {
+        Demangler innerDemangler;
+        auto result = readDemanglingForContextDescriptor(
+          remoteAddress, innerDemangler);
+
+        return cloneDemangleNode(result, dem);
+      }
+      }
+
+      return nullptr;
+    });
+
+    swift::Demangle::NodePointer result;
+    switch (kind) {
+    case MangledNameKind::Type:
+      result = dem.demangleType(mangledName);
+      break;
+
+    case MangledNameKind::Symbol:
+      result = dem.demangleSymbol(mangledName);
+      break;
+    }
+
+    dem.setSymbolicReferenceResolver(std::move(oldSymbolicReferenceResolver));
+    return result;
+  }
+
+  /// Read and demangle the name of an anonymous context.
+  Demangle::NodePointer demangleAnonymousContextName(
+      ContextDescriptorRef contextRef,
+      Demangler &dem) {
+    auto anonymousBuffer = cast<TargetAnonymousContextDescriptor<Runtime>>(
+        contextRef.getLocalBuffer());
+
+    if (!anonymousBuffer->hasMangledName())
+      return nullptr;
+
+    // Read the mangled name.
+    auto mangledContextName = anonymousBuffer->getMangledContextName();
+    auto mangledNameAddress = resolveRelativeField(contextRef,
+                                                   mangledContextName->name);
+    return readMangledName(RemoteAddress(mangledNameAddress),
+                           MangledNameKind::Symbol,
+                           dem);
+  }
+
+  /// If we have a context whose parent context is an anonymous context
+  /// that provides the local/private name for the current context,
+  /// produce a mangled node describing the name of \c context.
+  Demangle::NodePointer
+  adoptAnonymousContextName(ContextDescriptorRef contextRef,
+                            Optional<ContextDescriptorRef> &parentContextRef,
+                            Demangler &dem,
+                            Demangle::NodePointer &outerNode) {
+    outerNode = nullptr;
+
+    if (!parentContextRef || !*parentContextRef)
+      return nullptr;
+
+    auto context = contextRef.getLocalBuffer();
+    auto typeContext = dyn_cast<TargetTypeContextDescriptor<Runtime>>(context);
+    auto protoContext = dyn_cast<TargetProtocolDescriptor<Runtime>>(context);
+    if (!typeContext && !protoContext)
+      return nullptr;
+
+    auto anonymousParent = dyn_cast_or_null<TargetAnonymousContextDescriptor<Runtime>>(
+            parentContextRef->getLocalBuffer());
+    if (!anonymousParent)
+      return nullptr;
+
+    auto mangledNode = demangleAnonymousContextName(*parentContextRef, dem);
+    if (!mangledNode)
+      return nullptr;
+
+    if (mangledNode->getKind() == Demangle::Node::Kind::Global)
+      mangledNode = mangledNode->getFirstChild();
+
+    if (mangledNode->getNumChildren() < 2)
+      return nullptr;
+
+    // Dig out the name of the entity.
+    swift::Demangle::NodePointer nameChild = mangledNode->getChild(1);
+    if ((nameChild->getKind() != Node::Kind::PrivateDeclName &&
+         nameChild->getKind() != Node::Kind::LocalDeclName) ||
+        nameChild->getNumChildren() < 2)
+      return nullptr;
+
+    // Make sure we have an identifier where we expect it.
+    auto identifierNode = nameChild->getChild(1);
+    if (identifierNode->getKind() != Node::Kind::Identifier ||
+        !identifierNode->hasText())
+      return nullptr;
+
+    // Read the name of the current context.
+    Optional<TypeImportInfo<std::string>> importInfo;
+    auto contextName = readContextDescriptorName(contextRef, importInfo);
+    if (!contextName)
+      return nullptr;
+
+    // Make sure the name of the current context matches the one in the mangled
+    // name of the parent anonymous context.
+    // FIXME: Use the ABI name here.
+    if (*contextName != identifierNode->getText())
+      return nullptr;
+
+    // We have a match. Update the parent context to skip the anonymous
+    // context entirely.
+    parentContextRef = readParentContextDescriptor(*parentContextRef);
+
+    // The outer node is the first child.
+    outerNode = mangledNode->getChild(0);
+
+    // Return the name.
+    return nameChild;
+  }
+
+  /// Resolve a relative target protocol descriptor pointer, which uses
+  /// the lowest bit to indicate an indirect vs. direct relative reference and
+  /// the second lowest bit to indicate whether it is an Objective-C protocol.
+  StoredPointer resolveRelativeIndirectProtocol(
+      ContextDescriptorRef descriptor,
+      const RelativeTargetProtocolDescriptorPointer<Runtime> &protocol) {
+    // Map the offset from within our local buffer to the remote address.
+    auto distance = (intptr_t)&protocol - (intptr_t)descriptor.getLocalBuffer();
+    StoredPointer targetAddress(descriptor.getAddress() + distance);
+
+    // Read the relative offset.
+    int32_t relative;
+    if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
+      return StoredPointer();
+
+    // Collect and mask off the 'indirect' and 'isObjC' bits.
+    bool indirect = relative & 1;
+    relative &= ~1u;
+    bool isObjC = relative & 2;
+    relative &= ~2u;
+
+    using SignedPointer = typename std::make_signed<StoredPointer>::type;
+    auto signext = (SignedPointer)(int32_t)relative;
+
+    StoredPointer resultAddress = targetAddress + signext;
+
+    // Low bit set in the offset indicates that the offset leads to the absolute
+    // address in memory.
+    if (indirect) {
+      if (!Reader->readBytes(RemoteAddress(resultAddress),
+                             (uint8_t *)&resultAddress,
+                             sizeof(StoredPointer)))
+        return StoredPointer();
+    }
+
+    // Add back the Objective-C bit.
+    if (isObjC)
+      resultAddress |= 0x1;
+
+    return resultAddress;
+  }
+
   Demangle::NodePointer
   buildContextDescriptorMangling(ContextDescriptorRef descriptor,
-                                 Demangle::NodeFactory &nodeFactory) {
+                                 Demangler &dem) {
     // Read the parent descriptor.
     auto parentDescriptorResult = readParentContextDescriptor(descriptor);
+
+    // If the parent is an anonymous context that provides a complete
+    // name for this node, note that.
+    Demangle::NodePointer demangledParentNode = nullptr;
+    auto nameNode = adoptAnonymousContextName(
+        descriptor, parentDescriptorResult, dem, demangledParentNode);
 
     // If there was a problem reading the parent descriptor, we're done.
     if (!parentDescriptorResult) return nullptr;
@@ -1365,102 +1718,229 @@ private:
     Demangle::NodePointer parentDemangling = nullptr;
     if (auto parentDescriptor = *parentDescriptorResult) {
       parentDemangling =
-        buildContextDescriptorMangling(parentDescriptor, nodeFactory);
-      if (!parentDemangling)
+        buildContextDescriptorMangling(parentDescriptor, dem);
+      if (!parentDemangling && !demangledParentNode)
         return nullptr;
     }
 
-    std::string nodeName;
-    std::string relatedTag;
+    // If we have a better parent node produced from an enclosing nominal
+    // context, use that.
+    if (demangledParentNode &&
+        (!parentDemangling ||
+         parentDemangling->getKind() == Node::Kind::AnonymousContext)) {
+      parentDemangling = demangledParentNode;
+    }
+
     Demangle::Node::Kind nodeKind;
     Optional<TypeImportInfo<std::string>> importInfo;
 
-    auto getTypeName = [&]() -> bool {
-      auto typeBuffer =
-        reinterpret_cast<const TargetTypeContextDescriptor<Runtime> *>
-          (descriptor.getLocalBuffer());
-      auto nameAddress = resolveRelativeField(descriptor, typeBuffer->Name);
-      if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
-        return false;
+    auto getContextName = [&]() -> bool {
+      if (nameNode)
+        return true;
 
-      // Read the TypeImportInfo if present.
-      if (typeBuffer->getTypeContextDescriptorFlags().hasImportInfo()) {
-        importInfo.emplace();
-        nameAddress += nodeName.size() + 1;
-
-        while (true) {
-          // Read the next string.
-          std::string temp;
-          if (!Reader->readString(RemoteAddress(nameAddress), temp))
-            return false;
-
-          // If we read an empty string, we're done.
-          if (temp.empty())
-            break;
-
-          // Advance past the string.
-          nameAddress += temp.size() + 1;
-
-          // Collect the import information.  Ignore anything we don't
-          // understand.
-          importInfo->collect</*asserting*/false>(std::move(temp));
-        }
-
-        // Ignore the original if we have an ABI name override.
-        if (!importInfo->ABIName.empty())
-          nodeName = std::move(importInfo->ABIName);
+      if (auto name = readContextDescriptorName(descriptor, importInfo)) {
+        nameNode = dem.createNode(Node::Kind::Identifier, std::move(*name));
+        return true;
       }
-      
-      return true;
+
+      return false;
     };
-    
+
     bool isTypeContext = false;
     switch (auto contextKind = descriptor->getKind()) {
     case ContextDescriptorKind::Class:
-      if (!getTypeName())
+      if (!getContextName())
         return nullptr;
       nodeKind = Demangle::Node::Kind::Class;
       isTypeContext = true;
       break;
     case ContextDescriptorKind::Struct:
-      if (!getTypeName())
+      if (!getContextName())
         return nullptr;
       nodeKind = Demangle::Node::Kind::Structure;
       isTypeContext = true;
       break;
     case ContextDescriptorKind::Enum:
-      if (!getTypeName())
+      if (!getContextName())
         return nullptr;
       nodeKind = Demangle::Node::Kind::Enum;
       isTypeContext = true;
       break;
     case ContextDescriptorKind::Protocol: {
-      auto protocolBuffer =
-        reinterpret_cast<const TargetProtocolDescriptor<Runtime> *>
-          (descriptor.getLocalBuffer());
-      auto nameAddress = resolveRelativeField(descriptor, protocolBuffer->Name);
-      if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+      if (!getContextName())
         return nullptr;
 
       nodeKind = Demangle::Node::Kind::Protocol;
       break;
     }
-    case ContextDescriptorKind::Extension:
-      // TODO: Remangle something about the extension context here.
-      return nullptr;
-      
+    case ContextDescriptorKind::Extension: {
+      // There should always be a parent describing where the extension
+      // lives.
+      if (!parentDemangling) {
+        return nullptr;
+      }
+
+      auto extensionBuffer =
+        reinterpret_cast<const TargetExtensionContextDescriptor<Runtime> *>(
+          descriptor.getLocalBuffer());
+
+      auto extendedContextAddress =
+        resolveRelativeField(descriptor, extensionBuffer->ExtendedContext);
+
+      auto demangledExtendedContext =
+        readMangledName(RemoteAddress(extendedContextAddress),
+                        MangledNameKind::Type,
+                        dem);
+
+      auto demangling = dem.createNode(Node::Kind::Extension);
+      demangling->addChild(parentDemangling, dem);
+      demangling->addChild(demangledExtendedContext, dem);
+
+      /// Resolver to turn a protocol reference into a demangling.
+      struct ProtocolResolver {
+        using Result = Demangle::Node *;
+
+        Demangler &dem;
+
+        Result failure() const {
+          return nullptr;
+        }
+
+        Result swiftProtocol(Demangle::Node *node) {
+          return node;
+        }
+
+#if SWIFT_OBJC_INTEROP
+        Result objcProtocol(StringRef name) {
+          // FIXME: Unify this with the runtime's Demangle.cpp
+          auto module = dem.createNode(Node::Kind::Module,
+                                       MANGLING_MODULE_OBJC);
+          auto node = dem.createNode(Node::Kind::Protocol);
+          node->addChild(module, dem);
+          node->addChild(dem.createNode(Node::Kind::Identifier, name),
+                         dem);
+          return node;
+        }
+#endif
+      } protocolResolver{dem};
+
+      // If there are generic requirements, form the generic signature.
+      auto requirements = extensionBuffer->getGenericRequirements();
+      if (!requirements.empty()) {
+        auto signatureNode =
+          dem.createNode(Node::Kind::DependentGenericSignature);
+        bool failed = false;
+        for (const auto &req : requirements) {
+          if (failed)
+            break;
+
+          // Demangle the subject.
+          auto subjectAddress = resolveRelativeField(descriptor, req.Param);
+          swift::Demangle::NodePointer subject =
+              readMangledName(RemoteAddress(subjectAddress),
+                              MangledNameKind::Type, dem);
+          if (!subject) {
+            failed = true;
+            break;
+          }
+
+          switch (req.Flags.getKind()) {
+          case GenericRequirementKind::Protocol: {
+            auto protocolAddress =
+              resolveRelativeIndirectProtocol(descriptor, req.Protocol);
+            auto protocol = readProtocol(protocolAddress, dem,
+                                         protocolResolver);
+            if (!protocol) {
+              failed = true;
+              break;
+            }
+
+            auto reqNode =
+              dem.createNode(
+                Node::Kind::DependentGenericConformanceRequirement);
+            reqNode->addChild(subject, dem);
+            reqNode->addChild(protocol, dem);
+            signatureNode->addChild(reqNode, dem);
+            break;
+          }
+
+          case GenericRequirementKind::SameType:
+          case GenericRequirementKind::BaseClass: {
+            // Demangle the right-hand type.
+            auto typeAddress = resolveRelativeField(descriptor, req.Type);
+            swift::Demangle::NodePointer type =
+                readMangledName(RemoteAddress(typeAddress),
+                                MangledNameKind::Type, dem);
+            if (!type) {
+              failed = true;
+              break;
+            }
+
+            Node::Kind nodeKind;
+            if (req.Flags.getKind() == GenericRequirementKind::SameType)
+              nodeKind = Node::Kind::DependentGenericSameTypeRequirement;
+            else
+              nodeKind = Node::Kind::DependentGenericConformanceRequirement;
+
+            auto reqNode = dem.createNode(nodeKind);
+            reqNode->addChild(subject, dem);
+            reqNode->addChild(type, dem);
+            signatureNode->addChild(reqNode, dem);
+            break;
+          }
+
+          case GenericRequirementKind::SameConformance:
+            // Do nothing
+            break;
+
+          case GenericRequirementKind::Layout: {
+            // Map the offset from within our local buffer to the remote
+            // address.
+            auto distance =
+              (intptr_t)&req.Layout - (intptr_t)descriptor.getLocalBuffer();
+            StoredPointer targetAddress(descriptor.getAddress() + distance);
+
+            GenericRequirementLayoutKind kind;
+            if (!Reader->readBytes(RemoteAddress(targetAddress),
+                                   (uint8_t *)&kind, sizeof(kind))) {
+              failed = true;
+              break;
+            }
+
+            if (kind == GenericRequirementLayoutKind::Class) {
+              auto reqNode =
+                dem.createNode(Node::Kind::DependentGenericLayoutRequirement);
+              reqNode->addChild(subject, dem);
+              auto idNode = dem.createNode(Node::Kind::Identifier, "C");
+              reqNode->addChild(idNode, dem);
+              signatureNode->addChild(reqNode, dem);
+            } else {
+              failed = true;
+            }
+            break;
+          }
+          }
+        }
+
+        if (!failed) {
+          demangling->addChild(signatureNode, dem);
+        }
+      }
+      return demangling;
+    }
+
     case ContextDescriptorKind::Anonymous: {
       // Use the remote address to identify the anonymous context.
       char addressBuf[18];
       snprintf(addressBuf, sizeof(addressBuf), "$%" PRIx64,
                (uint64_t)descriptor.getAddress());
-      auto anonNode = nodeFactory.createNode(Node::Kind::AnonymousContext);
+      auto anonNode = dem.createNode(Node::Kind::AnonymousContext);
       CharVector addressStr;
-      addressStr.append(addressBuf, nodeFactory);
-      auto name = nodeFactory.createNode(Node::Kind::Identifier, addressStr);
-      anonNode->addChild(name, nodeFactory);
+      addressStr.append(addressBuf, dem);
+      auto name = dem.createNode(Node::Kind::Identifier, addressStr);
+      anonNode->addChild(name, dem);
       if (parentDemangling)
-        anonNode->addChild(parentDemangling, nodeFactory);
+        anonNode->addChild(parentDemangling, dem);
       
       return anonNode;
     }
@@ -1477,12 +1957,13 @@ private:
           (descriptor.getLocalBuffer());
       auto nameAddress
         = resolveRelativeField(descriptor, moduleBuffer->Name);
-      if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+      std::string moduleName;
+      if (!Reader->readString(RemoteAddress(nameAddress), moduleName))
         return nullptr;
 
       // The form of module contexts is a little different from other
       // contexts; just create the node directly here and return.
-      return nodeFactory.createNode(nodeKind, std::move(nodeName));
+      return dem.createNode(nodeKind, std::move(moduleName));
     }
     
     default:
@@ -1513,15 +1994,13 @@ private:
         nodeKind = Demangle::Node::Kind::Structure;
     }
 
-    auto nameNode = nodeFactory.createNode(Node::Kind::Identifier,
-                                           std::move(nodeName));
-
     // Use private declaration names for anonymous context references.
-    if (parentDemangling->getKind() == Node::Kind::AnonymousContext) {
+    if (parentDemangling->getKind() == Node::Kind::AnonymousContext
+        && nameNode->getKind() == Node::Kind::Identifier) {
       auto privateDeclName =
-        nodeFactory.createNode(Node::Kind::PrivateDeclName);
-      privateDeclName->addChild(parentDemangling->getChild(0), nodeFactory);
-      privateDeclName->addChild(nameNode, nodeFactory);
+        dem.createNode(Node::Kind::PrivateDeclName);
+      privateDeclName->addChild(parentDemangling->getChild(0), dem);
+      privateDeclName->addChild(nameNode, dem);
 
       nameNode = privateDeclName;
       parentDemangling = parentDemangling->getChild(1);
@@ -1529,15 +2008,15 @@ private:
 
     if (importInfo && !importInfo->RelatedEntityName.empty()) {
       auto relatedNode =
-        nodeFactory.createNode(Node::Kind::RelatedEntityDeclName,
+        dem.createNode(Node::Kind::RelatedEntityDeclName,
                                std::move(importInfo->RelatedEntityName));
-      relatedNode->addChild(nameNode, nodeFactory);
+      relatedNode->addChild(nameNode, dem);
       nameNode = relatedNode;
     }
 
-    auto demangling = nodeFactory.createNode(nodeKind);
-    demangling->addChild(parentDemangling, nodeFactory);
-    demangling->addChild(nameNode, nodeFactory);
+    auto demangling = dem.createNode(nodeKind);
+    demangling->addChild(parentDemangling, dem);
+    demangling->addChild(nameNode, dem);
     return demangling;
   }
 
@@ -1545,8 +2024,8 @@ private:
   /// for it.
   Demangle::NodePointer
   buildContextMangling(ContextDescriptorRef descriptor,
-                       Demangle::NodeFactory &nodeFactory) {
-    auto demangling = buildContextDescriptorMangling(descriptor, nodeFactory);
+                       Demangler &dem) {
+    auto demangling = buildContextDescriptorMangling(descriptor, dem);
     if (!demangling)
       return nullptr;
 
@@ -1554,8 +2033,8 @@ private:
     // References to type nodes behave as types in the mangling.
     if (isa<TargetTypeContextDescriptor<Runtime>>(descriptor.getLocalBuffer()) ||
         isa<TargetProtocolDescriptor<Runtime>>(descriptor.getLocalBuffer())) {
-      top = nodeFactory.createNode(Node::Kind::Type);
-      top->addChild(demangling, nodeFactory);
+      top = dem.createNode(Node::Kind::Type);
+      top->addChild(demangling, dem);
     } else {
       top = demangling;
     }
@@ -1565,14 +2044,15 @@ private:
 
   /// Given a read nominal type descriptor, attempt to build a
   /// nominal type decl from it.
-  BuiltNominalTypeDecl
+  BuiltTypeDecl
   buildNominalTypeDecl(ContextDescriptorRef descriptor) {
     // Build the demangling tree from the context tree.
-    Demangle::NodeFactory nodeFactory;
-    auto node = buildContextMangling(descriptor, nodeFactory);
+    Demangler dem;
+    auto node = buildContextMangling(descriptor, dem);
     if (!node || node->getKind() != Node::Kind::Type)
-      return BuiltNominalTypeDecl();
-    BuiltNominalTypeDecl decl = Builder.createNominalTypeDecl(node);
+      return BuiltTypeDecl();
+    bool typeAlias = false;
+    BuiltTypeDecl decl = Builder.createTypeDecl(node, typeAlias);
     return decl;
   }
 
@@ -1683,7 +2163,7 @@ private:
       return BuiltType();
 
     // From that, attempt to resolve a nominal type.
-    BuiltNominalTypeDecl typeDecl = buildNominalTypeDecl(descriptor);
+    BuiltTypeDecl typeDecl = buildNominalTypeDecl(descriptor);
     if (!typeDecl)
       return BuiltType();
 

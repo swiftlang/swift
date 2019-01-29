@@ -481,9 +481,10 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Allocate the 'self' value.
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
 
-  if (ctor->hasClangNode()) {
-    // For an allocator thunk synthesized for an Objective-C init method,
-    // allocate using the metatype.
+  if (ctor->hasClangNode() || ctor->isConvenienceInit()) {
+    assert(ctor->hasClangNode() || ctor->isObjC());
+    // For an allocator thunk synthesized for an @objc convenience initializer
+    // or imported Objective-C init method, allocate using the metatype.
     SILValue allocArg = selfMetaValue;
 
     // When using Objective-C allocation, convert the metatype
@@ -572,10 +573,13 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // enforce its DI properties on stored properties.
   MarkUninitializedInst::Kind MUKind;
 
-  if (isDelegating)
-    MUKind = MarkUninitializedInst::DelegatingSelf;
-  else if (selfClassDecl->requiresStoredPropertyInits() &&
-           usesObjCAllocator) {
+  if (isDelegating) {
+    if (ctor->isObjC())
+      MUKind = MarkUninitializedInst::DelegatingSelfAllocated;
+    else
+      MUKind = MarkUninitializedInst::DelegatingSelf;
+  } else if (selfClassDecl->requiresStoredPropertyInits() &&
+             usesObjCAllocator) {
     // Stored properties will be initialized in a separate
     // .cxx_construct method called by the Objective-C runtime.
     assert(selfClassDecl->hasSuperclass() &&
@@ -859,65 +863,6 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
   }
 }
 
-static SILValue getBehaviorInitStorageFn(SILGenFunction &SGF,
-                                         VarDecl *behaviorVar) {
-  Mangle::ASTMangler NewMangler;
-  std::string behaviorInitName = NewMangler.mangleBehaviorInitThunk(behaviorVar);
-  
-  SILFunction *thunkFn;
-  // Skip out early if we already emitted this thunk.
-  if (auto existing = SGF.SGM.M.lookUpFunction(behaviorInitName)) {
-    thunkFn = existing;
-  } else {
-    auto init = behaviorVar->getBehavior()->InitStorageDecl.getDecl();
-    auto initFn = SGF.SGM.getFunction(SILDeclRef(init), NotForDefinition);
-    
-    // Emit a thunk to inject the `self` metatype and implode tuples.
-    auto storageVar = behaviorVar->getBehavior()->StorageDecl;
-    auto selfTy = behaviorVar->getDeclContext()->getDeclaredInterfaceType();
-    auto initTy = SGF.getLoweredType(selfTy).getFieldType(behaviorVar,
-                                                          SGF.SGM.M);
-    auto storageTy = SGF.getLoweredType(selfTy).getFieldType(storageVar,
-                                                             SGF.SGM.M);
-    
-    auto initConstantTy = initFn->getLoweredType().castTo<SILFunctionType>();
-    
-    auto param = SILParameterInfo(initTy.getASTType(),
-                        initTy.isAddress() ? ParameterConvention::Indirect_In
-                                           : ParameterConvention::Direct_Owned);
-    auto result = SILResultInfo(storageTy.getASTType(),
-                              storageTy.isAddress() ? ResultConvention::Indirect
-                                                    : ResultConvention::Owned);
-    
-    initConstantTy = SILFunctionType::get(initConstantTy->getGenericSignature(),
-                                          initConstantTy->getExtInfo(),
-                                          SILCoroutineKind::None,
-                                          ParameterConvention::Direct_Unowned,
-                                          param,
-                                          /*yields*/ {},
-                                          result,
-                                          // TODO: throwing initializer?
-                                          None,
-                                          SGF.getASTContext());
-    
-    // TODO: Generate the body of the thunk.
-    SILGenFunctionBuilder builder(SGF);
-    thunkFn = builder.getOrCreateFunction(
-        SILLocation(behaviorVar), behaviorInitName, SILLinkage::PrivateExternal,
-        initConstantTy, IsBare, IsTransparent, IsSerialized);
-  }
-  return SGF.B.createFunctionRef(behaviorVar, thunkFn);
-}
-
-static SILValue getBehaviorSetterFn(SILGenFunction &SGF, VarDecl *behaviorVar) {
-  auto set = behaviorVar->getSetter();
-  auto setFn = SGF.SGM.getFunction(SILDeclRef(set), NotForDefinition);
-
-  // TODO: The setter may need to be a thunk, to implode tuples or perform
-  // reabstractions.
-  return SGF.B.createFunctionRef(behaviorVar, setFn);
-}
-
 static Type getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
     Pattern *pattern) {
@@ -981,38 +926,6 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
 
         emitMemberInit(*this, selfDecl, entry.getPattern(), std::move(result));
       }
-    }
-    
-    // Introduce behavior initialization markers for properties that need them.
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->isStatic()) continue;
-      if (!var->hasBehaviorNeedingInitialization()) continue;
-      
-      // Get the initializer method for behavior.
-      auto init = var->getBehavior()->InitStorageDecl;
-      SILValue initFn = getBehaviorInitStorageFn(*this, var);
-      
-      // Get the behavior's storage we need to initialize.
-      auto storage = var->getBehavior()->StorageDecl;
-      LValue storageRef = emitLValueForMemberInit(*this, var, selfDecl,storage);
-      // Shed any reabstraction over the member.
-      while (storageRef.isLastComponentTranslation())
-        storageRef.dropLastTranslationComponent();
-      
-      auto storageAddr = emitAddressOfLValue(var, std::move(storageRef));
-      
-      // Get the setter.
-      auto setterFn = getBehaviorSetterFn(*this, var);
-      auto self = emitSelfForMemberInit(*this, var, selfDecl);
-      
-      auto mark = B.createMarkUninitializedBehavior(var,
-               initFn, init.getSubstitutions(),
-               storageAddr.getValue(),
-               setterFn, getForwardingSubstitutionMap(), self.getValue(),
-               getLoweredType(var->getType()).getAddressType());
-      
-      // The mark instruction stands in for the behavior property.
-      VarLocs[var].value = mark;
     }
   }
 }

@@ -35,7 +35,7 @@ bb0:
   return %1 : $()                                 // id: %2
 }
 
-sil @$s12objc_dealloc10SwiftGizmoCfd : $@convention(thin) (@owned SwiftGizmo) -> @owned Builtin.NativeObject {
+sil [ossa] @$s12objc_dealloc10SwiftGizmoCfd : $@convention(thin) (@owned SwiftGizmo) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $SwiftGizmo):
   // function_ref objc_dealloc.onDestruct () -> ()
   %1 = function_ref @$s12objc_dealloc10onDestructyyF : $@convention(thin) () -> () // user: %2
@@ -48,7 +48,7 @@ bb0(%0 : @owned $SwiftGizmo):
   return %5 : $Builtin.NativeObject              // id: %6
 }
 
-sil @$s12objc_dealloc10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X {
+sil [ossa] @$s12objc_dealloc10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X {
 bb0(%0 : @unowned $SwiftGizmo):
   %1 = begin_borrow %0 : $SwiftGizmo
   %2 = ref_element_addr %1 : $SwiftGizmo, #SwiftGizmo.x      // user: %2
@@ -57,7 +57,7 @@ bb0(%0 : @unowned $SwiftGizmo):
   return %3 : $X                                  // id: %4
 }
 
-sil @$s12objc_dealloc10SwiftGizmoC1xAA1XCfsTo : $@convention(objc_method) (X, SwiftGizmo) -> () {
+sil [ossa] @$s12objc_dealloc10SwiftGizmoC1xAA1XCfsTo : $@convention(objc_method) (X, SwiftGizmo) -> () {
 bb0(%0 : @unowned $X, %1 : @unowned $SwiftGizmo):
   %2 = copy_value %0 : $X
   %3 = copy_value %1 : $SwiftGizmo
@@ -71,7 +71,7 @@ bb0(%0 : @unowned $X, %1 : @unowned $SwiftGizmo):
 }
 
 // CHECK: define internal void @"$s12objc_dealloc10SwiftGizmoCfDTo"([[OPAQUE:%.*]]*, i8*) unnamed_addr
-sil @$s12objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> () {
+sil [ossa] @$s12objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> () {
 bb0(%0 : @unowned $SwiftGizmo):
   // CHECK-NEXT: entry
   // CHECK-NEXT: [[OBJC_SUPER:%[a-zA-Z0-9_]+]] = alloca %objc_super, align 8
@@ -119,18 +119,18 @@ bb0(%0 : @unowned $SwiftGizmo):
 }
 
 // @objc ObjectiveC.SwiftGizmo.__ivar_destroyer
-sil @$s12objc_dealloc10SwiftGizmoCfETo : $@convention(objc_method) (SwiftGizmo) -> () {
+sil [ossa] @$s12objc_dealloc10SwiftGizmoCfETo : $@convention(objc_method) (SwiftGizmo) -> () {
 bb0(%0 : @unowned $SwiftGizmo):
   %3 = tuple ()
   return %3 : $()                                 // id: %4
 }
 
-sil @$s12objc_dealloc10SwiftGizmoCACycfcTo : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
+sil [ossa] @$s12objc_dealloc10SwiftGizmoCACycfcTo : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : @owned $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @$s12objc_dealloc10SwiftGizmoC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
-bb0(%0 : @trivial $Int, %1 : @owned $SwiftGizmo):
+sil [ossa] @$s12objc_dealloc10SwiftGizmoC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
+bb0(%0 : $Int, %1 : @owned $SwiftGizmo):
   unreachable
 }

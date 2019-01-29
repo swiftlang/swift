@@ -1,14 +1,15 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule -emit-parseable-module-interface-path %t/Test.swiftinterface -module-name Test -disable-objc-attr-requires-foundation-module -enable-objc-interop %s
-// RUN: %FileCheck %s < %t/Test.swiftinterface
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-parseable-module-interface-path - -module-name Test -enable-objc-interop | %FileCheck %s
+// RUN: %FileCheck %s --check-prefix FROMSOURCE --check-prefix CHECK < %t/Test.swiftinterface
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-parseable-module-interface-path - -module-name Test -enable-objc-interop | %FileCheck %s --check-prefix FROMMODULE --check-prefix CHECK
 
-// CHECK: final public class FinalClass {
+// CHECK-LABEL: final public class FinalClass {
 public final class FinalClass {
   // CHECK: @inlinable final public class var a: [[INT:(Swift.)?Int]] {
-  // CHECK-NEXT: {{^}} get {
-  // CHECK-NEXT: return 3
-  // CHECK-NEXT: }
+  // FROMSOURCE-NEXT: {{^}} get {
+  // FROMSOURCE-NEXT: return 3
+  // FROMSOURCE-NEXT: }
+  // FROMMODULE-NEXT: get{{$}}
   // CHECK-NEXT: }
   @inlinable
   public final class var a: Int {
@@ -16,9 +17,10 @@ public final class FinalClass {
   }
 
   // CHECK: final public class var b: [[INT]] {
-  // CHECK-NEXT:   {{^}} @inlinable get {
-  // CHECK-NEXT:     return 3
-  // CHECK-NEXT:   }
+  // FROMSOURCE-NEXT: {{^}} @inlinable get {
+  // FROMSOURCE-NEXT:   return 3
+  // FROMSOURCE-NEXT: }
+  // FROMMODULE-NEXT: {{^}} @inlinable get{{$}}
   // CHECK-NEXT:   set[[NEWVALUE:(\(newValue\))?]]{{$}}
   // CHECK-NEXT: }
   public final class var b: Int {
@@ -32,7 +34,8 @@ public final class FinalClass {
 
   // CHECK: public static var c: [[INT]] {
   // CHECK-NEXT: {{^}} get
-  // CHECK-NEXT:   @inlinable set[[NEWVALUE]] {}
+  // FROMSOURCE-NEXT:   @inlinable set[[NEWVALUE]] {}
+  // FROMMODULE-NEXT:   @inlinable set[[NEWVALUE]]{{$}}
   // CHECK-NEXT: }
   public static var c: Int {
     get {
@@ -53,11 +56,40 @@ public final class FinalClass {
   }
 }
 
-// CHECK: public struct MyStruct {
+// CHECK-LABEL: public class Base {
+public class Base {
+  // CHECK-NEXT: @objc public init(){{$}}
+  @objc public init() {}
+  // CHECK-NEXT: @objc required public init(x: [[INT]]){{$}}
+  @objc public required init(x: Int) {}
+  // CHECK-NEXT: @objc deinit{{$}}
+} // CHECK-NEXT: {{^}$}}
+
+
+// CHECK-LABEL: public class SubImplicit : {{(Test[.])?Base}} {
+public class SubImplicit: Base {
+  // CHECK-NEXT: @objc override public init(){{$}}
+  // CHECK-NEXT: @objc required public init(x: [[INT]]){{$}}
+  // CHECK-NEXT: @objc deinit{{$}}
+} // CHECK-NEXT: {{^}$}}
+
+
+// CHECK-LABEL: public class SubExplicit : {{(Test[.])?Base}} {
+public class SubExplicit: Base {
+  // Make sure adding "required" preserves both "required" and "override".
+  // CHECK-NEXT: @objc override required public init(){{$}}
+  public override required init() { super.init() }
+  // CHECK-NEXT: @objc required public init(x: [[INT]]){{$}}
+  public required init(x: Int) { super.init() }
+  // CHECK-NEXT: @objc deinit{{$}}
+} // CHECK-NEXT: {{^}$}}
+
+// CHECK-LABEL: public struct MyStruct {
 public struct MyStruct {
   // CHECK: public var e: [[INT]] {
   // CHECK-NEXT: {{^}} mutating get{{$}}
-  // CHECK-NEXT: {{^}} @inlinable nonmutating set[[NEWVALUE]] {}
+  // FROMSOURCE-NEXT: {{^}} @inlinable nonmutating set[[NEWVALUE]] {}
+  // FROMMODULE-NEXT: {{^}} @inlinable nonmutating set[[NEWVALUE]]{{$}}
   // CHECK-NEXT: }
   public var e: Int {
     mutating get { return 0 }

@@ -126,7 +126,7 @@ StringTests.test("AssociatedTypes-UTF16View") {
   typealias View = String.UTF16View
   expectCollectionAssociatedTypes(
     collectionType: View.self,
-    iteratorType: IndexingIterator<View>.self,
+    iteratorType: View.Iterator.self,
     subSequenceType: Substring.UTF16View.self,
     indexType: View.Index.self,
     indicesType: View.Indices.self)
@@ -145,7 +145,7 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
 StringTests.test("AssociatedTypes-CharacterView") {
   expectCollectionAssociatedTypes(
     collectionType: String.self,
-    iteratorType: IndexingIterator<String>.self,
+    iteratorType: String.Iterator.self,
     subSequenceType: Substring.self,
     indexType: String.Index.self,
     indicesType: DefaultIndices<String>.self)
@@ -2043,10 +2043,24 @@ struct ComparisonTestCase {
       switch comparison {
       case .less:
         expectLT(pair.0, pair.1)
+        if !pair.0.isEmpty {
+          // Test mixed String/Substring
+          expectTrue(pair.0.dropLast() < pair.1)
+        }
       case .greater:
         expectGT(pair.0, pair.1)
+        if !pair.1.isEmpty {
+          // Test mixed String/Substring
+          expectTrue(pair.0 > pair.1.dropLast())
+        }
       case .equal:
         expectEqual(pair.0, pair.1)
+        if !pair.0.isEmpty {
+          // Test mixed String/Substring
+          expectTrue(pair.0.dropLast() == pair.1.dropLast())
+          expectFalse(pair.0.dropFirst() == pair.1)
+          expectFalse(pair.0 == pair.1.dropFirst())
+        }
       }
     }
   }
@@ -2064,6 +2078,7 @@ struct ComparisonTestCase {
         expectEqual(pair.0, pair.1)
       }
     }
+    expectEqualSequence(strings, opaqueStrings)
 #endif
   }
   
@@ -2076,10 +2091,10 @@ struct ComparisonTestCase {
       
       guard string1.count > 0 else { return }
       
-      let expectedResult: _Ordering = string1 < string2 ? .less : (string1 > string2 ? .greater : .equal)
-      let opaqueResult: _Ordering = opaqueString < string2 ? .less : (opaqueString > string2 ? .greater : .equal)
-      
-      expectEqual(opaqueResult, expectedResult)
+      expectEqual(string1, opaqueString)
+      expectEqual(string1 < string2, opaqueString < string2)
+      expectEqual(string1 > string2, opaqueString > string2)
+      expectEqual(string1 == string2, opaqueString == string2)
     }
 #endif
   }
@@ -2133,6 +2148,9 @@ let comparisonTestCases = [
   ComparisonTestCase(["\u{f90b}", "\u{5587}"], .equal),
   
   ComparisonTestCase(["a\u{1D160}a", "a\u{1D158}\u{1D1C7}"], .less),
+
+  ComparisonTestCase(["a\u{305}\u{315}", "a\u{315}\u{305}"], .equal),
+  ComparisonTestCase(["a\u{315}bz", "a\u{315}\u{305}az"], .greater),
   
   ComparisonTestCase(["\u{212b}", "\u{00c5}"], .equal),
   ComparisonTestCase([
@@ -2151,10 +2169,14 @@ let comparisonTestCases = [
     "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
     "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
     "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}\u{302}",
     "ae\u{302}",
     "ae\u{302}{303}",
     "ae\u{302}🧀",
     "ae\u{303}",
+    "x\u{0939}x",
+    "x\u{0939}\u{093a}x",
+    "x\u{0939}\u{093a}\u{093b}x",
     "\u{f90b}\u{f90c}\u{f90d}", // Normalizes to BMP scalars
     "\u{FFEE}", // half width CJK dot
     "🧀", // D83E DDC0 -- aka a really big scalar
@@ -2177,10 +2199,58 @@ for test in comparisonTestCases {
   }
 
   StringTests.test("Comparison.OpaqueSubstring.\(test.strings)")
-    .skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
-    .code {
+  .skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
+  .code {
     test.testOpaqueSubstrings()
   }
+}
+
+StringTests.test("Comparison.Substrings") {
+  let str = "abcdefg"
+  let expectedStr = "bcdef"
+  let substring = str.dropFirst().dropLast()
+  
+  expectEqual(expectedStr, substring)
+}
+
+StringTests.test("Comparison.Substrings/Opaque")
+.skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
+.code {
+#if _runtime(_ObjC)
+  let str = NSSlowString(string: "abcdefg") as String
+  let expectedStr = NSSlowString(string: "bcdef") as String
+  let substring = str.dropFirst().dropLast()
+  
+  expectEqual(expectedStr, substring)
+#endif
+}
+
+StringTests.test("NormalizationBufferCrashRegressionTest") {
+  let str = "\u{0336}\u{0344}\u{0357}\u{0343}\u{0314}\u{0351}\u{0340}\u{0300}\u{0340}\u{0360}\u{0314}\u{0357}\u{0315}\u{0301}\u{0344}a"
+  let set = Set([str])
+  
+  expectTrue(set.contains(str))
+}
+
+StringTests.test("NormalizationCheck") {
+  let str = "\u{0336}\u{0344}\u{0357}\u{0343}\u{0314}\u{0351}\u{0340}\u{0300}\u{0340}\u{0360}\u{0314}\u{0357}\u{0315}\u{0301}\u{0344}a"
+  let nfcCodeUnits = str._nfcCodeUnits
+  let expectedCodeUnits: [UInt8] = [0xCC, 0xB6, 0xCC, 0x88, 0xCC, 0x81, 0xCD, 0x97, 0xCC, 0x93, 0xCC, 0x94, 0xCD, 0x91, 0xCC, 0x80, 0xCC, 0x80, 0xCC, 0x80, 0xCC, 0x94, 0xCD, 0x97, 0xCC, 0x81, 0xCC, 0x88, 0xCC, 0x81, 0xCC, 0x95, 0xCD, 0xA0, 0x61]
+
+  expectEqual(expectedCodeUnits, nfcCodeUnits)
+}
+
+StringTests.test("NormalizationCheck/Opaque")
+.skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
+.code {
+#if _runtime(_ObjC)
+  let str = "\u{0336}\u{0344}\u{0357}\u{0343}\u{0314}\u{0351}\u{0340}\u{0300}\u{0340}\u{0360}\u{0314}\u{0357}\u{0315}\u{0301}\u{0344}a"
+  let opaqueString = NSSlowString(string: str) as String
+  let nfcCodeUnits = opaqueString._nfcCodeUnits
+  let expectedCodeUnits: [UInt8] = [0xCC, 0xB6, 0xCC, 0x88, 0xCC, 0x81, 0xCD, 0x97, 0xCC, 0x93, 0xCC, 0x94, 0xCD, 0x91, 0xCC, 0x80, 0xCC, 0x80, 0xCC, 0x80, 0xCC, 0x94, 0xCD, 0x97, 0xCC, 0x81, 0xCC, 0x88, 0xCC, 0x81, 0xCC, 0x95, 0xCD, 0xA0, 0x61]
+
+  expectEqual(expectedCodeUnits, nfcCodeUnits)
+#endif
 }
 
 runAllTests()

@@ -157,7 +157,7 @@ namespace irgen {
                                 CanSILFunctionType &SubstFnType,
                                 Explosion &nativeParam, unsigned paramIndex);
 
-  /// \brief Load a reference to the protocol descriptor for the given protocol.
+  /// Load a reference to the protocol descriptor for the given protocol.
   ///
   /// For Swift protocols, this is a constant reference to the protocol
   /// descriptor symbol.
@@ -256,9 +256,6 @@ namespace irgen {
   void enumerateGenericParamFulfillments(IRGenModule &IGM,
     CanSILFunctionType fnType,
     GenericParamFulfillmentCallback callback);
-
-  bool isDependentConformance(const NormalProtocolConformance *conformance);
-
 } // end namespace irgen
 } // end namespace swift
 

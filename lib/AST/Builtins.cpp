@@ -45,10 +45,12 @@ bool BuiltinInfo::isReadNone() const {
 }
 
 bool IntrinsicInfo::hasAttribute(llvm::Attribute::AttrKind Kind) const {
-  // FIXME: We should not be relying on the global LLVM context.
-  llvm::AttributeList attrs =
-      llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
-  return (attrs.hasAttribute(llvm::AttributeList::FunctionIndex, Kind));
+  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeList>;
+  if (DenseMapInfo::isEqual(Attrs, DenseMapInfo::getEmptyKey())) {
+    // FIXME: We should not be relying on the global LLVM context.
+    Attrs = llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
+  }
+  return Attrs.hasFnAttribute(Kind);
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
@@ -949,6 +951,14 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
+static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
+  auto int1Type = BuiltinIntegerType::get(1, Context);
+  auto optionalRawPointerType = BoundGenericEnumType::get(
+      Context.getOptionalDecl(), Type(), {Context.TheRawPointerType});
+  return getBuiltinFunction(Id, {int1Type, optionalRawPointerType},
+                            Context.TheEmptyTupleType);
+}
+
 static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
   // <T> T -> ()
   BuiltinGenericSignatureBuilder builder(Context);
@@ -1000,6 +1010,12 @@ static ValueDecl *getTypeJoinMetaOperation(ASTContext &Context, Identifier Id) {
   builder.addParameter(makeMetatype(makeGenericParam(1)));
   builder.setResult(makeMetatype(makeGenericParam(2)));
   return builder.build(Id);
+}
+
+static ValueDecl *getTriggerFallbackDiagnosticOperation(ASTContext &Context,
+                                                        Identifier Id) {
+  // () -> Void
+  return getBuiltinFunction(Id, {}, Context.TheEmptyTupleType);
 }
 
 static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
@@ -1096,19 +1112,6 @@ static ValueDecl *getCheckedTruncOperation(ASTContext &Context, Identifier Id,
   TupleTypeElt ResultElts[] = { Type(OutTy), OverflowBitTy };
   Type ResultTy = TupleType::get(ResultElts, Context);
   return getBuiltinFunction(Id, { InTy }, ResultTy);
-}
-
-static ValueDecl *getCheckedConversionOperation(ASTContext &Context,
-                                                Identifier Id,
-                                                Type Ty) {
-  Type BuiltinTy = Ty->getAs<BuiltinIntegerType>();
-  if (!BuiltinTy)
-    return nullptr;
-
-  Type SignErrorBitTy = BuiltinIntegerType::get(1, Context);
-  TupleTypeElt ResultElts[] = { BuiltinTy, SignErrorBitTy };
-  Type ResultTy = TupleType::get(ResultElts, Context);
-  return getBuiltinFunction(Id, { BuiltinTy }, ResultTy);
 }
 
 static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
@@ -1228,10 +1231,7 @@ static const char *const IntrinsicNameTable[] = {
 #include "llvm/IR/IntrinsicImpl.inc"
 #undef GET_INTRINSIC_TARGET_DATA
 
-/// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
-/// removed (e.g. like "bswap") return the LLVM IR IntrinsicID for the intrinsic
-/// or 0 if the intrinsic name doesn't match anything.
-unsigned swift::getLLVMIntrinsicID(StringRef InName) {
+llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
   using namespace llvm;
 
   // Swift intrinsic names start with int_.
@@ -1324,12 +1324,11 @@ static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
 
 /// \returns true on success, false on failure.
 static bool
-getSwiftFunctionTypeForIntrinsic(unsigned iid, ArrayRef<Type> TypeArgs,
+getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
+                                 ArrayRef<Type> TypeArgs,
                                  ASTContext &Context,
                                  SmallVectorImpl<Type> &ArgElts,
-                                 Type &ResultTy, FunctionType::ExtInfo &Info) {
-  llvm::Intrinsic::ID ID = (llvm::Intrinsic::ID)iid;
-  
+                                 Type &ResultTy) {
   typedef llvm::Intrinsic::IITDescriptor IITDescriptor;
   SmallVector<IITDescriptor, 8> Table;
   getIntrinsicInfoTableEntries(ID, Table);
@@ -1351,7 +1350,6 @@ getSwiftFunctionTypeForIntrinsic(unsigned iid, ArrayRef<Type> TypeArgs,
   // Translate LLVM function attributes to Swift function attributes.
   llvm::AttributeList attrs =
       llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
-  Info = FunctionType::ExtInfo();
   if (attrs.hasAttribute(llvm::AttributeList::FunctionIndex,
                          llvm::Attribute::NoReturn)) {
     ResultTy = Context.getNeverType();
@@ -1442,13 +1440,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   // If this is the name of an LLVM intrinsic, cons up a swift function with a
   // type that matches the IR types.
-  if (unsigned ID = getLLVMIntrinsicID(OperationName)) {
+  if (llvm::Intrinsic::ID ID = getLLVMIntrinsicID(OperationName)) {
     SmallVector<Type, 8> ArgElts;
     Type ResultTy;
-    FunctionType::ExtInfo Info;
-    if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy,
-                                         Info))
-      return getBuiltinFunction(Id, ArgElts, ResultTy, Info);
+    if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy))
+      return getBuiltinFunction(Id, ArgElts, ResultTy);
   }
   
   // If this starts with fence, we have special suffixes to handle.
@@ -1845,11 +1841,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (Types.size() != 2) return nullptr;
     return getCheckedTruncOperation(Context, Id, Types[0], Types[1], false);
 
-  case BuiltinValueKind::SUCheckedConversion:
-  case BuiltinValueKind::USCheckedConversion:
-    if (Types.size() != 1) return nullptr;
-    return getCheckedConversionOperation(Context, Id, Types[0]);
-
   case BuiltinValueKind::ClassifyBridgeObject:
     if (!Types.empty()) return nullptr;
     return getClassifyBridgeObject(Context, Id);
@@ -1873,6 +1864,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);
 
+  case BuiltinValueKind::PoundAssert:
+    return getPoundAssert(Context, Id);
+
   case BuiltinValueKind::TSanInoutAccess:
     return getTSanInoutAccess(Context, Id);
 
@@ -1888,7 +1882,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getTypeJoinInoutOperation(Context, Id);
 
   case BuiltinValueKind::TypeJoinMeta:
-    return getTypeJoinMetaOperation(Context, Id);      
+    return getTypeJoinMetaOperation(Context, Id);
+
+  case BuiltinValueKind::TriggerFallbackDiagnostic:
+    return getTriggerFallbackDiagnosticOperation(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");
