@@ -1,4 +1,4 @@
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -369,6 +369,26 @@ class TestCodable : TestCodableSuper {
         let decoded = performEncodeAndDecode(of: value, encode: { try PropertyListEncoder().encode($0) }, decode: { try PropertyListDecoder().decode($0, from: $1)  }, lineNumber: #line)
         expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded ClosedRange upperBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
         expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded ClosedRange lowerBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+    }
+
+    // MARK: - ContiguousArray
+    lazy var contiguousArrayValues: [Int : ContiguousArray<String>] = [
+        #line : [],
+        #line : ["foo"],
+        #line : ["foo", "bar"],
+        #line : ["foo", "bar", "baz"],
+    ]
+
+    func test_ContiguousArray_JSON() {
+        for (testLine, contiguousArray) in contiguousArrayValues {
+            expectRoundTripEqualityThroughJSON(for: contiguousArray, lineNumber: testLine)
+        }
+    }
+
+    func test_ContiguousArray_Plist() {
+        for (testLine, contiguousArray) in contiguousArrayValues {
+            expectRoundTripEqualityThroughPlist(for: contiguousArray, lineNumber: testLine)
+        }
     }
 
     // MARK: - DateComponents
@@ -853,6 +873,8 @@ var tests = [
     "test_CGVector_Plist" : TestCodable.test_CGVector_Plist,
     "test_ClosedRange_JSON" : TestCodable.test_ClosedRange_JSON,
     "test_ClosedRange_Plist" : TestCodable.test_ClosedRange_Plist,
+    "test_ContiguousArray_JSON" : TestCodable.test_ContiguousArray_JSON,
+    "test_ContiguousArray_Plist" : TestCodable.test_ContiguousArray_Plist,
     "test_DateComponents_JSON" : TestCodable.test_DateComponents_JSON,
     "test_DateComponents_Plist" : TestCodable.test_DateComponents_Plist,
     "test_Decimal_JSON" : TestCodable.test_Decimal_JSON,
