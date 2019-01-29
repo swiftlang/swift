@@ -110,6 +110,7 @@ Globals
   global ::= nominal-type 'Ml'           // in-place type initialization cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
+  global ::= opaque-type-decl-name 'MQ'  // opaque type descriptor
   global ::= nominal-type 'Mu'           // class method lookup function
   global ::= nominal-type 'MU'           // ObjC metadata update callback function
   global ::= nominal-type 'Ms'           // ObjC resilient class stub
@@ -599,6 +600,18 @@ mangled in to disambiguate.
 For the most part, manglings follow the structure of formal language
 types.  However, in some cases it is more useful to encode the exact
 implementation details of a function type.
+
+::
+
+  type ::= 'Qr'                         // opaque result type (of current decl)
+  type ::= opaque-type-decl-name bound-generic-args 'Qo' // opaque type
+
+  opaque-type-decl-name ::= entity 'QO' // opaque result type of specified decl
+
+Opaque return types have a special short representation in the mangling of
+their defining entity. In structural position, opaque types are fully qualified
+by mangling the defining entity for the opaque declaration and the substitutions
+into the defining entity's generic environment.
 
 The ``type*`` list contains parameter and return types (including the error
 result), in that order.

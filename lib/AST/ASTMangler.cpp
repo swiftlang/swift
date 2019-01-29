@@ -731,9 +731,18 @@ static bool shouldMangleAsGeneric(Type type) {
   return type->isSpecialized();
 }
 
+void ASTMangler::appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl) {
+  if (auto namingDecl = opaqueDecl->getNamingDecl()) {
+    appendEntity(namingDecl);
+    appendOperator("QO");
+  } else {
+    llvm_unreachable("todo: independent opaque type decls");
+  }
+}
+
 /// Mangle a type into the buffer.
 ///
-void ASTMangler::appendType(Type type) {
+void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
   assert((DWARFMangling || type->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
   TypeBase *tybase = type.getPointer();
@@ -786,7 +795,8 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::SILToken:
       return appendOperator("Bt");
     case TypeKind::BuiltinVector:
-      appendType(cast<BuiltinVectorType>(tybase)->getElementType());
+      appendType(cast<BuiltinVectorType>(tybase)->getElementType(),
+                 forDecl);
       return appendOperator("Bv",
                             cast<BuiltinVectorType>(tybase)->getNumElements());
     case TypeKind::TypeAlias: {
@@ -798,7 +808,8 @@ void ASTMangler::appendType(Type type) {
       // unless the type alias references a builtin type.
       TypeAliasDecl *decl = aliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
-        return appendType(aliasTy->getSinglyDesugaredType());
+        return appendType(aliasTy->getSinglyDesugaredType(),
+                          forDecl);
       }
 
       if (aliasTy->getSubstitutionMap()) {
@@ -845,7 +856,7 @@ void ASTMangler::appendType(Type type) {
 
     case TypeKind::ExistentialMetatype: {
       ExistentialMetatypeType *EMT = cast<ExistentialMetatypeType>(tybase);
-      appendType(EMT->getInstanceType());
+      appendType(EMT->getInstanceType(), forDecl);
       if (EMT->hasRepresentation()) {
         appendOperator("Xm",
                        getMetatypeRepresentationOp(EMT->getRepresentation()));
@@ -856,7 +867,7 @@ void ASTMangler::appendType(Type type) {
     }
     case TypeKind::Metatype: {
       MetatypeType *MT = cast<MetatypeType>(tybase);
-      appendType(MT->getInstanceType());
+      appendType(MT->getInstanceType(), forDecl);
       if (MT->hasRepresentation()) {
         appendOperator("XM",
                        getMetatypeRepresentationOp(MT->getRepresentation()));
@@ -869,17 +880,17 @@ void ASTMangler::appendType(Type type) {
       llvm_unreachable("@lvalue types should not occur in function interfaces");
 
     case TypeKind::InOut:
-      appendType(cast<InOutType>(tybase)->getObjectType());
+      appendType(cast<InOutType>(tybase)->getObjectType(), forDecl);
       return appendOperator("z");
 
 #define REF_STORAGE(Name, ...) \
     case TypeKind::Name##Storage: \
-      appendType(cast<Name##StorageType>(tybase)->getReferentType()); \
+      appendType(cast<Name##StorageType>(tybase)->getReferentType(), forDecl); \
       return appendOperator(manglingOf(ReferenceOwnership::Name));
 #include "swift/AST/ReferenceStorage.def"
 
     case TypeKind::Tuple:
-      appendTypeList(type);
+      appendTypeList(type, forDecl);
       return appendOperator("t");
 
     case TypeKind::Protocol: {
@@ -902,7 +913,7 @@ void ASTMangler::appendType(Type type) {
         appendOperator("y");
 
       if (auto superclass = layout.explicitSuperclass) {
-        appendType(superclass);
+        appendType(superclass, forDecl);
         return appendOperator("Xc");
       } else if (layout.hasExplicitAnyObject) {
         return appendOperator("Xl");
@@ -930,7 +941,7 @@ void ASTMangler::appendType(Type type) {
         if (isStdlibType(Decl) && Decl->getName().str() == "Optional") {
           auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
-          appendType(GenArgs[0]);
+          appendType(GenArgs[0], forDecl);
           appendOperator("Sg");
         } else {
           appendAnyGenericType(Decl);
@@ -952,37 +963,49 @@ void ASTMangler::appendType(Type type) {
       // type ::= archetype
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::NestedArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
 
     case TypeKind::OpaqueTypeArchetype: {
-      // TODO: Mangle opaque archetypes as themselves, not their underlying type
-      auto opaqueTy = cast<OpaqueTypeArchetypeType>(tybase);
-      
-      // Currently an opaque type will only lack an underlying type when in
-      // error. Mangle an error type for USRs and other queries that might apply
-      // to a failed AST.
-      if (!opaqueTy->getOpaqueDecl()->getUnderlyingTypeSubstitutions()) {
-        return appendType(ErrorType::get(opaqueTy->getASTContext()));
+      // If this is the opaque return type of the declaration currently being
+      // mangled, use a short mangling to represent it.
+      auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
+      auto opaqueDecl = opaqueType->getOpaqueDecl();
+      if (opaqueDecl->getNamingDecl() == forDecl) {
+        if (opaqueType->getSubstitutions().isIdentity()) {
+          return appendOperator("Qr");
+        }
       }
-      auto underlyingType =
-        type.substOpaqueTypesWithUnderlyingTypes();
-      assert(!underlyingType->isEqual(type));
-      return appendType(underlyingType->getCanonicalType());
+      
+      // Otherwise, use the fully qualified mangling.
+      appendOpaqueDeclName(opaqueDecl);
+      bool isFirstArgList = true;
+      appendBoundGenericArgs(opaqueDecl->getInnermostDeclContext(),
+                             opaqueType->getSubstitutions(),
+                             isFirstArgList);
+      appendOperator("Qo");
+      return;
+    }
+      
+    case TypeKind::NestedArchetype: {
+      auto nestedType = cast<NestedArchetypeType>(tybase);
+      appendType(nestedType->getParent());
+      appendIdentifier(nestedType->getName().str());
+      appendOperator("Qa");
+      return;
     }
       
     case TypeKind::DynamicSelf: {
       auto dynamicSelf = cast<DynamicSelfType>(tybase);
       if (dynamicSelf->getSelfType()->getAnyNominal()) {
-        appendType(dynamicSelf->getSelfType());
+        appendType(dynamicSelf->getSelfType(), forDecl);
         return appendOperator("XD");
       }
-      return appendType(dynamicSelf->getSelfType());
+      return appendType(dynamicSelf->getSelfType(), forDecl);
     }
 
     case TypeKind::GenericFunction: {
       auto genFunc = cast<GenericFunctionType>(tybase);
-      appendFunctionType(genFunc);
+      appendFunctionType(genFunc, /*autoclosure*/ false, forDecl);
       appendGenericSignature(genFunc->getGenericSignature());
       appendOperator("u");
       return;
@@ -1016,7 +1039,7 @@ void ASTMangler::appendType(Type type) {
       } else {
         // Dependent members of non-generic-param types are not canonical, but
         // we may still want to mangle them for debugging or indexing purposes.
-        appendType(DepTy->getBase());
+        appendType(DepTy->getBase(), forDecl);
         appendIdentifier(DepTy->getName().str());
         appendOperator("Qa");
       }
@@ -1025,7 +1048,8 @@ void ASTMangler::appendType(Type type) {
     }
       
     case TypeKind::Function:
-      appendFunctionType(cast<FunctionType>(tybase));
+      appendFunctionType(cast<FunctionType>(tybase), /*autoclosure*/ false,
+                         forDecl);
       return;
       
     case TypeKind::SILBox: {
@@ -1033,7 +1057,7 @@ void ASTMangler::appendType(Type type) {
       auto layout = box->getLayout();
       bool firstField = true;
       for (auto &field : layout->getFields()) {
-        appendType(field.getLoweredType());
+        appendType(field.getLoweredType(), forDecl);
         if (field.isMutable()) {
           // Use the `inout` mangling to represent a mutable field.
           appendOperator("z");
@@ -1046,7 +1070,7 @@ void ASTMangler::appendType(Type type) {
       if (auto sig = layout->getGenericSignature()) {
         bool firstType = true;
         for (Type type : box->getSubstitutions().getReplacementTypes()) {
-          appendType(type);
+          appendType(type, forDecl);
           appendListSeparator(firstType);
         }
         if (firstType)
@@ -1813,7 +1837,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     addSubstitution(cast<TypeAliasDecl>(decl));
 }
 
-void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
+void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling,
+                                const ValueDecl *forDecl) {
   // Append parameter labels right before the signature/type.
   auto parameters = fn->getParams();
   auto firstLabel = std::find_if(
@@ -1833,17 +1858,18 @@ void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
   }
 
   if (isFunctionMangling) {
-    appendFunctionSignature(fn);
+    appendFunctionSignature(fn, forDecl);
   } else {
-    appendFunctionType(fn);
+    appendFunctionType(fn, /*autoclosure*/ false, forDecl);
   }
 }
 
-void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure) {
+void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
+                                    const ValueDecl *forDecl) {
   assert((DWARFMangling || fn->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
 
-  appendFunctionSignature(fn);
+  appendFunctionSignature(fn, forDecl);
 
   // Note that we do not currently use thin representations in the AST
   // for the types of function decls.  This may need to change at some
@@ -1876,15 +1902,17 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure) {
   }
 }
 
-void ASTMangler::appendFunctionSignature(AnyFunctionType *fn) {
-  appendFunctionResultType(fn->getResult());
-  appendFunctionInputType(fn->getParams());
+void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
+                                         const ValueDecl *forDecl) {
+  appendFunctionResultType(fn->getResult(), forDecl);
+  appendFunctionInputType(fn->getParams(), forDecl);
   if (fn->throws())
     appendOperator("K");
 }
 
 void ASTMangler::appendFunctionInputType(
-    ArrayRef<AnyFunctionType::Param> params) {
+    ArrayRef<AnyFunctionType::Param> params,
+    const ValueDecl *forDecl) {
   switch (params.size()) {
   case 0:
     appendOperator("y");
@@ -1898,7 +1926,8 @@ void ASTMangler::appendFunctionInputType(
     // the parameter list as a single type.
     if (!param.hasLabel() && !param.isVariadic() &&
         !isa<TupleType>(type.getPointer())) {
-      appendTypeListElement(Identifier(), type, param.getParameterFlags());
+      appendTypeListElement(Identifier(), type, param.getParameterFlags(),
+                            forDecl);
       break;
     }
 
@@ -1911,7 +1940,7 @@ void ASTMangler::appendFunctionInputType(
     bool isFirstParam = true;
     for (auto &param : params) {
       appendTypeListElement(Identifier(), param.getPlainType(),
-                            param.getParameterFlags());
+                            param.getParameterFlags(), forDecl);
       appendListSeparator(isFirstParam);
     }
     appendOperator("t");
@@ -1919,11 +1948,13 @@ void ASTMangler::appendFunctionInputType(
   }
 }
 
-void ASTMangler::appendFunctionResultType(Type resultType) {
-  return resultType->isVoid() ? appendOperator("y") : appendType(resultType);
+void ASTMangler::appendFunctionResultType(Type resultType,
+                                          const ValueDecl *forDecl) {
+  return resultType->isVoid() ? appendOperator("y")
+                              : appendType(resultType, forDecl);
 }
 
-void ASTMangler::appendTypeList(Type listTy) {
+void ASTMangler::appendTypeList(Type listTy, const ValueDecl *forDecl) {
   if (TupleType *tuple = listTy->getAs<TupleType>()) {
     if (tuple->getNumElements() == 0)
       return appendOperator("y");
@@ -1931,21 +1962,23 @@ void ASTMangler::appendTypeList(Type listTy) {
     for (auto &field : tuple->getElements()) {
       assert(field.getParameterFlags().isNone());
       appendTypeListElement(field.getName(), field.getRawType(),
-                            ParameterTypeFlags());
+                            ParameterTypeFlags(),
+                            forDecl);
       appendListSeparator(firstField);
     }
   } else {
-    appendType(listTy);
+    appendType(listTy, forDecl);
     appendListSeparator();
   }
 }
 
 void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
-                                       ParameterTypeFlags flags) {
+                                       ParameterTypeFlags flags,
+                                       const ValueDecl *forDecl) {
   if (auto *fnType = elementType->getAs<FunctionType>())
-    appendFunctionType(fnType, flags.isAutoClosure());
+    appendFunctionType(fnType, flags.isAutoClosure(), forDecl);
   else
-    appendType(elementType);
+    appendType(elementType, forDecl);
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
@@ -2289,9 +2322,9 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
   auto type = getDeclTypeForMangling(decl, genericSig, parentGenericSig);
 
   if (AnyFunctionType *FuncTy = type->getAs<AnyFunctionType>()) {
-    appendFunction(FuncTy, isFunctionMangling);
+    appendFunction(FuncTy, isFunctionMangling, decl);
   } else {
-    appendType(type);
+    appendType(type, decl);
   }
 
   // Mangle the generic signature, if any.
