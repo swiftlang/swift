@@ -558,7 +558,7 @@ void SILBuilder::emitDestructureValueOperation(
     function_ref<void(unsigned, SILValue)> func) {
   // Do a quick check to see if we have a tuple without elements. In that
   // case, bail early since we are not going to ever invoke Func.
-  if (auto tupleType = operand->getType().castTo<TupleType>())
+  if (auto tupleType = operand->getType().getAs<TupleType>())
     if (0 == tupleType->getNumElements())
       return;
 
