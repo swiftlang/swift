@@ -1700,9 +1700,6 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
   if (auto *inst = original->getDefiningInstruction()) {
     if (auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(inst)) {
       if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original) {
-        builder.createRetainValue(original.getLoc(),
-                                  adfei->getFunctionOperand(),
-                                  builder.getDefaultAtomicity());
         SILValue assocFn = builder.createAutoDiffFunctionExtract(
             original.getLoc(), kind, /*differentiationOrder*/ 1,
             adfei->getFunctionOperand());
