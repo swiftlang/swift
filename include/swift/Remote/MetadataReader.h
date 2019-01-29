@@ -1525,7 +1525,8 @@ private:
     dem.setSymbolicReferenceResolver([&](SymbolicReferenceKind kind,
                                          Directness directness,
                                          int32_t offset,
-                                         const void *base) -> NodePointer {
+                                         const void *base) ->
+        swift::Demangle::NodePointer {
       // Resolve the reference to a remote address.
       auto offsetInMangledName = (const char *)base - mangledName.data();
       auto remoteAddress =
@@ -1552,7 +1553,7 @@ private:
       return nullptr;
     });
 
-    NodePointer result;
+    swift::Demangle::NodePointer result;
     switch (kind) {
     case MangledNameKind::Type:
       result = dem.demangleType(mangledName);
@@ -1706,7 +1707,7 @@ private:
 
     // If the parent is an anonymous context that provides a complete
     // name for this node, note that.
-    NodePointer demangledParentNode = nullptr;
+    Demangle::NodePointer demangledParentNode = nullptr;
     auto nameNode = adoptAnonymousContextName(
         descriptor, parentDescriptorResult, dem, demangledParentNode);
 
@@ -1835,9 +1836,9 @@ private:
 
           // Demangle the subject.
           auto subjectAddress = resolveRelativeField(descriptor, req.Param);
-          NodePointer subject = readMangledName(RemoteAddress(subjectAddress),
-                                                MangledNameKind::Type,
-                                                dem);
+          swift::Demangle::NodePointer subject =
+              readMangledName(RemoteAddress(subjectAddress),
+                              MangledNameKind::Type, dem);
           if (!subject) {
             failed = true;
             break;
@@ -1867,9 +1868,9 @@ private:
           case GenericRequirementKind::BaseClass: {
             // Demangle the right-hand type.
             auto typeAddress = resolveRelativeField(descriptor, req.Type);
-            NodePointer type = readMangledName(RemoteAddress(typeAddress),
-                                               MangledNameKind::Type,
-                                               dem);
+            swift::Demangle::NodePointer type =
+                readMangledName(RemoteAddress(typeAddress),
+                                MangledNameKind::Type, dem);
             if (!type) {
               failed = true;
               break;
