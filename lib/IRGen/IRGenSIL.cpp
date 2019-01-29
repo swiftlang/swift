@@ -1228,13 +1228,19 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   }
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
     auto declContext = f->getDeclContext();
-    if (declContext && isa<DestructorDecl>(declContext))
+    if (f->getLoweredFunctionType()->isCoroutine()) {
+      // Disable TSan in coroutines; the instrumentation currently interferes
+      // with coroutine structural invariants.
+    } else if (declContext && isa<DestructorDecl>(declContext)) {
       // Do not report races in deinit and anything called from it
       // because TSan does not observe synchronization between retain
       // count dropping to '0' and the object deinitialization.
+      // Also don't report races in coroutines because the instrumentation
+      // code breaks coroutine rules.
       CurFn->addFnAttr("sanitize_thread_no_checking_at_run_time");
-    else
+    } else {
       CurFn->addFnAttr(llvm::Attribute::SanitizeThread);
+    }
   }
 
   // Disable inlining of coroutine functions until we split.
