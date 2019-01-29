@@ -2301,6 +2301,19 @@ class AvailabilityWalker : public ASTWalker {
   Optional<TypeChecker::FragileFunctionKind> FragileKind;
   bool TreatUsableFromInlineAsPublic = false;
 
+  /// Returns true if DC is an \c init(rawValue:) declaration and it is marked
+  /// implicit.
+  bool inSynthesizedInitRawValue() {
+    auto init = dyn_cast_or_null<ConstructorDecl>(
+                    DC->getInnermostDeclarationDeclContext());
+
+    return init &&
+           init->isImplicit() &&
+           init->getParameters()->size() == 1 &&
+           init->getParameters()->get(0)->getArgumentName() ==
+                   DC->getASTContext().Id_rawValue;
+  }
+
 public:
   AvailabilityWalker(
       TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {
@@ -2320,8 +2333,20 @@ public:
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
+      DeclAvailabilityFlags flags = None;
+      if (inSynthesizedInitRawValue())
+        // HACK: If a raw-value enum has cases with `@available(introduced:)`
+        // attributes, the auto-derived `init(rawValue:)` will contain
+        // DeclRefExprs which reference those cases. It will also contain
+        // appropriate `guard #available` statements to keep them from running
+        // on older versions, but the availability checker can't verify that
+        // because the synthesized code uses invalid SourceLocs. Don't diagnose
+        // these errors; instead, take it on faith that
+        // DerivedConformanceRawRepresentable will do the right thing.
+        flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailable;
+
       diagAvailability(DR->getDecl(), DR->getSourceRange(),
-                       getEnclosingApplyExpr());
+                       getEnclosingApplyExpr(), flags);
       maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
     }
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
@@ -2581,6 +2606,9 @@ AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
 
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
         && isa<ProtocolDecl>(D))
+    return false;
+
+  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailable))
     return false;
 
   // Diagnose (and possibly signal) for potential unavailability

@@ -38,6 +38,7 @@ enum class DeclAvailabilityFlag : uint8_t {
   AllowPotentiallyUnavailableProtocol = 1 << 0,
   ContinueOnPotentialUnavailability = 1 << 1,
   ForInout = 1 << 2,
+  AllowPotentiallyUnavailable = 1 << 3,
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
