@@ -5754,7 +5754,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   }
   
   // Emit a diagnostic if we recorded any constraints where the constraint
-  // type was not constraint to a protocol or class. Provide a fix-it if
+  // type was not constrained to a protocol or class. Provide a fix-it if
   // allowConcreteGenericParams is true.
   if (!invalidConstraints.empty()) {
     for (auto constraint : invalidConstraints) {
