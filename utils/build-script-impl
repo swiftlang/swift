@@ -83,6 +83,9 @@ KNOWN_SETTINGS=(
     xctest-build-type           "Debug"          "the build variant for xctest"
     swiftpm-build-type          "Debug"          "the build variant for swiftpm"
     swiftsyntax-build-type      "Debug"          "the build variant for swiftSyntax"
+    # When this flag is set, the build-script will only build/install the swift-syntax parser
+    # This is a temporary workaround of having a separate build product for swift-syntax parser
+    skip-swiftsyntax-swiftside  ""               "skip building/installing the swift side of swiftsyntax"
     skstresstester-build-type   "Debug"          "the build variant for the SourceKit stress tester"
     swiftevolve-build-type      "Debug"          "the build variant for the swift-evolve tool"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
@@ -2542,6 +2545,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 continue
                 ;;
             swiftsyntax)
+                if [[ "${SKIP_SWIFTSYNTAX_SWIFTSIDE}" ]]; then
+                    continue
+                fi
                 set_swiftsyntax_build_command
                 call "${swiftsyntax_build_command[@]}"
 
@@ -3548,7 +3554,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     DYLIB_DIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
                     MODULE_DIR="${DYLIB_DIR}/${SWIFT_HOST_VARIANT_ARCH}"
                 fi
-
+                if [[ "${SKIP_SWIFTSYNTAX_SWIFTSIDE}" ]]; then
+                    continue
+                fi
                 set_swiftsyntax_build_command
                 if [[ -z "${SKIP_INSTALL_SWIFTSYNTAX_MODULE}" ]] ; then
                     call "${swiftsyntax_build_command[@]}" --dylib-dir="${DYLIB_DIR}" --swiftmodule-dir "${MODULE_DIR}" --install
