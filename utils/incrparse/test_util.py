@@ -108,8 +108,8 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
 def prepareForIncrParse(test_file, test_case, pre_edit_file, post_edit_file,
                         incremental_edit_args, reparse_args):
     with open(test_file, mode='r') as test_file_handle, \
-            open(pre_edit_file, mode='w+') as pre_edit_file_handle, \
-            open(post_edit_file, mode='w+') as post_edit_file_handle:
+            open(pre_edit_file, mode='w+b') as pre_edit_file_handle, \
+            open(post_edit_file, mode='w+b') as post_edit_file_handle:
 
         current_reparse_start = None
 
