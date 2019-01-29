@@ -2,6 +2,9 @@
 // RUN: %target-swift-emit-silgen -emit-sorted-sil %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -emit-sorted-sil -enable-resilience %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
 
+// Really just requires a platform with meaningful runtime #available() tests.
+// REQUIRES: objc_interop
+
 public enum E: Int {
   case a, b
   @available(macOS 500, iOS 500, watchOS 500, tvOS 500, *)
