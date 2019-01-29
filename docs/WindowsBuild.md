@@ -196,6 +196,7 @@ mkdir "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
 pushd "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
 cmake -G Ninja
   -DCMAKE_BUILD_TYPE=Debug^
+  -DLLDB_ALLOW_STATIC_BINDINGS=YES^
   -DLLDB_PATH_TO_CMARK_SOURCE="S:/cmark"^
   -DLLDB_PATH_TO_LLVM_SOURCE="S:/llvm"^
   -DLLDB_PATH_TO_CLANG_SOURCE="S:/clang"^
@@ -205,6 +206,7 @@ cmake -G Ninja
   -DLLDB_PATH_TO_LLVM_BUILD="S:/build/Ninja-DebugAssert/llvm-windows-amd64"^
   -DLLDB_PATH_TO_SWIFT_BUILD="S:/build/Ninja-DebugAssert/swift-windows-amd64"^
   -DLLVM_ENABLE_ASSERTIONS=ON^
+  -DPYTHON_HOME=%ProgramFiles(x86)%\Microsoft Visual Studio\Shared\Python37_64^
   S:/lldb
 popd
 cmake --build "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
