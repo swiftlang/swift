@@ -564,7 +564,10 @@ const char *getNodeKindString(swift::Demangle::Node::Kind k);
 /// Useful for debugging.
 std::string getNodeTreeAsString(NodePointer Root);
 
+bool nodeConsumesGenericArgs(Node *node);
+
 bool isSpecialized(Node *node);
+
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 std::string archetypeName(Node::IndexType index, Node::IndexType depth);
 

@@ -1458,6 +1458,20 @@ NodePointer Demangler::demangleBoundGenericType() {
   return NTy;
 }
 
+bool Demangle::nodeConsumesGenericArgs(Node *node) {
+  switch (node->getKind()) {
+    case Node::Kind::Variable:
+    case Node::Kind::Subscript:
+    case Node::Kind::ImplicitClosure:
+    case Node::Kind::ExplicitClosure:
+    case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::Initializer:
+      return false;
+    default:
+      return true;
+  }
+}
+
 NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
                                     const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx) {
@@ -1493,18 +1507,7 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
     return nullptr;
   NodePointer Context = Nominal->getFirstChild();
 
-  bool consumesGenericArgs = true;
-  switch (Nominal->getKind()) {
-    case Node::Kind::Variable:
-    case Node::Kind::ExplicitClosure:
-    case Node::Kind::Subscript:
-      // Those nodes can appear in the context but do not "consume" a generic
-      // argument type list.
-      consumesGenericArgs = false;
-      break;
-    default:
-      break;
-  }
+  bool consumesGenericArgs = nodeConsumesGenericArgs(Nominal);
 
   NodePointer args = TypeLists[TypeListIdx];
 

@@ -76,6 +76,15 @@ public:
   ASTMangler(bool DWARFMangling = false)
     : DWARFMangling(DWARFMangling) {}
 
+  void addTypeSubstitution(Type type) {
+    type = dropProtocolsFromAssociatedTypes(type);
+    addSubstitution(type.getPointer());
+  }
+  bool tryMangleTypeSubstitution(Type type) {
+    type = dropProtocolsFromAssociatedTypes(type);
+    return tryMangleSubstitution(type.getPointer());
+  }
+
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
 
@@ -260,6 +269,9 @@ protected:
   void appendGenericSignatureParts(TypeArrayView<GenericTypeParamType> params,
                                    unsigned initialParamDepth,
                                    ArrayRef<Requirement> requirements);
+
+  DependentMemberType *dropProtocolFromAssociatedType(DependentMemberType *dmt);
+  Type dropProtocolsFromAssociatedTypes(Type type);
 
   void appendAssociatedTypeName(DependentMemberType *dmt);
 
