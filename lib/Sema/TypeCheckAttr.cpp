@@ -2434,7 +2434,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   TC.resolveDeclSignature(original);
-  auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
+  auto *originalFnTy = original->getInterfaceType()->eraseDynamicSelfType()
+      ->castTo<AnyFunctionType>();
   auto isInstanceMethod = original->isInstanceMember();
 
   // If the original function has no parameters or returns the empty tuple
@@ -2725,6 +2726,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return false;
 
     // Check that parameter types match (disregards labels).
+    if (candidateFnTy.getParams().size() != required.getParams().size())
+      return false;
     for (auto paramPair : llvm::zip(candidateFnTy.getParams(),
                                     required.getParams()))
       if (std::get<0>(paramPair).getParameterType() !=
