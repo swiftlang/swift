@@ -151,7 +151,7 @@ PATH S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin;%PATH%
   your target platform or Windows SDK version.
 ```cmd
 mkdir "S:\build\Ninja-DebugAssert\swift-windows-amd64"
-pushd "S:\build\inja-DebugAssert\swift-windows-amd64"
+pushd "S:\build\Ninja-DebugAssert\swift-windows-amd64"
 cmake -G Ninja^
  -DCMAKE_BUILD_TYPE=Debug^
  -DCMAKE_C_COMPILER=clang-cl^
@@ -197,7 +197,6 @@ pushd "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
 cmake -G Ninja
   -DCMAKE_BUILD_TYPE=Debug^
   -DLLDB_ALLOW_STATIC_BINDINGS=YES^
-  -DLLDB_PATH_TO_CMARK_SOURCE="S:/cmark"^
   -DLLDB_PATH_TO_LLVM_SOURCE="S:/llvm"^
   -DLLDB_PATH_TO_CLANG_SOURCE="S:/clang"^
   -DLLDB_PATH_TO_SWIFT_SOURCE="S:/swift"^
