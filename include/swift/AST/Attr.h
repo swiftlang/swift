@@ -1510,16 +1510,7 @@ public:
   }
 
   bool parametersMatch(const DifferentiableAttr &other) const {
-    auto a = getParsedParameters();
-    auto b = other.getParsedParameters();
-    if (a.size() != b.size())
-      return false;
-
-    for (unsigned i = 0, n = b.size(); i < n; ++i) {
-      if (!a[i].isEqual(b[i]))
-        return false;
-    }
-    return true;
+    return ParameterIndices->parameters == other.ParameterIndices->parameters;
   }
 };
 
