@@ -295,12 +295,14 @@ public:
   }
 
   const ExistentialMetatypeTypeRef *
-  createExistentialMetatypeType(const TypeRef *instance) {
+  createExistentialMetatypeType(const TypeRef *instance,
+                    Optional<Demangle::ImplMetatypeRepresentation> repr=None) {
     return ExistentialMetatypeTypeRef::create(*this, instance);
   }
 
   const MetatypeTypeRef *createMetatypeType(const TypeRef *instance,
-                                            bool WasAbstract = false) {
+                    Optional<Demangle::ImplMetatypeRepresentation> repr=None) {
+    bool WasAbstract = (repr && *repr != ImplMetatypeRepresentation::Thin);
     return MetatypeTypeRef::create(*this, instance, WasAbstract);
   }
 

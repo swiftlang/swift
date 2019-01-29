@@ -325,17 +325,35 @@ Type ASTBuilder::createProtocolCompositionType(
   return ProtocolCompositionType::get(Ctx, members, isClassBound);
 }
 
-Type ASTBuilder::createExistentialMetatypeType(Type instance) {
+static MetatypeRepresentation
+getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
+  switch (repr) {
+  case Demangle::ImplMetatypeRepresentation::Thin:
+    return MetatypeRepresentation::Thin;
+  case Demangle::ImplMetatypeRepresentation::Thick:
+    return MetatypeRepresentation::Thick;
+  case Demangle::ImplMetatypeRepresentation::ObjC:
+    return MetatypeRepresentation::ObjC;
+  }
+}
+
+Type ASTBuilder::createExistentialMetatypeType(Type instance,
+                          Optional<Demangle::ImplMetatypeRepresentation> repr) {
   if (!instance->isAnyExistentialType())
     return Type();
-  return ExistentialMetatypeType::get(instance);
+  if (!repr)
+    return ExistentialMetatypeType::get(instance);
+
+  return ExistentialMetatypeType::get(instance,
+                                      getMetatypeRepresentation(*repr));
 }
 
 Type ASTBuilder::createMetatypeType(Type instance,
-                                    bool wasAbstract) {
-  // FIXME: Plumb through metatype representation and generalize silly
-  // 'wasAbstract' flag
-  return MetatypeType::get(instance);
+                         Optional<Demangle::ImplMetatypeRepresentation> repr) {
+  if (!repr)
+    return MetatypeType::get(instance);
+
+  return MetatypeType::get(instance, getMetatypeRepresentation(*repr));
 }
 
 Type ASTBuilder::createGenericTypeParameterType(unsigned depth,

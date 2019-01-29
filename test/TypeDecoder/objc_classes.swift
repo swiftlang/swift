@@ -50,9 +50,7 @@ do {
 // DEMANGLE: $s12objc_classes15OurObjCProtocol_pXpD
 
 // CHECK: NSSet.Type
-
-// FIXME: we drop the metatype representation here
-// CHECK: NSSet.Type
+// CHECK: @thick NSSet.Type
 
 // CHECK: NSFastEnumeration.Type
 // CHECK: OurObjCProtocol.Type

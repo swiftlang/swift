@@ -1100,11 +1100,13 @@ public:
     return BuiltType();
   }
 
-  BuiltType createMetatypeType(BuiltType instance, bool wasAbstract) const {
+  BuiltType createMetatypeType(BuiltType instance,
+              Optional<Demangle::ImplMetatypeRepresentation> repr=None) const {
     return swift_getMetatypeMetadata(instance);
   }
 
-  BuiltType createExistentialMetatypeType(BuiltType instance) const {
+  BuiltType createExistentialMetatypeType(BuiltType instance,
+              Optional<Demangle::ImplMetatypeRepresentation> repr=None) const {
     return swift_getExistentialMetatypeMetadata(instance);
   }
 

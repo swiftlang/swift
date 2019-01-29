@@ -28,6 +28,12 @@
 namespace swift {
 namespace Demangle {
 
+enum class ImplMetatypeRepresentation {
+  Thin,
+  Thick,
+  ObjC,
+};
+
 /// Describe a function parameter, parameterized on the type
 /// representation.
 template <typename BuiltType>
@@ -243,18 +249,22 @@ class TypeDecoder {
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
       unsigned i = 0;
-      bool wasAbstract = false;
+      Optional<ImplMetatypeRepresentation> repr;
 
       // Handle lowered metatypes in a hackish way. If the representation
       // was not thin, force the resulting typeref to have a non-empty
       // representation.
       if (Node->getNumChildren() >= 2) {
-        auto repr = Node->getChild(i++);
-        if (repr->getKind() != NodeKind::MetatypeRepresentation ||
-            !repr->hasText())
+        auto reprNode = Node->getChild(i++);
+        if (reprNode->getKind() != NodeKind::MetatypeRepresentation ||
+            !reprNode->hasText())
           return BuiltType();
-        if (repr->getText() != "@thin")
-          wasAbstract = true;
+        if (reprNode->getText() == "@thin")
+          repr = ImplMetatypeRepresentation::Thin;
+        else if (reprNode->getText() == "@thick")
+          repr = ImplMetatypeRepresentation::Thick;
+        else if (reprNode->getText() == "@objc_metatype")
+          repr = ImplMetatypeRepresentation::ObjC;
       } else if (Node->getNumChildren() < 1) {
         return BuiltType();
       }
@@ -263,11 +273,9 @@ class TypeDecoder {
       if (!instance)
         return BuiltType();
       if (Node->getKind() == NodeKind::Metatype) {
-        return Builder.createMetatypeType(instance, wasAbstract);
+        return Builder.createMetatypeType(instance, repr);
       } else if (Node->getKind() == NodeKind::ExistentialMetatype) {
-        // FIXME: Ignore representation of existential metatype
-        // completely for now
-        return Builder.createExistentialMetatypeType(instance);
+        return Builder.createExistentialMetatypeType(instance, repr);
       } else {
         assert(false);
         return nullptr;

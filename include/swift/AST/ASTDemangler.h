@@ -86,9 +86,11 @@ public:
                                      Type superclass,
                                      bool isClassBound);
 
-  Type createExistentialMetatypeType(Type instance);
+  Type createExistentialMetatypeType(Type instance,
+                     Optional<Demangle::ImplMetatypeRepresentation> repr=None);
 
-  Type createMetatypeType(Type instance, bool wasAbstract=false);
+  Type createMetatypeType(Type instance,
+                     Optional<Demangle::ImplMetatypeRepresentation> repr=None);
 
   Type createGenericTypeParameterType(unsigned depth, unsigned index);
 
