@@ -293,10 +293,6 @@ struct OwnershipModelEliminator : SILModuleTransform {
     }
 
     for (auto &F : *getModule()) {
-      // Don't rerun early lowering on deserialized functions.
-      if (F.wasDeserializedCanonical())
-        continue;
-
       // If F does not have ownership, skip it. We have no further work to do.
       if (!F.hasOwnership())
         continue;
