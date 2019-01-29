@@ -603,3 +603,12 @@ class RethrowingConstructor {
     }
   }
 }
+
+// default values -vs- throwing function inside optional
+func rdar_47550715() {
+  typealias A<T> = (T) -> Void
+  typealias F = () throws -> Void
+
+  func foo(_: A<F>? = nil) {} // Ok
+  func bar(_: A<F>? = .none) {} // Ok
+}
