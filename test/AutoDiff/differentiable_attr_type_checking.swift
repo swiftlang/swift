@@ -391,6 +391,18 @@ extension FloatingPoint {
   }
 }
 
+protocol MethodDiffReq {
+  // expected-error @+1 {{'vjpFoo' does not have expected type '<Self where Self : Differentiable, Self : MethodDiffReq> (Self) -> () -> (Self, (Self.CotangentVector) -> Self.CotangentVector)'}}
+  @differentiable(wrt: (self), vjp: vjpFoo where Self : Differentiable)
+  func foo() -> Self
+}
+
+extension MethodDiffReq where Self : Differentiable {
+  func vjpFoo(x: Self) -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
+    return (self, { $0 })
+  }
+}
+
 // expected-error @+2 {{type 'Scalar' constrained to non-protocol, non-class type 'Float'}}
 // expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Scalar' does not conform to 'Differentiable'}}
 @differentiable(where Scalar : Float)
@@ -404,7 +416,6 @@ func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
 func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
   return x
 }
-
 
 protocol DiffReq : Differentiable {
   // expected-note @+2 {{protocol requires function 'f1'}}
