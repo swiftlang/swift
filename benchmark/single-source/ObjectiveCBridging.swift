@@ -32,6 +32,7 @@ public let ObjectiveCBridging = [
   BenchmarkInfo(name: "ObjectiveCBridgeToNSSet", runFunction: run_ObjectiveCBridgeToNSSet, tags: [.validation, .bridging]),
   BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectToString", runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectToString, tags: [.validation, .bridging, .String]),
   BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectToStringForced", runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced, tags: [.validation, .bridging, .String, .unstable]),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDateComponents", runFunction: run_ObjectiveCBridgeFromNSDateComponents, tags: [.validation, .bridging], setUpFunction: setup_dateComponents)
 ]
 
 #if _runtime(_ObjC)
@@ -608,4 +609,63 @@ public func run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced(_ N: Int) {
     }
   }
 #endif
+}
+
+#if _runtime(_ObjC)
+
+//translated directly from an objc part of the original testcase
+@objc class DictionaryContainer : NSObject {
+  @objc var _dictionary:NSDictionary
+  
+  //simulate an objc property being imported via bridging
+  @objc var dictionary:Dictionary<DateComponents, String> {
+    @inline(never)
+    get {
+      return _dictionary as! Dictionary<DateComponents, String>
+    }
+  }
+  
+  override init() {
+    _dictionary = NSDictionary()
+    super.init()
+    let dict = NSMutableDictionary()
+    let calendar = NSCalendar(calendarIdentifier: .gregorian)!
+    let now = Date()
+    for day in 0..<36 {
+      let date = calendar.date(byAdding: .day, value: -day, to: now, options: NSCalendar.Options())
+      let components = calendar.components([.year, .month, .day], from: date!)
+      dict[components as NSDateComponents] = "TESTING"
+    }
+    _dictionary = NSDictionary(dictionary: dict)
+  }
+}
+
+var componentsContainer: DictionaryContainer? = nil
+var componentsArray:[DateComponents]? = nil
+#endif
+
+public func setup_dateComponents() {
+  #if _runtime(_ObjC)
+  componentsContainer = DictionaryContainer()
+  let now = Date()
+  let calendar = Calendar(identifier: .gregorian)
+  componentsArray = (0..<10).compactMap { (day) -> DateComponents? in
+    guard let date = calendar.date(byAdding: .day, value: -day, to: now) else {
+      return nil
+    }
+    
+    return calendar.dateComponents([.year, .month, .day], from: date)
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeFromNSDateComponents(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    for components in componentsArray! {
+      let _ = componentsContainer!.dictionary[components]
+    }
+  }
+  #endif
 }
