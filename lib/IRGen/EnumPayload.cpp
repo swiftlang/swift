@@ -162,22 +162,22 @@ void EnumPayload::insertValue(IRGenFunction &IGF, llvm::Value *value,
         subvalue = IGF.Builder.CreateLShr(subvalue,
                                llvm::ConstantInt::get(valueIntTy, valueOffset));
       subvalue = IGF.Builder.CreateZExtOrTrunc(subvalue, payloadIntTy);
-#if defined(__BIG_ENDIAN__)
-      if ((valueBitWidth == 32 || valueBitWidth == 16 || valueBitWidth == 8 || valueBitWidth == 1) &&
-          payloadBitWidth > (payloadValueOffset + valueBitWidth)) {
-        unsigned shiftBitWidth = valueBitWidth;
-        if (valueBitWidth == 1) {
-          shiftBitWidth = 8;
+      if (IGF.IGM.Triple.isLittleEndian()) {
+        if (payloadValueOffset > 0)
+          subvalue = IGF.Builder.CreateShl(subvalue,
+                        llvm::ConstantInt::get(payloadIntTy, payloadValueOffset));
+      } else {
+        if ((valueBitWidth == 32 || valueBitWidth == 16 || valueBitWidth == 8 || valueBitWidth == 1) &&
+            payloadBitWidth > (payloadValueOffset + valueBitWidth)) {
+          unsigned shiftBitWidth = valueBitWidth;
+          if (valueBitWidth == 1) {
+            shiftBitWidth = 8;
+          }
+          subvalue = IGF.Builder.CreateShl(subvalue,
+            llvm::ConstantInt::get(payloadIntTy, (payloadBitWidth - shiftBitWidth) - payloadValueOffset));
         }
-        subvalue = IGF.Builder.CreateShl(subvalue,
-          llvm::ConstantInt::get(payloadIntTy, (payloadBitWidth - shiftBitWidth) - payloadValueOffset));
       }
-#else
-      if (payloadValueOffset > 0)
-        subvalue = IGF.Builder.CreateShl(subvalue,
-                      llvm::ConstantInt::get(payloadIntTy, payloadValueOffset));
-#endif
-      
+
       // If there hasn't yet been a value stored here, we can use the adjusted
       // value directly.
       if (payloadValue.is<llvm::Type *>()) {
@@ -230,21 +230,21 @@ llvm::Value *EnumPayload::extractValue(IRGenFunction &IGF, llvm::Type *type,
         llvm::IntegerType::get(IGF.IGM.getLLVMContext(), payloadBitWidth);
 
       value = IGF.Builder.CreateBitOrPointerCast(value, payloadIntTy);
-#if defined(__BIG_ENDIAN__)
-      if ((valueBitWidth == 32 || valueBitWidth == 16 || valueBitWidth == 8 || valueBitWidth == 1) &&
-          payloadBitWidth > (payloadValueOffset + valueBitWidth)) {
-        unsigned shiftBitWidth = valueBitWidth;
-        if (valueBitWidth == 1) {
-          shiftBitWidth = 8;
+      if (IGF.IGM.Triple.isLittleEndian()) {
+        if (payloadValueOffset > 0)
+          value = IGF.Builder.CreateLShr(value,
+                    llvm::ConstantInt::get(value->getType(), payloadValueOffset));
+      } else {
+        if ((valueBitWidth == 32 || valueBitWidth == 16 || valueBitWidth == 8 || valueBitWidth == 1) &&
+            payloadBitWidth > (payloadValueOffset + valueBitWidth)) {
+          unsigned shiftBitWidth = valueBitWidth;
+          if (valueBitWidth == 1) {
+            shiftBitWidth = 8;
+          }
+          value = IGF.Builder.CreateLShr(value,
+            llvm::ConstantInt::get(value->getType(), (payloadBitWidth - shiftBitWidth) - payloadValueOffset));
         }
-        value = IGF.Builder.CreateLShr(value,
-          llvm::ConstantInt::get(value->getType(), (payloadBitWidth - shiftBitWidth) - payloadValueOffset));
       }
-#else
-      if (payloadValueOffset > 0)
-        value = IGF.Builder.CreateLShr(value,
-                  llvm::ConstantInt::get(value->getType(), payloadValueOffset));
-#endif
       if (valueBitWidth > payloadBitWidth)
         value = IGF.Builder.CreateZExt(value, valueIntTy);
       if (valueOffset > 0)
