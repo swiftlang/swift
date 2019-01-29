@@ -4630,36 +4630,9 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
       Impl->HadAnyError = true;
       
-      bool shouldOfferFixIt = false;
-      if (subjectType->isTypeParameter()) {
-        auto declContext = subjectType->getRootGenericParam()->getDecl()
-                                                             ->getDeclContext();
-        shouldOfferFixIt = isa<ExtensionDecl>(declContext);
-      }
-      
-      Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
-                     subjectType, constraintType);
-      
-      // Remove "Self." from the type name to make diagnostics look
-      // better (i.e. use 'A == Int' instead of use 'Self.A == Int')
-      auto getNameWithoutSelf = [&](std::string subjectTypeName) {
-        std::string selfSubstring = "Self.";
-        
-        if (subjectTypeName.rfind(selfSubstring, 0) == 0) {
-          return subjectTypeName.erase(0, selfSubstring.length());
-        }
-        
-        return subjectTypeName;
-      };
-      
-      if (shouldOfferFixIt) {
-        auto subjectTypeName = subjectType.getString();
-        auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
-        Diags.diagnose(source.getLoc(),
-                       diag::requires_conformance_nonprotocol_fixit,
-                       subjectTypeNameWithoutSelf, constraintType.getString())
-             .fixItReplace(source.getLoc(), " == ");
-      }
+      auto invalidConstraint = InvalidConstraint(subjectType, constraintType,
+                                                 source.getLoc());
+      invalidConstraints.push_back(invalidConstraint);
     }
 
     return ConstraintResult::Conflicting;
@@ -5778,6 +5751,41 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         break;
       }
     }
+  }
+  
+  // Emit a diagnostic if we recorded any constraints where the constraint
+  // type was not constraint to a protocol or class. Provide a fix-it if
+  // allowConcreteGenericParams is true.
+  if (!invalidConstraints.empty()) {
+    for (auto constraint : invalidConstraints) {
+      auto loc = constraint.sourceLoc;
+      auto subjectType = constraint.subjectType;
+      auto constraintType = constraint.constraintType;
+      
+      Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
+                     subjectType, constraintType);
+      
+      auto getNameWithoutSelf = [&](std::string subjectTypeName) {
+        std::string selfSubstring = "Self.";
+        
+        if (subjectTypeName.rfind(selfSubstring, 0) == 0) {
+          return subjectTypeName.erase(0, selfSubstring.length());
+        }
+        
+        return subjectTypeName;
+      };
+      
+      if (allowConcreteGenericParams) {
+        auto subjectTypeName = subjectType.getString();
+        auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
+        Diags.diagnose(loc,
+                       diag::requires_conformance_nonprotocol_fixit,
+                       subjectTypeNameWithoutSelf, constraintType.getString())
+             .fixItReplace(loc, " == ");
+      }
+    }
+    
+    invalidConstraints.clear();
   }
 }
 

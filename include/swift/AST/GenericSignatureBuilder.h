@@ -314,6 +314,20 @@ public:
     /// \c ConstraintResult::Unresolved so the caller knows what happened.
     GenerateUnresolved = 1,
   };
+	
+	/// Describes a struct that contains information about the constraint
+	/// that didn't conform to a protocol or a class
+	struct InvalidConstraint {
+		Type subjectType;
+		Type constraintType;
+		SourceLoc sourceLoc;
+		
+		InvalidConstraint(const Type& type1, const Type& type2, const SourceLoc& loc) : subjectType(type1), constraintType(type2), sourceLoc(loc) {}
+	};
+	
+	/// The set of constraints that are invalid because the constraint
+	/// type isn't constrained to a protocol or a class
+	std::vector<InvalidConstraint> invalidConstraints;
 
 private:
   class InferRequirementsWalker;
