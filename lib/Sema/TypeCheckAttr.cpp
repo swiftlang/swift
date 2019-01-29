@@ -1645,7 +1645,6 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
         // lead to diagnostic fights between this and "declaration must be at
         // least this accessible" checking for overrides and protocol
         // requirements.
-        return;
       } else if (attr->getAccess() == defaultAccess) {
         TC.diagnose(attr->getLocation(),
                     diag::access_control_ext_member_redundant,
@@ -1653,7 +1652,6 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
                     D->getDescriptiveKind(),
                     extAttr->getAccess())
           .fixItRemove(attr->getRange());
-        return;
       }
     }
   }
