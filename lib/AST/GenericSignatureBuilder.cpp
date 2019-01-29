@@ -4631,24 +4631,16 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       Impl->HadAnyError = true;
       
       bool shouldOfferFixIt = false;
-      auto DMT = subjectType->getAs<DependentMemberType>();
-      auto GTPT = subjectType->getAs<GenericTypeParamType>();
-
-      if (GTPT) {
-        shouldOfferFixIt = isa<ExtensionDecl>(GTPT->getDecl()
-                                                  ->getDeclContext());
-      }
-
-      if (DMT) {
-        shouldOfferFixIt = isa<ExtensionDecl>(DMT->getRootGenericParam()
-                                                 ->getDecl()
-                                                 ->getDeclContext());
+      if (subjectType->isTypeParameter()) {
+        auto declContext = subjectType->getRootGenericParam()->getDecl()
+                                                             ->getDeclContext();
+        shouldOfferFixIt = isa<ExtensionDecl>(declContext);
       }
       
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
                      subjectType, constraintType);
       
-      // Remove "Self." from the type name to mske diagnostics look
+      // Remove "Self." from the type name to make diagnostics look
       // better (i.e. use 'A == Int' instead of use 'Self.A == Int')
       auto getNameWithoutSelf = [&](std::string subjectTypeName) {
         std::string selfSubstring = "Self.";
@@ -4661,7 +4653,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       };
       
       if (shouldOfferFixIt) {
-        auto subjectTypeName = DMT ? DMT->getString() : subjectType.getString();
+        auto subjectTypeName = subjectType.getString();
         auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
         Diags.diagnose(source.getLoc(),
                        diag::requires_conformance_nonprotocol_fixit,
