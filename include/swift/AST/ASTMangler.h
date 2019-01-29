@@ -201,7 +201,7 @@ protected:
 
   void appendSymbolKind(SymbolKind SKind);
 
-  void appendType(Type type);
+  void appendType(Type type, const ValueDecl *forDecl = nullptr);
   
   void appendDeclName(const ValueDecl *decl);
 
@@ -214,6 +214,15 @@ protected:
   void bindGenericParameters(const DeclContext *DC);
 
   void bindGenericParameters(CanGenericSignature sig);
+
+  /// Mangles a sugared type iff we are mangling for the debugger.
+  template <class T> void appendSugaredType(Type type,
+                                            const ValueDecl *forDecl) {
+    assert(DWARFMangling &&
+           "sugared types are only legal when mangling for the debugger");
+    auto *BlandTy = cast<T>(type.getPointer())->getSinglyDesugaredType();
+    appendType(BlandTy, forDecl);
+  }
 
   void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
@@ -242,17 +251,23 @@ protected:
 
   void appendAnyGenericType(const GenericTypeDecl *decl);
 
-  void appendFunction(AnyFunctionType *fn, bool isFunctionMangling = false);
-  void appendFunctionType(AnyFunctionType *fn, bool isAutoClosure = false);
+  void appendFunction(AnyFunctionType *fn, bool isFunctionMangling = false,
+                      const ValueDecl *forDecl = nullptr);
+  void appendFunctionType(AnyFunctionType *fn, bool isAutoClosure = false,
+                          const ValueDecl *forDecl = nullptr);
 
-  void appendFunctionSignature(AnyFunctionType *fn);
+  void appendFunctionSignature(AnyFunctionType *fn,
+                               const ValueDecl *forDecl = nullptr);
 
-  void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params);
-  void appendFunctionResultType(Type resultType);
+  void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params,
+                               const ValueDecl *forDecl = nullptr);
+  void appendFunctionResultType(Type resultType,
+                                const ValueDecl *forDecl = nullptr);
 
-  void appendTypeList(Type listTy);
+  void appendTypeList(Type listTy, const ValueDecl *forDecl = nullptr);
   void appendTypeListElement(Identifier name, Type elementType,
-                             ParameterTypeFlags flags);
+                             ParameterTypeFlags flags,
+                             const ValueDecl *forDecl = nullptr);
 
   /// Append a generic signature to the mangling.
   ///
@@ -319,6 +334,8 @@ protected:
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
   void appendSymbolicReference(SymbolicReferent referent);
+  
+  void appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl);
 };
 
 } // end namespace Mangle

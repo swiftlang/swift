@@ -700,3 +700,14 @@ void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
   id.AddPointer(storage);
 }
 
+bool SubstitutionMap::isIdentity() const {
+  for (unsigned i : indices(getReplacementTypes())) {
+    auto replacement = dyn_cast<GenericTypeParamType>(
+      getReplacementTypes()[i]->getCanonicalType(getGenericSignature()));
+    if (!replacement)
+      return false;
+    if (getGenericSignature()->getGenericParamOrdinal(replacement) != i)
+      return false;
+  }
+  return true;
+}

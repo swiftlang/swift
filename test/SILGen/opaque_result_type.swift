@@ -8,7 +8,7 @@ struct AddrOnly: P { var field: P }
 
 class C: Q {}
 
-// CHECK-LABEL: sil hidden {{.*}}11valueToAddr
+// CHECK-LABEL: sil hidden {{.*}}11valueToAddr1xQr
 func valueToAddr(x: String) -> __opaque P {
   // CHECK: [[UNDERLYING:%.*]] = unchecked_addr_cast %0
   // CHECK: [[VALUE_COPY:%.*]] = copy_value %1
@@ -16,14 +16,21 @@ func valueToAddr(x: String) -> __opaque P {
   return x
 }
 
-// CHECK-LABEL: sil hidden {{.*}}10addrToAddr
+// CHECK-LABEL: sil hidden {{.*}}10addrToAddr1xQr
 func addrToAddr(x: AddrOnly) -> __opaque P {
   // CHECK: [[UNDERLYING:%.*]] = unchecked_addr_cast %0
   // CHECK: copy_addr %1 to [initialization] [[UNDERLYING]]
   return x
 }
 
-// CHECK-LABEL: sil hidden {{.*}}12valueToValue
+// CHECK-LABEL: sil hidden {{.*}}13genericAddrToE01xQr
+func genericAddrToAddr<T: P>(x: T) -> __opaque P {
+  // CHECK: [[UNDERLYING:%.*]] = unchecked_addr_cast %0
+  // CHECK: copy_addr %1 to [initialization] [[UNDERLYING]]
+  return x
+}
+
+// CHECK-LABEL: sil hidden {{.*}}12valueToValue1xQr
 func valueToValue(x: C) -> __opaque Q {
   // CHECK: [[VALUE_COPY:%.*]] = copy_value %0
   // CHECK: [[CAST_TO_OPAQUE:%.*]] = unchecked_ref_cast [[VALUE_COPY]]
@@ -31,7 +38,7 @@ func valueToValue(x: C) -> __opaque Q {
   return x
 }
 
-// CHECK-LABEL: sil hidden {{.*}}13reabstraction
+// CHECK-LABEL: sil hidden {{.*}}13reabstraction1xQr
 func reabstraction(x: @escaping () -> ()) -> __opaque Any {
   // CHECK [[UNDERLYING:%.*]] = unchecked_addr_cast %0 : ${{.*}} to $*@callee_guaranteed () -> @out ()
   // CHECK: [[VALUE_COPY:%.*]] = copy_value %1
