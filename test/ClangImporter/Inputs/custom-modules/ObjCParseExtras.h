@@ -241,3 +241,11 @@ struct NonTrivialToCopyWrapper {
 struct TrivialToCopy {
   __unsafe_unretained id field;
 };
+
+@interface OverrideInExtensionBase : NSObject
+- (void)method;
+- (void)accessWarning;
+@end
+
+@interface OverrideInExtensionSub : OverrideInExtensionBase
+@end
