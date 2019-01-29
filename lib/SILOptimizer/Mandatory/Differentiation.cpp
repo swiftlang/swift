@@ -1062,10 +1062,35 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
   // that is not associated with any source location, we emit a diagnostic at
   // the instruction source location.
   case DifferentiationInvoker::Kind::AutoDiffFunctionInst:
-  case DifferentiationInvoker::Kind::SILDifferentiableAttribute:
+    // FIXME: This will not report an error to the user.
     diagnose(opLoc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     break;
+  case DifferentiationInvoker::Kind::SILDifferentiableAttribute: {
+    auto attr = invoker.getSILDifferentiableAttribute();
+    bool foundAttr = false;
+    if (auto *declContext = attr.second->getDeclContext()) {
+      if (auto *fnDecl = declContext->getInnermostDeclarationDeclContext()) {
+        if (auto *diffAttr =
+                fnDecl->getAttrs().getAttribute<DifferentiableAttr>()) {
+          diagnose(diffAttr->getLocation(),
+                   diag::autodiff_function_not_differentiable)
+              .highlight(diffAttr->getRangeWithAt());
+          diagnose(attr.second->getLocation().getSourceLoc(),
+                   diag::autodiff_when_differentiating_function_definition);
+          foundAttr = true;
+        }
+      }
+    }
+    if (!foundAttr) {
+      // Fallback if we cannot find the expected attribute.
+      diagnose(attr.second->getLocation().getSourceLoc(),
+               diag::autodiff_function_not_differentiable);
+    }
+    diagnose(opLoc,
+             diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+    break;
+  }
 
   // For indirect differentiation, emit a "not differentiable" note on the
   // expression first. Then emit an error at the source invoker of
@@ -2536,6 +2561,8 @@ private:
 bool AdjointGen::run() {
   // Push everything to the worklist.
   for (auto &task : context.getDifferentiationTasks()) {
+    if (task->getPrimalSynthesisState() != FunctionSynthesisState::Done)
+      continue;
     if (task->getAdjointSynthesisState() == FunctionSynthesisState::Needed) {
       FunctionSynthesisItem synthesis{task->getOriginal(), task->getAdjoint(),
                                       task->getIndices(), task.get()};
@@ -4470,17 +4497,14 @@ void Differentiation::run() {
   };
 
   // Run primal generation for newly created differentiation tasks. If any error
-  // occurs, back out.
+  // occurs, continue on the tasks that are still good.
   PrimalGen primalGen(context);
-  if (primalGen.run()) {
-    cleanUp();
-    return;
-  }
+  bool primalGenError = primalGen.run();
 
   // Run adjoint generation for differentiation tasks. If any error occurs, back
   // out.
   AdjointGen adjointGen(context);
-  if (adjointGen.run()) {
+  if (adjointGen.run() || primalGenError) {
     cleanUp();
     return;
   }
