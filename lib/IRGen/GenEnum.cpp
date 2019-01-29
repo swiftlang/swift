@@ -4202,12 +4202,12 @@ namespace {
       } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
         payload = EnumPayload::zero(IGM, PayloadSchema);
-#if defined(__BIG_ENDIAN__) && defined(__LP64__)
-        // Code produced above are of type IGM.Int32Ty
-        // However, payload is IGM.SizeTy in 64bit
-        if (numCaseBits >= 64)
-          tagIndex = IGF.Builder.CreateZExt(tagIndex, IGM.SizeTy);
-#endif
+        if (!IGF.IGM.Triple.isLittleEndian()) {
+          if (IGF.IGM.Triple.isArch64Bit() && numCaseBits >= 64) {
+            // Need to set the full 64-bit chunk on big-endian systems.
+            tagIndex = IGF.Builder.CreateZExt(tagIndex, IGM.SizeTy);
+          }
+	}
         // We know we won't use more than numCaseBits from tagIndex's value:
         // We made sure of this in the logic above.
         payload.insertValue(IGF, tagIndex, 0,
