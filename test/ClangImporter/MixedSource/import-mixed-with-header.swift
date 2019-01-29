@@ -12,7 +12,7 @@
 // RUN: rm -rf %t/mixed-target/
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/../Inputs/custom-modules -enable-objc-interop -typecheck %s -verify
 
-// XFAIL: linux
+// REQUIRES: objc_interop
 
 import MixedWithHeader
 

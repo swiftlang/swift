@@ -12,5 +12,5 @@ public let y = Test()
 
 // CHECK: !llvm.linker.options
 // CHECK-NOT: !{!"-framework", !"AutolinkingTest"}
-// CHECK: !{!"-lswiftCore"}
+// CHECK: !{!"{{-lswiftCore|/DEFAULTLIB:swiftCore.lib}}"}
 // CHECK-NOT: !{!"-framework", !"AutolinkingTest"}

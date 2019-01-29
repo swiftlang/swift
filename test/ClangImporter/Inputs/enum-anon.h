@@ -1,9 +1,18 @@
-enum {
+#if defined(_WIN32)
+typedef __INTPTR_TYPE__ intptr_t;
+
+#define MAKE_UNSIGNED : unsigned
+#define MAKE_SIGNEDLL : intptr_t
+#else
+#define MAKE_UNSIGNED
+#endif
+
+enum MAKE_SIGNEDLL {
   Constant1,
   Constant2
 };
 
-enum {
+enum MAKE_UNSIGNED {
   VarConstant1,
   VarConstant2
 } global;
@@ -11,7 +20,7 @@ enum {
 typedef struct SR2511 {
     int x;
 
-    enum {
+    enum MAKE_UNSIGNED {
       SR2511A = 0, SR2511B, SR2511C
     } y;
 

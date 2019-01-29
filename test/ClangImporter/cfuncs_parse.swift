@@ -9,7 +9,7 @@ func test_cfunc1(_ i: Int) {
 }
 
 func test_cfunc2(_ i: Int) {
-  let f = cfunc2(i, 17)
+  let f = cfunc2(numericCast(i), 17)
   _ = f as Float
   cfunc2(b:17, a:i) // expected-error{{extraneous argument labels 'b:a:' in call}}
   cfunc2(17, i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Int32'}}

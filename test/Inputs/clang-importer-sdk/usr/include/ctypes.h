@@ -7,7 +7,11 @@ enum Tribool {
   True, False, Indeterminate
 };
 
-enum {
+enum
+#if defined(_WIN32)
+: unsigned
+#endif
+{
   AnonConst1 = 0x700000000,
   AnonConst2
 };

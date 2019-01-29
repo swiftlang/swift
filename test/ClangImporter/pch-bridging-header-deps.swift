@@ -16,10 +16,10 @@
 
 print(app_function(1))
 
-// CHECK-DEPS: pch-bridging-header-deps.o : {{.*}}SOURCE_DIR/test/ClangImporter/Inputs/app-bridging-header-to-pch.h {{.*}}SOURCE_DIR/test/ClangImporter/Inputs/chained-unit-test-bridging-header-to-pch.h
+// CHECK-DEPS: pch-bridging-header-deps.o : {{.*}}{{/|\\}}test{{/|\\}}ClangImporter{{/|\\}}Inputs{{/|\\}}app-bridging-header-to-pch.h {{.*}}{{/|\\}}test{{/|\\}}ClangImporter{{/|\\}}Inputs{{/|\\}}chained-unit-test-bridging-header-to-pch.h
 
 // CHECK-SWIFTDEPS: depends-external:
-// CHECK-SWIFTDEPS: - "SOURCE_DIR/test/ClangImporter/Inputs/app-bridging-header-to-pch.h"
-// CHECK-SWIFTDEPS: - "SOURCE_DIR/test/ClangImporter/Inputs/chained-unit-test-bridging-header-to-pch.h"
+// CHECK-SWIFTDEPS: - "{{.*}}{{/|\\\\}}test{{/|\\\\}}ClangImporter{{/|\\\\}}Inputs{{/|\\\\}}app-bridging-header-to-pch.h"
+// CHECK-SWIFTDEPS: - "{{.*}}{{/|\\\\}}test{{/|\\\\}}ClangImporter{{/|\\\\}}Inputs{{/|\\\\}}chained-unit-test-bridging-header-to-pch.h"
 
 // CHECK-SWIFTDEPS2-NOT: {{.*}}.pch
