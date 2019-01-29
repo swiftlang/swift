@@ -563,11 +563,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     // Get original function.
     auto *original = dyn_cast_or_null<AbstractFunctionDecl>(D);
-    bool isProperty = original && isa<AccessorDecl>(original);
-    if (auto *varDecl = dyn_cast_or_null<VarDecl>(D)) {
-      isProperty = true;
+    if (auto *varDecl = dyn_cast_or_null<VarDecl>(D))
       original = varDecl->getGetter();
-    }
     bool isMethod = original && original->getImplicitSelfDecl() ? true : false;
 
     // Print comma if not leading clause.
@@ -584,11 +581,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (auto indices = attr->getParameterIndices()) {
       printCommaIfNecessary();
       Printer << "wrt: (";
-      interleave(indices->parameters.set_bits(), [&](unsigned index) {
-        if (isProperty || (isMethod && index == indices->parameters.size() - 1))
-          Printer << "self";
-        else
-          Printer << original->getParameters()->get(index)->getName().str();
+      SmallBitVector parameters(indices->parameters);
+      // Check if differentiating wrt `self`. If so, manually print it first.
+      if (isMethod && parameters.test(parameters.size() - 1)) {
+        parameters.reset(parameters.size() - 1);
+        Printer << "self";
+        if (parameters.any())
+          Printer << ", ";
+      }
+      // Print remaining differentiation parameters.
+      interleave(parameters.set_bits(), [&](unsigned index) {
+        Printer << original->getParameters()->get(index)->getName().str();
       }, [&] { Printer << ", "; });
       Printer << ")";
     } else if (!parsedParams.empty()) {
@@ -597,7 +600,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       interleave(parsedParams, [&](const ParsedAutoDiffParameter &param) {
         switch (param.getKind()) {
         case ParsedAutoDiffParameter::Kind::Named:
-          Printer << '.' << param.getName();
+          Printer << param.getName();
           break;
         case ParsedAutoDiffParameter::Kind::Self:
           Printer << "self";
