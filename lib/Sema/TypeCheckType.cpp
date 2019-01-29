@@ -1721,6 +1721,9 @@ namespace {
     Type buildProtocolType(ProtocolTypeRepr *repr,
                            Type instanceType,
                            Optional<MetatypeRepresentation> storedRepr);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    bool isDifferentiableType(Type ty);
   };
 } // end anonymous namespace
 
@@ -2321,6 +2324,15 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       }
     }
 
+    if (isDifferentiable &&
+        resolution.getStage() != TypeResolutionStage::Structural) {
+      if (!nondiff && !isDifferentiableType(ty)) {
+        diagnose(eltTypeRepr->getLoc(),
+                 diag::autodiff_attr_argument_not_differentiable)
+            .fixItInsert(eltTypeRepr->getLoc(), "@nondiff ");
+      }
+    }
+
     // SWIFT_ENABLE_TENSORFLOW
     ParameterTypeFlags paramFlags =
         ParameterTypeFlags::fromParameterType(ty, variadic, autoclosure,
@@ -2400,7 +2412,31 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
     break;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // If the function is marked as `@autodiff`, the result must be a
+  // differentiable type.
+  if (extInfo.isDifferentiable() &&
+      resolution.getStage() != TypeResolutionStage::Structural) {
+    if (!isDifferentiableType(outputTy)) {
+      diagnose(repr->getResultTypeRepr()->getLoc(),
+               diag::autodiff_attr_result_not_differentiable)
+          .highlight(repr->getResultTypeRepr()->getSourceRange());
+    }
+  }
+
   return fnTy;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+bool TypeResolver::isDifferentiableType(Type ty) {
+  if (resolution.getStage() != TypeResolutionStage::Contextual) {
+    ty = DC->mapTypeIntoContext(ty);
+  }
+  return ty
+      ->getAutoDiffAssociatedVectorSpace(
+          AutoDiffAssociatedVectorSpaceKind::Tangent,
+          LookUpConformanceInModule(DC->getParentModule()))
+      .hasValue();
 }
 
 Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
