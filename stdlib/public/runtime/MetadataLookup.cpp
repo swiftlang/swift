@@ -1167,6 +1167,16 @@ public:
                                          result);
   }
 
+  BuiltType createImplFunctionType(
+    Demangle::ImplParameterConvention calleeConvention,
+    ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
+    ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
+    Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
+    ImplFunctionTypeFlags flags) {
+    // We can't realize the metadata for a SILFunctionType.
+    return BuiltType();
+  }
+
   BuiltType createTupleType(ArrayRef<BuiltType> elements,
                             std::string labels,
                             bool variadic) const {

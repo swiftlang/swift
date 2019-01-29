@@ -313,6 +313,115 @@ Type ASTBuilder::createFunctionType(
   return FunctionType::get(funcParams, output, einfo);
 }
 
+static ParameterConvention
+getParameterConvention(ImplParameterConvention conv) {
+  switch (conv) {
+  case Demangle::ImplParameterConvention::Indirect_In:
+    return ParameterConvention::Indirect_In;
+  case Demangle::ImplParameterConvention::Indirect_In_Constant:
+    return ParameterConvention::Indirect_In_Constant;
+  case Demangle::ImplParameterConvention::Indirect_In_Guaranteed:
+    return ParameterConvention::Indirect_In_Guaranteed;
+  case Demangle::ImplParameterConvention::Indirect_Inout:
+    return ParameterConvention::Indirect_Inout;
+  case Demangle::ImplParameterConvention::Indirect_InoutAliasable:
+    return ParameterConvention::Indirect_InoutAliasable;
+  case Demangle::ImplParameterConvention::Direct_Owned:
+    return ParameterConvention::Direct_Owned;
+  case Demangle::ImplParameterConvention::Direct_Unowned:
+    return ParameterConvention::Direct_Unowned;
+  case Demangle::ImplParameterConvention::Direct_Guaranteed:
+    return ParameterConvention::Direct_Guaranteed;
+  }
+}
+
+static ResultConvention getResultConvention(ImplResultConvention conv) {
+  switch (conv) {
+  case Demangle::ImplResultConvention::Indirect:
+    return ResultConvention::Indirect;
+  case Demangle::ImplResultConvention::Owned:
+    return ResultConvention::Owned;
+  case Demangle::ImplResultConvention::Unowned:
+    return ResultConvention::Unowned;
+  case Demangle::ImplResultConvention::UnownedInnerPointer:
+    return ResultConvention::UnownedInnerPointer;
+  case Demangle::ImplResultConvention::Autoreleased:
+    return ResultConvention::Autoreleased;
+  }
+}
+
+Type ASTBuilder::createImplFunctionType(
+    Demangle::ImplParameterConvention calleeConvention,
+    ArrayRef<Demangle::ImplFunctionParam<Type>> params,
+    ArrayRef<Demangle::ImplFunctionResult<Type>> results,
+    Optional<Demangle::ImplFunctionResult<Type>> errorResult,
+    ImplFunctionTypeFlags flags) {
+  GenericSignature *genericSig = nullptr;
+
+  SILCoroutineKind funcCoroutineKind = SILCoroutineKind::None;
+  ParameterConvention funcCalleeConvention =
+    getParameterConvention(calleeConvention);
+
+  SILFunctionTypeRepresentation representation;
+  switch (flags.getRepresentation()) {
+  case ImplFunctionRepresentation::Thick:
+    representation = SILFunctionTypeRepresentation::Thick;
+    break;
+  case ImplFunctionRepresentation::Block:
+    representation = SILFunctionTypeRepresentation::Block;
+    break;
+  case ImplFunctionRepresentation::Thin:
+    representation = SILFunctionTypeRepresentation::Thin;
+    break;
+  case ImplFunctionRepresentation::CFunctionPointer:
+    representation = SILFunctionTypeRepresentation::CFunctionPointer;
+    break;
+  case ImplFunctionRepresentation::Method:
+    representation = SILFunctionTypeRepresentation::Method;
+    break;
+  case ImplFunctionRepresentation::ObjCMethod:
+    representation = SILFunctionTypeRepresentation::ObjCMethod;
+    break;
+  case ImplFunctionRepresentation::WitnessMethod:
+    representation = SILFunctionTypeRepresentation::WitnessMethod;
+    break;
+  case ImplFunctionRepresentation::Closure:
+    representation = SILFunctionTypeRepresentation::Closure;
+    break;
+  }
+
+  auto einfo = SILFunctionType::ExtInfo(representation,
+                                        flags.isPseudogeneric(),
+                                        !flags.isEscaping());
+
+  llvm::SmallVector<SILParameterInfo, 8> funcParams;
+  llvm::SmallVector<SILYieldInfo, 8> funcYields;
+  llvm::SmallVector<SILResultInfo, 8> funcResults;
+  Optional<SILResultInfo> funcErrorResult;
+
+  for (const auto &param : params) {
+    auto type = param.getType()->getCanonicalType();
+    auto conv = getParameterConvention(param.getConvention());
+    funcParams.emplace_back(type, conv);
+  }
+
+  for (const auto &result : results) {
+    auto type = result.getType()->getCanonicalType();
+    auto conv = getResultConvention(result.getConvention());
+    funcResults.emplace_back(type, conv);
+  }
+
+  if (errorResult) {
+    auto type = errorResult->getType()->getCanonicalType();
+    auto conv = getResultConvention(errorResult->getConvention());
+    funcErrorResult.emplace(type, conv);
+  }
+
+  return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
+                              funcCalleeConvention, funcParams, funcYields,
+                              funcResults, funcErrorResult, Ctx);
+}
+
 Type ASTBuilder::createProtocolCompositionType(
     ArrayRef<ProtocolDecl *> protocols,
     Type superclass,

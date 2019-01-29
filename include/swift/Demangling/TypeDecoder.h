@@ -77,6 +77,147 @@ public:
   }
 };
 
+enum class ImplParameterConvention {
+  Indirect_In,
+  Indirect_In_Constant,
+  Indirect_In_Guaranteed,
+  Indirect_Inout,
+  Indirect_InoutAliasable,
+  Direct_Owned,
+  Direct_Unowned,
+  Direct_Guaranteed,
+};
+
+/// Describe a lowered function parameter, parameterized on the type
+/// representation.
+template <typename BuiltType>
+class ImplFunctionParam {
+  ImplParameterConvention Convention;
+  BuiltType Type;
+
+public:
+  using ConventionType = ImplParameterConvention;
+
+  static Optional<ConventionType>
+  getConventionFromString(StringRef conventionString) {
+    if (conventionString == "@in")
+      return ConventionType::Indirect_In;
+    if (conventionString == "@indirect_in_constant")
+      return ConventionType::Indirect_In_Constant;
+    if (conventionString == "@in_guaranteed")
+      return ConventionType::Indirect_In_Guaranteed;
+    if (conventionString == "@inout")
+      return ConventionType::Indirect_Inout;
+    if (conventionString == "@inout_aliasable")
+      return ConventionType::Indirect_InoutAliasable;
+    if (conventionString == "@owned")
+      return ConventionType::Direct_Owned;
+    if (conventionString == "@unowned")
+      return ConventionType::Direct_Unowned;
+    if (conventionString == "@guaranteed")
+      return ConventionType::Direct_Guaranteed;
+
+    return None;
+  }
+
+  ImplFunctionParam(ImplParameterConvention convention, BuiltType type)
+      : Convention(convention), Type(type) {}
+
+  ImplParameterConvention getConvention() const { return Convention; }
+
+  BuiltType getType() const { return Type; }
+};
+
+enum class ImplResultConvention {
+  Indirect,
+  Owned,
+  Unowned,
+  UnownedInnerPointer,
+  Autoreleased,
+};
+
+/// Describe a lowered function result, parameterized on the type
+/// representation.
+template <typename BuiltType>
+class ImplFunctionResult {
+  ImplResultConvention Convention;
+  BuiltType Type;
+
+public:
+  using ConventionType = ImplResultConvention;
+
+  static Optional<ConventionType>
+  getConventionFromString(StringRef conventionString) {
+    if (conventionString == "@out")
+      return ConventionType::Indirect;
+    if (conventionString == "@owned")
+      return ConventionType::Owned;
+    if (conventionString == "@unowned")
+      return ConventionType::Unowned;
+    if (conventionString == "@unowned_inner_pointer")
+      return ConventionType::UnownedInnerPointer;
+    if (conventionString == "@autoreleased")
+      return ConventionType::Autoreleased;
+
+    return None;
+  }
+
+  ImplFunctionResult(ImplResultConvention convention, BuiltType type)
+      : Convention(convention), Type(type) {}
+
+  ImplResultConvention getConvention() const { return Convention; }
+
+  BuiltType getType() const { return Type; }
+};
+
+enum class ImplFunctionRepresentation {
+  Thick,
+  Block,
+  Thin,
+  CFunctionPointer,
+  Method,
+  ObjCMethod,
+  WitnessMethod,
+  Closure
+};
+
+class ImplFunctionTypeFlags {
+  unsigned Rep : 3;
+  unsigned Pseudogeneric : 1;
+  unsigned Escaping : 1;
+
+public:
+  ImplFunctionTypeFlags() : Rep(0), Pseudogeneric(0), Escaping(0) {}
+
+  ImplFunctionTypeFlags(ImplFunctionRepresentation rep,
+                        bool pseudogeneric, bool noescape)
+      : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape) {}
+
+  ImplFunctionTypeFlags
+  withRepresentation(ImplFunctionRepresentation rep) const {
+    return ImplFunctionTypeFlags(rep, Pseudogeneric, Escaping);
+  }
+
+  ImplFunctionTypeFlags
+  withEscaping() const {
+    return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep),
+                                 Pseudogeneric, true);
+  }
+  
+  ImplFunctionTypeFlags
+  withPseudogeneric() const {
+    return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep),
+                                 true, Escaping);
+  }
+
+  ImplFunctionRepresentation getRepresentation() const {
+    return ImplFunctionRepresentation(Rep);
+  }
+
+  bool isEscaping() const { return Escaping; }
+
+  bool isPseudogeneric() const { return Pseudogeneric; }
+};
 
 #if SWIFT_OBJC_INTEROP
 /// For a mangled node that refers to an Objective-C class or protocol,
@@ -391,12 +532,11 @@ class TypeDecoder {
       return Builder.createFunctionType(parameters, result, flags);
     }
     case NodeKind::ImplFunctionType: {
-      // Minimal support for lowered function types. These come up in
-      // reflection as capture types. For the reflection library's
-      // purposes, the only part that matters is the convention.
-      //
-      // TODO: Do we want to reflect @escaping?
-      FunctionTypeFlags flags;
+      auto calleeConvention = ImplParameterConvention::Direct_Unowned;
+      std::vector<ImplFunctionParam<BuiltType>> parameters;
+      std::vector<ImplFunctionResult<BuiltType>> results;
+      std::vector<ImplFunctionResult<BuiltType>> errorResults;
+      ImplFunctionTypeFlags flags;
 
       for (unsigned i = 0; i < Node->getNumChildren(); i++) {
         auto child = Node->getChild(i);
@@ -407,7 +547,9 @@ class TypeDecoder {
 
           if (child->getText() == "@convention(thin)") {
             flags =
-              flags.withConvention(FunctionMetadataConvention::Thin);
+              flags.withRepresentation(ImplFunctionRepresentation::Thin);
+          } else if (child->getText() == "@callee_guaranteed") {
+            calleeConvention = ImplParameterConvention::Direct_Guaranteed;
           }
         } else if (child->getKind() == NodeKind::ImplFunctionAttribute) {
           if (!child->hasText())
@@ -416,24 +558,46 @@ class TypeDecoder {
           StringRef text = child->getText();
           if (text == "@convention(c)") {
             flags =
-              flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
+              flags.withRepresentation(ImplFunctionRepresentation::CFunctionPointer);
           } else if (text == "@convention(block)") {
             flags =
-              flags.withConvention(FunctionMetadataConvention::Block);
+              flags.withRepresentation(ImplFunctionRepresentation::Block);
           }
         } else if (child->getKind() == NodeKind::ImplEscaping) {
-          flags = flags.withEscaping(true);
+          flags = flags.withEscaping();
+        } else if (child->getKind() == NodeKind::ImplParameter) {
+          if (decodeImplFunctionPart(child, parameters))
+            return BuiltType();
+        } else if (child->getKind() == NodeKind::ImplResult) {
+          if (decodeImplFunctionPart(child, results))
+            return BuiltType();
+        } else if (child->getKind() == NodeKind::ImplErrorResult) {
+          if (decodeImplFunctionPart(child, errorResults))
+            return BuiltType();
+        } else {
+          return BuiltType();
         }
       }
 
-      // Completely punt on argument types and results.
-      std::vector<FunctionParam<BuiltType>> parameters;
+      Optional<ImplFunctionResult<BuiltType>> errorResult;
+      switch (errorResults.size()) {
+      case 0:
+        break;
+      case 1:
+        errorResult = errorResults.front();
+        break;
+      default:
+        return BuiltType();
+      }
 
-      std::vector<BuiltType> elements;
-      std::string labels;
-      auto result = Builder.createTupleType(elements, std::move(labels), false);
-
-      return Builder.createFunctionType(parameters, result, flags);
+      // TODO: Some cases not handled above, but *probably* they cannot
+      // appear as the types of values in SIL (yet?):
+      // - functions with yield returns
+      // - functions with generic signatures
+      // - foreign error conventions
+      return Builder.createImplFunctionType(calleeConvention,
+                                            parameters, results,
+                                            errorResult, flags);
     }
 
     case NodeKind::ArgumentTuple:
@@ -577,6 +741,29 @@ class TypeDecoder {
   }
 
 private:
+  template <typename T>
+  bool decodeImplFunctionPart(Demangle::NodePointer node,
+                              std::vector<T> &results) {
+    if (node->getNumChildren() != 2)
+      return true;
+    
+    if (node->getChild(0)->getKind() != Node::Kind::ImplConvention ||
+        node->getChild(1)->getKind() != Node::Kind::Type)
+      return true;
+
+    StringRef conventionString = node->getChild(0)->getText();
+    Optional<typename T::ConventionType> convention =
+        T::getConventionFromString(conventionString);
+    if (!convention)
+      return true;
+    BuiltType type = decodeMangledType(node->getChild(1));
+    if (!type)
+      return true;
+
+    results.emplace_back(*convention, type);
+    return false;
+  }
+
   bool decodeMangledTypeDecl(Demangle::NodePointer node,
                              BuiltTypeDecl &typeDecl,
                              BuiltType &parent,

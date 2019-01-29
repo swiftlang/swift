@@ -275,6 +275,39 @@ public:
     return FunctionTypeRef::create(*this, params, result, flags);
   }
 
+  const FunctionTypeRef *createImplFunctionType(
+    Demangle::ImplParameterConvention calleeConvention,
+    ArrayRef<Demangle::ImplFunctionParam<const TypeRef *>> params,
+    ArrayRef<Demangle::ImplFunctionResult<const TypeRef *>> results,
+    Optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
+    ImplFunctionTypeFlags flags) {
+    // Minimal support for lowered function types. These come up in
+    // reflection as capture types. For the reflection library's
+    // purposes, the only part that matters is the convention.
+    FunctionTypeFlags funcFlags;
+    switch (flags.getRepresentation()) {
+    case Demangle::ImplFunctionRepresentation::Thick:
+    case Demangle::ImplFunctionRepresentation::Closure:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Swift);
+      break;
+    case Demangle::ImplFunctionRepresentation::Thin:
+    case Demangle::ImplFunctionRepresentation::Method:
+    case Demangle::ImplFunctionRepresentation::ObjCMethod:
+    case Demangle::ImplFunctionRepresentation::WitnessMethod:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Thin);
+      break;
+    case Demangle::ImplFunctionRepresentation::CFunctionPointer:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::CFunctionPointer);
+      break;
+    case Demangle::ImplFunctionRepresentation::Block:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Block);
+      break;
+    }
+
+    auto result = createTupleType({}, "", false);
+    return FunctionTypeRef::create(*this, {}, result, funcFlags);
+  }
+
   const ProtocolCompositionTypeRef *
   createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
                                 BuiltType superclass,
