@@ -468,6 +468,20 @@ std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
   return finalize();
 }
 
+std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
+  DWARFMangling = true;
+  beginMangling();
+  
+  if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
+    appendFunction(fnType, false);
+  } else {
+    appendType(Ty);
+  }
+
+  appendOperator("D");
+  return finalize();
+}
+
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
   beginManglingWithoutPrefix();

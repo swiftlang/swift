@@ -169,6 +169,8 @@ public:
     return finalize();
   }
 
+  std::string mangleTypeAsUSR(Type decl);
+
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
   std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
