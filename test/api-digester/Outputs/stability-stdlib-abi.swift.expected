@@ -82,3 +82,5 @@ Protocol SIMDStorage has generic signature change from <τ_0_0.Scalar : Hashable
 Func Sequence.flatMap(_:) has been removed
 Subscript String.UnicodeScalarView.subscript(_:) has been removed
 Subscript Substring.subscript(_:) has been removed
+
+Func Collection.makeIterator() has self access kind changing from NonMutating to __Consuming
