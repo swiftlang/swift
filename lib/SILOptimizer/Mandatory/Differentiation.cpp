@@ -2965,6 +2965,9 @@ public:
     auto adjParamArgs = getAdjoint().getArgumentsWithoutIndirectResults();
     seed = adjParamArgs[0];
     primalValueAggregateInAdj = adjParamArgs[1];
+    // NOTE: Retaining `seed` below is a temporary hotfix for SR-9804.
+    builder.setInsertionPoint(adjointEntry);
+    builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
 
     // Assign adjoint to the return value.
     //   y = tuple (y0, ..., yn)
