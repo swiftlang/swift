@@ -22,6 +22,8 @@ do {
 
 // DEMANGLE: $sSi22lowered_function_types5ClassCACypS2iACypIegygxnldor_D
 // DEMANGLE: $ss5Error_pIegzo_D
+// DEMANGLE: $sSiSiIegco_D
 
 // CHECK: @callee_guaranteed (Int, @guaranteed Class, @owned Class, @in_guaranteed Any, @inout Int) -> (Int, @owned Class, @out Any)
 // CHECK: @callee_guaranteed () -> @error Error
+// CHECK: @callee_guaranteed (@in_constant Int) -> @owned Int

@@ -102,7 +102,7 @@ public:
   getConventionFromString(StringRef conventionString) {
     if (conventionString == "@in")
       return ConventionType::Indirect_In;
-    if (conventionString == "@indirect_in_constant")
+    if (conventionString == "@in_constant")
       return ConventionType::Indirect_In_Constant;
     if (conventionString == "@in_guaranteed")
       return ConventionType::Indirect_In_Guaranteed;
