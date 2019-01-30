@@ -1221,6 +1221,12 @@ if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
     make_relative_symlink "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
 fi
 
+# Don't symlink clang-tools-extra into the tree as the 'clang' symlink prevents
+# make_relative_symlink from working correctly.
+if [ -e "${WORKSPACE}/clang-tools-extra" ] ; then
+    CLANG_TOOLS_EXTRA_SOURCE_DIR="${WORKSPACE}/clang-tools-extra"
+fi
+
 # Symlink compiler-rt into the llvm tree, if it exists.
 COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
 if [ -e "${WORKSPACE}/compiler-rt" ] ; then
@@ -1229,7 +1235,16 @@ if [ -e "${WORKSPACE}/compiler-rt" ] ; then
     fi
 fi
 
+# Build libcxx, unless it doesn't exist.
+LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
+if [[ ! -e "${LIBCXX_SOURCE_DIR}" ]] ; then
+  SKIP_BUILD_LIBCXX=1
+fi
+
 PRODUCTS=(cmark llvm)
+if [[ ! "${SKIP_BUILD_LIBCXX}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" libcxx)
+fi
 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libicu)
 fi
@@ -1575,6 +1590,10 @@ function build_directory_bin() {
             llvm)
                 echo "${root}/${LLVM_BUILD_TYPE}/bin"
                 ;;
+            libcxx)
+                # Reuse LLVM's build type.
+                echo "${root}/${LLVM_BUILD_TYPE}/bin"
+                ;;
             swift)
                 echo "${root}/${SWIFT_BUILD_TYPE}/bin"
                 ;;
@@ -1720,6 +1739,10 @@ function cmake_config_opt() {
                 echo "--config ${CMARK_BUILD_TYPE}"
                 ;;
             llvm)
+                echo "--config ${LLVM_BUILD_TYPE}"
+                ;;
+            libcxx)
+                # Reuse LLVM's build type.
                 echo "--config ${LLVM_BUILD_TYPE}"
                 ;;
             swift)
@@ -2165,6 +2188,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${llvm_cmake_options[@]}"
                 )
 
+                if [[ ! -z "${CLANG_TOOLS_EXTRA_SOURCE_DIR}" ]] ; then
+                  cmake_options+=(
+                    -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="${CLANG_TOOLS_EXTRA_SOURCE_DIR}"
+                  )
+                fi
+
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
                     cmake_options+=(
                     -DLLVM_BUILD_TOOLS=NO
@@ -2201,6 +2230,22 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DLLVM_NATIVE_BUILD=$(build_directory "${LOCAL_HOST}" llvm)
                     )
                 fi
+
+                ;;
+
+            libcxx)
+                build_targets=(cxx-headers)
+                cmake_options=(
+                    "${cmake_options[@]}"
+                    -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
+                    -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
+                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
+                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
+                    -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
+                    -DLLVM_INCLUDE_DOCS:BOOL=TRUE
+                    -DLLVM_CONFIG_PATH="$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-config"
+                    "${llvm_cmake_options[@]}"
+                )
 
                 ;;
 
@@ -2980,6 +3025,9 @@ for host in "${ALL_HOSTS[@]}"; do
             llvm)
                 continue # We don't test LLVM
                 ;;
+            libcxx)
+                continue # We don't test libc++
+                ;;
             swift)
                 executable_target=
                 results_targets=
@@ -3477,6 +3525,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/;/ install-/g')
+                ;;
+            libcxx)
+                INSTALL_TARGETS=install-cxx-headers
                 ;;
             swift)
                 if [[ -z "${INSTALL_SWIFT}" ]] ; then
