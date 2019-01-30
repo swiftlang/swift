@@ -322,8 +322,8 @@ public:
     Type constraintType;
     SourceLoc sourceLoc;
     
-    InvalidConstraint(const Type& type1, const Type& type2,
-                      const SourceLoc& loc) : subjectType(type1),
+    InvalidConstraint(const Type type1, const Type type2,
+                      const SourceLoc loc) : subjectType(type1),
                                               constraintType(type2),
                                               sourceLoc(loc) {}
   };
