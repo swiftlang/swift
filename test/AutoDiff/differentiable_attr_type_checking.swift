@@ -85,6 +85,18 @@ func jvpNonDiffResult2(x: Float) -> (Float, Int) {
   return (x, Int(x))
 }
 
+// expected-error @+1 {{ambiguous or overloaded identifier 'jvpAmbiguousVJP' cannot be used in '@differentiable' attribute}}
+@differentiable(jvp: jvpAmbiguousVJP)
+func jvpAmbiguous(x: Float) -> Float {
+  return x
+}
+func jvpAmbiguousVJP(_ x: Float) -> (Float, (Float) -> Float) {
+  return (x, { $0 })
+}
+func jvpAmbiguousVJP(x: Float) -> (Float, (Float) -> Float) {
+  return (x, { $0 })
+}
+
 struct JVPStruct {
   let p: Float
 
@@ -342,6 +354,19 @@ extension VJPStruct {
   }
 }
 
+// expected-error @+2 {{empty 'where' clause in '@differentiable' attribute}}
+// expected-error @+1 {{expected type}}
+@differentiable(where)
+func emptyWhereClause<T>(x: T) -> T {
+  return x
+}
+
+// expected-error @+1 {{trailing 'where' clause in '@differentiable' attribute of non-generic function 'nongenericWhereClause(x:)'}}
+@differentiable(where T : Differentiable)
+func nongenericWhereClause(x: Float) -> Float {
+  return x
+}
+
 @differentiable(jvp: jvpWhere1, vjp: vjpWhere1 where T : Differentiable)
 func where1<T>(x: T) -> T {
   return x
@@ -411,7 +436,7 @@ func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
 }
 
 // expected-error @+2 {{layout constraints are only allowed inside '_specialize' attributes}}
-// expected-error @+1 {{empty 'where' clause in @differentiable attribute}}
+// expected-error @+1 {{empty 'where' clause in '@differentiable' attribute}}
 @differentiable(where Scalar : _Trivial)
 func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
   return x
