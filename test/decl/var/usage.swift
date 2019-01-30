@@ -303,14 +303,6 @@ func sr964() {
       }
     }
   }
-  extension MemberGetterClass {
-    var suspiciousSetterExt: String {
-      get { return "" }
-      set {
-        print(suspiciousSetterExt) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{15-34=newValue}}
-      }
-    }
-  }
   var namedSuspiciousSetter: String {
     get { return "" }
     set(parameter) {
@@ -326,6 +318,15 @@ func sr964() {
     set {
       print(multiTriggerSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-31=newValue}}
       print(multiTriggerSetter)
+    }
+  }
+}
+struct MemberGetterExtension {}
+extension MemberGetterExtension {
+  var suspiciousSetter: String {
+    get { return "" }
+    set {
+      print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-29=newValue}}
     }
   }
 }
