@@ -802,16 +802,17 @@ ASTBuilder::findDeclContext(const Demangle::NodePointer &node) {
       return nullptr;
     }
 
+    // Do some special logic for foreign type declarations.
+    if (privateDiscriminator.empty()) {
+      if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
+        return findForeignTypeDecl(name, relatedEntityKind,
+                                    foreignModuleKind.getValue(),
+                                    node->getKind());
+      }
+    }
+
     DeclContext *dc = findDeclContext(node->getChild(0));
     if (!dc) {
-      // Do some backup logic for foreign type declarations.
-      if (privateDiscriminator.empty()) {
-        if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
-          return findForeignTypeDecl(name, relatedEntityKind,
-                                     foreignModuleKind.getValue(),
-                                     node->getKind());
-        }
-      }
       return nullptr;
     }
 
