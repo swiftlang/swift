@@ -365,17 +365,13 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
                                         "mangling type for debugger", Ty);
 
   DWARFMangling = true;
+  OptimizeProtocolNames = false;
   beginMangling();
   
   if (DC)
     bindGenericParameters(DC);
 
-  if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
-    appendFunction(fnType, false);
-  } else {
-    appendType(Ty);
-  }
-
+  appendType(Ty);
   appendOperator("D");
   return finalize();
 }
