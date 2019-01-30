@@ -234,3 +234,16 @@ func rdar_30906031(in arr: [Int], fn: @autoclosure () -> Int) -> Bool {
     arr.lazy.filter { $0 >= escapableF() }.isEmpty
   }
 }
+
+func rdar_47586626() {
+  struct S {}
+  typealias F = () -> S
+
+  func foo(_: @autoclosure S) {} // expected-error {{@autoclosure attribute only applies to function types}}
+  func bar(_: @autoclosure F) {} // expected-error {{@autoclosure attribute only applies to function types}}
+
+  let s = S()
+
+  foo(s) // ok
+  bar(s) // ok
+}
