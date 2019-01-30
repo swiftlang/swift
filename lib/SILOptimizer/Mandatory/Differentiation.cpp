@@ -1649,10 +1649,8 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
         : SubstitutionMap::get(
               newFuncGenSig, QuerySubstitutionMap{pai->getSubstitutionMap()},
               LookUpConformanceInModule(builder.getModule().getSwiftModule()));
-    auto result = builder.createPartialApply(
-        loc, innerNewFunc, substMap, newArgs,
-        ParameterConvention::Direct_Guaranteed);
-    return result;
+    return builder.createPartialApply(loc, innerNewFunc, substMap, newArgs,
+                                      ParameterConvention::Direct_Guaranteed);
   }
   // convert_escape_to_noescape
   if (auto *cetn = dyn_cast<ConvertEscapeToNoEscapeInst>(oldConvertedFunc)) {
@@ -2294,15 +2292,14 @@ public:
     auto &context = getContext();
     auto origSubstMap = ai->getSubstitutionMap();
     auto assocGenSig = assocFnTy->getGenericSignature();
+    // If associated function has no generic signature, then short-circuit and
+    // return original substitution map.
     if (!assocGenSig)
       return origSubstMap;
 
     auto assocSubstMap = assocGenSig->createGenericEnvironment()
         ->getForwardingSubstitutionMap();
-    SubstitutionMap primalSubstMap;
-    auto primalGenEnv = getPrimal()->getGenericEnvironment();
-    if (primalGenEnv)
-      primalSubstMap = primalGenEnv->getForwardingSubstitutionMap();
+    auto substMap = SubsMap.empty() ? origSubstMap : SubsMap;
 
     // Jointly iterate through requirements and conformances of VJP callee.
     SmallVector<Requirement, 2> unsatisfiedRequirements;
@@ -2314,18 +2311,12 @@ public:
       auto *proto = conformance.getAbstract();
       assert(proto && "Expected protocol in generic signature requirement");
       auto reqType = req.getFirstType();
-      // If requirement type can be substituted in original substutition map to
-      // form a non-archetype type, use the substituted type.
-      if (auto origFirstType = reqType.subst(origSubstMap))
-        if (!origFirstType->hasArchetype())
-          reqType = origFirstType;
-      // If requirement type has no type parameters and is not an archetype type,
-      // it is valid. Continue.
+      // If requirement type has no type parameters and is not an archetype
+      // type, it is valid. Continue.
       if (!reqType->isTypeParameter() && !reqType->hasArchetype())
         continue;
       auto isConformanceMet =
-          origSubstMap.lookupConformance(reqType->getCanonicalType(), proto) ||
-          primalSubstMap.lookupConformance(reqType->getCanonicalType(), proto);
+          substMap.lookupConformance(reqType->getCanonicalType(), proto);
       if (!isConformanceMet)
         unsatisfiedRequirements.push_back(req);
       conformances = conformances.slice(1);
@@ -2340,18 +2331,10 @@ public:
 
     // If all requirements are satisfied, return associated function
     // substitution map.
-    if (assocSubstMap.empty())
-      return origSubstMap;
-    return assocSubstMap.subst(
-      [&](SubstitutableType *ty) -> Type {
-        Type type(ty);
-        if (!primalSubstMap.empty())
-          type = type.subst(primalSubstMap);
-        if (type->hasArchetype() && primalGenEnv)
-          return type;
-        return type.subst(origSubstMap);
-      },
-      LookUpConformanceInModule(context.getModule().getSwiftModule()));
+    return SubstitutionMap::get(
+        assocSubstMap.getGenericSignature(),
+        QuerySubstitutionMap{substMap},
+        LookUpConformanceInModule(context.getModule().getSwiftModule()));
   }
 
   void visitApplyInst(ApplyInst *ai) {
@@ -2506,8 +2489,10 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // Synthesize primal.
   auto substMap = item.original->getForwardingSubstitutionMap();
   if (auto primalGenEnv = item.target->getGenericEnvironment()) {
-    auto primalSubstMap = primalGenEnv->getForwardingSubstitutionMap();
-    substMap = substMap.subst(primalSubstMap);
+    substMap = SubstitutionMap::get(
+        primalGenEnv->getGenericSignature(),
+        QuerySubstitutionMap{primalGenEnv->getForwardingSubstitutionMap()},
+        LookUpConformanceInModule(context.getModule().getSwiftModule()));
   }
   PrimalGenCloner cloner(item, activityInfo, substMap, *this, context);
   // Run the cloner.
