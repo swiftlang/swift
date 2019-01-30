@@ -2956,14 +2956,12 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
 
   // Construct a representative function type.
   auto generics = ncGenerics->getCanonicalSignature();
-  CanSILFunctionType fnType = [&]() -> CanSILFunctionType {
-    return SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
+  auto fnType = SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 SILCoroutineKind::None,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
                                 /*params*/ {}, /*yields*/ {},
                                 /*results*/ {}, /*error*/ None,
                                 IGM.Context);
-  }();
 
   // Figure out what we're actually still required to pass 
   PolymorphicConvention convention(IGM, fnType);
