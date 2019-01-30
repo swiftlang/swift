@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
 
+// UNSUPPORTED: OS=windows-msvc
+
 sil_stage canonical
 
 // CHECK-DAG: define{{( protected)?}} swiftcc void @weakButDefined() {{#[0-9]+}} {

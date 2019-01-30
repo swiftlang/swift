@@ -24,7 +24,7 @@ public struct S2 {
 // CHECK: %T18static_initializer1SV = type <{ %Ts5Int32V }>
 // CHECK: %T18static_initializer16TestArrayStorageC_tailelems0c = type { [1 x i64], %T18static_initializer16TestArrayStorageC_tailelems0 }
 // CHECK: %T18static_initializer16TestArrayStorageC_tailelems0 = type <{ %swift.refcounted, %Ts5Int32V, [4 x i8], %Ts5Int64V, %Ts5Int64V }>
-// CHECK: %T18static_initializer16TestArrayStorageC_tailelems1c = type { [2 x i64], %T18static_initializer16TestArrayStorageC_tailelems1 }
+// CHECK: %T18static_initializer16TestArrayStorageC_tailelems1c = type { [{{2|1}} x i64], %T18static_initializer16TestArrayStorageC_tailelems1 }
 // CHECK: %T18static_initializer16TestArrayStorageC_tailelems1 = type <{ %swift.refcounted, %Ts5Int32V, [12 x i8], %Ts7Float80V }>
 // CHECK: %T18static_initializer16TestArrayStorageC_tailelems3 = type <{ %swift.refcounted, %Ts5Int32V, [1 x i8], [1 x i8] }>
 

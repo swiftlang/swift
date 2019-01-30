@@ -3,6 +3,8 @@
 //
 // RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir | %FileCheck %s
 
+// UNSUPPORTED: OS=windows-msvc
+
 import weak_import_native_helper
 
 // CHECK-DAG-LABEL: @"$s25weak_import_native_helper23ProtocolWithWeakMembersP1TAC_AA05OtherE0Tn" = extern_weak global %swift.protocol_requirement

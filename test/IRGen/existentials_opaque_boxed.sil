@@ -140,8 +140,8 @@ entry:
 // CHECK-32:[[ALIGNMASK:%.*]] = and i32 [[FLAGS]], 255
 // CHECK-16:[[T0:%.*]] = trunc i32 [[FLAGS]] to i16
 // CHECK-16:[[ALIGNMASK:%.*]] = and i16 [[T0]], 255
-// CHECK:   [[HEADERSIZEPLUSALIGN:%.*]] = add {{(i64 16|i32 8)}}, [[ALIGNMASK]]
-// CHECK:   [[NOTALIGNMASK:%.*]] = xor {{(i64|i32)}} [[ALIGNMASK]], -1
+// CHECK-DAG:   [[HEADERSIZEPLUSALIGN:%.*]] = add {{(i64 16|i32 8)}}, [[ALIGNMASK]]
+// CHECK-DAG:   [[NOTALIGNMASK:%.*]] = xor {{(i64|i32)}} [[ALIGNMASK]], -1
 // CHECK:   [[ALIGNEDSTART:%.*]] = and {{(i64|i32)}} [[HEADERSIZEPLUSALIGN]], [[NOTALIGNMASK]]
 // CHECK:   [[HEAPSIZE:%.*]] = add {{(i64|i32)}} [[ALIGNEDSTART]], [[SIZE]]
 // CHECK:   [[ALIGNMASK_ATLEASTPOINTER:%.*]] = or {{(i64|i32)}} [[ALIGNMASK]], {{(7|3)}}
@@ -187,8 +187,8 @@ bb0(%0 : $*Existential):
 // CHECK-32:[[ALIGNMASK:%.*]] = and i32 [[FLAGS]], 255
 // CHECK-16:[[T0:%.*]] = trunc i32 [[FLAGS]] to i16
 // CHECK-16:[[ALIGNMASK:%.*]] = and i16 [[T0]], 255
-// CHECK:   [[HEADERSIZEPLUSALIGN:%.*]] = add {{(i64 16|i32 8)}}, [[ALIGNMASK]]
-// CHECK:   [[NOTALIGNMASK:%.*]] = xor {{(i64|i32)}} [[ALIGNMASK]], -1
+// CHECK-DAG:   [[HEADERSIZEPLUSALIGN:%.*]] = add {{(i64 16|i32 8)}}, [[ALIGNMASK]]
+// CHECK-DAG:   [[NOTALIGNMASK:%.*]] = xor {{(i64|i32)}} [[ALIGNMASK]], -1
 // CHECK:   [[ALIGNEDSTART:%.*]] = and {{(i64|i32)}} [[HEADERSIZEPLUSALIGN]], [[NOTALIGNMASK]]
 // CHECK:   [[HEAPOBJ:%.*]] = bitcast %swift.refcounted* %9 to i8*
 // CHECK:   [[STARTOFVALUE:%.*]] = getelementptr inbounds i8, i8* [[HEAPOBJ]], {{(i64|i32)}} [[ALIGNEDSTART]]
@@ -321,8 +321,8 @@ bb0(%0 : $*Existential):
 // CHECK:   br i1 [[ISINLINE]], label %match-inline, label %match-outline
 //
 // CHECK: match-inline:
-// CHECK:   [[DEST_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[DEST_BUFFERADDR]] to %swift.opaque*
-// CHECK:   [[SRC_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[SRC_BUFFERADDR]] to %swift.opaque*
+// CHECK-DAG:   [[DEST_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[DEST_BUFFERADDR]] to %swift.opaque*
+// CHECK-DAG:   [[SRC_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[SRC_BUFFERADDR]] to %swift.opaque*
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[DEST_TYPE]] to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
@@ -367,8 +367,8 @@ bb0(%0 : $*Existential):
 // CHECK:   br i1 [[DEST_ISINLINE]], label %dest-inline, label %dest-outline
 //
 // CHECK: dest-inline:
-// CHECK:   [[TMPBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[TMPBUFFER]] to %swift.opaque*
-// CHECK:   [[DESTBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[DEST_BUFFERADDR]] to %swift.opaque*
+// CHECK-DAG:   [[TMPBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[TMPBUFFER]] to %swift.opaque*
+// CHECK-DAG:   [[DESTBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[DEST_BUFFERADDR]] to %swift.opaque*
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[DEST_TYPE]] to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
@@ -379,8 +379,8 @@ bb0(%0 : $*Existential):
 // CHECK:   br i1 [[SRC_ISINLINE]], label %dest-inline-src-inline, label %dest-inline-src-outline
 //
 // CHECK: dest-inline-src-inline:
-// CHECK:   [[DESTBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[DEST_BUFFERADDR]] to %swift.opaque*
-// CHECK:   [[SRCBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[SRC_BUFFERADDR]] to %swift.opaque*
+// CHECK-DAG:   [[DESTBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[DEST_BUFFERADDR]] to %swift.opaque*
+// CHECK-DAG:   [[SRCBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[SRC_BUFFERADDR]] to %swift.opaque*
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[SRC_TYPE]] to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
@@ -415,8 +415,8 @@ bb0(%0 : $*Existential):
 // CHECK:   br i1 [[SRC_ISINLINE]], label %dest-outline-src-inline, label %dest-outline-src-outline
 //
 // CHECK: dest-outline-src-inline:
-// CHECK:   [[DESTBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[DEST_BUFFERADDR]] to %swift.opaque*
-// CHECK:   [[SRCBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[SRC_BUFFERADDR]] to %swift.opaque*
+// CHECK-DAG:   [[DESTBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[DEST_BUFFERADDR]] to %swift.opaque*
+// CHECK-DAG:   [[SRCBUFFER_OPAQUE:%.*]] = bitcast [{{(24|12)}} x i8]* [[SRC_BUFFERADDR]] to %swift.opaque*
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[SRC_TYPE]] to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
