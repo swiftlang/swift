@@ -1,3 +1,4 @@
+Func Collection.makeIterator() has self access kind changing from NonMutating to __Consuming
 Func tryReallocateUniquelyReferenced(buffer:newMinimumCapacity:) has been removed
 Protocol SIMD has added inherited protocol Decodable
 Protocol SIMD has added inherited protocol Encodable
