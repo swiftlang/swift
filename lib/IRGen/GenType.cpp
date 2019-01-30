@@ -1777,10 +1777,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
-    return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::OpaqueTypeArchetype:
-    // TODO: opaque type resilience
-    llvm_unreachable("should be lowered to underlying type; resilience not implemented");
+    return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::Class:
   case TypeKind::Enum:
   case TypeKind::Struct:
