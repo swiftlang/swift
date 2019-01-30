@@ -1588,6 +1588,7 @@ static SILValue
 reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
                           SILValue oldConvertedFunc, SILBuilder &builder,
                           SILLocation loc,
+                          SubstitutionMap substMap = SubstitutionMap(),
                           std::function<SILValue(SILValue)> substituteOperand =
                               [](SILValue v) { return v; }) {
   // If the old func is the new func, then there's no conversion.
@@ -1597,7 +1598,8 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   // thin_to_thick_function
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(
-        newFunc, oldFunc, tttfi->getOperand(), builder, loc, substituteOperand);
+        newFunc, oldFunc, tttfi->getOperand(), builder, loc, substMap,
+        substituteOperand);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto thickTy = operandFnTy->getWithRepresentation(
         SILFunctionTypeRepresentation::Thick);
@@ -1612,16 +1614,28 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
     for (auto arg : pai->getArguments())
       newArgs.push_back(substituteOperand(arg));
     auto innerNewFunc = reapplyFunctionConversion(
-        newFunc, oldFunc, pai->getCallee(), builder, loc, substituteOperand);
-    return builder.createPartialApply(
-        loc, innerNewFunc, pai->getSubstitutionMap(), newArgs,
+        newFunc, oldFunc, pai->getCallee(), builder, loc, substMap,
+        substituteOperand);
+    if (substMap.empty()) {
+      substMap = pai->getSubstitutionMap();
+    } else {
+      substMap = substMap.subst(
+          [&](SubstitutableType *ty) -> Type {
+            return Type(ty).subst(pai->getSubstitutionMap());
+          },
+          LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+    }
+    auto result = builder.createPartialApply(
+        loc, innerNewFunc, substMap, newArgs,
         ParameterConvention::Direct_Guaranteed);
+    return result;
   }
   // convert_escape_to_noescape
   if (auto *cetn = dyn_cast<ConvertEscapeToNoEscapeInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
                                                   cetn->getOperand(), builder,
-                                                  loc, substituteOperand);
+                                                  loc, substMap,
+                                                  substituteOperand);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto noEscapeType = operandFnTy->getWithExtInfo(
         operandFnTy->getExtInfo().withNoEscape());
@@ -1640,7 +1654,8 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
         cfi->getOperand()->getType().castTo<SILFunctionType>();
     auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
                                                   cfi->getOperand(), builder,
-                                                  loc, substituteOperand);
+                                                  loc, substMap,
+                                                  substituteOperand);
     // Match a conversion from escaping to `@noescape`
     CanSILFunctionType targetType;
     if (!origSourceFnTy->isNoEscape() && origTargetFnTy->isNoEscape() &&
@@ -1743,10 +1758,11 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     }
     assert(task);
     taskCallback(task);
-    auto *ref =
-        builder.createFunctionRef(loc, task->getAssociatedFunction(kind));
+    auto *assocFn = task->getAssociatedFunction(kind);
+    auto *ref = builder.createFunctionRef(loc, assocFn);
     auto convertedRef = reapplyFunctionConversion(
-        ref, originalFRI, original, builder, loc);
+        ref, originalFRI, original, builder, loc,
+        assocFn->getForwardingSubstitutionMap());
     return std::make_pair(convertedRef, task->getIndices());
   }
 
@@ -1797,13 +1813,16 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
             initialFn, desiredIndices, invoker);
       }
       auto loc = original.getLoc();
-      auto *initialVJPRef = builder.createFunctionRef(
-          loc, task->getAssociatedFunction(kind));
+      auto *assocFn = task->getAssociatedFunction(kind);
+      auto *initialVJPRef = builder.createFunctionRef(loc, assocFn);
       auto converted =
           reapplyFunctionConversion(initialVJPRef, initialFnRef, initVal,
-                                    builder, loc);
-      converted = reapplyFunctionConversion(converted, load, original,
-                                            builder, loc);
+                                    builder, loc,
+                                    assocFn->getForwardingSubstitutionMap());
+      converted =
+          reapplyFunctionConversion(converted, load, original,
+                                    builder, loc,
+                                    assocFn->getForwardingSubstitutionMap());
       SILAutoDiffIndices indices(0, desiredIndices.parameters);
       return std::make_pair(converted, indices);
     }
@@ -3900,6 +3919,9 @@ ADContext::declareExternalAssociatedFunction(
       break;
   }
   auto assocGenSig = getAssociatedFunctionGenericSignature(attr, original);
+  auto *assocGenEnv = assocGenSig
+      ? assocGenSig->createGenericEnvironment()
+      : nullptr;
   auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
       module, LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
@@ -3907,7 +3929,7 @@ ADContext::declareExternalAssociatedFunction(
   // Create external function declaration.
   auto *assocFn = fb.createFunction(
       SILLinkage::PublicExternal, name, assocFnTy,
-      /*GenericEnv*/ nullptr, originalLoc, original->isBare(), IsNotTransparent,
+      assocGenEnv, originalLoc, original->isBare(), IsNotTransparent,
       original->isSerialized(), original->isDynamicallyReplaceable());
   // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
   assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
