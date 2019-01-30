@@ -326,3 +326,4 @@ next to the other projects and it will be bootstrapped automatically:
     git clone git@github.com:ninja-build/ninja.git && cd ninja
     git checkout release
     cat README
+foo
