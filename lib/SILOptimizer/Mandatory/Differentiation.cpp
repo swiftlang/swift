@@ -2283,25 +2283,37 @@ public:
     primalValues.push_back(pullback);
   }
 
-  // Return the substitution map for the associated function of an apply
-  // instruction. If the associated function has generic requirements that are
+  // Return the substitution map for the associated function of an `apply`
+  // instruction. If the associated derivative has generic requirements that are
   // unfulfilled by the primal function, emit "callee requirements unmet"
   // diagnostics for each unmet requirement and return `None`.
   Optional<SubstitutionMap> getOrDiagnoseAssociatedFunctionSubstitutionMap(
       ApplyInst *ai, CanSILFunctionType assocFnTy) {
     auto &context = getContext();
+    auto *swiftModule = context.getModule().getSwiftModule();
     auto origSubstMap = ai->getSubstitutionMap();
     auto assocGenSig = assocFnTy->getGenericSignature();
-    // If associated function has no generic signature, then short-circuit and
+    // If associated derivative has no generic signature, then short-circuit and
     // return original substitution map.
     if (!assocGenSig)
       return origSubstMap;
 
-    auto assocSubstMap = assocGenSig->createGenericEnvironment()
-        ->getForwardingSubstitutionMap();
+    // Get the associated function substitution map.
+    auto assocGenEnv = assocGenSig->createGenericEnvironment();
+    auto assocSubstMap = assocGenEnv->getForwardingSubstitutionMap();
+    // If the primal function has a generic environment, use it to update
+    // `origSubstMap` (because the primal substitution map may have more
+    // requirements).
+    if (auto primalGenEnv = getPrimal()->getGenericEnvironment())
+      origSubstMap = SubstitutionMap::get(
+          primalGenEnv->getGenericSignature(),
+          QuerySubstitutionMap{origSubstMap},
+          LookUpConformanceInModule(swiftModule));
+    // Get the cloner substitution map.
     auto substMap = SubsMap.empty() ? origSubstMap : SubsMap;
 
-    // Jointly iterate through requirements and conformances of VJP callee.
+    // Jointly iterate through requirements and conformances of associated
+    // function.
     SmallVector<Requirement, 2> unsatisfiedRequirements;
     auto conformances = assocSubstMap.getConformances();
     for (auto req : assocGenSig->getRequirements()) {
@@ -2311,11 +2323,21 @@ public:
       auto *proto = conformance.getAbstract();
       assert(proto && "Expected protocol in generic signature requirement");
       auto reqType = req.getFirstType();
-      // If requirement type has no type parameters and is not an archetype
-      // type, it is valid. Continue.
-      if (!reqType->isTypeParameter() && !reqType->hasArchetype())
-        continue;
+      // Try substituting requirement type using original substutition map. If
+      // the result type is known to conform to protocol in the current module,
+      // continue.
+      // This handles cases where the primal caller is non-generic (specialized
+      // with concrete types) but the associated derivative callee is generic.
+      if (auto origFirstType = reqType.subst(origSubstMap)) {
+        if (!origFirstType->hasError() &&
+            swiftModule->lookupConformance(origFirstType, proto)) {
+          conformances = conformances.slice(1);
+          continue;
+        }
+      }
+      // Otherwise, try to look up conformance in substitution maps.
       auto isConformanceMet =
+          origSubstMap.lookupConformance(reqType->getCanonicalType(), proto) ||
           substMap.lookupConformance(reqType->getCanonicalType(), proto);
       if (!isConformanceMet)
         unsatisfiedRequirements.push_back(req);
@@ -2329,8 +2351,7 @@ public:
       return None;
     }
 
-    // If all requirements are satisfied, return associated function
-    // substitution map.
+    // If all requirements are satisfied, return target substitution map.
     return SubstitutionMap::get(
         assocSubstMap.getGenericSignature(),
         QuerySubstitutionMap{substMap},
@@ -2488,12 +2509,8 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
                               activityInfo, getADDebugStream()));
   // Synthesize primal.
   auto substMap = item.original->getForwardingSubstitutionMap();
-  if (auto primalGenEnv = item.target->getGenericEnvironment()) {
-    substMap = SubstitutionMap::get(
-        primalGenEnv->getGenericSignature(),
-        QuerySubstitutionMap{primalGenEnv->getForwardingSubstitutionMap()},
-        LookUpConformanceInModule(context.getModule().getSwiftModule()));
-  }
+  if (auto primalGenEnv = item.target->getGenericEnvironment())
+    substMap = substMap.subst(primalGenEnv->getForwardingSubstitutionMap());
   PrimalGenCloner cloner(item, activityInfo, substMap, *this, context);
   // Run the cloner.
   return cloner.run();
