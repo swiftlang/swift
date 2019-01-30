@@ -1226,6 +1226,7 @@ ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
       MemberNameLoc(MemberNameLoc) {
 }
 
+
 ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
                                        TypeLoc ProtocolType,

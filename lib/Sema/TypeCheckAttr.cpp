@@ -2891,7 +2891,7 @@ getAutoDiffOriginalFunctionType(AnyFunctionType *derivativeType) {
 
   // Wrap the associated function type in additional curry levels.
   auto curryLevelsWithoutLast =
-  ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
+      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
   for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
     unsigned i = pair.index();
     AnyFunctionType *curryLevel = pair.value();

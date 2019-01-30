@@ -1505,7 +1505,7 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
 // SWIFT_ENABLE_TENSORFLOW
 // differentiable
 ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
-      "expected a qualified %0 function", (StringRef))
+      "expected a %0 function name", (StringRef))
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
@@ -1521,7 +1521,7 @@ ERROR(attr_differentiable_expected_label,none,
 
 // differentiating
 ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
-      "expected a qualified original function name", ())
+      "expected an original function name", ())
 
 // [differentiable ...] (sil-decl attr)
 ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,

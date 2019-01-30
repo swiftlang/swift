@@ -14,16 +14,20 @@ func vjpSin(x: Float) -> (value: Float, pullback: (Float) -> Float) {
 func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
-@differentiating(sin) // expected-error {{@differentiating attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')}}
-func vjpSinWrongLabel(x: Float) -> (value: Float, (Float) -> Float) {
+@differentiating(sin) // expected-error {{'@differentiating' attribute requires function to return a two-element tuple of type '(value: T..., pullback: (U.CotangentVector) -> T.CotangentVector...)' or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'}}
+func jvpSinResultInvalid(x: @nondiff Float) -> Float {
+  return x
+}
+@differentiating(sin) // expected-error {{'@differentiating' attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')}}
+func vjpSinResultWrongLabel(x: Float) -> (value: Float, (Float) -> Float) {
   return (x, { $0 })
 }
-@differentiating(sin) // expected-error {{@differentiating attribute requires function to return a two-element tuple (first element type 'Int' must conform to 'Differentiable')}}
+@differentiating(sin) // expected-error {{'@differentiating' attribute requires function to return a two-element tuple (first element type 'Int' must conform to 'Differentiable')}}
 func vjpSinResultNotDifferentiable(x: Int) -> (value: Int, pullback: (Int) -> Int) {
   return (x, { $0 })
 }
 @differentiating(sin) // expected-error {{expected 'pullback' to be a function with a single parameter of type 'Float.CotangentVector' (aka 'Float')}}
-func vjpSinIncorrectSeedType(x: Float) -> (value: Float, pullback: (Double) -> Double) {
+func vjpSinResultInvalidSeedType(x: Float) -> (value: Float, pullback: (Double) -> Double) {
   return (x, { $0 })
 }
 
@@ -38,7 +42,7 @@ func vjpGeneric<T : Differentiable>(x: T, y: T) -> (value: T, pullback: (T.Cotan
 func jvpGeneric<T : Differentiable>(x: T, y: T) -> (value: T, differential: (T.TangentVector) -> (T.TangentVector, T.TangentVector)) {
   return (x, { ($0, $0) })
 }
-@differentiating(generic) // expected-error {{@differentiating attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')}}
+@differentiating(generic) // expected-error {{'@differentiating' attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')}}
 func vjpGenericWrongLabel<T : Differentiable>(x: T, y: T) -> (value: T, (T) -> (T, T)) {
   return (x, { ($0, $0) })
 }

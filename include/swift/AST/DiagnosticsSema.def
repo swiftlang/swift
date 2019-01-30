@@ -2734,17 +2734,19 @@ ERROR(differentiable_attr_unsupported_req_kind,none,
 
 // @differentiang
 ERROR(differentiating_attr_expected_result_tuple,none,
-      "@differentiating attribute requires function to return a two-element tuple (value and pullback/differential)", ())
+      "'@differentiating' attribute requires function to return a two-element tuple of type "
+      "'(value: T..., pullback: (U.CotangentVector) -> T.CotangentVector...)' or "
+      "'(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'", ())
 ERROR(differentiating_attr_expected_result_tuple_value_label,none,
-      "@differentiating attribute requires function to return a two-element tuple (first element must have label 'value:')", ())
+      "'@differentiating' attribute requires function to return a two-element tuple (first element must have label 'value:')", ())
 ERROR(differentiating_attr_expected_result_tuple_func_label,none,
-      "@differentiating attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')", ())
+      "'@differentiating' attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')", ())
 ERROR(differentiating_attr_result_value_not_differentiable,none,
-      "@differentiating attribute requires function to return a two-element tuple (first element type %0 must conform to 'Differentiable')", (Type))
+      "'@differentiating' attribute requires function to return a two-element tuple (first element type %0 must conform to 'Differentiable')", (Type))
 ERROR(differentiating_attr_result_func_invalid_parameter,none,
       "expected %0 to be a function with a single parameter of type %1", (Identifier, Type))
 ERROR(differentiating_attr_no_diff_parameters,none,
-      "@differentiating attribute requires function to have at least one differentiation parameter", ())
+      "'@differentiating' attribute requires function to have at least one differentiation parameter", ())
 ERROR(differentiating_attr_unexpected_diff_params_type,none,
       "unexpected differentiation parameters type; got %0, but expected %1", (Type, Type))
 ERROR(differentiating_attr_overload_not_found,none,

@@ -2799,7 +2799,7 @@ public:
     bool isOwned() const { return Flags.isOwned(); }
 
     // SWIFT_ENABLE_TENSORFLOW
-    /// Whether the parameter is marked '@nondiff'
+    /// Whether the parameter is marked '@nondiff'.
     bool isNonDifferentiable() const { return Flags.isNonDifferentiable(); }
 
     ValueOwnership getValueOwnership() const {
