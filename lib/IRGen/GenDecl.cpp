@@ -3435,6 +3435,15 @@ llvm::Constant *IRGenModule::getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
                                DebugTypeInfo());
 }
 
+llvm::Constant *IRGenModule::getAddrOfOpaqueTypeDescriptor(
+                                               OpaqueTypeDecl *opaqueType,
+                                               ConstantInit definition) {
+  auto entity = LinkEntity::forOpaqueTypeDescriptor(opaqueType);
+  return getAddrOfLLVMVariable(entity,
+                               definition,
+                               DebugTypeInfo());
+}
+
 llvm::Constant *IRGenModule::
 getAddrOfReflectionBuiltinDescriptor(CanType type,
                                      ConstantInit definition) {
