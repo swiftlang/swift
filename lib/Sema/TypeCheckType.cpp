@@ -1381,7 +1381,7 @@ static Type resolveNestedIdentTypeComponent(
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
     // Diagnose invalid cases.
-    if (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member)) {
+    if (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member, memberType)) {
       if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
         if (parentTy->is<UnboundGenericType>())
           diagnoseUnboundGenericType(parentTy, parentRange.End);

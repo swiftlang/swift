@@ -1190,16 +1190,15 @@ ConstraintSystem::getTypeOfMemberReference(
 
   FunctionType::Param baseObjParam(baseObjTy);
 
-  // Don't open existentials when accessing typealias members of
-  // protocols.
   if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
     if (baseObjTy->isExistentialType()) {
       auto memberTy = alias->getInterfaceType();
-      // If we end up with a protocol typealias here, it's underlying
-      // type must be fully concrete.
-      assert(!memberTy->hasTypeParameter());
-      auto openedType = FunctionType::get({baseObjParam}, memberTy);
-      return { openedType, memberTy };
+      // Only proceed to opening existentials when the protocol typealias
+      // has type parameters.
+      if (!memberTy->hasTypeParameter()) {
+        auto openedType = FunctionType::get({baseObjParam}, memberTy);
+        return { openedType, memberTy };
+      }
     }
   }
 

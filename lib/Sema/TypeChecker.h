@@ -1816,7 +1816,8 @@ public:
 
   /// Check whether the given declaration can be written as a
   /// member of the given base type.
-  static bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
+  static bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
+                                            Type replacementTy);
 
   /// Look up a member type within the given type.
   ///

@@ -3466,14 +3466,32 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         return;
       }
 
-    // If the underlying type of a typealias is fully concrete, it is legal
+    // If the member type is fully concrete, it is legal
     // to access the type with a protocol metatype base.
-    } else if (instanceTy->isExistentialType() &&
-               isa<TypeAliasDecl>(decl) &&
-               !cast<TypeAliasDecl>(decl)->getInterfaceType()->hasTypeParameter()) {
+    } else if (instanceTy->isExistentialType() && isa<TypeDecl>(decl)) {
+      auto typeDecl = cast<TypeDecl>(decl);
+
+      if (isa<TypeAliasDecl>(decl) &&
+          !cast<TypeAliasDecl>(decl)->getInterfaceType()->hasTypeParameter()) {
 
       /* We're OK */
 
+      } else {
+        // We are allowed to access type members that are or contain
+        // type parameters with a protocol metatype base iff these
+        // parameters are concrete relative to the base. Try substituting
+        // the base type into the member type to verify.
+        auto memberType = TC.substMemberTypeWithBase(DC->getParentModule(),
+                                                     typeDecl, instanceTy);
+        if (TC.isUnsupportedMemberTypeAccess(instanceTy, typeDecl,
+                                             memberType)) {
+          if (!hasStaticMembers) {
+            result.addUnviable(candidate,
+                               MemberLookupResult::UR_TypeMemberOnInstance);
+            return;
+          }
+        }
+      }
     } else {
       if (!hasStaticMembers) {
         result.addUnviable(candidate,

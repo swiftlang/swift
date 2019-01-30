@@ -215,7 +215,27 @@ func testExistential11(arg: EdgeCaseSub1) {}
 typealias Comp = EdgeCaseSub2 & EdgeCase1 & ProtAssoc
 
 func testExistential12(arg1: EdgeCaseSub2, arg2: Comp & ProtAssoc2) {
+  print(EdgeCaseSub2.Assoc.self)
+  print(EdgeCaseSub2.SimpleAlias.self)
+  print(EdgeCaseSub2.ComplexAlias.self)
+  print(Comp.Assoc.self)
+  print(Comp.SimpleAlias.self)
+  print(Comp.ComplexAlias.self)
+  print((EdgeCaseSub2 & EdgeCase1).Assoc.self)
+  print((EdgeCaseSub2 & EdgeCase1).SimpleAlias.self)
+  print((EdgeCaseSub2 & EdgeCase1).ComplexAlias.self)
 
   let _: Conforming = arg1.simpleAliasToAssoc(arg: Conforming())
   let _: Conforming = arg2.simpleAliasToAssoc(arg: Conforming())
+}
+
+func testExistentialMetatype(meta1: EdgeCaseSub2.Protocol,
+                             meta2: (EdgeCaseSub2 & EdgeCase1).Protocol,
+                             meta3: Comp.Protocol) {
+  print(meta1.Assoc.self)
+  print(meta1.ComplexAlias.self)
+  print(meta2.Assoc.self)
+  print(meta2.ComplexAlias.self)
+  print(meta3.Assoc.self)
+  print(meta3.ComplexAlias.self)
 }

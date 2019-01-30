@@ -394,7 +394,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   return result;
 }
 
-bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
+bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
+                                                Type replacementTy) {
   auto memberType = typeDecl->getDeclaredInterfaceType();
 
   // We don't allow lookups of a non-generic typealias of an unbound
@@ -421,10 +422,31 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
 
   if (type->isExistentialType() &&
       typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-    // TODO: Temporarily allow typealias and associated type lookup on
-    //       existential type iff it doesn't have any type parameters.
-    if (isa<TypeAliasDecl>(typeDecl) || isa<AssociatedTypeDecl>(typeDecl))
-      return memberType->hasTypeParameter();
+    if (isa<TypeAliasDecl>(typeDecl) || isa<AssociatedTypeDecl>(typeDecl)) {
+      // If this is a typealias and the underlying type contains 'Self',
+      // reject it right away. Otherwise, the member type could be resolved
+      // to a fully concrete type once we substitute the base – allow lookup
+      // unless we encounter a valid replacement type containing type
+      // parameters or dependent member types.
+      if (auto alias = dyn_cast<TypeAliasDecl>(typeDecl)) {
+        class Walker : public TypeWalker {
+        public:
+          Action walkToTypePre(Type ty) override {
+            if (ty->is<DependentMemberType>()) {
+              return Action::SkipChildren;
+            } else if (ty->is<GenericTypeParamType>()) {
+              return Action::Stop;
+            }
+            return Action::Continue;
+          }
+        };
+        // Walk the canonical type in search of explicit Self.
+        if (memberType->getCanonicalType().walk(Walker()))
+          return true;
+      }
+      return replacementTy && (replacementTy->hasDependentMember() ||
+                               replacementTy->hasTypeParameter());
+    }
 
     // Don't allow lookups of nested types of an existential type,
     // because there is no way to represent such types.
@@ -456,6 +478,21 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   // Look through the declarations, keeping only the unique type declarations.
   llvm::SmallPtrSet<CanType, 4> types;
   SmallVector<AssociatedTypeDecl *, 4> inferredAssociatedTypes;
+
+  auto verifyMemberAccessSupport = [&](TypeDecl *typeDecl,
+                                       Type replacementTy) {
+    auto memberType = typeDecl->getDeclaredInterfaceType();
+    if (isUnsupportedMemberTypeAccess(type, typeDecl, replacementTy)) {
+      // Add the type to the result set, so that we can diagnose the
+      // reference instead of just saying the member does not exist.
+      if (types.insert(memberType->getCanonicalType()).second)
+        result.Results.push_back({typeDecl, memberType, nullptr});
+
+      return false;
+    }
+    return true;
+  };
+
   for (auto decl : decls) {
     auto *typeDecl = cast<TypeDecl>(decl);
 
@@ -468,21 +505,16 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
     auto memberType = typeDecl->getDeclaredInterfaceType();
 
-    if (isUnsupportedMemberTypeAccess(type, typeDecl)) {
-      // Add the type to the result set, so that we can diagnose the
-      // reference instead of just saying the member does not exist.
-      if (types.insert(memberType->getCanonicalType()).second)
-        result.Results.push_back({typeDecl, memberType, nullptr});
-
+    if (!verifyMemberAccessSupport(typeDecl, Type()))
       continue;
-    }
 
     // If we're looking up an associated type of a concrete type,
     // record it later for conformance checking; we might find a more
     // direct typealias with the same name later.
     if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-        if (!type->is<ArchetypeType>() &&
+        if (!type->isExistentialType() &&
+            !type->is<ArchetypeType>() &&
             !type->isTypeParameter()) {
           if (options.contains(NameLookupFlags::PerformConformanceCheck))
             inferredAssociatedTypes.push_back(assocType);
@@ -514,6 +546,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     // Substitute the base into the member's type.
     memberType = substMemberTypeWithBase(dc->getParentModule(),
                                          typeDecl, type);
+
+    // Recheck whether we are allowed to access this type member, this time
+    // passing the replacement type. This will cast away associated types
+    // and type aliases that weren't resolved to concrete types during
+    // the substitution.
+    if (!verifyMemberAccessSupport(typeDecl, memberType))
+      continue;
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)

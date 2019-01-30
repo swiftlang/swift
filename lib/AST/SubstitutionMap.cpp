@@ -222,6 +222,17 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
     CanType depTy = req.getFirstType()->getCanonicalType();
     auto replacement = depTy.subst(subs, lookupConformance,
                                    SubstFlags::UseErrorType);
+
+    // If we are substituting with an existential base, this
+    // might be a legal concrete member type access; because existential
+    // types don't conform to themselves, use the Self parameter for
+    // protocols and an archetype for compositions to avoid overlooking
+    // conformances.
+    if (auto proto = replacement->getAs<ProtocolType>())
+      replacement = proto->getDecl()->getSelfInterfaceType();
+    else if (replacement->is<ProtocolCompositionType>())
+      replacement = OpenedArchetypeType::get(replacement);
+
     auto protoType = req.getSecondType()->castTo<ProtocolType>();
     auto proto = protoType->getDecl();
     auto conformance = lookupConformance(depTy, replacement, proto)
