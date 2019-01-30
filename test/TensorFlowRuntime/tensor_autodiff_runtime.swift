@@ -147,7 +147,14 @@ TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {
     return foo(foo(x))
   }
   let pb = pullback(at: Tensor(Float(10)), in: body)
-  expectEqual(Tensor(1.0), pb(Tensor(1)))
+  expectEqual(Tensor(1), pb(Tensor(1)))
+}
+
+TensorADTests.testAllBackends("SR-9804: AD refcounting") {
+  func f(_ x: Tensor<Float>) -> Tensor<Float> {
+    return x
+  }
+  expectEqual(Tensor(1), gradient(at: Tensor(0), in: f))
 }
 
 let cube: (Tensor<Float>) -> Tensor<Float> = { $0 * $0 * $0 }
