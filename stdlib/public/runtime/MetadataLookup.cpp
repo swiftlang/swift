@@ -246,7 +246,7 @@ _findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
       return nullptr;
     node = node->getChild(0);
   }
-  node = stripGenericArgsFromContextNode(node, demangler);
+  node = Demangle::getUnspecialized(node, demangler);
 
   return _findNominalTypeDescriptor(node, demangler);
 }
@@ -1100,11 +1100,13 @@ public:
     return BuiltType();
   }
 
-  BuiltType createMetatypeType(BuiltType instance, bool wasAbstract) const {
+  BuiltType createMetatypeType(BuiltType instance,
+              Optional<Demangle::ImplMetatypeRepresentation> repr=None) const {
     return swift_getMetatypeMetadata(instance);
   }
 
-  BuiltType createExistentialMetatypeType(BuiltType instance) const {
+  BuiltType createExistentialMetatypeType(BuiltType instance,
+              Optional<Demangle::ImplMetatypeRepresentation> repr=None) const {
     return swift_getExistentialMetatypeMetadata(instance);
   }
 
@@ -1163,6 +1165,16 @@ public:
                                            ? paramFlags.data()
                                            : nullptr,
                                          result);
+  }
+
+  BuiltType createImplFunctionType(
+    Demangle::ImplParameterConvention calleeConvention,
+    ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
+    ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
+    Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
+    ImplFunctionTypeFlags flags) {
+    // We can't realize the metadata for a SILFunctionType.
+    return BuiltType();
   }
 
   BuiltType createTupleType(ArrayRef<BuiltType> elements,
