@@ -891,7 +891,16 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     if (!Callee->shouldOptimize()) {
       continue;
     }
-    
+
+    // If we have a callee that doesn't have ownership, but the caller does have
+    // ownership... do not inline. The two modes are incompatible. Today this
+    // should only happen with transparent functions.
+    if (!Callee->hasOwnership() && Caller->hasOwnership()) {
+      assert(Caller->isTransparent() &&
+             "Should only happen with transparent functions");
+      continue;
+    }
+
     SmallVector<SILValue, 8> Args;
     for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);

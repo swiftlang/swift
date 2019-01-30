@@ -13,8 +13,8 @@ class ABC {
 
 
 // This is our c'tor.
-sil @_TFC4main3ABCcfMS0_FT1ySi_S0_ : $@convention(method) (Int64, @owned ABC) -> @owned ABC {
-bb0(%0 : $Int64, %1 : $ABC):
+sil [ossa] @_TFC4main3ABCcfMS0_FT1ySi_S0_ : $@convention(method) (Int64, @owned ABC) -> @owned ABC {
+bb0(%0 : $Int64, %1 : @owned $ABC):
   return %1 : $ABC                                // id: %38
 }
 
