@@ -402,6 +402,8 @@ NOTE(autodiff_value_defined_here,none,
      "value defined here", ())
 NOTE(autodiff_when_differentiating_function_call,none,
      "when differentiating this function call", ())
+NOTE(autodiff_when_differentiating_function_definition,none,
+     "when differentiating this function definition", ())
 NOTE(autodiff_expression_is_not_differentiable,none,
      "expression is not differentiable", ())
 NOTE(autodiff_nested_function_call_multiple_return_active,none,
