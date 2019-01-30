@@ -82,13 +82,22 @@ public:
   Type createFunctionType(ArrayRef<Demangle::FunctionParam<Type>> params,
                           Type output, FunctionTypeFlags flags);
 
+  Type createImplFunctionType(
+    Demangle::ImplParameterConvention calleeConvention,
+    ArrayRef<Demangle::ImplFunctionParam<Type>> params,
+    ArrayRef<Demangle::ImplFunctionResult<Type>> results,
+    Optional<Demangle::ImplFunctionResult<Type>> errorResult,
+    ImplFunctionTypeFlags flags);
+
   Type createProtocolCompositionType(ArrayRef<ProtocolDecl *> protocols,
                                      Type superclass,
                                      bool isClassBound);
 
-  Type createExistentialMetatypeType(Type instance);
+  Type createExistentialMetatypeType(Type instance,
+                     Optional<Demangle::ImplMetatypeRepresentation> repr=None);
 
-  Type createMetatypeType(Type instance, bool wasAbstract=false);
+  Type createMetatypeType(Type instance,
+                     Optional<Demangle::ImplMetatypeRepresentation> repr=None);
 
   Type createGenericTypeParameterType(unsigned depth, unsigned index);
 

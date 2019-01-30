@@ -10,6 +10,11 @@ import Foundation
 import CoreCooling
 import ErrorEnums
 
+extension CCRefrigerator {
+    struct InternalNestedType {}
+    fileprivate struct PrivateNestedType {}
+}
+
 /*
 do {
     let x1 = CCRefrigeratorCreate(kCCPowerStandard)
@@ -45,6 +50,8 @@ do {
 // DEMANGLE: $sSo18WrapperByAttributeaD
 // DEMANGLE: $sSo7IceCubeVD
 // DEMANGLE: $sSo10BlockOfIceaD
+// DEMANGLE: $sSo17CCRefrigeratorRefa13foreign_typesE18InternalNestedTypeVD
+// DEMANGLE: $sSo17CCRefrigeratorRefa13foreign_typesE17PrivateNestedType33_5415CB6AE6FCD935BF2278A4C9A5F9C3LLVD
 
 // CHECK: CCRefrigerator
 // CHECK: MyError.Code
@@ -55,6 +62,8 @@ do {
 // CHECK: WrapperByAttribute
 // CHECK: IceCube
 // CHECK: BlockOfIce
+// CHECK: CCRefrigerator.InternalNestedType
+// CHECK: CCRefrigerator.PrivateNestedType
 
 // DEMANGLE: $sSo17CCRefrigeratorRefamD
 // DEMANGLE: $sSo7MyErrorVmD
@@ -65,6 +74,8 @@ do {
 // DEMANGLE: $sSo18WrapperByAttributeamD
 // DEMANGLE: $sSo7IceCubeVmD
 // DEMANGLE: $sSo10BlockOfIceamD
+// DEMANGLE: $sSo17CCRefrigeratorRefa13foreign_typesE18InternalNestedTypeVmD
+// DEMANGLE: $sSo17CCRefrigeratorRefa13foreign_typesE17PrivateNestedType33_5415CB6AE6FCD935BF2278A4C9A5F9C3LLVmD
 
 // CHECK: CCRefrigerator.Type
 // CHECK: MyError.Code.Type
@@ -75,3 +86,6 @@ do {
 // CHECK: WrapperByAttribute.Type
 // CHECK: IceCube.Type
 // CHECK: BlockOfIce.Type
+// CHECK: CCRefrigerator.InternalNestedType.Type
+// CHECK: CCRefrigerator.PrivateNestedType.Type
+

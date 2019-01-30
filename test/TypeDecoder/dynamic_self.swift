@@ -14,4 +14,4 @@ class Me {
 }
 
 // DEMANGLE: $s12dynamic_self2MeCXDXMTD
-// CHECK: Self.Type
+// CHECK: @thick Self.Type
