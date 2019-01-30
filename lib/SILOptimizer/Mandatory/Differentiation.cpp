@@ -2297,7 +2297,7 @@ public:
       assert(proto && "Expected protocol in generic signature requirement");
       auto reqType = req.getFirstType();
       // If requirement type can be substituted in original substutition map to
-      // form a non-archetype type, use the ssubstituted type.
+      // form a non-archetype type, use the substituted type.
       if (auto origFirstType = reqType.subst(origSubstMap))
         if (!origFirstType->hasArchetype())
           reqType = origFirstType;

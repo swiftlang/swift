@@ -67,6 +67,8 @@ func testGenericContext<T, U, V>() -> A<T>.B<U, V>.GenericContextNested {
 
 // Test errors.
 
+struct Empty : VectorNumeric {} // expected-error {{type 'Empty' does not conform to protocol 'VectorNumeric'}}
+
 // Test type whose members conform to `VectorNumeric`
 // but have different `Scalar` associated type.
 struct InvalidMixedScalar: VectorNumeric { // expected-error {{type 'InvalidMixedScalar' does not conform to protocol 'VectorNumeric'}}

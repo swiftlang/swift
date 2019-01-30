@@ -4093,8 +4093,7 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
 // with `params` parameters and `retTy` return type.
 static AnyFunctionType *
 makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
-                 Type retTy, GenericSignature *whereClauseGenSig) {
-  auto genericSignature = whereClauseGenSig;
+                 Type retTy, GenericSignature *genericSignature) {
   if (!genericSignature)
     if (auto *genericFunctionType = copy->getAs<GenericFunctionType>())
       genericSignature = genericFunctionType->getGenericSignature();

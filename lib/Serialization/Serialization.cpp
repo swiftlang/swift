@@ -2391,10 +2391,22 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
       indices.push_back(paramIndices->parameters[i]);
 
     DifferentiableDeclAttrLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, attr->isImplicit(),
-      jvpName, jvpRef, vjpName, vjpRef, indices);
+        Out, ScratchRecord, abbrCode, attr->isImplicit(),
+        jvpName, jvpRef, vjpName, vjpRef, indices);
 
     writeGenericRequirements(attr->getRequirements(), DeclTypeAbbrCodes);
+    return;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case DAK_Differentiating: {
+    auto abbrCode = DeclTypeAbbrCodes[DifferentiatingDeclAttrLayout::Code];
+    auto attr = cast<DifferentiatingAttr>(DA);
+    IdentifierID origName =
+        addDeclBaseNameRef(attr->getOriginal().Name.getBaseName());
+    DeclID origRef = addDeclRef(attr->getOriginalFunction());
+    DifferentiatingDeclAttrLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, attr->isImplicit(), origName, origRef);
     return;
   }
   }

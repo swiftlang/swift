@@ -34,7 +34,7 @@
 func method(){}
 
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD2:                  Begin completions, 14 items
+// KEYWORD2:                  Begin completions, 15 items
 // KEYWORD2-NEXT:             Keyword/None:                       available[#Func Attribute#]; name=available{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Func Attribute#]; name=noreturn{{$}}
@@ -48,6 +48,7 @@ func method(){}
 // KEYWORD2-NEXT:             Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
 // SWIFT_ENABLE_TENSORFLOW
 // KEYWORD2-NEXT:             Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
+// KEYWORD2-NEXT:             Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
 // KEYWORD2-NEXT:             Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
 // KEYWORD2-NEXT:             Keyword/None:                       TensorFlowGraph[#Func Attribute#]; name=TensorFlowGraph
 // KEYWORD2-NEXT:             End completions
@@ -92,7 +93,7 @@ struct S{}
 @#^KEYWORD_LAST^#
 
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD_LAST:                  Begin completions, 27 items
+// KEYWORD_LAST:                  Begin completions, 28 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
@@ -117,6 +118,7 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
 // SWIFT_ENABLE_TENSORFLOW
 // KEYWORD_LAST-NEXT:             Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
+// KEYWORD_LAST-NEXT:             Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
 // KEYWORD_LAST-NEXT:             Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // KEYWORD_LAST-NEXT:             Keyword/None:                       TensorFlowGraph[#Declaration Attribute#]; name=TensorFlowGraph
 // KEYWORD_LAST-NEXT:             Keyword/None:                       TFParameter[#Declaration Attribute#]; name=TFParameter

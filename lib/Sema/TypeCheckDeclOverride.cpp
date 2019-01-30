@@ -1217,6 +1217,7 @@ namespace  {
 
     // SWIFT_ENABLE_TENSORFLOW
     UNINTERESTING_ATTR(Differentiable)
+    UNINTERESTING_ATTR(Differentiating)
     UNINTERESTING_ATTR(CompilerEvaluable)
     UNINTERESTING_ATTR(TensorFlowGraph)
     UNINTERESTING_ATTR(TFParameter)
