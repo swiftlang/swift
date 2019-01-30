@@ -1,5 +1,5 @@
 // SWIFT_ENABLE_TENSORFLOW
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown %s
 
 // Verify that a `Differentiable` type upholds `AllDifferentiableVariables == CotangentVector`.
 func assertAllDifferentiableVariablesEqualsCotangentVector<T>(_: T.Type)
@@ -183,7 +183,6 @@ struct HasGenericEnvironment<Scalar : FloatingPoint & Differentiable> : Differen
   var x: Float
 }
 
-/*
 // Test type with generic members that conform to `Differentiable`.
 // Since it's not the case that
 // `T == T.TangentVector == T.CotangentVector`,
@@ -219,7 +218,6 @@ struct A<T : Differentiable> {
     }
   }
 }
-*/
 
 // Test errors.
 

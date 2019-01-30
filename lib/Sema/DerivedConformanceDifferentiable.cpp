@@ -56,9 +56,9 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
   for (auto *vd : nominal->getStoredProperties()) {
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
-    if (!vd->hasInterfaceType())
+    if (!vd->hasType())
       C.getLazyResolver()->resolveDeclSignature(vd);
-    if (!vd->hasInterfaceType() ||
+    if (!vd->hasType() ||
         !TypeChecker::conformsToProtocol(vd->getType(), diffableProto, nominal,
                                          ConformanceCheckFlags::Used))
       continue;
@@ -268,9 +268,8 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
     if (confRef->isConcrete())
-      if (auto methodDecl =
-              confRef->getConcrete()->getWitnessDecl(methodReq, nullptr))
-        memberMethodDecl = methodDecl;
+      memberMethodDecl = confRef->getConcrete()->getWitnessDecl(
+          methodReq, C.getLazyResolver());
     assert(memberMethodDecl && "Member method declaration must exist");
     auto memberMethodDRE =
         new (C) DeclRefExpr(memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
@@ -434,13 +433,18 @@ static ValueDecl *getUnderlyingAllDiffableVariables(ModuleDecl *module,
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto allDiffableVarsReq =
       getProtocolRequirement(diffableProto, C.Id_allDifferentiableVariables);
+  if (!varDecl->hasType())
+    C.getLazyResolver()->resolveDeclSignature(varDecl);
   auto confRef =
       module->lookupConformance(varDecl->getType(), diffableProto);
   if (!confRef)
     return varDecl;
-  auto conf = confRef->getConcrete();
-  auto allDiffableVarsDecl =
-     conf->getWitnessDecl(allDiffableVarsReq, /*lazyResolver*/ nullptr);
+  // Use protocol requirement as a default for abstract conformances.
+  // If conformance is concrete, get concrete witness declaration instead.
+  ValueDecl *allDiffableVarsDecl = allDiffableVarsReq;
+  if (confRef->isConcrete())
+    allDiffableVarsDecl = confRef->getConcrete()->getWitnessDecl(
+        allDiffableVarsReq, C.getLazyResolver());
   return allDiffableVarsDecl;
 }
 
