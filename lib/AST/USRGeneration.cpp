@@ -165,7 +165,8 @@ static bool shouldUseObjCUSR(const Decl *D) {
 }
 
 llvm::Expected<std::string>
-swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl* D) const {
+swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
+                                      const ValueDecl *D) const {
   if (!D->hasName() && !isa<ParamDecl>(D) && !isa<AccessorDecl>(D))
     return std::string(); // Ignore.
   if (D->getModuleContext()->isBuiltinModule())
@@ -247,6 +248,19 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl* D) 
 
   Mangle::ASTMangler NewMangler;
   return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
+}
+
+llvm::Expected<std::string>
+swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
+                                            const TypeDecl *D) const {
+  if (!D->hasInterfaceType())
+    return std::string();
+
+  if (isa<ModuleDecl>(D))
+    return std::string(); // Ignore.
+
+  Mangle::ASTMangler NewMangler;
+  return NewMangler.mangleLocalTypeDecl(D);
 }
 
 bool ide::printModuleUSR(ModuleEntity Mod, raw_ostream &OS) {

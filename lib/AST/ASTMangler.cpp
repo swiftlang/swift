@@ -506,6 +506,22 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   return finalize();
 }
 
+std::string ASTMangler::mangleLocalTypeDecl(const TypeDecl *type) {
+  beginManglingWithoutPrefix();
+  AllowNamelessEntities = true;
+  OptimizeProtocolNames = false;
+
+  if (auto GTD = dyn_cast<GenericTypeDecl>(type)) {
+    appendAnyGenericType(GTD);
+  } else {
+    assert(isa<AssociatedTypeDecl>(type));
+    appendContextOf(type);
+    appendDeclName(type);
+    appendOperator("Qa");
+  }
+
+  return finalize();
+}
 
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {

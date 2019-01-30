@@ -176,6 +176,8 @@ public:
                                         const AbstractStorageDecl *decl,
                                         StringRef USRPrefix);
 
+  std::string mangleLocalTypeDecl(const TypeDecl *type);
+
   enum SpecialContext {
     ObjCContext,
     ClangImporterContext,
