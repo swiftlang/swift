@@ -386,6 +386,14 @@ public:
     return ObjCClassTypeRef::create(*this, name);
   }
 
+  const ObjCClassTypeRef *
+  createBoundGenericObjCClassType(const std::string &name,
+                                  std::vector<const TypeRef *> &args) {
+    // Remote reflection just ignores generic arguments for Objective-C
+    // lightweight generic types, since they don't affect layout.
+    return createObjCClassType(name);
+  }
+
   const ObjCProtocolTypeRef *
   createObjCProtocolType(const std::string &name) {
     return ObjCProtocolTypeRef::create(*this, name);

@@ -365,17 +365,13 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
                                         "mangling type for debugger", Ty);
 
   DWARFMangling = true;
+  OptimizeProtocolNames = false;
   beginMangling();
   
   if (DC)
     bindGenericParameters(DC);
 
-  if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
-    appendFunction(fnType, false);
-  } else {
-    appendType(Ty);
-  }
-
+  appendType(Ty);
   appendOperator("D");
   return finalize();
 }
@@ -468,6 +464,20 @@ std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
   return finalize();
 }
 
+std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
+  DWARFMangling = true;
+  beginMangling();
+  
+  if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
+    appendFunction(fnType, false);
+  } else {
+    appendType(Ty);
+  }
+
+  appendOperator("D");
+  return finalize();
+}
+
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
   beginManglingWithoutPrefix();
@@ -506,6 +516,22 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   return finalize();
 }
 
+std::string ASTMangler::mangleLocalTypeDecl(const TypeDecl *type) {
+  beginManglingWithoutPrefix();
+  AllowNamelessEntities = true;
+  OptimizeProtocolNames = false;
+
+  if (auto GTD = dyn_cast<GenericTypeDecl>(type)) {
+    appendAnyGenericType(GTD);
+  } else {
+    assert(isa<AssociatedTypeDecl>(type));
+    appendContextOf(type);
+    appendDeclName(type);
+    appendOperator("Qa");
+  }
+
+  return finalize();
+}
 
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {

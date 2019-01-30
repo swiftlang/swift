@@ -102,7 +102,7 @@ public:
   getConventionFromString(StringRef conventionString) {
     if (conventionString == "@in")
       return ConventionType::Indirect_In;
-    if (conventionString == "@indirect_in_constant")
+    if (conventionString == "@in_constant")
       return ConventionType::Indirect_In_Constant;
     if (conventionString == "@in_guaranteed")
       return ConventionType::Indirect_In_Guaranteed;
@@ -306,33 +306,13 @@ class TypeDecoder {
 
       return Builder.createNominalType(typeDecl, parent);
     }
-    case NodeKind::BoundGenericClass:
-    {
-#if SWIFT_OBJC_INTEROP
-      if (Node->getNumChildren() >= 2) {
-        auto ChildNode = Node->getChild(0);
-        if (ChildNode->getKind() == NodeKind::Type &&
-            ChildNode->getNumChildren() > 0)
-          ChildNode = ChildNode->getChild(0);
 
-        if (auto mangledName = getObjCClassOrProtocolName(ChildNode))
-          return Builder.createObjCClassType(mangledName->str());
-      }
-#endif
-      LLVM_FALLTHROUGH;
-    }
     case NodeKind::BoundGenericEnum:
     case NodeKind::BoundGenericStructure:
+    case NodeKind::BoundGenericClass:
     case NodeKind::BoundGenericTypeAlias:
     case NodeKind::BoundGenericOtherNominalType: {
       if (Node->getNumChildren() < 2)
-        return BuiltType();
-
-      BuiltTypeDecl typeDecl = BuiltTypeDecl();
-      BuiltType parent = BuiltType();
-      bool typeAlias = false;
-      if (!decodeMangledTypeDecl(Node->getChild(0), typeDecl,
-                                 parent, typeAlias))
         return BuiltType();
 
       std::vector<BuiltType> args;
@@ -346,6 +326,24 @@ class TypeDecoder {
           return BuiltType();
         args.push_back(paramType);
       }
+
+      auto ChildNode = Node->getChild(0);
+      if (ChildNode->getKind() == NodeKind::Type &&
+          ChildNode->getNumChildren() > 0)
+        ChildNode = ChildNode->getChild(0);
+
+#if SWIFT_OBJC_INTEROP
+      if (auto mangledName = getObjCClassOrProtocolName(ChildNode))
+        return Builder.createBoundGenericObjCClassType(mangledName->str(),
+                                                       args);
+#endif
+
+      BuiltTypeDecl typeDecl = BuiltTypeDecl();
+      BuiltType parent = BuiltType();
+      bool typeAlias = false;
+      if (!decodeMangledTypeDecl(ChildNode, typeDecl,
+                                 parent, typeAlias))
+        return BuiltType();
 
       return Builder.createBoundGenericType(typeDecl, args, parent);
     }
