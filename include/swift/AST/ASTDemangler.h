@@ -114,6 +114,8 @@ public:
 
   Type createObjCClassType(StringRef name);
 
+  Type createBoundGenericObjCClassType(StringRef name, ArrayRef<Type> args);
+
   ProtocolDecl *createObjCProtocolDecl(StringRef name);
 
   Type createDynamicSelfType(Type selfType);

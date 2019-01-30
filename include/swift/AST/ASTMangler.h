@@ -164,9 +164,12 @@ public:
   
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
 
-  std::string mangleTypeAsUSR(Type type) {
-    return mangleTypeWithoutPrefix(type);
+  std::string mangleTypeWithoutPrefix(Type type) {
+    appendType(type);
+    return finalize();
   }
+
+  std::string mangleTypeAsUSR(Type decl);
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
@@ -175,6 +178,8 @@ public:
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,
                                         StringRef USRPrefix);
+
+  std::string mangleLocalTypeDecl(const TypeDecl *type);
 
   enum SpecialContext {
     ObjCContext,
@@ -317,11 +322,6 @@ protected:
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
   void appendSymbolicReference(SymbolicReferent referent);
-  
-  std::string mangleTypeWithoutPrefix(Type type) {
-    appendType(type);
-    return finalize();
-  }
 };
 
 } // end namespace Mangle

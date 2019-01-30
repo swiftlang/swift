@@ -570,11 +570,8 @@ TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
   ASTContext &ctx = getASTContext();
   for (auto typeDecl : LocalTypeDecls) {
     auto typeMangledName = evaluateOrDefault(ctx.evaluator,
-                                             USRGenerationRequest { typeDecl },
+                                             MangleLocalTypeDeclRequest { typeDecl },
                                              std::string());
-    if (typeMangledName.find("s:") == 0)
-      typeMangledName = typeMangledName.substr(2);
-
     if (mangledName == typeMangledName)
       return typeDecl;
   }

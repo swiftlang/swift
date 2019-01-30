@@ -26,6 +26,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
@@ -4638,7 +4639,10 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     for (auto TD : localTypeDecls) {
       hasLocalTypes = true;
       Mangle::ASTMangler Mangler;
-      std::string MangledName = Mangler.mangleDeclAsUSR(TD, /*USRPrefix*/"");
+      std::string MangledName =
+          evaluateOrDefault(M->getASTContext().evaluator,
+                            MangleLocalTypeDeclRequest { TD },
+                            std::string());
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, addDeclRef(TD));
 
