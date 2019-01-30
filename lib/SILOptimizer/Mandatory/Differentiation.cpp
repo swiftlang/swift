@@ -1583,12 +1583,13 @@ static SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
 /// some conversion instruction in between, e.g. `thin_to_thick_function`. Given
 /// a new function value and an old function value, this helper function
 /// recursively converts the new function just like how the old function is
-/// converted.
+/// converted. If the new function's generic signature is specified, it is used
+/// to create substitution maps for reapplied `partial_apply` instructions.
 static SILValue
 reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
                           SILValue oldConvertedFunc, SILBuilder &builder,
                           SILLocation loc,
-                          SubstitutionMap substMap = SubstitutionMap(),
+                          GenericSignature* newFuncGenSig = nullptr,
                           std::function<SILValue(SILValue)> substituteOperand =
                               [](SILValue v) { return v; }) {
   // If the old func is the new func, then there's no conversion.
@@ -1598,7 +1599,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   // thin_to_thick_function
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(
-        newFunc, oldFunc, tttfi->getOperand(), builder, loc, substMap,
+        newFunc, oldFunc, tttfi->getOperand(), builder, loc, newFuncGenSig,
         substituteOperand);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto thickTy = operandFnTy->getWithRepresentation(
@@ -1614,17 +1615,15 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
     for (auto arg : pai->getArguments())
       newArgs.push_back(substituteOperand(arg));
     auto innerNewFunc = reapplyFunctionConversion(
-        newFunc, oldFunc, pai->getCallee(), builder, loc, substMap,
+        newFunc, oldFunc, pai->getCallee(), builder, loc, newFuncGenSig,
         substituteOperand);
-    if (substMap.empty()) {
-      substMap = pai->getSubstitutionMap();
-    } else {
-      substMap = substMap.subst(
-          [&](SubstitutableType *ty) -> Type {
-            return Type(ty).subst(pai->getSubstitutionMap());
-          },
-          LookUpConformanceInModule(builder.getModule().getSwiftModule()));
-    }
+    // If new function's generic signature is specified, use it to create
+    // substitution map for reapplied `partial_apply` instruction.
+    auto substMap = !newFuncGenSig
+        ? pai->getSubstitutionMap()
+        : SubstitutionMap::get(
+              newFuncGenSig, QuerySubstitutionMap{pai->getSubstitutionMap()},
+              LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto result = builder.createPartialApply(
         loc, innerNewFunc, substMap, newArgs,
         ParameterConvention::Direct_Guaranteed);
@@ -1634,7 +1633,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   if (auto *cetn = dyn_cast<ConvertEscapeToNoEscapeInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
                                                   cetn->getOperand(), builder,
-                                                  loc, substMap,
+                                                  loc, newFuncGenSig,
                                                   substituteOperand);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto noEscapeType = operandFnTy->getWithExtInfo(
@@ -1654,7 +1653,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
         cfi->getOperand()->getType().castTo<SILFunctionType>();
     auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
                                                   cfi->getOperand(), builder,
-                                                  loc, substMap,
+                                                  loc, newFuncGenSig,
                                                   substituteOperand);
     // Match a conversion from escaping to `@noescape`
     CanSILFunctionType targetType;
@@ -1762,7 +1761,7 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     auto *ref = builder.createFunctionRef(loc, assocFn);
     auto convertedRef = reapplyFunctionConversion(
         ref, originalFRI, original, builder, loc,
-        assocFn->getForwardingSubstitutionMap());
+        assocFn->getLoweredFunctionType()->getGenericSignature());
     return std::make_pair(convertedRef, task->getIndices());
   }
 
@@ -1814,15 +1813,15 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
       }
       auto loc = original.getLoc();
       auto *assocFn = task->getAssociatedFunction(kind);
+      auto assocFnGenSig =
+          assocFn->getLoweredFunctionType()->getGenericSignature();
       auto *initialVJPRef = builder.createFunctionRef(loc, assocFn);
       auto converted =
           reapplyFunctionConversion(initialVJPRef, initialFnRef, initVal,
-                                    builder, loc,
-                                    assocFn->getForwardingSubstitutionMap());
+                                    builder, loc, assocFnGenSig);
       converted =
           reapplyFunctionConversion(converted, load, original,
-                                    builder, loc,
-                                    assocFn->getForwardingSubstitutionMap());
+                                    builder, loc, assocFnGenSig);
       SILAutoDiffIndices indices(0, desiredIndices.parameters);
       return std::make_pair(converted, indices);
     }
@@ -3919,9 +3918,6 @@ ADContext::declareExternalAssociatedFunction(
       break;
   }
   auto assocGenSig = getAssociatedFunctionGenericSignature(attr, original);
-  auto *assocGenEnv = assocGenSig
-      ? assocGenSig->createGenericEnvironment()
-      : nullptr;
   auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
       module, LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
@@ -3929,7 +3925,7 @@ ADContext::declareExternalAssociatedFunction(
   // Create external function declaration.
   auto *assocFn = fb.createFunction(
       SILLinkage::PublicExternal, name, assocFnTy,
-      assocGenEnv, originalLoc, original->isBare(), IsNotTransparent,
+      /*genericEnv*/ nullptr, originalLoc, original->isBare(), IsNotTransparent,
       original->isSerialized(), original->isDynamicallyReplaceable());
   // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
   assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
