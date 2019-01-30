@@ -789,6 +789,7 @@ class CompositionTypeRepr final : public TypeRepr,
     private llvm::TrailingObjects<CompositionTypeRepr, TypeRepr*> {
   friend TrailingObjects;
   SourceLoc FirstTypeLoc;
+  Type ResolvedType;
   SourceRange CompositionRange;
 
   CompositionTypeRepr(ArrayRef<TypeRepr *> Types,
@@ -807,6 +808,9 @@ public:
   }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
+  Type getResolvedType() const { return ResolvedType; }
+
+  void setResolvedType(Type ty) { ResolvedType = ty; }
 
   static CompositionTypeRepr *create(const ASTContext &C,
                                      ArrayRef<TypeRepr*> Protocols,

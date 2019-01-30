@@ -2909,6 +2909,19 @@ void ArchetypeType::resolveNestedType(
     if (auto proto = exist->getAs<ProtocolType>()) {
       genericEnv = proto->getDecl()->getGenericEnvironment();
       interfaceType = proto->getDecl()->getSelfInterfaceType();
+    } else {
+      auto protos = getConformsTo();
+      interfaceType = protos.front()->getSelfInterfaceType();
+
+      llvm::SmallVector<Requirement, 4> reqs;
+      for (auto &proto: protos) {
+       reqs.push_back(Requirement(RequirementKind::Conformance,
+                                  interfaceType,
+                                  proto->getDeclaredInterfaceType()));
+      }
+      auto sig = GenericSignature::get(
+          {interfaceType->castTo<GenericTypeParamType>()}, reqs);
+      genericEnv = sig->createGenericEnvironment();
     }
   } else {
     genericEnv = getPrimary()->getGenericEnvironment();

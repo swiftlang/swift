@@ -351,10 +351,16 @@ protected:
     Representation : 2
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+32,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+1+1+32,
     /// Whether we have an explicitly-stated class constraint not
     /// implied by any of our members.
     HasExplicitAnyObject : 1,
+
+    /// Whether the \c ExistentialTypeSupported bit is valid.
+    ExistentialTypeSupportedValid : 1,
+
+    /// Whether the existential of this composition can be represented.
+    ExistentialTypeSupported : 1,
 
     : NumPadBits,
 
@@ -4436,6 +4442,17 @@ public:
     return {getTrailingObjects<Type>(), Bits.ProtocolCompositionType.Count};
   }
 
+  /// \brief Determine whether we are allowed to use this composition
+  /// as an existential type. This is only permitted if \em all associated type
+  /// members are constrained to concrete types, and neither of its members
+  /// contain \c Self in non-covariant position.
+  ///
+  /// \param [out] protocols An optional set that will contain the protocols
+  /// at fault if this composition type turns out to be unsupported.
+  bool existentialTypeSupported(
+                    LazyResolver *resolver,
+                    llvm::SmallPtrSet<ProtocolDecl *, 4> *protocols = nullptr);
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getMembers(), hasExplicitAnyObject());
   }
@@ -4468,6 +4485,7 @@ private:
                           RecursiveTypeProperties properties)
     : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx, properties) {
     Bits.ProtocolCompositionType.HasExplicitAnyObject = hasExplicitAnyObject;
+    Bits.ProtocolCompositionType.ExistentialTypeSupportedValid = false;
     Bits.ProtocolCompositionType.Count = members.size();
     std::uninitialized_copy(members.begin(), members.end(),
                             getTrailingObjects<Type>());

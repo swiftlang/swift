@@ -168,12 +168,26 @@ protocol ProtAssoc2 {
 }
 protocol ProtMergeAssocInt: ProtAssocInt, ProtAssoc2 {}
 
+typealias Composition1 = ProtAssocConcreteHasSelf & TrivialProto
+typealias Composition2 = Composition1 & ProtAssoc2
+
 func testExistential1(arg: ProtAssocInt) {} // Ok
 func testExistential2(arg: ProtAssocBssocConcrete) {} // Ok
 func testExistential3(arg: ProtMergeAssocInt) {} // Ok
+func testExistential4(arg: TrivialClass & ProtAssoc2 & ProtAssocInt) {} // Ok
+func testExistential5(arg: TrivialProto & ProtAssocBssocConcrete & ProtAssoc2) {} // Ok
 
-func testExistential4(arg: ProtAssocConcreteHasSelf) {}
+func testExistential6(arg: ProtAssocConcreteHasSelf) {}
 // expected-error@-1 {{protocol 'ProtAssocConcreteHasSelf' can only be used}}
+func testExistential7(arg: ProtAssocInt & ProtAssocHasSelf & TrivialClass) {}
+// expected-error@-1 {{protocol 'ProtAssocHasSelf' can only be used}}
+func testExistential8(arg: ProtAssocConcreteHasSelf & TrivialProto & ProtAssoc2) {}
+// expected-error@-1 {{protocol 'ProtAssocConcreteHasSelf' can only be used}}
+func testExistential9(arg: Composition2) {}
+// expected-error@-1 {{protocol 'ProtAssocConcreteHasSelf' can only be used}}
+func testExistential10(arg: ProtAssoc & ProtAssoc2) {}
+// expected-error@-1 {{protocol 'ProtAssoc' can only be used}}
+// expected-error@-2 {{protocol 'ProtAssoc2' can only be used}}
 
 // Test various edge cases and expressions.
 class Conforming: EdgeCase1, EdgeCase2 {
@@ -197,7 +211,11 @@ protocol EdgeCaseSub2: EdgeCase2 where Assoc.Assoc == Conforming {}
 
 func testExistential11(arg: EdgeCaseSub1) {}
 // expected-error@-1 {{protocol 'EdgeCaseSub1' can only be used}}
-func testExistential12(arg1: EdgeCaseSub2) {
+
+typealias Comp = EdgeCaseSub2 & EdgeCase1 & ProtAssoc
+
+func testExistential12(arg1: EdgeCaseSub2, arg2: Comp & ProtAssoc2) {
 
   let _: Conforming = arg1.simpleAliasToAssoc(arg: Conforming())
+  let _: Conforming = arg2.simpleAliasToAssoc(arg: Conforming())
 }

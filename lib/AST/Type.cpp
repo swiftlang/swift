@@ -2676,6 +2676,117 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
+bool ProtocolCompositionType::existentialTypeSupported(
+                          LazyResolver *resolver,
+                          llvm::SmallPtrSet<ProtocolDecl *, 4> *protocols) {
+  if (Bits.ProtocolCompositionType.ExistentialTypeSupportedValid) {
+    // If supported, there are no protocols to diagnose.
+    if (Bits.ProtocolCompositionType.ExistentialTypeSupported ||
+        !protocols)
+      return Bits.ProtocolCompositionType.ExistentialTypeSupported;
+  }
+
+  // Assume for now that the existential type is supported.
+  Bits.ProtocolCompositionType.ExistentialTypeSupportedValid = true;
+  Bits.ProtocolCompositionType.ExistentialTypeSupported = true;
+
+  bool allSupported = true;
+  auto layout = getExistentialLayout();
+  for (auto *proto: layout.getProtocols()) {
+    auto protoDecl = proto->getDecl();
+    auto suppKind = protoDecl->existentialTypeSupported(resolver);
+    if (suppKind != ExistentialSupportKind::Supported) {
+      allSupported = false;
+      if (suppKind == ExistentialSupportKind::UnsupportedSelf) {
+        // If the reason is a 'Self' reference, the outcome is
+        // known beforehand.
+        Bits.ProtocolCompositionType.ExistentialTypeSupported = false;
+        if (!protocols)
+          return false;
+
+        protocols->insert(protoDecl);
+      }
+    }
+  }
+
+  if (allSupported)
+    return Bits.ProtocolCompositionType.ExistentialTypeSupported;
+
+  // Assemble an associated type map for the composition.
+  llvm::SmallDenseMap<AssociatedTypeDecl *,
+                      std::pair<ProtocolDecl *,
+                        /*isConstrainedToConcrete*/ bool>> assocTys;
+
+  for (auto *proto: layout.getProtocols()) {
+    AssociatedTypeFreedomMap map;
+    auto protoDecl = proto->getDecl();
+    protoDecl->getAssociatedTypeFreedomMapRec(map);
+
+    // FIXME: Switch to using a function reference instead of
+    // AssociatedTypeFreedomMap to avoid creating local maps for every iteration?
+    for (auto &pair: map)
+      assocTys[pair.getFirst()] = {protoDecl, pair.getSecond()};
+  }
+
+  // The culprit is a Self reference. These protocols were already enqueued
+  // for diagnosis earlier, so just bail out.
+  if (assocTys.empty())
+    return Bits.ProtocolCompositionType.ExistentialTypeSupported;
+
+  llvm::SmallDenseMap<Identifier,
+                      /*isConstrainedToConcrete*/ bool> identMap;
+
+  // Merge associated types with equal identifiers into a new map,
+  // marking each identifier as concrete if at least one corresponding
+  // associated type is constrained to a concrete type.
+  for (auto &pair: assocTys) {
+    auto assocName = pair.getFirst()->getName();
+
+    if (identMap.count(assocName)) {
+      if (pair.getSecond().second)
+        identMap[assocName] = true;
+    } else {
+      identMap[assocName] = pair.getSecond().second;
+    }
+  }
+
+  auto hasFreeIdent = [&]() -> bool {
+    for (auto &pair: identMap)
+      if (!pair.getSecond())
+        return true;
+    return false;
+  };
+
+  // If the identifier map doesn't change our mind, we're done.
+  if (!hasFreeIdent())
+    return Bits.ProtocolCompositionType.ExistentialTypeSupported;
+
+  if (protocols) {
+    // Protocols must not be judged separately; this often obscures the
+    // true reason a composition type isn't supported. Consider this example:
+    //
+    // protocol P {
+    //   associatedtype A
+    //   associatedtype B
+    // }
+    // protocol P1: P where A == Int {}
+    //
+    // protocol P2 { assocatedtype A }
+    //
+    // For 'P1 & P2', 'P1' is the only culprit, because if it weren't for 'B', the
+    // composition would be supported.
+
+    // Collect protocols corresponding to the assoc. type identifiers that
+    // persisted a degree of freedom.
+    for (auto &pair: assocTys) {
+      if (!identMap[pair.getFirst()->getName()])
+        protocols->insert(pair.getSecond().first);
+    }
+  }
+  Bits.ProtocolCompositionType.ExistentialTypeSupported = false;
+  return false;
+}
+
 FunctionType *
 GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
   auto substFn = Type(this).subst(subs)->castTo<AnyFunctionType>();

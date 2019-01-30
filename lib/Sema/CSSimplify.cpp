@@ -3413,7 +3413,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       // match that of the subtype. For example, an inheriting protocol could
       // introduce an associated type or, conversely, specialize an inherited
       // associated type that would otherwise prevent the protocol from
-      // being supported.
+      // being supported. Similarly, a supported protocol does not
+      // always imply that a composition type containing said protocol is
+      // also supported, and vice versa.
 
       // Make sure the candidate belongs to a protocol.
       if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
@@ -3421,6 +3423,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         if (auto *protoTy = outerBaseTy->getAs<ProtocolType>()) {
           supported = protoTy->getDecl()->existentialTypeSupported(&TC)
               == ExistentialSupportKind::Supported;
+        } else if (auto *comp = outerBaseTy->getAs<ProtocolCompositionType>()) {
+          supported = comp->existentialTypeSupported(&TC);
         }
         supported = proto->isAvailableInExistential(
                                decl, /*skipAssocTypes=*/supported);

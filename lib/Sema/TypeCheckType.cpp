@@ -3063,7 +3063,10 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
   for (auto tyR : repr->getTypes()) {
     Type ty = resolveType(tyR, options.withoutContext());
-    if (!ty || ty->hasError()) return ty;
+    if (!ty || ty->hasError()) {
+      repr->setResolvedType(ty);
+      return ty;
+    }
 
     auto nominalDecl = ty->getAnyNominal();
     if (nominalDecl && isa<ClassDecl>(nominalDecl)) {
@@ -3094,13 +3097,18 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   // Avoid confusing diagnostics ('MyClass' not convertible to 'MyClass',
   // etc) by collapsing a composition consisting of a single class down
   // to the class itself.
-  if (SuperclassType && !HasProtocol)
+  if (SuperclassType && !HasProtocol) {
+    repr->setResolvedType(SuperclassType);
     return SuperclassType;
+  }
 
   // In user-written types, AnyObject constraints always refer to the
   // AnyObject type in the standard library.
-  return ProtocolCompositionType::get(Context, Members,
-                                      /*HasExplicitAnyObject=*/false);
+  auto ty = ProtocolCompositionType::get(Context, Members,
+                                         /*HasExplicitAnyObject=*/false);
+  repr->setResolvedType(ty);
+
+  return ty;
 }
 
 Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
@@ -3282,6 +3290,13 @@ public:
       visit(compound->getComponentRange().back());
       return false;
     }
+    if (auto composition = dyn_cast<CompositionTypeRepr>(T)) {
+      // Only visit the composition itself; we have to verify whether the
+      // composition is supported as a whole.
+      visit(composition);
+      return false;
+    }
+
     visit(T);
     return true;
   }
@@ -3299,41 +3314,109 @@ public:
     return !checkStatements;
   }
 
-  void visitIdentTypeRepr(IdentTypeRepr *T) {
+  void visitCompositionTypeRepr(CompositionTypeRepr *T) {
     if (T->isInvalid())
       return;
-    
-    auto comp = T->getComponentRange().back();
-    if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
-      if (proto->existentialTypeSupported(&TC) !=
-          ExistentialSupportKind::Supported) {
-        TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
-                    proto->getName());
-        T->setInvalid();
-      }
-    } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
-      if (!alias->hasInterfaceType())
-        return;
-      auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
-      type.findIf([&](Type type) -> bool {
-        if (T->isInvalid())
-          return false;
-        if (type->isExistentialType()) {
+
+    llvm::SmallPtrSet<ProtocolDecl *, 4> failureReason;
+
+    auto diagnoseProtocols = [&]() {
+      for (auto tyR : T->getTypes()) {
+        auto ident = dyn_cast<IdentTypeRepr>(tyR);
+
+        if (!ident) continue;
+
+        auto comp = ident->getComponentRange().back();
+        auto decl = comp->getBoundDecl();
+
+        if (auto *proto = dyn_cast_or_null<ProtocolDecl>(decl)) {
+          if (failureReason.count(proto)) {
+            TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
+                        proto->getName());
+            T->setInvalid();
+          }
+        } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(decl)) {
+          if (!alias->hasInterfaceType())
+            return;
+
+          auto type = alias->getDeclaredInterfaceType()->getDesugaredType();
+          if (!type->isExistentialType())
+            return;
+
           auto layout = type->getExistentialLayout();
           for (auto *proto : layout.getProtocols()) {
             auto *protoDecl = proto->getDecl();
 
-            if (protoDecl->existentialTypeSupported(&TC) ==
-                ExistentialSupportKind::Supported)
-              continue;
-            
-            TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
-                        protoDecl->getName());
-            T->setInvalid();
+            if (failureReason.count(protoDecl)) {
+              TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
+                          protoDecl->getName());
+              T->setInvalid();
+            }
           }
         }
-        return false;
-      });
+      }
+    };
+
+    auto resolvedTy = T->getResolvedType();
+    if (!resolvedTy)
+      return;
+
+    // Collect protocols that should be diagnosed and walk through
+    // the type representation to figure out the locations at which
+    // to emit an error.
+    if (auto *proto = resolvedTy->getAs<ProtocolType>()) {
+      auto *protoDecl = proto->getDecl();
+      if (protoDecl->existentialTypeSupported(&TC)
+          != ExistentialSupportKind::Supported) {
+        failureReason.insert(protoDecl);
+        diagnoseProtocols();
+      }
+    } else if (auto compTy = resolvedTy->getAs<ProtocolCompositionType>()) {
+      if (!compTy->existentialTypeSupported(&TC, &failureReason))
+        diagnoseProtocols();
+    }
+  }
+
+  void visitIdentTypeRepr(IdentTypeRepr *T) {
+    if (T->isInvalid())
+       return;
+    
+    auto emitError = [&](SourceLoc loc, Identifier protoName) {
+      TC.diagnose(loc, diag::unsupported_existential_type, protoName);
+      T->setInvalid();
+    };
+
+    auto comp = T->getComponentRange().back();
+    if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
+      if (proto->existentialTypeSupported(&TC)
+          != ExistentialSupportKind::Supported)
+        emitError(comp->getIdLoc(), proto->getName());
+    } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
+      if (!alias->hasInterfaceType())
+        return;
+
+      auto type = alias->getDeclaredInterfaceType()->getDesugaredType();
+
+      if (auto proto = type->getAs<ProtocolType>()) {
+        auto *protoDecl = proto->getDecl();
+        if (protoDecl->existentialTypeSupported(&TC)
+            != ExistentialSupportKind::Supported)
+          emitError(comp->getIdLoc(), protoDecl->getName());
+
+      } else if (auto compTy = type->getAs<ProtocolCompositionType>()) {
+        llvm::SmallPtrSet<ProtocolDecl *, 4> failureReason;
+
+        if (compTy->existentialTypeSupported(&TC, &failureReason))
+          return;
+
+        auto layout = type->getExistentialLayout();
+        for (auto *proto : layout.getProtocols()) {
+          auto *protoDecl = proto->getDecl();
+
+          if (failureReason.count(protoDecl))
+            emitError(comp->getIdLoc(), protoDecl->getName());
+        }
+      }
     }
   }
 
