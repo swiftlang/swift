@@ -13,20 +13,20 @@
 @_exported import Intents
 import Foundation
 
-#if os(iOS) || os(watchOS) || os(macOS)
+#if os(iOS) || os(watchOS)
 
 public protocol _INIntentSetImageKeyPath { }
 
 extension _INIntentSetImageKeyPath {
     
-    @available(iOS 12.0, watchOS 5.0, macOS 10.14, *)
+    @available(iOS 12.0, watchOS 5.0, *)
     public func setImage<Value>(_ image: INImage?, forParameterNamed parameterName: KeyPath<Self, Value>) {
         if let keyPathString = parameterName._kvcKeyPathString {
             (self as! INIntent).__setImage(image, forParameterNamed: keyPathString)
         }
     }
     
-    @available(iOS 12.0, watchOS 5.0, macOS 10.14, *)
+    @available(iOS 12.0, watchOS 5.0, *)
     public func image<Value>(forParameterNamed parameterName: KeyPath<Self, Value>) -> INImage? {
         if let keyPathString = parameterName._kvcKeyPathString {
             return (self as! INIntent).__image(forParameterNamed: keyPathString)
@@ -36,7 +36,7 @@ extension _INIntentSetImageKeyPath {
     }
 }
 
-@available(iOS 10.0, watchOS 3.2, macOS 10.12, *)
+@available(iOS 10.0, watchOS 3.2, *)
 extension INIntent : _INIntentSetImageKeyPath { }
 
 #endif
