@@ -115,10 +115,10 @@ print("target removed")
 //===----------------------------------------------------------------------===//
 
 class Target2 : NSObject, NSKeyValueObservingCustomization {
-    dynamic var name: String?
+    @objc dynamic var name: String?
 
     class Dummy : NSObject {
-        dynamic var name: String?
+        @objc dynamic var name: String?
     }
 
     // In both of the callbacks, observe another property with the same key path.
