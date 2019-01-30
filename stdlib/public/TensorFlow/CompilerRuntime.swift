@@ -133,14 +133,13 @@ private class TraceContext {
   /// the code snippet above.
   var additionalInputTensorCount: Int32 = -1
 
-  /// `inputValueCount` is the length of the (flattened) list of input tensors
+  /// `dtypes` is the (flattened) list of TF_DataType of input tensors
   /// to the trace function.
-  init(inputValueCount: Int) {
-    debugLog("Instiantiating TraceContext with \(inputValueCount) input tensors.")
-    for i in 0..<inputValueCount {
+  init(dtypes: [TF_DataType]) {
+    debugLog("Instiantiating TraceContext with \(dtypes.count) input tensors.")
+    for (i, dtype) in dtypes.enumerated() {
       let desc = TF_NewOperation(graph, "Placeholder", "input_\(i)")
-      // TODO: add other dtype support.
-      TF_SetAttrType(desc, "dtype", TF_FLOAT)
+      TF_SetAttrType(desc, "dtype", dtype)
       let result = TF_FinishOperation(desc, status)
       checkOk(status)
       symbolicInputs.append(TF_Output(oper: result, index: 0))
@@ -233,7 +232,7 @@ private class TraceContext {
 
   /// Execute the trace graph function, and return the list of output tensors
   /// from the trace execution. These output tensors are owned by the caller.
-  func execute(traceeInputs: [Tensor<Float>],
+  func execute(traceeInputs: [_AnyTensorHandle],
                outputs: [CTensorHandle]) -> [CTensorHandle] {
     // We must be in the `notTracing` enum mode.
     internalConsistencyCheck(_RuntimeConfig.traceState.context == nil)
@@ -256,7 +255,7 @@ private class TraceContext {
     internalConsistencyCheck(symbolicInputs.count == traceeInputs.count
                                + Int(additionalInputTensorCount))
     for input in traceeInputs {
-      _TFCOpAddInputFromTensorHandle(op, input.handle, status)
+      _TFCOpAddInputFromTensorHandle(op, input, status)
       checkOk(status)
     }
 
@@ -726,6 +725,18 @@ public protocol _TensorArrayProtocolEnhanced : TensorArrayProtocol {
     where C.Element == CTensorHandle
 }
 
+
+extension _TensorArrayProtocolEnhanced {
+  func _dtypes() -> [TF_DataType] {
+    let count = _tensorHandleCount
+    let buffer =
+        UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: Int(count))
+    defer { buffer.deallocate() }
+    _unpackTensorHandles(into: buffer.baseAddress)
+    return buffer.map { TFE_TensorHandleDataType($0) }
+  }
+}
+
 // TODO: rename this to `graph` when it's ready for end users.
 public func _graph<State : _TensorArrayProtocolEnhanced,
                    Data : TensorGroup,
@@ -743,17 +754,15 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
                            "Should not be in tracing mode already!")
 
   // Switch to tracing mode.
-  let inputValueCount = Int(state._tensorHandleCount) + Data._typeList.count
-  _RuntimeConfig.traceState = .tracing(
-    TraceContext(inputValueCount: inputValueCount))
+  let dtypes = state._dtypes() + (Data._typeList.map { $0.cDataType })
+  _RuntimeConfig.traceState = .tracing(TraceContext(dtypes: dtypes))
 
   // Handle inputs.
   let traceFn = _RuntimeConfig.traceState.context!
-  // TODO: support other dtypes.
   let inputSymbolicTensors = traceFn.symbolicInputs.map {
-    TFE_NewTensorHandleFromTFOutput($0, TF_FLOAT)!
+      TFE_NewTensorHandleFromTFOutput($0, TF_OperationOutputType($0))!
   }
-  internalConsistencyCheck(inputSymbolicTensors.count == inputValueCount)
+  internalConsistencyCheck(inputSymbolicTensors.count == dtypes.count)
   let symbolicState = state._makeInstance(
     owning: inputSymbolicTensors.dropLast(Data._typeList.count))
   let symbolicData = Data(
@@ -783,13 +792,12 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
     debugLog("Getting input state tensor handles.")
     let inputStateTensorHandles =  oldState.cTensorHandles
     var inputTensors = inputStateTensorHandles.map {
-      // TODO: support other dtypes.
-      Tensor<Float>(handle: TensorHandle(_owning: $0))
+      _TFCCreateTensorHandleFromC($0)
     }
     debugLog("Getting input data tensor handles.")
     let inputDataTensorHandles =  data.cTensorHandles
     inputTensors.append(contentsOf: inputDataTensorHandles.map {
-                          Tensor<Float>(handle: TensorHandle(_owning: $0))
+                          _TFCCreateTensorHandleFromC($0)
                         })
 
     debugLog("Executing trace graph function.")
