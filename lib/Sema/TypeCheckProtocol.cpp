@@ -2405,6 +2405,45 @@ public:
 };
 }
 
+/// Helper function for diagnostics when a witness needs to be seated at a
+/// required access level.
+static void diagnoseWitnessFixAccessLevel(DiagnosticEngine &diags,
+                                          ValueDecl *decl,
+                                          AccessLevel requiredAccess,
+                                          bool isForSetter = false) {
+  bool shouldMoveToAnotherExtension = false;
+  bool shouldUseDefaultAccess = false;
+  if (auto extDecl = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+    if (auto attr = extDecl->getAttrs().getAttribute<AccessControlAttr>()) {
+      auto extAccess = std::max(attr->getAccess(), AccessLevel::FilePrivate);
+      if (extAccess < requiredAccess) {
+        shouldMoveToAnotherExtension = true;
+      } else if (extAccess == requiredAccess) {
+        auto declAttr = decl->getAttrs().getAttribute<AccessControlAttr>();
+        assert(declAttr && declAttr->getAccess() < requiredAccess &&
+            "expect an explicitly specified access control level which is "
+            "less accessible than required.");
+        (void)declAttr;
+        shouldUseDefaultAccess = true;
+      }
+    }
+  }
+
+  // If decl lives in an extension that forbids the required level, we should
+  // move it to another extension where the required level is possible;
+  // otherwise, we simply mark decl as the required level.
+  if (shouldMoveToAnotherExtension) {
+    diags.diagnose(decl, diag::witness_move_to_another_extension,
+                   decl->getDescriptiveKind(), requiredAccess);
+  } else {
+    auto fixItDiag = diags.diagnose(decl, diag::witness_fix_access,
+                                    decl->getDescriptiveKind(),
+                                    requiredAccess);
+    fixItAccess(fixItDiag, decl, requiredAccess, isForSetter,
+                shouldUseDefaultAccess);
+  }
+}
+
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
                                            TypeDecl *typeDecl) {
@@ -2446,10 +2485,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                        typeDecl->getFullName(),
                        requiredAccess,
                        proto->getName());
-        auto fixItDiag = diags.diagnose(typeDecl, diag::witness_fix_access,
-                                        typeDecl->getDescriptiveKind(),
-                                        requiredAccess);
-        fixItAccess(fixItDiag, typeDecl, requiredAccess);
+        diagnoseWitnessFixAccessLevel(diags, typeDecl, requiredAccess);
       });
     }
 
@@ -3105,10 +3141,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             return;
           }
         }
-        auto fixItDiag = diags.diagnose(witness, diag::witness_fix_access,
-                                        witness->getDescriptiveKind(),
-                                        requiredAccess);
-        fixItAccess(fixItDiag, witness, requiredAccess, isSetter);
+        diagnoseWitnessFixAccessLevel(diags, witness, requiredAccess,
+                                      isSetter);
       });
       break;
     }
