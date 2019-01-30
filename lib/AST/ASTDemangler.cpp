@@ -514,6 +514,30 @@ Type ASTBuilder::createObjCClassType(StringRef name) {
   return typeDecl->getDeclaredInterfaceType();
 }
 
+Type ASTBuilder::createBoundGenericObjCClassType(StringRef name,
+                                                 ArrayRef<Type> args) {
+  auto typeDecl =
+      findForeignTypeDecl(name, /*relatedEntityKind*/{},
+                          ForeignModuleKind::Imported,
+                          Demangle::Node::Kind::Class);
+  if (!typeDecl ||
+      !isa<ClassDecl>(typeDecl)) return Type();
+  if (!typeDecl->getGenericParams() ||
+      typeDecl->getGenericParams()->size() != args.size())
+    return Type();
+
+  Type parent;
+  auto *dc = typeDecl->getDeclContext();
+  if (dc->isTypeContext()) {
+    if (dc->isGenericContext())
+      return Type();
+    parent = dc->getDeclaredInterfaceType();
+  }
+
+  return BoundGenericClassType::get(cast<ClassDecl>(typeDecl),
+                                    parent, args);
+}
+
 ProtocolDecl *ASTBuilder::createObjCProtocolDecl(StringRef name) {
   auto typeDecl =
       findForeignTypeDecl(name, /*relatedEntityKind*/{},

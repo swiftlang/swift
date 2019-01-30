@@ -987,6 +987,13 @@ public:
 #endif
   }
 
+  BuiltType createBoundGenericObjCClassType(const std::string &mangledName,
+                                            ArrayRef<BuiltType> args) const {
+    // Generic arguments of lightweight Objective-C generic classes are not
+    // reified in the metadata.
+    return createObjCClassType(mangledName);
+  }
+
   BuiltType createNominalType(BuiltTypeDecl metadataOrTypeDecl,
                               BuiltType parent) const {
     // Treat nominal type creation the same way as generic type creation,
