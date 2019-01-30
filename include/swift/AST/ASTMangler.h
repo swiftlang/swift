@@ -164,8 +164,9 @@ public:
   
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
 
-  std::string mangleTypeAsUSR(Type type) {
-    return mangleTypeWithoutPrefix(type);
+  std::string mangleTypeWithoutPrefix(Type type) {
+    appendType(type);
+    return finalize();
   }
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
@@ -319,11 +320,6 @@ protected:
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
   void appendSymbolicReference(SymbolicReferent referent);
-  
-  std::string mangleTypeWithoutPrefix(Type type) {
-    appendType(type);
-    return finalize();
-  }
 };
 
 } // end namespace Mangle
