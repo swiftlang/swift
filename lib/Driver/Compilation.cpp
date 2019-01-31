@@ -123,7 +123,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool EnableExperimentalDependencies,
                          bool VerifyExperimentalDependencyGraphAfterEveryImport,
                          bool EmitExperimentalDependencyDotFileAfterEveryImport,
-                         bool ExperimentalDependencyIncludePrivateDeps)
+                         bool ExperimentalDependenciesIncludeIntrafileOnes)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -150,8 +150,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       VerifyExperimentalDependencyGraphAfterEveryImport),
     EmitExperimentalDependencyDotFileAfterEveryImport(
       EmitExperimentalDependencyDotFileAfterEveryImport),
-    ExperimentalDependencyIncludePrivateDeps(
-      ExperimentalDependencyIncludePrivateDeps) {
+    ExperimentalDependenciesIncludeIntrafileOnes(
+      ExperimentalDependenciesIncludeIntrafileOnes) {
       
 };
 // clang-format on
@@ -802,7 +802,7 @@ namespace driver {
         }
       }
       if (ExpDepGraph.hasValue())
-        assert(ExpDepGraph.getValue().emitAndVerify(Comp.getDiags()));
+        assert(ExpDepGraph.getValue().emitDotFileAndVerify(Comp.getDiags()));
     }
 
     /// Schedule transitive closure of initial jobs, and external jobs.
@@ -1433,7 +1433,7 @@ int Compilation::performJobsImpl(bool &abnormalExit,
     }
   }
   if (State.ExpDepGraph.hasValue())
-    assert(State.ExpDepGraph.getValue().emitAndVerify(getDiags()));
+    assert(State.ExpDepGraph.getValue().emitDotFileAndVerify(getDiags()));
   abnormalExit = State.hadAnyAbnormalExit();
   return State.getResult();
 }

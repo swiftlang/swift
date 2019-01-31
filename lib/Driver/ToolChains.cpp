@@ -222,7 +222,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_dependencies);
   inputArgs.AddLastArg(
-      arguments, options::OPT_experimental_dependency_include_private_deps);
+      arguments, options::OPT_experimental_dependency_include_intrafile);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
 
   // Pass on any build config options

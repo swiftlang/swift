@@ -317,7 +317,7 @@ public:
 
   /// Don't want to do this after every integration--too slow--
   /// So export this hook to the driver.
-  bool emitAndVerify(DiagnosticEngine &);
+  bool emitDotFileAndVerify(DiagnosticEngine &);
 
 private:
   void verifyNodeMapEntries() const;

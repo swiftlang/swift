@@ -210,12 +210,13 @@ private:
   /// faster rebuilds.
   const bool EnableExperimentalDependencies;
 
-  /// Really slows down the driver--so only turn on when needed.
+  /// Helpful for debugging, but slows down the driver. So, only turn on when needed.
   const bool VerifyExperimentalDependencyGraphAfterEveryImport;
+  /// Helpful for debugging, but slows down the driver. So, only turn on when needed.
   const bool EmitExperimentalDependencyDotFileAfterEveryImport;
 
   /// Experiment with inter-file dependencies
-  const bool ExperimentalDependencyIncludePrivateDeps;
+  const bool ExperimentalDependenciesIncludeIntrafileOnes;
 
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
@@ -250,7 +251,7 @@ public:
               bool EnableExperimentalDependencies = false,
               bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
               bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
-              bool ExperimentalDependencyIncludePrivateDeps = false);
+              bool ExperimentalDependenciesIncludeIntrafileOnes = false);
   // clang-format on
   ~Compilation();
 
@@ -318,8 +319,8 @@ public:
     return EmitExperimentalDependencyDotFileAfterEveryImport;
   }
 
-  bool getExperimentalDependencyIncludePrivateDeps() const {
-    return ExperimentalDependencyIncludePrivateDeps;
+  bool getExperimentalDependenciesIncludeIntrafileOnes() const {
+    return ExperimentalDependenciesIncludeIntrafileOnes;
   }
 
   bool getBatchModeEnabled() const {
@@ -359,6 +360,8 @@ public:
     return Stats.get();
   }
   
+  /// True if extra work has to be done when tracing through the dependency graph,
+  /// either in order to print dependencies or to collect statistics.
   bool getTraceDependencies() const {
     return getShowIncrementalBuildDecisions() || getStatsReporter();
   }

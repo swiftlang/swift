@@ -932,8 +932,8 @@ Driver::buildCompilation(const ToolChain &TC,
     const bool EmitExperimentalDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_emit_experimental_dependency_dot_file_after_every_import);
-    const bool ExperimentalDependencyIncludePrivateDeps = ArgList->hasArg(
-        options::OPT_experimental_dependency_include_private_deps);
+    const bool ExperimentalDependenciesIncludeIntrafileOnes = ArgList->hasArg(
+        options::OPT_experimental_dependency_include_intrafile);
 
     C = llvm::make_unique<Compilation>(
         Diags, TC, OI, Level,
@@ -957,7 +957,7 @@ Driver::buildCompilation(const ToolChain &TC,
         EnableExperimentalDependencies,
         VerifyExperimentalDependencyGraphAfterEveryImport,
         EmitExperimentalDependencyDotFileAfterEveryImport,
-        ExperimentalDependencyIncludePrivateDeps);
+        ExperimentalDependenciesIncludeIntrafileOnes);
   }
 
   // Construct the graph of Actions.

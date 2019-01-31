@@ -507,7 +507,7 @@ void ModuleDepGraph::verifyEachJobInGraphIsTracked() const {
       });
 }
 
-bool ModuleDepGraph::emitAndVerify(DiagnosticEngine &diags) {
+bool ModuleDepGraph::emitDotFileAndVerify(DiagnosticEngine &diags) {
   if (!driverDotFileBasePath.empty())
     emitDotFile(diags, driverDotFileBasePath);
   return verify();

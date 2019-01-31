@@ -679,11 +679,11 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
-  const bool includePrivateDeps =
-      SF->getASTContext().LangOpts.ExperimentalDependenciesIncludePrivateDeps;
+  const bool includeIntrafileDeps =
+      SF->getASTContext().LangOpts.ExperimentalDependenciesIncludeIntrafileOnes;
   const bool hadCompilationError = SF->getASTContext().hadError();
   SourceFileDepGraphConstructor gc(SF, depTracker, outputPath,
-                                   includePrivateDeps, hadCompilationError);
+                                   includeIntrafileDeps, hadCompilationError);
   SourceFileDepGraph g = gc.construct();
 
   const bool hadError =

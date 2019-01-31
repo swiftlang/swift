@@ -139,12 +139,12 @@ InternalDebugOpt,
 HelpText<"Debug DriverGraph by verifying it after every import">;
 
 def driver_emit_experimental_dependency_dot_file_after_every_import :
-Flag<["-"], "driver-experimental-dependency-include-private-deps">,
+Flag<["-"], "driver-emit-experimental-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
-HelpText<"Experiment with intra-file info by including private dependencies.">;
+HelpText<"Emit dot files every time driver imports an experimental swiftdeps file.">;
 
-def experimental_dependency_include_private_deps :
-Flag<["-"], "experimental_dependency_include_private_deps">,
+def experimental_dependency_include_intrafile :
+Flag<["-"], "experimental-dependency-include-intrafile">,
 InternalDebugOpt,
 HelpText<"Include within-file dependencies.">;
 
