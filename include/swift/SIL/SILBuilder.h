@@ -2179,6 +2179,13 @@ public:
     : SILBuilder(I, I->getDebugScope(), C)
   {}
 
+  /// Build instructions before the given insertion point, inheriting the debug
+  /// location and using the context from the passed in builder.
+  ///
+  /// Clients should prefer this constructor.
+  SILBuilderWithScope(SILInstruction *I, SILBuilder &B)
+      : SILBuilder(I, I->getDebugScope(), B.getBuilderContext()) {}
+
   explicit SILBuilderWithScope(
       SILInstruction *I,
       SmallVectorImpl<SILInstruction *> *InsertedInstrs = nullptr)
