@@ -313,6 +313,10 @@ Type ASTBuilder::createFunctionType(
                               .withVariadic(flags.isVariadic())
                               .withAutoClosure(flags.isAutoClosure());
 
+    if (auto *fnType = type->getAs<FunctionType>())
+      if (!fnType->isNoEscape())
+        parameterFlags = parameterFlags.withEscaping(true);
+
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }
 
