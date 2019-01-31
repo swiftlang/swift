@@ -1151,6 +1151,10 @@ public:
     if (!F->shouldOptimize())
       return;
 
+    // FIXME: Support ownership.
+    if (F->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName()
                             << " ***\n");
 
