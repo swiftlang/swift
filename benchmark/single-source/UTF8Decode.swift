@@ -31,6 +31,22 @@ public let UTF8Decode = [
       runFunction: run_UTF8Decode_InitFromBytes,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
+      name: "UTF8Decode_InitDecoding_buffer",
+      runFunction: run_UTF8Decode_InitDecoding_buffer,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "UTF8Decode_InitFromBytes_buffer",
+      runFunction: run_UTF8Decode_InitFromBytes_buffer,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "UTF8Decode_InitDecoding_rawbuffer",
+      runFunction: run_UTF8Decode_InitDecoding_rawbuffer,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "UTF8Decode_InitFromBytes_rawbuffer",
+      runFunction: run_UTF8Decode_InitFromBytes_rawbuffer,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
       name: "UTF8Decode_InitFromData_ascii",
       runFunction: run_UTF8Decode_InitFromData_ascii,
       tags: [.validation, .api, .String]),
@@ -92,6 +108,7 @@ public func run_UTF8Decode_InitFromData(_ N: Int) {
     blackHole(String(data: input, encoding: .utf8))
   }
 }
+// Array<UInt8>.
 @inline(never)
 public func run_UTF8Decode_InitDecoding(_ N: Int) {
   let input = allStringsBytes
@@ -104,6 +121,44 @@ public func run_UTF8Decode_InitFromBytes(_ N: Int) {
   let input = allStringsBytes
   for _ in 0..<200*N {
     blackHole(String(bytes: input, encoding: .utf8))
+  }
+}
+// UnsafeBufferPointer<UInt8>.
+@inline(never)
+public func run_UTF8Decode_InitDecoding_buffer(_ N: Int) {
+  let input = allStringsBytes
+  for _ in 0..<200*N {
+    input.withUnsafeBufferPointer {
+      blackHole(String(decoding: $0, as: UTF8.self))
+    }
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitFromBytes_buffer(_ N: Int) {
+  let input = allStringsBytes
+  for _ in 0..<200*N {
+    input.withUnsafeBufferPointer {
+      blackHole(String(bytes: $0, encoding: .utf8))
+    }
+  }
+}
+// UnsafeRawBufferPointer.
+@inline(never)
+public func run_UTF8Decode_InitDecoding_rawbuffer(_ N: Int) {
+  let input = allStringsBytes
+  for _ in 0..<200*N {
+    input.withUnsafeBytes {
+      blackHole(String(decoding: $0, as: UTF8.self))
+    }
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitFromBytes_rawbuffer(_ N: Int) {
+  let input = allStringsBytes
+  for _ in 0..<200*N {
+    input.withUnsafeBytes {
+      blackHole(String(bytes: $0, encoding: .utf8))
+    }
   }
 }
 
@@ -128,5 +183,3 @@ public func run_UTF8Decode_InitFromBytes_ascii(_ N: Int) {
     blackHole(String(bytes: input, encoding: .utf8))
   }
 }
-
-
