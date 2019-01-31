@@ -44,6 +44,10 @@ SILValue stripCasts(SILValue V);
 /// mark_dependence) from the current SILValue.
 SILValue stripCastsWithoutMarkDependence(SILValue V);
 
+/// Return the underlying SILValue after stripping off all copy_value and
+/// begin_borrow instructions.
+SILValue stripOwnershipInsts(SILValue v);
+
 /// Return the underlying SILValue after stripping off all upcasts from the
 /// current SILValue.
 SILValue stripUpCasts(SILValue V);
