@@ -401,13 +401,11 @@ extension String {
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
-    if let contigBytes = codeUnits as? _HasContiguousBytes,
-       sourceEncoding == UTF8.self,
-       contigBytes._providesContiguousBytesNoCopy
-    {
-      self = contigBytes.withUnsafeBytes { rawBufPtr -> String in
-        return String._fromUTF8Repairing(rawBufPtr).0
-      }
+    if sourceEncoding == UTF8.self,
+      let str = codeUnits._withRawContiguousStorageIfAvailable({
+        buf -> String in String._fromUTF8Repairing(buf).0
+      }) {
+      self = str
       return
     }
 
