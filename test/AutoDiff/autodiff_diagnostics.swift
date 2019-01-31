@@ -4,7 +4,7 @@
 // Top-level (before primal/adjoint synthesis)
 //===----------------------------------------------------------------------===//
 
-// expected-note @+1 {{opaque non-'@autodiff' function is not differentiable}}
+// expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
 func foo(_ f: (Float) -> Float) -> Float {
   // expected-error @+1 {{function is not differentiable}}
   return gradient(at: 0, in: f)

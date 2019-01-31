@@ -6,25 +6,25 @@ func simpleStoreLoad(x: Float) -> Float {
   y = x + y
   return y
 }
-let _: @autodiff (Float) -> Float = simpleStoreLoad(x:)
+let _: @differentiable (Float) -> Float = simpleStoreLoad(x:)
 
 var global: Float = 10
 
 // Test differentiation of write to non-useful global variable.
-let _: @autodiff (Float) -> Float = { x in
+let _: @differentiable (Float) -> Float = { x in
   global = x
   return x * x
 }
 
 // Test differentiation of write to non-useful local variable.
-let _: @autodiff (Float) -> Float = { x in
+let _: @differentiable (Float) -> Float = { x in
   var local = x // expected-warning {{initialization of variable 'local' was never used}}
   return x + x
 }
 
 // Test differentiation of write to useful global variable.
 // expected-error @+1 {{function is not differentiable}}
-let _: @autodiff (Float) -> Float = { x in
+let _: @differentiable (Float) -> Float = { x in
   // expected-note @+1 {{cannot differentiate writes to global variables}}
   global = x
   return global + x
@@ -34,7 +34,7 @@ let _: @autodiff (Float) -> Float = { x in
 func testMutableCaptures() {
   var y: Float = 10
   // expected-error @+1 {{function is not differentiable}}
-  let _: @autodiff (Float) -> Float = { x in
+  let _: @differentiable (Float) -> Float = { x in
     // expected-note @+1 {{cannot differentiate writes to mutable captures}}
     y = x
     return y + x
@@ -42,7 +42,7 @@ func testMutableCaptures() {
 }
 
 // Test differentiation of write to useful local variable.
-let _: @autodiff (Float) -> Float = { x in
+let _: @differentiable (Float) -> Float = { x in
   var local = x // expected-warning {{variable 'local' was never mutated}}
   return local + x
 }

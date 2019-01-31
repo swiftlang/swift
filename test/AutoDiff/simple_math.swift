@@ -80,7 +80,7 @@ SimpleMathTests.test("GlobalLet") {
   expectEqual(2, gradient(at: 1, in: foo))
 }
 
-var foo_diffable: @autodiff (Float) -> (Float)
+var foo_diffable: @differentiable (Float) -> (Float)
   = differentiableFunction { x in (x * x, { v in 2 * x * v }) }
 SimpleMathTests.test("GlobalDiffableFunc") {
   expectEqual(2, gradient(at: 1, in: foo_diffable))

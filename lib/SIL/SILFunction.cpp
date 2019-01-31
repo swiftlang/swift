@@ -172,9 +172,9 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Function type cannot be @autodiff.
+  // Function type cannot be @differentiable.
   assert(!LoweredType->isDifferentiable() &&
-         "SIL function declarations cannot have an @autodiff type");
+         "SIL function declarations cannot have an @differentiable type");
 
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);

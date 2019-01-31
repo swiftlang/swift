@@ -5,7 +5,7 @@ import StdlibUnittest
 var ProtocolRequirementAutodiffTests = TestSuite("ProtocolRequirementAutodiff")
 
 func _pullback<T, U, R>(
-  at x: (T, U), in f: @autodiff (T) -> (U) -> R
+  at x: (T, U), in f: @differentiable (T) -> (U) -> R
 ) -> (R.CotangentVector) -> (T.CotangentVector, U.CotangentVector)
   where T : Differentiable, U : Differentiable, R : Differentiable {
   // Builtin.autodiffApply_vjp_method(f, x.0, x.1).1

@@ -7,7 +7,7 @@ protocol FloatTangent : Differentiable
   where TangentVector == Float, CotangentVector == Float {}
 
 func gradient<T: Differentiable, R: FloatTangent>(
-  of f: @autodiff (T) -> R, at x: T
+  of f: @differentiable (T) -> R, at x: T
 ) -> T.CotangentVector {
   fatalError("unimplemented")
 }

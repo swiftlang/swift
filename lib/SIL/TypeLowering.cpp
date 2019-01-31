@@ -155,7 +155,7 @@ namespace {
       auto extInfo = type->getExtInfo();
       auto nondiffExtInfo = extInfo.withDifferentiable(false);
       auto origTy = type->getWithExtInfo(nondiffExtInfo);
-      // TODO: Use the parameter indices and diff order in the @autodiff
+      // TODO: Use the parameter indices and diff order in the @differentiable
       // function type.
       auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(
           SmallBitVector(type->getNumParameters(), true), /*resultIndex*/ 0,
@@ -239,7 +239,7 @@ namespace {
       case AnyFunctionType::Representation::Block:
         // SWIFT_ENABLE_TENSORFLOW
         // TODO: Are there cases where we have to lower this differently when it
-        // is @autodiff?
+        // is @differentiable?
         return asImpl().handleReference(type);
 
       // SWIFT_ENABLE_TENSORFLOW
