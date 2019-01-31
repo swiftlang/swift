@@ -287,6 +287,11 @@ bool OwnershipModelEliminatorVisitor::visitDestructureTupleInst(
 namespace {
 
 struct OwnershipModelEliminator : SILModuleTransform {
+  bool SkipTransparent;
+
+  OwnershipModelEliminator(bool SkipTransparent)
+      : SkipTransparent(SkipTransparent) {}
+
   void run() override {
     if (DumpBefore.size()) {
       getModule()->dump(DumpBefore.c_str());
@@ -295,6 +300,11 @@ struct OwnershipModelEliminator : SILModuleTransform {
     for (auto &F : *getModule()) {
       // If F does not have ownership, skip it. We have no further work to do.
       if (!F.hasOwnership())
+        continue;
+
+      // If we were asked to not strip ownership from transparent functions,
+      // continue.
+      if (SkipTransparent && F.isTransparent())
         continue;
 
       // Set F to have unqualified ownership.
@@ -334,5 +344,9 @@ struct OwnershipModelEliminator : SILModuleTransform {
 } // end anonymous namespace
 
 SILTransform *swift::createOwnershipModelEliminator() {
-  return new OwnershipModelEliminator();
+  return new OwnershipModelEliminator(false /*skip transparent*/);
+}
+
+SILTransform *swift::createNonTransparentFunctionOwnershipModelEliminator() {
+  return new OwnershipModelEliminator(true /*skip transparent*/);
 }

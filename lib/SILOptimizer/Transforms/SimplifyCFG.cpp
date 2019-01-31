@@ -3591,6 +3591,10 @@ namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
+    // FIXME: We should be able to handle ownership.
+    if (getFunction()->hasOwnership())
+      return;
+
     if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
                     /*EnableJumpThread=*/false)
             .run())
@@ -3608,6 +3612,9 @@ namespace {
 class JumpThreadSimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
+    // FIXME: Handle ownership.
+    if (getFunction()->hasOwnership())
+      return;
     if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
                     /*EnableJumpThread=*/true)
             .run())
