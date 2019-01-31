@@ -210,9 +210,11 @@ private:
   /// faster rebuilds.
   const bool EnableExperimentalDependencies;
 
-  /// Helpful for debugging, but slows down the driver. So, only turn on when needed.
+  /// Helpful for debugging, but slows down the driver. So, only turn on when
+  /// needed.
   const bool VerifyExperimentalDependencyGraphAfterEveryImport;
-  /// Helpful for debugging, but slows down the driver. So, only turn on when needed.
+  /// Helpful for debugging, but slows down the driver. So, only turn on when
+  /// needed.
   const bool EmitExperimentalDependencyDotFileAfterEveryImport;
 
   /// Experiment with inter-file dependencies
@@ -359,9 +361,9 @@ public:
   UnifiedStatsReporter *getStatsReporter() const {
     return Stats.get();
   }
-  
-  /// True if extra work has to be done when tracing through the dependency graph,
-  /// either in order to print dependencies or to collect statistics.
+
+  /// True if extra work has to be done when tracing through the dependency
+  /// graph, either in order to print dependencies or to collect statistics.
   bool getTraceDependencies() const {
     return getShowIncrementalBuildDecisions() || getStatsReporter();
   }

@@ -935,6 +935,7 @@ Driver::buildCompilation(const ToolChain &TC,
     const bool ExperimentalDependenciesIncludeIntrafileOnes = ArgList->hasArg(
         options::OPT_experimental_dependency_include_intrafile);
 
+    // clang-format off
     C = llvm::make_unique<Compilation>(
         Diags, TC, OI, Level,
         std::move(ArgList),
@@ -958,6 +959,7 @@ Driver::buildCompilation(const ToolChain &TC,
         VerifyExperimentalDependencyGraphAfterEveryImport,
         EmitExperimentalDependencyDotFileAfterEveryImport,
         ExperimentalDependenciesIncludeIntrafileOnes);
+    // clang-format on
   }
 
   // Construct the graph of Actions.
