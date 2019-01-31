@@ -110,10 +110,9 @@ static SILLinkage getAutoDiffFunctionLinkage(SILLinkage originalLinkage) {
 
   // If the original is public, then external modules may need to link the
   // associated function. Make the associated function public.
-  if (originalLinkage == SILLinkage::Public)
-    return SILLinkage::Public;
-  if (originalLinkage == SILLinkage::PublicNonABI)
-    return SILLinkage::PublicNonABI;
+  if (originalLinkage == SILLinkage::Public ||
+      originalLinkage == SILLinkage::PublicNonABI)
+    return originalLinkage;
 
   // Otherwise, the original function is defined and used only in the current
   // module, so external modules will never try to access the associated
@@ -984,7 +983,7 @@ public:
   /// function kind.
   SILFunction *
   declareExternalAssociatedFunction(SILFunction *original,
-                                    SILDifferentiableAttr *attr,
+                                    SILDifferentiableAttr *attr, StringRef name,
                                     AutoDiffAssociatedFunctionKind kind);
 
   template <typename... T, typename... U>
@@ -3934,21 +3933,12 @@ bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
 
 SILFunction *
 ADContext::declareExternalAssociatedFunction(
-    SILFunction *original, SILDifferentiableAttr *attr,
+    SILFunction *original, SILDifferentiableAttr *attr, StringRef name,
     AutoDiffAssociatedFunctionKind kind) {
   auto &module = getModule();
   auto &indices = attr->getIndices();
   auto originalTy = original->getLoweredFunctionType();
   auto originalLoc = original->getLocation();
-  StringRef name;
-  switch (kind) {
-    case AutoDiffAssociatedFunctionKind::JVP:
-      name = attr->getJVPName();
-      break;
-    case AutoDiffAssociatedFunctionKind::VJP:
-      name = attr->getVJPName();
-      break;
-  }
   auto assocGenSig = getAssociatedFunctionGenericSignature(attr, original);
   auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
@@ -3958,7 +3948,7 @@ ADContext::declareExternalAssociatedFunction(
   auto *assocFn = fb.createFunction(
       SILLinkage::PublicExternal, name, assocFnTy,
       /*genericEnv*/ nullptr, originalLoc, original->isBare(), IsNotTransparent,
-      original->isSerialized(), original->isDynamicallyReplaceable());
+      IsNotSerialized, original->isDynamicallyReplaceable());
   // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
   assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
   return assocFn;
@@ -3970,21 +3960,41 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
                                          DifferentiationInvoker invoker)
     : context(context), original(original), attr(attr), invoker(invoker) {
   auto &module = context.getModule();
+  // If attribute specifies JVP name, try to look up JVP in current module.
+  // If the JVP doesn't exist, or if the original is an external declaration,
+  // create an external JVP reference.
   if (attr->hasJVP()) {
-    // If attribute specifies JVP name, try to look up JVP in current module.
-    // Otherwise, create an external reference.
     jvp = module.lookUpFunction(attr->getJVPName());
     if (!jvp)
       jvp = context.declareExternalAssociatedFunction(
-          original, attr, AutoDiffAssociatedFunctionKind::JVP);
+          original, attr, attr->getJVPName(),
+          AutoDiffAssociatedFunctionKind::JVP);
+  } else if (original->isExternalDeclaration()) {
+    auto jvpName = original->getASTContext()
+                       .getIdentifier("AD__" + original->getName().str() +
+                                      "__jvp_" + getIndices().mangle())
+                       .str();
+    attr->setJVPName(jvpName);
+    jvp = context.declareExternalAssociatedFunction(
+        original, attr, jvpName, AutoDiffAssociatedFunctionKind::JVP);
   }
+  // If attribute specifies VJP name, try to look up VJP in current module.
+  // If the VJP doesn't exist, or if the original is an external declaration,
+  // create an external VJP reference.
   if (attr->hasVJP()) {
-    // If attribute specifies VJP name, try to look up VJP in current module.
-    // Otherwise, create an external reference.
     vjp = module.lookUpFunction(attr->getVJPName());
     if (!vjp)
       vjp = context.declareExternalAssociatedFunction(
-          original, attr, AutoDiffAssociatedFunctionKind::VJP);
+          original, attr, attr->getVJPName(),
+          AutoDiffAssociatedFunctionKind::VJP);
+  } else if (original->isExternalDeclaration()) {
+    auto vjpName = original->getASTContext()
+                       .getIdentifier("AD__" + original->getName().str() +
+                                      "__vjp_" + getIndices().mangle())
+                       .str();
+    attr->setVJPName(vjpName);
+    vjp = context.declareExternalAssociatedFunction(
+        original, attr, vjpName, AutoDiffAssociatedFunctionKind::JVP);
   }
 
   if (!jvp)
@@ -4040,17 +4050,14 @@ void DifferentiationTask::createEmptyPrimal() {
   // We set generated primal linkage to Hidden because generated primals are
   // never called cross-module in VJP mode: all cross-module calls to associated
   // functions call the VJP.
-  // TODO: In order for cross-module calls to work in non-VJP mode, we must use
-  // `getAutoDiffFunctionLinkage` to make the linkage occasionally public. We'll
-  // also need to update TBDGen to generate TBD entries for public primals.
   auto linkage = SILLinkage::Hidden;
-  primal = fb.getOrCreateFunction(original->getLocation(), primalName, linkage,
-                                  primalTy, original->isBare(),
-                                  IsNotTransparent, original->isSerialized(),
-                                  original->isDynamicallyReplaceable());
+  primal = fb.createFunction(linkage, primalName, primalTy, primalGenericEnv,
+                             original->getLocation(), original->isBare(),
+                             IsNotTransparent, original->isSerialized(),
+                             original->isDynamicallyReplaceable());
   primal->setUnqualifiedOwnership();
-  if (primalGenericEnv)
-    primal->setGenericEnvironment(primalGenericEnv);
+  primal->setDebugScope(new (context.getModule())
+                            SILDebugScope(original->getLocation(), primal));
   LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
                                 << *primal << '\n');
 }
@@ -4160,9 +4167,6 @@ void DifferentiationTask::createEmptyAdjoint() {
   // We set generated adjoint linkage to Hidden because generated adjoints are
   // never called cross-module in VJP mode: all cross-module calls to associated
   // functions call the VJP.
-  // TODO: In order for cross-module calls to work in non-VJP mode, we must use
-  // `getAutoDiffFunctionLinkage` to make the linkage occasionally public. We'll
-  // also need to update TBDGen to generate TBD entries for public adjoints.
   auto linkage = SILLinkage::Hidden;
   adjoint = fb.createFunction(linkage, adjName, adjType, adjGenericEnv,
                               original->getLocation(), original->isBare(),

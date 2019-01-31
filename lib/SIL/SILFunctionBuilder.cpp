@@ -35,8 +35,6 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   return fn;
 }
 
-
-// SWIFT_ENABLE_TENSORFLOW
 void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
                                                DeclAttributes &Attrs,
                                                SILModule &M,
@@ -82,27 +80,11 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
       auto *DA = cast<DifferentiableAttr>(A);
       std::string jvpName, vjpName;
-      // Note: the following alternative implementations of `isSameModule` don't
-      // work under all scenarios:
-      // - `F->isDefinition()`
-      // - `forDefinition` (passed from `getOrCreateFunction`)
-      bool isSameModule = M.getSwiftModule() == decl->getModuleContext();
-      // Get JVP/VJP names. If the functions aren't specified, use the expected
-      // mangled name. Differentiation pass ensures that JVP and VJP exist.
+      // Get JVP/VJP names.
       if (auto *jvpFn = DA->getJVPFunction())
         jvpName = SILDeclRef(jvpFn).mangle();
-      else if (!isSameModule)
-        jvpName = constant.asAutoDiffAssociatedFunction(
-            AutoDiffAssociatedFunctionIdentifier::get(
-                AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-                DA->getParameterIndices(), F->getASTContext())).mangle();
       if (auto *vjpFn = DA->getVJPFunction())
         vjpName = SILDeclRef(vjpFn).mangle();
-      else if (!isSameModule)
-        vjpName = constant.asAutoDiffAssociatedFunction(
-            AutoDiffAssociatedFunctionIdentifier::get(
-                AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-                DA->getParameterIndices(), F->getASTContext())).mangle();
       // Get lowered argument indices.
       auto paramIndices = DA->getParameterIndices();
       auto loweredIndices = paramIndices->getLowered(
