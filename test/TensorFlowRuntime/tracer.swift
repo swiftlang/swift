@@ -66,7 +66,7 @@ TracerTests.testAllBackends("AllDtypeSupport") {
   }
 
   func traceAndRun<T>(_ v: T) -> (Tensor<T>, Tensor<T>)
-  where T: TensorFlowScalar & Numeric {
+    where T: TensorFlowScalar & Numeric {
     let state = Tensor<T>(v)
     let data = Tensor<T>(v + 4)
     let tracedFn = _graph(with: state, in: tracee)
@@ -74,15 +74,14 @@ TracerTests.testAllBackends("AllDtypeSupport") {
   }
 
   func traceAndCheckNearlyEqual<T>(_ v: T)
-  where T: TensorFlowScalar & FloatingPoint & ExpressibleByFloatLiteral {
+    where T: TensorFlowScalar & FloatingPoint & ExpressibleByFloatLiteral {
     let (newState, newData) = traceAndRun(v)
-
     expectNearlyEqualWithScalarTensor(v, newState)
     expectNearlyEqualWithScalarTensor(v + 4, newData)
   }
 
   func traceAndCheckEqual<T>(_ v: T)
-  where T: TensorFlowScalar & Numeric & Comparable {
+    where T: TensorFlowScalar & Numeric & Comparable {
     let (newState, newData) = traceAndRun(v)
     expectEqualWithScalarTensor(v, newState)
     expectEqualWithScalarTensor(v + 4, newData)

@@ -727,10 +727,10 @@ public protocol _TensorArrayProtocolEnhanced : TensorArrayProtocol {
 
 
 extension _TensorArrayProtocolEnhanced {
-  func _dtypes() -> [TF_DataType] {
-    let count = _tensorHandleCount
+  func _dtypes: [TF_DataType] = {
+    let count = Int(_tensorHandleCount)
     let buffer =
-        UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: Int(count))
+        UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: count)
     defer { buffer.deallocate() }
     _unpackTensorHandles(into: buffer.baseAddress)
     return buffer.map { TFE_TensorHandleDataType($0) }
@@ -754,7 +754,7 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
                            "Should not be in tracing mode already!")
 
   // Switch to tracing mode.
-  let dtypes = state._dtypes() + Data._typeList.map { $0.cDataType }
+  let dtypes = state._dtypes + Data._typeList.map { $0.cDataType }
   _RuntimeConfig.traceState = .tracing(TraceContext(dtypes: dtypes))
 
   // Handle inputs.
