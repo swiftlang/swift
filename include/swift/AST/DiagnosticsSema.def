@@ -2778,7 +2778,7 @@ ERROR(specific_type_of_expression_is_ambiguous,none,
 
 ERROR(failed_to_produce_diagnostic,Fatal,
       "failed to produce diagnostic for expression; "
-      "please file a bug report with your project", ())
+      "please file a bug report", ())
 
 
 ERROR(missing_protocol,none,
