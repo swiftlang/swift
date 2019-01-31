@@ -760,7 +760,7 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
   // Handle inputs.
   let traceFn = _RuntimeConfig.traceState.context!
   let inputSymbolicTensors = traceFn.symbolicInputs.map {
-      TFE_NewTensorHandleFromTFOutput($0, TF_OperationOutputType($0))!
+    TFE_NewTensorHandleFromTFOutput($0, TF_OperationOutputType($0))!
   }
   internalConsistencyCheck(inputSymbolicTensors.count == dtypes.count)
   let symbolicState = state._makeInstance(
