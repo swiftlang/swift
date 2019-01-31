@@ -207,6 +207,8 @@ public:
     return *this;
   }
 
+  void printEscapedStringLiteral(StringRef str);
+
   void printName(Identifier Name,
                  PrintNameContext Context = PrintNameContext::Normal);
 
