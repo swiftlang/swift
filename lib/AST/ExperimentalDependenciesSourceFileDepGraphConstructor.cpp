@@ -62,7 +62,8 @@ SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
   yamlReader >> fg;
   if (yamlReader.error())
     return None;
-  return fg;
+  // return fg; compiles for Mac but not Linux, because it cannot be copied.
+  return Optional<SourceFileDepGraph>(std::move(fg));
 }
 
 //==============================================================================
