@@ -916,7 +916,8 @@ Driver::buildCompilation(const ToolChain &TC,
   std::unique_ptr<Compilation> C;
   {
     const unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
-    const Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
+    const Optional<unsigned> DriverBatchCount =
+        getDriverBatchCount(*ArgList, Diags);
     const Optional<unsigned> DriverBatchSizeLimit =
       getDriverBatchSizeLimit(*ArgList, Diags);
     const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
