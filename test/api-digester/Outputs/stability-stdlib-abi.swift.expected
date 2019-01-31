@@ -95,3 +95,4 @@ Struct String has removed conformance to _HasContiguousBytes
 Struct Substring has removed conformance to _HasContiguousBytes
 Var String._providesContiguousBytesNoCopy has been removed
 Var Substring._providesContiguousBytesNoCopy has been removed
+Func Sequence._withRawContiguousStorageIfAvailable(_:) has been added as a protocol requirement

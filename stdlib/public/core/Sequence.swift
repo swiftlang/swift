@@ -366,6 +366,10 @@ public protocol Sequence {
   func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?  
+
+  func _withRawContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R?  
 }
 
 // Provides a default associated type witness for Iterator when the
@@ -1111,6 +1115,15 @@ extension Sequence {
   ) rethrows -> R? {
     return nil
   }  
+  
+  @inlinable
+  public func _withRawContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R?  {
+    return try withContiguousStorageIfAvailable { 
+      try body(UnsafeRawBufferPointer($0)) 
+    }
+  }
 }
 
 // FIXME(ABI)#182

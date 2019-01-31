@@ -145,6 +145,17 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   public func makeIterator() -> Iterator {
     return Iterator(_position: _position, _end: _end)
   }
+
+  @inlinable @inline(__always)
+  public func _withRawContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R? {
+% if not mutable:
+      return try body(self)
+% else:
+      return try body(UnsafeRawBufferPointer(self))
+% end
+  }
 }
 
 extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
