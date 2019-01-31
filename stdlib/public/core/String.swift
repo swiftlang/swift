@@ -405,12 +405,8 @@ extension String {
        sourceEncoding == UTF8.self,
        contigBytes._providesContiguousBytesNoCopy
     {
-      self = contigBytes.withUnsafeBytes { rawBufPtr in
-        let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
-        return String._fromUTF8Repairing(
-          UnsafeBufferPointer(
-            start: ptr.assumingMemoryBound(to: UInt8.self),
-            count: rawBufPtr.count)).0
+      self = contigBytes.withUnsafeBytes { rawBufPtr -> String in
+        return String._fromUTF8Repairing(rawBufPtr).0
       }
       return
     }

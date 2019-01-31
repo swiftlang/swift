@@ -320,4 +320,3 @@ func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   }
   return result
 }
-

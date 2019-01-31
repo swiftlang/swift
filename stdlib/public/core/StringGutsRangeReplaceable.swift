@@ -186,6 +186,12 @@ extension _StringGuts {
   internal mutating func appendInPlace(
     _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) {
+    self.appendInPlace(UnsafeRawBufferPointer(other), isASCII: isASCII)
+  }
+
+  internal mutating func appendInPlace(
+    _ other: UnsafeRawBufferPointer, isASCII: Bool
+  ) {
     self._object.nativeStorage.appendInPlace(other, isASCII: isASCII)
 
     // We re-initialize from the modified storage to pick up new count, flags,
@@ -315,4 +321,3 @@ extension _StringGuts {
     self = _StringGuts(_object.nativeStorage)
   }
 }
-

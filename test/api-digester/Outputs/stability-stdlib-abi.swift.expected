@@ -85,3 +85,6 @@ Subscript String.UnicodeScalarView.subscript(_:) has been removed
 Subscript Substring.subscript(_:) has been removed
 
 Func Collection.makeIterator() has self access kind changing from NonMutating to __Consuming
+
+Func String._uncheckedFromUTF8(_:isASCII:) has parameter 0 type change from UnsafeBufferPointer<UInt8> to UnsafeRawBufferPointer
+Func _bytesToUInt64(_:_:) has parameter 0 type change from UnsafePointer<UInt8> to UnsafeRawPointer

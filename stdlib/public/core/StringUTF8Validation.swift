@@ -35,7 +35,7 @@ extension UTF8ValidationResult: Equatable {}
 
 private struct UTF8ValidationError: Error {}
 
-internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationResult {
+internal func validateUTF8(_ buf: UnsafeRawBufferPointer) -> UTF8ValidationResult {
   if _allASCII(buf) {
     return .success(UTF8ExtraInfo(isASCII: true))
   }
@@ -74,7 +74,7 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     return 1
   }
 
-  func _legacyNarrowIllegalRange(buf: Slice<UnsafeBufferPointer<UInt8>>) -> Range<Int> {
+  func _legacyNarrowIllegalRange(buf: Slice<UnsafeRawBufferPointer>) -> Range<Int> {
     var reversePacked: UInt32 = 0
     if let third = buf.dropFirst(2).first {
       reversePacked |= UInt32(third)
@@ -90,7 +90,7 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     return buf.startIndex ..< buf.startIndex + invalids
   }
 
-  func findInvalidRange(_ buf: Slice<UnsafeBufferPointer<UInt8>>) -> Range<Int> {
+  func findInvalidRange(_ buf: Slice<UnsafeRawBufferPointer>) -> Range<Int> {
     var endIndex = buf.startIndex
     var iter = buf.makeIterator()
     _ = iter.next()
@@ -157,7 +157,7 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
   }
 }
 
-internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRange: Range<Int>) -> String {
+internal func repairUTF8(_ input: UnsafeRawBufferPointer, firstKnownBrokenRange: Range<Int>) -> String {
   _internalInvariant(input.count > 0, "empty input doesn't need to be repaired")
   _internalInvariant(firstKnownBrokenRange.clamped(to: input.indices) == firstKnownBrokenRange)
   // During this process, `remainingInput` contains the remaining bytes to process. It's split into three
@@ -189,13 +189,13 @@ internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRa
     result.reserveCapacity(result.count + remainingInput.count + replacementCharacterCount)
 
     // we can now safely append the next known good bytes and a replacement character
-    result.appendInPlace(UnsafeBufferPointer(rebasing: goodChunk),
+    result.appendInPlace(UnsafeRawBufferPointer(rebasing: goodChunk),
                          isASCII: false /* appending replacement character anyway, so let's not bother */)
     Unicode.Scalar._replacementCharacter.withUTF8CodeUnits {
       result.appendInPlace($0, isASCII: false)
     }
 
-    remainingInput = UnsafeBufferPointer(rebasing: remainingInput[brokenRange.endIndex...])
+    remainingInput = UnsafeRawBufferPointer(rebasing: remainingInput[brokenRange.endIndex...])
     switch validateUTF8(remainingInput) {
     case .success:
       result.appendInPlace(remainingInput, isASCII: false)

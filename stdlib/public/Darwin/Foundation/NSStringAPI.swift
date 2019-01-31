@@ -396,9 +396,7 @@ extension String {
   /// Unicode characters using a given `encoding`.
   public init?(data: __shared Data, encoding: Encoding) {
     if encoding == .utf8,
-       let str = data.withUnsafeBytes({
-         String._tryFromUTF8($0.bindMemory(to: UInt8.self))
-    }) {
+       let str = data.withUnsafeBytes(String._tryFromUTF8) {
       self = str
       return
     }

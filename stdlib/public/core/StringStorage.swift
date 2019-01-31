@@ -393,7 +393,7 @@ extension __StringStorage {
 
   @_effects(releasenone)
   internal static func create(
-    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>,
+    initializingFrom bufPtr: UnsafeRawBufferPointer,
     capacity: Int,
     isASCII: Bool
   ) -> __StringStorage {
@@ -403,9 +403,30 @@ extension __StringStorage {
     let storage = __StringStorage.create(
       capacity: capacity, countAndFlags: countAndFlags)
     let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-    storage.mutableStart.initialize(from: addr, count: bufPtr.count)
+    UnsafeMutableRawPointer(storage.mutableStart)
+      .copyMemory(from: addr, byteCount: bufPtr.count)
     storage._invariantCheck()
     return storage
+  }
+
+  @_effects(releasenone)
+  internal static func create(
+    initializingFrom bufPtr: UnsafeRawBufferPointer, isASCII: Bool
+  ) -> __StringStorage {
+    return __StringStorage.create(
+      initializingFrom: bufPtr, capacity: bufPtr.count, isASCII: isASCII)
+  }
+
+  @_effects(releasenone)
+  internal static func create(
+    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>,
+    capacity: Int,
+    isASCII: Bool
+  ) -> __StringStorage {
+    return __StringStorage.create(
+      initializingFrom: UnsafeRawBufferPointer(bufPtr), capacity: capacity,
+      isASCII: isASCII
+    )
   }
 
   @_effects(releasenone)
@@ -413,7 +434,7 @@ extension __StringStorage {
     initializingFrom bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) -> __StringStorage {
     return __StringStorage.create(
-      initializingFrom: bufPtr, capacity: bufPtr.count, isASCII: isASCII)
+      initializingFrom: UnsafeRawBufferPointer(bufPtr), isASCII: isASCII)
   }
 }
 
@@ -538,12 +559,13 @@ extension __StringStorage {
 
   @_effects(releasenone)
   internal func appendInPlace(
-    _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
+    _ other: UnsafeRawBufferPointer, isASCII: Bool
   ) {
     _internalInvariant(self.capacity >= other.count)
     let srcAddr = other.baseAddress._unsafelyUnwrappedUnchecked
     let srcCount = other.count
-    self.mutableEnd.initialize(from: srcAddr, count: srcCount)
+    UnsafeMutableRawPointer(self.mutableEnd)
+      .copyMemory(from: srcAddr, byteCount: srcCount)
     _postAppendAdjust(appendedCount: srcCount, appendedIsASCII: isASCII)
   }
 

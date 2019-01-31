@@ -241,7 +241,7 @@ extension _SmallString {
 
   // Direct from UTF-8
   @inlinable @inline(__always)
-  internal init?(_ input: UnsafeBufferPointer<UInt8>) {
+  internal init?(_ input: UnsafeRawBufferPointer) {
     let count = input.count
     guard count <= _SmallString.capacity else { return nil }
 
@@ -252,6 +252,11 @@ extension _SmallString {
     let trailing = count > 8 ? _bytesToUInt64(ptr + 8, count &- 8) : 0
 
     self.init(leading: leading, trailing: trailing, count: count)
+  }
+
+  @inlinable @inline(__always)
+  internal init?(_ input: UnsafeBufferPointer<UInt8>) {
+    self.init(UnsafeRawBufferPointer(input))
   }
 
   @usableFromInline // @testable
@@ -319,7 +324,7 @@ extension UInt64 {
 
 @inlinable @inline(__always)
 internal func _bytesToUInt64(
-  _ input: UnsafePointer<UInt8>,
+  _ input: UnsafeRawPointer,
   _ c: Int
 ) -> UInt64 {
   // FIXME: This should be unified with _loadPartialUnalignedUInt64LE.
@@ -328,7 +333,7 @@ internal func _bytesToUInt64(
   var r: UInt64 = 0
   var shift: Int = 0
   for idx in 0..<c {
-    r = r | (UInt64(input[idx]) &<< shift)
+    r = r | (UInt64(input.load(fromByteOffset: idx, as: UInt8.self)) &<< shift)
     shift = shift &+ 8
   }
   return r
