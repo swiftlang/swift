@@ -43,13 +43,13 @@ protocol Base {
 // same type.
 protocol Sub1: Base {
   associatedtype SubAssoc: Assoc
-  // expected-error@-1 {{type 'Self.SubAssoc' constrained to non-protocol, non-class type 'Self.Assoc'}}
+  // expected-error@-1 {{type 'Self.SubAssoc' constrained to non-protocol, non-class type 'Self.Assoc'}} expected-note@-1 {{use 'SubAssoc == Self.Assoc' to require 'SubAssoc' to be 'Self.Assoc'}} {{28-33===}}
   // expected-error@-2 {{inheritance from non-protocol, non-class type 'Self.Assoc'}}
 }
 
 // FIXME: This error is incorrect in what it states.
 protocol Sub2: Base {
-  associatedtype SubAssoc where SubAssoc: Assoc // expected-error {{type 'Self.SubAssoc' constrained to non-protocol, non-class type 'Self.Assoc'}}
+  associatedtype SubAssoc where SubAssoc: Assoc // expected-error {{type 'Self.SubAssoc' constrained to non-protocol, non-class type 'Self.Assoc'}} expected-note {{use 'SubAssoc == Self.Assoc' to require 'SubAssoc' to be 'Self.Assoc'}} {{41-42= ==}}
 }
 
 struct S {}
@@ -57,10 +57,10 @@ struct S {}
 // FIX-ME: One of these errors is redundant.
 protocol P4 {
   associatedtype X : S
-  // expected-error@-1 {{type 'Self.X' constrained to non-protocol, non-class type 'S'}}
+  // expected-error@-1 {{type 'Self.X' constrained to non-protocol, non-class type 'S'}} expected-note@-1 {{use 'X == S' to require 'X' to be 'S'}} {{22-23===}}
   // expected-error@-2 {{inheritance from non-protocol, non-class type 'S'}}
 }
 
 protocol P5 {
-  associatedtype Y where Y : S // expected-error {{type 'Self.Y' constrained to non-protocol, non-class type 'S'}}
+  associatedtype Y where Y : S // expected-error {{type 'Self.Y' constrained to non-protocol, non-class type 'S'}} expected-note {{use 'Y == S' to require 'Y' to be 'S'}} {{28-29===}}
 }
