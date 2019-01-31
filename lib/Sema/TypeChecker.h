@@ -267,6 +267,14 @@ enum class TypeCheckExprFlags {
   /// If set, a conversion constraint should be specfied so that the result of
   /// the expression is an optional type.
   ExpressionTypeMustBeOptional = 0x400,
+
+  /// FIXME(diagnostics): Once diagnostics are completely switched to new
+  /// framework, this flag could be removed as obsolete.
+  ///
+  /// If set, this is a sub-expression, and it is being re-typechecked
+  /// as part of the expression diagnostics, which is attempting to narrow
+  /// down failure location.
+  SubExpressionDiagnostics = 0x800,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -385,6 +393,18 @@ public:
   /// failure.
   virtual Expr *appliedSolution(constraints::Solution &solution,
                                 Expr *expr);
+
+  /// Callback invoked if expression is structurally unsound and can't
+  /// be correctly processed by the constraint solver.
+  virtual void preCheckFailed(Expr *expr);
+
+  /// Callback invoked if constraint system failed to generate
+  /// constraints for a given expression.
+  virtual void constraintGenerationFailed(Expr *expr);
+
+  /// Callback invoked if application of chosen solution to
+  /// expression has failed.
+  virtual void applySolutionFailed(constraints::Solution &solution, Expr *expr);
 };
 
 /// A conditional conformance that implied some other requirements. That is, \c
@@ -1369,7 +1389,15 @@ public:
                                TypeCheckExprOptions(), listener);
   }
 
+private:
+  Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
+                               TypeLoc convertType,
+                               ContextualTypePurpose convertTypePurpose,
+                               TypeCheckExprOptions options,
+                               ExprTypeCheckListener &listener,
+                               constraints::ConstraintSystem *baseCS);
 
+public:
   /// \brief Type check the given expression and return its type without
   /// applying the solution.
   ///
