@@ -5755,7 +5755,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   
   // Emit a diagnostic if we recorded any constraints where the constraint
   // type was not constrained to a protocol or class. Provide a fix-it if
-  // allowConcreteGenericParams is true.
+  // allowConcreteGenericParams is true or the subject type is a member type.
   if (!invalidConstraints.empty()) {
     for (auto constraint : invalidConstraints) {
       auto loc = constraint.sourceLoc;
@@ -5775,7 +5775,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         return subjectTypeName;
       };
       
-      if (allowConcreteGenericParams) {
+      if (allowConcreteGenericParams || subjectType->is<DependentMemberType>()) {
         auto subjectTypeName = subjectType.getString();
         auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
         Diags.diagnose(loc,
