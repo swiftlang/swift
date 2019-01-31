@@ -1610,6 +1610,13 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitUnmanagedRetainValueInst(
     UnmanagedRetainValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordClonedInstruction(
+        Inst, getBuilder().createRetainValue(getOpLocation(Inst->getLoc()),
+                                             getOpValue(Inst->getOperand()),
+                                             Inst->getAtomicity()));
+  }
+
   recordClonedInstruction(Inst, getBuilder().createUnmanagedRetainValue(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
@@ -1653,6 +1660,12 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitUnmanagedReleaseValueInst(
     UnmanagedReleaseValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordClonedInstruction(
+        Inst, getBuilder().createReleaseValue(getOpLocation(Inst->getLoc()),
+                                              getOpValue(Inst->getOperand()),
+                                              Inst->getAtomicity()));
+  }
   recordClonedInstruction(Inst, getBuilder().createUnmanagedReleaseValue(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
