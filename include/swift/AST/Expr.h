@@ -835,6 +835,8 @@ public:
 ///
 class BooleanLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
+  ConcreteDeclRef BuiltinInitializer;
+  ConcreteDeclRef Initializer;
 
 public:
   BooleanLiteralExpr(bool Value, SourceLoc Loc, bool Implicit = false)
@@ -848,7 +850,33 @@ public:
   SourceRange getSourceRange() const {
     return Loc;
   }
-  
+
+  /// Retrieve the builtin initializer that will be used to construct the
+  /// boolean literal.
+  ///
+  /// Any type-checked boolean literal will have a builtin initializer, which is
+  /// called first to form a concrete Swift type.
+  ConcreteDeclRef getBuiltinInitializer() const { return BuiltinInitializer; }
+
+  /// Set the builtin initializer that will be used to construct the boolean
+  /// literal.
+  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
+    BuiltinInitializer = builtinInitializer;
+  }
+
+  /// Retrieve the initializer that will be used to construct the boolean
+  /// literal from the result of the initializer.
+  ///
+  /// Only boolean literals that have no builtin literal conformance will have
+  /// this initializer, which will be called on the result of the builtin
+  /// initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the boolean literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::BooleanLiteral;
   }
