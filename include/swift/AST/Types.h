@@ -3096,9 +3096,9 @@ public:
   /// Given `indices`, `differentiationOrder`, and `kind`, calculates the type
   /// of the corresponding autodiff associated function.
   ///
-  /// \note The original function type (`self`) need not be `@autodiff`, and the
-  /// resulting function will preserve all `ExtInfo` of the original function,
-  /// including `@autodiff`.
+  /// \note The original function type (`self`) need not be `@differentiable`,
+  /// and the resulting function will preserve all `ExtInfo` of the original
+  /// function, including `@differentiable`.
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
       AutoDiffParameterIndices *indices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,

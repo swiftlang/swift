@@ -2,7 +2,7 @@
 
 struct Foo {
   var x: Float
-  var f: @autodiff (Float) -> Float
+  var f: @differentiable (Float) -> Float
 }
 func diffableClosureInStruct(s: Foo) {
   _ = gradient(of: s.f)
@@ -10,8 +10,8 @@ func diffableClosureInStruct(s: Foo) {
 
 // CHECK-LABEL: @{{.*}}diffableClosureInStruct{{.*}} : $@convention(thin) (@guaranteed Foo) -> () {
 // CHECK:   [[CLOSURE:%.*]] = struct_extract {{%.*}} : $Foo, #Foo.f
-// CHECK:   retain_value [[CLOSURE]] : $@autodiff @callee_guaranteed (Float) -> Float
-// CHECK:   autodiff_function_extract [original] [[CLOSURE]] : $@autodiff @callee_guaranteed (Float) -> Float
+// CHECK:   retain_value [[CLOSURE]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK:   autodiff_function_extract [original] [[CLOSURE]] : $@differentiable @callee_guaranteed (Float) -> Float
 
 
 public func closureCaptureMutable() {

@@ -33,14 +33,14 @@ SupersetVJPTests.test("CrossModuleClosure") {
   expectEqual(1, gradient(at: Float(1)) { x in x + 2 })
 }
 
-// FIXME: The expression `(+) as @autodiff (Float, @nondiff Float) -> Float)`
-// forms a curry thunk of `Float.+` before conversion to @autodiff, and AD
+// FIXME: The expression `(+) as @differentiable (Float, @nondiff Float) -> Float)`
+// forms a curry thunk of `Float.+` before conversion to @differentiable, and AD
 // doesn't know how to differentiate the curry thunk, so it produces a
 // "function is not differentiable" error.
 // FIXME: Propagate wrt indices correctly so that this actually takes the
 // gradient wrt only the first parameter, as intended.
 // SupersetVJPTests.test("CrossModule") {
-//   expectEqual(1, gradient(at: 1, 2, in: (+) as @autodiff (Float, @nondiff Float) -> Float))
+//   expectEqual(1, gradient(at: 1, 2, in: (+) as @differentiable (Float, @nondiff Float) -> Float))
 // }
 
 // FIXME: Unbreak this one.

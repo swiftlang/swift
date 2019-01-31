@@ -7627,7 +7627,7 @@ class TryApplyInst final
 
 // SWIFT_ENABLE_TENSORFLOW
 /// `autodiff_function` - given a function and differentiation indices and its
-/// associated differentiation functions, create an `@autodiff` function that
+/// associated differentiation functions, create an `@differentiable` function that
 /// represents a bundle of these functions and configurations.
 class AutoDiffFunctionInst final :
     public InstructionBaseWithTrailingOperands<
@@ -7694,7 +7694,7 @@ public:
                                  AutoDiffAssociatedFunctionKind kind) const;
 };
 
-/// `autodiff_function_extract` - given an `@autodiff` function representing a
+/// `autodiff_function_extract` - given an `@differentiable` function representing a
 /// bundle of the original function and associated functions, extract the
 /// specified function.
 class AutoDiffFunctionExtractInst
@@ -7724,7 +7724,7 @@ private:
   /// The differentiation order. A zero value is only legal when the extractee
   /// is the original function, and it is a private representation only.
   unsigned differentiationOrder;
-  /// The list containing the `@autodiff` function operand.
+  /// The list containing the `@differentiable` function operand.
   FixedOperandList<1> operands;
 
   static SILType

@@ -30,7 +30,7 @@ CustomDerivativesTests.test("differentiableFunction-unary") {
     (value: unary(x), pullback: { v in v * x * 2 })
   }
   expectEqual(20, gradient(at: 10, in: diffableUnary))
-  // Test differentiation of @autodiff function.
+  // Test differentiation of @differentiable function.
   expectEqual(20, gradient(at: 10, in: { diffableUnary($0) }))
   expectEqual(40, gradient(at: 10, in: { diffableUnary($0) * 2 }))
 }
@@ -40,7 +40,7 @@ CustomDerivativesTests.test("differentiableFunction-binary") {
     (value: binary(x, y), pullback: { v in (v * y, v * x) })
   }
   expectEqual((10, 5), gradient(at: 5, 10, in: diffableBinary))
-  // Test differentiation of @autodiff function.
+  // Test differentiation of @differentiable function.
   expectEqual((10, 5), gradient(at: 5, 10, in: { diffableBinary($0, $1) }))
   expectEqual((20, 10), gradient(at: 5, 10, in: { diffableBinary($0, $1) * 2 }))
 }

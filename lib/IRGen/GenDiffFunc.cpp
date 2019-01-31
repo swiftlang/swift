@@ -1,4 +1,4 @@
-//===--- GenDiffFunc.cpp - Swift IR Generation For @autodiff Functions ---===//
+//===- GenDiffFunc.cpp - Swift IR Generation For @differentiable Functions ===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -95,7 +95,7 @@ public:
 
   void initializeFromParams(IRGenFunction &IGF, Explosion &params, Address src,
                             SILType T, bool isOutlined) const override {
-    llvm_unreachable("unexploded @autodiff function as argument?");
+    llvm_unreachable("unexploded @differentiable function as argument?");
   }
 
   void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -130,7 +130,7 @@ public:
 
   TypeInfo *createFixed(ArrayRef<DiffFuncFieldInfo> fields,
                         StructLayout &&layout) {
-    llvm_unreachable("@autodiff functions are always loadable");
+    llvm_unreachable("@differentiable functions are always loadable");
   }
 
   DiffFuncTypeInfo *createLoadable(ArrayRef<DiffFuncFieldInfo> fields,
@@ -145,7 +145,7 @@ public:
   TypeInfo *createNonFixed(ArrayRef<DiffFuncFieldInfo> fields,
                            FieldsAreABIAccessible_t fieldsAccessible,
                            StructLayout &&layout) {
-    llvm_unreachable("@autodiff functions are always loadable");
+    llvm_unreachable("@differentiable functions are always loadable");
   }
 
   DiffFuncFieldInfo getFieldInfo(unsigned index, DiffFuncIndex field,

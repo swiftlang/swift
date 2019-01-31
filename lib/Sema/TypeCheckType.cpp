@@ -1944,7 +1944,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     TAK_convention, TAK_noreturn, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
     // SWIFT_ENABLE_TENSORFLOW
-    TAK_escaping, TAK_autodiff, TAK_yield_once, TAK_yield_many
+    TAK_escaping, TAK_autodiff, TAK_differentiable, TAK_yield_once, TAK_yield_many
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2047,7 +2047,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
                                      // SWIFT_ENABLE_TENSORFLOW
                                      attrs.has(TAK_noescape),
-                                     attrs.has(TAK_autodiff));
+                                     attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
 
     ty = resolveSILFunctionType(fnRepr, options, coroutineKind,
                                 extInfo, calleeConvention,
@@ -2108,7 +2108,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                   attrs.has(TAK_noescape),
                                   // SWIFT_ENABLE_TENSORFLOW
                                   fnRepr->throws(),
-                                  attrs.has(TAK_autodiff));
+                                  attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
     if (!ty || ty->hasError()) return ty;
@@ -2413,7 +2413,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // If the function is marked as `@autodiff`, the result must be a
+  // If the function is marked as `@differentiable`, the result must be a
   // differentiable type.
   if (extInfo.isDifferentiable() &&
       resolution.getStage() != TypeResolutionStage::Structural) {

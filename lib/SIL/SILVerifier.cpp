@@ -1238,7 +1238,7 @@ public:
         adfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
     require(!origTy->isDifferentiable(),
-            "The original function must not be @autodiff");
+            "The original function must not be @differentiable");
     if (F.getModule().getStage() == SILStage::Canonical ||
         adfi->hasAssociatedFunctions()) {
       for (auto order : range(1, adfi->getDifferentiationOrder() + 1)) {
@@ -1246,7 +1246,7 @@ public:
         auto jvpType = pair.first->getType().getAs<SILFunctionType>();
         require(jvpType, "The JVP function must have a function type");
         require(!jvpType->isDifferentiable(),
-                "The JVP function must not be @autodiff");
+                "The JVP function must not be @differentiable");
         auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
             adfi->getParameterIndices(), /*resultIndex*/ 0, order,
             AutoDiffAssociatedFunctionKind::JVP, F.getModule(),
@@ -1255,7 +1255,7 @@ public:
         auto vjpType = pair.second->getType().getAs<SILFunctionType>();
         require(vjpType, "The VJP function must have a function type");
         require(!vjpType->isDifferentiable(),
-                "The VJP function must not be @autodiff");
+                "The VJP function must not be @differentiable");
         auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
             adfi->getParameterIndices(), /*resultIndex*/ 0, order,
             AutoDiffAssociatedFunctionKind::VJP, F.getModule(),
@@ -1277,7 +1277,7 @@ public:
     auto fnTy = adfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
     require(fnTy->isDifferentiable(),
-            "The function operand must be an '@autodiff' function");
+            "The function operand must be an '@differentiable' function");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {

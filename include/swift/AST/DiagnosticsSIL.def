@@ -395,7 +395,7 @@ NOTE(autodiff_function_assoc_func_requirements_unmet,none,
      "function call is not differentiable because generic requirements are not "
      "met", ())
 NOTE(autodiff_opaque_function_not_differentiable,none,
-     "opaque non-'@autodiff' function is not differentiable", ())
+     "opaque non-'@differentiable' function is not differentiable", ())
 NOTE(autodiff_property_not_differentiable,none,
      "property is not differentiable", ())
 NOTE(autodiff_value_defined_here,none,

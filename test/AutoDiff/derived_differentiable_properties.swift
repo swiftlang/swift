@@ -22,7 +22,7 @@ public struct Foo : Differentiable {
 struct AdditiveTangentIsSelf : AdditiveArithmetic, Differentiable {
   var a: Float
 }
-let _: @autodiff (AdditiveTangentIsSelf) -> Float = { x in
+let _: @differentiable (AdditiveTangentIsSelf) -> Float = { x in
   x.a + x.a
 }
 

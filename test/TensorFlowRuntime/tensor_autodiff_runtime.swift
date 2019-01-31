@@ -163,7 +163,7 @@ TensorADTests.testAllBackends("Differentiate global") {
 }
 
 TensorADTests.testAllBackends("Side effects") {
-  let foo: @autodiff (Tensor<Float>) -> Tensor<Float> = { x in
+  let foo: @differentiable (Tensor<Float>) -> Tensor<Float> = { x in
     var a = x
     a = a + x
     a = a + x

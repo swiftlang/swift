@@ -3713,11 +3713,11 @@ ERROR(unreferenced_generic_parameter,none,
 // Function differentiability
 ERROR(autodiff_attr_argument_not_differentiable,none,
       "argument is not differentiable, but the enclosing function type is "
-      "marked '@autodiff'; did you want to add '@nondiff' to this argument?",
+      "marked '@differentiable'; did you want to add '@nondiff' to this argument?",
       ())
 ERROR(autodiff_attr_result_not_differentiable,none,
       "result is not differentiable, but the function type is marked "
-      "'@autodiff'", ())
+      "'@differentiable'", ())
 ERROR(nondiff_attr_invalid_on_nondifferentiable_function,none,
       "'nondiff' cannot be applied to arguments of a non-differentiable "
       "function", ())

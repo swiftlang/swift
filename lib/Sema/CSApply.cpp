@@ -6765,7 +6765,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       assert(toType->is<FunctionType>());
       // SWIFT_ENABLE_TENSORFLOW
       auto fromEI = fromFunc->getExtInfo();
-      // Handle implicit conversion from @autodiff.
+      // Handle implicit conversion from @differentiable.
       if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
         fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiable(false))
                 ->castTo<FunctionType>();
@@ -6827,9 +6827,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                               FunctionConversionExpr(expr,
                                                      toFuncNoADConversion));
 
-      // Make the conversion to @autodiff happen after all other conversions,
+      // Make the conversion to @differentiable happen after all other conversions,
       // because some of the other conversions are not currently supported on
-      // @autodiff functions. (e.g. escape_to_noescape).
+      // @differentiable functions. (e.g. escape_to_noescape).
       // After we do support those conversions, the order will no longer matter.
       if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
         expr = cs.cacheType(new (tc.Context)

@@ -1034,10 +1034,10 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   assert(arity >= 1);
   assert(order == 1 && "higher-order differentiation is not supported yet");
   // JVP:
-  //   <...T...(arity), R> (@autodiff (...T) throws -> R, ...T)
+  //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
   //       rethrows -> (R, (...T.TangentVector) -> R.TangentVector)
   // VJP:
-  //   <...T...(arity), R> (@autodiff (...T) throws -> R, ...T)
+  //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
   //       rethrows -> (R, (R.CotangentVector) -> ...T.CotangentVector)
   unsigned numGenericParams = 1 + arity + (isMethod ? 1 : 0);
   BuiltinGenericSignatureBuilder builder(Context, numGenericParams);
@@ -1060,7 +1060,7 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
     selfArgGen = makeGenericParam(arity + 1);
     builder.addConformanceRequirement(*selfArgGen, diffableProto);
   }
-  // Generator for the first argument, i.e. the @autodiff function.
+  // Generator for the first argument, i.e. the @differentiable function.
   BuiltinGenericSignatureBuilder::LambdaGenerator firstArgGen {
     // Generator for the function type at the argument position, i.e. the
     // function being differentiated.
