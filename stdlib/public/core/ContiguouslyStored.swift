@@ -73,11 +73,7 @@ extension UnsafeMutableRawBufferPointer: _HasContiguousBytes {
     return try body(UnsafeRawBufferPointer(self))
   }
 }
-extension String: _HasContiguousBytes {
-  @inlinable
-  internal var _providesContiguousBytesNoCopy: Bool {
-    @inline(__always) get { return self._guts.isFastUTF8 }
-  }
+extension String {
 
   @inlinable @inline(__always)
   internal func _withUTF8<R>(
@@ -93,20 +89,9 @@ extension String: _HasContiguousBytes {
       try body($0)
     }
   }
-
-  @inlinable @inline(__always)
-  internal func withUnsafeBytes<R>(
-    _ body: (UnsafeRawBufferPointer) throws -> R
-  ) rethrows -> R {
-    return try self._withUTF8 { return try body(UnsafeRawBufferPointer($0)) }
-  }
 }
-extension Substring: _HasContiguousBytes {
-  @inlinable
-  internal var _providesContiguousBytesNoCopy: Bool {
-    @inline(__always) get { return self._wholeGuts.isFastUTF8 }
-  }
-
+extension Substring {
+  
   @inlinable @inline(__always)
   internal func _withUTF8<R>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> R
@@ -120,12 +105,5 @@ extension Substring: _HasContiguousBytes {
     return try ContiguousArray(self.utf8).withUnsafeBufferPointer {
       try body($0)
     }
-  }
-
-  @inlinable @inline(__always)
-  internal func withUnsafeBytes<R>(
-    _ body: (UnsafeRawBufferPointer) throws -> R
-  ) rethrows -> R {
-    return try self._withUTF8 { return try body(UnsafeRawBufferPointer($0)) }
   }
 }

@@ -86,5 +86,12 @@ Subscript Substring.subscript(_:) has been removed
 
 Func Collection.makeIterator() has self access kind changing from NonMutating to __Consuming
 
-Func String._uncheckedFromUTF8(_:isASCII:) has parameter 0 type change from UnsafeBufferPointer<UInt8> to UnsafeRawBufferPointer
+Func String._uncheckedFromUTF8(_:isASCII:) has been removed
 Func _bytesToUInt64(_:_:) has parameter 0 type change from UnsafePointer<UInt8> to UnsafeRawPointer
+Func String._uncheckedFromUTF8(_:asciiPreScanResult:) has been removed
+Func String.withUnsafeBytes(_:) has been removed
+Func Substring.withUnsafeBytes(_:) has been removed
+Struct String has removed conformance to _HasContiguousBytes
+Struct Substring has removed conformance to _HasContiguousBytes
+Var String._providesContiguousBytesNoCopy has been removed
+Var Substring._providesContiguousBytesNoCopy has been removed

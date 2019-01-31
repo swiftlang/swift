@@ -115,7 +115,7 @@ internal func _assertionFailure(
 ) -> Never {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
-    message._withUnsafeBufferPointerToUTF8 {
+    message._withUTF8 {
       (messageUTF8) -> Void in
       file.withUTF8Buffer {
         (file) -> Void in
@@ -145,7 +145,7 @@ internal func _assertionFailure(
 ) -> Never {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
-    message._withUnsafeBufferPointerToUTF8 {
+    message._withUTF8 {
       (messageUTF8) -> Void in
       _swift_stdlib_reportFatalError(
         prefix.baseAddress!, CInt(prefix.count),

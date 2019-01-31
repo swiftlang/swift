@@ -58,13 +58,7 @@ extension String {
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String {
     _internalInvariant(_allASCII(input), "not actually ASCII")
-
-    if let smol = _SmallString(input) {
-      return String(_StringGuts(smol))
-    }
-
-    let storage = __StringStorage.create(initializingFrom: input, isASCII: true)
-    return storage.asString
+    return _uncheckedFromUTF8(UnsafeRawBufferPointer(input), isASCII: true)
   }
 
   // UTF8 from typed memory.
@@ -113,8 +107,7 @@ extension String {
     }
   }
 
-  @usableFromInline
-  internal static func _uncheckedFromUTF8(
+  private static func _uncheckedFromUTF8(
     _ input: UnsafeRawBufferPointer,
     isASCII: Bool
   ) -> String {
@@ -125,15 +118,6 @@ extension String {
     let storage = __StringStorage.create(
       initializingFrom: input, isASCII: isASCII)
     return storage.asString
-  }
-
-  // If we've already pre-scanned for ASCII, just supply the result
-  @usableFromInline
-  internal static func _uncheckedFromUTF8(
-    _ input: UnsafeBufferPointer<UInt8>, asciiPreScanResult: Bool
-  ) -> String {
-    return _uncheckedFromUTF8(UnsafeRawBufferPointer(input),
-                              isASCII: asciiPreScanResult)
   }
 
   // Other encodings.
@@ -157,12 +141,6 @@ extension String {
     _internalInvariant(!repaired, "Error present")
 
     return contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
-  }
-
-  internal func _withUnsafeBufferPointerToUTF8<R>(
-    _ body: (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
-  ) rethrows -> R {
-    return try self._withUTF8(body)
   }
 
   @usableFromInline @inline(never) // slow-path
