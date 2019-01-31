@@ -754,7 +754,7 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
                            "Should not be in tracing mode already!")
 
   // Switch to tracing mode.
-  let dtypes = state._dtypes() + (Data._typeList.map { $0.cDataType })
+  let dtypes = state._dtypes() + Data._typeList.map { $0.cDataType }
   _RuntimeConfig.traceState = .tracing(TraceContext(dtypes: dtypes))
 
   // Handle inputs.
@@ -797,8 +797,8 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
     debugLog("Getting input data tensor handles.")
     let inputDataTensorHandles =  data.cTensorHandles
     inputTensors.append(contentsOf: inputDataTensorHandles.map {
-                          _TFCCreateTensorHandleFromC($0)
-                        })
+      _TFCCreateTensorHandleFromC($0)
+    })
 
     debugLog("Executing trace graph function.")
     let returnValues = traceContext.execute(traceeInputs: inputTensors,
