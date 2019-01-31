@@ -727,7 +727,7 @@ public protocol _TensorArrayProtocolEnhanced : TensorArrayProtocol {
 
 
 extension _TensorArrayProtocolEnhanced {
-  func _dtypes: [TF_DataType] = {
+  var _dtypes: [TF_DataType] {
     let count = Int(_tensorHandleCount)
     let buffer =
         UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: count)
