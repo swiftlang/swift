@@ -413,7 +413,7 @@ func testHashableGenerics(
   let _: Int = any.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
   let _: Int = constrained.foo // expected-error{{cannot convert value of type 'Set<ElementConcrete>' to specified type 'Int'}}
   let _: Int = insufficient.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
-  let _: Int = extra.foo // expected-error{{cannot convert value of type 'Set<ElementConcrete>' to specified type 'Int'}}
+  let _: Int = extra.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
   let _: Int = existential.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
 }
 
