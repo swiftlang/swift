@@ -2045,6 +2045,21 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (DC->getParentModule()->getNameStr().startswith("__lldb_expr") &&
+      viable.size() > 1) {
+    // TOOD(https://bugs.swift.org/browse/SR-9814):
+    // If in LLDB repl mode, patch up the solution if we have ambiguity.
+    //
+    // This is a *temporary* short-term hack that simply returns the last
+    // solution.  It seems to work for now and returns the lastly added
+    // defintion during the repl session. However, this is extremely brittle and
+    // is not expected to work correctly all the time.
+    viable[0] = std::move(viable.back());
+    viable.erase(viable.begin() + 1, viable.end());
+    return false;
+  }
+
   // Attempt to solve again, capturing all states that come from our attempts to
   // select overloads or bind type variables.
   //
