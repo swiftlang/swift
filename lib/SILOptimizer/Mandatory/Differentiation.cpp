@@ -3948,9 +3948,18 @@ ADContext::declareExternalAssociatedFunction(
   auto *assocFn = fb.createFunction(
       SILLinkage::PublicExternal, name, assocFnTy,
       /*genericEnv*/ nullptr, originalLoc, original->isBare(), IsNotTransparent,
-      IsNotSerialized, original->isDynamicallyReplaceable());
+      original->isSerialized(), original->isDynamicallyReplaceable());
   // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
   assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
+  // Update associated function name in attribute.
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    attr->setJVPName(name);
+    break;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    attr->setVJPName(name);
+    break;
+  }
   return assocFn;
 }
 
@@ -3974,7 +3983,6 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
                        .getIdentifier("AD__" + original->getName().str() +
                                       "__jvp_" + getIndices().mangle())
                        .str();
-    attr->setJVPName(jvpName);
     jvp = context.declareExternalAssociatedFunction(
         original, attr, jvpName, AutoDiffAssociatedFunctionKind::JVP);
   }
@@ -3992,9 +4000,8 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
                        .getIdentifier("AD__" + original->getName().str() +
                                       "__vjp_" + getIndices().mangle())
                        .str();
-    attr->setVJPName(vjpName);
     vjp = context.declareExternalAssociatedFunction(
-        original, attr, vjpName, AutoDiffAssociatedFunctionKind::JVP);
+        original, attr, vjpName, AutoDiffAssociatedFunctionKind::VJP);
   }
 
   if (!jvp)
