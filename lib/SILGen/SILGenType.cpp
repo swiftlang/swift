@@ -969,7 +969,7 @@ public:
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::All,
-                               nullptr, /*sorted=*/true)) {
+                               nullptr, /*sorted=*/false)) {
       if (conformance->isComplete() &&
           isa<NormalProtocolConformance>(conformance))
         SGM.getWitnessTable(conformance);
@@ -1064,7 +1064,7 @@ public:
       // extension.
       for (auto *conformance : e->getLocalConformances(
                                  ConformanceLookupKind::All,
-                                 nullptr, /*sorted=*/true)) {
+                                 nullptr, /*sorted=*/false)) {
         if (conformance->isComplete() &&
             isa<NormalProtocolConformance>(conformance))
           SGM.getWitnessTable(conformance);
