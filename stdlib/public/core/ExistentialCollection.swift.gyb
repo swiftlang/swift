@@ -231,6 +231,13 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
+  @inlinable
+  internal func _withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    _abstract()
+  }  
+
 %   end
 
 % # This deinit has to be present on all the types
@@ -473,6 +480,12 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
     let (it,idx) = _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
+  @inlinable
+  internal override func _withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try _base.withContiguousStorageIfAvailable(body)
+  }  
 %   if Kind == 'Sequence':
   @inlinable
   internal override func _dropFirst(_ n: Int) -> _AnySequenceBox<Element> {
@@ -834,6 +847,13 @@ extension Any${Kind} {
     let (it,idx) = _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try _box._withContiguousStorageIfAvailable(body)
+  }  
 }
 % end
 
