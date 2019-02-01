@@ -159,9 +159,7 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
       C.getLazyResolver()->resolveDeclSignature(v);
     if (!v->getType())
       return false;
-    auto declType = v->getType()->hasArchetype()
-        ? v->getType()
-        : DC->mapTypeIntoContext(v->getType());
+    auto declType = DC->mapTypeIntoContext(v->getType());
     return (bool)TypeChecker::conformsToProtocol(declType, addArithProto, DC,
                                                  ConformanceCheckFlags::Used);
   });
