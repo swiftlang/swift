@@ -28,10 +28,11 @@
 namespace swift {
 namespace Demangle {
 
-/// Strip generic arguments from the "spine" of a context node, producing a
-/// bare context to be used in (e.g.) forming nominal type descriptors.
-NodePointer stripGenericArgsFromContextNode(NodePointer node,
-                                            NodeFactory &factory);
+enum class ImplMetatypeRepresentation {
+  Thin,
+  Thick,
+  ObjC,
+};
 
 /// Describe a function parameter, parameterized on the type
 /// representation.
@@ -76,6 +77,147 @@ public:
   }
 };
 
+enum class ImplParameterConvention {
+  Indirect_In,
+  Indirect_In_Constant,
+  Indirect_In_Guaranteed,
+  Indirect_Inout,
+  Indirect_InoutAliasable,
+  Direct_Owned,
+  Direct_Unowned,
+  Direct_Guaranteed,
+};
+
+/// Describe a lowered function parameter, parameterized on the type
+/// representation.
+template <typename BuiltType>
+class ImplFunctionParam {
+  ImplParameterConvention Convention;
+  BuiltType Type;
+
+public:
+  using ConventionType = ImplParameterConvention;
+
+  static Optional<ConventionType>
+  getConventionFromString(StringRef conventionString) {
+    if (conventionString == "@in")
+      return ConventionType::Indirect_In;
+    if (conventionString == "@in_constant")
+      return ConventionType::Indirect_In_Constant;
+    if (conventionString == "@in_guaranteed")
+      return ConventionType::Indirect_In_Guaranteed;
+    if (conventionString == "@inout")
+      return ConventionType::Indirect_Inout;
+    if (conventionString == "@inout_aliasable")
+      return ConventionType::Indirect_InoutAliasable;
+    if (conventionString == "@owned")
+      return ConventionType::Direct_Owned;
+    if (conventionString == "@unowned")
+      return ConventionType::Direct_Unowned;
+    if (conventionString == "@guaranteed")
+      return ConventionType::Direct_Guaranteed;
+
+    return None;
+  }
+
+  ImplFunctionParam(ImplParameterConvention convention, BuiltType type)
+      : Convention(convention), Type(type) {}
+
+  ImplParameterConvention getConvention() const { return Convention; }
+
+  BuiltType getType() const { return Type; }
+};
+
+enum class ImplResultConvention {
+  Indirect,
+  Owned,
+  Unowned,
+  UnownedInnerPointer,
+  Autoreleased,
+};
+
+/// Describe a lowered function result, parameterized on the type
+/// representation.
+template <typename BuiltType>
+class ImplFunctionResult {
+  ImplResultConvention Convention;
+  BuiltType Type;
+
+public:
+  using ConventionType = ImplResultConvention;
+
+  static Optional<ConventionType>
+  getConventionFromString(StringRef conventionString) {
+    if (conventionString == "@out")
+      return ConventionType::Indirect;
+    if (conventionString == "@owned")
+      return ConventionType::Owned;
+    if (conventionString == "@unowned")
+      return ConventionType::Unowned;
+    if (conventionString == "@unowned_inner_pointer")
+      return ConventionType::UnownedInnerPointer;
+    if (conventionString == "@autoreleased")
+      return ConventionType::Autoreleased;
+
+    return None;
+  }
+
+  ImplFunctionResult(ImplResultConvention convention, BuiltType type)
+      : Convention(convention), Type(type) {}
+
+  ImplResultConvention getConvention() const { return Convention; }
+
+  BuiltType getType() const { return Type; }
+};
+
+enum class ImplFunctionRepresentation {
+  Thick,
+  Block,
+  Thin,
+  CFunctionPointer,
+  Method,
+  ObjCMethod,
+  WitnessMethod,
+  Closure
+};
+
+class ImplFunctionTypeFlags {
+  unsigned Rep : 3;
+  unsigned Pseudogeneric : 1;
+  unsigned Escaping : 1;
+
+public:
+  ImplFunctionTypeFlags() : Rep(0), Pseudogeneric(0), Escaping(0) {}
+
+  ImplFunctionTypeFlags(ImplFunctionRepresentation rep,
+                        bool pseudogeneric, bool noescape)
+      : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape) {}
+
+  ImplFunctionTypeFlags
+  withRepresentation(ImplFunctionRepresentation rep) const {
+    return ImplFunctionTypeFlags(rep, Pseudogeneric, Escaping);
+  }
+
+  ImplFunctionTypeFlags
+  withEscaping() const {
+    return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep),
+                                 Pseudogeneric, true);
+  }
+  
+  ImplFunctionTypeFlags
+  withPseudogeneric() const {
+    return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep),
+                                 true, Escaping);
+  }
+
+  ImplFunctionRepresentation getRepresentation() const {
+    return ImplFunctionRepresentation(Rep);
+  }
+
+  bool isEscaping() const { return Escaping; }
+
+  bool isPseudogeneric() const { return Pseudogeneric; }
+};
 
 #if SWIFT_OBJC_INTEROP
 /// For a mangled node that refers to an Objective-C class or protocol,
@@ -109,7 +251,7 @@ static inline Optional<StringRef> getObjCClassOrProtocolName(
 template <typename BuilderType>
 class TypeDecoder {
   using BuiltType = typename BuilderType::BuiltType;
-  using BuiltNominalTypeDecl = typename BuilderType::BuiltNominalTypeDecl;
+  using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using NodeKind = Demangle::Node::Kind;
 
@@ -150,40 +292,27 @@ class TypeDecoder {
     }
     case NodeKind::Enum:
     case NodeKind::Structure:
-    case NodeKind::TypeAlias: // This can show up for imported Clang decls.
+    case NodeKind::TypeAlias:
     case NodeKind::TypeSymbolicReference:
     {
-      BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
+      BuiltTypeDecl typeDecl = BuiltTypeDecl();
       BuiltType parent = BuiltType();
-      if (!decodeMangledNominalType(Node, typeDecl, parent))
+      bool typeAlias = false;
+      if (!decodeMangledTypeDecl(Node, typeDecl, parent, typeAlias))
         return BuiltType();
+
+      if (typeAlias && Node->getKind() == NodeKind::TypeAlias)
+        return Builder.createTypeAliasType(typeDecl, parent);
 
       return Builder.createNominalType(typeDecl, parent);
     }
-    case NodeKind::BoundGenericClass:
-    {
-#if SWIFT_OBJC_INTEROP
-      if (Node->getNumChildren() >= 2) {
-        auto ChildNode = Node->getChild(0);
-        if (ChildNode->getKind() == NodeKind::Type &&
-            ChildNode->getNumChildren() > 0)
-          ChildNode = ChildNode->getChild(0);
 
-        if (auto mangledName = getObjCClassOrProtocolName(ChildNode))
-          return Builder.createObjCClassType(mangledName->str());
-      }
-#endif
-      LLVM_FALLTHROUGH;
-    }
     case NodeKind::BoundGenericEnum:
     case NodeKind::BoundGenericStructure:
+    case NodeKind::BoundGenericClass:
+    case NodeKind::BoundGenericTypeAlias:
     case NodeKind::BoundGenericOtherNominalType: {
       if (Node->getNumChildren() < 2)
-        return BuiltType();
-
-      BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
-      BuiltType parent = BuiltType();
-      if (!decodeMangledNominalType(Node->getChild(0), typeDecl, parent))
         return BuiltType();
 
       std::vector<BuiltType> args;
@@ -198,27 +327,83 @@ class TypeDecoder {
         args.push_back(paramType);
       }
 
+      auto ChildNode = Node->getChild(0);
+      if (ChildNode->getKind() == NodeKind::Type &&
+          ChildNode->getNumChildren() > 0)
+        ChildNode = ChildNode->getChild(0);
+
+#if SWIFT_OBJC_INTEROP
+      if (auto mangledName = getObjCClassOrProtocolName(ChildNode))
+        return Builder.createBoundGenericObjCClassType(mangledName->str(),
+                                                       args);
+#endif
+
+      BuiltTypeDecl typeDecl = BuiltTypeDecl();
+      BuiltType parent = BuiltType();
+      bool typeAlias = false;
+      if (!decodeMangledTypeDecl(ChildNode, typeDecl,
+                                 parent, typeAlias))
+        return BuiltType();
+
       return Builder.createBoundGenericType(typeDecl, args, parent);
+    }
+    case NodeKind::BoundGenericProtocol: {
+      // This is a special case. When you write a protocol typealias with a
+      // concrete type base, for example:
+      //
+      // protocol P { typealias A<T> = ... }
+      // struct S : P {}
+      // let x: S.A<Int> = ...
+      //
+      // The mangling tree looks like this:
+      //
+      // BoundGenericProtocol ---> BoundGenericTypeAlias
+      // |                         |
+      // |                         |
+      // --> Protocol: P           --> TypeAlias: A
+      // |                         |
+      // --> TypeList:             --> TypeList:
+      //     |                         |
+      //     --> Structure: S          --> Structure: Int
+      //
+      // When resolving the mangling tree to a decl, we strip off the
+      // BoundGenericProtocol's *argument*, leaving behind only the
+      // protocol reference.
+      //
+      // But when resolving it to a type, we want to *keep* the argument
+      // so that the parent type becomes 'S' and not 'P'.
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
+      const auto &genericArgs = Node->getChild(1);
+      if (genericArgs->getNumChildren() != 1)
+        return BuiltType();
+
+      return decodeMangledType(genericArgs->getChild(0));
     }
     case NodeKind::BuiltinTypeName: {
       auto mangledName = Demangle::mangleNode(Node);
-      return Builder.createBuiltinType(mangledName);
+      return Builder.createBuiltinType(Node->getText(), mangledName);
     }
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
       unsigned i = 0;
-      bool wasAbstract = false;
+      Optional<ImplMetatypeRepresentation> repr;
 
       // Handle lowered metatypes in a hackish way. If the representation
       // was not thin, force the resulting typeref to have a non-empty
       // representation.
       if (Node->getNumChildren() >= 2) {
-        auto repr = Node->getChild(i++);
-        if (repr->getKind() != NodeKind::MetatypeRepresentation ||
-            !repr->hasText())
+        auto reprNode = Node->getChild(i++);
+        if (reprNode->getKind() != NodeKind::MetatypeRepresentation ||
+            !reprNode->hasText())
           return BuiltType();
-        if (repr->getText() != "@thin")
-          wasAbstract = true;
+        if (reprNode->getText() == "@thin")
+          repr = ImplMetatypeRepresentation::Thin;
+        else if (reprNode->getText() == "@thick")
+          repr = ImplMetatypeRepresentation::Thick;
+        else if (reprNode->getText() == "@objc_metatype")
+          repr = ImplMetatypeRepresentation::ObjC;
       } else if (Node->getNumChildren() < 1) {
         return BuiltType();
       }
@@ -227,11 +412,9 @@ class TypeDecoder {
       if (!instance)
         return BuiltType();
       if (Node->getKind() == NodeKind::Metatype) {
-        return Builder.createMetatypeType(instance, wasAbstract);
+        return Builder.createMetatypeType(instance, repr);
       } else if (Node->getKind() == NodeKind::ExistentialMetatype) {
-        // FIXME: Ignore representation of existential metatype
-        // completely for now
-        return Builder.createExistentialMetatypeType(instance);
+        return Builder.createExistentialMetatypeType(instance, repr);
       } else {
         assert(false);
         return nullptr;
@@ -288,7 +471,16 @@ class TypeDecoder {
 
       return BuiltType();
     }
+    case NodeKind::DynamicSelf: {
+      if (Node->getNumChildren() != 1)
+        return BuiltType();
 
+      auto selfType = decodeMangledType(Node->getChild(0));
+      if (!selfType)
+        return BuiltType();
+
+      return Builder.createDynamicSelfType(selfType);
+    }
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();
       auto index = Node->getChild(1)->getIndex();
@@ -338,12 +530,11 @@ class TypeDecoder {
       return Builder.createFunctionType(parameters, result, flags);
     }
     case NodeKind::ImplFunctionType: {
-      // Minimal support for lowered function types. These come up in
-      // reflection as capture types. For the reflection library's
-      // purposes, the only part that matters is the convention.
-      //
-      // TODO: Do we want to reflect @escaping?
-      FunctionTypeFlags flags;
+      auto calleeConvention = ImplParameterConvention::Direct_Unowned;
+      std::vector<ImplFunctionParam<BuiltType>> parameters;
+      std::vector<ImplFunctionResult<BuiltType>> results;
+      std::vector<ImplFunctionResult<BuiltType>> errorResults;
+      ImplFunctionTypeFlags flags;
 
       for (unsigned i = 0; i < Node->getNumChildren(); i++) {
         auto child = Node->getChild(i);
@@ -354,7 +545,9 @@ class TypeDecoder {
 
           if (child->getText() == "@convention(thin)") {
             flags =
-              flags.withConvention(FunctionMetadataConvention::Thin);
+              flags.withRepresentation(ImplFunctionRepresentation::Thin);
+          } else if (child->getText() == "@callee_guaranteed") {
+            calleeConvention = ImplParameterConvention::Direct_Guaranteed;
           }
         } else if (child->getKind() == NodeKind::ImplFunctionAttribute) {
           if (!child->hasText())
@@ -363,24 +556,46 @@ class TypeDecoder {
           StringRef text = child->getText();
           if (text == "@convention(c)") {
             flags =
-              flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
+              flags.withRepresentation(ImplFunctionRepresentation::CFunctionPointer);
           } else if (text == "@convention(block)") {
             flags =
-              flags.withConvention(FunctionMetadataConvention::Block);
+              flags.withRepresentation(ImplFunctionRepresentation::Block);
           }
         } else if (child->getKind() == NodeKind::ImplEscaping) {
-          flags = flags.withEscaping(true);
+          flags = flags.withEscaping();
+        } else if (child->getKind() == NodeKind::ImplParameter) {
+          if (decodeImplFunctionPart(child, parameters))
+            return BuiltType();
+        } else if (child->getKind() == NodeKind::ImplResult) {
+          if (decodeImplFunctionPart(child, results))
+            return BuiltType();
+        } else if (child->getKind() == NodeKind::ImplErrorResult) {
+          if (decodeImplFunctionPart(child, errorResults))
+            return BuiltType();
+        } else {
+          return BuiltType();
         }
       }
 
-      // Completely punt on argument types and results.
-      std::vector<FunctionParam<BuiltType>> parameters;
+      Optional<ImplFunctionResult<BuiltType>> errorResult;
+      switch (errorResults.size()) {
+      case 0:
+        break;
+      case 1:
+        errorResult = errorResults.front();
+        break;
+      default:
+        return BuiltType();
+      }
 
-      std::vector<BuiltType> elements;
-      std::string labels;
-      auto result = Builder.createTupleType(elements, std::move(labels), false);
-
-      return Builder.createFunctionType(parameters, result, flags);
+      // TODO: Some cases not handled above, but *probably* they cannot
+      // appear as the types of values in SIL (yet?):
+      // - functions with yield returns
+      // - functions with generic signatures
+      // - foreign error conventions
+      return Builder.createImplFunctionType(calleeConvention,
+                                            parameters, results,
+                                            errorResult, flags);
     }
 
     case NodeKind::ArgumentTuple:
@@ -464,7 +679,7 @@ class TypeDecoder {
       auto member = Node->getChild(1)->getText();
       auto assocTypeChild = Node->getChild(1);
       if (assocTypeChild->getNumChildren() < 1)
-        return BuiltType();
+        return Builder.createDependentMemberType(member, base);
 
       auto protocol = decodeMangledProtocolType(assocTypeChild->getChild(0));
       if (!protocol)
@@ -516,7 +731,7 @@ class TypeDecoder {
     case NodeKind::SILBoxTypeWithLayout: {
       // TODO: Implement SILBoxTypeRefs with layout. As a stopgap, specify the
       // NativeObject type ref.
-      return Builder.createBuiltinType("Bo");
+      return Builder.createBuiltinType("Builtin.NativeObject", "Bo");
     }
     default:
       return BuiltType();
@@ -524,16 +739,41 @@ class TypeDecoder {
   }
 
 private:
-  bool decodeMangledNominalType(Demangle::NodePointer node,
-                                BuiltNominalTypeDecl &typeDecl,
-                                BuiltType &parent) {
-    if (node->getKind() == NodeKind::Type)
-      return decodeMangledNominalType(node->getChild(0), typeDecl, parent);
+  template <typename T>
+  bool decodeImplFunctionPart(Demangle::NodePointer node,
+                              std::vector<T> &results) {
+    if (node->getNumChildren() != 2)
+      return true;
+    
+    if (node->getChild(0)->getKind() != Node::Kind::ImplConvention ||
+        node->getChild(1)->getKind() != Node::Kind::Type)
+      return true;
 
-    Demangle::NodePointer nominalNode;
+    StringRef conventionString = node->getChild(0)->getText();
+    Optional<typename T::ConventionType> convention =
+        T::getConventionFromString(conventionString);
+    if (!convention)
+      return true;
+    BuiltType type = decodeMangledType(node->getChild(1));
+    if (!type)
+      return true;
+
+    results.emplace_back(*convention, type);
+    return false;
+  }
+
+  bool decodeMangledTypeDecl(Demangle::NodePointer node,
+                             BuiltTypeDecl &typeDecl,
+                             BuiltType &parent,
+                             bool &typeAlias) {
+    if (node->getKind() == NodeKind::Type)
+      return decodeMangledTypeDecl(node->getChild(0), typeDecl,
+                                   parent, typeAlias);
+
+    Demangle::NodePointer declNode;
     if (node->getKind() == NodeKind::TypeSymbolicReference) {
       // A symbolic reference can be directly resolved to a nominal type.
-      nominalNode = node;
+      declNode = node;
     } else {
       if (node->getNumChildren() < 2)
         return false;
@@ -545,7 +785,7 @@ private:
       // in addition to a reference to the parent type. The
       // mangled name already includes the module and parent
       // types, if any.
-      nominalNode = node;
+      declNode = node;
       switch (parentContext->getKind()) {
       case Node::Kind::Module:
         break;
@@ -559,12 +799,11 @@ private:
         parent = decodeMangledType(parentContext);
         // Remove any generic arguments from the context node, producing a
         // node that references the nominal type declaration.
-        nominalNode =
-          stripGenericArgsFromContextNode(node, Builder.getNodeFactory());
+        declNode = Demangle::getUnspecialized(node, Builder.getNodeFactory());
         break;
       }
     }
-    typeDecl = Builder.createNominalTypeDecl(nominalNode);
+    typeDecl = Builder.createTypeDecl(declNode, typeAlias);
     if (!typeDecl) return false;
 
     return true;

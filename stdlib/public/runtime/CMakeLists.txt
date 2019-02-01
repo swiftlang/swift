@@ -18,9 +18,6 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
-list(APPEND swift_runtime_compile_flags
-     "-D__SWIFT_CURRENT_DYLIB=swiftCore")
-
 set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
@@ -29,7 +26,6 @@ set(swift_runtime_objc_sources
     ObjCRuntimeGetImageNameFromClass.mm
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
     )
 
 set(swift_runtime_sources

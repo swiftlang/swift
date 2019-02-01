@@ -139,7 +139,7 @@ EXPECTED_DEFAULTS = {
     'install_symroot': None,
     'ios': False,
     'ios_all': False,
-    'legacy_impl': True,
+    'legacy_impl': False,
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
     'lit_args': '-sv',
@@ -413,7 +413,7 @@ EXPECTED_OPTIONS = [
     SetTrueOption('-n', dest='dry_run'),
     SetTrueOption('-p', dest='build_swiftpm'),
 
-    SetFalseOption('--no-legacy-impl', dest='legacy_impl'),
+    SetTrueOption('--legacy-impl', dest='legacy_impl'),
 
     EnableOption('--android'),
     EnableOption('--build-external-benchmarks'),

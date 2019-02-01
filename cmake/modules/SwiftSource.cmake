@@ -74,10 +74,6 @@ function(handle_swift_sources
     # <rdar://problem/15972329>
     list(APPEND swift_compile_flags "-force-single-frontend-invocation")
 
-    if(SWIFTSOURCES_IS_STDLIB_CORE)
-      list(APPEND swift_compile_flags "-Xcc" "-D__SWIFT_CURRENT_DYLIB=swiftCore")
-    endif()
-
     _compile_swift_files(
         dependency_target
         module_dependency_target
@@ -347,9 +343,16 @@ function(_compile_swift_files
     list(APPEND module_outputs "${interface_file}")
   endif()
 
+  set(optional_arg)
+  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+    # Allow installation of stdlib without building all variants on Darwin.
+    set(optional_arg "OPTIONAL")
+  endif()
+
   swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
     FILES ${module_outputs}
-    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+    "${optional_arg}")
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
   set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")

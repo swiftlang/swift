@@ -212,7 +212,7 @@ macro(configure_sdk_unix name architectures)
           message(FATAL_ERROR "unknown arch for ${prefix}: ${arch}")
         endif()
       elseif("${prefix}" STREQUAL "FREEBSD")
-        if(arch STREQUAL x86_64)
+        if(NOT arch STREQUAL x86_64)
           message(FATAL_ERROR "unsupported arch for FreeBSD: ${arch}")
         endif()
 

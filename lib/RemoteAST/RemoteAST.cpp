@@ -442,7 +442,7 @@ public:
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) override {
     if (auto result =
           Reader.readNominalTypeFromDescriptor(descriptor.getAddressData()))
-      return result;
+      return dyn_cast<NominalTypeDecl>((GenericTypeDecl *) result);
     return getFailure<NominalTypeDecl*>();
   }
 

@@ -278,6 +278,13 @@ def emit_tbd_path_EQ : Joined<["-"], "emit-tbd-path=">,
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Serialize diagnostics in a binary format">;
+def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
+  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Emit a serialized diagnostics file to <path>">,
+  MetaVarName<"<path>">;
+def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
+  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Alias<serialize_diagnostics_path>;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,

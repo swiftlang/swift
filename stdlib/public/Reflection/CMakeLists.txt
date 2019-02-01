@@ -9,8 +9,7 @@ set(swiftReflection_SOURCES
   "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp")
+  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
 
 # When we're building with assertions, include the demangle node dumper to aid
 # in debugging.

@@ -21,8 +21,8 @@ namespace swift {
 
 /// The name of the symbol that ErrorObject.mm will look up using dlsym. It uses
 /// this to locate various items related to Error bridging to NS/CFError.
-#define ERROR_BRIDGING_SYMBOL_NAME swift_errorBridgingInfo
-#define ERROR_BRIDGING_SYMBOL_NAME_STRING "swift_errorBridgingInfo"
+#define ERROR_BRIDGING_SYMBOL_NAME swift_errorBridgingInfo_
+#define ERROR_BRIDGING_SYMBOL_NAME_STRING "swift_errorBridgingInfo_"
 
 /// The items that ErrorObject.mm needs for bridging. The
 /// ERROR_BRIDGING_SYMBOL_NAME symbol will contain an instance of this struct.

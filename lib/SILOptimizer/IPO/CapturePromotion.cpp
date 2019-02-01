@@ -1212,10 +1212,12 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
 /// Change the base in mark_dependence.
 static void
 mapMarkDependenceArguments(SingleValueInstruction *root,
-                           llvm::DenseMap<SILValue, SILValue> &map) {
-  for (auto *Use : root->getUses()) {
+                           llvm::DenseMap<SILValue, SILValue> &map,
+                           SmallVectorImpl<SILInstruction *> &Delete) {
+  SmallVector<Operand *, 16> Uses(root->getUses());
+  for (auto *Use : Uses) {
     if (auto *MD = dyn_cast<MarkDependenceInst>(Use->getUser())) {
-      mapMarkDependenceArguments(MD, map);
+      mapMarkDependenceArguments(MD, map, Delete);
       auto iter = map.find(MD->getBase());
       if (iter != map.end()) {
         MD->setBase(iter->second);
@@ -1223,7 +1225,7 @@ mapMarkDependenceArguments(SingleValueInstruction *root,
       // Remove mark_dependence on trivial values.
       if (MD->getBase()->getType().isTrivial(MD->getModule())) {
         MD->replaceAllUsesWith(MD->getValue());
-        MD->eraseFromParent();
+        Delete.push_back(MD);
       }
     }
   }
@@ -1332,7 +1334,10 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
       }
     }
     // Map the mark dependence arguments.
-    mapMarkDependenceArguments(NewPAI, capturedMap);
+    SmallVector<SILInstruction *, 16> Delete;
+    mapMarkDependenceArguments(NewPAI, capturedMap, Delete);
+    for (auto *inst : Delete)
+      inst->eraseFromParent();
   }
 
   return ClonedFn;

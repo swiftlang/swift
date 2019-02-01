@@ -1317,19 +1317,22 @@ void LoadableStorageAllocation::allocateLoadableStorage() {
 SILArgument *LoadableStorageAllocation::replaceArgType(SILBuilder &argBuilder,
                                                        SILArgument *arg,
                                                        SILType newSILType) {
-  CopyValueInst *copyArg = argBuilder.createCopyValue(
-      RegularLocation(const_cast<ValueDecl *>(arg->getDecl())),
-      SILUndef::get(newSILType, pass.F->getModule()));
+  SILValue undef = SILUndef::get(newSILType, pass.F->getModule());
+  SmallVector<Operand *, 8> useList(arg->use_begin(), arg->use_end());
+  for (auto *use : useList) {
+    use->set(undef);
+  }
 
-  arg->replaceAllUsesWith(copyArg);
+  // Make sure that this is an argument we want to replace.
   assert(std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
                    arg) == pass.largeLoadableArgs.end());
 
   arg = arg->getParent()->replaceFunctionArgument(
       arg->getIndex(), newSILType, ValueOwnershipKind::Any, arg->getDecl());
 
-  copyArg->replaceAllUsesWith(arg);
-  copyArg->eraseFromParent();
+  for (auto *use : useList) {
+    use->set(arg);
+  }
 
   return arg;
 }
@@ -1384,16 +1387,17 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
 
 static void convertBBArgType(SILBuilder &argBuilder, SILType newSILType,
                              SILArgument *arg) {
-  CopyValueInst *copyArg = argBuilder.createCopyValue(
-      RegularLocation(const_cast<ValueDecl *>(arg->getDecl())),
-      SILUndef::get(newSILType, arg->getFunction()->getModule()));
+  SILValue undef = SILUndef::get(newSILType, argBuilder.getModule());
+  SmallVector<Operand *, 8> useList(arg->use_begin(), arg->use_end());
+  for (auto *use : useList) {
+    use->set(undef);
+  }
 
-  arg->replaceAllUsesWith(copyArg);
   arg = arg->getParent()->replacePhiArgument(arg->getIndex(), newSILType,
                                              arg->getOwnershipKind());
-
-  copyArg->replaceAllUsesWith(arg);
-  copyArg->eraseFromParent();
+  for (auto *use : useList) {
+    use->set(arg);
+  }
 }
 
 void LoadableStorageAllocation::convertApplyResults() {
@@ -1599,14 +1603,22 @@ class LoadableByAddress : public SILModuleTransform {
 
 private:
   void updateLoweredTypes(SILFunction *F);
-  void recreateSingleApply(SILInstruction *applyInst);
-  bool recreateApply(SILInstruction &I);
-  bool recreateConvInstr(SILInstruction &I);
-  bool recreateBuiltinInstr(SILInstruction &I);
-  bool recreateLoadInstr(SILInstruction &I);
-  bool recreateUncheckedEnumDataInstr(SILInstruction &I);
-  bool recreateUncheckedTakeEnumDataAddrInst(SILInstruction &I);
-  bool fixStoreToBlockStorageInstr(SILInstruction &I);
+  void recreateSingleApply(SILInstruction *applyInst,
+                           SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateApply(SILInstruction &I,
+                     SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateConvInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateBuiltinInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateLoadInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateUncheckedEnumDataInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateUncheckedTakeEnumDataAddrInst(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
+  bool fixStoreToBlockStorageInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
 
 private:
   llvm::SetVector<SILFunction *> modFuncs;
@@ -2369,7 +2381,8 @@ getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
   return op;
 }
 
-void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
+void LoadableByAddress::recreateSingleApply(
+    SILInstruction *applyInst, SmallVectorImpl<SILInstruction *> &Delete) {
   auto *F = applyInst->getFunction();
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
   // Collect common info
@@ -2380,7 +2393,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     // else verification will fail with wrong SubstCalleeType
     auto calleInstr = site.getInstruction();
     if (modApplies.remove(calleInstr)) {
-      recreateSingleApply(calleInstr);
+      recreateSingleApply(calleInstr, Delete);
       callee = applySite.getCallee();
     }
   }
@@ -2490,18 +2503,20 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   default:
     llvm_unreachable("Unexpected instr: unknown apply type");
   }
-  applyInst->getParent()->erase(applyInst);
+  Delete.push_back(applyInst);
 }
 
-bool LoadableByAddress::recreateApply(SILInstruction &I) {
+bool LoadableByAddress::recreateApply(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
   if (!modApplies.count(&I))
     return false;
-  recreateSingleApply(&I);
+  recreateSingleApply(&I, Delete);
   modApplies.remove(&I);
   return true;
 }
 
-bool LoadableByAddress::recreateLoadInstr(SILInstruction &I) {
+bool LoadableByAddress::recreateLoadInstr(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
   auto *loadInstr = dyn_cast<LoadInst>(&I);
   if (!loadInstr || !loadInstrsOfFunc.count(loadInstr))
     return false;
@@ -2515,11 +2530,12 @@ bool LoadableByAddress::recreateLoadInstr(SILInstruction &I) {
   auto *newInstr = loadBuilder.createLoad(loadInstr->getLoc(), loadOp,
                                           loadInstr->getOwnershipQualifier());
   loadInstr->replaceAllUsesWith(newInstr);
-  loadInstr->getParent()->erase(loadInstr);
+  Delete.push_back(loadInstr);
   return true;
 }
 
-bool LoadableByAddress::recreateUncheckedEnumDataInstr(SILInstruction &I) {
+bool LoadableByAddress::recreateUncheckedEnumDataInstr(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
   auto enumInstr = dyn_cast<UncheckedEnumDataInst>(&I);
   if (!enumInstr || !uncheckedEnumDataOfFunc.count(enumInstr))
     return false;
@@ -2547,12 +2563,12 @@ bool LoadableByAddress::recreateUncheckedEnumDataInstr(SILInstruction &I) {
         newType);
   }
   enumInstr->replaceAllUsesWith(newInstr);
-  enumInstr->getParent()->erase(enumInstr);
+  Delete.push_back(enumInstr);
   return false;
 }
 
 bool LoadableByAddress::recreateUncheckedTakeEnumDataAddrInst(
-    SILInstruction &I) {
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
   auto *enumInstr = dyn_cast<UncheckedTakeEnumDataAddrInst>(&I);
   if (!enumInstr || !uncheckedTakeEnumDataAddrOfFunc.count(enumInstr))
     return false;
@@ -2577,11 +2593,12 @@ bool LoadableByAddress::recreateUncheckedTakeEnumDataAddrInst(
         newType.getAddressType());
   }
   enumInstr->replaceAllUsesWith(newInstr);
-  enumInstr->getParent()->erase(enumInstr);
+  Delete.push_back(enumInstr);
   return true;
 }
 
-bool LoadableByAddress::fixStoreToBlockStorageInstr(SILInstruction &I) {
+bool LoadableByAddress::fixStoreToBlockStorageInstr(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
   auto *instr = dyn_cast<StoreInst>(&I);
   if (!instr || !storeToBlockStorageInstrs.count(instr))
     return false;
@@ -2600,7 +2617,8 @@ bool LoadableByAddress::fixStoreToBlockStorageInstr(SILInstruction &I) {
   return true;
 }
 
-bool LoadableByAddress::recreateConvInstr(SILInstruction &I) {
+bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete) {
   auto *convInstr = dyn_cast<SingleValueInstruction>(&I);
   if (!convInstr || !conversionInstrs.count(convInstr))
     return false;
@@ -2657,11 +2675,12 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I) {
     llvm_unreachable("Unexpected conversion instruction");
   }
   convInstr->replaceAllUsesWith(newInstr);
-  convInstr->getParent()->erase(convInstr);
+  Delete.push_back(convInstr);
   return true;
 }
 
-bool LoadableByAddress::recreateBuiltinInstr(SILInstruction &I) {
+bool LoadableByAddress::recreateBuiltinInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete) {
 	auto builtinInstr = dyn_cast<BuiltinInst>(&I);
   if (!builtinInstr || !builtinInstrs.count(builtinInstr))
     return false;
@@ -2682,7 +2701,7 @@ bool LoadableByAddress::recreateBuiltinInstr(SILInstruction &I) {
       builtinInstr->getLoc(), builtinInstr->getName(), newResultTy,
       builtinInstr->getSubstitutions(), newArgs);
   builtinInstr->replaceAllUsesWith(newInstr);
-  builtinInstr->getParent()->erase(builtinInstr);
+  Delete.push_back(builtinInstr);
   return true;
 }
 
@@ -2833,29 +2852,28 @@ void LoadableByAddress::run() {
   // Recreate the instructions in topological order. Some instructions inherit
   // their result type from their operand.
   for (SILFunction &CurrF : *getModule()) {
+    SmallVector<SILInstruction *, 32> Delete;
     for (SILBasicBlock &BB : CurrF) {
-      SmallVector<SILInstruction *, 32> InstInBlock;
-      for (auto &Inst : BB)
-        InstInBlock.push_back(&Inst);
-      for (SILInstruction *inst : InstInBlock) {
-        SILInstruction &I = *inst;
-        if (recreateConvInstr(I))
+      for (SILInstruction &I : BB) {
+        if (recreateConvInstr(I, Delete))
           continue;
-        else if (recreateBuiltinInstr(I))
+        else if (recreateBuiltinInstr(I, Delete))
           continue;
-        else if (recreateUncheckedEnumDataInstr(I))
+        else if (recreateUncheckedEnumDataInstr(I, Delete))
           continue;
-        else if (recreateUncheckedTakeEnumDataAddrInst(I))
+        else if (recreateUncheckedTakeEnumDataAddrInst(I, Delete))
           continue;
-        else if (recreateLoadInstr(I))
+        else if (recreateLoadInstr(I, Delete))
           continue;
-        else if (recreateApply(I))
+        else if (recreateApply(I, Delete))
           continue;
         else
-          fixStoreToBlockStorageInstr(I);
+          fixStoreToBlockStorageInstr(I, Delete);
       }
     }
-	}
+    for (auto *Inst : Delete)
+      Inst->eraseFromParent();
+  }
 
   // Clean up the data structs:
   modFuncs.clear();

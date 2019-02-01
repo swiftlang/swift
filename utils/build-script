@@ -531,9 +531,11 @@ class BuildScriptInvocation(object):
             # just invoke cmake from build-script directly rather than futzing
             # with build-script-impl. This makes even more sense since there
             # really isn't a security issue here.
-            impl_args += [
-                "--%s-cmake-options=%s" % (product_name, ' '.join(cmake_opts))
-            ]
+            if cmake_opts:
+                impl_args += [
+                    "--{}-cmake-options={}".format(
+                        product_name, ' '.join(cmake_opts))
+                ]
 
         if args.build_stdlib_deployment_targets:
             impl_args += [
@@ -844,16 +846,20 @@ class BuildScriptInvocation(object):
         product_classes.append(products.Swift)
         if self.args.build_lldb:
             product_classes.append(products.LLDB)
-        if self.args.build_llbuild:
-            product_classes.append(products.LLBuild)
         if self.args.build_libdispatch:
             product_classes.append(products.LibDispatch)
         if self.args.build_foundation:
             product_classes.append(products.Foundation)
         if self.args.build_xctest:
             product_classes.append(products.XCTest)
+        if self.args.build_llbuild:
+            product_classes.append(products.LLBuild)
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
+        if self.args.build_swiftsyntax:
+            product_classes.append(products.SwiftSyntax)
+        if self.args.build_skstresstester:
+            product_classes.append(products.SKStressTester)
         return product_classes
 
     def execute(self):
@@ -878,7 +884,7 @@ class BuildScriptInvocation(object):
                         name == "merged-hosts-lipo"), "invalid action"
                 action_name = name
             elif product_class is None:
-                assert name == "package", "invalid action"
+                assert name in ("package", "extractsymbols"), "invalid action"
                 action_name = "{}-{}".format(host.name, name)
             else:
                 assert name is not None, "invalid action"
@@ -929,6 +935,10 @@ class BuildScriptInvocation(object):
         for host_target in all_hosts:
             for product_class in product_classes:
                 execute_one_impl_action(host_target, product_class, "install")
+
+        # Extract symbols...
+        for host_target in all_hosts:
+            execute_one_impl_action(host_target, name="extractsymbols")
 
         # Package...
         for host_target in all_hosts:
@@ -993,8 +1003,13 @@ def main_preset():
         help="Print the expanded build-script invocation generated "
              "by the preset, but do not run the preset",
         action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--swiftsyntax-install-prefix",
+        help="specify the directory to where SwiftSyntax should be installed")
+    parser.add_argument(
+        "--build-dir",
+        help="specify the directory where build artifact should be stored")
     args = parser.parse_args()
-
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
             os.path.join(
@@ -1044,6 +1059,12 @@ def main_preset():
         build_script_args += ["--distcc"]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
+    if args.swiftsyntax_install_prefix:
+        build_script_args += ["--install-swiftsyntax",
+                              "--install-destdir",
+                              args.swiftsyntax_install_prefix]
+    if args.build_dir:
+        build_script_args += ["--build-dir", args.build_dir]
 
     diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
         args.preset, shell.quote_command(build_script_args)))

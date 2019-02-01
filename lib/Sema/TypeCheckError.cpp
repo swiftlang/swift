@@ -679,6 +679,16 @@ private:
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
 
+    // If this argument is `nil` literal or `.none`,
+    // it doesn't cause the call to throw.
+    if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(arg)) {
+      if (auto *DE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+        auto &ctx = paramType->getASTContext();
+        if (DE->getDecl() == ctx.getOptionalNoneDecl())
+          return Classification();
+      }
+    }
+
     // If the parameter was structurally a tuple, try to look through the
     // various tuple operations.
     if (auto paramTupleType = dyn_cast<TupleType>(paramType.getPointer())) {

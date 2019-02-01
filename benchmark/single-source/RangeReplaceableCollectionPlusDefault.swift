@@ -7,7 +7,8 @@ import TestsUtils
 public var RangeReplaceableCollectionPlusDefault = BenchmarkInfo(
   name: "RangeReplaceableCollectionPlusDefault",
   runFunction: run_RangeReplaceableCollectionPlusDefault,
-  tags: [.validation]
+  tags: [.validation],
+  legacyFactor: 4
 )
 
 @inline(never)
@@ -18,7 +19,7 @@ public func run_RangeReplaceableCollectionPlusDefault(_ N: Int) {
   var a = [Int]()
   var b = [Int]()
 
-  for _ in 1...1000*N {
+  for _ in 1...250*N {
     let a2: Array = mapSome(strings, toInt)
     let b2 = mapSome(strings, toInt)
     a = a2

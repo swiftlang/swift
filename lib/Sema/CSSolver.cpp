@@ -327,15 +327,11 @@ void truncate(llvm::SmallSetVector<T, N> &vec, unsigned newSize) {
 } // end anonymous namespace
 
 ConstraintSystem::SolverState::SolverState(
-    Expr *const expr, ConstraintSystem &cs,
-    FreeTypeVariableBinding allowFreeTypeVariables)
+    ConstraintSystem &cs, FreeTypeVariableBinding allowFreeTypeVariables)
     : CS(cs), AllowFreeTypeVariables(allowFreeTypeVariables) {
   assert(!CS.solverState &&
          "Constraint system should not already have solver state!");
   CS.solverState = this;
-
-  if (expr)
-    ExprWeights = expr->getDepthMap();
 
   ++NumSolutionAttempts;
   SolutionAttempt = NumSolutionAttempts;
@@ -498,12 +494,12 @@ Optional<Solution>
 ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
                               bool allowFixes) {
 
-  SolverState state(nullptr, *this, allowFreeTypeVariables);
+  SolverState state(*this, allowFreeTypeVariables);
   state.recordFixes = allowFixes;
 
   SmallVector<Solution, 4> solutions;
   solve(solutions);
-  filterSolutions(solutions, state.ExprWeights);
+  filterSolutions(solutions);
 
   if (solutions.size() != 1)
     return Optional<Solution>();
@@ -538,7 +534,7 @@ bool ConstraintSystem::Candidate::solve(
   };
 
   // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(TC, DC, None);
+  ConstraintSystem cs(TC, DC, None, E);
   cs.baseCS = &BaseCS;
 
   // Set up expression type checker timer for the candidate.
@@ -589,7 +585,7 @@ bool ConstraintSystem::Candidate::solve(
   // Try to solve the system and record all available solutions.
   llvm::SmallVector<Solution, 2> solutions;
   {
-    SolverState state(E, cs, FreeTypeVariableBinding::Allow);
+    SolverState state(cs, FreeTypeVariableBinding::Allow);
 
     // Use solve which doesn't try to filter solution list.
     // Because we want the whole set of possible domain choices.
@@ -1179,7 +1175,7 @@ bool ConstraintSystem::solve(Expr *const expr,
                              SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
   // Set up solver state.
-  SolverState state(expr, *this, allowFreeTypeVariables);
+  SolverState state(*this, allowFreeTypeVariables);
 
   // Solve the system.
   solve(solutions);
@@ -1200,7 +1196,7 @@ bool ConstraintSystem::solve(Expr *const expr,
   // a single best solution to use, if not explicitly disabled
   // by constraint system options.
   if (!retainAllSolutions())
-    filterSolutions(solutions, state.ExprWeights);
+    filterSolutions(solutions);
 
   // We fail if there is no solution or the expression was too complex.
   return solutions.empty() || getExpressionTooComplex(solutions);
@@ -1901,10 +1897,10 @@ Constraint *ConstraintSystem::selectDisjunction() {
   // disjunctions that we may not be able to short-circuit, allowing
   // us to eliminate behavior that is exponential in the number of
   // operators in the expression.
-  if (getASTContext().isSwiftVersionAtLeast(5) ||
-      TC.getLangOpts().SolverEnableOperatorDesignatedTypes)
+  if (TC.getLangOpts().SolverEnableOperatorDesignatedTypes) {
     if (auto *disjunction = selectApplyDisjunction())
       return disjunction;
+  }
 
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;

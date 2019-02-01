@@ -271,7 +271,10 @@ internal func sendStringLength() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let address = readUInt()
   let cString = UnsafePointer<CChar>(bitPattern: address)!
-  let count = String(validatingUTF8: cString)!.utf8.count
+  var count = 0
+  while cString[count] != CChar(0) {
+    count = count + 1
+  }
   sendValue(count)
 }
 

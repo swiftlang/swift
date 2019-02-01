@@ -761,7 +761,7 @@ ERROR(imported_decl_is_wrong_kind_typealias,none,
 ERROR(ambiguous_decl_in_module,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
 
-ERROR(module_not_testable,none,
+ERROR(module_not_testable,Fatal,
       "module %0 was not compiled for testing", (Identifier))
 
 ERROR(module_not_compiled_for_private_import,none,
@@ -1210,9 +1210,10 @@ WARNING(access_control_setter_redundant,none,
       "%1",
       (AccessLevel, DescriptiveDeclKind, AccessLevel))
 WARNING(access_control_ext_member_more,none,
-    "declaring %select{%error|a fileprivate|an internal|a public|open}0 %1 in "
-    "%select{a private|a fileprivate|an internal|a public|%error}2 extension",
-    (AccessLevel, DescriptiveDeclKind, AccessLevel))
+    "'%select{%error|fileprivate|internal|public|open}0' modifier conflicts "
+    "with extension's default access of "
+    "'%select{private|fileprivate|internal|public|%error}1'",
+    (AccessLevel, AccessLevel))
 WARNING(access_control_ext_member_redundant,none,
     "'%select{%error|fileprivate|internal|public|%error}0' modifier is redundant "
     "for %1 declared in %select{a private (equivalent to fileprivate)|a fileprivate"
@@ -2777,7 +2778,7 @@ ERROR(specific_type_of_expression_is_ambiguous,none,
 
 ERROR(failed_to_produce_diagnostic,Fatal,
       "failed to produce diagnostic for expression; "
-      "please file a bug report with your project", ())
+      "please file a bug report", ())
 
 
 ERROR(missing_protocol,none,
@@ -3171,6 +3172,12 @@ ERROR(continue_outside_loop,none,
       "'continue' is only allowed inside a loop", ())
 ERROR(continue_not_in_this_stmt,none,
       "'continue' cannot be used with %0 statements", (StringRef))
+
+ERROR(unresolved_label,none,
+      "use of unresolved label %0", (Identifier))
+ERROR(unresolved_label_corrected,none,
+      "use of unresolved label %0; did you mean %1?",
+      (Identifier, Identifier))
 
 // Switch Stmt
 ERROR(no_match_operator,none,
@@ -4181,8 +4188,8 @@ WARNING(immutable_value_never_used_but_assigned, none,
         (Identifier))
 WARNING(variable_never_mutated, none,
         "%select{variable|parameter}1 %0 was never mutated; "
-        "consider changing to 'let' constant",
-        (Identifier, unsigned))
+        "consider %select{removing 'var' to make it|changing to 'let'}2 constant",
+        (Identifier, unsigned, bool))
 WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
@@ -4239,9 +4246,13 @@ WARNING(non_exhaustive_switch_unknown_only,none,
         "switch covers known cases, but %0 may have additional unknown values"
         "%select{|, possibly added in future versions}1", (Type, bool))
 
-WARNING(override_nsobject_hashvalue,none,
+WARNING(override_nsobject_hashvalue_warning,none,
         "override of 'NSObject.hashValue' is deprecated; "
-        "override 'NSObject.hash' to get consistent hashing behavior", ())
+        "did you mean to override 'NSObject.hash'?", ())
+ERROR(override_nsobject_hashvalue_error,none,
+      "'NSObject.hashValue' is not overridable; "
+      "did you mean to override 'NSObject.hash'?", ())
+
 WARNING(hashvalue_implementation,none,
         "'Hashable.hashValue' is deprecated as a protocol requirement; "
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",

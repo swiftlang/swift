@@ -1052,6 +1052,8 @@ public:
   virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &results) const override;
 
+  virtual TypeDecl *lookupLocalType(llvm::StringRef MangledName) const override;
+
   virtual void
   getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;
 

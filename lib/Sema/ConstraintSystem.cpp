@@ -70,11 +70,15 @@ ExpressionTimer::~ExpressionTimer() {
 }
 
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
-                                   ConstraintSystemOptions options)
+                                   ConstraintSystemOptions options,
+                                   Expr *expr)
   : TC(tc), DC(dc), Options(options),
     Arena(tc.Context, Allocator),
     CG(*new ConstraintGraph(*this))
 {
+  if (expr)
+    ExprWeights = expr->getDepthMap();
+
   assert(DC && "context required");
 }
 
@@ -304,7 +308,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   switch (kind) {
 #define PROTOCOL_WITH_NAME(Id, Name) \
   case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name)
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, __, ___)
 #include "swift/AST/KnownProtocols.def"
 
   case KnownProtocolKind::ExpressibleByArrayLiteral:     index = 0; break;
@@ -334,7 +338,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   switch (kind) {
 #define PROTOCOL_WITH_NAME(Id, Name) \
   case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name)
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, __, ___)
 #include "swift/AST/KnownProtocols.def"
 
   case KnownProtocolKind::ExpressibleByArrayLiteral:
@@ -1628,6 +1632,77 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
   llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
 }
 
+/// \returns true if given declaration is an instance method marked as
+/// `mutating`, false otherwise.
+bool isMutatingMethod(const ValueDecl *decl) {
+  if (!(decl->isInstanceMember() && isa<FuncDecl>(decl)))
+    return false;
+  return cast<FuncDecl>(decl)->isMutating();
+}
+
+static bool shouldCheckForPartialApplication(ConstraintSystem &cs,
+                                             const ValueDecl *decl,
+                                             ConstraintLocator *locator) {
+  auto *anchor = locator->getAnchor();
+  if (!(anchor && isa<UnresolvedDotExpr>(anchor)))
+    return false;
+
+  // FIXME(diagnostics): This check should be removed together with
+  // expression based diagnostics.
+  if (cs.TC.isExprBeingDiagnosed(anchor))
+    return false;
+
+  // If this is a reference to instance method marked as 'mutating'
+  // it should be checked for invalid partial application.
+  if (isMutatingMethod(decl))
+    return true;
+
+  // Another unsupported partial application is related
+  // to constructor delegation via `self.init` or `super.init`.
+
+  if (!isa<ConstructorDecl>(decl))
+    return false;
+
+  auto *UDE = cast<UnresolvedDotExpr>(anchor);
+  // This is `super.init`
+  if (UDE->getBase()->isSuperExpr())
+    return true;
+
+  // Or this might be `self.init`.
+  if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+    if (auto *baseDecl = DRE->getDecl())
+      return baseDecl->getBaseName() == cs.getASTContext().Id_self;
+  }
+
+  return false;
+}
+
+/// Try to identify and fix failures related to partial function application
+/// e.g. partial application of `init` or 'mutating' instance methods.
+static std::pair<bool, unsigned>
+isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
+                            ConstraintLocator *locator) {
+  if (!shouldCheckForPartialApplication(cs, member, locator))
+    return {false, 0};
+
+  auto anchor = cast<UnresolvedDotExpr>(locator->getAnchor());
+  // If this choice is a partial application of `init` or
+  // `mutating` instance method we should report that it's not allowed.
+  auto baseTy =
+      cs.simplifyType(cs.getType(anchor->getBase()))->getWithoutSpecifierType();
+
+  // If base is a metatype it would be ignored (unless this is an initializer
+  // call), but if it is some other type it means that we have a single
+  // application level already.
+  unsigned level =
+      baseTy->is<MetatypeType>() && !isa<ConstructorDecl>(member) ? 0 : 1;
+  if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(anchor))) {
+    level += dyn_cast_or_null<CallExpr>(cs.getParentExpr(call)) ? 2 : 1;
+  }
+
+  return {true, level};
+}
+
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice,
@@ -1868,10 +1943,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
   
-  // If we're binding to an init member, the 'throws' need to line up between
-  // the bound and reference types.
   if (choice.isDecl()) {
     auto decl = choice.getDecl();
+    // If we're binding to an init member, the 'throws' need to line up between
+    // the bound and reference types.
     if (auto CD = dyn_cast<ConstructorDecl>(decl)) {
       auto boundFunctionType = boundType->getAs<AnyFunctionType>();
         
@@ -1880,6 +1955,41 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         boundType = boundFunctionType->withExtInfo(
             boundFunctionType->getExtInfo().withThrows());
       }
+    }
+
+    // Check whether applying this overload would result in invalid
+    // partial function application e.g. partial application of
+    // mutating method or initializer.
+
+    // This check is supposed to be performed without
+    // `shouldAttemptFixes` because name lookup can't
+    // detect that particular partial application is
+    // invalid, so it has to return all of the candidates.
+
+    bool isInvalidPartialApply;
+    unsigned level;
+
+    std::tie(isInvalidPartialApply, level) =
+        isInvalidPartialApplication(*this, decl, locator);
+
+    if (isInvalidPartialApply) {
+      // No application at all e.g. `Foo.bar`.
+      if (level == 0) {
+        // Swift 4 and earlier failed to diagnose a reference to a mutating
+        // method without any applications at all, which would get
+        // miscompiled into a function with undefined behavior. Warn for
+        // source compatibility.
+        bool isWarning = !getASTContext().isSwiftVersionAtLeast(5);
+        (void)recordFix(
+            AllowInvalidPartialApplication::create(isWarning, *this, locator));
+      } else if (level == 1) {
+        // `Self` parameter is applied, e.g. `foo.bar` or `Foo.bar(&foo)`
+        (void)recordFix(AllowInvalidPartialApplication::create(
+            /*isWarning=*/false, *this, locator));
+      }
+
+      // Otherwise both `Self` and arguments are applied,
+      // e.g. `foo.bar()` or `Foo.bar(&foo)()`, and there is nothing to do.
     }
   }
 
@@ -2063,7 +2173,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
   {
     // Set up solver state.
-    SolverState state(expr, *this, FreeTypeVariableBinding::Disallow);
+    SolverState state(*this, FreeTypeVariableBinding::Disallow);
     state.recordFixes = true;
 
     // Solve the system.
@@ -2071,8 +2181,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.
-    if (auto best = findBestSolution(viable, state.ExprWeights,
-                                     /*minimize=*/true)) {
+    if (auto best = findBestSolution(viable, /*minimize=*/true)) {
       if (*best != 0)
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());
@@ -2289,10 +2398,11 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
     if (it == indexMap.end())
       continue;
     unsigned index = it->second;
-    it = depthMap.find(anchor);
-    if (it == depthMap.end())
+
+    auto e = depthMap.find(anchor);
+    if (e == depthMap.end())
       continue;
-    unsigned depth = it->second;
+    unsigned depth = e->second.first;
 
     // If we don't have a name to hang on to, it'll be hard to diagnose this
     // overload.

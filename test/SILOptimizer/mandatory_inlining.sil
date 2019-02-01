@@ -507,11 +507,9 @@ bb0(%0 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeOb
 // CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
 // CHECK:   [[FN:%.*]] = function_ref @test_partial_nativeobject_baz :
 // CHECK:   strong_retain [[ARG]]
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[PAI:%.*]] = partial_apply [[FN]]([[ARG]])
 // CHECK:   strong_retain [[ARG]]
-// CHECK:   strong_retain [[PAI]]
-// CHECK:   strong_retain [[ARG]]
-// CHECK:   strong_release [[PAI]]
 // CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
 // CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG]], [[ARG]])
 // CHECK:   strong_retain [[PAI]]
@@ -597,7 +595,6 @@ bb0(%0 : ${ var Bool }):
 sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
 
 // CHECK-LABEL: sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
-
   // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 
 // CHECK: bb1:
@@ -608,12 +605,11 @@ sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: strong_retain [[OLD_CALLEE]]
   // Separation marker
   // CHECK: integer_literal $Builtin.Int32, 3
-  // CHECK: strong_retain [[VAL4:%[0-9]*]]
-  // CHECK: strong_release [[OLD_CALLEE]]
-  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
+  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4:%.*]] :
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
   // CHECK: strong_release [[VAL4]]
+  // CHECK: strong_release [[OLD_CALLEE]]
   // CHECK: br [[BB3]](
 
 // CHECK: [[BB3]](
@@ -655,12 +651,11 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: strong_retain [[OLD_CALLEE]]
   // Marker -
   // CHECK: integer_literal $Builtin.Int32, 3
-  // CHECK: strong_retain [[VAL4:%[0-9]*]]
-  // CHECK: strong_release [[OLD_CALLEE]]
-  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
+  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4:%[0-9]+]]
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
   // CHECK: strong_release [[VAL4]]
+  // CHECK: strong_release [[OLD_CALLEE]]
   // CHECK: br [[BB3]](
 
 // CHECK: [[BB3]](
@@ -1087,10 +1082,10 @@ bb0(%0 : $C):
 // CHECK-LABEL: sil @test_guaranteed_closure_capture
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK:   strong_retain [[ARG]] : $C
-// @guaranteed closure captures *don't* release the capture in the closure implementation.
-// CHECK-NOT:   strong_retain [[ARG]] : $C
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
 // CHECK:   apply [[F]]([[ARG]])
+// CHECK:   strong_release [[ARG]]
 // CHECK:   strong_release [[ARG]]
 // CHECK:   return
 sil @test_guaranteed_closure_capture : $@convention(thin) (@guaranteed C) -> () {
@@ -1106,12 +1101,12 @@ bb0(%0: $C):
 
 // CHECK-LABEL: sil @test_guaranteed_closure_capture2
 // CHECK: bb0([[ARG:%.*]] : $C):
-// @guaranteed closure captures *don't* release the capture in the closure implementation.
 // CHECK:   strong_retain [[ARG]] : $C
-// CHECK:   strong_release [[ARG]] : $C
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
 // CHECK:   apply [[F]]([[ARG]])
-// CHECK-NOT:   strong_release [[ARG]]
+// CHECK:   strong_release [[ARG]] : $C
+// CHECK:   strong_release [[ARG]] : $C
 // CHECK:   return
 sil @test_guaranteed_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0: $C):
@@ -1126,11 +1121,11 @@ bb0(%0: $C):
 // CHECK-LABEL: sil @test_unowned_closure_capture2
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK:   strong_retain [[ARG]]
-// CHECK:   strong_release [[ARG]]
-// CHECK-NOT: strong_release [[ARG]]
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c_unowned
 // CHECK:   apply [[F]]([[ARG]]) : $@convention(thin) (C) -> ()
-// CHECK-NOT: strong_release [[ARG]]
+// CHECK:   strong_release [[ARG]]
+// CHECK:   strong_release [[ARG]]
 // CHECK:   return
 sil @test_unowned_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0: $C):
@@ -1190,7 +1185,6 @@ bb0:
 // CHECK:  [[F:%.*]] = function_ref @use_c : $@convention(thin) (@guaranteed C) -> ()
 // CHECK:  apply [[F]](%0) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK:  strong_release %0 : $C
-// CHECK-NOT:  strong_release
 // CHECK: return
 sil @test_guaranteed_on_stack_closure : $@convention(thin) (@guaranteed C) ->  () {
 bb0(%0: $C):

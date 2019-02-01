@@ -153,11 +153,16 @@ public:
     appendOperator("MXX");
     return finalize();
   }
-  
+
+  std::string mangleContext(const DeclContext *DC) {
+    beginMangling();
+    appendContext(DC);
+    return finalize();
+  }
+
   std::string mangleBareProtocol(const ProtocolDecl *Decl) {
     beginMangling();
-    appendProtocolName(Decl, /*allowStandardSubstitution=*/false);
-    appendOperator("P");
+    appendAnyGenericType(Decl);
     return finalize();
   }
 

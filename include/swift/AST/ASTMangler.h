@@ -76,6 +76,15 @@ public:
   ASTMangler(bool DWARFMangling = false)
     : DWARFMangling(DWARFMangling) {}
 
+  void addTypeSubstitution(Type type) {
+    type = dropProtocolsFromAssociatedTypes(type);
+    addSubstitution(type.getPointer());
+  }
+  bool tryMangleTypeSubstitution(Type type) {
+    type = dropProtocolsFromAssociatedTypes(type);
+    return tryMangleSubstitution(type.getPointer());
+  }
+
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
 
@@ -155,9 +164,12 @@ public:
   
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
 
-  std::string mangleTypeAsUSR(Type type) {
-    return mangleTypeWithoutPrefix(type);
+  std::string mangleTypeWithoutPrefix(Type type) {
+    appendType(type);
+    return finalize();
   }
+
+  std::string mangleTypeAsUSR(Type decl);
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
@@ -166,6 +178,8 @@ public:
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,
                                         StringRef USRPrefix);
+
+  std::string mangleLocalTypeDecl(const TypeDecl *type);
 
   enum SpecialContext {
     ObjCContext,
@@ -261,6 +275,9 @@ protected:
                                    unsigned initialParamDepth,
                                    ArrayRef<Requirement> requirements);
 
+  DependentMemberType *dropProtocolFromAssociatedType(DependentMemberType *dmt);
+  Type dropProtocolsFromAssociatedTypes(Type type);
+
   void appendAssociatedTypeName(DependentMemberType *dmt);
 
   void appendClosureEntity(const SerializedAbstractClosureExpr *closure);
@@ -305,11 +322,6 @@ protected:
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
   void appendSymbolicReference(SymbolicReferent referent);
-  
-  std::string mangleTypeWithoutPrefix(Type type) {
-    appendType(type);
-    return finalize();
-  }
 };
 
 } // end namespace Mangle

@@ -63,6 +63,13 @@ func main () {
   // CHECK: [[GENERIC_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s9typealias11NotSpecificaySiGD"
   let g: NotSpecific<Int> = .value
   markUsed(g)
+
+  // Make sure we're not using the abbreviation for this obsolete type that was replaced with a typealias in Swift 4
+  //
+  // CHECK-DAG: !DILocalVariable(name: "h", {{.*}} type: [[UNICODE_SCALAR_TYPE:![0-9]+]])
+  // CHECK: [[UNICODE_SCALAR_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$ss13UnicodeScalaraD"
+  let h: UnicodeScalar = "a"
+  markUsed(h)
 }
 
 main()

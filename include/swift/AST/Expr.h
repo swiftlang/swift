@@ -524,10 +524,10 @@ public:
   /// the parent map.
   llvm::DenseMap<Expr *, Expr *> getParentMap();
 
-  /// Produce a mapping from each subexpression to its depth in the root
-  /// expression. The root expression has depth 0, its children have depth
-  /// 1, etc.
-  llvm::DenseMap<Expr *, unsigned> getDepthMap();
+  /// Produce a mapping from each subexpression to its depth and parent,
+  /// in the root expression. The root expression has depth 0, its children have
+  /// depth 1, etc.
+  llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> getDepthMap();
 
   /// Produce a mapping from each expression to its index according to a
   /// preorder traversal of the expressions. The parent has index 0, its first
@@ -711,6 +711,7 @@ public:
 ///
 class NilLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
+  ConcreteDeclRef Initializer;
 public:
   NilLiteralExpr(SourceLoc Loc, bool Implicit = false)
   : LiteralExpr(ExprKind::NilLiteral, Implicit), Loc(Loc) {
@@ -718,6 +719,15 @@ public:
   
   SourceRange getSourceRange() const {
     return Loc;
+  }
+
+  /// Retrieve the initializer that will be used to construct the 'nil'
+  /// literal from the result of the initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the 'nil' literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
   }
   
   static bool classof(const Expr *E) {

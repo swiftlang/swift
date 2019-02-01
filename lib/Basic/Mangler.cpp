@@ -180,19 +180,9 @@ void Mangler::verify(StringRef nameStr) {
   if (Remangled == nameStr)
     return;
 
-  // There are cases (e.g. with dependent associated types) which results in
-  // different remangled names. See ASTMangler::appendAssociatedTypeName.
-  // This is no problem for the compiler, but we have to be more tolerant for
-  // those cases. Instead we try to re-de-mangle the remangled name.
-  NodePointer RootOfRemangled = Dem.demangleSymbol(Remangled);
-  std::string ReDemangled = mangleNode(RootOfRemangled);
-  if (Remangled == ReDemangled)
-    return;
-
   llvm::errs() << "Remangling failed:\n"
                   "original     = " << nameStr << "\n"
-                  "remangled    = " << Remangled << "\n"
-                  "re-demangled = " << ReDemangled << '\n';
+                  "remangled    = " << Remangled << "\n";
   abort();
 #endif
 }

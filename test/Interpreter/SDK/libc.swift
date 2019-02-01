@@ -13,6 +13,8 @@
   import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
   import Glibc
+#elseif os(Windows)
+  import MSVCRT
 #endif
 
 let sourcePath = CommandLine.arguments[1]

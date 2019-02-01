@@ -91,8 +91,11 @@ public:
   Type getType(Expr *expr) const;
 
   /// Resolve type variables present in the raw type, if any.
-  Type resolveType(Type rawType) const {
-    return CS.simplifyType(rawType);
+  Type resolveType(Type rawType, bool reconstituteSugar = false) const {
+    auto resolvedType = CS.simplifyType(rawType);
+    return reconstituteSugar
+               ? resolvedType->reconstituteSugar(/*recursive*/ true)
+               : resolvedType;
   }
 
   template <typename... ArgTypes>
@@ -480,12 +483,25 @@ public:
 /// Diagnose failures related to use of the unwrapped optional types,
 /// which require some type of force-unwrap e.g. "!" or "try!".
 class MissingOptionalUnwrapFailure final : public FailureDiagnostic {
+  Type BaseType;
+  Type UnwrappedType;
+
 public:
-  MissingOptionalUnwrapFailure(Expr *expr, ConstraintSystem &cs,
-                               ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator) {}
+  MissingOptionalUnwrapFailure(Expr *expr, ConstraintSystem &cs, Type baseType,
+                               Type unwrappedType, ConstraintLocator *locator)
+      : FailureDiagnostic(expr, cs, locator), BaseType(baseType),
+        UnwrappedType(unwrappedType) {}
 
   bool diagnoseAsError() override;
+
+private:
+  Type getBaseType() const {
+    return resolveType(BaseType, /*reconstituteSugar=*/true);
+  }
+
+  Type getUnwrappedType() const {
+    return resolveType(UnwrappedType, /*reconstituteSugar=*/true);
+  }
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -699,6 +715,19 @@ public:
                                    DeclName memberName, ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), BaseType(baseType),
         Name(memberName) {}
+class PartialApplicationFailure final : public FailureDiagnostic {
+  enum RefKind : unsigned {
+    MutatingMethod,
+    SuperInit,
+    SelfInit,
+  };
+
+  bool CompatibilityWarning;
+
+public:
+  PartialApplicationFailure(Expr *root, bool warning, ConstraintSystem &cs,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), CompatibilityWarning(warning) {}
 
   bool diagnoseAsError() override;
 };

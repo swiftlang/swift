@@ -246,7 +246,7 @@ _findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
       return nullptr;
     node = node->getChild(0);
   }
-  node = stripGenericArgsFromContextNode(node, demangler);
+  node = Demangle::getUnspecialized(node, demangler);
 
   return _findNominalTypeDescriptor(node, demangler);
 }
@@ -939,13 +939,13 @@ public:
       substWitnessTable(substWitnessTable) { }
 
   using BuiltType = const Metadata *;
-  using BuiltNominalTypeDecl = const ContextDescriptor *;
+  using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
-  BuiltNominalTypeDecl createNominalTypeDecl(
-                                     const Demangle::NodePointer &node) const {
+  BuiltTypeDecl createTypeDecl(const Demangle::NodePointer &node,
+                               bool &typeAlias) const {
     // Look for a nominal type descriptor based on its mangled name.
     return _findNominalTypeDescriptor(node, demangler);
   }
@@ -987,14 +987,29 @@ public:
 #endif
   }
 
-  BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
+  BuiltType createBoundGenericObjCClassType(const std::string &mangledName,
+                                            ArrayRef<BuiltType> args) const {
+    // Generic arguments of lightweight Objective-C generic classes are not
+    // reified in the metadata.
+    return createObjCClassType(mangledName);
+  }
+
+  BuiltType createNominalType(BuiltTypeDecl metadataOrTypeDecl,
                               BuiltType parent) const {
     // Treat nominal type creation the same way as generic type creation,
     // but with no generic arguments at this level.
     return createBoundGenericType(metadataOrTypeDecl, { }, parent);
   }
 
-  BuiltType createBoundGenericType(BuiltNominalTypeDecl anyTypeDecl,
+  BuiltType createTypeAliasType(BuiltTypeDecl typeAliasDecl,
+                                BuiltType parent) const {
+    // We can't support sugared types here since we have no way to
+    // resolve the underlying type of the type alias. However, some
+    // CF types are mangled as type aliases.
+    return createNominalType(typeAliasDecl, parent);
+  }
+
+  BuiltType createBoundGenericType(BuiltTypeDecl anyTypeDecl,
                                    const ArrayRef<BuiltType> genericArgs,
                                    const BuiltType parent) const {
     auto typeDecl = dyn_cast<TypeContextDescriptor>(anyTypeDecl);
@@ -1083,7 +1098,8 @@ public:
     return accessFunction(MetadataState::Abstract, allGenericArgsVec).Value;
   }
 
-  BuiltType createBuiltinType(StringRef mangledName) const {
+  BuiltType createBuiltinType(StringRef builtinName,
+                              StringRef mangledName) const {
 #define BUILTIN_TYPE(Symbol, _) \
     if (mangledName.equals(#Symbol)) \
       return &METADATA_SYM(Symbol).base;
@@ -1091,11 +1107,13 @@ public:
     return BuiltType();
   }
 
-  BuiltType createMetatypeType(BuiltType instance, bool wasAbstract) const {
+  BuiltType createMetatypeType(BuiltType instance,
+              Optional<Demangle::ImplMetatypeRepresentation> repr=None) const {
     return swift_getMetatypeMetadata(instance);
   }
 
-  BuiltType createExistentialMetatypeType(BuiltType instance) const {
+  BuiltType createExistentialMetatypeType(BuiltType instance,
+              Optional<Demangle::ImplMetatypeRepresentation> repr=None) const {
     return swift_getExistentialMetatypeMetadata(instance);
   }
 
@@ -1117,6 +1135,11 @@ public:
 
     return swift_getExistentialTypeMetadata(classConstraint, superclass,
                                             protocols.size(), protocols.data());
+  }
+
+  BuiltType createDynamicSelfType(BuiltType selfType) const {
+    // Free-standing mangled type strings should not contain DynamicSelfType.
+    return BuiltType();
   }
 
   BuiltType createGenericTypeParameterType(unsigned depth,
@@ -1151,6 +1174,16 @@ public:
                                          result);
   }
 
+  BuiltType createImplFunctionType(
+    Demangle::ImplParameterConvention calleeConvention,
+    ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
+    ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
+    Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
+    ImplFunctionTypeFlags flags) {
+    // We can't realize the metadata for a SILFunctionType.
+    return BuiltType();
+  }
+
   BuiltType createTupleType(ArrayRef<BuiltType> elements,
                             std::string labels,
                             bool variadic) const {
@@ -1162,6 +1195,11 @@ public:
                                       flags, elements.data(),
                                       labels.empty() ? nullptr : labels.c_str(),
                                       /*proposedWitnesses=*/nullptr).Value;
+  }
+
+  BuiltType createDependentMemberType(StringRef name, BuiltType base) const {
+    // Should not have unresolved dependent member types here.
+    return BuiltType();
   }
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
@@ -1677,11 +1715,15 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       replacedFunctionKey->root.get());
 
   // Make sure this entry is not already enabled.
+  // This does not work until we make sure that when a dynamic library is
+  // unloaded all descriptors are removed.
+#if 0
   for (auto *curr = chainRoot; curr != nullptr; curr = curr->next) {
     if (curr == chainEntry.get()) {
       swift::swift_abortDynamicReplacementEnabling();
     }
   }
+#endif
 
   // Unlink the previous entry if we are not chaining.
   if (!shouldChain() && chainRoot->next) {

@@ -271,6 +271,42 @@ static void recordShadowedDeclsAfterSignatureMatch(
         }
       }
 
+      // The Foundation overlay introduced Data.withUnsafeBytes, which is
+      // treated as being ambiguous with SwiftNIO's Data.withUnsafeBytes
+      // extension. Apply a special-case name shadowing rule to use the
+      // latter rather than the former, which be the consequence of a more
+      // significant change to name shadowing in the future.
+      if (auto owningStruct1
+            = firstDecl->getDeclContext()->getSelfStructDecl()) {
+        if (auto owningStruct2
+              = secondDecl->getDeclContext()->getSelfStructDecl()) {
+          if (owningStruct1 == owningStruct2 &&
+              owningStruct1->getName().is("Data") &&
+              isa<FuncDecl>(firstDecl) && isa<FuncDecl>(secondDecl) &&
+              firstDecl->getFullName() == secondDecl->getFullName() &&
+              firstDecl->getBaseName().userFacingName() == "withUnsafeBytes") {
+            // If the second module is the Foundation module and the first
+            // is the NIOFoundationCompat module, the second is shadowed by the
+            // first.
+            if (firstDecl->getModuleContext()->getName()
+                  .is("NIOFoundationCompat") &&
+                secondDecl->getModuleContext()->getName().is("Foundation")) {
+              shadowed.insert(secondDecl);
+              continue;
+            }
+
+            // If it's the other way around, the first declaration is shadowed
+            // by the second.
+            if (secondDecl->getModuleContext()->getName()
+                  .is("NIOFoundationCompat") &&
+                firstDecl->getModuleContext()->getName().is("Foundation")) {
+              shadowed.insert(firstDecl);
+              break;
+            }
+          }
+        }
+      }
+
       // Prefer declarations in an overlay to similar declarations in
       // the Clang module it customizes.
       if (firstDecl->hasClangNode() != secondDecl->hasClangNode()) {
@@ -594,6 +630,14 @@ SelfBoundsFromWhereClauseRequest::evaluate(
   auto *extDecl = decl.dyn_cast<ExtensionDecl *>();
 
   DeclContext *dc = protoDecl ? (DeclContext *)protoDecl : (DeclContext *)extDecl;
+
+  // A protocol or extension 'where' clause can reference associated types of
+  // the protocol itself, so we have to start unqualified lookup from 'dc'.
+  //
+  // However, the right hand side of a 'Self' conformance constraint must be
+  // resolved before unqualified lookup into 'dc' can work, so we make an
+  // exception here and begin lookup from the parent context instead.
+  auto *lookupDC = dc->getParent();
   auto requirements = protoDecl ? protoDecl->getTrailingWhereClause()
                                 : extDecl->getTrailingWhereClause();
 
@@ -623,7 +667,7 @@ SelfBoundsFromWhereClauseRequest::evaluate(
     // Resolve the right-hand side.
     DirectlyReferencedTypeDecls rhsDecls;
     if (auto typeRepr = req.getConstraintRepr()) {
-      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, dc);
+      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, lookupDC);
     } else if (Type type = req.getConstraint()) {
       rhsDecls = directReferencesForType(type);
     }

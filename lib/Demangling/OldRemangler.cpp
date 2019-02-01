@@ -1350,7 +1350,7 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Out << 'w';
   } else if (stripPrefix(text, "Builtin.Int")) {
     Out << 'i' << text << '_';
-  } else if (stripPrefix(text, "Builtin.Float")) {
+  } else if (stripPrefix(text, "Builtin.FPIEEE")) {
     Out << 'f' << text << '_';
   } else if (stripPrefix(text, "Builtin.Vec")) {
     // Avoid using StringRef::split because its definition is not
@@ -1910,6 +1910,7 @@ void Remangler::mangleGenericArgs(Node *node, EntityContext &ctx) {
     break;
   }
 
+  case Node::Kind::AnonymousContext:
   case Node::Kind::Extension: {
     mangleGenericArgs(node->getChild(1), ctx);
     break;

@@ -55,10 +55,11 @@ import StdlibUnittest
 
 #if os(Linux)
   import Glibc
-  let dylibSuffix = "so"
+#elseif os(Windows)
+  import MSVCRT
+  import WinSDK
 #else
   import Darwin
-  let dylibSuffix = "dylib"
 #endif
 
 var DynamicallyReplaceable = TestSuite("DynamicallyReplaceable")
@@ -108,6 +109,16 @@ func checkExpectedResults(forOriginalLibrary useOrig: Bool) {
             expectedResult(useOrig, "public_enum_generic_func"))
 }
 
+private func target_library_name(_ name: String) -> String {
+#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+  return "lib\(name).dylib"
+#elseif os(Windows)
+  return "\(name).dll"
+#else
+  return "lib\(name).so"
+#endif
+}
+
 DynamicallyReplaceable.test("DynamicallyReplaceable") {
   var executablePath = CommandLine.arguments[0]
   executablePath.removeLast(4)
@@ -118,9 +129,11 @@ DynamicallyReplaceable.test("DynamicallyReplaceable") {
   // Now, test with the module containing the replacements.
 
 #if os(Linux)
-	_ = dlopen("libModule2."+dylibSuffix, RTLD_NOW)
+	_ = dlopen(target_library_name("Module2"), RTLD_NOW)
+#elseif os(Windows)
+        _ = LoadLibraryA(target_library_name("Module2"))
 #else
-	_ = dlopen(executablePath+"libModule2."+dylibSuffix, RTLD_NOW)
+	_ = dlopen(executablePath+target_library_name("Module2"), RTLD_NOW)
 #endif
 	checkExpectedResults(forOriginalLibrary: false)
 }

@@ -1,6 +1,7 @@
 Func _SmallString.computeIsASCII() has been removed
 Func _SmallString.withMutableCapacity(_:) has been removed
 Struct _StringObject.Discriminator has been removed
+Struct __swift_stdlib_UErrorCode has been removed
 Var _SmallString.discriminator has been removed
 Var _StringObject.CountAndFlags._storage has declared type change from UInt to UInt64
 Var _StringObject.CountAndFlags.countMask has declared type change from UInt to UInt64
@@ -73,3 +74,14 @@ Var _RawDictionaryStorage.empty has declared type change from _EmptyDictionarySi
 Var _RawSetStorage.empty has declared type change from _EmptySetSingleton to __EmptySetSingleton
 
 Func tryReallocateUniquelyReferenced(buffer:newMinimumCapacity:) has been removed
+
+Protocol SIMD has added inherited protocol Decodable
+Protocol SIMD has added inherited protocol Encodable
+Protocol SIMD has generic signature change from <τ_0_0 : CustomStringConvertible, τ_0_0 : ExpressibleByArrayLiteral, τ_0_0 : Hashable, τ_0_0 : SIMDStorage, τ_0_0.MaskStorage : SIMD, τ_0_0.MaskStorage.Scalar : FixedWidthInteger, τ_0_0.MaskStorage.Scalar : SignedInteger> to <τ_0_0 : CustomStringConvertible, τ_0_0 : Decodable, τ_0_0 : Encodable, τ_0_0 : ExpressibleByArrayLiteral, τ_0_0 : Hashable, τ_0_0 : SIMDStorage, τ_0_0.MaskStorage : SIMD, τ_0_0.MaskStorage.Scalar : FixedWidthInteger, τ_0_0.MaskStorage.Scalar : SignedInteger>
+Protocol SIMDStorage has generic signature change from <τ_0_0.Scalar : Hashable> to <τ_0_0.Scalar : Decodable, τ_0_0.Scalar : Encodable, τ_0_0.Scalar : Hashable>
+
+Func Sequence.flatMap(_:) has been removed
+Subscript String.UnicodeScalarView.subscript(_:) has been removed
+Subscript Substring.subscript(_:) has been removed
+
+Func Collection.makeIterator() has self access kind changing from NonMutating to __Consuming

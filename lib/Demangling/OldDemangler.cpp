@@ -1810,7 +1810,7 @@ private:
         if (demangleBuiltinSize(size)) {
           return Factory.createNode(
               Node::Kind::BuiltinTypeName,
-              std::move(DemanglerPrinter() << "Builtin.Float" << size).str());
+              std::move(DemanglerPrinter() << "Builtin.FPIEEE" << size).str());
         }
       }
       if (c == 'i') {

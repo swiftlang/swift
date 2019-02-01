@@ -238,44 +238,38 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       continue;
     }
 
-#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
-  if (isa<Load##Name##Inst>(User)) {                                           \
-    Uses.emplace_back(User, PMOUseKind::Load);                                 \
-    continue;                                                                  \
-  }
-#include "swift/AST/ReferenceStorage.def"
-
     // Stores *to* the allocation are writes.
-    if (isa<StoreInst>(User) && UI->getOperandNumber() == 1) {
-      if (PointeeType.is<TupleType>()) {
-        UsesToScalarize.push_back(User);
+    if (auto *si = dyn_cast<StoreInst>(User)) {
+      if (UI->getOperandNumber() == StoreInst::Dest) {
+        if (PointeeType.is<TupleType>()) {
+          UsesToScalarize.push_back(User);
+          continue;
+        }
+
+        auto kind = ([&]() -> PMOUseKind {
+          switch (si->getOwnershipQualifier()) {
+          // Coming out of SILGen, we assume that raw stores are
+          // initializations, unless they have trivial type (which we classify
+          // as InitOrAssign).
+          case StoreOwnershipQualifier::Unqualified:
+            if (PointeeType.isTrivial(User->getModule()))
+              return PMOUseKind::InitOrAssign;
+            return PMOUseKind::Initialization;
+
+          case StoreOwnershipQualifier::Init:
+            return PMOUseKind::Initialization;
+
+          case StoreOwnershipQualifier::Assign:
+            return PMOUseKind::Assign;
+
+          case StoreOwnershipQualifier::Trivial:
+            return PMOUseKind::InitOrAssign;
+          }
+        })();
+        Uses.emplace_back(si, kind);
         continue;
       }
-
-      // Coming out of SILGen, we assume that raw stores are initializations,
-      // unless they have trivial type (which we classify as InitOrAssign).
-      auto Kind = ([&]() -> PMOUseKind {
-        if (PointeeType.isTrivial(User->getModule()))
-          return PMOUseKind::InitOrAssign;
-        return PMOUseKind::Initialization;
-      })();
-      Uses.emplace_back(User, Kind);
-      continue;
     }
-
-#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
-  if (auto *SI = dyn_cast<Store##Name##Inst>(User)) {                          \
-    if (UI->getOperandNumber() == 1) {                                         \
-      PMOUseKind Kind;                                                         \
-      if (SI->isInitializationOfDest())                                        \
-        Kind = PMOUseKind::Initialization;                                     \
-      else                                                                     \
-        Kind = PMOUseKind::Assign;                                             \
-      Uses.emplace_back(User, Kind);                                           \
-      continue;                                                                \
-    }                                                                          \
-  }
-#include "swift/AST/ReferenceStorage.def"
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't
@@ -294,6 +288,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       auto Kind = ([&]() -> PMOUseKind {
         if (UI->getOperandNumber() == CopyAddrInst::Src)
           return PMOUseKind::Load;
+        if (PointeeType.isTrivial(CAI->getModule()))
+          return PMOUseKind::InitOrAssign;
         if (CAI->isInitializationOfDest())
           return PMOUseKind::Initialization;
         return PMOUseKind::Assign;

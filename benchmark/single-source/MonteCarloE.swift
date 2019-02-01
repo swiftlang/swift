@@ -22,10 +22,11 @@ import TestsUtils
 public let MonteCarloE = BenchmarkInfo(
   name: "MonteCarloE",
   runFunction: run_MonteCarloE,
-  tags: [.validation, .algorithm])
+  tags: [.validation, .algorithm],
+  legacyFactor: 20)
 
 public func run_MonteCarloE(scale: Int) {
-  let N = 200000*scale
+  let N = 10_000*scale
   var intervals = [Bool](repeating: false, count: N)
   for _ in 1...N {
     let pos = Int(UInt(truncatingIfNeeded: Random())%UInt(N))
@@ -37,5 +38,5 @@ public func run_MonteCarloE(scale: Int) {
   CheckResults(numEmptyIntervals != N)
   let e_estimate = Double(N)/Double(numEmptyIntervals)
   let e = 2.71828
-  CheckResults(abs(e_estimate - e) < 0.1)
+  CheckResults(abs(e_estimate - e) < 0.2)
 }

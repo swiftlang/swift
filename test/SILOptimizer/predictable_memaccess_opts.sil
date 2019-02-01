@@ -1,0 +1,531 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-sil-ownership -predictable-memaccess-opts %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+
+struct NativeObjectPair {
+  var x: Klass
+  var y: Klass
+}
+
+/// Needed to avoid tuple scalarization code in the use gatherer.
+struct KlassAndTuple {
+  var first: Klass
+  var second: (Klass, Klass)
+}
+
+///////////
+// Tests //
+///////////
+
+//===---
+// Fully Available Leaf Node Values
+//
+
+// CHECK-LABEL: sil [ossa] @simple_trivial_load_promotion : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   return [[ARG]]
+// CHECK: } // end sil function 'simple_trivial_load_promotion'
+sil [ossa] @simple_trivial_load_promotion : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %1 = alloc_stack $Builtin.Int32
+  store %0 to [trivial] %1 : $*Builtin.Int32
+  %2 = load [trivial] %1 : $*Builtin.Int32
+  dealloc_stack %1 : $*Builtin.Int32
+  return %2 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @simple_nontrivial_load_promotion : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack $Klass
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   store [[ARG]] to [init] [[STACK]]
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[ARG_COPY]]
+// CHECK: } // end sil function 'simple_nontrivial_load_promotion'
+sil [ossa] @simple_nontrivial_load_promotion : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load [copy] %1 : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  return %2 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @struct_nontrivial_load_promotion : $@convention(thin) (@owned Klass, @owned Klass) -> @owned NativeObjectPair {
+// CHECK: bb0([[ARG1:%.*]] : @owned $Klass, [[ARG2:%.*]] : @owned $Klass):
+// CHECK:   [[STACK:%.*]] = alloc_stack $NativeObjectPair
+// CHECK:   [[FIRST_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[SECOND_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [init] [[FIRST_ADDR]]
+// CHECK:   [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK:   store [[ARG2]] to [init] [[SECOND_ADDR]]
+// CHECK:   [[RESULT:%.*]] = struct $NativeObjectPair ([[ARG1_COPY:%.*]] : $Klass, [[ARG2_COPY:%.*]] : $Klass)
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'struct_nontrivial_load_promotion'
+sil [ossa] @struct_nontrivial_load_promotion : $@convention(thin) (@owned Klass, @owned Klass) -> @owned NativeObjectPair {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $NativeObjectPair
+  %3 = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.x
+  %4 = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.y
+  store %0 to [init] %3 : $*Klass
+  store %1 to [init] %4 : $*Klass
+  %5 = load [copy] %2 : $*NativeObjectPair
+  destroy_addr %2 : $*NativeObjectPair
+  dealloc_stack %2 : $*NativeObjectPair
+  return %5 : $NativeObjectPair
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_nontrivial_load_promotion : $@convention(thin) (@owned Klass, @owned Klass) -> @owned (Klass, Klass) {
+// CHECK: bb0([[ARG1:%.*]] : @owned $Klass, [[ARG2:%.*]] : @owned $Klass):
+// CHECK:   [[STACK:%.*]] = alloc_stack $(Klass, Klass)
+// CHECK:   [[FIRST_ADDR:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   [[SECOND_ADDR:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [init] [[FIRST_ADDR]]
+// CHECK:   [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK:   store [[ARG2]] to [init] [[SECOND_ADDR]]
+// CHECK:   [[RESULT:%.*]] = tuple ([[ARG1_COPY:%.*]] : $Klass, [[ARG2_COPY:%.*]] : $Klass)
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'tuple_nontrivial_load_promotion'
+sil [ossa] @tuple_nontrivial_load_promotion : $@convention(thin) (@owned Klass, @owned Klass) -> @owned (Klass, Klass) {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $(Klass, Klass)
+  %3 = tuple_element_addr %2 : $*(Klass, Klass), 0
+  %4 = tuple_element_addr %2 : $*(Klass, Klass), 1
+  store %0 to [init] %3 : $*Klass
+  store %1 to [init] %4 : $*Klass
+  %5 = load [copy] %2 : $*(Klass, Klass)
+  destroy_addr %2 : $*(Klass, Klass)
+  dealloc_stack %2 : $*(Klass, Klass)
+  return %5 : $(Klass, Klass)
+}
+
+// CHECK-LABEL: sil [ossa] @simple_nontrivial_load_promotion_multi_insertpt : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack $Klass
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   store [[ARG]] to [init] [[STACK]]
+// CHECK:   br bb3([[ARG_COPY]] :
+//
+// CHECK: bb2:
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   store [[ARG]] to [init] [[STACK]]
+// CHECK:   br bb3([[ARG_COPY]] :
+//
+// CHECK: bb3([[RESULT:%.*]] : @owned $Klass):
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'simple_nontrivial_load_promotion_multi_insertpt'
+sil [ossa] @simple_nontrivial_load_promotion_multi_insertpt : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0 to [init] %1 : $*Klass
+  br bb3
+
+bb2:
+  store %0 to [init] %1 : $*Klass
+  br bb3
+
+bb3:
+  %2 = load [copy] %1 : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  return %2 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @struct_nontrivial_load_promotion_multi_insertpt : $@convention(thin) (@owned Klass, @owned Klass) -> @owned NativeObjectPair {
+// CHECK: bb0([[ARG1:%.*]] : @owned $Klass, [[ARG2:%.*]] : @owned $Klass):
+// CHECK:   [[STACK:%.*]] = alloc_stack $NativeObjectPair
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   [[FIRST_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[SECOND_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [init] [[FIRST_ADDR]]
+// CHECK:   [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK:   store [[ARG2]] to [init] [[SECOND_ADDR]]
+// CHECK:   br bb3([[ARG1_COPY]] : $Klass, [[ARG2_COPY]] : $Klass)
+//
+// CHECK: bb2:
+// CHECK:   [[FIRST_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[SECOND_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [init] [[FIRST_ADDR]]
+// CHECK:   [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK:   store [[ARG2]] to [init] [[SECOND_ADDR]]
+// CHECK:   br bb3([[ARG1_COPY]] : $Klass, [[ARG2_COPY]] : $Klass)
+//
+// CHECK: bb3([[ARG1_COPY:%.*]] : @owned $Klass, [[ARG2_COPY:%.*]] : @owned $Klass):
+// CHECK:   [[RESULT:%.*]] = struct $NativeObjectPair ([[ARG1_COPY:%.*]] : $Klass, [[ARG2_COPY:%.*]] : $Klass)
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'struct_nontrivial_load_promotion_multi_insertpt'
+sil [ossa] @struct_nontrivial_load_promotion_multi_insertpt : $@convention(thin) (@owned Klass, @owned Klass) -> @owned NativeObjectPair {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $NativeObjectPair
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.x
+  %4a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.y
+  store %0 to [init] %3a : $*Klass
+  store %1 to [init] %4a : $*Klass
+  br bb3
+
+bb2:
+  %3b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.x
+  %4b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.y
+  store %0 to [init] %3b : $*Klass
+  store %1 to [init] %4b : $*Klass
+  br bb3
+
+bb3:
+  %5 = load [copy] %2 : $*NativeObjectPair
+  destroy_addr %2 : $*NativeObjectPair
+  dealloc_stack %2 : $*NativeObjectPair
+  return %5 : $NativeObjectPair
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_nontrivial_load_promotion_multi_insertpt : $@convention(thin) (@owned Klass, @owned Klass) -> @owned (Klass, Klass) {
+// CHECK: bb0([[ARG1:%.*]] : @owned $Klass, [[ARG2:%.*]] : @owned $Klass):
+// CHECK:   [[STACK:%.*]] = alloc_stack $(Klass, Klass)
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   [[FIRST_ADDR:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   [[SECOND_ADDR:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [init] [[FIRST_ADDR]]
+// CHECK:   [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK:   store [[ARG2]] to [init] [[SECOND_ADDR]]
+// CHECK:   br bb3([[ARG1_COPY]] : $Klass, [[ARG2_COPY]] : $Klass)
+//
+// CHECK: bb2:
+// CHECK:   [[FIRST_ADDR:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   [[SECOND_ADDR:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [init] [[FIRST_ADDR]]
+// CHECK:   [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK:   store [[ARG2]] to [init] [[SECOND_ADDR]]
+// CHECK:   br bb3([[ARG1_COPY]] : $Klass, [[ARG2_COPY]] : $Klass)
+//
+// CHECK: bb3([[ARG1_COPY:%.*]] : @owned $Klass, [[ARG2_COPY:%.*]] : @owned $Klass):
+// CHECK:   [[RESULT:%.*]] = tuple ([[ARG1_COPY:%.*]] : $Klass, [[ARG2_COPY:%.*]] : $Klass)
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'tuple_nontrivial_load_promotion_multi_insertpt'
+sil [ossa] @tuple_nontrivial_load_promotion_multi_insertpt : $@convention(thin) (@owned Klass, @owned Klass) -> @owned (Klass, Klass) {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $(Klass, Klass)
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3a = tuple_element_addr %2 : $*(Klass, Klass), 0
+  %4a = tuple_element_addr %2 : $*(Klass, Klass), 1
+  store %0 to [init] %3a : $*Klass
+  store %1 to [init] %4a : $*Klass
+  br bb3
+
+bb2:
+  %3b = tuple_element_addr %2 : $*(Klass, Klass), 0
+  %4b = tuple_element_addr %2 : $*(Klass, Klass), 1
+  store %0 to [init] %3b : $*Klass
+  store %1 to [init] %4b : $*Klass
+  br bb3
+
+bb3:
+  %5 = load [copy] %2 : $*(Klass, Klass)
+  destroy_addr %2 : $*(Klass, Klass)
+  dealloc_stack %2 : $*(Klass, Klass)
+  return %5 : $(Klass, Klass)
+}
+
+//===---
+// Value Not Fully Available
+//
+
+// CHECK-LABEL: sil [ossa] @struct_nontrivial_load_promotion_multi_insertpt_value_not_fully_available : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> @owned NativeObjectPair {
+// CHECK: bb0([[ARG1:%.*]] : @owned $Klass, [[ARG2:%.*]] : @owned $Klass, [[ARG3:%.*]] : @owned $Klass):
+// CHECK:   [[STACK:%.*]] = alloc_stack $NativeObjectPair
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   [[FIRST_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[SECOND_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [init] [[FIRST_ADDR]]
+// CHECK:   store [[ARG2]] to [init] [[SECOND_ADDR]]
+// CHECK:   destroy_value [[ARG3]]
+// CHECK:   br bb3([[ARG1_COPY]] : $Klass)
+//
+// CHECK: bb2:
+// CHECK:   [[FIRST_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[SECOND_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [init] [[FIRST_ADDR]]
+// CHECK:   destroy_value [[ARG2]]
+// CHECK:   store [[ARG3]] to [init] [[SECOND_ADDR]]
+// CHECK:   br bb3([[ARG1_COPY]] : $Klass)
+//
+// CHECK: bb3([[ARG1_COPY:%.*]] : @owned $Klass):
+// CHECK:   [[SECOND_ADDR:%.*]] = struct_element_addr [[STACK]]
+// CHECK:   [[SECOND_VAL_COPY:%.*]] = load [copy] [[SECOND_ADDR]]
+// CHECK:   [[RESULT:%.*]] = struct $NativeObjectPair ([[ARG1_COPY:%.*]] : $Klass, [[SECOND_VAL_COPY]] : $Klass)
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'struct_nontrivial_load_promotion_multi_insertpt_value_not_fully_available'
+sil [ossa] @struct_nontrivial_load_promotion_multi_insertpt_value_not_fully_available : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> @owned NativeObjectPair {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %arg2 : @owned $Klass):
+  %2 = alloc_stack $NativeObjectPair
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.x
+  %4a = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.y
+  store %0 to [init] %3a : $*Klass
+  store %1 to [init] %4a : $*Klass
+  destroy_value %arg2 : $Klass
+  br bb3
+
+bb2:
+  %3b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.x
+  %4b = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.y
+  store %0 to [init] %3b : $*Klass
+  destroy_value %1 : $Klass
+  store %arg2 to [init] %4b : $*Klass
+  br bb3
+
+bb3:
+  %5 = load [copy] %2 : $*NativeObjectPair
+  destroy_addr %2 : $*NativeObjectPair
+  dealloc_stack %2 : $*NativeObjectPair
+  return %5 : $NativeObjectPair
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_nontrivial_load_promotion_multi_insertpt_value_not_fully_available : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> @owned (Klass, Klass) {
+// CHECK: bb0([[ARG1:%.*]] : @owned $Klass, [[ARG2:%.*]] : @owned $Klass, [[ARG3:%.*]] : @owned $Klass):
+// CHECK:   [[STACK:%.*]] = alloc_stack $(Klass, Klass)
+// This is here b/c we scalarize loads in our use list. Really, PMO shouldn't scalarize.
+// CHECK:   [[SCALARIZED_TUPLE_GEP:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   [[FIRST_ADDR:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   [[SECOND_ADDR:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [init] [[FIRST_ADDR]]
+// CHECK:   store [[ARG2]] to [init] [[SECOND_ADDR]]
+// CHECK:   destroy_value [[ARG3]]
+// CHECK:   br bb3([[ARG1_COPY]] : $Klass)
+//
+// CHECK: bb2:
+// CHECK:   [[FIRST_ADDR:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   [[SECOND_ADDR:%.*]] = tuple_element_addr [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [init] [[FIRST_ADDR]]
+// CHECK:   destroy_value [[ARG2]]
+// CHECK:   store [[ARG3]] to [init] [[SECOND_ADDR]]
+// CHECK:   br bb3([[ARG1_COPY]] : $Klass)
+//
+// CHECK: bb3([[ARG1_COPY:%.*]] : @owned $Klass):
+// CHECK:   [[SECOND_VAL_COPY:%.*]] = load [copy] [[SCALARIZED_TUPLE_GEP]]
+// CHECK:   [[RESULT:%.*]] = tuple ([[ARG1_COPY:%.*]] : $Klass, [[SECOND_VAL_COPY]] : $Klass)
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'tuple_nontrivial_load_promotion_multi_insertpt_value_not_fully_available'
+sil [ossa] @tuple_nontrivial_load_promotion_multi_insertpt_value_not_fully_available : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> @owned (Klass, Klass) {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %arg2 : @owned $Klass):
+  %2 = alloc_stack $(Klass, Klass)
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3a = tuple_element_addr %2 : $*(Klass, Klass), 0
+  %4a = tuple_element_addr %2 : $*(Klass, Klass), 1
+  store %0 to [init] %3a : $*Klass
+  store %1 to [init] %4a : $*Klass
+  destroy_value %arg2 : $Klass
+  br bb3
+
+bb2:
+  %3b = tuple_element_addr %2 : $*(Klass, Klass), 0
+  %4b = tuple_element_addr %2 : $*(Klass, Klass), 1
+  store %0 to [init] %3b : $*Klass
+  destroy_value %1 : $Klass
+  store %arg2 to [init] %4b : $*Klass
+  br bb3
+
+bb3:
+  %5 = load [copy] %2 : $*(Klass, Klass)
+  destroy_addr %2 : $*(Klass, Klass)
+  dealloc_stack %2 : $*(Klass, Klass)
+  return %5 : $(Klass, Klass)
+}
+
+//===---
+// Tests For Partial Uses Of Available Value
+//
+
+// CHECK-LABEL: sil [ossa] @simple_partialstructuse_load_promotion : $@convention(thin) (@owned NativeObjectPair) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] : @owned $NativeObjectPair):
+// CHECK:   [[STACK:%.*]] = alloc_stack
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[BORROWED_ARG_FIELD:%.*]] = struct_extract [[BORROWED_ARG]]
+// CHECK:   [[COPIED_ARG_FIELD:%.*]] = copy_value [[BORROWED_ARG_FIELD]]
+// CHECK:   end_borrow [[BORROWED_ARG]]
+// CHECK:   store [[ARG]] to [init] [[STACK]]
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[COPIED_ARG_FIELD]]
+// CHECK: } // end sil function 'simple_partialstructuse_load_promotion'
+sil [ossa] @simple_partialstructuse_load_promotion : $@convention(thin) (@owned NativeObjectPair) -> (@owned Klass) {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = alloc_stack $NativeObjectPair
+  store %0 to [init] %1 : $*NativeObjectPair
+  %2 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.x
+  %3 = load [copy] %2 : $*Klass
+  destroy_addr %1 : $*NativeObjectPair
+  dealloc_stack %1 : $*NativeObjectPair
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @simple_partialtupleuse_load_promotion : $@convention(thin) (@owned KlassAndTuple) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] : @owned $KlassAndTuple):
+// CHECK:   [[STACK:%.*]] = alloc_stack
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[BORROWED_ARG_FIELD_1:%.*]] = struct_extract [[BORROWED_ARG]]
+// CHECK:   [[BORROWED_ARG_FIELD_2:%.*]] = tuple_extract [[BORROWED_ARG_FIELD_1]]
+// CHECK:   [[COPIED_ARG_FIELD:%.*]] = copy_value [[BORROWED_ARG_FIELD_2]]
+// CHECK:   end_borrow [[BORROWED_ARG]]
+// CHECK:   store [[ARG]] to [init] [[STACK]]
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[COPIED_ARG_FIELD]]
+// CHECK: } // end sil function 'simple_partialtupleuse_load_promotion'
+sil [ossa] @simple_partialtupleuse_load_promotion : $@convention(thin) (@owned KlassAndTuple) -> (@owned Klass) {
+bb0(%0 : @owned $KlassAndTuple):
+  %1 = alloc_stack $KlassAndTuple
+  store %0 to [init] %1 : $*KlassAndTuple
+  %2 = struct_element_addr %1 : $*KlassAndTuple, #KlassAndTuple.second
+  %3 = tuple_element_addr %2 : $*(Klass, Klass), 0
+  %4 = load [copy] %3 : $*Klass
+  destroy_addr %1 : $*KlassAndTuple
+  dealloc_stack %1 : $*KlassAndTuple
+  return %4 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @simple_assignstore : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+// CHECK: bb0([[ARG0:%.*]] : @owned $Klass, [[ARG1:%.*]] : @owned $Klass):
+// CHECK:   [[STACK:%.*]] = alloc_stack $Klass
+// CHECK:   store [[ARG0]] to [init] [[STACK]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   store [[ARG1]] to [assign] [[STACK]]
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[ARG1_COPY]]
+// CHECK: } // end sil function 'simple_assignstore'
+sil [ossa] @simple_assignstore : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  store %1 to [assign] %2 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @diamond_test_2 : $@convention(thin) (@owned NativeObjectPair) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] : @owned $NativeObjectPair):
+// CHECK:   [[STACK:%.*]] = alloc_stack $NativeObjectPair
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[LHS1:%.*]] = struct_extract [[BORROWED_ARG]] : $NativeObjectPair, #NativeObjectPair.x
+// CHECK:   [[LHS1_COPY:%.*]] = copy_value [[LHS1]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[LHS2:%.*]] = struct_extract [[BORROWED_ARG]] : $NativeObjectPair, #NativeObjectPair.x
+// CHECK:   [[LHS2_COPY:%.*]] = copy_value [[LHS2]]
+// CHECK:   store [[ARG]] to [init] [[STACK]]
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   destroy_value [[LHS1_COPY]]
+// CHECK:   br bb3([[LHS2_COPY]] :
+//
+// CHECK: bb2:
+// CHECK:   destroy_value [[LHS2_COPY]]
+// CHECK:   br bb3([[LHS1_COPY]] :
+//
+// CHECK: bb3([[PHI:%.*]] :
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[PHI]]
+// CHECK: } // end sil function 'diamond_test_2'
+sil [ossa] @diamond_test_2 : $@convention(thin) (@owned NativeObjectPair) -> @owned Klass {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = alloc_stack $NativeObjectPair
+  store %0 to [init] %1 : $*NativeObjectPair
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.x
+  %3 = load [copy] %2 : $*Klass
+  br bb3(%3 : $Klass)
+
+bb2:
+  %4 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.x
+  %5 = load [copy] %4 : $*Klass
+  br bb3(%5 : $Klass)
+
+bb3(%6 : @owned $Klass):
+  destroy_addr %1 : $*NativeObjectPair
+  dealloc_stack %1 : $*NativeObjectPair
+  return %6 : $Klass
+}
+
+////////////////////
+// Negative Tests //
+////////////////////
+
+// CHECK-LABEL: sil [ossa] @simple_nontrivial_loadtake_no_promote : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack $Klass
+// CHECK:   store [[ARG]] to [init] [[STACK]]
+// CHECK:   [[RESULT:%.*]] = load [take] [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'simple_nontrivial_loadtake_no_promote'
+sil [ossa] @simple_nontrivial_loadtake_no_promote : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load [take] %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  return %2 : $Klass
+}

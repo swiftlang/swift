@@ -2390,11 +2390,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           forceUnwrapPossible = false;
         }
       }
-      
 
       if (forceUnwrapPossible) {
-        conversionsOrFixes.push_back(
-            ForceOptional::create(*this, getConstraintLocator(locator)));
+        conversionsOrFixes.push_back(ForceOptional::create(
+            *this, objectType1, objectType1->getOptionalObjectType(),
+            getConstraintLocator(locator)));
       }
     }
 
@@ -2743,7 +2743,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         locator.withPathElement(LocatorPathElt::getGenericArgument(0)),
         subflags);
     if (result == SolutionKind::Solved) {
-      auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+      auto *fix = ForceOptional::create(*this, type, optionalObjectType,
+                                        getConstraintLocator(locator));
       if (recordFix(fix)) {
         return SolutionKind::Error;
       }
@@ -2996,6 +2997,7 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
   auto simplified = simplifyType(first);
+  auto simplifiedCopy = simplified;
 
   unsigned unwrapCount = 0;
   if (shouldAttemptFixes()) {
@@ -3038,7 +3040,9 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
   }
 
   if (unwrapCount > 0) {
-    auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+    auto *fix = ForceOptional::create(*this, simplifiedCopy,
+                                      simplifiedCopy->getOptionalObjectType(),
+                                      getConstraintLocator(locator));
     while (unwrapCount-- > 0) {
       if (recordFix(fix))
         return SolutionKind::Error;
@@ -4691,8 +4695,13 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                      ConstraintLocator::FunctionResult)).isFailure())
       return SolutionKind::Error;
 
+    if (unwrapCount == 0)
+      return SolutionKind::Solved;
+
     // Record any fixes we attempted to get to the correct solution.
-    auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+    auto *fix = ForceOptional::create(*this, origType2,
+                                      origType2->getOptionalObjectType(),
+                                      getConstraintLocator(locator));
     while (unwrapCount-- > 0) {
       if (recordFix(fix))
         return SolutionKind::Error;
@@ -4715,7 +4724,12 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     // Record any fixes we attempted to get to the correct solution.
     if (simplified == SolutionKind::Solved) {
-      auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+      if (unwrapCount == 0)
+        return SolutionKind::Solved;
+
+      auto *fix = ForceOptional::create(*this, origType2,
+                                        origType2->getOptionalObjectType(),
+                                        getConstraintLocator(locator));
       while (unwrapCount-- > 0) {
         if (recordFix(fix))
           return SolutionKind::Error;
@@ -5420,11 +5434,14 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
 
   // Record the fix.
 
-  // Increase the score. If this would make the current solution worse than
-  // the best solution we've seen already, stop now.
-  increaseScore(SK_Fix);
-  if (worseThanBestSolution())
-    return true;
+  // If this is just a warning it's shouldn't affect the solver.
+  if (!fix->isWarning()) {
+    // Otherswise increase the score. If this would make the current
+    // solution worse than the best solution we've seen already, stop now.
+    increaseScore(SK_Fix);
+    if (worseThanBestSolution())
+      return true;
+  }
 
   if (isAugmentingFix(fix)) {
     // Always useful, unless duplicate of exactly the same fix and location.
@@ -5530,6 +5547,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
   case FixKind::AllowTypeOrInstanceMember:
+  case FixKind::AllowInvalidPartialApplication:
     llvm_unreachable("handled elsewhere");
   }
 

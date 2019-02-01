@@ -107,6 +107,14 @@ enum class FixKind : uint8_t {
 	
   /// Allow access to type member on instance or instance member on type
   AllowTypeOrInstanceMember,
+
+  /// Allow expressions where 'mutating' method is only partially applied,
+  /// which means either not applied at all e.g. `Foo.bar` or only `Self`
+  /// is applied e.g. `foo.bar` or `Foo.bar(&foo)`.
+  ///
+  /// Allow expressions where initializer call (either `self.init` or
+  /// `super.init`) is only partially applied.
+  AllowInvalidPartialApplication,
 };
 
 class ConstraintFix {
@@ -169,16 +177,24 @@ public:
 
 /// Introduce a '!' to force an optional unwrap.
 class ForceOptional final : public ConstraintFix {
-  ForceOptional(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ForceOptional, locator) {}
+  Type BaseType;
+  Type UnwrappedType;
+
+  ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
+                ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
+        UnwrappedType(unwrappedType) {
+    assert(baseType && "Base type must not be null");
+    assert(unwrappedType && "Unwrapped type must not be null");
+  }
 
 public:
   std::string getName() const override { return "force optional"; }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static ForceOptional *create(ConstraintSystem &cs,
-                               ConstraintLocator *locator);
+  static ForceOptional *create(ConstraintSystem &cs, Type baseType,
+                               Type unwrappedType, ConstraintLocator *locator);
 };
 
 /// Unwrap an optional base when we have a member access.
@@ -523,6 +539,24 @@ public:
   static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
                                            DeclName member,
                                            ConstraintLocator *locator);
+};
+
+class AllowInvalidPartialApplication final : public ConstraintFix {
+public:
+  AllowInvalidPartialApplication(bool isWarning, ConstraintSystem &cs,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPartialApplication, locator,
+                      isWarning) {}
+
+  std::string getName() const override {
+    return "allow partially applied 'mutating' method";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInvalidPartialApplication *create(bool isWarning,
+                                                ConstraintSystem &cs,
+                                                ConstraintLocator *locator);
 };
 
 } // end namespace constraints

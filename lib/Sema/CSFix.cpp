@@ -65,14 +65,17 @@ ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type toType,
 }
 
 bool ForceOptional::diagnose(Expr *root, bool asNote) const {
-  MissingOptionalUnwrapFailure failure(root, getConstraintSystem(),
-                                       getLocator());
+  MissingOptionalUnwrapFailure failure(root, getConstraintSystem(), BaseType,
+                                       UnwrappedType, getLocator());
   return failure.diagnose(asNote);
 }
 
-ForceOptional *ForceOptional::create(ConstraintSystem &cs,
+ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type baseType,
+                                     Type unwrappedType,
                                      ConstraintLocator *locator) {
-  return new (cs.getAllocator()) ForceOptional(cs, locator);
+  return new (cs.getAllocator()) ForceOptional(
+      cs, baseType, unwrappedType,
+      cs.getConstraintLocator(simplifyLocatorToAnchor(cs, locator)));
 }
 
 bool UnwrapOptionalBase::diagnose(Expr *root, bool asNote) const {
@@ -270,4 +273,15 @@ AllowTypeOrInstanceMember *AllowTypeOrInstanceMember::create(ConstraintSystem &c
                                                              DeclName member,
                                                              ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowTypeOrInstanceMember(cs, baseType, member, locator);
+bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
+  auto failure = PartialApplicationFailure(root, isWarning(),
+                                           getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidPartialApplication *
+AllowInvalidPartialApplication::create(bool isWarning, ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidPartialApplication(isWarning, cs, locator);
 }

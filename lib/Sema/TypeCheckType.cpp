@@ -216,8 +216,9 @@ Type TypeResolution::resolveDependentMemberType(
     return DependentMemberType::get(baseTy, assocType);
   }
 
-  // Otherwise, the nested type comes from a concrete type. Substitute the
-  // base type into it.
+  // Otherwise, the nested type comes from a concrete type,
+  // or it's a typealias declared in protocol or protocol extension.
+  // Substitute the base type into it.
   auto concrete = ref->getBoundDecl();
   auto lazyResolver = ctx.getLazyResolver();
   if (lazyResolver)
@@ -225,14 +226,26 @@ Type TypeResolution::resolveDependentMemberType(
   if (!concrete->hasInterfaceType())
     return ErrorType::get(ctx);
 
-  if (concrete->getDeclContext()->getSelfClassDecl()) {
-    // We found a member of a class from a protocol or protocol
-    // extension.
-    //
-    // Get the superclass of the 'Self' type parameter.
-    baseTy = (baseEquivClass->concreteType
-              ? baseEquivClass->concreteType
-              : baseEquivClass->superclass);
+  // Make sure that base type didn't get replaced along the way.
+  assert(baseTy->isTypeParameter());
+
+  // There are two situations possible here:
+  //
+  // 1. Member comes from the protocol, which means that it has been
+  //    found through a conformance constraint placed on base e.g. `T: P`.
+  //    In this case member is a `typealias` declaration located in
+  //    protocol or protocol extension.
+  //
+  // 2. Member comes from struct/enum/class type, which means that it
+  //    has been found through same-type constraint on base e.g. `T == Q`.
+  //
+  // If this is situation #2 we need to make sure to switch base to
+  // a concrete type (according to equivalence class) otherwise we'd
+  // end up using incorrect generic signature while attempting to form
+  // a substituted type for the member we found.
+  if (!concrete->getDeclContext()->getSelfProtocolDecl()) {
+    baseTy = baseEquivClass->concreteType ? baseEquivClass->concreteType
+                                          : baseEquivClass->superclass;
     assert(baseTy);
   }
 
@@ -1996,7 +2009,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       hasFunctionAttr = true;
       break;
     }
-
+  
+  // If we have an @autoclosure then try resolving the top level type repr
+  // first as it may be pointing to a typealias
+  if (attrs.has(TAK_autoclosure)) {
+    if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(repr)) {
+      auto typeAliasResolver = TypeResolverContext::TypeAliasDecl;
+      if (auto type = resolveTopLevelIdentTypeComponent(resolution, CITR,
+                                                        typeAliasResolver)) {
+        if (auto TAT = dyn_cast<TypeAliasType>(type.getPointer())) {
+          repr = TAT->getDecl()->getUnderlyingTypeLoc().getTypeRepr();
+        }
+      }
+    }
+  }
+  
   // Function attributes require a syntactic function type.
   auto *fnRepr = dyn_cast<FunctionTypeRepr>(repr);
 
@@ -2135,6 +2162,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   if (!ty) ty = resolveType(repr, instanceOptions);
   if (!ty || ty->hasError()) return ty;
 
+  // Type aliases inside protocols are not yet resolved in the structural
+  // stage of type resolution
+  if (ty->is<DependentMemberType>() &&
+      resolution.getStage() == TypeResolutionStage::Structural) {
+    return ty;
+  }
+
   // Handle @escaping
   if (hasFunctionAttr && ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
@@ -2266,10 +2300,6 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       variadic = true;
     }
 
-    bool autoclosure = false;
-    if (auto *ATR = dyn_cast<AttributedTypeRepr>(eltTypeRepr))
-      autoclosure = ATR->getAttrs().has(TAK_autoclosure);
-
     Type ty = resolveType(eltTypeRepr, thisElementOptions);
     if (!ty) return true;
 
@@ -2281,6 +2311,16 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     // Parameters of polymorphic functions speak in terms of interface types.
     if (requiresMappingOut) {
       ty = ty->mapTypeOutOfContext();
+    }
+
+    bool autoclosure = false;
+    if (auto *ATR = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
+      // Make sure that parameter itself is of a function type, otherwise
+      // the problem would already be diagnosed by `resolveAttributedType`
+      // but attributes would stay unchanged. So as a recovery let's drop
+      // 'autoclosure' attribute from the resolved parameter.
+      autoclosure =
+          ty->is<FunctionType>() && ATR->getAttrs().has(TAK_autoclosure);
     }
 
     ValueOwnership ownership;

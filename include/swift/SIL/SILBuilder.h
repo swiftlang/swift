@@ -1068,12 +1068,18 @@ public:
   }
 
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
+    assert(!operand->getType().isTrivial(getModule()) &&
+           "Should not be passing trivial values to this api. Use instead "
+           "emitCopyValueOperation");
     return insert(new (getModule())
                       CopyValueInst(getSILDebugLocation(Loc), operand));
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
     assert(isLoadableOrOpaque(operand->getType()));
+    assert(!operand->getType().isTrivial(getModule()) &&
+           "Should not be passing trivial values to this api. Use instead "
+           "emitDestroyValueOperation");
     return insert(new (getModule())
                       DestroyValueInst(getSILDebugLocation(Loc), operand));
   }
@@ -2172,6 +2178,13 @@ public:
   SILBuilderWithScope(SILInstruction *I, SILBuilderContext &C)
     : SILBuilder(I, I->getDebugScope(), C)
   {}
+
+  /// Build instructions before the given insertion point, inheriting the debug
+  /// location and using the context from the passed in builder.
+  ///
+  /// Clients should prefer this constructor.
+  SILBuilderWithScope(SILInstruction *I, SILBuilder &B)
+      : SILBuilder(I, I->getDebugScope(), B.getBuilderContext()) {}
 
   explicit SILBuilderWithScope(
       SILInstruction *I,

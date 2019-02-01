@@ -1474,6 +1474,10 @@ class CopyForwardingPass : public SILFunctionTransform
     if (!EnableCopyForwarding && !EnableDestroyHoisting)
       return;
 
+    // FIXME: We should be able to support [ossa].
+    if (getFunction()->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "Copy Forwarding in Func "
                             << getFunction()->getName() << "\n");
 
@@ -1555,8 +1559,9 @@ class CopyForwardingPass : public SILFunctionTransform
 class TempRValueOptPass : public SILFunctionTransform {
   AliasAnalysis *AA = nullptr;
 
-  static bool collectLoads(Operand *UserOp, SILInstruction *UserInst,
+  bool collectLoads(Operand *UserOp, SILInstruction *UserInst,
                            SingleValueInstruction *Addr,
+                           SILValue srcObject,
                            llvm::SmallPtrSetImpl<SILInstruction *> &LoadInsts);
 
   bool checkNoSourceModification(CopyAddrInst *copyInst,
@@ -1569,6 +1574,9 @@ class TempRValueOptPass : public SILFunctionTransform {
 
 /// The main entry point of the pass.
 void TempRValueOptPass::run() {
+  if (getFunction()->hasOwnership())
+    return;
+
   LLVM_DEBUG(llvm::dbgs() << "Copy Peephole in Func "
                           << getFunction()->getName() << "\n");
 
@@ -1615,6 +1623,7 @@ void TempRValueOptPass::run() {
 /// reaching a load or returning false.
 bool TempRValueOptPass::collectLoads(
     Operand *userOp, SILInstruction *user, SingleValueInstruction *address,
+    SILValue srcObject,
     llvm::SmallPtrSetImpl<SILInstruction *> &loadInsts) {
   // All normal uses (loads) must be in the initialization block.
   // (The destroy and dealloc are commonly in a different block though.)
@@ -1639,22 +1648,42 @@ bool TempRValueOptPass::collectLoads(
 
   case SILInstructionKind::ApplyInst: {
     ApplySite apply(user);
+
+    // Check if the function can just read from userOp.
     auto Convention = apply.getArgumentConvention(*userOp);
-    if (Convention.isGuaranteedConvention()) {
-      loadInsts.insert(user);
-      return true;
+    if (!Convention.isGuaranteedConvention()) {
+      LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "
+                 "its source" << *user);
+      return false;
     }
-    LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "
-                               "its source"
-                            << *user);
-    return false;
+
+    // Check if there is another function argument, which is inout which might
+    // modify the source of the copy_addr.
+    // If we would remove the copy_addr in this case, it would result in an
+    // exclusivity violation.
+    auto calleeConv = apply.getSubstCalleeConv();
+    unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
+    for (Operand &operand : apply.getArgumentOperands()) {
+      auto argConv = calleeConv.getSILArgumentConvention(calleeArgIdx);
+      if (argConv.isInoutConvention()) {
+        if (!AA->isNoAlias(operand.get(), srcObject)) {
+          return false;
+        }
+      }
+      ++calleeArgIdx;
+    }
+
+    // Everything is okay with the function call. Register it as a "load".
+    loadInsts.insert(user);
+    return true;
   }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst: {
     // Transitively look through projections on stack addresses.
     auto proj = cast<SingleValueInstruction>(user);
     for (auto *projUseOper : proj->getUses()) {
-      if (!collectLoads(projUseOper, projUseOper->getUser(), proj, loadInsts))
+      if (!collectLoads(projUseOper, projUseOper->getUser(), proj, srcObject,
+                        loadInsts))
         return false;
     }
     return true;
@@ -1744,7 +1773,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user))
       continue;
 
-    if (!collectLoads(useOper, user, tempObj, loadInsts))
+    if (!collectLoads(useOper, user, tempObj, copyInst->getSrc(), loadInsts))
       return false;
   }
 

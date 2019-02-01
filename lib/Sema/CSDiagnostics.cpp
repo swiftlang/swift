@@ -510,12 +510,18 @@ public:
   int referencesCount() { return count; }
 };
 
-static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
-  Type unwrappedType = type->getOptionalObjectType();
-  if (!unwrappedType)
+static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type baseType,
+                           Type unwrappedType) {
+
+  assert(!baseType->hasTypeVariable() &&
+         "Base type must not be a type variable");
+  assert(!unwrappedType->hasTypeVariable() &&
+         "Unwrapped type must not be a type variable");
+
+  if (!baseType->getOptionalObjectType())
     return false;
 
-  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
+  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, baseType,
                  unwrappedType);
 
   // If the expression we're unwrapping is the only reference to a
@@ -541,7 +547,8 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
         Expr *initializer = varDecl->getParentInitializer();
         if (auto declRefExpr = dyn_cast<DeclRefExpr>(initializer)) {
           if (declRefExpr->getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer, type);
+            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer,
+                           baseType);
           }
         }
 
@@ -583,9 +590,11 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   auto type = getType(anchor)->getRValueType();
 
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
-  if (!tryExpr)
-    return diagnoseUnwrap(getConstraintSystem(), unwrapped, type);
-  
+  if (!tryExpr) {
+    return diagnoseUnwrap(getConstraintSystem(), unwrapped, getBaseType(),
+                          getUnwrappedType());
+  }
+
   bool isSwift5OrGreater = getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5);
   auto subExprType = getType(tryExpr->getSubExpr());
   bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
@@ -596,11 +605,10 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     // under Swift 5+, so just report that a missing unwrap can't be handled here.
     return false;
   }
-  else {
-    emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
-    .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
-    return true;
-  }
+
+  emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
+      .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
+  return true;
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
@@ -1690,4 +1698,23 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   }
   
   return false;
+bool PartialApplicationFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
+  auto *anchor = cast<UnresolvedDotExpr>(getRawAnchor());
+
+  RefKind kind = RefKind::MutatingMethod;
+
+  // If this is initializer delegation chain, we have a tailored message.
+  if (getOverloadChoiceIfAvailable(cs.getConstraintLocator(
+          anchor, ConstraintLocator::ConstructorMember))) {
+    kind = anchor->getBase()->isSuperExpr() ? RefKind::SuperInit
+                                            : RefKind::SelfInit;
+  }
+
+  auto diagnostic = CompatibilityWarning
+                        ? diag::partial_application_of_function_invalid_swift4
+                        : diag::partial_application_of_function_invalid;
+
+  emitDiagnostic(anchor->getNameLoc(), diagnostic, kind);
+  return true;
 }

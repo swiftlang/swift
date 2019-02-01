@@ -1,1 +1,6 @@
+Func Collection.makeIterator() has self access kind changing from NonMutating to __Consuming
 Func tryReallocateUniquelyReferenced(buffer:newMinimumCapacity:) has been removed
+Protocol SIMD has added inherited protocol Decodable
+Protocol SIMD has added inherited protocol Encodable
+Protocol SIMD has generic signature change from <Self : CustomStringConvertible, Self : ExpressibleByArrayLiteral, Self : Hashable, Self : SIMDStorage, Self.MaskStorage : SIMD, Self.MaskStorage.Scalar : FixedWidthInteger, Self.MaskStorage.Scalar : SignedInteger> to <Self : CustomStringConvertible, Self : Decodable, Self : Encodable, Self : ExpressibleByArrayLiteral, Self : Hashable, Self : SIMDStorage, Self.MaskStorage : SIMD, Self.MaskStorage.Scalar : FixedWidthInteger, Self.MaskStorage.Scalar : SignedInteger>
+Protocol SIMDStorage has generic signature change from <Self.Scalar : Hashable> to <Self.Scalar : Decodable, Self.Scalar : Encodable, Self.Scalar : Hashable>

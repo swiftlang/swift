@@ -105,7 +105,68 @@ print("target removed")
 // CHECK-NEXT: swiftValue 42, objcValue three
 // CHECK-NEXT: swiftValue 42, objcValue four
 // CHECK-NEXT: swiftValue 13, objcValue four
+// The next 2 logs are actually a bug and shouldn't happen
 // CHECK-NEXT: swiftValue 13, objcValue four
 // CHECK-NEXT: swiftValue 13, objcValue four
 // CHECK-NEXT: target removed
 
+//===----------------------------------------------------------------------===//
+// Test NSKeyValueObservingCustomization issue with observing from the callbacks
+//===----------------------------------------------------------------------===//
+
+class Target2 : NSObject, NSKeyValueObservingCustomization {
+    @objc dynamic var name: String?
+
+    class Dummy : NSObject {
+        @objc dynamic var name: String?
+    }
+
+    // In both of the callbacks, observe another property with the same key path.
+    // We do it in both because we're not sure which callback is invoked first.
+    // This ensures that using KVO with key paths from one callback doesn't interfere
+    // with the ability to look up the key path using the other.
+    static func keyPathsAffectingValue(for key: AnyKeyPath) -> Set<AnyKeyPath> {
+        print("keyPathsAffectingValue: key == \\.name:", key == \Target2.name)
+        _ = Dummy().observe(\.name) { (_, _) in }
+        return []
+    }
+
+    static func automaticallyNotifiesObservers(for key: AnyKeyPath) -> Bool {
+        print("automaticallyNotifiesObservers: key == \\.name:", key == \Target2.name)
+        _ = Dummy().observe(\.name) { (_, _) in }
+        return true
+    }
+}
+
+print("registering observer for Target2")
+withExtendedLifetime(Target2()) { (target) in
+    _ = target.observe(\.name) { (_, _) in }
+}
+print("observer removed")
+
+// CHECK-LABEL: registering observer for Target2
+// CHECK-DAG: keyPathsAffectingValue: key == \.name: true
+// CHECK-DAG: automaticallyNotifiesObservers: key == \.name: true
+// CHECK-NEXT: observer removed
+
+//===----------------------------------------------------------------------===//
+// Test NSSortDescriptor keyPath support
+//===----------------------------------------------------------------------===//
+
+// This one doesn't really match the context of "KVO KeyPaths" but it's close enough
+
+class Sortable1 : NSObject {
+    @objc var name: String?
+}
+
+class Sortable2 : NSObject {
+    @objc var name: String?
+}
+
+print("creating NSSortDescriptor")
+let descriptor = NSSortDescriptor(keyPath: \Sortable1.name, ascending: true)
+_ = NSSortDescriptor(keyPath: \Sortable2.name, ascending: true)
+print("keyPath == \\Sortable1.name:", descriptor.keyPath == \Sortable1.name)
+
+// CHECK-LABEL: creating NSSortDescriptor
+// CHECK-NEXT: keyPath == \Sortable1.name: true

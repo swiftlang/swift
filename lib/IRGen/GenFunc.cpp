@@ -1456,10 +1456,6 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
                     /*typeToFill*/ nullptr,
                     std::move(bindings));
 
-  auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
-                                                       substType, subs,
-                                                       layout);
-
   llvm::Value *data;
 
   Optional<StackAddress> stackAddr;
@@ -1479,8 +1475,13 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       stackAddr = stackAddr->withAddress(IGF.Builder.CreateBitCast(
           stackAddr->getAddress(), IGF.IGM.OpaquePtrTy));
       data = stackAddr->getAddress().getAddress();
-    } else
-      data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
+    } else {
+        auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
+                                                       substType, subs,
+                                                       layout);
+
+        data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
+    }
     Address dataAddr = layout.emitCastTo(IGF, data);
     
     unsigned i = 0;
