@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+#
+# SWIFT_ENABLE_TENSORFLOW
+#
+# utils/build-toolchain-tensorflow - documents process for building a toolchain
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+
+function usage() {
+  echo "$0 [OPTIONS]"
+  echo ""
+  echo "OPTIONS"
+  echo ""
+  echo "-h --help"
+  echo "Show help information."
+  echo ""
+  echo "-n --dry-run"
+  echo "Do a dry run."
+  echo ""
+  echo "-t --test"
+  echo "Run tests."
+  echo ""
+  if [[ "$(uname -s)" == "Darwin" ]] ; then
+      echo "-p --pkg"
+      echo "Build a installer package."
+      echo ""
+  fi
+}
+
+cd "$(dirname $0)/.." || exit
+SRC_DIR=$PWD
+
+# Set defaults
+DRY_RUN=
+BUNDLE_PREFIX=
+INSTALLER_PACKAGE=
+# SWIFT_ENABLE_TENSORFLOW
+if [[ -z ${SWIFT_PACKAGE} ]]; then
+  case $(uname -s) in
+    Darwin)
+      SWIFT_PACKAGE=tensorflow_osx,no_test
+    ;;
+    Linux)
+      SWIFT_PACKAGE=tensorflow_linux,no_test
+    ;;
+    *)
+      echo "Unrecognised platform $(uname -s)"
+      exit 1
+    ;;
+  esac
+fi
+
+# Process command line arguments
+FIRST_ARG_PROCESSED=0
+while [ $# -ne 0 ]; do
+  case "$1" in
+    -n|--dry-run)
+      DRY_RUN="-n"
+  ;;
+    -t|--test)
+      if [ "$(uname -s)" == "Linux" ]; then
+        SWIFT_PACKAGE=tensorflow_linux
+      else
+        SWIFT_PACKAGE=tensorflow_osx
+      fi
+  ;;
+  -h|--help)
+    usage
+    exit 0
+  ;;
+  -p|--pkg)
+    INSTALLER_PACKAGE=1
+    if [ "$(uname -s)" == "Darwin" ]; then
+        SWIFT_PACKAGE=tensorflow_osx,installer
+    else
+        echo "--pkg is not supported on \"$(uname -s)\". See --help"
+        exit 1
+    fi
+  ;;
+  *)
+    if [ ${FIRST_ARG_PROCESSED} -ne 0 ]; then
+      echo "Unrecognised argument \"$1\""
+      exit 1
+    fi
+  ;;
+  esac
+  FIRST_ARG_PROCESSED=1
+  shift
+done
+
+# Get host name.
+HOST=
+if [ "$(uname -s)" == "Darwin" ]; then
+  HOST=osx
+elif [ "$(uname -s)" == "Linux" ]; then
+  linux_platform="$(lsb_release -i | cut -f2 | tr '[:upper:]' '[:lower:]')"
+  linux_version="$(lsb_release -r | cut -f2)"
+  HOST="${linux_platform}${linux_version}"
+fi
+
+
+# Report the commands being run
+set -x
+YEAR=$(date +"%Y")
+MONTH=$(date +"%m")
+DAY=$(date +"%d")
+TOOLCHAIN_VERSION="swift-tensorflow-LOCAL-${YEAR}-${MONTH}-${DAY}-a"
+ARCHIVE="${TOOLCHAIN_VERSION}-${HOST}.tar.gz"
+SYM_ARCHIVE="${TOOLCHAIN_VERSION}-osx-symbols.tar.gz"
+BUNDLE_PREFIX=com.google.swift
+BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
+DISPLAY_NAME_SHORT="Swift for TensorFlow Local Snapshot"
+DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
+TOOLCHAIN_NAME="${TOOLCHAIN_VERSION}"
+
+SWIFT_INSTALLABLE_PACKAGE="${SRC_DIR}/${ARCHIVE}"
+SWIFT_INSTALL_DIR="${SRC_DIR}/swift-nightly-install"
+SWIFT_INSTALL_SYMROOT="${SRC_DIR}/swift-nightly-symroot"
+SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain"
+SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
+DRY_RUN="${DRY_RUN}"
+
+if [ ${INSTALLER_PACKAGE} ]; then
+  INSTALLER_PACKAGE="darwin_toolchain_installer_package=${TOOLCHAIN_NAME}-osx.pkg"
+fi
+
+./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
+        install_destdir="${SWIFT_INSTALL_DIR}" \
+        installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
+        install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \
+        install_symroot="${SWIFT_INSTALL_SYMROOT}" \
+        symbols_package="${SYMBOLS_PACKAGE}" \
+        darwin_toolchain_bundle_identifier="${BUNDLE_IDENTIFIER}" \
+        darwin_toolchain_display_name="${DISPLAY_NAME}" \
+        darwin_toolchain_display_name_short="${DISPLAY_NAME_SHORT}" \
+        darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
+        darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
+        darwin_toolchain_alias="Swift for TensorFlow" \
+        ${INSTALLER_PACKAGE}
