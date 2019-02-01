@@ -138,6 +138,7 @@ extension _StringGuts {
     // Thread-safe compare-and-swap
     let crumbs = _StringBreadcrumbs(String(self))
     _stdlib_atomicInitializeARCRef(
-      object: UnsafeMutablePointer(mutating: UnsafeRawPointer(mutPtr).assumingMemoryBound(to: Optional<AnyObject>.self)), desired: crumbs)
+      object: UnsafeMutableRawPointer(mutPtr).assumingMemoryBound(to: Optional<AnyObject>.self), 
+      desired: crumbs)
   }
 }
