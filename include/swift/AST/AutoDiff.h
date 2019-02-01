@@ -293,7 +293,7 @@ struct AutoDiffAssociatedFunctionKind {
 class AutoDiffAssociatedFunctionIdentifier : public llvm::FoldingSetNode {
   const AutoDiffAssociatedFunctionKind kind;
   const unsigned differentiationOrder;
-  AutoDiffParameterIndices * const parameterIndices;
+  AutoDiffParameterIndices *const parameterIndices;
 
   AutoDiffAssociatedFunctionIdentifier(
       AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
