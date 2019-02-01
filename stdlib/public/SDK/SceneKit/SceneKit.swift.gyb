@@ -179,21 +179,15 @@ extension SCNGeometryElement {
 extension SCNGeometrySource {
   @nonobjc
   public convenience init(vertices: [SCNVector3]) {
-    fatalError()
-    // FIXME: <rdar://problem/43534146>
-    // self.init(__vertices: vertices, count: vertices.count)
+    self.init(__vertices: vertices, count: vertices.count)
   }
   @nonobjc
   public convenience init(normals: [SCNVector3]) {
-    fatalError()
-    // FIXME: <rdar://problem/43534146>
-    // self.init(__normals: normals, count: normals.count)
+    self.init(__normals: normals, count: normals.count)
   }
   @nonobjc
   public convenience init(textureCoordinates: [CGPoint]) {
-    fatalError()
-    // FIXME: <rdar://problem/43534146>
-    // self.init(__textureCoordinates: textureCoordinates, count: textureCoordinates.count)
+    self.init(__textureCoordinates: textureCoordinates, count: textureCoordinates.count)
   }
 }
 
