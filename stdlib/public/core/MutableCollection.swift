@@ -167,10 +167,10 @@ where SubSequence: MutableCollection
   /// - Complexity: O(1)
   mutating func swapAt(_ i: Index, _ j: Index)
   
-  /// Call `body(p)`, where `p` is a pointer to the collection's
+  /// Calls the given closure with a pointer to the collection's
   /// mutable contiguous storage.  If no such storage exists, it is
   /// first created.  If the collection does not support an internal
-  /// representation in a form of mutable contiguous storage, `body` is not
+  /// representation in a form of mutable contiguous storage, the closure is not
   /// called and `nil` is returned.
   ///
   /// Often, the optimizer can eliminate bounds- and uniqueness-checks
@@ -181,10 +181,10 @@ where SubSequence: MutableCollection
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
 
-  /// Call `body(p)`, where `p` is a pointer to the collection's
+  /// Calls the given closure with a pointer to the collection's
   /// mutable contiguous storage.  If no such storage exists, it is
   /// first created.  If the collection does not support an internal
-  /// representation in a form of mutable contiguous storage, `body` is not
+  /// representation in a form of mutable contiguous storage, the closure is not
   /// called and `nil` is returned.
   ///
   /// Often, the optimizer can eliminate bounds- and uniqueness-checks
@@ -295,4 +295,3 @@ public func swap<T>(_ a: inout T, _ b: inout T) {
   // Initialize P2.
   Builtin.initialize(tmp, p2)
 }
-
