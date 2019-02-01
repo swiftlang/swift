@@ -408,11 +408,13 @@ func testHashableGenerics(
     any: ObjCBridgeGeneric<ElementConcrete>,
     constrained: ObjCBridgeGenericConstrained<ElementConcrete>,
     insufficient: ObjCBridgeGenericInsufficientlyConstrained<ElementConcrete>,
-    extra: ObjCBridgeGenericConstrainedExtra<ElementConcrete>) {
+    extra: ObjCBridgeGenericConstrainedExtra<ElementConcrete>,
+    existential: ObjCBridgeExistential) {
   let _: Int = any.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
   let _: Int = constrained.foo // expected-error{{cannot convert value of type 'Set<ElementConcrete>' to specified type 'Int'}}
   let _: Int = insufficient.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
   let _: Int = extra.foo // expected-error{{cannot convert value of type 'Set<ElementConcrete>' to specified type 'Int'}}
+  let _: Int = existential.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
 }
 
 func testGenericsWithTypedefBlocks(hba: HasBlockArray) {

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
-// Ensure that the superclass's generid argument canonicalizes to
+// Ensure that the superclass's generic argument canonicalizes to
 // Sequence.Element.
 
 // CHECK: @"symbolic _____y7ElementSTQzG
