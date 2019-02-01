@@ -3951,15 +3951,6 @@ ADContext::declareExternalAssociatedFunction(
       original->isSerialized(), original->isDynamicallyReplaceable());
   // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
   assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
-  // Update associated function name in attribute.
-  switch (kind) {
-  case AutoDiffAssociatedFunctionKind::JVP:
-    attr->setJVPName(name);
-    break;
-  case AutoDiffAssociatedFunctionKind::VJP:
-    attr->setVJPName(name);
-    break;
-  }
   return assocFn;
 }
 
@@ -3969,39 +3960,44 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
                                          DifferentiationInvoker invoker)
     : context(context), original(original), attr(attr), invoker(invoker) {
   auto &module = context.getModule();
-  // If attribute specifies JVP name, try to look up JVP in current module.
-  // If the JVP doesn't exist, or if the original is an external declaration,
+  // Try to look up JVP only if attribute specifies JVP name or if original
+  // function is an external declaration. If JVP function can't be found,
   // create an external JVP reference.
+  StringRef jvpName;
   if (attr->hasJVP()) {
-    jvp = module.lookUpFunction(attr->getJVPName());
+    jvpName = attr->getJVPName();
+  } else if (original->isExternalDeclaration()) {
+    jvpName = original->getASTContext()
+                  .getIdentifier("AD__" + original->getName().str() +
+				 "__jvp_" + getIndices().mangle())
+                  .str();
+  }
+  if (!jvpName.empty()) {
+    jvp = module.lookUpFunction(jvpName);
     if (!jvp)
       jvp = context.declareExternalAssociatedFunction(
-          original, attr, attr->getJVPName(),
-          AutoDiffAssociatedFunctionKind::JVP);
-  } else if (original->isExternalDeclaration()) {
-    auto jvpName = original->getASTContext()
-                       .getIdentifier("AD__" + original->getName().str() +
-                                      "__jvp_" + getIndices().mangle())
-                       .str();
-    jvp = context.declareExternalAssociatedFunction(
-        original, attr, jvpName, AutoDiffAssociatedFunctionKind::JVP);
+          original, attr, jvpName, AutoDiffAssociatedFunctionKind::JVP);
+    attr->setJVPName(jvpName);
   }
-  // If attribute specifies VJP name, try to look up VJP in current module.
-  // If the VJP doesn't exist, or if the original is an external declaration,
+
+  // Try to look up VJP only if attribute specifies VJP name or if original
+  // function is an external declaration. If VJP function can't be found,
   // create an external VJP reference.
+  StringRef vjpName;
   if (attr->hasVJP()) {
-    vjp = module.lookUpFunction(attr->getVJPName());
+    vjpName = attr->getVJPName();
+  } else if (original->isExternalDeclaration()) {
+    vjpName = original->getASTContext()
+                  .getIdentifier("AD__" + original->getName().str() +
+				 "__vjp_" + getIndices().mangle())
+                  .str();
+  }
+  if (!vjpName.empty()) {
+    vjp = module.lookUpFunction(vjpName);
     if (!vjp)
       vjp = context.declareExternalAssociatedFunction(
-          original, attr, attr->getVJPName(),
-          AutoDiffAssociatedFunctionKind::VJP);
-  } else if (original->isExternalDeclaration()) {
-    auto vjpName = original->getASTContext()
-                       .getIdentifier("AD__" + original->getName().str() +
-                                      "__vjp_" + getIndices().mangle())
-                       .str();
-    vjp = context.declareExternalAssociatedFunction(
-        original, attr, vjpName, AutoDiffAssociatedFunctionKind::VJP);
+          original, attr, vjpName, AutoDiffAssociatedFunctionKind::VJP);
+    attr->setVJPName(vjpName);
   }
 
   if (!jvp)
