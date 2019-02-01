@@ -93,34 +93,6 @@ extension _Pointer {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped._rawValue)
   }
-
-  // all pointers are creatable from mutable pointers
-  
-  /// Creates a new pointer from the given mutable pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The typed pointer to convert.
-  @_transparent
-  public init<T>(_ other: UnsafeMutablePointer<T>) {
-    self.init(other._rawValue)
-  }
-
-  /// Creates a new raw pointer from the given typed pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
-  ///   result is `nil`.
-  @_transparent
-  public init?<T>(_ other: UnsafeMutablePointer<T>?) {
-    guard let unwrapped = other else { return nil }
-    self.init(unwrapped)
-  }
 }
 
 // well, this is pretty annoying
