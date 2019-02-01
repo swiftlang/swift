@@ -85,6 +85,11 @@ func unsafePointerConversionAvailability(
   _ = UnsafePointer<Int>(mrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'RawPointer'}}
   _ = UnsafePointer<Int>(orp)  // expected-error {{cannot convert value of type 'UnsafeRawPointer?' to expected argument type 'RawPointer'}}
   _ = UnsafePointer<Int>(omrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer?' to expected argument type 'RawPointer'}}
+
+  _ = UnsafePointer<Int>(ups) // expected-error {{cannot convert value of type 'UnsafePointer<String>' to expected argument type 'RawPointer'}}
+  _ = UnsafeMutablePointer<Int>(umps) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<String>' to expected argument type 'UnsafeMutablePointer<_>'}}
+  _ = UnsafePointer<String>(upi) // expected-error {{cannot convert value of type 'UnsafePointer<Int>' to expected argument type 'RawPointer'}}
+  _ = UnsafeMutablePointer<String>(umpi) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<_>'}}
 }
 
 func unsafeRawBufferPointerConversions(
@@ -114,4 +119,14 @@ func unsafeRawBufferPointerConversions(
   _ = UnsafeRawBufferPointer(start: omrp, count: 1)
   _ = UnsafeMutableRawBufferPointer(start: orp, count: 1) // expected-error {{cannot convert value of type 'UnsafeRawPointer?' to expected argument type 'UnsafeMutableRawPointer?'}}
   _ = UnsafeRawBufferPointer(start: orp, count: 1)
+}
+
+
+struct SR9800 {
+  func foo(_: UnsafePointer<CChar>) {}
+  func foo(_: UnsafePointer<UInt8>) {}
+
+  func ambiguityTest(buf: UnsafeMutablePointer<CChar>) {
+    _ = foo(UnsafePointer(buf)) // this call should be unambiguoius
+  }
 }
