@@ -284,6 +284,58 @@ bool OwnershipModelEliminatorVisitor::visitDestructureTupleInst(
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 
+static bool stripOwnership(SILFunction &F) {
+  // If F is an external declaration, do not process it.
+  if (F.isExternalDeclaration())
+    return false;
+
+  // Set F to have unqualified ownership.
+  F.setOwnershipEliminated();
+
+  bool MadeChange = false;
+  SILBuilder B(F);
+  OwnershipModelEliminatorVisitor Visitor(B);
+
+  for (auto &BB : F) {
+    // Change all arguments to have ValueOwnershipKind::Any.
+    for (auto *Arg : BB.getArguments()) {
+      Arg->setOwnershipKind(ValueOwnershipKind::Any);
+    }
+
+    for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
+      // Since we are going to be potentially removing instructions, we need
+      // to make sure to increment our iterator before we perform any
+      // visits.
+      SILInstruction *I = &*II;
+      ++II;
+
+      MadeChange |= Visitor.visit(I);
+    }
+  }
+  return MadeChange;
+}
+
+static void prepareNonTransparentSILFunctionForOptimization(ModuleDecl *,
+                                                            SILFunction *F) {
+  if (!F->hasOwnership() || F->isTransparent())
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "After deserialization, stripping ownership in:"
+                          << F->getName() << "\n");
+
+  stripOwnership(*F);
+}
+
+static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *F) {
+  if (!F->hasOwnership())
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "After deserialization, stripping ownership in:"
+                          << F->getName() << "\n");
+
+  stripOwnership(*F);
+}
+
 namespace {
 
 struct OwnershipModelEliminator : SILModuleTransform {
@@ -297,48 +349,38 @@ struct OwnershipModelEliminator : SILModuleTransform {
       getModule()->dump(DumpBefore.c_str());
     }
 
-    for (auto &F : *getModule()) {
+    auto &Mod = *getModule();
+    for (auto &F : Mod) {
       // If F does not have ownership, skip it. We have no further work to do.
       if (!F.hasOwnership())
         continue;
 
-      // If we were asked to not strip ownership from transparent functions,
-      // continue.
+      // If we were asked to not strip ownership from transparent functions in
+      // /our/ module, continue.
       if (SkipTransparent && F.isTransparent())
         continue;
 
-      // Set F to have unqualified ownership.
-      F.setOwnershipEliminated();
-
-      bool MadeChange = false;
-      SILBuilder B(F);
-      OwnershipModelEliminatorVisitor Visitor(B);
-
-      for (auto &BB : F) {
-        // Change all arguments to have ValueOwnershipKind::Any.
-        for (auto *Arg : BB.getArguments()) {
-          Arg->setOwnershipKind(ValueOwnershipKind::Any);
-        }
-
-        for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
-          // Since we are going to be potentially removing instructions, we need
-          // to make sure to increment our iterator before we perform any
-          // visits.
-          SILInstruction *I = &*II;
-          ++II;
-
-          MadeChange |= Visitor.visit(I);
-        }
-      }
-
-      if (MadeChange) {
+      if (stripOwnership(F)) {
         auto InvalidKind =
             SILAnalysis::InvalidationKind::BranchesAndInstructions;
         invalidateAnalysis(&F, InvalidKind);
       }
     }
-  }
 
+    // If we were asked to strip transparent, we are at the beginning of the
+    // performance pipeline. In such a case, we register a handler so that all
+    // future things we deserialize have ownership stripped.
+    using NotificationHandlerTy =
+        FunctionBodyDeserializationNotificationHandler;
+    std::unique_ptr<DeserializationNotificationHandler> ptr;
+    if (SkipTransparent) {
+      ptr.reset(new NotificationHandlerTy(
+          prepareNonTransparentSILFunctionForOptimization));
+    } else {
+      ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
+    }
+    Mod.registerDeserializationNotificationHandler(std::move(ptr));
+  }
 };
 
 } // end anonymous namespace
