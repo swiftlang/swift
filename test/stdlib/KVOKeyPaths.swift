@@ -3,6 +3,9 @@
 
 // REQUIRES: objc_interop
 
+// SR-9838 Disable because it blocks PR testing.
+// UNSUPPORTED: CPU=i386
+
 import Foundation
 
 struct Guts {
