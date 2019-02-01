@@ -11,22 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
-import ObjectiveC
 
 extension NSSortDescriptor {
     public convenience init<Root, Value>(keyPath: KeyPath<Root, Value>, ascending: Bool) {
         self.init(key: _bridgeKeyPathToString(keyPath), ascending: ascending)
-        objc_setAssociatedObject(self, UnsafeRawPointer(&associationKey), keyPath, .OBJC_ASSOCIATION_RETAIN)
     }
     
     public convenience init<Root, Value>(keyPath: KeyPath<Root, Value>, ascending: Bool, comparator cmptr: @escaping Foundation.Comparator) {
         self.init(key: _bridgeKeyPathToString(keyPath), ascending: ascending, comparator: cmptr)
-        objc_setAssociatedObject(self, UnsafeRawPointer(&associationKey), keyPath, .OBJC_ASSOCIATION_RETAIN)
     }
     
     public var keyPath: AnyKeyPath? {
-        return objc_getAssociatedObject(self, UnsafeRawPointer(&associationKey)) as? AnyKeyPath
+        guard let key = self.key else { return nil }
+        return _bridgeStringToKeyPath(key)
     }
 }
-
-private var associationKey: ()?
