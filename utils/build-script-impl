@@ -2487,7 +2487,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     if [[ ! "${TENSORFLOW_SWIFT_APIS}" && -d "${TENSORFLOW_SWIFT_APIS_DIR}" ]] ; then
                         TENSORFLOW_SWIFT_APIS="${TENSORFLOW_SWIFT_APIS_DIR}"
                     fi
-                    echo "BUILD SCRIPT IMPL TF APIS: ${TENSORFLOW_SWIFT_APIS}"
                     if [[ "${TENSORFLOW_SWIFT_APIS}" ]] ; then
                         cmake_options=(
                             "${cmake_options[@]}"
