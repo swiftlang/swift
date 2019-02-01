@@ -2436,9 +2436,13 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
   // Match generic parameters against their bounds.
   if (auto *genericTy = type->getAs<GenericTypeParamType>()) {
     if (auto *generic = genericTy->getDecl()) {
-      type = generic->getSuperclass();
-      if (!type)
-        return false;
+      auto genericSig =
+        generic->getDeclContext()->getGenericSignatureOfContext();
+      if (genericSig && genericSig->getConformsTo(type).empty()) {
+        type = genericSig->getSuperclassBound(type);
+        if (!type)
+          return false;
+      }
     }
   }
 
