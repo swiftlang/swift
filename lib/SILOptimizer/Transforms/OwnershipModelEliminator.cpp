@@ -27,7 +27,9 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -248,6 +250,9 @@ static void splitDestructure(SILBuilder &B, SILInstruction *I, SILValue Op) {
   assert((isa<DestructureStructInst>(I) || isa<DestructureTupleInst>(I)) &&
          "Only destructure operations can be passed to splitDestructure");
 
+  // First before we destructure anything, see if we can simplify any of our
+  // instruction operands.
+
   SILModule &M = I->getModule();
   SILLocation Loc = I->getLoc();
   SILType OpType = Op->getType();
@@ -256,15 +261,23 @@ static void splitDestructure(SILBuilder &B, SILInstruction *I, SILValue Op) {
   Projection::getFirstLevelProjections(OpType, M, Projections);
   assert(Projections.size() == I->getNumResults());
 
-  llvm::SmallVector<SILValue, 8> NewValues;
-  for (unsigned i : indices(Projections)) {
-    const auto &Proj = Projections[i];
-    NewValues.push_back(Proj.createObjectProjection(B, Loc, Op).get());
-    assert(NewValues.back()->getType() == I->getResults()[i]->getType() &&
-           "Expected created projections and results to be the same types");
+  auto Results = I->getResults();
+  for (unsigned Index : indices(Results)) {
+    SILValue Result = Results[Index];
+
+    // If our result doesnt have any uses, do not emit instructions, just skip
+    // it.
+    if (Result->use_empty())
+      continue;
+
+    // Otherwise, create a projection.
+    const auto &Proj = Projections[Index];
+    SingleValueInstruction *ProjInst =
+        Proj.createObjectProjection(B, Loc, Op).get();
+
+    Result->replaceAllUsesWith(ProjInst);
   }
 
-  I->replaceAllUsesPairwiseWith(NewValues);
   I->eraseFromParent();
 }
 
