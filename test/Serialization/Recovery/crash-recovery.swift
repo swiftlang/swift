@@ -14,7 +14,7 @@ public class Sub: Base {
 
 // CHECK-CRASH: error: fatal error encountered while reading from module 'Lib'; please file a bug report with your project and the crash log
 // CHECK-CRASH-3-NOT: note
-// CHECK-CRASH-4: note: compiling as Swift 4.2.1, with 'Lib' built as Swift 3.4
+// CHECK-CRASH-4: note: compiling as Swift 4.2.2, with 'Lib' built as Swift 3.4
 // CHECK-CRASH-LABEL: *** DESERIALIZATION FAILURE (please include this section in any bug report) ***
 // CHECK-CRASH: could not find 'disappearingMethod()' in parent class
 // CHECK-CRASH: While loading members for 'Sub' in module 'Lib'
