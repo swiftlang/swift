@@ -598,6 +598,8 @@ Type TypeChecker::resolveTypeInContext(
           if (resolution.getStage() == TypeResolutionStage::Structural) {
             return resolution.resolveSelfAssociatedType(
               selfType, foundDC, typeDecl->getName());
+          } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+            typeDecl = assocType->getAssociatedTypeAnchor();
           }
         }
       }
