@@ -715,6 +715,9 @@ public:
                                    DeclName memberName, ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), BaseType(baseType),
         Name(memberName) {}
+    
+  bool diagnoseAsError() override;
+};
 class PartialApplicationFailure final : public FailureDiagnostic {
   enum RefKind : unsigned {
     MutatingMethod,

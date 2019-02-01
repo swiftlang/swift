@@ -1698,6 +1698,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   }
   
   return false;
+}
 bool PartialApplicationFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *anchor = cast<UnresolvedDotExpr>(getRawAnchor());

@@ -273,6 +273,7 @@ AllowTypeOrInstanceMember *AllowTypeOrInstanceMember::create(ConstraintSystem &c
                                                              DeclName member,
                                                              ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowTypeOrInstanceMember(cs, baseType, member, locator);
+}
 bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
   auto failure = PartialApplicationFailure(root, isWarning(),
                                            getConstraintSystem(), getLocator());
