@@ -53,6 +53,14 @@ extension EmptyCollection: Sequence {
   public func makeIterator() -> Iterator {
     return Iterator()
   }
+
+  /// Calls the closure with a zero-length buffer and no address.
+  @inlinable // trivial-implementation
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try body(UnsafeBufferPointer(start: nil, count: 0))
+  }  
 }
 
 extension EmptyCollection: RandomAccessCollection, MutableCollection {

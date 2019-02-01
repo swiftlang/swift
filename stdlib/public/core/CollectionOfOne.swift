@@ -156,6 +156,16 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   public var count: Int {
     return 1
   }
+
+  /// Calls the closure with a pointer to the singular element.
+  @inlinable // trivial-implementation
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafePointer(to: _element) {
+      return try body(UnsafeBufferPointer(start: $0, count: 1))
+    }
+  } 
 }
 
 extension CollectionOfOne : CustomDebugStringConvertible {

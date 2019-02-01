@@ -437,6 +437,18 @@ extension DropFirstSequence: Sequence {
     // [1,2,3,4].dropFirst(2).
     return DropFirstSequence(_base, dropping: _limit + k)
   }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try _base.withContiguousStorageIfAvailable { buffer in
+      let sliced = UnsafeBufferPointer(
+        start: buffer.baseAddress?.advanced(by: _limit),
+        count: Swift.max(buffer.count - _limit, 0))
+      return try body(sliced)
+    }
+  }  
 }
 
 /// A sequence that only consumes up to `n` elements from an underlying
@@ -499,6 +511,18 @@ extension PrefixSequence: Sequence {
     let length = Swift.min(maxLength, self._maxLength)
     return PrefixSequence(_base, maxLength: length)
   }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try _base.withContiguousStorageIfAvailable { buffer in
+      let sliced = UnsafeBufferPointer(
+        start: buffer.baseAddress,
+        count: Swift.min(_maxLength, buffer.count))
+      return try body(sliced)
+    }
+  }  
 }
 
 
