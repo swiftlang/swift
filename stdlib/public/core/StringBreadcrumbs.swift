@@ -126,7 +126,8 @@ extension _StringGuts {
     }
 
     _internalInvariant(mutPtr.pointee != nil)
-    return UnsafePointer(mutPtr)
+    // assuming optional class reference and class reference can alias
+    return UnsafeRawPointer(mutPtr).assumingMemoryBound(to: _StringBreadcrumbs.self)
   }
 
   @inline(never) // slow-path
@@ -137,6 +138,6 @@ extension _StringGuts {
     // Thread-safe compare-and-swap
     let crumbs = _StringBreadcrumbs(String(self))
     _stdlib_atomicInitializeARCRef(
-      object: UnsafeMutablePointer(mutPtr), desired: crumbs)
+      object: UnsafeMutablePointer(mutating: UnsafeRawPointer(mutPtr).assumingMemoryBound(to: Optional<AnyObject>.self)), desired: crumbs)
   }
 }
