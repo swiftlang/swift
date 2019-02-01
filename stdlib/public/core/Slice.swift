@@ -215,6 +215,20 @@ extension Slice: Collection {
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     _base._failEarlyRangeCheck(range, bounds: bounds)
   }
+
+  @inlinable // generic-performance
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R?  {
+    return try _base.withContiguousStorageIfAvailable { buffer in 
+      let offset = _base.distance(from: _base.startIndex, to: self._startIndex)
+      let length = _base.distance(from: self._startIndex, to: self._endIndex)
+      let sliced = UnsafeBufferPointer(
+        start: buffer.baseAddress?.advanced(by: offset),
+        count: length)
+      return try body(sliced)
+    }
+  }
 }
 
 extension Slice: BidirectionalCollection where Base: BidirectionalCollection {
