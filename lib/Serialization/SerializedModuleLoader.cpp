@@ -788,6 +788,10 @@ const clang::Module *SerializedASTFile::getUnderlyingClangModule() const {
   return nullptr;
 }
 
+const ModuleDecl *SerializedASTFile::getShadowedModule() const {
+  return File.getShadowedModule();
+}
+
 Identifier
 SerializedASTFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   Identifier discriminator = File.getDiscriminatorForPrivateValue(D);
