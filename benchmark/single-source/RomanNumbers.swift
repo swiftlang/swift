@@ -12,63 +12,84 @@
 
 import TestsUtils
 
+//
 // Mini benchmark implementing roman numeral conversions to/from integers.
-// Measures performance of Substring.starts(with:), dropFirst and String.append
+// Measures performance of Substring.starts(with:) and String.append(),
 // with very short string arguments.
-
-let t: [BenchmarkCategory] = [.api, .String, .algorithm]
-let N = 270
+//
 
 public let RomanNumbers = [
   BenchmarkInfo(
-    name: "Roman.Substring.startsWith.dropFirst",
-    runFunction: {
-      checkId($0, upTo: N, { $0.romanNumeral }, Int.init(romanSSsWdF:)) },
-    tags: t),
+    name: "RomanNumbers",
+    runFunction: run_RomanNumbers,
+    tags: [.api, .String, .algorithm])
 ]
 
-@inline(__always)
-func checkId(_ n: Int, upTo limit: Int, _ itor: (Int) -> String,
-  _ rtoi: (String) -> Int?) {
-  for _ in 1...n {
-   CheckResults(
-     zip(1...limit, (1...limit).map(itor).map(rtoi)).allSatisfy { $0 == $1 })
-  }
-}
-
 let romanTable: KeyValuePairs<String, Int> = [
-  "M": 1000, "CM": 900, "D": 500, "CD": 400,
-  "C": 100_, "XC": 90_, "L": 50_, "XL": 40_,
-  "X": 10__, "IX": 9__, "V": 5__, "IV": 4__,
+  "M": 1000,
+  "CM": 900,
+  "D": 500,
+  "CD": 400,
+  "C": 100,
+  "XC": 90,
+  "L": 50,
+  "XL": 40,
+  "X": 10,
+  "IX": 9,
+  "V": 5,
+  "IV": 4,
   "I": 1,
 ]
 
 extension BinaryInteger {
-  // Imperative Style
-  // See https://www.rosettacode.org/wiki/Roman_numerals/Encode#Swift
-  // See https://www.rosettacode.org/wiki/Roman_numerals/Decode#Swift
-
   var romanNumeral: String {
     var result = ""
-    var n = self
-    for (numeral, value) in romanTable {
-      while n >= value {
-        result += numeral
-        n -= Self(value)
+    var value = self
+  outer:
+    while value > 0 {
+      var position = 0
+      for (i, (key: s, value: v)) in romanTable[position...].enumerated() {
+        if value >= v {
+          result += s
+          value -= Self(v)
+          position = i
+          continue outer
+        }
       }
+      fatalError("Unreachable")
     }
     return result
   }
 
-  init?(romanSSsWdF number: String) {
+  init?(romanNumeral: String) {
     self = 0
-    var raw = Substring(number)
-    for (numeral, value) in romanTable {
-      while raw.starts(with: numeral) {
-        self += Self(value)
-        raw = raw.dropFirst(numeral.count)
+    var input = Substring(romanNumeral)
+  outer:
+    while !input.isEmpty {
+      var position = 0
+      for (i, (key: s, value: v)) in romanTable[position...].enumerated() {
+        if input.starts(with: s) {
+          self += Self(v)
+          input = input.dropFirst(s.count)
+          position = i
+          continue outer
+        }
       }
+      return nil
     }
-    guard raw.isEmpty else { return nil }
+  }
+}
+
+@inline(never)
+func checkRomanNumerals(upTo limit: Int) {
+  for i in 0 ..< limit {
+    CheckResults(Int(romanNumeral: identity(i.romanNumeral)) == i)
+  }
+}
+
+@inline(never)
+public func run_RomanNumbers(_ N: Int) {
+  for _ in 0 ..< 10 * N {
+    checkRomanNumerals(upTo: 1100)
   }
 }
