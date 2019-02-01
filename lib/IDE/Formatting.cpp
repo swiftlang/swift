@@ -575,8 +575,12 @@ class FormatWalker : public SourceEntityWalker {
       };
 
       if (auto AE = dyn_cast_or_null<ApplyExpr>(Node.dyn_cast<Expr *>())) {
-        collect(AE->getArg());
-        return;
+        // PrefixUnaryExpr shouldn't be syntacticly considered as a funtion call
+        // for sibling alignment.
+        if (!isa<PrefixUnaryExpr>(AE)) {
+          collect(AE->getArg());
+          return;
+        }
       }
 
       if (auto PE = dyn_cast_or_null<ParenExpr>(Node.dyn_cast<Expr *>())) {
