@@ -26,7 +26,7 @@ protocol P1 {
 protocol AProtocol {
   associatedtype e : e
   // expected-error@-1 {{inheritance from non-protocol, non-class type 'Self.e'}}
-  // expected-error@-2 {{type 'Self.e' constrained to non-protocol, non-class type 'Self.e'}} expected-note@-2 {{use 'e == Self.e' to require 'e' to be 'Self.e'}} {{22-23===}}
+  // expected-error@-2 {{type 'Self.e' constrained to non-protocol, non-class type 'Self.e'}}
 }
 
 // Extensions.

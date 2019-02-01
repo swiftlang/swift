@@ -664,3 +664,7 @@ extension SR_7984_X where T.Assoc.Foo: String {} // expected-error {{type 'T.Ass
 
 struct SR_7984_S<T: Sequence> where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{46-47= ==}}
 func SR_7984_F<T: Sequence>(foo: T) where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{52-53= ==}}
+
+protocol SR_7984_P {
+  func S<T : Sequence>(bar: T) where T.Element: String // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{47-48= ==}}
+}

@@ -5775,11 +5775,12 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         return subjectTypeName;
       };
       
-      if (allowConcreteGenericParams || subjectType->is<DependentMemberType>()) {
+      auto DMT = subjectType->getAs<DependentMemberType>();
+      
+      if (allowConcreteGenericParams || (DMT && !DMT->getAssocType())) {
         auto subjectTypeName = subjectType.getString();
         auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
-        Diags.diagnose(loc,
-                       diag::requires_conformance_nonprotocol_fixit,
+        Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
                        subjectTypeNameWithoutSelf, constraintType.getString())
              .fixItReplace(loc, " == ");
       }
