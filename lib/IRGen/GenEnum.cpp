@@ -4785,7 +4785,11 @@ namespace {
         Address payloadAddr = projectPayload(IGF, enumAddr);
         auto payload = EnumPayload::load(IGF, payloadAddr, PayloadSchema);
         
-        auto spareBitMask = ~PayloadTagBits.asAPInt();
+        // We need to mask not only the payload tag bits, but all spare bits,
+        // because the other spare bits may be used to tag a single-payload
+        // enum containing this enum as a payload. Single payload layout
+        // unfortunately assumes that tagging the payload case is a no-op.
+        auto spareBitMask = ~CommonSpareBits.asAPInt();
         APInt tagBitMask
           = interleaveSpareBits(IGF.IGM, PayloadTagBits, PayloadTagBits.size(),
                                 spareTagBits, 0);
@@ -4823,7 +4827,11 @@ namespace {
         auto payload = EnumPayload::load(IGF, payloadAddr, PayloadSchema);
 
         // Mask off the spare bits.
-        auto spareBitMask = ~PayloadTagBits.asAPInt();
+        // We need to mask not only the payload tag bits, but all spare bits,
+        // because the other spare bits may be used to tag a single-payload
+        // enum containing this enum as a payload. Single payload layout
+        // unfortunately assumes that tagging the payload case is a no-op.
+        auto spareBitMask = ~CommonSpareBits.asAPInt();
         payload.emitApplyAndMask(IGF, spareBitMask);
 
         // Store the tag into the spare bits.
