@@ -136,13 +136,11 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   return llvm::all_of(diffProperties, [&](VarDecl *v) {
     if (v->isLet() && v->hasInitialValue())
       return false;
-    if (!v->hasType())
+    if (!v->hasInterfaceType())
       lazyResolver->resolveDeclSignature(v);
-    if (!v->hasType())
+    if (!v->hasInterfaceType())
       return false;
-    auto declType = v->getType()->hasArchetype()
-                        ? v->getType()
-                        : DC->mapTypeIntoContext(v->getType());
+    auto declType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     auto conf = TypeChecker::conformsToProtocol(declType, diffableProto, DC,
                                                 ConformanceCheckFlags::Used);
     return (bool)conf;
@@ -155,10 +153,9 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
 static Type getAssociatedType(VarDecl *decl, DeclContext *DC, Identifier id) {
   auto &C = decl->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
-  auto declType = decl->getType()->hasArchetype()
-                      ? decl->getType()
-                      : DC->mapTypeIntoContext(decl->getType());
-  C.getLazyResolver()->resolveDeclSignature(decl);
+  if (!decl->hasInterfaceType())
+    C.getLazyResolver()->resolveDeclSignature(decl);
+  auto declType = DC->mapTypeIntoContext(decl->getValueInterfaceType());
   auto conf = TypeChecker::conformsToProtocol(declType, diffableProto, DC,
                                               ConformanceCheckFlags::Used);
   if (!conf)
@@ -433,7 +430,7 @@ static ValueDecl *getUnderlyingAllDiffableVariables(ModuleDecl *module,
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto allDiffableVarsReq =
       getProtocolRequirement(diffableProto, C.Id_allDifferentiableVariables);
-  if (!varDecl->hasType())
+  if (!varDecl->hasInterfaceType())
     C.getLazyResolver()->resolveDeclSignature(varDecl);
   auto confRef =
       module->lookupConformance(varDecl->getType(), diffableProto);
