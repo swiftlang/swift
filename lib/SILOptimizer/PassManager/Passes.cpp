@@ -147,6 +147,22 @@ void swift::runSILTFPartitionPass(SILModule &Module) {
 
 }
 
+/// \brief Run the mandatory optimization passes needed before differentiation.
+void swift::runSILMandatoryOptPreDiffPasses(SILModule &Module) {
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+
+  SILPassManager PM(&Module, "TensorFlow", /*isMandatoryPipeline=*/ true);
+  PM.executePassPipelinePlan(
+      SILPassPipelinePlan::getMandatoryOptPreDiffPassPipeline(
+          Module.getOptions()));
+
+  // Verify the module, if required.
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+
+}
+
 void swift::runSILOptimizationPassesWithFileSpecification(SILModule &M,
                                                           StringRef Filename) {
   SILPassManager PM(&M);

@@ -46,6 +46,9 @@ namespace swift {
   /// \brief Run the partioning pass for TensorFlow operations.
   void runSILTFPartitionPass(SILModule &M);
 
+  /// Run the mandatory optimization passes needed before differentiation.
+  void runSILMandatoryOptPreDiffPasses(SILModule &Module);
+
   /// \brief Run the SIL ownership eliminator pass on \p M.
   bool runSILOwnershipEliminatorPass(SILModule &M);
 

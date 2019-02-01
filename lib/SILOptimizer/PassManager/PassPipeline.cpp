@@ -79,9 +79,9 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
   P.addRawSILInstLowering();
 }
 
-static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
-                                    const SILOptions &Options) {
-  P.startPipeline("Guaranteed Passes");
+// SWIFT_ENABLE_TENSORFLOW
+static void addMandatoryOptPreDiffPipeline(SILPassPipelinePlan &P,
+                                           const SILOptions &Options) {
   if (Options.EnableMandatorySemanticARCOpts) {
     P.addSemanticARCOpts();
   }
@@ -97,7 +97,13 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   addDefiniteInitialization(P);
   P.addClosureLifetimeFixup();
   P.addOwnershipModelEliminator();
+}
+
+static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
+                                    const SILOptions &Options) {
+  P.startPipeline("Guaranteed Passes");
   // SWIFT_ENABLE_TENSORFLOW
+  addMandatoryOptPreDiffPipeline(P, Options);
   P.addDifferentiation();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
@@ -637,6 +643,15 @@ SILPassPipelinePlan SILPassPipelinePlan::getTFPartitionPassPipeline() {
   P.addTFPartition();
   return P;
 }
+
+SILPassPipelinePlan SILPassPipelinePlan::getMandatoryOptPreDiffPassPipeline(
+    const SILOptions &Options) {
+  SILPassPipelinePlan P;
+  P.startPipeline("Mandatory Opt PreDiff");
+  addMandatoryOptPreDiffPipeline(P, Options);
+  return P;
+}
+
 /// SWIFT_ENABLE_TENSORFLOW End
 
 //===----------------------------------------------------------------------===//
