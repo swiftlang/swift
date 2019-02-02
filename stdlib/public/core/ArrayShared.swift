@@ -87,8 +87,8 @@ extension Collection {
 }
 
 extension _ArrayBufferProtocol {
-  @inlinable // FIXME @useableFromInline https://bugs.swift.org/browse/SR-7588
   @inline(never)
+  @usableFromInline
   internal mutating func _arrayOutOfPlaceReplace<C: Collection>(
     _ bounds: Range<Int>,
     with newValues: __owned C,
