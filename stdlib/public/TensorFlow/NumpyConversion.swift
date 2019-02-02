@@ -28,16 +28,22 @@ extension ShapedArray : ConvertibleFromNumpyArray
   public init?(numpy numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
+      debugLog("numpy array is not an ndarray.")
       return nil
     }
     // Check if the dtype of the `ndarray` is compatible with the `Scalar`
     // type.
     guard Scalar.numpyScalarTypes.contains(numpyArray.dtype) else {
+      debugLog("""
+                 ndarray dtype \(numpyArray.dtype) cannot be mapped to Swift \
+                 type \(Scalar.self).
+                 """)
       return nil
     }
 
     let pyShape = numpyArray.__array_interface__["shape"]
     guard let shape = Array<Int>(pyShape) else {
+      debugLog("unknown numpy array shape.")
       return nil
     }
 
@@ -47,6 +53,7 @@ extension ShapedArray : ConvertibleFromNumpyArray
 
     guard let ptrVal =
       UInt(contiguousNumpyArray.__array_interface__["data"].tuple2.0) else {
+      debugLog("cannot get the data pointer of the numpy array.")
       return nil
     }
     // Note: `ptr` is not nil even if the `ndarray` is empty (i.e. has a shape
