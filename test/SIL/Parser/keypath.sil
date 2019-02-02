@@ -135,6 +135,17 @@ entry:
   return undef : $()
 }
 
+// CHECK-LABEL: sil shared @tuple_generic
+sil shared @ tuple_generic : $@convention(thin) <T, U> () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  %a = keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  // CHECK: keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+  %b = keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+
+  return undef : $()
+}
+
 // CHECK-LABEL: sil @optional
 sil @optional : $@convention(thin) () -> () {
 entry:

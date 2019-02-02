@@ -90,6 +90,8 @@ struct ComputedB {
   var reabstracted: () -> () = {}
 }
 
+typealias Tuple<T: Equatable, U> = (S<T>, C<U>)
+
 keyPath.test("key path in-place instantiation") {
   for _ in 1...2 {
     let s_x = (\S<Int>.x as AnyKeyPath) as! WritableKeyPath<S<Int>, Int>
@@ -101,12 +103,25 @@ keyPath.test("key path in-place instantiation") {
     let s_c = (\S<Int>.c as AnyKeyPath) as! WritableKeyPath<S<Int>, C<Int>>
     let s_c_x = (\S<Int>.c.x as AnyKeyPath) as! ReferenceWritableKeyPath<S<Int>, Int>
 
+    let t_0s = (\Tuple<Int, Int>.0 as AnyKeyPath) as! WritableKeyPath<Tuple<Int, Int>, S<Int>>
+    let t_1c = (\Tuple<Int, Int>.1 as AnyKeyPath) as! WritableKeyPath<Tuple<Int, Int>, C<Int>>
+    let t_0s_x = (\Tuple<Int, Int>.0.x as AnyKeyPath) as! WritableKeyPath<Tuple<Int, Int>, Int>
+    let t_0s_p_hypotenuse = (\Tuple<Int, Int>.0.p.hypotenuse as AnyKeyPath) as! KeyPath<Tuple<Int, Int>, Double>
+    let t_1c_x = (\Tuple<Int, Int>.1.x as AnyKeyPath) as! ReferenceWritableKeyPath<Tuple<Int, Int>, Int>
+    let t_1c_immutable = (\Tuple<Int, Int>.1.immutable as AnyKeyPath) as! KeyPath<Tuple<Int, Int>, String>
+
     let c_x = (\C<Int>.x as AnyKeyPath) as! ReferenceWritableKeyPath<C<Int>, Int>
     let s_c_x_2 = s_c.appending(path: c_x)
 
     expectEqual(s_c_x, s_c_x_2)
     expectEqual(s_c_x_2, s_c_x)
     expectEqual(s_c_x.hashValue, s_c_x_2.hashValue)
+
+    let t_1c_x_2 = t_1c.appending(path: c_x)
+
+    expectEqual(t_1c_x, t_1c_x_2)
+    expectEqual(t_1c_x_2, t_1c_x)
+    expectEqual(t_1c_x.hashValue, t_1c_x_2.hashValue)
 
     let point_x = (\Point.x as AnyKeyPath) as! WritableKeyPath<Point, Double>
     let point_y = (\Point.y as AnyKeyPath) as! WritableKeyPath<Point, Double>
@@ -173,12 +188,25 @@ keyPath.test("key path generic instantiation") {
       let s_c = (\S<T>.c as AnyKeyPath) as! WritableKeyPath<S<T>, C<T>>
       let s_c_x = (\S<T>.c.x as AnyKeyPath) as! ReferenceWritableKeyPath<S<T>, Int>
 
+      let t_0s = (\Tuple<T, T>.0 as AnyKeyPath) as! WritableKeyPath<Tuple<T, T>, S<T>>
+      let t_1c = (\Tuple<T, T>.1 as AnyKeyPath) as! WritableKeyPath<Tuple<T, T>, C<T>>
+      let t_0s_x = (\Tuple<T, T>.0.x as AnyKeyPath) as! WritableKeyPath<Tuple<T, T>, Int>
+      let t_0s_p_hypotenuse = (\Tuple<T, T>.0.p.hypotenuse as AnyKeyPath) as! KeyPath<Tuple<T, T>, Double>
+      let t_1c_x = (\Tuple<T, T>.1.x as AnyKeyPath) as! ReferenceWritableKeyPath<Tuple<T, T>, Int>
+      let t_1c_immutable = (\Tuple<T, T>.1.immutable as AnyKeyPath) as! KeyPath<Tuple<T, T>, String>
+
       let c_x = (\C<T>.x as AnyKeyPath) as! ReferenceWritableKeyPath<C<T>, Int>
       let s_c_x_2 = s_c.appending(path: c_x)
 
       expectEqual(s_c_x, s_c_x_2)
       expectEqual(s_c_x_2, s_c_x)
       expectEqual(s_c_x.hashValue, s_c_x_2.hashValue)
+
+      let t_1c_x_2 = t_1c.appending(path: c_x)
+
+      expectEqual(t_1c_x, t_1c_x_2)
+      expectEqual(t_1c_x_2, t_1c_x)
+      expectEqual(t_1c_x.hashValue, t_1c_x_2.hashValue)
 
       let point_x = (\Point.x as AnyKeyPath) as! WritableKeyPath<Point, Double>
       let point_y = (\Point.y as AnyKeyPath) as! WritableKeyPath<Point, Double>
@@ -721,6 +749,7 @@ keyPath.test("offsets") {
   expectEqual(SLayout.offset(of: getIdentityKeyPathOfType(S<Int>.self)), 0)
 
   let TPLayout = MemoryLayout<TupleProperties>.self
+  expectEqual(TPLayout.offset(of: \TupleProperties.self), 0)
   expectEqual(TPLayout.offset(of: \TupleProperties.a), 0)
   expectEqual(TPLayout.offset(of: \TupleProperties.a.0), 0)
   expectEqual(TPLayout.offset(of: \TupleProperties.a.1), 8)
@@ -730,6 +759,12 @@ keyPath.test("offsets") {
   expectEqual(TPLayout.offset(of: \TupleProperties.c), 48)
   expectEqual(TPLayout.offset(of: \TupleProperties.c.m), 48)
   expectEqual(TPLayout.offset(of: \TupleProperties.c.n), 56)
+
+  let TLayout = MemoryLayout<Tuple<Int, Int>>.self
+  expectEqual(TLayout.offset(of: \Tuple<Int, Int>.self), 0)
+  expectEqual(TLayout.offset(of: \Tuple<Int, Int>.0), 0)
+  expectEqual(TLayout.offset(of: \Tuple<Int, Int>.0.x), 0)
+  expectEqual(TLayout.offset(of: \Tuple<Int, Int>.1), SLayout.size)
 }
 
 keyPath.test("identity key path") {

@@ -1115,7 +1115,9 @@ emitKeyPathComponent(IRGenModule &IGM,
     //
     // This code is ALSO executed in the case of a tuple with dynamic layout,
     // (see below) but only if `component.getTupleIndex()` is 0 - in that case
-    // the compiler knows that the tuple element is always at offset 0
+    // the compiler knows that the tuple element is always at offset 0.
+    // TODO: If this is behavior is not desired we should find a way to skip to
+    // the next section of code e.g. check if baseTy has archetypes?
     if (auto offset = getFixedTupleElementOffset(IGM, loweredTy, component.getTupleIndex())) {
       auto header = KeyPathComponentHeader
                       ::forStructComponentWithInlineOffset(/*isLet*/ false,

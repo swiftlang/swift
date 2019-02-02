@@ -97,6 +97,17 @@ entry:
   return undef : $()
 }
 
+// CHECK-LABEL: sil shared [serialized] @tuple_generic
+sil shared [serialized] @tuple_generic : $@convention(thin) <T, U> () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  %a = keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  // CHECK: keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+  %b = keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+
+  return undef : $()
+}
+
 sil @id_a : $@convention(thin) () -> ()
 sil @get_s_int : $@convention(thin) (@in_guaranteed S) -> @out Int
 sil @set_s_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed S) -> ()
@@ -184,11 +195,12 @@ entry:
   %0 = function_ref @stored_properties : $@convention(thin) () -> ()
   %1 = function_ref @stored_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
   %2 = function_ref @tuple_elements : $@convention(thin) () -> ()
-  %3 = function_ref @computed_properties : $@convention(thin) () -> ()
-  %4 = function_ref @computed_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
-  %5 = function_ref @optional : $@convention(thin) () -> ()
-  %6 = function_ref @indexes : $@convention(thin) (S, C) -> ()
-  %7 = function_ref @external : $@convention(thin) <D: P, E: Q, F: R> () -> ()
+  %3 = function_ref @tuple_generic : $@convention(thin) <T, U> () -> ()
+  %4 = function_ref @computed_properties : $@convention(thin) () -> ()
+  %5 = function_ref @computed_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
+  %6 = function_ref @optional : $@convention(thin) () -> ()
+  %7 = function_ref @indexes : $@convention(thin) (S, C) -> ()
+  %8 = function_ref @external : $@convention(thin) <D: P, E: Q, F: R> () -> ()
 
   unreachable
 }
