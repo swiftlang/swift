@@ -11,7 +11,6 @@
 #
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-#
 
 function usage() {
   echo "$0 [OPTIONS]"
@@ -27,6 +26,11 @@ function usage() {
   echo "-t --test"
   echo "Run tests."
   echo ""
+  if [[ "$(uname -s)" == "Linux" ]] ; then
+      echo "-g --gpu"
+      echo "Enable GPU support."
+      echo ""
+  fi
   if [[ "$(uname -s)" == "Darwin" ]] ; then
       echo "-p --pkg"
       echo "Build a installer package."
@@ -41,14 +45,20 @@ SRC_DIR=$PWD
 DRY_RUN=
 BUNDLE_PREFIX=
 INSTALLER_PACKAGE=
+SWIFT_PACKAGE_BASE=
+SWIFT_PACKAGE_GPU=
+SWIFT_PACKAGE_NOTEST=
+SWIFT_PACKAGE_INSTALLER=
 # SWIFT_ENABLE_TENSORFLOW
 if [[ -z ${SWIFT_PACKAGE} ]]; then
   case $(uname -s) in
     Darwin)
-      SWIFT_PACKAGE=tensorflow_osx,no_test
+      SWIFT_PACKAGE_BASE=tensorflow_osx
+      SWIFT_PACKAGE_NOTEST=,no_test
     ;;
     Linux)
-      SWIFT_PACKAGE=tensorflow_linux,no_test
+      SWIFT_PACKAGE_BASE=tensorflow_linux
+      SWIFT_PACKAGE_NOTEST=,no_test
     ;;
     *)
       echo "Unrecognised platform $(uname -s)"
@@ -61,15 +71,11 @@ fi
 FIRST_ARG_PROCESSED=0
 while [ $# -ne 0 ]; do
   case "$1" in
-    -n|--dry-run)
-      DRY_RUN="-n"
+  -n|--dry-run)
+    DRY_RUN="-n"
   ;;
-    -t|--test)
-      if [ "$(uname -s)" == "Linux" ]; then
-        SWIFT_PACKAGE=tensorflow_linux
-      else
-        SWIFT_PACKAGE=tensorflow_osx
-      fi
+  -t|--test)
+    SWIFT_PACKAGE_NOTEST=
   ;;
   -h|--help)
     usage
@@ -78,10 +84,19 @@ while [ $# -ne 0 ]; do
   -p|--pkg)
     INSTALLER_PACKAGE=1
     if [ "$(uname -s)" == "Darwin" ]; then
-        SWIFT_PACKAGE=tensorflow_osx,installer
+      SWIFT_PACKAGE_INSTALLER=,installer
+      SWIFT_PACKAGE_NOTEST=
     else
-        echo "--pkg is not supported on \"$(uname -s)\". See --help"
-        exit 1
+      echo "--pkg is not supported on \"$(uname -s)\". See --help"
+      exit 1
+    fi
+  ;;
+  -g|--gpu)
+    if [ "$(uname -s)" == "Linux" ]; then
+      SWIFT_PACKAGE_GPU=,gpu
+    else
+      echo "--gpu is not supported on \"$(uname -s)\". See --help"
+      exit 1
     fi
   ;;
   *)
@@ -94,6 +109,8 @@ while [ $# -ne 0 ]; do
   FIRST_ARG_PROCESSED=1
   shift
 done
+
+SWIFT_PACKAGE="${SWIFT_PACKAGE_BASE}${SWIFT_PACKAGE_GPU}${SWIFT_PACKAGE_NOTEST}${SWIFT_PACKAGE_INSTALLER}"
 
 # Get host name.
 HOST=
