@@ -135,6 +135,9 @@ public:
   /// \brief Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
 
+  /// Enable serialization of the module just before differentiation.
+  bool SerializeForDifferentiation = false;
+
   /// The name of the file to which the backend should save YAML optimization
   /// records.
   std::string OptRecordFile;
