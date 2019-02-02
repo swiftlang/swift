@@ -4629,9 +4629,9 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                         ->getDependentType(getGenericParams());
 
       Impl->HadAnyError = true;
-      
-      auto invalidConstraint = InvalidConstraint(subjectType, constraintType,
-                                                 source.getLoc());
+
+      auto invalidConstraint = InvalidConstraint(
+          subjectType, constraintType, source.getSource(*this, subjectType));
       invalidConstraints.push_back(invalidConstraint);
     }
 
@@ -5758,10 +5758,11 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   // allowConcreteGenericParams is true or the subject type is a member type.
   if (!invalidConstraints.empty()) {
     for (auto constraint : invalidConstraints) {
-      auto loc = constraint.sourceLoc;
       auto subjectType = constraint.subjectType;
       auto constraintType = constraint.constraintType;
-      
+      auto source = constraint.reqSource;
+      auto loc = source->getLoc();
+
       Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
                      subjectType, constraintType);
       
@@ -5774,10 +5775,10 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         
         return subjectTypeName;
       };
-      
-      auto DMT = subjectType->getAs<DependentMemberType>();
-      
-      if (allowConcreteGenericParams || (DMT && !DMT->getAssocType())) {
+
+      if (allowConcreteGenericParams ||
+          (subjectType->is<DependentMemberType>() &&
+           !source->isProtocolRequirement())) {
         auto subjectTypeName = subjectType.getString();
         auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
         Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,

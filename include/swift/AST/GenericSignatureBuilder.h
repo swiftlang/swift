@@ -320,12 +320,11 @@ public:
   struct InvalidConstraint {
     Type subjectType;
     Type constraintType;
-    SourceLoc sourceLoc;
-    
+    const RequirementSource *reqSource;
+
     InvalidConstraint(const Type type1, const Type type2,
-                      const SourceLoc loc) : subjectType(type1),
-                                              constraintType(type2),
-                                              sourceLoc(loc) {}
+                      const RequirementSource *source)
+        : subjectType(type1), constraintType(type2), reqSource(source) {}
   };
   
   /// The set of constraints that are invalid because the constraint
