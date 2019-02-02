@@ -82,13 +82,11 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
 static Type getVectorNumericScalarAssocType(VarDecl *decl, DeclContext *DC) {
   auto &C = decl->getASTContext();
   auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
-  if (!decl->hasType())
+  if (!decl->hasInterfaceType())
     C.getLazyResolver()->resolveDeclSignature(decl);
-  if (!decl->hasType())
+  if (!decl->hasInterfaceType())
     return nullptr;
-  auto declType = decl->getType()->hasArchetype()
-                      ? decl->getType()
-                      : DC->mapTypeIntoContext(decl->getType());
+  auto declType = DC->mapTypeIntoContext(decl->getValueInterfaceType());
   auto conf = TypeChecker::conformsToProtocol(declType, vectorNumericProto, DC,
                                               ConformanceCheckFlags::Used);
   if (!conf)
@@ -154,16 +152,14 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
   // All stored properties must conform to `AdditiveArithmetic`.
   auto &C = nominal->getASTContext();
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-    return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-      if (!v->hasInterfaceType() || !v->getType())
-        C.getLazyResolver()->resolveDeclSignature(v);
-      if (!v->hasInterfaceType() || !v->getType())
-        return false;
-      auto declType = v->getType()->hasArchetype()
-          ? v->getType()
-          : DC->mapTypeIntoContext(v->getType());
-      return (bool)TypeChecker::conformsToProtocol(declType, addArithProto, DC,
-                                                   ConformanceCheckFlags::Used);
+  return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
+    if (!v->hasInterfaceType())
+      C.getLazyResolver()->resolveDeclSignature(v);
+    if (!v->hasInterfaceType())
+      return false;
+    auto declType = DC->mapTypeIntoContext(v->getValueInterfaceType());
+    return (bool)TypeChecker::conformsToProtocol(declType, addArithProto, DC,
+                                                 ConformanceCheckFlags::Used);
   });
 }
 
@@ -209,10 +205,8 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
   // Create expression combining lhs and rhs members using member operator.
   auto createMemberOpExpr = [&](VarDecl *member) -> Expr * {
     auto module = nominal->getModuleContext();
-    auto memberType = member->getType()->hasArchetype()
-                          ? member->getType()
-                          : nominal->mapTypeIntoContext(
-                                member->getType()->mapTypeOutOfContext());
+    auto memberType =
+        nominal->mapTypeIntoContext(member->getValueInterfaceType());
     auto confRef = module->lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to math protocol");
 
@@ -223,13 +217,12 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
     if (confRef->isConcrete())
-      if (auto opDecl =
-              confRef->getConcrete()->getWitnessDecl(operatorReq, nullptr))
-        memberOpDecl = opDecl;
+      memberOpDecl = confRef->getConcrete()->getWitnessDecl(
+          operatorReq, C.getLazyResolver());
     assert(memberOpDecl && "Member operator declaration must exist");
     auto memberOpDRE =
         new (C) DeclRefExpr(memberOpDecl, DeclNameLoc(), /*Implicit*/ true);
-    auto *memberTypeExpr = TypeExpr::createImplicit(member->getType(), C);
+    auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
     auto memberOpExpr =
         new (C) DotSyntaxCallExpr(memberOpDRE, SourceLoc(), memberTypeExpr);
 
@@ -378,7 +371,9 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
   auto *zeroReq = getProtocolRequirement(addArithProto, C.Id_zero);
 
   auto createMemberZeroExpr = [&](VarDecl *member) -> Expr * {
-    auto *memberTypeExpr = TypeExpr::createImplicit(member->getType(), C);
+    auto memberType =
+        nominal->mapTypeIntoContext(member->getValueInterfaceType());
+    auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
     auto module = nominal->getModuleContext();
     auto confRef = module->lookupConformance(member->getType(), addArithProto);
     assert(confRef && "Member does not conform to 'AdditiveArithmetic'");
@@ -391,7 +386,7 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
     }
     // Otherwise, return reference to concrete witness declaration for `zero`.
     auto conf = confRef->getConcrete();
-    auto zeroDecl = conf->getWitnessDecl(zeroReq, nullptr);
+    auto zeroDecl = conf->getWitnessDecl(zeroReq, C.getLazyResolver());
     return new (C) MemberRefExpr(memberTypeExpr, SourceLoc(), zeroDecl,
                                  DeclNameLoc(), /*Implicit*/ true);
   };
