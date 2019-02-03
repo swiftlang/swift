@@ -74,7 +74,8 @@ struct VectorSpacesEqualSelf : AdditiveArithmetic, Differentiable {
 // Test generic type with vector space types to `Self`.
 struct GenericVectorSpacesEqualSelf<T> : AdditiveArithmetic, Differentiable
   where T : AdditiveArithmetic, T : Differentiable,
-        T == T.TangentVector, T == T.CotangentVector
+        T == T.TangentVector, T == T.CotangentVector,
+        T == T.AllDifferentiableVariables
 {
   var w: T
   var b: T
@@ -184,40 +185,70 @@ struct HasGenericEnvironment<Scalar : FloatingPoint & Differentiable> : Differen
 }
 
 // Test type with generic members that conform to `Differentiable`.
-// Since it's not the case that
-// `T == T.TangentVector == T.CotangentVector`,
-// it's necessary to synthesize new vector space struct types.
-
-// FIXME: Blocked by bug, potentially related to SR-9595.
-// Type checker is unable to infer `T.TangentVector : AdditiveArithmetic` due
-// to mutually recursive constraints:
-// - `TangentVector.CotangentVector == CotangentVector`
-// - `CotangentVector.CotangentVector == TangentVector`
-struct GenericNeedsVectorSpaceStructs<T> : Differentiable
+// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
+// due to `Differentiable` protocol generic signature minimization bug.
+// expected-error @+1 {{type 'GenericSynthesizeAllStructs<T>' does not conform to protocol 'Differentiable'}}
+struct GenericSynthesizeAllStructs<T> : Differentiable
   where T : Differentiable
 {
+  // expected-error @+1 {{'Differentiable' protocol derived conformances is broken; please explicitly conform 'T.TangentVector' to 'AdditiveArithmetic'}}
   var w: T
   var b: T
 }
 
 // Test generic type with vector space types to `Self`.
+// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
+// due to `Differentiable` protocol generic signature minimization bug.
+// expected-error @+1 {{type 'GenericNotAdditiveArithmetic<T>' does not conform to protocol 'Differentiable'}}
 struct GenericNotAdditiveArithmetic<T> : Differentiable
   where T : Differentiable, T == T.TangentVector, T == T.CotangentVector
 {
+  // expected-error @+1 {{'Differentiable' protocol derived conformances is broken; please explicitly conform 'T' to 'AdditiveArithmetic'}}
   var w: T
   var b: T
 }
 
 // Test type in generic context.
-// FIXME: Blocked by bug, potentially related to SR-9595.
+// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
+// due to `Differentiable` protocol generic signature minimization bug.
 struct A<T : Differentiable> {
   struct B<U : Differentiable, V> : Differentiable {
-    struct InGenericContext {
-      var w: T
-      var b: U
+    // expected-error @+1 {{type 'A<T>.B<U, V>.InGenericContext' does not conform to protocol 'Differentiable'}}
+    struct InGenericContext : Differentiable {
+      @noDerivative var a: A
+      var b: B
+      // expected-error @+1 {{'Differentiable' protocol derived conformances is broken; please explicitly conform 'T.TangentVector' to 'AdditiveArithmetic'}}
+      var t: T
+      // expected-error @+1 {{'Differentiable' protocol derived conformances is broken; please explicitly conform 'U.TangentVector' to 'AdditiveArithmetic'}}
+      var u: U
     }
   }
 }
+
+// Test extension.
+struct Extended {
+  var x: Float
+}
+extension Extended : Differentiable {}
+
+// Test extension of generic type.
+// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
+// due to `Differentiable` protocol generic signature minimization bug.
+struct GenericExtended<T> {
+  // expected-error @+1 {{'Differentiable' protocol derived conformances is broken; please explicitly conform 'T.TangentVector' to 'AdditiveArithmetic'}}
+  var x: T
+}
+// expected-error @+1 {{type 'GenericExtended<T>' does not conform to protocol 'Differentiable'}}
+extension GenericExtended : Differentiable where T : Differentiable {}
+
+// Test constrained extension of generic type (workaround for SR-9595).
+struct GenericConstrained<T> {
+  var x: T
+}
+extension GenericConstrained : Differentiable
+  where T : Differentiable,
+        T.TangentVector : AdditiveArithmetic,
+        T.CotangentVector : AdditiveArithmetic {}
 
 // Test errors.
 

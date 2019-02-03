@@ -2446,6 +2446,9 @@ ERROR(broken_vector_numeric_requirement,none,
       "VectorNumeric protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
+ERROR(broken_differentiable_generic_signature,none,
+      "'Differentiable' protocol derived conformances is broken; fix by "
+      "explicitly conforming %0 to 'AdditiveArithmetic'", (Type))
 WARNING(differentiable_implicit_noderivative_fixit,none,
       "stored property has no derivative because it does not conform to "
       "'Differentiable'; add '@noDerivative' to make it explicit", ())
