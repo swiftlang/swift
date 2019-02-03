@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize %s
+// SWIFT_ENABLE_TENSORFLOW
+// NOTE(TF-11): Added explicit `-enable-large-loadable-types` flag.
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -enable-large-loadable-types | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize %s
 import Swift
 import Builtin
 
