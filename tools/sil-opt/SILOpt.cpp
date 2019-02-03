@@ -257,8 +257,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
 #include "swift/SILOptimizer/PassManager/Passes.def"
   }
 
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPassPipelineForKinds(Passes));
+  PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
+      Module->getOptions(), Passes));
 
   if (Module->getOptions().VerifyAll)
     Module->verify();
