@@ -157,5 +157,5 @@ void swift::performSILInstCountIfNeeded(SILModule *M) {
     return;
   SILPassManager PrinterPM(M);
   PrinterPM.executePassPipelinePlan(
-      SILPassPipelinePlan::getInstCountPassPipeline());
+      SILPassPipelinePlan::getInstCountPassPipeline(M->getOptions()));
 }
