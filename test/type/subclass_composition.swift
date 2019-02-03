@@ -510,8 +510,8 @@ func staticMembers(
   _ = m2.staticClassMember()
   _ = m2.staticClassMember
 
-  _ = m2.instanceProtocolMember // expected-error {{instance member 'instanceProtocolMember' cannot be used on type 'ClassWithStaticMember & ProtocolWithStaticMember'}}
-  _ = m2.instanceClassMember // expected-error {{instance member 'instanceClassMember' cannot be used on type 'ClassWithStaticMember & ProtocolWithStaticMember'}}
+  _ = m2.instanceProtocolMember // expected-error {{static member 'instanceProtocolMember' cannot be used on instance of type '(ClassWithStaticMember & ProtocolWithStaticMember).Type'}}
+  _ = m2.instanceClassMember // expected-error {{static member 'instanceClassMember' cannot be used on instance of type '(ClassWithStaticMember & ProtocolWithStaticMember).Type'}}
 }
 
 // Make sure we correctly form subclass existentials in expression context.

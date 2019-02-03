@@ -4972,7 +4972,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       auto diag = diagnose(arg->getStartLoc(),
                            diag::cannot_call_non_function_value, fnType);
       diag.highlight(fnExpr->getSourceRange());
-
+      
       // If the argument is an empty tuple, then offer a
       // fix-it to remove the empty tuple and use the value
       // directly.

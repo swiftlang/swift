@@ -1490,7 +1490,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getAnchor()->getLoc();
   auto &cs = getConstraintSystem();
   
-  Expr *expr = getParentExpr();
+  Expr *expr = getAnchor();
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
   auto member = getResolvedOverload(getLocator())->Choice.getDecl();
   
@@ -1563,6 +1563,19 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
           .highlight(baseRange)
           .highlight(member->getSourceRange());
       return true;
+    }
+    
+    if (auto callExpr = dyn_cast<ApplyExpr>(expr)) {
+      auto fnExpr = callExpr->getFn();
+      auto fnType = cs.getType(fnExpr)->getRValueType();
+      auto arg = callExpr->getArg();
+      
+      if (fnType->is<ExistentialMetatypeType>()) {
+        emitDiagnostic(arg->getStartLoc(),
+                       diag::missing_init_on_metatype_initialization)
+        .highlight(fnExpr->getSourceRange());
+        return true;
+      }
     }
     
     // Just emit a generic "instance member cannot be used" error

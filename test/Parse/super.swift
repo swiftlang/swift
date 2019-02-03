@@ -37,8 +37,8 @@ class D : B {
     super.bar        // expected-error {{expression resolves to an unused function}}
     super.bar()
     super.init // expected-error{{'super.init' cannot be called outside of an initializer}}
-    super.init() // expected-error{{'super.init' cannot be called outside of an initializer}}
-    super.init(0) // expected-error{{'super.init' cannot be called outside of an initializer}}
+    super.init() // expected-error{{member 'init' cannot be used on value of type 'B'}}
+    super.init(0) // expected-error{{cannot invoke 'B.init' with an argument list of type '(Int)'}}
     super[0]        // expected-error {{expression resolves to an unused subscript}}
     super
       .bar()
