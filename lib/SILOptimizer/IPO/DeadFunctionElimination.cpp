@@ -753,5 +753,5 @@ void swift::performSILDeadFunctionElimination(SILModule *M) {
   SILPassManager PM(M);
   llvm::SmallVector<PassKind, 1> Pass = {PassKind::DeadFunctionElimination};
   PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPassPipelineForKinds(Pass));
+      SILPassPipelinePlan::getPassPipelineForKinds(M->getOptions(), Pass));
 }
