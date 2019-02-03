@@ -6475,28 +6475,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   return false;
 }
 
-static bool diagnoseKeyPathUnsupportedOperations(TypeChecker &TC,
-                                                 KeyPathExpr *KPE) {
-  if (KPE->isObjC())
-    return false;
-
-  using ComponentKind = KeyPathExpr::Component::Kind;
-  const auto components = KPE->getComponents();
-
-  if (auto *rootType = KPE->getRootType()) {
-    if (isa<TupleTypeRepr>(rootType)) {
-      auto first = components.front();
-      if (first.getKind() == ComponentKind::UnresolvedProperty) {
-        TC.diagnose(first.getLoc(),
-                    diag::unsupported_keypath_tuple_element_reference);
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 // Ported version of TypeChecker::checkObjCKeyPathExpr which works
 // with new Smart KeyPath feature.
 static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
@@ -6728,18 +6706,13 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
                                corrections);
 
       if (currentType) {
-        if (currentType->is<TupleType>()) {
-          TC.diagnose(KPE->getLoc(), diag::expr_keypath_unimplemented_tuple);
-          isInvalid = true;
-          break;
-        }
-        else
-          TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
-                      currentType, componentName);
-      } else
+        TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
+                    currentType, componentName);
+      } else {
         TC.diagnose(componentNameLoc, diag::use_unresolved_identifier,
                     componentName, false);
-
+      }
+        
       // Note all the correction candidates.
       corrections.noteAllCandidates();
       corrections.addAllCandidatesToLookup(lookup);
@@ -6851,9 +6824,6 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
 }
 
 bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
-  if (diagnoseKeyPathUnsupportedOperations(CS.TC, KPE))
-    return true;
-
   auto contextualType = CS.getContextualType();
 
   auto components = KPE->getComponents();
