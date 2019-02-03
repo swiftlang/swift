@@ -1555,22 +1555,22 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
 /// differentiation parameters/result, emit a "unknown parameter or result
 /// size" error at appropriate source locations. Returns true if error is
 /// emitted.
-static bool diagnoseIndirectParametersOrResult(ADContext &context,
+static bool diagnoseIndirectParametersOrResult(CanSILFunctionType fnType,
+                                               ADContext &context,
                                                DifferentiationTask *task) {
-  auto originalFnTy = task->getOriginal()->getLoweredFunctionType();
   auto indices = task->getIndices();
   // Check whether differentiation result or parameters are indirect.
-  bool originalHasIndirectParamOrResult =
-      originalFnTy->getResults()[indices.source].isFormalIndirect();
-  for (unsigned i : swift::indices(originalFnTy->getParameters())) {
+  bool hasIndirectParamOrResult =
+      fnType->getResults()[indices.source].isFormalIndirect();
+  for (unsigned i : swift::indices(fnType->getParameters())) {
     if (!indices.isWrtParameter(i))
       continue;
-    if (originalFnTy->getParameters()[i].isFormalIndirect()) {
-      originalHasIndirectParamOrResult = true;
+    if (fnType->getParameters()[i].isFormalIndirect()) {
+      hasIndirectParamOrResult = true;
       break;
     }
   }
-  if (originalHasIndirectParamOrResult) {
+  if (hasIndirectParamOrResult) {
     context.emitNondifferentiabilityError(
         task, diag::autodiff_function_indirect_params_or_result_unsupported);
     return true;
@@ -1958,6 +1958,8 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task,
                               /*NameLoc*/ loc, /*Inherited*/ {},
                               /*GenericParams*/ nullptr, // to be set later
                               /*DC*/ &file);
+  // Set braces so that `pvStruct` can be dumped.
+  pvStruct->setBraces(loc);
   if (primalGenericSig) {
     auto genericParams =
         cloneGenericParameters(astCtx, pvStruct, primalGenericSig);
@@ -2410,6 +2412,14 @@ public:
     }
     auto vjp = vjpAndVJPIndices->first;
 
+    // Emit error if callee type has indirect differentiation parameters/result.
+    if (diagnoseIndirectParametersOrResult(
+            vjp->getType().getAs<SILFunctionType>(), getContext(),
+            getDifferentiationTask())) {
+      errorOccurred = true;
+      return;
+    }
+
     // Record the VJP's indices.
     getDifferentiationTask()->getNestedApplyActivities().insert(
         {ai, {vjpAndVJPIndices->second}});
@@ -2494,7 +2504,8 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // parameters/result, bail out since AD does not support function calls with
   // indirect parameters yet.
   if (diagnoseUnsupportedControlFlow(context, item.task) ||
-      diagnoseIndirectParametersOrResult(context, item.task)) {
+      diagnoseIndirectParametersOrResult(
+          item.original->getLoweredFunctionType(), context, item.task)) {
     errorOccurred = true;
     return true;
   }
