@@ -11,6 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 module WinSDK [system] [extern_c] {
+  module WinSock2 {
+    header "WinSock2.h"
+    header "WS2tcpip.h"
+    export *
+  }
+
   module core {
     // api-ms-win-core-errhandling-l1-1-0.dll
     module errhandling {
@@ -39,6 +45,11 @@ module WinSDK [system] [extern_c] {
     // api-ms-win-core-interlocked-l1-1-0.dll
     module interlocked {
       header "interlockedapi.h"
+      export *
+    }
+
+    module iphlp {
+      header "iphlpapi.h"
       export *
     }
 
