@@ -715,12 +715,43 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::doFixUp(SILFunction *F) {
+  // If our source function is in ossa form, but the function into which we are
+  // cloning is not in ossa, after we clone, eliminate default arguments.
+  if (!getBuilder().hasOwnership() && F->hasOwnership()) {
+    for (auto &Block : getBuilder().getFunction()) {
+      auto *Term = Block.getTerminator();
+      if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(Term)) {
+        // Check if we have a default argument.
+        auto *FailureBlock = CCBI->getFailureBB();
+        assert(FailureBlock->getNumArguments() <= 1 &&
+               "We should either have no args or a single default arg");
+        if (0 == FailureBlock->getNumArguments())
+          continue;
+        FailureBlock->getArgument(0)->replaceAllUsesWith(CCBI->getOperand());
+        FailureBlock->eraseArgument(0);
+        continue;
+      }
+
+      if (auto *SEI = dyn_cast<SwitchEnumInst>(Term)) {
+        if (auto DefaultBlock = SEI->getDefaultBBOrNull()) {
+          assert(DefaultBlock.get()->getNumArguments() <= 1 &&
+                 "We should either have no args or a single default arg");
+          if (0 == DefaultBlock.get()->getNumArguments())
+            continue;
+          DefaultBlock.get()->getArgument(0)->replaceAllUsesWith(
+              SEI->getOperand());
+          DefaultBlock.get()->eraseArgument(0);
+          continue;
+        }
+      }
+    }
+  }
+
   // Remove any code after unreachable instructions.
 
-  // NOTE: It is unfortunate that it essentially duplicates
-  // the code from sil-combine, but doing so allows for
-  // avoiding any cross-layer invocations between SIL and
-  // SILOptimizer layers.
+  // NOTE: It is unfortunate that it essentially duplicates the code from
+  // sil-combine, but doing so allows for avoiding any cross-layer invocations
+  // between SIL and SILOptimizer layers.
 
   for (auto *BB : BlocksWithUnreachables) {
     for (auto &I : *BB) {
