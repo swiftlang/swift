@@ -19,6 +19,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-witness-table"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
@@ -65,6 +66,8 @@ SILWitnessTable *SILWitnessTable::create(
 
   // Create the mangled name of our witness table...
   Identifier Name = M.getASTContext().getIdentifier(mangleConstant(Conformance));
+
+  LLVM_DEBUG(llvm::dbgs() << "SILWitnessTable Creating: " << Name.str() << '\n');
 
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
