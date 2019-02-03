@@ -28,7 +28,9 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -582,14 +584,18 @@ private:
     }
 
     StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
-    auto M =
+    llvm::DIModule *M =
         DBuilder.createModule(Parent, Name, ConfigMacros, IncludePath, Sysroot);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
 
-  llvm::DIModule *
-  getOrCreateModule(clang::ExternalASTSource::ASTSourceDescriptor Desc) {
+  using ASTSourceDescriptor = clang::ExternalASTSource::ASTSourceDescriptor;
+  /// Create a DIModule from a clang module or PCH.
+  /// The clang::Module pointer is passed separately because the recursive case
+  /// needs to fudge the AST descriptor.
+  llvm::DIModule *getOrCreateModule(ASTSourceDescriptor Desc,
+                                    const clang::Module *ClangModule) {
     // PCH files don't have a signature field in the control block,
     // but LLVM detects skeleton CUs by looking for a non-zero DWO id.
     // We use the lower 64 bits for debug info.
@@ -599,10 +605,24 @@ private:
             : ~1ULL;
 
     // Handle Clang modules.
-    if (const clang::Module *ClangModule = Desc.getModuleOrNull()) {
+    if (ClangModule) {
       llvm::DIModule *Parent = nullptr;
-      if (ClangModule->Parent)
-        Parent = getOrCreateModule(*ClangModule->Parent);
+      if (ClangModule->Parent) {
+        // The loading of additional modules by Sema may trigger an out-of-date
+        // PCM rebuild in the Clang module dependencies of the additional
+        // module. A PCM rebuild causes the ModuleManager to unload previously
+        // loaded ASTFiles. For this reason we must use the cached ASTFile
+        // information here instead of the potentially dangling pointer to the
+        // ASTFile that is stored in the clang::Module object.
+        //
+        // Note: The implementation here assumes that all clang submodules
+        //       belong to the same PCM file.
+        ASTSourceDescriptor ParentDescriptor(*ClangModule->Parent);
+        Parent = getOrCreateModule({ParentDescriptor.getModuleName(),
+                                    ParentDescriptor.getPath(),
+                                    Desc.getASTFile(), Desc.getSignature()},
+                                   ClangModule->Parent);
+      }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
                                Desc.getPath(), Signature, Desc.getASTFile());
     }
@@ -612,10 +632,18 @@ private:
                              Desc.getASTFile());
   };
 
+  static Optional<ASTSourceDescriptor> getClangModule(const ModuleDecl &M) {
+    for (auto *FU : M.getFiles())
+      if (auto *CMU = dyn_cast_or_null<ClangModuleUnit>(FU))
+        if (auto Desc = CMU->getASTSourceDescriptor())
+          return Desc;
+    return None;
+  }
+  
   llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
     ModuleDecl *M = IM.second;
-    if (auto *ClangModule = M->findUnderlyingClangModule())
-      return getOrCreateModule(*ClangModule);
+    if (Optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
+      return getOrCreateModule(*ModuleDesc, ModuleDesc->getModuleOrNull());
 
     StringRef Path = getFilenameFromDC(M);
     StringRef Name = M->getName().str();
@@ -1457,8 +1485,18 @@ private:
         if (auto *ClangDecl = D->getClangDecl()) {
           clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
           auto Idx = ClangDecl->getOwningModuleID();
-          if (auto Info = Reader.getSourceDescriptor(Idx))
-            Scope = getOrCreateModule(*Info);
+          auto SubModuleDesc = Reader.getSourceDescriptor(Idx);
+          auto TopLevelModuleDesc = getClangModule(*D->getModuleContext());
+          if (SubModuleDesc && TopLevelModuleDesc) {
+            // Describe the submodule, but substitute the cached ASTFile from
+            // the toplevel module. The ASTFile pointer in SubModule may be
+            // dangling and cant be trusted.
+            Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
+                                       SubModuleDesc->getPath(),
+                                       TopLevelModuleDesc->getASTFile(),
+                                       TopLevelModuleDesc->getSignature()},
+                                      SubModuleDesc->getModuleOrNull());
+          }
         }
       Context = Context->getParent();
     }
