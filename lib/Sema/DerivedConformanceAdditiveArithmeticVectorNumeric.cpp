@@ -73,7 +73,7 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
                               }),
                lookup.end());
   assert(lookup.size() == 1 && "Ambiguous protocol requirement");
-  return lookup[0];
+  return lookup.front();
 }
 
 // Return the `Scalar` associated type for the given `ValueDecl` if it conforms
