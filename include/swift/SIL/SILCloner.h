@@ -1701,6 +1701,13 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitUnmanagedAutoreleaseValueInst(
     UnmanagedAutoreleaseValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordClonedInstruction(Inst, getBuilder().createAutoreleaseValue(
+                                             getOpLocation(Inst->getLoc()),
+                                             getOpValue(Inst->getOperand()),
+                                             Inst->getAtomicity()));
+  }
+
   recordClonedInstruction(Inst, getBuilder().createUnmanagedAutoreleaseValue(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
