@@ -133,7 +133,10 @@ public:
   bool EnableMandatorySemanticARCOpts = false;
 
   /// \brief Enable large loadable types IRGen pass.
-  bool EnableLargeLoadableTypes = true;
+  // bool EnableLargeLoadableTypes = true;
+  // FIXME(TF-11, SR-9849): Disabled because LoadableByAddress cannot handle
+  // some functions that return closures that take/return large loadable types.
+  bool EnableLargeLoadableTypes = false;
 
   /// The name of the file to which the backend should save YAML optimization
   /// records.

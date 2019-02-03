@@ -1,6 +1,8 @@
 // RUN: %target-run-eager-swift
-//
 // REQUIRES: executable_test
+//
+// FIXME: `XORTraining` segfaults with `-O`, possibly due to AD refcounting bugs.
+// UNSUPPORTED: swift_test_mode_optimize
 //
 // Machine learning API AD runtime tests.
 
@@ -13,14 +15,11 @@ var ModelADTests = TestSuite("ModelAD")
 ModelADTests.testAllBackends("SimpleLayerAD") {
   let ones = Tensor<Float>(ones: [2, 2])
   let dense = Dense<Float>(inputSize: 2, outputSize: 2, activation: { $0 })
-  // FIXME: Differentiation blocked by SR-9806.
-  /*
   let grad = gradient(at: dense) { dense in
     dense.applied(to: ones).sum()
   }
-  expectEqual(ones * 2, grad.weight)
-  expectEqual(ones, grad.bias)
-  */
+  expectEqual([[2, 2], [2, 2]], grad.weight)
+  expectEqual([2, 2], grad.bias)
 }
 
 ModelADTests.testAllBackends("XORTraining") {
@@ -38,8 +37,6 @@ ModelADTests.testAllBackends("XORTraining") {
   }
   var classifier = Classifier(hiddenSize: 4)
   let optimizer = SGD<Classifier, Float>()
-  // FIXME: Differentiation blocked by SR-9806.
-  /*
   let x: Tensor<Float> = [[0, 0], [0, 1], [1, 0], [1, 1]]
   let y: Tensor<Float> = [0, 1, 1, 0]
   for _ in 0..<1000 {
@@ -50,7 +47,6 @@ ModelADTests.testAllBackends("XORTraining") {
       optimizer.update(&classifier.allDifferentiableVariables, along: 𝛁model)
   }
   print(classifier.applied(to: [[0, 0], [0, 1], [1, 0], [1, 1]]))
-  */
 }
 
 runAllTests()
