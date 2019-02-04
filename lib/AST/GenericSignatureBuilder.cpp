@@ -4629,6 +4629,10 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                         ->getDependentType(getGenericParams());
 
       Impl->HadAnyError = true;
+      
+      if (subjectType->is<DependentMemberType>()) {
+        subjectType = resolveDependentMemberTypes(*this, subjectType);
+      }
 
       auto invalidConstraint = InvalidConstraint(
           subjectType, constraintType, source.getSource(*this, subjectType));

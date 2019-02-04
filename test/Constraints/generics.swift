@@ -668,3 +668,12 @@ func SR_7984_F<T: Sequence>(foo: T) where T.Element: String {} // expected-error
 protocol SR_7984_P {
   func S<T : Sequence>(bar: T) where T.Element: String // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{47-48= ==}}
 }
+
+struct A<T: String> {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
+struct B<T> where T: String {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
+protocol C {
+  associatedtype Foo: String // expected-error {{inheritance from non-protocol, non-class type 'String'}} expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+}
+protocol D {
+  associatedtype Foo where Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+}
