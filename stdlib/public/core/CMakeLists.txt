@@ -201,11 +201,11 @@ set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Availability.swift
+  CollectionDifference.swift
   CollectionOfOne.swift
   Diffing.swift
   ExistentialCollection.swift.gyb
   Mirror.swift
-  OrderedCollectionDifference.swift
   PlaygroundDisplay.swift
   CommandLine.swift
   SliceBuffer.swift

@@ -14,8 +14,8 @@
 
 extension RangeReplaceableCollection {
   private static func fastApplicationEnumeration(
-    of diff: OrderedCollectionDifference<Element>,
-    _ f: (OrderedCollectionDifference<Element>.Change) -> Void
+    of diff: CollectionDifference<Element>,
+    _ f: (CollectionDifference<Element>.Change) -> Void
   ) {
     let totalRemoves = diff.removals.count
     let totalInserts = diff.insertions.count
@@ -23,7 +23,7 @@ extension RangeReplaceableCollection {
     var enumeratedInserts = 0
 
     while enumeratedRemoves < totalRemoves || enumeratedInserts < totalInserts {
-      let consume: OrderedCollectionDifference<Element>.Change
+      let consume: CollectionDifference<Element>.Change
       if enumeratedRemoves < diff.removals.count && enumeratedInserts < diff.insertions.count {
         let removeOffset = diff.removals[enumeratedRemoves].offset
         let insertOffset = diff.insertions[enumeratedInserts].offset
@@ -62,8 +62,8 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n* + *c*), where *n* is `self.count` and *c* is the
   ///   number of changes contained by the parameter.
-//  @available(swift, introduced: 5.1)
-  public func applying(_ difference: OrderedCollectionDifference<Element>) -> Self? {
+  @available(swift, introduced: 5.1)
+  public func applying(_ difference: CollectionDifference<Element>) -> Self? {
     var result = Self()
     var enumeratedRemoves = 0
     var enumeratedInserts = 0
@@ -105,34 +105,31 @@ extension RangeReplaceableCollection {
 
 // MARK: Definition of API
 
-//@available(swift, introduced: 5.1)
+@available(swift, introduced: 5.1)
 extension BidirectionalCollection {
   /// Returns the difference needed to produce the receiver's state from the
-  /// parameter's state with the fewest possible changes, using the provided
-  /// closure to establish equivalence between elements.
+  /// parameter's state, using the provided closure to establish equivalence
+  /// between elements.
   ///
-  /// This function does not infer element moves, but they can be computed
-  /// using `OrderedCollectionDifference.inferringMoves()` if desired.
-  ///
-  /// Implementation is an optimized variation of the algorithm described by
-  /// E. Myers (1986).
+  /// This function does not infer moves.
   ///
   /// - Parameters:
   ///   - other: The base state.
   ///   - areEquivalent: A closure that returns whether the two
-  ///   parameters are equivalent.
+  ///     parameters are equivalent.
   ///
   /// - Returns: The difference needed to produce the reciever's state from
   ///   the parameter's state.
   ///
-  /// - Complexity: O(*n* * *d*), where *n* is `other.count + self.count` and
-  ///   *d* is the number of changes between the two ordered collections.
+  /// - Complexity: For pathological inputs, worst case performance is
+  ///   O(`self.count` * `other.count`). Faster execution can be expected
+  ///   when the collections share many common elements.
   public func difference<C>(
     from other: C, by areEquivalent: (Element, C.Element) -> Bool
-  ) -> OrderedCollectionDifference<Element>
+  ) -> CollectionDifference<Element>
     where C : BidirectionalCollection, C.Element == Self.Element
   {
-    var rawChanges: [OrderedCollectionDifference<Element>.Change] = []
+    var rawChanges: [CollectionDifference<Element>.Change] = []
 
     let source = CountingIndexCollection(other)
     let target = CountingIndexCollection(self)
@@ -159,20 +156,17 @@ extension BidirectionalCollection {
       }
     }
 
-    return OrderedCollectionDifference<Element>(validatedChanges: rawChanges)
+    return CollectionDifference<Element>(validatedChanges: rawChanges)
   }
 }
 
 extension BidirectionalCollection where Element : Equatable {
   /// Returns the difference needed to produce the receiver's state from the
-  /// parameter's state with the fewest possible changes, using equality to
-  /// establish equivalence between elements.
+  /// parameter's state, using equality to establish equivalence between
+  /// elements.
   ///
   /// This function does not infer element moves, but they can be computed
-  /// using `OrderedCollectionDifference.inferringMoves()` if desired.
-  ///
-  /// Implementation is an optimized variation of the algorithm described by
-  /// E. Myers (1986).
+  /// using `CollectionDifference.inferringMoves()` if desired.
   ///
   /// - Parameters:
   ///   - other: The base state.
@@ -180,9 +174,11 @@ extension BidirectionalCollection where Element : Equatable {
   /// - Returns: The difference needed to produce the reciever's state from
   ///   the parameter's state.
   ///
-  /// - Complexity: O(*n* * *d*), where *n* is `other.count + self.count` and
-  ///   *d* is the number of changes between the two ordered collections.
-  public func difference<C>(from other: C) -> OrderedCollectionDifference<Element>
+  /// - Complexity: For pathological inputs, worst case performance is
+  ///   O(`self.count` * `other.count`). Faster execution can be expected
+  ///   when the collections share many common elements, or if `Element`
+  ///   also conforms to `Hashable`.
+  public func difference<C>(from other: C) -> CollectionDifference<Element>
     where C: BidirectionalCollection, C.Element == Self.Element
   {
     return difference(from: other, by: ==)

@@ -83,7 +83,7 @@
     "UIntBuffer.swift",
     "KeyValuePairs.swift",
     "Diffing.swift",
-    "OrderedCollectionDifference.swift",
+    "CollectionDifference.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
