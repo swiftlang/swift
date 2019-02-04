@@ -210,6 +210,16 @@ private:
   /// faster rebuilds.
   const bool EnableExperimentalDependencies;
 
+  /// Helpful for debugging, but slows down the driver. So, only turn on when
+  /// needed.
+  const bool VerifyExperimentalDependencyGraphAfterEveryImport;
+  /// Helpful for debugging, but slows down the driver. So, only turn on when
+  /// needed.
+  const bool EmitExperimentalDependencyDotFileAfterEveryImport;
+
+  /// Experiment with inter-file dependencies
+  const bool ExperimentalDependenciesIncludeIntrafileOnes;
+
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -220,6 +230,7 @@ private:
       ArrayRefView<std::unique_ptr<T>, T *, Compilation::unwrap<T>>;
 
 public:
+  // clang-format off
   Compilation(DiagnosticEngine &Diags, const ToolChain &TC,
               OutputInfo const &OI,
               OutputLevel Level,
@@ -239,7 +250,11 @@ public:
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
-              bool EnableExperimentalDependencies = false);
+              bool EnableExperimentalDependencies = false,
+              bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
+              bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
+              bool ExperimentalDependenciesIncludeIntrafileOnes = false);
+  // clang-format on
   ~Compilation();
 
   ToolChain const &getToolChain() const {
@@ -298,6 +313,18 @@ public:
     return EnableExperimentalDependencies;
   }
 
+  bool getVerifyExperimentalDependencyGraphAfterEveryImport() const {
+    return VerifyExperimentalDependencyGraphAfterEveryImport;
+  }
+
+  bool getEmitExperimentalDependencyDotFileAfterEveryImport() const {
+    return EmitExperimentalDependencyDotFileAfterEveryImport;
+  }
+
+  bool getExperimentalDependenciesIncludeIntrafileOnes() const {
+    return ExperimentalDependenciesIncludeIntrafileOnes;
+  }
+
   bool getBatchModeEnabled() const {
     return EnableBatchMode;
   }
@@ -312,7 +339,7 @@ public:
   bool getShowIncrementalBuildDecisions() const {
     return ShowIncrementalBuildDecisions;
   }
-  void setShowsIncrementalBuildDecisions(bool value = true) {
+  void setShowIncrementalBuildDecisions(bool value = true) {
     ShowIncrementalBuildDecisions = value;
   }
 
@@ -333,6 +360,12 @@ public:
 
   UnifiedStatsReporter *getStatsReporter() const {
     return Stats.get();
+  }
+
+  /// True if extra work has to be done when tracing through the dependency
+  /// graph, either in order to print dependencies or to collect statistics.
+  bool getTraceDependencies() const {
+    return getShowIncrementalBuildDecisions() || getStatsReporter();
   }
 
   OutputLevel getOutputLevel() const {

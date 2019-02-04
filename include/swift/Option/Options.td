@@ -133,6 +133,21 @@ def enable_experimental_dependencies :
 Flag<["-"], "enable-experimental-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
 
+def driver_verify_experimental_dependency_graph_after_every_import :
+Flag<["-"], "driver-verify-experimental-dependency-graph-after-every-import">,
+InternalDebugOpt,
+HelpText<"Debug DriverGraph by verifying it after every import">;
+
+def driver_emit_experimental_dependency_dot_file_after_every_import :
+Flag<["-"], "driver-emit-experimental-dependency-dot-file-after-every-import">,
+InternalDebugOpt,
+HelpText<"Emit dot files every time driver imports an experimental swiftdeps file.">;
+
+def experimental_dependency_include_intrafile :
+Flag<["-"], "experimental-dependency-include-intrafile">,
+InternalDebugOpt,
+HelpText<"Include within-file dependencies.">;
+
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
