@@ -21,7 +21,7 @@ let N = 270
 
 public let RomanNumbers = [
   BenchmarkInfo(
-    name: "Roman.Substring.startsWith.dropFirst",
+    name: "RomanNumbers2",
     runFunction: {
       checkId($0, upTo: N, { $0.romanNumeral }, Int.init(romanSSsWdF:)) },
     tags: t),
