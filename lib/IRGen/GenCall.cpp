@@ -1599,7 +1599,7 @@ llvm::CallSite CallEmission::emitCallSite() {
                                       { opaqueCallee });
     opaqueCallee =
       IGF.Builder.CreateBitCast(opaqueCallee, origCallee->getType());
-    call->setCalledFunction(opaqueCallee);
+    call->setCalledFunction(fn.getFunctionType(), opaqueCallee);
 
     // Reset the insert point to after the call.
     IGF.Builder.SetInsertPoint(call->getParent());
