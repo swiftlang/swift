@@ -12,6 +12,7 @@
 
 from .cmark import CMark
 from .foundation import Foundation
+from .libcxx import LibCXX
 from .libdispatch import LibDispatch
 from .libicu import LibICU
 from .llbuild import LLBuild
@@ -28,6 +29,7 @@ __all__ = [
     'CMark',
     'Ninja',
     'Foundation',
+    'LibCXX',
     'LibDispatch',
     'LibICU',
     'LLBuild',
