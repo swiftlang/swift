@@ -135,7 +135,10 @@ public:
   /// \brief Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
 
-  /// Enable serialization of the module just before differentiation.
+  /// Enable serialization of the module just before differentiation.  This
+  /// allows the differentiation pass to differentiate SIL that has been loaded
+  /// from this module.  The LLDB REPL uses this so that the differentiation
+  /// pass can differentiate functions defined on different lines.
   bool SerializeForDifferentiation = false;
 
   /// The name of the file to which the backend should save YAML optimization
