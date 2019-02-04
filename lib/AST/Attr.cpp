@@ -131,6 +131,47 @@ DeclAttributes::isUnavailableInSwiftVersion(
   return false;
 }
 
+const AvailableAttr *DeclAttributes::getPotentiallyUnavailable(
+                          const ASTContext &ctx) const {
+  const AvailableAttr *potential = nullptr;
+  const AvailableAttr *conditional = nullptr;
+
+  for (auto Attr : *this)
+    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+      if (AvAttr->isInvalid())
+        continue;
+
+      if (!AvAttr->isActivePlatform(ctx) &&
+          !AvAttr->isLanguageVersionSpecific() &&
+          !AvAttr->isPackageDescriptionVersionSpecific())
+        continue;
+
+      // Definitely not available.
+      if (AvAttr->isUnconditionallyDeprecated())
+        return AvAttr;
+
+      switch (AvAttr->getVersionAvailability(ctx)) {
+        case AvailableVersionComparison::Available:
+          // Doesn't limit the introduced version.
+          break;
+
+        case AvailableVersionComparison::PotentiallyUnavailable:
+          // We'll return this if we don't see something that proves it's
+          // not available in this version.
+          potential = AvAttr;
+          break;
+
+        case AvailableVersionComparison::Unavailable:
+        case AvailableVersionComparison::Obsoleted:
+          conditional = AvAttr;
+      }
+    }
+
+  if (conditional)
+    return conditional;
+  return potential;
+}
+
 const AvailableAttr *DeclAttributes::getUnavailable(
                           const ASTContext &ctx) const {
   const AvailableAttr *conditional = nullptr;
