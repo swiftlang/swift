@@ -27,12 +27,24 @@ import SwiftShims
 /// - Returns: The string of characters read from standard input. If EOF has
 ///   already been reached when `readLine()` is called, the result is `nil`.
 public func readLine(strippingNewline: Bool = true) -> String? {
-  let bytes: [UInt8] = _readLine()
-  if bytes.isEmpty {
-    return nil
+  _swift_stdlib_flockfile_stdin()
+  defer {
+    _swift_stdlib_funlockfile_stdin()
   }
-  var result: String = bytes.withUnsafeBufferPointer {
-    String._fromUTF8Repairing($0).result
+
+  var result = ""
+  while let character = _readCharacter() {
+    result.append(character)
+    if character == "\r", _peekByte() == UInt8(ascii: "\n") {
+      continue
+    }
+    if character.isNewline {
+      break
+    }
+  }
+
+  guard !result.isEmpty else {
+    return nil
   }
   if strippingNewline, result.last!.isNewline {
     _ = result.removeLast()
@@ -41,55 +53,65 @@ public func readLine(strippingNewline: Bool = true) -> String? {
 }
 
 //===----------------------------------------------------------------------===//
-//          | Abbrev |               Alias | Code Point |    UTF-8 |          //
-//          | :----: | ------------------: | :--------: | -------: |          //
-//          |   LF   |           LINE FEED |   U+000A   |       0A |          //
-//          |   VT   | VERTICAL TABULATION |   U+000B   |       0B |          //
-//          |   FF   |           FORM FEED |   U+000C   |       0C |          //
-//          |   CR   |     CARRIAGE RETURN |   U+000D   |       0D |          //
-//          |   NEL  |           NEXT LINE |   U+0085   |    C2 85 |          //
-//          |   LS   |      LINE SEPARATOR |   U+2028   | E2 80 A8 |          //
-//          |   PS   | PARAGRAPH SEPARATOR |   U+2029   | E2 80 A9 |          //
+
+private let _replacementCharacter: Character = "\u{FFFD}"
+
+private func _readCharacter() -> Character? {
+  var utf8Bytes = _FixedArray4<UInt8>()
+  do {
+    // Leading byte...
+    guard let byte = _readByte() else {
+      return nil
+    }
+    guard !_isContinuation(byte) else {
+      return _replacementCharacter
+    }
+    utf8Bytes.append(byte)
+  }
+
+  let utf8Count = _utf8ScalarLength(utf8Bytes[0])
+  switch utf8Count {
+  case 1:
+    _internalInvariant(_isASCII(utf8Bytes[0]))
+  case 2, 3, 4:
+    for _ in 1 ..< utf8Count {
+      // Continuation bytes...
+      guard let byte = _readByte() else {
+        return _replacementCharacter
+      }
+      guard _isContinuation(byte) else {
+        _ = _pushByte(byte)
+        return _replacementCharacter
+      }
+      utf8Bytes.append(byte)
+    }
+  default:
+    return _replacementCharacter
+  }
+
+  return utf8Bytes.withUnsafeBufferPointer {
+    _internalInvariant($0.count == utf8Count)
+    let result = String._fromUTF8Repairing($0).result
+    return result.count == 1 ? Character(result) : _replacementCharacter
+  }
+}
+
 //===----------------------------------------------------------------------===//
 
-private func _readLine() -> [UInt8] {
-  _swift_stdlib_flockfile_stdin()
-  defer {
-    _swift_stdlib_funlockfile_stdin()
+@inline(__always)
+private func _readByte() -> UInt8? {
+  return UInt8(exactly: _swift_stdlib_getc_unlocked_stdin())
+}
+
+@inline(__always)
+private func _pushByte(_ byte: UInt8) -> Bool {
+  return UInt8(exactly: _swift_stdlib_ungetc_unlocked_stdin(CInt(byte))) == byte
+}
+
+@inline(__always)
+private func _peekByte() -> UInt8? {
+  guard let byte = _readByte(), _pushByte(byte) else {
+    return nil
   }
-
-  var bytes = [UInt8]()
-  while true {
-
-    // ISO C requires the `EOF` (end-of-file) macro to be a negative value.
-    guard let byte = UInt8(exactly: _swift_stdlib_getc_unlocked_stdin()) else {
-      return bytes
-    }
-    bytes.append(byte)
-
-    // The "\r\n" (CRLF) sequence is handled by two iterations of the loop.
-    // Other sequences are searched for in reverse UTF-8 code unit order.
-    switch byte {
-    case 0x0A, 0x0B, 0x0C:
-      return bytes
-    case 0x0D:
-      if _swift_stdlib_ungetc_unlocked_stdin(
-           _swift_stdlib_getc_unlocked_stdin()) != 0x0A {
-        return bytes
-      }
-    case 0x85:
-      if bytes.count >= 2,
-         bytes[bytes.count - 2] == 0xC2 {
-        return bytes
-      }
-    case 0xA8, 0xA9:
-      if bytes.count >= 3,
-         bytes[bytes.count - 2] == 0x80,
-         bytes[bytes.count - 3] == 0xE2 {
-        return bytes
-      }
-    default:
-      continue
-    }
-  }
+  return byte
 }

@@ -21,6 +21,7 @@
 #include <Windows.h>
 #endif
 
+#include <errno.h>
 #include <stdio.h>
 #include <sys/types.h>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
@@ -58,29 +59,28 @@ void swift::_swift_stdlib_funlockfile_stdin() {
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int swift::_swift_stdlib_getc_unlocked_stdin() {
+  int result = EOF;
+  do {
 #if defined(_WIN32) && !defined(__CYGWIN__)
-  return _fgetc_nolock(stdin);
+    result = _fgetc_nolock(stdin);
 #else
-  return getc_unlocked(stdin);
+    result = getc_unlocked(stdin);
 #endif
+  } while (result == EOF && ferror(stdin) && errno == EINTR);
+  return result;
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int swift::_swift_stdlib_ungetc_unlocked_stdin(int c) {
+  int result = EOF;
+  do {
 #if defined(_WIN32) && !defined(__CYGWIN__)
-  return _ungetc_nolock(c, stdin);
+    result = _ungetc_nolock(c, stdin);
 #else
-  return ungetc(c, stdin);
+    result = ungetc(c, stdin);
 #endif
-}
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int swift::_swift_stdlib_putchar_unlocked(int c) {
-#if defined(_WIN32)
-  return _putc_nolock(c, stdout);
-#else
-  return putchar_unlocked(c);
-#endif
+  } while (result == EOF && ferror(stdin) && errno == EINTR);
+  return result;
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
