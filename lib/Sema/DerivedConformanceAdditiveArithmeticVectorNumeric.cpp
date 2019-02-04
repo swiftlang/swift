@@ -73,32 +73,31 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
                               }),
                lookup.end());
   assert(lookup.size() == 1 && "Ambiguous protocol requirement");
-  return lookup[0];
+  return lookup.front();
 }
 
-// Return the `Scalar` associated type for a ValueDecl if it conforms to
-// `VectorNumeric` in the given context.
-// If the decl does not conform to `VectorNumeric`, return nullptr.
-static Type getVectorNumericScalarAssocType(VarDecl *decl, DeclContext *DC) {
-  auto &C = decl->getASTContext();
+// Return the `Scalar` associated type for the given `ValueDecl` if it conforms
+// to `VectorNumeric` in the given context. Otherwise, return `nullptr`.
+static Type getVectorNumericScalarAssocType(VarDecl *varDecl, DeclContext *DC) {
+  auto &C = varDecl->getASTContext();
   auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
-  if (!decl->hasInterfaceType())
-    C.getLazyResolver()->resolveDeclSignature(decl);
-  if (!decl->hasInterfaceType())
+  if (!varDecl->hasInterfaceType())
+    C.getLazyResolver()->resolveDeclSignature(varDecl);
+  if (!varDecl->hasInterfaceType())
     return nullptr;
-  auto declType = DC->mapTypeIntoContext(decl->getValueInterfaceType());
-  auto conf = TypeChecker::conformsToProtocol(declType, vectorNumericProto, DC,
+  auto varType = DC->mapTypeIntoContext(varDecl->getValueInterfaceType());
+  auto conf = TypeChecker::conformsToProtocol(varType, vectorNumericProto, DC,
                                               ConformanceCheckFlags::Used);
   if (!conf)
     return nullptr;
   Type scalarType = ProtocolConformanceRef::getTypeWitnessByName(
-      declType, *conf, C.Id_Scalar, C.getLazyResolver());
+      varType, *conf, C.Id_Scalar, C.getLazyResolver());
   assert(scalarType && "'Scalar' associated type not found");
   return scalarType;
 }
 
-// Return the `Scalar` associated type for a nominal type with the given
-// members, or nullptr if `Scalar` cannot be derived.
+// Return the `Scalar` associated type for the given nominal type in the given
+// context, or `nullptr` if `Scalar` cannot be derived.
 static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal,
                                        DeclContext *DC) {
   auto &C = DC->getASTContext();
@@ -113,7 +112,7 @@ static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal,
     if (!member->hasInterfaceType())
       C.getLazyResolver()->resolveDeclSignature(member);
     if (!member->hasInterfaceType())
-      return Type();
+      return nullptr;
     auto scalarType = getVectorNumericScalarAssocType(member, DC);
     // If stored property does not conform to `VectorNumeric`, return nullptr.
     if (!scalarType)
@@ -157,8 +156,8 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
       C.getLazyResolver()->resolveDeclSignature(v);
     if (!v->hasInterfaceType())
       return false;
-    auto declType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(declType, addArithProto, DC,
+    auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
+    return (bool)TypeChecker::conformsToProtocol(varType, addArithProto, DC,
                                                  ConformanceCheckFlags::Used);
   });
 }
@@ -178,7 +177,8 @@ bool DerivedConformance::canDeriveVectorNumeric(NominalTypeDecl *nominal,
 // Synthesize body for the given math operator.
 static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
                                    MathOperator op) {
-  auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
+  auto *parentDC = funcDecl->getParent();
+  auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
   // Create memberwise initializer: `Nominal.init(...)`.
@@ -206,7 +206,7 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
   auto createMemberOpExpr = [&](VarDecl *member) -> Expr * {
     auto module = nominal->getModuleContext();
     auto memberType =
-        nominal->mapTypeIntoContext(member->getValueInterfaceType());
+        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
     auto confRef = module->lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to math protocol");
 
@@ -289,8 +289,8 @@ deriveBodyVectorNumeric_scalarMultiply(AbstractFunctionDecl *funcDecl) {
 static ValueDecl *deriveMathOperator(DerivedConformance &derived,
                                      MathOperator op) {
   auto nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
   auto parentDC = derived.getConformanceContext();
+  auto &C = derived.TC.Context;
   auto selfInterfaceType = parentDC->getDeclaredInterfaceType();
 
   // Return tuple of the lhs and rhs parameter types for the given math
@@ -355,7 +355,8 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
 
 // Synthesize body for the `AdditiveArithmetic.zero` computed property getter.
 static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
-  auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
+  auto *parentDC = funcDecl->getParent();
+  auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
   auto *memberwiseInitDecl = nominal->getMemberwiseInitializer();
@@ -372,10 +373,10 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
 
   auto createMemberZeroExpr = [&](VarDecl *member) -> Expr * {
     auto memberType =
-        nominal->mapTypeIntoContext(member->getValueInterfaceType());
+        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
     auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
     auto module = nominal->getModuleContext();
-    auto confRef = module->lookupConformance(member->getType(), addArithProto);
+    auto confRef = module->lookupConformance(memberType, addArithProto);
     assert(confRef && "Member does not conform to 'AdditiveArithmetic'");
     // If conformance reference is not concrete, then concrete witness
     // declaration for `zero` cannot be resolved. Return reference to `zero`
@@ -408,7 +409,8 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
 
 // Synthesize the static property declaration for `AdditiveArithmetic.zero`.
 static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
-  auto nominal = derived.Nominal;
+  auto *nominal = derived.Nominal;
+  auto *parentDC = derived.getConformanceContext();
   auto &TC = derived.TC;
   auto &C = TC.Context;
 
@@ -423,8 +425,7 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   }
 
   auto returnInterfaceTy = nominal->getDeclaredInterfaceType();
-  auto returnTy =
-      derived.getConformanceContext()->mapTypeIntoContext(returnInterfaceTy);
+  auto returnTy = parentDC->mapTypeIntoContext(returnInterfaceTy);
 
   // Create `zero` static property declaration.
   VarDecl *zeroDecl;

@@ -65,6 +65,18 @@ func testGenericContext<T, U, V>() -> A<T>.B<U, V>.GenericContextNested {
   return genericNested
 }
 
+// Test extension.
+struct Extended {
+  var x: Float
+}
+extension Extended : Equatable, AdditiveArithmetic, VectorNumeric {}
+
+// Test extension of generic type.
+struct GenericExtended<T> {
+  var x: T
+}
+extension GenericExtended : Equatable, AdditiveArithmetic, VectorNumeric where T : VectorNumeric {}
+
 // Test errors.
 
 struct Empty : VectorNumeric {} // expected-error {{type 'Empty' does not conform to protocol 'VectorNumeric'}}

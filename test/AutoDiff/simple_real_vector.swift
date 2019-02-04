@@ -5,9 +5,6 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
   public var x: Float
   public var y: Float
 
-  public typealias TangentVector = Vector
-  public typealias Scalar = Float
-
   public static var zero: Vector {
     return Vector(0)
   }
