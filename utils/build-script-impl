@@ -107,6 +107,7 @@ KNOWN_SETTINGS=(
     test-installable-package    ""               "whether to run post-packaging tests on the produced package"
     reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
     build-libparser-only        ""               "only build libSwiftSyntaxParser"
+    libparser-ver               ""               "current version of libSwiftSyntaxParser"
     skip-reconfigure            ""               "set to skip reconfigure"
     swift-primary-variant-sdk   ""               "default SDK for target binaries"
     swift-primary-variant-arch  ""               "default arch for target binaries"
@@ -2462,6 +2463,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 if [ "${BUILD_LIBPARSER_ONLY}" ]; then
                     build_targets=(libSwiftSyntaxParser)
+                    if [ "${LIBPARSER_VER}" ] ; then
+                      cmake_options=(
+                          "${cmake_options[@]}"
+                          -DSWIFT_LIBPARSER_VER:STRING="${LIBPARSER_VER}"
+                      )
+                    fi
                 fi
                 skip_build=${SKIP_BUILD_SWIFT}
                 ;;
