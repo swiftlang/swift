@@ -152,9 +152,8 @@ public:
                                        CanType Target, SILBasicBlock *SuccessBB,
                                        SILBasicBlock *FailureBB);
 
-  SILInstruction *
-  optimizeMetatypeConversion(ConversionInst *MCI,
-                             MetatypeRepresentation Representation);
+  SILValue optimizeMetatypeConversion(ConversionInst *mci,
+                                      MetatypeRepresentation representation);
 };
 
 } // namespace swift
