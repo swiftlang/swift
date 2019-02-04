@@ -126,6 +126,12 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
   if (aliasDecl->getGenericParams())
     return Type();
 
+  // Imported types can be renamed to be members of other (non-generic)
+  // types, but the mangling does not have a parent type. Just use the
+  // declared type directly in this case and skip the parent check below.
+  if (aliasDecl->hasClangNode() && !aliasDecl->isGenericContext())
+    return aliasDecl->getDeclaredInterfaceType();
+
   // Validate the parent type.
   if (!validateParentType(aliasDecl, parent))
     return Type();
@@ -306,6 +312,10 @@ Type ASTBuilder::createFunctionType(
                               .withValueOwnership(ownership)
                               .withVariadic(flags.isVariadic())
                               .withAutoClosure(flags.isAutoClosure());
+
+    if (auto *fnType = type->getAs<FunctionType>())
+      if (!fnType->isNoEscape())
+        parameterFlags = parameterFlags.withEscaping(true);
 
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }
