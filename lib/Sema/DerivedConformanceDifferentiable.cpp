@@ -698,10 +698,13 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
         if (!TC.conformsToProtocol(memberAssocType, addArithProto, parentDC,
                                    ConformanceCheckFlags::Used)) {
           // Diagnose error types only once.
-          if (errorMemberAssocTypes.insert(memberAssocType).second)
+          if (errorMemberAssocTypes.insert(memberAssocType).second) {
+            auto requirementString =
+                memberAssocType->getString() + " : AdditiveArithmetic";
             TC.diagnose(member,
                         diag::differentiable_need_explicit_addarith_conformance,
-                        memberAssocType);
+                        requirementString);
+          }
         }
       }
       return {nullptr, false};

@@ -2448,7 +2448,7 @@ ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
 ERROR(differentiable_need_explicit_addarith_conformance,none,
       "synthesizing a conformance to 'Differentiable' requires an explicit "
-      "%0 : 'AdditiveArithmetic' conformance constraint", (Type))
+      "'%0' conformance constraint", (StringRef))
 WARNING(differentiable_implicit_noderivative_fixit,none,
       "stored property has no derivative because it does not conform to "
       "'Differentiable'; add '@noDerivative' to make it explicit", ())

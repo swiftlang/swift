@@ -191,7 +191,7 @@ struct HasGenericEnvironment<Scalar : FloatingPoint & Differentiable> : Differen
 struct GenericSynthesizeAllStructs<T> : Differentiable
   where T : Differentiable
 {
-  // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T.TangentVector' : 'AdditiveArithmetic' conformance constraint}}
+  // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T.TangentVector : AdditiveArithmetic' conformance constraint}}
   var w: T
   var b: T
 }
@@ -203,7 +203,7 @@ struct GenericSynthesizeAllStructs<T> : Differentiable
 struct GenericNotAdditiveArithmetic<T> : Differentiable
   where T : Differentiable, T == T.TangentVector, T == T.CotangentVector
 {
-  // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T' : 'AdditiveArithmetic' conformance constraint}}
+  // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T : AdditiveArithmetic' conformance constraint}}
   var w: T
   var b: T
 }
@@ -217,9 +217,9 @@ struct A<T : Differentiable> {
     struct InGenericContext : Differentiable {
       @noDerivative var a: A
       var b: B
-      // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T.TangentVector' : 'AdditiveArithmetic' conformance constraint}}
+      // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T.TangentVector : AdditiveArithmetic' conformance constraint}}
       var t: T
-      // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'U.TangentVector' : 'AdditiveArithmetic' conformance constraint}}
+      // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'U.TangentVector : AdditiveArithmetic' conformance constraint}}
       var u: U
     }
   }
@@ -235,7 +235,7 @@ extension Extended : Differentiable {}
 // FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
 // due to `Differentiable` protocol generic signature minimization bug.
 struct GenericExtended<T> {
-  // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T.TangentVector' : 'AdditiveArithmetic' conformance constraint}}
+  // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T.TangentVector : AdditiveArithmetic' conformance constraint}}
   var x: T
 }
 // expected-error @+1 {{type 'GenericExtended<T>' does not conform to protocol 'Differentiable'}}
