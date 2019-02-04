@@ -273,9 +273,19 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     }
 
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
-        let dictionary = NSMutableDictionary()
-        self.container[key.stringValue] = dictionary
-
+        let containerKey = key.stringValue
+        let dictionary: NSMutableDictionary
+        if let existingContainer = self.container[containerKey] {
+            precondition(
+                existingContainer is NSMutableDictionary,
+                "Attempt to re-encode into nested KeyedEncodingContainer<\(Key.self)> for key \"\(containerKey)\" is invalid: non-keyed container already encoded for this key"
+            )
+            dictionary = existingContainer as! NSMutableDictionary
+        } else {
+            dictionary = NSMutableDictionary()
+            self.container[containerKey] = dictionary
+        }
+        
         self.codingPath.append(key)
         defer { self.codingPath.removeLast() }
 
@@ -284,8 +294,18 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     }
 
     public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        let array = NSMutableArray()
-        self.container[key.stringValue] = array
+        let containerKey = key.stringValue
+        let array: NSMutableArray
+        if let existingContainer = self.container[containerKey] {
+            precondition(
+                existingContainer is NSMutableArray, 
+                "Attempt to re-encode into nested UnkeyedEncodingContainer for key \"\(containerKey)\" is invalid: keyed container/single value already encoded for this key"
+            )
+            array = existingContainer as! NSMutableArray
+        } else {
+            array = NSMutableArray()
+            self.container[containerKey] = array
+        }
 
         self.codingPath.append(key)
         defer { self.codingPath.removeLast() }
