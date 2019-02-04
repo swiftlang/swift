@@ -448,3 +448,28 @@ bb2(%3 : $Never):
 bb3(%4 : $Error):
   throw %4 : $Error
 }
+
+struct Pair<L, R> {
+  var left: L
+  var right: R
+}
+
+// CHECK-LABEL: sil [ossa] @destructure_struct_never_positive : $@convention(thin) (@owned Pair<Builtin.NativeObject, Never>) -> @owned Builtin.NativeObject {
+// CHECK-NOT: {{ unreachable }}
+// CHECK: } // end sil function 'destructure_struct_never_positive'
+sil [ossa] @destructure_struct_never_positive : $@convention(thin) (@owned Pair<Builtin.NativeObject, Never>) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Pair<Builtin.NativeObject, Never>):
+  (%1, %2) = destructure_struct %0 : $Pair<Builtin.NativeObject, Never>
+  return %1 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @destructure_struct_never_negative : $@convention(thin) (@owned Pair<Builtin.NativeObject, Never>) -> Never {
+// CHECK: bb0(
+// CHECK-NEXT: {{ unreachable }}
+// CHECK: } // end sil function 'destructure_struct_never_negative'
+sil [ossa] @destructure_struct_never_negative : $@convention(thin) (@owned Pair<Builtin.NativeObject, Never>) -> Never {
+bb0(%0 : @owned $Pair<Builtin.NativeObject, Never>):
+  (%1, %2) = destructure_struct %0 : $Pair<Builtin.NativeObject, Never>
+  destroy_value %1 : $Builtin.NativeObject
+  return %2 : $Never
+}

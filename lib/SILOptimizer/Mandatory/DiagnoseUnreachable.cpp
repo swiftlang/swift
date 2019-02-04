@@ -438,6 +438,17 @@ static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {
       return SEAI;
   }
 
+  // If we have a destructure_struct and we have a result of uninhabited type
+  // that has a use, return the destructure_struct.
+  if (auto *DSI = dyn_cast<DestructureStructInst>(I)) {
+    if (llvm::any_of(DSI->getResults(), [](SILValue result) {
+          return !result->use_empty() &&
+                 result->getType().getASTType()->isUninhabited();
+        })) {
+      return DSI;
+    }
+  }
+
   return nullptr;
 }
 
