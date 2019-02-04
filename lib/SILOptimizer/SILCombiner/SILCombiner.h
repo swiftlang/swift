@@ -91,6 +91,11 @@ public:
       add(UI->getUser());
   }
 
+  void addUsersToWorklist(SILValue value) {
+    for (auto *use : value->getUses())
+      add(use->getUser());
+  }
+
   /// When an instruction has been simplified, add all of its users to the
   /// worklist, since additional simplifications of its users may have been
   /// exposed.
@@ -147,13 +152,17 @@ class SILCombiner :
   CastOptimizer CastOpt;
 
 public:
-  SILCombiner(SILOptFunctionBuilder &FuncBuilder,
-              SILBuilder &B, AliasAnalysis *AA, DominanceAnalysis *DA,
+  SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
+              AliasAnalysis *AA, DominanceAnalysis *DA,
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
               bool removeCondFails)
       : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist(), MadeChange(false),
         RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
         CastOpt(FuncBuilder,
+                /* ReplaceValueUsesAction */
+                [&](SILValue Original, SILValue Replacement) {
+                  replaceValueUsesWith(Original, Replacement);
+                },
                 /* ReplaceInstUsesAction */
                 [&](SingleValueInstruction *I, ValueBase *V) {
                   replaceInstUsesWith(*I, V);
@@ -178,6 +187,12 @@ public:
   // to the worklist, replace all uses of I with the new value, then return I,
   // so that the combiner will know that I was modified.
   void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V);
+
+  // This method is to be used when a value is found to be dead,
+  // replaceable with another preexisting expression. Here we add all
+  // uses of oldValue to the worklist, replace all uses of oldValue
+  // with newValue.
+  void replaceValueUsesWith(SILValue oldValue, SILValue newValue);
 
   void replaceInstUsesPairwiseWith(SILInstruction *oldI, SILInstruction *newI);
 

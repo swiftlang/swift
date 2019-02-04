@@ -34,19 +34,25 @@ class SILOptFunctionBuilder;
 class CastOptimizer {
   SILOptFunctionBuilder &FunctionBuilder;
 
-  // Callback to be called when uses of an instruction should be replaced.
-  std::function<void(SingleValueInstruction *I, ValueBase *V)>
+  /// Callback that replaces the first SILValue's uses with a use of the second
+  /// value.
+  std::function<void(SILValue, SILValue)> ReplaceValueUsesAction;
+
+  /// Callback that replaces a SingleValueInstruction with a ValueBase after
+  /// updating any status in the caller.
+  std::function<void(SingleValueInstruction *, ValueBase *)>
       ReplaceInstUsesAction;
 
-  // Callback to call when an instruction needs to be erased.
+  /// Callback that erases an instruction and performs any state updates in the
+  /// caller required.
   std::function<void(SILInstruction *)> EraseInstAction;
 
-  // Callback to call after an optimization was performed based on the fact
-  // that a cast will succeed.
+  /// Callback to call after an optimization was performed based on the fact
+  /// that a cast will succeed.
   std::function<void()> WillSucceedAction;
 
-  // Callback to call after an optimization was performed based on the fact
-  // that a cast will fail.
+  /// Callback to call after an optimization was performed based on the fact
+  /// that a cast will fail.
   std::function<void()> WillFailAction;
 
   /// Optimize a cast from a bridged ObjC type into
@@ -69,12 +75,15 @@ class CastOptimizer {
 
 public:
   CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
-                std::function<void(SingleValueInstruction *I, ValueBase *V)>
+                std::function<void(SILValue, SILValue)> ReplaceValueUsesAction,
+                std::function<void(SingleValueInstruction *, ValueBase *)>
                     ReplaceInstUsesAction,
                 std::function<void(SILInstruction *)> EraseAction,
                 std::function<void()> WillSucceedAction,
                 std::function<void()> WillFailAction = []() {})
-      : FunctionBuilder(FunctionBuilder), ReplaceInstUsesAction(ReplaceInstUsesAction),
+      : FunctionBuilder(FunctionBuilder),
+        ReplaceValueUsesAction(ReplaceValueUsesAction),
+        ReplaceInstUsesAction(ReplaceInstUsesAction),
         EraseInstAction(EraseAction), WillSucceedAction(WillSucceedAction),
         WillFailAction(WillFailAction) {}
 
@@ -84,11 +93,13 @@ public:
   // arguments. It seems the number of the default argument with lambda is
   // limited.
   CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
+                std::function<void(SILValue, SILValue)> ReplaceValueUsesAction,
                 std::function<void(SingleValueInstruction *I, ValueBase *V)>
                     ReplaceInstUsesAction,
                 std::function<void(SILInstruction *)> EraseAction =
                     [](SILInstruction *) {})
-      : CastOptimizer(FunctionBuilder, ReplaceInstUsesAction, EraseAction, []() {}, []() {}) {}
+      : CastOptimizer(FunctionBuilder, ReplaceValueUsesAction,
+                      ReplaceInstUsesAction, EraseAction, []() {}, []() {}) {}
 
   /// Simplify checked_cast_br. It may change the control flow.
   SILInstruction *simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst);
