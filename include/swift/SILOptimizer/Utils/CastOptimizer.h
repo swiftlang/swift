@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Allocator.h"
 #include <functional>
@@ -33,6 +34,12 @@ class SILOptFunctionBuilder;
 /// This is a helper class used to optimize casts.
 class CastOptimizer {
   SILOptFunctionBuilder &FunctionBuilder;
+
+  /// Temporary context for clients that do not provide their own.
+  SILBuilderContext TempBuilderContext;
+
+  /// Reference to the provided SILBuilderContext.
+  SILBuilderContext &BuilderContext;
 
   /// Callback that replaces the first SILValue's uses with a use of the second
   /// value.
@@ -75,6 +82,7 @@ class CastOptimizer {
 
 public:
   CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
+                SILBuilderContext *BuilderContext,
                 std::function<void(SILValue, SILValue)> ReplaceValueUsesAction,
                 std::function<void(SingleValueInstruction *, ValueBase *)>
                     ReplaceInstUsesAction,
@@ -82,6 +90,8 @@ public:
                 std::function<void()> WillSucceedAction,
                 std::function<void()> WillFailAction = []() {})
       : FunctionBuilder(FunctionBuilder),
+        TempBuilderContext(FunctionBuilder.getModule()),
+        BuilderContext(BuilderContext ? *BuilderContext : TempBuilderContext),
         ReplaceValueUsesAction(ReplaceValueUsesAction),
         ReplaceInstUsesAction(ReplaceInstUsesAction),
         EraseInstAction(EraseAction), WillSucceedAction(WillSucceedAction),
@@ -93,12 +103,13 @@ public:
   // arguments. It seems the number of the default argument with lambda is
   // limited.
   CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
+                SILBuilderContext *BuilderContext,
                 std::function<void(SILValue, SILValue)> ReplaceValueUsesAction,
                 std::function<void(SingleValueInstruction *I, ValueBase *V)>
                     ReplaceInstUsesAction,
                 std::function<void(SILInstruction *)> EraseAction =
                     [](SILInstruction *) {})
-      : CastOptimizer(FunctionBuilder, ReplaceValueUsesAction,
+      : CastOptimizer(FunctionBuilder, BuilderContext, ReplaceValueUsesAction,
                       ReplaceInstUsesAction, EraseAction, []() {}, []() {}) {}
 
   /// Simplify checked_cast_br. It may change the control flow.

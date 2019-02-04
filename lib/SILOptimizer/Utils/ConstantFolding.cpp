@@ -1438,7 +1438,7 @@ ConstantFolder::processWorkList() {
   // instruction from different entry points in the WorkList.
   llvm::DenseSet<SILInstruction *> ErrorSet;
   llvm::SetVector<SILInstruction *> FoldedUsers;
-  CastOptimizer CastOpt(FuncBuilder,
+  CastOptimizer CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
                         /* ReplaceValueUsesAction */
                         [&](SILValue oldValue, SILValue newValue) {
                           InvalidateInstructions = true;
