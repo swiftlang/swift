@@ -460,8 +460,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // If there's no message, but this is specifically an imported
     // "unavailable in Swift" attribute, synthesize a message to look good in
     // the generated interface.
-    if (!Attr->Message.empty())
-      Printer << ", message: \"" << Attr->Message << "\"";
+    if (!Attr->Message.empty()) {
+      Printer << ", message: ";
+      Printer.printEscapedStringLiteral(Attr->Message);
+    }
     else if (Attr->getPlatformAgnosticAvailability()
                == PlatformAgnosticAvailabilityKind::UnavailableInSwift)
       Printer << ", message: \"Not available in Swift\"";

@@ -270,6 +270,22 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   printText(Text);
 }
 
+void ASTPrinter::printEscapedStringLiteral(StringRef str) {
+  SmallString<128> encodeBuf;
+  StringRef escaped =
+    Lexer::getEncodedStringSegment(str, encodeBuf,
+                                   /*isFirstSegment*/true,
+                                   /*isLastSegment*/true,
+                                   /*indentToStrip*/~0U /* sentinel */);
+
+  // FIXME: This is wasteful, but ASTPrinter is an abstract class that doesn't
+  //        have a directly-accessible ostream.
+  SmallString<128> escapeBuf;
+  llvm::raw_svector_ostream os(escapeBuf);
+  os << QuotedString(escaped);
+  printTextImpl(escapeBuf.str());
+}
+
 void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name) {
   PrintNameContext Context = PrintNameContext::Normal;
   if (isa<GenericTypeParamDecl>(RefTo)) {
