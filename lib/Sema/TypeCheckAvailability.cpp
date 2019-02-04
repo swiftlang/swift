@@ -2311,7 +2311,7 @@ class AvailabilityWalker : public ASTWalker {
            init->isImplicit() &&
            init->getParameters()->size() == 1 &&
            init->getParameters()->get(0)->getArgumentName() ==
-                   DC->getASTContext().Id_rawValue;
+                   TC.Context.Id_rawValue;
   }
 
 public:
@@ -2604,11 +2604,11 @@ AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
   if (!isAccessorWithDeprecatedStorage)
     TC.diagnoseIfDeprecated(R, DC, D, call);
 
-  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
-        && isa<ProtocolDecl>(D))
+  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailable))
     return false;
 
-  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailable))
+  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
+        && isa<ProtocolDecl>(D))
     return false;
 
   // Diagnose (and possibly signal) for potential unavailability

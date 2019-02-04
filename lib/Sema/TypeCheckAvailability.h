@@ -35,9 +35,21 @@ void diagAvailability(TypeChecker &TC, const Expr *E,
                       DeclContext *DC);
 
 enum class DeclAvailabilityFlag : uint8_t {
+  /// Do not diagnose uses of protocols in versions before they were introduced.
+  /// Used when type-checking protocol conformances, since conforming to a
+  /// protocol that doesn't exist yet is allowed.
   AllowPotentiallyUnavailableProtocol = 1 << 0,
+
+  /// Diagnose uses of declarations in versions before they were introduced, but
+  /// do not return true to indicate that a diagnostic was emitted.
   ContinueOnPotentialUnavailability = 1 << 1,
+
+  /// If a diagnostic must be emitted, use a variant indicating that the usage
+  /// is inout and both the getter and setter must be available.
   ForInout = 1 << 2,
+
+  /// Do not diagnose uses of declarations in versions before they were
+  /// introduced. Used to work around availability-checker bugs.
   AllowPotentiallyUnavailable = 1 << 3,
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
