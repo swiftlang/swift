@@ -13,6 +13,7 @@
 from .cmark import CMark
 from .foundation import Foundation
 from .libdispatch import LibDispatch
+from .libcxx import LibCXX
 from .libicu import LibICU
 from .llbuild import LLBuild
 from .lldb import LLDB
@@ -29,6 +30,7 @@ __all__ = [
     'Ninja',
     'Foundation',
     'LibDispatch',
+    'LibCXX',
     'LibICU',
     'LLBuild',
     'LLDB',
