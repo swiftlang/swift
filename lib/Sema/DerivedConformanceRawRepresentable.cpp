@@ -188,6 +188,83 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
   return propDecl;
 }
 
+/// Contains information needed to synthesize a runtime version check.
+struct RuntimeVersionCheck {
+  PlatformKind Platform;
+  llvm::VersionTuple Version;
+
+  RuntimeVersionCheck(PlatformKind Platform, llvm::VersionTuple Version)
+    : Platform(Platform), Version(Version)
+  { }
+
+  VersionRange getVersionRange() const {
+    return VersionRange::allGTE(Version);
+  }
+
+  /// Synthesizes a statement which returns nil if the runtime version check
+  /// fails, e.g. "guard #available(iOS 10, *) else { return nil }".
+  Stmt *createEarlyReturnStmt(ASTContext &C) const {
+    // platformSpec = "\(attr.platform) \(attr.introduced)"
+    auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
+                            Platform, SourceLoc(),
+                            Version, SourceLoc()
+                        );
+
+    // otherSpec = "*"
+    auto otherSpec = new (C) OtherPlatformAvailabilitySpec(SourceLoc());
+
+    // availableInfo = "#available(\(platformSpec), \(otherSpec))"
+    auto availableInfo = PoundAvailableInfo::create(C, SourceLoc(),
+                                              { platformSpec, otherSpec },
+                                                    SourceLoc());
+
+    // This won't be filled in by TypeCheckAvailability because we have
+    // invalid SourceLocs in this area of the AST.
+    availableInfo->setAvailableRange(getVersionRange());
+
+    // earlyReturnBody = "{ return nil }"
+    auto earlyReturn = new (C) FailStmt(SourceLoc(), SourceLoc());
+    auto earlyReturnBody = BraceStmt::create(C, SourceLoc(),
+                                             ASTNode(earlyReturn),
+                                             SourceLoc(), /*implicit=*/true);
+
+    // guardStmt = "guard \(availableInfo) else \(earlyReturnBody)"
+    StmtConditionElement conds[1] = { availableInfo };
+    auto guardStmt = new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conds),
+                                       earlyReturnBody, /*implicit=*/true);
+
+    return guardStmt;
+  }
+};
+
+/// Checks if the case will be available at runtime given the current target
+/// platform. If it will never be available, returns false. If it will always
+/// be available, returns true. If it will sometimes be available, adds
+/// information about the runtime check needed to ensure it is available to
+/// \c versionCheck and returns true.
+static bool checkAvailability(EnumElementDecl* elt, ASTContext &C,
+                              Optional<RuntimeVersionCheck> &versionCheck) {
+  auto *attr = elt->getAttrs().getPotentiallyUnavailable(C);
+
+  // Is it always available?
+  if (!attr)
+    return true;
+
+  AvailableVersionComparison availability = attr->getVersionAvailability(C);
+
+  assert(availability != AvailableVersionComparison::Available &&
+         "DeclAttributes::getPotentiallyUnavailable() shouldn't "
+         "return an available attribute");
+
+  // Is it never available?
+  if (availability != AvailableVersionComparison::PotentiallyUnavailable)
+    return false;
+
+  // It's conditionally available; create a version constraint and return true.
+  versionCheck.emplace(attr->Platform, *attr->Introduced);
+  return true;
+}
+
 static void
 deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   // enum SomeEnum : SomeType {
@@ -238,7 +315,15 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   SmallVector<ASTNode, 4> cases;
   unsigned Idx = 0;
   for (auto elt : enumDecl->getAllElements()) {
-    // litPat = "\(elt.rawValueExpr)", e.g. "42" as a pattern
+    // First, check case availability. If the case will definitely be
+    // unavailable, skip it. If it might be unavailable at runtime, save
+    // information about that check in versionCheck and keep processing this
+    // element.
+    Optional<RuntimeVersionCheck> versionCheck(None);
+    if (!checkAvailability(elt, C, versionCheck))
+      continue;
+
+    // litPat = elt.rawValueExpr as a pattern
     LiteralExpr *litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
     if (isStringEnum) {
       // In case of a string enum we are calling the _findStringSwitchCase
@@ -250,73 +335,31 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                       nullptr, nullptr);
     litPat->setImplicit();
 
-    // Will collect any preliminary guards, plus the final assignment.
+    /// Statements in the body of this case.
     SmallVector<ASTNode, 2> stmts;
 
-    // If there's an @available attribute specifying when the case was
-    // introduced, generate an early return on unavailability, e.g.
-    // "guard #available(iOS 9, *) else { return nil }"
-    for (auto *attr : elt->getAttrs().getAttributes<AvailableAttr>()) {
-      // We only care about attributes which have an "introduced" version for
-      // the platform we're building for. We don't care about language version
-      // because we may be compiling in an older language mode, but writing APIs
-      // for a newer one.
-      if (attr->Introduced.hasValue() && attr->hasPlatform() &&
-          attr->isActivePlatform(C) &&
-          *attr->Introduced > C.LangOpts.getMinPlatformVersion()) {
-        // platformSpec = "\(attr.platform) \(attr.introduced)"
-        auto platformSpec =
-          new (C) PlatformVersionConstraintAvailabilitySpec(
-            attr->Platform, SourceLoc(),
-            *attr->Introduced, SourceLoc()
-          );
+    // If checkAvailability() discovered we need a runtime version check,
+    // add it now.
+    if (versionCheck.hasValue())
+      stmts.push_back(ASTNode(versionCheck->createEarlyReturnStmt(C)));
 
-        // otherSpec = "*"
-        auto otherSpec = new (C) OtherPlatformAvailabilitySpec(SourceLoc());
-
-        // availableInfo = "#available(\(platformSpec), \(otherSpec))"
-        auto availableInfo = PoundAvailableInfo::create(C, SourceLoc(),
-                                                { platformSpec, otherSpec },
-                                                        SourceLoc());
-
-        // This won't be filled in by TypeCheckAvailability because we have
-        // invalid SourceLocs in this area of the AST.
-        auto versionRange = VersionRange::allGTE(*attr->Introduced);
-        availableInfo->setAvailableRange(versionRange);
-
-        // earlyReturnBody = "{ return nil }"
-        auto earlyReturn = new (C) FailStmt(SourceLoc(), SourceLoc());
-        auto earlyReturnBody = BraceStmt::create(C, SourceLoc(),
-                                                 ASTNode(earlyReturn),
-                                                 SourceLoc(), /*implicit=*/true);
-
-        // guardStmt = "guard \(vailableInfo) else \(earlyReturnBody)"
-        SmallVector<StmtConditionElement, 1>
-        conds{StmtConditionElement(availableInfo)};
-        auto guardStmt = new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conds),
-                                           earlyReturnBody, /*implicit=*/true);
-
-        stmts.push_back(guardStmt);
-      }
-    }
+    // Create a statement which assigns the case to self.
 
     // valueExpr = "\(enumType).\(elt)"
     auto eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto metaTyRef = TypeExpr::createImplicit(enumType, C);
     auto valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
     
-    // selfRef = "self"
+    // assignment = "self = \(valueExpr)"
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/true,
                                        AccessSemantics::DirectToStorage);
-
-    // assignment = "\(selfRef) = \(valueExpr)"
     auto assignment = new (C) AssignExpr(selfRef, SourceLoc(), valueExpr,
                                          /*implicit*/ true);
 
     stmts.push_back(ASTNode(assignment));
     
-    // body = stmts.joined(separator: "\n")
+    // body = "{ \(stmts) }" (the braces are silent)
     auto body = BraceStmt::create(C, SourceLoc(),
                                   stmts, SourceLoc());
 

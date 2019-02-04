@@ -147,7 +147,7 @@ const AvailableAttr *DeclAttributes::getPotentiallyUnavailable(
         continue;
 
       // Definitely not available.
-      if (AvAttr->isUnconditionallyDeprecated())
+      if (AvAttr->isUnconditionallyUnavailable())
         return AvAttr;
 
       switch (AvAttr->getVersionAvailability(ctx)) {
@@ -164,6 +164,7 @@ const AvailableAttr *DeclAttributes::getPotentiallyUnavailable(
         case AvailableVersionComparison::Unavailable:
         case AvailableVersionComparison::Obsoleted:
           conditional = AvAttr;
+          break;
       }
     }
 
