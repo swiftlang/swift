@@ -8,7 +8,7 @@ struct S {
 
 class D : B {
   func foo() {
-    super.init() // expected-error{{'super.init' cannot be called outside of an initializer}}
+    super.init() // expected-error{{member 'init' cannot be used on value of type 'B'}}
   }
 
   init(a:Int) {

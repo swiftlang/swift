@@ -1489,8 +1489,8 @@ bool MissingMemberFailure::diagnoseAsError() {
 bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getAnchor()->getLoc();
   auto &cs = getConstraintSystem();
-  
-  Expr *expr = getAnchor();
+
+  Expr *expr = getParentExpr();
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
   auto member = getResolvedOverload(getLocator())->Choice.getDecl();
   
@@ -1548,7 +1548,26 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         }
       }
     }
-    
+
+    auto maybeCallExpr = getRawAnchor();
+
+    if (auto UDE = dyn_cast<UnresolvedDotExpr>(maybeCallExpr)) {
+      maybeCallExpr = UDE->getBase();
+    }
+
+    if (auto callExpr = dyn_cast<ApplyExpr>(maybeCallExpr)) {
+      auto fnExpr = callExpr->getFn();
+      auto fnType = cs.getType(fnExpr)->getRValueType();
+      auto arg = callExpr->getArg();
+
+      if (fnType->is<ExistentialMetatypeType>()) {
+        emitDiagnostic(arg->getStartLoc(),
+                       diag::missing_init_on_metatype_initialization)
+            .highlight(fnExpr->getSourceRange());
+        return true;
+      }
+    }
+
     // Check whether the instance member is declared on parent context and if so
     // provide more specialized message.
     auto memberTypeContext = member->getDeclContext()->getInnermostTypeContext();
@@ -1563,19 +1582,6 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
           .highlight(baseRange)
           .highlight(member->getSourceRange());
       return true;
-    }
-    
-    if (auto callExpr = dyn_cast<ApplyExpr>(expr)) {
-      auto fnExpr = callExpr->getFn();
-      auto fnType = cs.getType(fnExpr)->getRValueType();
-      auto arg = callExpr->getArg();
-      
-      if (fnType->is<ExistentialMetatypeType>()) {
-        emitDiagnostic(arg->getStartLoc(),
-                       diag::missing_init_on_metatype_initialization)
-        .highlight(fnExpr->getSourceRange());
-        return true;
-      }
     }
     
     // Just emit a generic "instance member cannot be used" error
@@ -1628,7 +1634,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         // 'Proto.static', suggest 'Self.static'
         if (auto extensionContext = parent->getExtendedProtocolDecl()) {
           if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
-            Diag->fixItReplace(baseRange, "Self");
+            Diag->fixItReplace(getAnchor()->getSourceRange(), "Self");
           }
         }
       }
@@ -1648,7 +1654,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     Diag->highlight(getAnchor()->getSourceRange());
     
     // No fix-it if the lookup was qualified
-    if (expr && !expr->isImplicit()) {
+    if (getAnchor() && !getAnchor()->isImplicit()) {
       return true;
     }
     
