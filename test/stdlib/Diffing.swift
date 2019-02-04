@@ -18,7 +18,7 @@ TestSuite(suite).test("Basic diffing algorithm validators") {
   let expectedChanges: [(
     source: [String],
     target: [String],
-    changes: [OrderedCollectionDifference<String>.Change],
+    changes: [CollectionDifference<String>.Change],
     line: UInt
   )] = [
     (source:
@@ -336,12 +336,12 @@ TestSuite(suite).test("Basic diffing algorithm validators") {
 
   for (source, target, expected, line) in expectedChanges {
     let actual = target.difference(from: source).inferringMoves()
-    expectEqual(actual, OrderedCollectionDifference(expected), "failed test at line \(line)")
+    expectEqual(actual, CollectionDifference(expected), "failed test at line \(line)")
   }
 }
 
 TestSuite(suite).test("Empty diffs have sane behaviour") {
-  guard let diff = OrderedCollectionDifference<String>([]) else {
+  guard let diff = CollectionDifference<String>([]) else {
     expectUnreachable()
     return
   }
@@ -356,7 +356,7 @@ TestSuite(suite).test("Empty diffs have sane behaviour") {
 
 TestSuite(suite).test("Happy path tests for the change validator") {
   // Base case: one insert and one remove with legal offsets
-  expectNotNil(OrderedCollectionDifference<Int>.init([
+  expectNotNil(CollectionDifference<Int>.init([
     .insert(offset: 0, element: 0, associatedWith: nil),
     .remove(offset: 0, element: 0, associatedWith: nil)
   ]))
@@ -364,7 +364,7 @@ TestSuite(suite).test("Happy path tests for the change validator") {
   // Code coverage:
   // • non-first change .remove has legal associated offset
   // • non-first change .insert has legal associated offset
-  expectNotNil(OrderedCollectionDifference<Int>.init([
+  expectNotNil(CollectionDifference<Int>.init([
     .remove(offset: 1, element: 0, associatedWith: 0),
     .remove(offset: 0, element: 0, associatedWith: 1),
     .insert(offset: 0, element: 0, associatedWith: 1),
@@ -374,64 +374,64 @@ TestSuite(suite).test("Happy path tests for the change validator") {
 
 TestSuite(suite).test("Exhaustive edge case tests for the change validator") {
   // Base case: two inserts sharing the same offset
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .insert(offset: 0, element: 0, associatedWith: nil),
     .insert(offset: 0, element: 0, associatedWith: nil)
   ]))
 
   // Base case: two removes sharing the same offset
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .remove(offset: 0, element: 0, associatedWith: nil),
     .remove(offset: 0, element: 0, associatedWith: nil)
   ]))
 
   // Base case: illegal insertion offset
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .insert(offset: -1, element: 0, associatedWith: nil)
   ]))
 
   // Base case: illegal remove offset
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .remove(offset: -1, element: 0, associatedWith: nil)
   ]))
 
   // Base case: two inserts sharing same associated offset
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .insert(offset: 0, element: 0, associatedWith: 0),
     .insert(offset: 1, element: 0, associatedWith: 0)
   ]))
 
   // Base case: two removes sharing same associated offset
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .remove(offset: 0, element: 0, associatedWith: 0),
     .remove(offset: 1, element: 0, associatedWith: 0)
   ]))
 
   // Base case: insert with illegal associated offset
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .insert(offset: 0, element: 0, associatedWith: -1)
   ]))
 
   // Base case: remove with illegal associated offset
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .remove(offset: 1, element: 0, associatedWith: -1)
   ]))
 
   // Code coverage: non-first change has illegal offset
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .remove(offset: 0, element: 0, associatedWith: nil),
     .insert(offset: -1, element: 0, associatedWith: nil)
   ]))
 
   // Code coverage: non-first change has illegal associated offset
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .remove(offset: 0, element: 0, associatedWith: nil),
     .insert(offset: 0, element: 0, associatedWith: -1)
   ]))
 }
 
 TestSuite(suite).test("Enumeration order is safe") {
-  let safelyOrderedChanges: [OrderedCollectionDifference<Int>.Change] = [
+  let safelyOrderedChanges: [CollectionDifference<Int>.Change] = [
     .remove(offset: 2, element: 0, associatedWith: nil),
     .remove(offset: 1, element: 0, associatedWith: 0),
     .remove(offset: 0, element: 0, associatedWith: 1),
@@ -439,8 +439,8 @@ TestSuite(suite).test("Enumeration order is safe") {
     .insert(offset: 1, element: 0, associatedWith: 0),
     .insert(offset: 2, element: 0, associatedWith: nil),
   ]
-  let diff = OrderedCollectionDifference<Int>.init(safelyOrderedChanges)!
-  var enumerationOrderedChanges = [OrderedCollectionDifference<Int>.Change]()
+  let diff = CollectionDifference<Int>.init(safelyOrderedChanges)!
+  var enumerationOrderedChanges = [CollectionDifference<Int>.Change]()
   diff.forEach { c in
     enumerationOrderedChanges.append(c)
   }
@@ -451,7 +451,7 @@ TestSuite(suite).test("Change validator rejects bad associations") {
   // .remove(1) → .insert(1)
   //   ↑      ↓
   // .insert(0) ← .remove(0)
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .remove(offset: 1, element: 0, associatedWith: 1),
     .remove(offset: 0, element: 0, associatedWith: 0),
     .insert(offset: 0, element: 0, associatedWith: 1),
@@ -459,75 +459,75 @@ TestSuite(suite).test("Change validator rejects bad associations") {
   ]))
 
   // Coverage: duplicate remove offsets both with assocs
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .remove(offset: 0, element: 0, associatedWith: 1),
     .remove(offset: 0, element: 0, associatedWith: 0),
   ]))
 
   // Coverage: duplicate insert assocs
-  expectNil(OrderedCollectionDifference<Int>.init([
+  expectNil(CollectionDifference<Int>.init([
     .insert(offset: 0, element: 0, associatedWith: 1),
     .insert(offset: 1, element: 0, associatedWith: 1),
   ]))
 }
 
-// Full-coverage test for OrderedCollectionDifference.Change.==()
+// Full-coverage test for CollectionDifference.Change.==()
 TestSuite(suite).test("Exhaustive testing for equatable conformance") {
   // Differs by type:
   expectNotEqual(
-    OrderedCollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0),
-    OrderedCollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 0)
+    CollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0),
+    CollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 0)
   )
 
   // Differs by type in the other direction:
   expectNotEqual(
-    OrderedCollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 0),
-    OrderedCollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0)
+    CollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 0),
+    CollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0)
   )
 
   // Insert differs by offset
   expectNotEqual(
-    OrderedCollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0),
-    OrderedCollectionDifference<Int>.Change.insert(offset: 1, element: 0, associatedWith: 0)
+    CollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0),
+    CollectionDifference<Int>.Change.insert(offset: 1, element: 0, associatedWith: 0)
   )
 
   // Insert differs by element
   expectNotEqual(
-    OrderedCollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0),
-    OrderedCollectionDifference<Int>.Change.insert(offset: 0, element: 1, associatedWith: 0)
+    CollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0),
+    CollectionDifference<Int>.Change.insert(offset: 0, element: 1, associatedWith: 0)
   )
 
   // Insert differs by association
   expectNotEqual(
-    OrderedCollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0),
-    OrderedCollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 1)
+    CollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0),
+    CollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 1)
   )
 
   // Remove differs by offset
   expectNotEqual(
-    OrderedCollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 0),
-    OrderedCollectionDifference<Int>.Change.remove(offset: 1, element: 0, associatedWith: 0)
+    CollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 0),
+    CollectionDifference<Int>.Change.remove(offset: 1, element: 0, associatedWith: 0)
   )
 
   // Remove differs by element
   expectNotEqual(
-    OrderedCollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 0),
-    OrderedCollectionDifference<Int>.Change.remove(offset: 0, element: 1, associatedWith: 0)
+    CollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 0),
+    CollectionDifference<Int>.Change.remove(offset: 0, element: 1, associatedWith: 0)
   )
 
   // Remove differs by association
   expectNotEqual(
-    OrderedCollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 0),
-    OrderedCollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 1)
+    CollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 0),
+    CollectionDifference<Int>.Change.remove(offset: 0, element: 0, associatedWith: 1)
   )
 }
 
 TestSuite(suite).test("Compile-time test of hashable conformance") {
-  let _ = Set<OrderedCollectionDifference<String>>();
+  let _ = Set<CollectionDifference<String>>();
 }
 
 TestSuite(suite).test("Move inference") {
-  let n = OrderedCollectionDifference<String>.init([
+  let n = CollectionDifference<String>.init([
     .insert(offset: 3, element: "Sike", associatedWith: nil),
     .insert(offset: 4, element: "Sike", associatedWith: nil),
     .insert(offset: 2, element: "Hello", associatedWith: nil),
@@ -535,7 +535,7 @@ TestSuite(suite).test("Move inference") {
     .remove(offset: 8, element: "Goodbye", associatedWith: nil),
     .remove(offset: 9, element: "Sike", associatedWith: nil),
   ])
-  let w = OrderedCollectionDifference<String>.init([
+  let w = CollectionDifference<String>.init([
     .insert(offset: 3, element: "Sike", associatedWith: nil),
     .insert(offset: 4, element: "Sike", associatedWith: nil),
     .insert(offset: 2, element: "Hello", associatedWith: 6),
@@ -572,9 +572,9 @@ TestSuite(suite).test("Three way diff demo code") {
 }
 
 TestSuite(suite).test("Diff reversal demo code") {
-  let diff = OrderedCollectionDifference<Int>([])!
-  let _ = OrderedCollectionDifference<Int>(
-    diff.map({(change) -> OrderedCollectionDifference<Int>.Change in
+  let diff = CollectionDifference<Int>([])!
+  let _ = CollectionDifference<Int>(
+    diff.map({(change) -> CollectionDifference<Int>.Change in
       switch change {
       case .insert(offset: let o, element: let e, associatedWith: let a):
         return .remove(offset: o, element: e, associatedWith: a)
