@@ -1489,13 +1489,20 @@ bool MissingMemberFailure::diagnoseAsError() {
 bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getAnchor()->getLoc();
   auto &cs = getConstraintSystem();
-  
-  if (loc.isInvalid()) { return true; }
+
+  if (loc.isInvalid()) {
+    return true;
+  }
 
   Expr *expr = getParentExpr();
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
-  auto member = getResolvedOverload(getLocator())->Choice.getDecl();
-  
+  auto resolvedOverloadChoice = getResolvedOverload(getLocator())->Choice;
+
+  if (!resolvedOverloadChoice.isDecl()) {
+    return true;
+  }
+  auto member = resolvedOverloadChoice.getDecl();
+
   // If the base is an implicit self type reference, and we're in a
   // an initializer, then the user wrote something like:
   //

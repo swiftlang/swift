@@ -815,9 +815,12 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       return;
     case MemberLookupResult::UR_InstanceMemberOnType:
     case MemberLookupResult::UR_TypeMemberOnInstance: {
+      auto locatorKind = isa<SubscriptExpr>(E)
+                             ? ConstraintLocator::SubscriptMember
+                             : ConstraintLocator::Member;
       AllowTypeOrInstanceMemberFailure failure(
           nullptr, CS, baseObjTy, memberName,
-          CS.getConstraintLocator(E, ConstraintLocator::Member));
+          CS.getConstraintLocator(E, locatorKind));
       auto diagnosed = failure.diagnoseAsError();
       assert(diagnosed &&
              "Failed to produce missing or extraneous metatype diagnostic");
@@ -4964,16 +4967,18 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       }
     }
 
-    auto diag = diagnose(arg->getStartLoc(),
-                         diag::cannot_call_non_function_value, fnType);
-    diag.highlight(fnExpr->getSourceRange());
+    if (!fnType->is<ExistentialMetatypeType>()) {
+      auto diag = diagnose(arg->getStartLoc(),
+                           diag::cannot_call_non_function_value, fnType);
+      diag.highlight(fnExpr->getSourceRange());
 
-    // If the argument is an empty tuple, then offer a
-    // fix-it to remove the empty tuple and use the value
-    // directly.
-    if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-      if (tuple->getNumElements() == 0) {
-        diag.fixItRemove(arg->getSourceRange());
+      // If the argument is an empty tuple, then offer a
+      // fix-it to remove the empty tuple and use the value
+      // directly.
+      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+        if (tuple->getNumElements() == 0) {
+          diag.fixItRemove(arg->getSourceRange());
+        }
       }
     }
 
