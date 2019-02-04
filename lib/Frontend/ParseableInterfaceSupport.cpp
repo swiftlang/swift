@@ -110,6 +110,7 @@ getStatusOfDependency(clang::vfs::FileSystem &FS,
   }
   return Status.get();
 }
+
 /// Construct a cache key for the .swiftmodule being generated. There is a
 /// balance to be struck here between things that go in the cache key and
 /// things that go in the "up to date" check of the cache entry. We want to
@@ -124,20 +125,23 @@ static std::string getCacheHash(ASTContext &Ctx,
                                 const CompilerInvocation &SubInvocation,
                                 StringRef InPath) {
   // Start with the compiler version (which will be either tag names or revs).
-  std::string vers = swift::version::getSwiftFullVersion(
-      Ctx.LangOpts.EffectiveLanguageVersion);
-  llvm::hash_code H = llvm::hash_value(vers);
+  // Explicitly don't pass in the "effective" language version -- this would
+  // mean modules built in different -swift-version modes would rebuild their
+  // dependencies.
+  llvm::hash_code H = hash_value(swift::version::getSwiftFullVersion());
 
   // Simplest representation of input "identity" (not content) is just a
   // pathname, and probably all we can get from the VFS in this regard anyways.
-  H = llvm::hash_combine(H, InPath);
+  H = hash_combine(H, InPath);
 
-  // ClangImporterOpts does include the target CPU, which is redundant: we
-  // already have separate .swiftinterface files per target due to expanding
-  // preprocessing directives, but further specializing the cache key to that
-  // target is harmless and will not make any extra cache entries, so allow it.
-  H = llvm::hash_combine(
-      H, SubInvocation.getClangImporterOptions().getPCHHashComponents());
+  // Include the target CPU. In practice, .swiftinterface files will be in
+  // architecture-specific subdirectories and would have target-specific pieces
+  // #if'd out. However, it doesn't hurt to include it, and it guards against
+  // mistakenly reusing cached modules across targets.
+  H = hash_combine(H, SubInvocation.getTargetTriple());
+
+  // The SDK path is going to affect how this module is imported, so include it.
+  H = hash_combine(H, SubInvocation.getSDKPath());
 
   return llvm::APInt(64, H).toString(36, /*Signed=*/false);
 }

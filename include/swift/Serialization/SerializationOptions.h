@@ -35,7 +35,6 @@ namespace swift {
     StringRef ModuleLinkName;
     ArrayRef<std::string> ExtraClangOptions;
 
-    /// Describes a dependency that 
     struct FileDependency {
       uint64_t Size;
       uint64_t ModificationTime;
