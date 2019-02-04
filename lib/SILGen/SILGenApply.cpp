@@ -5523,6 +5523,15 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
   } else if (auto nilLiteral = dyn_cast<NilLiteralExpr>(literal)) {
     builtinLiteralArgs = emitEmptyTupleRValue(literal, C);
     builtinInit = nilLiteral->getInitializer();
+  } else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal)) {
+    auto i1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    SILValue boolValue = B.createIntegerLiteral(booleanLiteral, i1Ty,
+                                                booleanLiteral->getValue());
+    ManagedValue boolManaged = ManagedValue::forUnmanaged(boolValue);
+    CanType ty = boolManaged.getType().getASTType()->getCanonicalType();
+    builtinLiteralArgs = RValue(*this, {boolManaged}, ty);
+    builtinInit = booleanLiteral->getBuiltinInitializer();
+    init = booleanLiteral->getInitializer();
   } else {
     ASTContext &ctx = getASTContext();
     SourceLoc loc = literal->getStartLoc();
