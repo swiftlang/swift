@@ -2136,6 +2136,10 @@ function(_add_swift_executable_single name)
         "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
         "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
         SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+    _list_add_string_suffix(
+        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
+        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
+        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES)
   else()
     _list_add_string_suffix(
         "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
