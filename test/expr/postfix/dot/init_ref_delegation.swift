@@ -271,7 +271,7 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
   var c4a = type(of: x).init(proto: "")
 
   var ci1 = x.init(required: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(required: Int)'}} {{15-15=type(of: }} {{19-19=)}} 
-  var ci2 = x.init(x: 0) // expected-error{{ cannot invoke 'T.init' with an argument list of type '(x: Int)'}} {{15-15=type(of: }} {{19-19=)}} 
+  var ci2 = x.init(x: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(x: Int)'}} {{15-15=type(of: }} {{19-19=)}} 
   var ci3 = x.init() // expected-error{{member 'init' cannot be used on value of type 'T'}} {{15-15=type(of: }} {{19-19=)}} 
   var ci4 = x.init(proto: "") // expected-error{{cannot invoke 'T.init' with an argument list of type '(proto: String)'}} {{15-15=type(of: }} {{19-19=)}} 
 
