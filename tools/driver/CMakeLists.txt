@@ -1,17 +1,14 @@
 add_swift_host_tool(swift
-  api_notes.cpp
   driver.cpp
   autolink_extract_main.cpp
   modulewrap_main.cpp
   swift_format_main.cpp
-  LINK_LIBRARIES
-    swiftDriver
-    swiftFrontendTool
-  LLVM_COMPONENT_DEPENDS
-    DebugInfoCodeView
   SWIFT_COMPONENT compiler
 )
-
+target_link_libraries(swift
+                      PRIVATE
+                        swiftDriver
+                        swiftFrontendTool)
 if(HAVE_UNICODE_LIBEDIT)
   target_link_libraries(swift PRIVATE edit)
 endif()

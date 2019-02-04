@@ -15,5 +15,5 @@ add_swift_host_library(swiftRemoteAST STATIC
   RemoteAST.cpp
   InProcessMemoryReader.cpp
   ${REMOTE_LIB_HEADERS}
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftSema swiftIRGen)

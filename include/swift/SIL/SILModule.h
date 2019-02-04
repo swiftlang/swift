@@ -73,14 +73,14 @@ class SILGenModule;
 
 /// A stage of SIL processing.
 enum class SILStage {
-  /// \brief "Raw" SIL, emitted by SILGen, but not yet run through guaranteed
+  /// "Raw" SIL, emitted by SILGen, but not yet run through guaranteed
   /// optimization and diagnostic passes.
   ///
   /// Raw SIL does not have fully-constructed SSA and may contain undiagnosed
   /// dataflow errors.
   Raw,
 
-  /// \brief Canonical SIL, which has been run through at least the guaranteed
+  /// Canonical SIL, which has been run through at least the guaranteed
   /// optimization and diagnostic passes.
   ///
   /// Canonical SIL has stricter invariants than raw SIL. It must not contain
@@ -88,7 +88,7 @@ enum class SILStage {
   /// forms.
   Canonical,
 
-  /// \brief Lowered SIL, which has been prepared for IRGen and will no longer
+  /// Lowered SIL, which has been prepared for IRGen and will no longer
   /// be passed to canonical SIL transform passes.
   ///
   /// In lowered SIL, the SILType of all SILValues is its SIL storage
@@ -101,7 +101,7 @@ enum class SILStage {
   Lowered,
 };
 
-/// \brief A SIL module. The SIL module owns all of the SILFunctions generated
+/// A SIL module. The SIL module owns all of the SILFunctions generated
 /// when a Swift compilation context is lowered to SIL.
 class SILModule {
   friend class SILFunctionBuilder;
@@ -181,7 +181,7 @@ private:
       VTableEntryCache;
 
   /// Lookup table for SIL witness tables from conformances.
-  llvm::DenseMap<const NormalProtocolConformance *, SILWitnessTable *>
+  llvm::DenseMap<const RootProtocolConformance *, SILWitnessTable *>
   WitnessTableMap;
 
   /// The list of SILWitnessTables in the module.
@@ -312,12 +312,14 @@ public:
   /// Serialize a SIL module using the configured SerializeSILAction.
   void serialize();
 
-  /// \brief This converts Swift types to SILTypes.
+  /// This converts Swift types to SILTypes.
   mutable Lowering::TypeConverter Types;
 
   /// Look up the TypeLowering for a SILType.
-  const Lowering::TypeLowering &getTypeLowering(SILType t) {
-    return Types.getTypeLowering(t);
+  const Lowering::TypeLowering &
+  getTypeLowering(SILType t, ResilienceExpansion expansion =
+                               ResilienceExpansion::Minimal) {
+    return Types.getTypeLowering(t, expansion);
   }
 
   /// Invalidate cached entries in SIL Loader.
@@ -347,7 +349,7 @@ public:
   static std::unique_ptr<SILModule>
   constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr);
 
-  /// \brief Create and return an empty SIL module that we can
+  /// Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
   createEmptyModule(ModuleDecl *M, SILOptions &Options,
@@ -570,11 +572,6 @@ public:
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
 
-  // Given a protocol conformance, attempt to create a witness table declaration
-  // for it.
-  SILWitnessTable *
-  createWitnessTableDeclaration(ProtocolConformance *C, SILLinkage linkage);
-
   // Given a protocol, attempt to create a default witness table declaration
   // for it.
   SILDefaultWitnessTable *
@@ -584,10 +581,10 @@ public:
   /// Deletes a dead witness table.
   void deleteWitnessTable(SILWitnessTable *Wt);
 
-  /// \brief Return the stage of processing this module is at.
+  /// Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
 
-  /// \brief Advance the module to a further stage of processing.
+  /// Advance the module to a further stage of processing.
   void setStage(SILStage s) {
     assert(s >= Stage && "regressing stage?!");
     Stage = s;
@@ -607,7 +604,7 @@ public:
   /// the given module?
   bool isTypeMetadataAccessible(CanType type);
 
-  /// \brief Run the SIL verifier to make sure that all Functions follow
+  /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify() const;
 
@@ -671,14 +668,14 @@ public:
   /// Deallocate memory of an instruction.
   void deallocateInst(SILInstruction *I);
 
-  /// \brief Looks up the llvm intrinsic ID and type for the builtin function.
+  /// Looks up the llvm intrinsic ID and type for the builtin function.
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
   /// intrinsic. The particular intrinsic functions which correspond to the
   /// returned value are defined in llvm/Intrinsics.h.
   const IntrinsicInfo &getIntrinsicInfo(Identifier ID);
 
-  /// \brief Looks up the lazily cached identification for the builtin function.
+  /// Looks up the lazily cached identification for the builtin function.
   ///
   /// \returns Returns builtin info of BuiltinValueKind::None kind if the
   /// declaration is not a builtin.

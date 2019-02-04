@@ -9,7 +9,7 @@ sil_stage canonical
 
 import Builtin
 
-sil [_semantics "verify.ownership.sil.never"] @test1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [_semantics "verify.ownership.sil.never"] [ossa] @test1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
@@ -24,7 +24,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // CHECK-NEXT: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb0
 // CHECK-NOT: Function: 'test1'
-sil @test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject

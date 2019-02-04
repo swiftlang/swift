@@ -12,7 +12,7 @@ add_swift_host_library(swiftFrontend STATIC
   SerializedDiagnosticConsumer.cpp
   DEPENDS
     SwiftOptions
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftSIL
     swiftMigrator
     swiftOption

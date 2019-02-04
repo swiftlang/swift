@@ -5,7 +5,7 @@ sil_stage canonical
 import Swift
 
 class A {
-   @sil_stored final var x: Int { get set }
+   @_hasStorage final var x: Int { get set }
    init(x: Int)
 }
 sil_vtable A {}
@@ -13,7 +13,7 @@ sil_vtable A {}
 sil public_external @changeInt : $@convention(thin) (@inout Int) -> ()
 
 // CHECK-LABEL: define {{.*}} @test1(
-sil @test1 : $@convention(thin) (@owned A) -> Int {
+sil [ossa] @test1 : $@convention(thin) (@owned A) -> Int {
 bb0(%0 : @owned $A):
   // CHECK: [[SCRATCH0:%.*]] = alloca [[BUFFER_T:\[.* x i8\]]],
   // CHECK: [[SCRATCH1:%.*]] = alloca [[BUFFER_T:\[.* x i8\]]],

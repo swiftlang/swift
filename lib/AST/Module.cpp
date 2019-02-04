@@ -32,6 +32,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -565,9 +566,82 @@ void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
   Results.append(LocalTypeDecls.begin(), LocalTypeDecls.end());
 }
 
+TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
+  ASTContext &ctx = getASTContext();
+  for (auto typeDecl : LocalTypeDecls) {
+    auto typeMangledName = evaluateOrDefault(ctx.evaluator,
+                                             MangleLocalTypeDeclRequest { typeDecl },
+                                             std::string());
+    if (mangledName == typeMangledName)
+      return typeDecl;
+  }
+
+  return nullptr;
+}
+
 void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
   // FIXME: Should this do extra access control filtering?
   FORWARD(getDisplayDecls, (Results));
+}
+
+Optional<ProtocolConformanceRef>
+ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
+  assert(type->isExistentialType());
+
+  // If the existential type cannot be represented or the protocol does not
+  // conform to itself, there's no point in looking further.
+  if (!protocol->existentialConformsToSelf())
+    return None;
+
+  auto layout = type->getExistentialLayout();
+
+  // Due to an IRGen limitation, witness tables cannot be passed from an
+  // existential to an archetype parameter, so for now we restrict this to
+  // @objc protocols.
+  if (!layout.isObjC()) {
+    // There's a specific exception for protocols with self-conforming
+    // witness tables, but the existential has to be *exactly* that type.
+    // TODO: synthesize witness tables on-demand for protocol compositions
+    // that can satisfy the requirement.
+    if (protocol->requiresSelfConformanceWitnessTable() &&
+        type->is<ProtocolType>() &&
+        type->castTo<ProtocolType>()->getDecl() == protocol)
+      return ProtocolConformanceRef(protocol);
+
+    return None;
+  }
+
+  // If the existential is class-constrained, the class might conform
+  // concretely.
+  if (auto superclass = layout.explicitSuperclass) {
+    if (auto result = lookupConformance(superclass, protocol))
+      return result;
+  }
+
+  // Otherwise, the existential might conform abstractly.
+  for (auto proto : layout.getProtocols()) {
+    auto *protoDecl = proto->getDecl();
+
+    // If we found the protocol we're looking for, return an abstract
+    // conformance to it.
+    if (protoDecl == protocol)
+      return ProtocolConformanceRef(protocol);
+
+    // If the protocol has a superclass constraint, we might conform
+    // concretely.
+    if (auto superclass = protoDecl->getSuperclass()) {
+      if (auto result = lookupConformance(superclass, protocol))
+        return result;
+    }
+
+    // Now check refined protocols.
+    if (protoDecl->inheritsFrom(protocol))
+      return ProtocolConformanceRef(protocol);
+  }
+
+  // We didn't find our protocol in the existential's list; it doesn't
+  // conform.
+  return None;
 }
 
 Optional<ProtocolConformanceRef>
@@ -609,52 +683,8 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   // An existential conforms to a protocol if the protocol is listed in the
   // existential's list of conformances and the existential conforms to
   // itself.
-  if (type->isExistentialType()) {
-    // If the existential type cannot be represented or the protocol does not
-    // conform to itself, there's no point in looking further.
-    if (!protocol->existentialConformsToSelf())
-      return None;
-
-    auto layout = type->getExistentialLayout();
-
-    // Due to an IRGen limitation, witness tables cannot be passed from an
-    // existential to an archetype parameter, so for now we restrict this to
-    // @objc protocols.
-    if (!layout.isObjC())
-      return None;
-
-    // If the existential is class-constrained, the class might conform
-    // concretely.
-    if (auto superclass = layout.explicitSuperclass) {
-      if (auto result = lookupConformance(superclass, protocol))
-        return result;
-    }
-
-    // Otherwise, the existential might conform abstractly.
-    for (auto proto : layout.getProtocols()) {
-      auto *protoDecl = proto->getDecl();
-
-      // If we found the protocol we're looking for, return an abstract
-      // conformance to it.
-      if (protoDecl == protocol)
-        return ProtocolConformanceRef(protocol);
-
-      // If the protocol has a superclass constraint, we might conform
-      // concretely.
-      if (auto superclass = protoDecl->getSuperclass()) {
-        if (auto result = lookupConformance(superclass, protocol))
-          return result;
-      }
-
-      // Now check refined protocols.
-      if (protoDecl->inheritsFrom(protocol))
-        return ProtocolConformanceRef(protocol);
-    }
-
-    // We didn't find our protocol in the existential's list; it doesn't
-    // conform.
-    return None;
-  }
+  if (type->isExistentialType())
+    return lookupExistentialConformance(type, protocol);
 
   // Type variables have trivial conformances.
   if (type->isTypeVariableOrMember())
@@ -669,7 +699,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
-  if (!nominal) return None;
+  if (!nominal || isa<ProtocolDecl>(nominal)) return None;
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
@@ -778,7 +808,7 @@ namespace {
 class SourceFile::Impl {
 public:
   /// Only intended for use by lookupOperatorDeclForName.
-  static ArrayRef<std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>>
+  static ArrayRef<SourceFile::ImportedModuleDesc>
   getImportsForSourceFile(const SourceFile &SF) {
     return SF.Imports;
   }
@@ -869,6 +899,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
     break;
   case FileUnitKind::SerializedAST:
   case FileUnitKind::ClangModule:
+  case FileUnitKind::DWARFModule:
     return OperatorLookup<OP_DECL>::lookup(cast<LoadedFile>(File), Name);
   }
 
@@ -888,16 +919,16 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
   ImportedOperatorsMap<OP_DECL> importedOperators;
   for (auto &imported : SourceFile::Impl::getImportsForSourceFile(SF)) {
     // Protect against source files that contrive to import their own modules.
-    if (imported.first.second == ownModule)
+    if (imported.module.second == ownModule)
       continue;
 
     bool isExported =
-        imported.second.contains(SourceFile::ImportFlags::Exported);
+        imported.importOptions.contains(SourceFile::ImportFlags::Exported);
     if (!includePrivate && !isExported)
       continue;
 
-    Optional<OP_DECL *> maybeOp
-      = lookupOperatorDeclForName(imported.first.second, Loc, Name, OP_MAP);
+    Optional<OP_DECL *> maybeOp =
+        lookupOperatorDeclForName(imported.module.second, Loc, Name, OP_MAP);
     if (!maybeOp)
       return None;
     
@@ -989,21 +1020,21 @@ void
 SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
   assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
-  for (auto importPair : Imports) {
+  for (auto desc : Imports) {
     switch (filter) {
     case ModuleDecl::ImportFilter::All:
       break;
     case ModuleDecl::ImportFilter::Public:
-      if (!importPair.second.contains(ImportFlags::Exported))
+      if (!desc.importOptions.contains(ImportFlags::Exported))
         continue;
       break;
     case ModuleDecl::ImportFilter::Private:
-      if (importPair.second.contains(ImportFlags::Exported))
+      if (desc.importOptions.contains(ImportFlags::Exported))
         continue;
       break;
     }
 
-    modules.push_back(importPair.first);
+    modules.push_back(desc.module);
   }
 }
 
@@ -1373,14 +1404,12 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   }
 }
 
-void SourceFile::addImports(
-    ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM) {
-  using ImportPair = std::pair<ModuleDecl::ImportedModule, ImportOptions>;
+void SourceFile::addImports(ArrayRef<ImportedModuleDesc> IM) {
   if (IM.empty())
     return;
   ASTContext &ctx = getASTContext();
   auto newBuf =
-     ctx.AllocateUninitialized<ImportPair>(Imports.size() + IM.size());
+      ctx.AllocateUninitialized<ImportedModuleDesc>(Imports.size() + IM.size());
 
   auto iter = newBuf.begin();
   iter = std::uninitialized_copy(Imports.begin(), Imports.end(), iter);
@@ -1390,13 +1419,66 @@ void SourceFile::addImports(
   Imports = newBuf;
 }
 
-bool SourceFile::hasTestableImport(const swift::ModuleDecl *module) const {
-  using ImportPair = std::pair<ModuleDecl::ImportedModule, ImportOptions>;
+bool SourceFile::hasTestableOrPrivateImport(
+    AccessLevel accessLevel, const swift::ValueDecl *ofDecl,
+    SourceFile::ImportQueryKind queryKind) const {
+  auto *module = ofDecl->getModuleContext();
+  switch (accessLevel) {
+  case AccessLevel::Internal:
+  case AccessLevel::Public:
+    // internal/public access only needs an import marked as @_private. The
+    // filename does not need to match (and we don't serialize it for such
+    // decls).
+    return std::any_of(
+        Imports.begin(), Imports.end(),
+        [module, queryKind](ImportedModuleDesc desc) -> bool {
+          if (queryKind == ImportQueryKind::TestableAndPrivate)
+            return desc.module.second == module &&
+                   (desc.importOptions.contains(ImportFlags::PrivateImport) ||
+                    desc.importOptions.contains(ImportFlags::Testable));
+          else if (queryKind == ImportQueryKind::TestableOnly)
+            return desc.module.second == module &&
+                   desc.importOptions.contains(ImportFlags::Testable);
+          else {
+            assert(queryKind == ImportQueryKind::PrivateOnly);
+            return desc.module.second == module &&
+                   desc.importOptions.contains(ImportFlags::PrivateImport);
+          }
+        });
+  case AccessLevel::Open:
+    return true;
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Private:
+    // Fallthrough.
+    break;
+  }
+
+  if (queryKind == ImportQueryKind::TestableOnly)
+    return false;
+
+  auto *DC = ofDecl->getDeclContext();
+  if (!DC)
+    return false;
+  auto *scope = DC->getModuleScopeContext();
+  if (!scope)
+    return false;
+
+  StringRef filename;
+  if (auto *file = dyn_cast<LoadedFile>(scope)) {
+    filename = file->getFilenameForPrivateDecl(ofDecl);
+  } else
+    return false;
+
+  if (filename.empty())
+    return false;
+
   return std::any_of(Imports.begin(), Imports.end(),
-                     [module](ImportPair importPair) -> bool {
-    return importPair.first.second == module &&
-        importPair.second.contains(ImportFlags::Testable);
-  });
+                     [module, filename](ImportedModuleDesc desc) -> bool {
+                       return desc.module.second == module &&
+                              desc.importOptions.contains(
+                                  ImportFlags::PrivateImport) &&
+                              desc.filename == filename;
+                     });
 }
 
 void SourceFile::clearLookupCache() {
@@ -1444,8 +1526,8 @@ static void performAutoImport(
 
   // FIXME: These will be the same for most source files, but we copy them
   // over and over again.
-  auto Imports =
-    std::make_pair(ModuleDecl::ImportedModule({}, M), SourceFile::ImportOptions());
+  auto Imports = SourceFile::ImportedModuleDesc(
+      ModuleDecl::ImportedModule({}, M), SourceFile::ImportOptions());
   SF.addImports(Imports);
 }
 
@@ -1493,11 +1575,15 @@ bool SourceFile::shouldCollectToken() const {
 }
 
 bool SourceFile::shouldBuildSyntaxTree() const {
+  return canBeParsedInFull() && SyntaxInfo->Enable;
+}
+
+bool SourceFile::canBeParsedInFull() const {
   switch (Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
-    return SyntaxInfo->Enable;
+    return true;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:
     return false;

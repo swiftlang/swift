@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-objc-interop -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -9,7 +9,7 @@ import Swift
 import SwiftShims
 
 class Node {
-  @sil_stored var index: Int { get set }
+  @_hasStorage var index: Int { get set }
   init(index: Int)
   func check() -> Int
   @objc deinit

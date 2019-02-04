@@ -1,5 +1,3 @@
-set(swift_platform_name)
-set(swift_platform_flags)
 set(swift_platform_sources
     Platform.swift
     TiocConstants.swift
@@ -14,7 +12,10 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
     SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS
-    API_NOTES_NON_OVERLAY)
+
+    # This is overly conservative, but we have so few API notes files that
+    # haven't migrated to the Swift repo that it's probably fine in practice.
+    DEPENDS copy_apinotes)
 
 add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Glibc.swift.gyb
@@ -121,3 +122,4 @@ foreach(sdk ${SWIFT_SDKS})
   endforeach()
 endforeach()
 add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})
+set_property(TARGET glibc_modulemap PROPERTY FOLDER "Miscellaneous")

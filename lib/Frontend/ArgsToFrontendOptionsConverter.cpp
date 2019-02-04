@@ -60,6 +60,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
     Opts.IndexStorePath = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_prebuilt_module_cache_path)) {
+    Opts.PrebuiltModuleCachePath = A->getValue();
+  }
 
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
 
@@ -67,7 +70,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
+  Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
   Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
+  Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
 
@@ -147,8 +152,12 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
 
-  Opts.AlwaysSerializeDebuggingOptions |=
-      Args.hasArg(OPT_serialize_debugging_options);
+  if (const Arg *A = Args.getLastArg(OPT_serialize_debugging_options,
+                                     OPT_no_serialize_debugging_options)) {
+    Opts.SerializeOptionsForDebugging =
+        A->getOption().matches(OPT_serialize_debugging_options);
+  }
+
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
   Opts.EnableParseableModuleInterface |=
@@ -364,6 +373,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::REPL;
   if (Opt.matches(OPT_interpret))
     return FrontendOptions::ActionType::Immediate;
+  if (Opt.matches(OPT_build_module_from_parseable_interface))
+    return FrontendOptions::ActionType::BuildModuleFromParseableInterface;
 
   llvm_unreachable("Unhandled mode option");
 }

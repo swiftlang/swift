@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil -save-optimization-record-path %t.opt.yaml | %FileCheck %s
+// RUN: %target-swift-frontend %/s -parse-as-library -O -emit-sil -save-optimization-record-path %t.opt.yaml | %FileCheck %s
 // RUN: %FileCheck -check-prefix=YAML -input-file=%t.opt.yaml %s
-// RUN: %target-swift-frontend %s -parse-as-library -Osize -emit-sil | %FileCheck %s --check-prefix=OSIZE
+// RUN: %target-swift-frontend %/s -parse-as-library -Osize -emit-sil | %FileCheck %s --check-prefix=OSIZE
 //
 // Test speculative devirtualization.
 

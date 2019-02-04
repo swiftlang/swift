@@ -31,8 +31,8 @@ sil @baz_init : $@convention(thin) (@thin Baz.Type) -> @owned Baz
 sil @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
 sil @destructured_baz_user : $@convention(thin) (@owned Bar, @guaranteed Bar, Int) -> ()
 
-// CHECK-LABEL: sil @test_capture_promotion
-sil @test_capture_promotion : $@convention(thin) () -> @owned @callee_owned () -> (Int, Builtin.Int64) {
+// CHECK-LABEL: sil [ossa] @test_capture_promotion
+sil [ossa] @test_capture_promotion : $@convention(thin) () -> @owned @callee_owned () -> (Int, Builtin.Int64) {
 bb0:
   // CHECK: [[BOX1:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Foo>
   // CHECK: [[MARKED_BOX1:%.*]] = mark_uninitialized [var] [[BOX1]]
@@ -102,8 +102,8 @@ bb0:
   return %21 : $@callee_owned () -> (Int, Builtin.Int64)
 }
 
-// CHECK-LABEL: sil @test_capture_promotion_indirect
-sil @test_capture_promotion_indirect : $@convention(thin) () -> @owned @callee_owned () -> @out Int {
+// CHECK-LABEL: sil [ossa] @test_capture_promotion_indirect
+sil [ossa] @test_capture_promotion_indirect : $@convention(thin) () -> @owned @callee_owned () -> @out Int {
 bb0:
   // CHECK: [[BOX1:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Foo>
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Foo>
@@ -164,8 +164,8 @@ bb0:
   return %21 : $@callee_owned () -> @out Int
 }
 
-// CHECK-LABEL: sil private @$s8closure0Tf2iii_n : $@convention(thin) (@owned Foo, @owned Baz, Int) -> (Int, Builtin.Int64) {
-// CHECK: bb0([[ORIGINAL_ARG0:%.*]] : @owned $Foo, [[ORIGINAL_ARG1:%.*]] : @owned $Baz, [[ARG2:%.*]] : @trivial $Int):
+// CHECK-LABEL: sil private [ossa] @$s8closure0Tf2iii_n : $@convention(thin) (@owned Foo, @owned Baz, Int) -> (Int, Builtin.Int64) {
+// CHECK: bb0([[ORIGINAL_ARG0:%.*]] : @owned $Foo, [[ORIGINAL_ARG1:%.*]] : @owned $Baz, [[ARG2:%.*]] : $Int):
 // CHECK:   [[ARG0:%.*]] = begin_borrow [[ORIGINAL_ARG0]]
 // CHECK:   [[ARG1:%.*]] = begin_borrow [[ORIGINAL_ARG1]]
 // CHECK:   [[DUMMY_FUNC:%.*]] = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
@@ -196,7 +196,7 @@ bb0:
 // CHECK: return [[RESULT]] : $(Int, Builtin.Int64)
 // CHECK: } // end sil function '$s8closure0Tf2iii_n'
 
-sil private @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> (Int, Builtin.Int64) {
+sil private [ossa] @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> (Int, Builtin.Int64) {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %4 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Foo>, 0
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
@@ -225,8 +225,8 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0
 
 // The closure in this function is not promotable because it mutates its argument
 
-// CHECK-LABEL: sil @test_unpromotable
-sil @test_unpromotable : $@convention(thin) () -> @owned @callee_owned () -> Int {
+// CHECK-LABEL: sil [ossa] @test_unpromotable
+sil [ossa] @test_unpromotable : $@convention(thin) () -> @owned @callee_owned () -> Int {
 bb0:
   %0 = tuple ()
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Foo>
@@ -243,9 +243,9 @@ bb0:
   return %21 : $@callee_owned () -> Int
 }
 
-sil @mutate_foo : $@convention(thin) (@inout Foo) -> ()
+sil [ossa] @mutate_foo : $@convention(thin) (@inout Foo) -> ()
 
-sil private @closure1 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>) -> Int {
+sil private [ossa] @closure1 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>) -> Int {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Foo>, 0
   %6 = tuple ()
@@ -263,12 +263,12 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>):
   return %11 : $Int
 }
 
-sil @apply : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+sil [ossa] @apply : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 
-// CHECK-LABEL: sil @captureWithinGeneric
-sil @captureWithinGeneric : $@convention(thin) <T> (@inout Int, @inout Int) -> () {
+// CHECK-LABEL: sil [ossa] @captureWithinGeneric
+sil [ossa] @captureWithinGeneric : $@convention(thin) <T> (@inout Int, @inout Int) -> () {
 // CHECK: bb0
-bb0(%0 : @trivial $*Int, %1 : @trivial $*Int):
+bb0(%0 : $*Int, %1 : $*Int):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   copy_addr %0 to [initialization] %2a : $*Int
@@ -291,8 +291,8 @@ bb0(%0 : @trivial $*Int, %1 : @trivial $*Int):
   return %16 : $()
 }
 
-// CHECK: sil @$s27closureWithGenericSignatureTf2ni_n : $@convention(thin) <{{[^>]+}}> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
-sil @closureWithGenericSignature : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <Int>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> () {
+// CHECK: sil [ossa] @$s27closureWithGenericSignatureTf2ni_n : $@convention(thin) <{{[^>]+}}> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
+sil [ossa] @closureWithGenericSignature : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <Int>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> () {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
@@ -309,8 +309,8 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>, %2 : @owned $<τ_0_0> { var τ_0
 
 sil [transparent] [serialized] @$ss1poiyS2i_SitF : $@convention(thin) (Int, Int) -> Int
 
-sil private @closure_indirect_result : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int {
-bb0(%0: @trivial $*Int, %1 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %4 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
+sil private [ossa] @closure_indirect_result : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int {
+bb0(%0: $*Int, %1 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %4 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %17 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Foo>, 0
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
   %5 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Int>, 0
@@ -338,13 +338,13 @@ bb0(%0: @trivial $*Int, %1 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned 
 // struct_element_addr that always have load users with the load occurring before
 // and after the element in the use list.
 
-sil @mutate_int : $@convention(thin) (@inout Int) -> ()
+sil [ossa] @mutate_int : $@convention(thin) (@inout Int) -> ()
 
-// CHECK-LABEL: sil @test_closure_multiple_uses_of_struct_element_addr : $@convention(thin) () -> @owned @callee_owned () -> () {
+// CHECK-LABEL: sil [ossa] @test_closure_multiple_uses_of_struct_element_addr : $@convention(thin) () -> @owned @callee_owned () -> () {
 // CHECK: [[FUNC:%.*]] = function_ref @closure_multiple_uses_of_struct_element_addr : $@convention(thin)
 // CHECK: partial_apply [[FUNC]](
 // CHECK: } // end sil function 'test_closure_multiple_uses_of_struct_element_addr'
-sil @test_closure_multiple_uses_of_struct_element_addr : $@convention(thin) () -> @owned @callee_owned () -> () {
+sil [ossa] @test_closure_multiple_uses_of_struct_element_addr : $@convention(thin) () -> @owned @callee_owned () -> () {
 bb0:
   %0 = function_ref @baz_init : $@convention(thin) (@thin Baz.Type) -> @owned Baz
   %1 = metatype $@thin Baz.Type
@@ -365,7 +365,7 @@ bb0:
   return %9 : $@callee_owned () -> ()
 }
 
-sil @closure_multiple_uses_of_struct_element_addr : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Baz>) -> () {
+sil [ossa] @closure_multiple_uses_of_struct_element_addr : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Baz>) -> () {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %1 : @owned $<τ_0_0> { var τ_0_0 } <Baz>):
   %2 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
   %3 = struct_element_addr %2 : $*Baz, #Baz.x
@@ -384,8 +384,8 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %1 : @owned $<τ_0_0> { var τ_0
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @test_capture_projection_test : $@convention(thin) () -> @owned @callee_owned () -> () {
-sil @test_capture_projection_test : $@convention(thin) () -> @owned @callee_owned () -> () {
+// CHECK-LABEL: sil [ossa] @test_capture_projection_test : $@convention(thin) () -> @owned @callee_owned () -> () {
+sil [ossa] @test_capture_projection_test : $@convention(thin) () -> @owned @callee_owned () -> () {
 bb0:
   %0 = function_ref @baz_init : $@convention(thin) (@thin Baz.Type) -> @owned Baz
   %1 = metatype $@thin Baz.Type
@@ -425,7 +425,7 @@ bb0:
   return %21 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: sil @$s23closure_projection_testTf2ni_n : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned Baz) -> () {
+// CHECK-LABEL: sil [ossa] @$s23closure_projection_testTf2ni_n : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned Baz) -> () {
 // CHECK: bb0([[UNPROMOTED_BAZ:%.*]] : @owned $<τ_0_0> { var τ_0_0 } <Baz>, [[BAZ:%.*]] : @owned $Baz):
 // CHECK:   [[BORROWED_BAZ:%.*]] = begin_borrow [[BAZ]] : $Baz
 // CHECK:   [[X:%.*]] = struct_extract [[BORROWED_BAZ]] : $Baz, #Baz.x
@@ -440,7 +440,7 @@ bb0:
 // CHECK:   end_borrow [[BORROWED_BAZ]]
 // CHECK:   destroy_value [[BAZ]]
 // CHECK: } // end sil function '$s23closure_projection_testTf2ni_n'
-sil @closure_projection_test : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Baz>) -> () {
+sil [ossa] @closure_projection_test : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Baz>) -> () {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %1 : @owned $<τ_0_0> { var τ_0_0 } <Baz>):
   %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
   %2 = struct_element_addr %0a : $*Baz, #Baz.x

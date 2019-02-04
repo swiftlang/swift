@@ -300,6 +300,12 @@ class RefinedClass : BaseClass, RefinedProtocol {
   }
 }
 
+func takesBaseProtocol(_: BaseProtocol) {}
+
+func passesRefinedProtocol(_ r: RefinedProtocol) {
+  takesBaseProtocol(r)
+}
+
 class LoopClass : LoopProto {}
 protocol LoopProto where Self : LoopClass {}
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -enable-key-path-resilience -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
-// RUN: %target-swift-emit-ir(mock-sdk: %clang-importer-sdk) -enable-key-path-resilience -import-objc-header %S/Inputs/keypaths_objc.h %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
+// RUN: %target-swift-emit-ir(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/keypaths_objc.h %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -25,7 +25,7 @@ class Bar: NSObject {
   @objc var foo: Foo { fatalError() }
 }
 
-// CHECK-LABEL: sil hidden @$s13keypaths_objc0B8KeypathsyyF
+// CHECK-LABEL: sil hidden [ossa] @$s13keypaths_objc0B8KeypathsyyF
 func objcKeypaths() {
   // CHECK: keypath $WritableKeyPath<NonObjC, Int>, (root
   _ = \NonObjC.x
@@ -47,7 +47,7 @@ func objcKeypaths() {
   _ = \Foo.differentName
 }
 
-// CHECK-LABEL: sil hidden @$s13keypaths_objc0B18KeypathIdentifiersyyF
+// CHECK-LABEL: sil hidden [ossa] @$s13keypaths_objc0B18KeypathIdentifiersyyF
 func objcKeypathIdentifiers() {
   // CHECK: keypath $KeyPath<ObjCFoo, String>, (objc "objcProp"; {{.*}} id #ObjCFoo.objcProp!getter.1.foreign
   _ = \ObjCFoo.objcProp
@@ -65,7 +65,7 @@ extension NSObject {
     @objc dynamic var dynamic: Int { return 0 }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}nonobjcExtensionOfObjCClass
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}nonobjcExtensionOfObjCClass
 func nonobjcExtensionOfObjCClass() {
   // Should be treated as a statically-dispatch property
   // CHECK: keypath $KeyPath<NSObject, X>, ({{.*}} id @
@@ -81,7 +81,7 @@ func nonobjcExtensionOfObjCClass() {
   var objcRequirement: Int { get set }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}ProtocolRequirement
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}ProtocolRequirement
 func objcProtocolRequirement<T: ObjCProto>(_: T) {
   // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
   _ = \T.objcRequirement
@@ -89,7 +89,7 @@ func objcProtocolRequirement<T: ObjCProto>(_: T) {
   _ = \ObjCProto.objcRequirement
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}externalObjCProperty
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}externalObjCProperty
 func externalObjCProperty() {
   // Pure ObjC-dispatched properties do not have external descriptors.
   // CHECK: keypath $KeyPath<NSObject, String>, 

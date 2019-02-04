@@ -30,8 +30,8 @@ sil @makesInt : $@convention(thin) () -> Builtin.Int32
 //  takes_Int_inout(&a)
 //  return (t, a)
 //}
-sil @used_by_inout : $@convention(thin) (Builtin.Int32) -> (Builtin.Int32, Builtin.Int32) {
-bb0(%0 : @trivial $Builtin.Int32):
+sil [ossa] @used_by_inout : $@convention(thin) (Builtin.Int32) -> (Builtin.Int32, Builtin.Int32) {
+bb0(%0 : $Builtin.Int32):
   %91 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %91a = project_box %91 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %1 = mark_uninitialized [var] %91a : $*Builtin.Int32
@@ -54,7 +54,7 @@ struct AddressOnlyStruct {
 sil @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
 
 // There should be no error in this function.
-sil @call_struct_return_function : $@convention(thin) () -> Builtin.Int32 {
+sil [ossa] @call_struct_return_function : $@convention(thin) () -> Builtin.Int32 {
 bb0:
   %0 = alloc_box $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>
   %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>, 0
@@ -67,8 +67,8 @@ bb0:
   return %5 : $Builtin.Int32
 }
 
-sil @copy_addr1 : $@convention(thin) <T> (@in T) -> @out T {
-bb0(%0 : @trivial $*T, %1 : @trivial $*T):
+sil [ossa] @copy_addr1 : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
   %4 = mark_uninitialized [var] %3a : $*T
@@ -84,8 +84,8 @@ class SomeClass {}
 sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
 sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
 
-sil @assign_test_trivial : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
-bb0(%0 : @trivial $Builtin.Int32):
+sil [ossa] @assign_test_trivial : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
   %7 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %7a = project_box %7 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %1 = mark_uninitialized [var] %7a : $*Builtin.Int32
@@ -102,7 +102,7 @@ bb0(%0 : @trivial $Builtin.Int32):
   return %2 : $Builtin.Int32
 }
 
-sil @assign_test_nontrivial : $@convention(thin) () -> () {
+sil [ossa] @assign_test_nontrivial : $@convention(thin) () -> () {
 bb0:
   // Assignments of nontrivial types.  The first becomes an initialize (i.e.,
   // lone store), the second becomes an assignment (retain/release dance).
@@ -122,8 +122,8 @@ bb0:
 }
 
 
-sil @assign_test_addressonly : $@convention(thin) <T> (@in T) -> @out T {
-bb0(%0 : @trivial $*T, %1 : @trivial $*T):
+sil [ossa] @assign_test_addressonly : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <T>, 0
   %2 = mark_uninitialized [var] %ba : $*T
@@ -135,7 +135,7 @@ bb0(%0 : @trivial $*T, %1 : @trivial $*T):
   return %9 : $()
 }
 
-sil @assign_test_unowned : $@convention(thin) () -> () {
+sil [ossa] @assign_test_unowned : $@convention(thin) () -> () {
 bb0:
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <@sil_unowned SomeClass>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <@sil_unowned SomeClass>, 0
@@ -168,8 +168,8 @@ struct ContainsNativeObject {
   var y : Builtin.NativeObject
 }
 
-sil @test_struct : $@convention(thin) (@inout ContainsNativeObject) -> () {
-bb0(%0 : @trivial $*ContainsNativeObject):
+sil [ossa] @test_struct : $@convention(thin) (@inout ContainsNativeObject) -> () {
+bb0(%0 : $*ContainsNativeObject):
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>, 0
   %c = mark_uninitialized [var] %ba : $*ContainsNativeObject
@@ -181,14 +181,14 @@ bb0(%0 : @trivial $*ContainsNativeObject):
   return %x : $()
 }
 
-sil @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
-bb0(%0 : @trivial $*Bool, %1 : @trivial $Bool):
+sil [ossa] @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
+bb0(%0 : $*Bool, %1 : $Bool):
   assign %1 to %0 : $*Bool
   %9 = tuple ()
   return %9 : $()
 }
-sil @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
-bb0(%0 : @trivial $*SomeClass, %1 : @owned $SomeClass):
+sil [ossa] @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
+bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
   assign %1 to %0 : $*SomeClass
   %9 = tuple ()
   return %9 : $()
@@ -196,10 +196,10 @@ bb0(%0 : @trivial $*SomeClass, %1 : @owned $SomeClass):
 
 sil_global @int_global : $Builtin.Int32
 
-// CHECK-LABEL: sil @test_tlc
+// CHECK-LABEL: sil [ossa] @test_tlc
 // CHECK-NOT: mark_uninitialized
 // CHECK: return
-sil @test_tlc : $() -> () {
+sil [ossa] @test_tlc : $() -> () {
   %0 = global_addr @int_global : $*Builtin.Int32
   %1 = mark_uninitialized [var] %0 : $*Builtin.Int32
 
@@ -219,7 +219,7 @@ class C : P {}
 sil @use : $@convention(thin) (@in P) -> ()
 
 
-sil @release_not_constructed : $@convention(thin) () -> () {
+sil [ossa] @release_not_constructed : $@convention(thin) () -> () {
 bb0:
   %3 = alloc_stack $SomeClass
   %c = mark_uninitialized [var] %3 : $*SomeClass
@@ -229,7 +229,7 @@ bb0:
   return %15 : $()
 }
 
-sil @release_some_constructed : $@convention(thin) () -> () {
+sil [ossa] @release_some_constructed : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   %b = alloc_stack $(SomeClass, SomeClass)
@@ -244,8 +244,8 @@ bb0:
   return %8 : $()
 }
 
-sil @init_existential_with_class : $@convention(thin) (@inout C) -> () {
-entry(%a : @trivial $*C):
+sil [ossa] @init_existential_with_class : $@convention(thin) (@inout C) -> () {
+entry(%a : $*C):
   %p = alloc_stack $P
   %b = mark_uninitialized [var] %p : $*P
   %q = init_existential_addr %b : $*P, $C
@@ -257,8 +257,8 @@ entry(%a : @trivial $*C):
   return %z : $()
 }
 
-sil @conditional_init : $@convention(thin) (Bool) -> () {
-bb0(%0 : @trivial $Bool):
+sil [ossa] @conditional_init : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
   %2 = alloc_stack $SomeClass
   %3 = mark_uninitialized [var] %2 : $*SomeClass
   %5 = integer_literal $Builtin.Int1, 1
@@ -277,8 +277,8 @@ bb2:
   return %14 : $()
 }
 
-sil @conditionalInitOrAssign : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+sil [ossa] @conditionalInitOrAssign : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
   %5 = alloc_stack $SomeClass
   %6 = mark_uninitialized [var] %5 : $*SomeClass
   cond_br %0, bb1, bb2
@@ -307,8 +307,8 @@ class RootClassWithIVars {
 }
 
 /// Root class tests.
-sil @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Builtin.Int32) -> @owned RootClassWithIVars {
-bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Builtin.Int32):
+sil [ossa] @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Builtin.Int32) -> @owned RootClassWithIVars {
+bb0(%0 : @owned $RootClassWithIVars, %1 : $Builtin.Int32):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
   %4 = begin_borrow %3 : $RootClassWithIVars
   %10 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.x
@@ -334,7 +334,7 @@ class DerivedClassWithIVars : RootClassWithIVars {
 sil @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
 
-sil @derived_test1 : $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
+sil [ossa] @derived_test1 : $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : @owned $DerivedClassWithIVars):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
@@ -365,8 +365,8 @@ bb0(%0 : @owned $DerivedClassWithIVars):
 
 struct MyStruct : P {}
 
-sil @self_init_assert_instruction : $@convention(thin) (Builtin.Int32, @thin MyStruct.Type) -> MyStruct {
-bb0(%0 : @trivial $Builtin.Int32, %1 : @trivial $@thin MyStruct.Type):
+sil [ossa] @self_init_assert_instruction : $@convention(thin) (Builtin.Int32, @thin MyStruct.Type) -> MyStruct {
+bb0(%0 : $Builtin.Int32, %1 : $@thin MyStruct.Type):
   %2 = alloc_stack $MyStruct, var, name "sf"
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct
   %6 = function_ref @selfinit : $@convention(thin) () -> MyStruct
@@ -387,8 +387,8 @@ struct MyStruct2 {
 
 sil @selfinit_delegate : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2
 
-sil @self_init_copyaddr : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2 {
-bb0(%0 : @trivial $*MyStruct2, %1 : @trivial $@thin MyStruct2.Type):
+sil [ossa] @self_init_copyaddr : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2 {
+bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
   %2 = alloc_stack $MyStruct2, var, name "sf"
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct2
   %6 = metatype $@thin MyStruct2.Type
@@ -413,7 +413,7 @@ class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStored
   override init()
 }
 
-sil @test_root_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+sil [ossa] @test_root_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
   destroy_value %4 : $RootClassWithNontrivialStoredProperties
@@ -421,7 +421,7 @@ bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
-sil @test_root_partial_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+sil [ossa] @test_root_partial_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
   %1 = alloc_ref $SomeClass
@@ -434,7 +434,7 @@ bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
-sil @test_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+sil [ossa] @test_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [derivedself] %1 : $*DerivedClassWithNontrivialStoredProperties
@@ -445,7 +445,7 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
-sil @test_derived_partial_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+sil [ossa] @test_derived_partial_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [derivedself] %1 : $*DerivedClassWithNontrivialStoredProperties
@@ -464,7 +464,7 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
-sil @test_delegating_box_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+sil [ossa] @test_delegating_box_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
@@ -475,7 +475,7 @@ bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
-sil @test_delegating_rvalue_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+sil [ossa] @test_delegating_rvalue_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
@@ -488,7 +488,7 @@ bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
-sil @test_delegating_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+sil [ossa] @test_delegating_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   %2 = alloc_stack $DerivedClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [delegatingself] %2 : $*DerivedClassWithNontrivialStoredProperties
@@ -499,8 +499,8 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
-sil @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Builtin.Int32) -> @owned DerivedClassWithIVars {
-bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Builtin.Int32):
+sil [ossa] @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Builtin.Int32) -> @owned DerivedClassWithIVars {
+bb0(%0 : @owned $DerivedClassWithIVars, %i : $Builtin.Int32):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
   %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
@@ -529,12 +529,12 @@ bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Builtin.Int32):
 
 
 struct MyStruct3 {
-  @sil_stored var c: C
+  @_hasStorage var c: C
 }
 sil @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
 
-sil hidden @test_conditional_destroy_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+sil hidden [ossa] @test_conditional_destroy_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
   %2 = alloc_stack $MyStruct3
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct3
   cond_br %0, bb1, bb2
@@ -556,8 +556,8 @@ class MyClass3 {
 }
 sil @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
 
-sil hidden @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+sil hidden [ossa] @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
   %2 = alloc_stack $MyClass3
   %3 = mark_uninitialized [delegatingself] %2 : $*MyClass3
   cond_br %0, bb1, bb2

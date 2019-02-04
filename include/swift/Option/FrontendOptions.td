@@ -55,10 +55,6 @@ def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
 
-def serialize_diagnostics_path
-  : Separate<["-"], "serialize-diagnostics-path">, MetaVarName<"<path>">,
-    HelpText<"Output serialized diagnostics to <path>">;
-
 def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
@@ -133,6 +129,9 @@ def print_clang_stats : Flag<["-"], "print-clang-stats">,
 
 def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
   HelpText<"Always serialize options for debugging (default: only for apps)">;
+def no_serialize_debugging_options :
+  Flag<["-"], "no-serialize-debugging-options">,
+  HelpText<"Never serialize options for debugging (default: only for apps)">;
 
 def autolink_library : Separate<["-"], "autolink-library">,
   HelpText<"Add dependent library">, Flags<[FrontendOption]>;
@@ -269,6 +268,10 @@ def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
 def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
   HelpText<"Add names to local values in LLVM IR">;
 
+def enable_anonymous_context_mangled_names :
+  Flag<["-"], "enable-anonymous-context-mangled-names">,
+  HelpText<"Enable emission of mangled names in anonymous context descriptors">;
+
 def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
   HelpText<"Disable emission of reflection metadata for nominal types">;
 
@@ -301,14 +304,8 @@ def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;
 
-def disable_guaranteed_normal_arguments : Flag<["-"], "disable-guaranteed-normal-arguments">,
-  HelpText<"If set to true, all normal parameters (except to inits/setters) will be passed at +1">;
-
-def disable_mandatory_semantic_arc_opts : Flag<["-"], "disable-mandatory-semantic-arc-opts">,
-  HelpText<"Disable the mandatory semantic arc optimizer">;
-
-def assume_parsing_unqualified_ownership_sil : Flag<["-"], "assume-parsing-unqualified-ownership-sil">,
-  HelpText<"Assume unqualified SIL ownership when parsing SIL">;
+def enable_mandatory_semantic_arc_opts : Flag<["-"], "enable-mandatory-semantic-arc-opts">,
+  HelpText<"Enable the mandatory semantic arc optimizer">;
 
 def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-swap">,
   HelpText<"Suppress static violations of exclusive access with swap()">;
@@ -319,10 +316,10 @@ def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
 def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
   HelpText<"Enable Large Loadable types IRGen pass">;
 
-def enable_experimental_property_behaviors :
-  Flag<["-"], "enable-experimental-property-behaviors">,
-  HelpText<"Enable experimental property behaviors">;
-  
+def enable_experimental_static_assert :
+  Flag<["-"], "enable-experimental-static-assert">,
+  HelpText<"Enable experimental #assert">;
+
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -353,6 +350,15 @@ def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
+
+def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Add 'dynamic' to all declarations">;
+
+def enable_dynamic_replacement_chaining :
+  Flag<["-"], "enable-dynamic-replacement-chaining">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Enable chaining of dynamic replacements">;
 
 def enable_nskeyedarchiver_diagnostics :
   Flag<["-"], "enable-nskeyedarchiver-diagnostics">,
@@ -501,6 +507,18 @@ def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
 
+def build_module_from_parseable_interface :
+  Flag<["-"], "build-module-from-parseable-interface">,
+  HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
+  ModeOpt;
+
+def prebuilt_module_cache_path :
+  Separate<["-"], "prebuilt-module-cache-path">,
+  HelpText<"Directory of prebuilt modules for loading parseable interfaces">;
+def prebuilt_module_cache_path_EQ :
+  Joined<["-"], "prebuilt-module-cache-path=">,
+  Alias<prebuilt_module_cache_path>;
+
 def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
    HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
 
@@ -530,9 +548,6 @@ def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
 
 def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
   HelpText<"Diable verification of access markers used to enforce exclusivity.">;
-
-def enable_key_path_resilience : Flag<["-"], "enable-key-path-resilience">,
-  HelpText<"Enable key path resilience.">;
 
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,

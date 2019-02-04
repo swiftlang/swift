@@ -1,8 +1,8 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 // CHECK: sil_global [[DSO:@__dso_handle]] : $Builtin.RawPointer
 
-// CHECK-LABEL: sil @main : $@convention(c)
+// CHECK-LABEL: sil [ossa] @main : $@convention(c)
 // CHECK: bb0
 // CHECK: [[DSOAddr:%[0-9]+]] = global_addr [[DSO]] : $*Builtin.RawPointer
 // CHECK-NEXT: [[DSOPtr:%[0-9]+]] = address_to_pointer [[DSOAddr]] : $*Builtin.RawPointer to $Builtin.RawPointer

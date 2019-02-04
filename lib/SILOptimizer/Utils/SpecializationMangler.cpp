@@ -202,6 +202,12 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   switch (LI->getKind()) {
   default:
     llvm_unreachable("unknown literal");
+  case SILInstructionKind::DynamicFunctionRefInst: {
+    SILFunction *F = cast<DynamicFunctionRefInst>(LI)->getReferencedFunction();
+    ArgOpBuffer << 'f';
+    appendIdentifier(F->getName());
+    break;
+  }
   case SILInstructionKind::FunctionRefInst: {
     SILFunction *F = cast<FunctionRefInst>(LI)->getReferencedFunction();
     ArgOpBuffer << 'f';

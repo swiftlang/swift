@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -capture-promotion | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion | %FileCheck %s
 
 // Check to make sure that the process of promoting closure captures results in
 // a correctly cloned and modified closure function body. This test
@@ -406,4 +406,71 @@ bb0:
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <Foo>
 
   return %21 : $@callee_guaranteed () -> Int
+}
+
+// CHECK-LABEL: sil @test_capture_promotion_on_stack
+sil @test_capture_promotion_on_stack : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Foo>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Foo>, 0
+  %2 = function_ref @foo_allocating_init : $@convention(thin) (@thick Foo.Type) -> @owned Foo
+  %3 = metatype $@thick Foo.Type
+  %4 = apply %2(%3) : $@convention(thin) (@thick Foo.Type) -> @owned Foo
+  store %4 to %1a : $*Foo
+  %6 = alloc_box $<τ_0_0> { var τ_0_0 } <Baz>
+  %6a = project_box %6 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
+  %7 = function_ref @baz_init : $@convention(thin) (@thin Baz.Type) -> @owned Baz
+  %8 = metatype $@thin Baz.Type
+  %9 = apply %7(%8) : $@convention(thin) (@thin Baz.Type) -> @owned Baz
+  store %9 to %6a : $*Baz
+  %11 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %11a = project_box %11 : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %12 = function_ref @convert_from_integer_literal : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+  %13 = metatype $@thin Int.Type
+  %14 = integer_literal $Builtin.Word, 3
+  %15 = apply %12(%14, %13) : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+  store %15 to %11a : $*Int
+
+// CHECK-NOT: function_ref @closure0_guaranteed
+// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @$s19closure0_guaranteedTf2iii_n
+// CHECK-NOT: function_ref @closure0_guaranteed
+
+// The Foo variable is loaded from and retained, because it is a reference type
+// CHECK-NEXT: [[LOADFOO:%.*]] = load {{.*}} : $*Foo
+// CHECK-NEXT: strong_retain [[LOADFOO]] : $Foo
+
+// The Baz variable is loaded and retain_value'd, because it is a non-trivial
+// aggregate type
+// CHECK-NEXT: [[LOADBAZ:%.*]] = load {{.*}} : $*Baz
+// CHECK-NEXT: retain_value [[LOADBAZ:%.*]] : $Baz
+
+// The Int variable is loaded only, because it is trivial
+// CHECK-NEXT: [[LOADINT:%.*]] = load {{.*}} : $*Int
+
+// The partial apply has one value argument for each pair of arguments that was
+// previously used to capture and pass the variable by reference
+// CHECK-NEXT: [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[CLOSURE_PROMOTE]]([[LOADFOO]], [[LOADBAZ]], [[LOADINT]])
+// CHECK-NEXT: [[MD1:%.*]] = mark_dependence [[PA]] : $@noescape @callee_guaranteed () -> Int on [[LOADFOO]] : $Foo
+// CHECK-NEXT: [[MD2:%.*]] = mark_dependence [[MD1]] : $@noescape @callee_guaranteed () -> Int on [[LOADBAZ]] : $Baz
+// CHECK-NEXT: apply [[MD2]]() : $@noescape @callee_guaranteed () -> Int
+// CHECK-NEXT:  dealloc_stack [[PA]] : $@noescape @callee_guaranteed () -> Int
+// CHECK-NEXT:  strong_release [[LOADFOO]] : $Foo
+// CHECK-NEXT:  release_value [[LOADBAZ]] : $Baz
+// CHECK-NEXT:  strong_release {{.*}} : $<τ_0_0> { var τ_0_0 } <Int>
+// CHECK-NEXT:  strong_release {{.*}} : $<τ_0_0> { var τ_0_0 } <Baz>
+// CHECK-NEXT:  strong_release {{.*}} : $<τ_0_0> { var τ_0_0 } <Foo>
+
+  %17 = function_ref @closure0_guaranteed : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Foo>, @guaranteed <τ_0_0> { var τ_0_0 } <Baz>, @guaranteed <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  %21 = partial_apply [callee_guaranteed] [on_stack] %17(%1, %6, %11) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Foo>, @guaranteed <τ_0_0> { var τ_0_0 } <Baz>, @guaranteed <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  %md = mark_dependence %21 :$@noescape @callee_guaranteed () -> Int on %1 : $<τ_0_0> { var τ_0_0 } <Foo>
+  %md2 = mark_dependence %md :$@noescape @callee_guaranteed () -> Int on %6 : $<τ_0_0> { var τ_0_0 } <Baz>
+  %md3 = mark_dependence %md2 :$@noescape @callee_guaranteed () -> Int on %11 : $<τ_0_0> { var τ_0_0 } <Int>
+  apply %md3() : $@noescape @callee_guaranteed () -> Int
+  dealloc_stack %21 : $@noescape @callee_guaranteed () -> Int
+  strong_release %11 : $<τ_0_0> { var τ_0_0 } <Int>
+  strong_release %6 : $<τ_0_0> { var τ_0_0 } <Baz>
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <Foo>
+  %tuple = tuple()
+  return %tuple : $()
 }

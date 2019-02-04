@@ -2,14 +2,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-emit-silgen -module-name class_resilience -I %t -enable-sil-ownership -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name class_resilience -I %t -enable-resilience %s | %FileCheck %s
 
 import resilient_class
 
 // Accessing final property of resilient class from different resilience domain
 // through accessor
 
-// CHECK-LABEL: sil @$s16class_resilience20finalPropertyOfOtheryy010resilient_A022ResilientOutsideParentCF
+// CHECK-LABEL: sil [ossa] @$s16class_resilience20finalPropertyOfOtheryy010resilient_A022ResilientOutsideParentCF
 // CHECK: function_ref @$s15resilient_class22ResilientOutsideParentC13finalPropertySSvg
 
 public func finalPropertyOfOther(_ other: ResilientOutsideParent) {
@@ -23,7 +23,7 @@ public class MyResilientClass {
 // Accessing final property of resilient class from my resilience domain
 // directly
 
-// CHECK-LABEL: sil @$s16class_resilience19finalPropertyOfMineyyAA16MyResilientClassCF
+// CHECK-LABEL: sil [ossa] @$s16class_resilience19finalPropertyOfMineyyAA16MyResilientClassCF
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $MyResilientClass):
 // CHECK:   ref_element_addr [[ARG]] : $MyResilientClass, #MyResilientClass.finalProperty
 // CHECK: } // end sil function '$s16class_resilience19finalPropertyOfMineyyAA16MyResilientClassCF'

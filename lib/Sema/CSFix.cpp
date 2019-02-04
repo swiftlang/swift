@@ -22,6 +22,7 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
@@ -64,14 +65,17 @@ ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type toType,
 }
 
 bool ForceOptional::diagnose(Expr *root, bool asNote) const {
-  MissingOptionalUnwrapFailure failure(root, getConstraintSystem(),
-                                       getLocator());
+  MissingOptionalUnwrapFailure failure(root, getConstraintSystem(), BaseType,
+                                       UnwrappedType, getLocator());
   return failure.diagnose(asNote);
 }
 
-ForceOptional *ForceOptional::create(ConstraintSystem &cs,
+ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type baseType,
+                                     Type unwrappedType,
                                      ConstraintLocator *locator) {
-  return new (cs.getAllocator()) ForceOptional(cs, locator);
+  return new (cs.getAllocator()) ForceOptional(
+      cs, baseType, unwrappedType,
+      cs.getConstraintLocator(simplifyLocatorToAnchor(cs, locator)));
 }
 
 bool UnwrapOptionalBase::diagnose(Expr *root, bool asNote) const {
@@ -189,4 +193,84 @@ SkipSuperclassRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                   ConstraintLocator *locator) {
   return new (cs.getAllocator())
       SkipSuperclassRequirement(cs, lhs, rhs, locator);
+}
+
+bool ContextualMismatch::diagnose(Expr *root, bool asNote) const {
+  auto failure = ContextualFailure(root, getConstraintSystem(), getFromType(),
+                                   getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
+                                               Type rhs,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
+}
+
+bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {
+  auto failure =
+      AutoClosureForwardingFailure(getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
+                                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
+}
+
+bool RemoveUnwrap::diagnose(Expr *root, bool asNote) const {
+  auto failure = NonOptionalUnwrapFailure(root, getConstraintSystem(), BaseType,
+                                          getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveUnwrap *RemoveUnwrap::create(ConstraintSystem &cs, Type baseType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveUnwrap(cs, baseType, locator);
+}
+
+bool InsertExplicitCall::diagnose(Expr *root, bool asNote) const {
+  auto failure = MissingCallFailure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) InsertExplicitCall(cs, locator);
+}
+
+bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {
+  auto failure = SubscriptMisuseFailure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+UseSubscriptOperator *UseSubscriptOperator::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) UseSubscriptOperator(cs, locator);
+}
+
+bool DefineMemberBasedOnUse::diagnose(Expr *root, bool asNote) const {
+  auto failure = MissingMemberFailure(root, getConstraintSystem(), BaseType,
+                                      Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
+DefineMemberBasedOnUse *
+DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
+                               DeclName member, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DefineMemberBasedOnUse(cs, baseType, member, locator);
+}
+
+bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
+  auto failure = PartialApplicationFailure(root, isWarning(),
+                                           getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidPartialApplication *
+AllowInvalidPartialApplication::create(bool isWarning, ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidPartialApplication(isWarning, cs, locator);
 }

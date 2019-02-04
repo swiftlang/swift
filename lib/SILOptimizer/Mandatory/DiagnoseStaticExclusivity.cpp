@@ -335,13 +335,13 @@ static StringRef extractExprText(const Expr *E, SourceManager &SM) {
 /// it is in the ifndef.
 #ifndef NDEBUG
 static bool isCallToStandardLibrarySwap(CallExpr *CE, ASTContext &Ctx) {
-  if (CE->getCalledValue() == Ctx.getSwap(nullptr))
+  if (CE->getCalledValue() == Ctx.getSwap())
     return true;
 
   // Is the call module qualified, i.e. Swift.swap(&a[i], &[j)?
   if (auto *DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(CE->getFn())) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSBIE->getRHS())) {
-      return DRE->getDecl() == Ctx.getSwap(nullptr);
+      return DRE->getDecl() == Ctx.getSwap();
     }
   }
 
@@ -605,7 +605,7 @@ static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   if (!FD)
     return false;
 
-  return FD == Ctx.getSwap(nullptr);
+  return FD == Ctx.getSwap();
 }
 
 static llvm::cl::opt<bool> ShouldAssertOnFailure(
@@ -956,8 +956,10 @@ template <typename FollowUse>
 static void checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
   SILInstruction *user = oper->getUser();
 
-  // Ignore uses that are totally uninteresting.
-  if (isIncidentalUse(user) || onlyAffectsRefCount(user))
+  // Ignore uses that are totally uninteresting. partial_apply [stack] is
+  // terminated by a dealloc_stack instruction.
+  if (isIncidentalUse(user) || onlyAffectsRefCount(user) ||
+      isa<DeallocStackInst>(user))
     return;
 
   // Before checking conversions in general below (getSingleValueCopyOrCast),
@@ -969,9 +971,6 @@ static void checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
   }
 
   // Look through copies, borrows, and conversions.
-  //
-  // Note: This handles ConversionInst, which already includes everything in
-  // swift::stripConvertFunctions.
   if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
     // Only follow the copied operand. Other operands are incidental,
     // as in the second operand of mark_dependence.

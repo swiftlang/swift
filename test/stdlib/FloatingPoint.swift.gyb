@@ -8,7 +8,7 @@
 import Swift
 import StdlibUnittest
 
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 
 struct Float80Bits : Equatable, CustomStringConvertible {
   var signAndExponent: UInt16
@@ -58,7 +58,7 @@ extension Float80 {
 %   ('Float80', 'Float80Bits')
 % ]:
 %   if FloatTy == 'Float80':
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 %   end
 func expectBitwiseEqual(
   _ expected: ${FloatTy}, _ actual: ${FloatTy},
@@ -413,6 +413,11 @@ extension FloatingPoint {
   public var isQuietNaN: Bool { return isNaN && !isSignalingNaN }
 }
 
+func genericAbs<T: SignedNumeric & Comparable>(_ x: T) -> T {
+  return abs(x)
+}
+
+
 %for Self in ['Float', 'Double', 'Float80']:
 % if Self == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -533,6 +538,12 @@ FloatingPoint.test("${Self}.significandWidth") {
   expectEqual(0, ${Self}(2).significandWidth)
   expectEqual(1, ${Self}(3).significandWidth)
 }
+
+FloatingPoint.test("${Self}.absNegativeZero") {
+  expectEqual(abs(${Self}(-0.0)), ${Self}(0.0))
+  expectEqual(genericAbs(${Self}(-0.0)), ${Self}(0.0))
+}
+
 % if Self == 'Float80':
 #endif
 % end
@@ -594,7 +605,7 @@ FloatingPoint.test("${Self}.nextUp, .nextDown/nan") {
 }
 %end
 
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 
 FloatingPoint.test("Float80/ExpressibleByIntegerLiteral") {
   expectEqual(positiveOne(),  1.0 as Float80)
@@ -814,7 +825,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
 % end
 
 % for Self in ['Float32', 'Float64', 'Float80']:
-#if ${'arch(i386) || arch(x86_64)' if Self == 'Float80' else 'true'}
+#if ${'!os(Windows) && (arch(i386) || arch(x86_64))' if Self == 'Float80' else 'true'}
 FloatingPoint.test("${Self}/Strideable") {
   // FIXME: the test data could probably be better chosen here, to
   // exercise more cases.  Note: NaNs (and possibly Infs) are singular
@@ -1007,7 +1018,7 @@ FloatingPoint.test("Float64/Literals") {
   }
 }
 
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 
 FloatingPoint.test("Float80/Literals") {
   do {
@@ -1145,7 +1156,7 @@ FloatingPoint.test("Float64/quietNaN") {
   }
 }
 
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 
 FloatingPoint.test("Float80/quietNaN") {
   do {
@@ -1240,7 +1251,7 @@ FloatingPoint.test("Float64/signalingNaN") {
 
 #endif
 
-#if arch(x86_64)
+#if !os(Windows) && arch(x86_64)
 
 FloatingPoint.test("Float80/signalingNaN") {
   do {

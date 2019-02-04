@@ -17,6 +17,10 @@
 
 namespace swift {
 
+//===----------------------------------------------------------------------===//
+//                         SSA Use-Def Helpers
+//===----------------------------------------------------------------------===//
+
 /// Strip off casts/indexing insts/address projections from V until there is
 /// nothing left to strip.
 SILValue getUnderlyingObject(SILValue V);
@@ -39,6 +43,10 @@ SILValue stripCasts(SILValue V);
 /// Return the underlying SILValue after stripping off all casts (but
 /// mark_dependence) from the current SILValue.
 SILValue stripCastsWithoutMarkDependence(SILValue V);
+
+/// Return the underlying SILValue after stripping off all copy_value and
+/// begin_borrow instructions.
+SILValue stripOwnershipInsts(SILValue v);
 
 /// Return the underlying SILValue after stripping off all upcasts from the
 /// current SILValue.
@@ -78,6 +86,10 @@ SILValue stripExpectIntrinsic(SILValue V);
 /// ust return V.
 SILValue stripBorrow(SILValue V);
 
+//===----------------------------------------------------------------------===//
+//                         Instruction Properties
+//===----------------------------------------------------------------------===//
+
 /// Return a non-null SingleValueInstruction if the given instruction merely
 /// copies the value of its first operand, possibly changing its type or
 /// ownership state, but otherwise having no effect.
@@ -110,13 +122,13 @@ bool isIncidentalUse(SILInstruction *user);
 /// only used in recognizable patterns without otherwise "escaping".
 bool onlyAffectsRefCount(SILInstruction *user);
 
+/// Returns true if the given user instruction checks the ref count of a
+/// pointer.
+bool mayCheckRefCount(SILInstruction *User);
+
 /// Return true when the instruction represents added instrumentation for
 /// run-time sanitizers.
 bool isSanitizerInstrumentation(SILInstruction *Instruction);
-
-/// If V is a convert_function or convert_escape_to_noescape return its operand
-/// recursively.
-SILValue stripConvertFunctions(SILValue V);
 
 /// Check that this is a partial apply of a reabstraction thunk and return the
 /// argument of the partial apply if it is.

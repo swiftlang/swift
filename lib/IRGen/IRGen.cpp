@@ -740,7 +740,7 @@ void swift::irgen::deleteIRGenModule(
   delete IRGenPair.first;
 }
 
-/// \brief Run the IRGen preparation SIL pipeline. Passes have access to the
+/// Run the IRGen preparation SIL pipeline. Passes have access to the
 /// IRGenModule.
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
@@ -822,6 +822,7 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
       irgen.emitEagerClassInitialization();
+      irgen.emitDynamicReplacements();
     }
 
     // Emit symbols for eliminated dead methods.
@@ -963,11 +964,11 @@ static void performParallelIRGeneration(
   }
 
   // Emit the module contents.
-  irgen.emitGlobalTopLevel(true /*emitForParallelEmission*/);
+  irgen.emitGlobalTopLevel();
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
-      IRGenModule *IGM = irgen.getGenModule(SF);
+      CurrentIGMPtr IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF);
     } else {
       File->collectLinkLibraries([&](LinkLibrary LinkLib) {
@@ -980,6 +981,8 @@ static void performParallelIRGeneration(
   irgen.emitLazyDefinitions();
 
   irgen.emitSwiftProtocols();
+
+  irgen.emitDynamicReplacements();
 
   irgen.emitProtocolConformances();
 
@@ -1157,7 +1160,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
     Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
     break;
   case llvm::Triple::Wasm:
-    llvm_unreachable("web assembly object format is not supported.");
+    Section = WasmASTSectionName;
     break;
   }
   ASTSym->setSection(Section);

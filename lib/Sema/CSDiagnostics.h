@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -39,6 +40,9 @@ class FailureDiagnostic {
   ConstraintSystem &CS;
   ConstraintLocator *Locator;
 
+  /// The original anchor before any simplification.
+  Expr *RawAnchor;
+  /// Simplified anchor associated with the given locator.
   Expr *Anchor;
   /// Indicates whether locator could be simplified
   /// down to anchor expression.
@@ -47,7 +51,7 @@ class FailureDiagnostic {
 public:
   FailureDiagnostic(Expr *expr, ConstraintSystem &cs,
                     ConstraintLocator *locator)
-      : E(expr), CS(cs), Locator(locator) {
+      : E(expr), CS(cs), Locator(locator), RawAnchor(locator->getAnchor()) {
     std::tie(Anchor, HasComplexLocator) = computeAnchor();
   }
 
@@ -78,6 +82,8 @@ public:
 
   Expr *getParentExpr() const { return E; }
 
+  Expr *getRawAnchor() const { return RawAnchor; }
+
   Expr *getAnchor() const { return Anchor; }
 
   ConstraintLocator *getLocator() const { return Locator; }
@@ -85,8 +91,11 @@ public:
   Type getType(Expr *expr) const;
 
   /// Resolve type variables present in the raw type, if any.
-  Type resolveType(Type rawType) const {
-    return CS.simplifyType(rawType);
+  Type resolveType(Type rawType, bool reconstituteSugar = false) const {
+    auto resolvedType = CS.simplifyType(rawType);
+    return reconstituteSugar
+               ? resolvedType->reconstituteSugar(/*recursive*/ true)
+               : resolvedType;
   }
 
   template <typename... ArgTypes>
@@ -138,6 +147,10 @@ protected:
   /// \returns true is locator hasn't been simplified down to expression.
   bool hasComplexLocator() const { return HasComplexLocator; }
 
+  /// \returns A parent expression if sub-expression is contained anywhere
+  /// in the root expression or `nullptr` otherwise.
+  Expr *findParentExpr(Expr *subExpr) const;
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
@@ -177,15 +190,8 @@ public:
     if (!expr)
       return;
 
-    auto *anchor = getAnchor();
-    expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
-      auto *AE = dyn_cast<ApplyExpr>(subExpr);
-      if (!AE || AE->getFn() != anchor)
-        return subExpr;
-
-      Apply = AE;
-      return nullptr;
-    });
+    if (auto *parentExpr = findParentExpr(getAnchor()))
+      Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
   unsigned getRequirementIndex() const {
@@ -477,12 +483,25 @@ public:
 /// Diagnose failures related to use of the unwrapped optional types,
 /// which require some type of force-unwrap e.g. "!" or "try!".
 class MissingOptionalUnwrapFailure final : public FailureDiagnostic {
+  Type BaseType;
+  Type UnwrappedType;
+
 public:
-  MissingOptionalUnwrapFailure(Expr *expr, ConstraintSystem &cs,
-                               ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator) {}
+  MissingOptionalUnwrapFailure(Expr *expr, ConstraintSystem &cs, Type baseType,
+                               Type unwrappedType, ConstraintLocator *locator)
+      : FailureDiagnostic(expr, cs, locator), BaseType(baseType),
+        UnwrappedType(unwrappedType) {}
 
   bool diagnoseAsError() override;
+
+private:
+  Type getBaseType() const {
+    return resolveType(BaseType, /*reconstituteSugar=*/true);
+  }
+
+  Type getUnwrappedType() const {
+    return resolveType(UnwrappedType, /*reconstituteSugar=*/true);
+  }
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -556,6 +575,136 @@ private:
              isLoadedLValue(ifExpr->getElseExpr());
     return false;
   }
+};
+
+/// Intended to diagnose any possible contextual failure
+/// e.g. argument/parameter, closure result, conversions etc.
+class ContextualFailure final : public FailureDiagnostic {
+  Type FromType, ToType;
+
+public:
+  ContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                    ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
+        ToType(resolve(rhs)) {}
+
+  bool diagnoseAsError() override;
+
+  // If we're trying to convert something of type "() -> T" to T,
+  // then we probably meant to call the value.
+  bool diagnoseMissingFunctionCall() const;
+
+  /// Try to add a fix-it when converting between a collection and its slice
+  /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
+  static bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
+                                           ConstraintSystem &CS, Type fromType,
+                                           Type toType, Expr *expr);
+
+private:
+  Type resolve(Type rawType) {
+    auto type = resolveType(rawType)->getWithoutSpecifierType();
+    if (auto *BGT = type->getAs<BoundGenericType>()) {
+      if (BGT->hasUnresolvedType())
+        return BGT->getDecl()->getDeclaredInterfaceType();
+    }
+    return type;
+  }
+};
+
+/// Diagnose situations when @autoclosure argument is passed to @autoclosure
+/// parameter directly without calling it first.
+class AutoClosureForwardingFailure final : public FailureDiagnostic {
+public:
+  AutoClosureForwardingFailure(ConstraintSystem &cs, ConstraintLocator *locator)
+      : FailureDiagnostic(nullptr, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations when there was an attempt to unwrap entity
+/// of non-optional type e.g.
+///
+/// ```swift
+/// let i: Int = 0
+/// _ = i!
+///
+/// struct A { func foo() {} }
+/// func foo(_ a: A) {
+///   a?.foo()
+/// }
+/// ```
+class NonOptionalUnwrapFailure final : public FailureDiagnostic {
+  Type BaseType;
+
+public:
+  NonOptionalUnwrapFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                           ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseType) {}
+
+  bool diagnoseAsError() override;
+};
+
+class MissingCallFailure final : public FailureDiagnostic {
+public:
+  MissingCallFailure(Expr *root, ConstraintSystem &cs,
+                     ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+class SubscriptMisuseFailure final : public FailureDiagnostic {
+public:
+  SubscriptMisuseFailure(Expr *root, ConstraintSystem &cs,
+                         ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+};
+
+/// Diagnose situations when member referenced by name is missing
+/// from the associated base type, e.g.
+///
+/// ```swift
+/// struct S {}
+/// func foo(_ s: S) {
+///   let _: Int = s.foo(1, 2) // expected type is `(Int, Int) -> Int`
+/// }
+/// ```
+class MissingMemberFailure final : public FailureDiagnostic {
+  Type BaseType;
+  DeclName Name;
+
+public:
+  MissingMemberFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                       DeclName memberName, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseType),
+        Name(memberName) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  static DeclName findCorrectEnumCaseName(Type Ty,
+                                          TypoCorrectionResults &corrections,
+                                          DeclName memberName);
+};
+
+class PartialApplicationFailure final : public FailureDiagnostic {
+  enum RefKind : unsigned {
+    MutatingMethod,
+    SuperInit,
+    SelfInit,
+  };
+
+  bool CompatibilityWarning;
+
+public:
+  PartialApplicationFailure(Expr *root, bool warning, ConstraintSystem &cs,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), CompatibilityWarning(warning) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints

@@ -322,6 +322,7 @@ public:
   StringRef getFullyQualifiedName() const;
   bool isDeprecated() const { return IsDeprecated; };
   bool isProtocolRequirement() const { return IsProtocolReq; }
+  bool isNonOptionalProtocolRequirement() const;
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
   bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };
@@ -647,6 +648,8 @@ public:
 
   void printTopLevelNames();
 
+  /// Adds all conformances from the provided NominalTypeDecl to the provided
+  /// SDK node for that type decl.
   void addConformancesToTypeDecl(SDKNodeDeclType *Root, NominalTypeDecl* NTD);
   void addMembersToRoot(SDKNode *Root, IterableDeclContext *Context);
 

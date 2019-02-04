@@ -20,6 +20,7 @@ add_swift_host_library(swiftSIL STATIC
   SILArgument.cpp
   SILBasicBlock.cpp
   SILBuilder.cpp
+  SILConstants.cpp
   SILCoverageMap.cpp
   SILDebugScope.cpp
   SILDeclRef.cpp
@@ -37,6 +38,7 @@ add_swift_host_library(swiftSIL STATIC
   SILProfiler.cpp
   SILSuccessor.cpp
   SILType.cpp
+  SILUndef.cpp
   SILValue.cpp
   SILVerifier.cpp
   SILOwnershipVerifier.cpp
@@ -44,7 +46,8 @@ add_swift_host_library(swiftSIL STATIC
   SILWitnessTable.cpp
   TypeLowering.cpp
   ValueOwnership.cpp
-  LINK_LIBS
+  ValueUtils.cpp
+  LINK_LIBRARIES
     swiftSerialization
     swiftSema
 )

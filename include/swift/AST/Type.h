@@ -54,7 +54,7 @@ class Type;
 class TypeWalker;
 struct ExistentialLayout;
 
-/// \brief Type substitution mapping from substitutable types to their
+/// Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
@@ -647,7 +647,8 @@ namespace llvm {
   template<> struct DenseMapInfo<swift::CanType>
     : public DenseMapInfo<swift::Type> {
     static swift::CanType getEmptyKey() {
-      return swift::CanType(nullptr);
+      return swift::CanType(llvm::DenseMapInfo<swift::
+                              TypeBase*>::getEmptyKey());
     }
     static swift::CanType getTombstoneKey() {
       return swift::CanType(llvm::DenseMapInfo<swift::

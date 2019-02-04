@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift-swift3 | %FileCheck %s
+// RUN: %target-run-stdlib-swift | %FileCheck %s
 // REQUIRES: executable_test
 //
 // Parts of this test depend on memory allocator specifics.  The test

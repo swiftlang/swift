@@ -1,0 +1,39 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-anonymous-context-mangled-names %s | %FileCheck %s -check-prefix CHECK-MANGLED
+
+import Builtin
+import Swift
+
+protocol P { }
+
+class Blah<T: P> {
+  private struct Inner<U: P> { }
+}
+
+// Mangled name of the anonymous descriptor
+// CHECK-NOT: private constant [84 x i8] c"$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV\00"
+// CHECK-MANGLED: [[INNER_MANGLED:@[0-9]+]] = private constant [84 x i8] c"$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV\00"
+
+// Anonymous descriptor
+// CHECK: @"$s29anonymous_context_descriptors4BlahC5Inner33{{.*}}MXX" =
+// CHECK-MANGLED: @"$s29anonymous_context_descriptors4BlahC5Inner33{{.*}}MXX" =
+
+// Flags: anonymous (2) + generic (0x80) + unique (0x40)
+// CHECK-SAME: i32 194
+
+// Flags: anonymous (2) + generic (0x80) + unique (0x40) + has mangled name (0x10000)
+// CHECK-MANGLED-SAME: i32 65730
+
+// Parent
+// CHECK-SAME: $s29anonymous_context_descriptors4BlahCMn
+// CHECK-MANGLED-SAME: $s29anonymous_context_descriptors4BlahCMn
+
+// # generic header
+// CHECK-SAME: i16 2, i16 2
+// CHECK-SAME: i16 4, i16 0
+
+// CHECK-MANGLED-SAME: i16 2, i16 2
+// CHECK-MANGLED-SAME: i16 4, i16 0
+
+// # mangled name
+// CHECK-MANGLED-SAME: [[INNER_MANGLED]]

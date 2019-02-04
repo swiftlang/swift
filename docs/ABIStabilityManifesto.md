@@ -213,7 +213,7 @@ ABI stability means nailing down type layout and making decisions about how to h
 
 For all of the areas discussed above, more aggressive layout improvements may be invented in the post-ABI stability future. For example, we may want to explore rearranging and packing nested type data members with outer type data members. Such improvements would have to be done in an ABI-additive fashion through deployment target and/or min-version checking. This may mean that the module file will need to track per-type ABI versioning information.
 
-A potentially out of date description of Swift's current type layout can be found in the [Type Layout docs](https://github.com/apple/swift/blob/master/docs/ABI.rst#type-layout).
+A potentially out of date description of Swift's current type layout can be found in the [Type Layout docs](https://github.com/apple/swift/blob/master/docs/ABI/TypeLayout.rst).
 
 
 ## <a name="metadata"></a>Type Metadata
@@ -230,7 +230,7 @@ Metadata has many historical artifacts in its representation that we want to cle
 
 Stabilizing the ABI means producing a precise technical specification for the fixed part of the metadata layout of all language constructs so that future compilers and tools can continue to read and write them. A prose description is not necessarily needed, though explanations are useful. We will also want to carve out extra space for areas where it is likely to be needed for future functionality [[SR-3731](https://bugs.swift.org/browse/SR-3731)].
 
-For more, but potentially out of date, details see the [Type Metadata docs](https://github.com/apple/swift/blob/master/docs/ABI.rst#type-metadata).
+For more, but potentially out of date, details see the [Type Metadata docs](https://github.com/apple/swift/blob/master/docs/ABI/TypeMetadata.rst).
 
 ### Generic Parameters
 
@@ -284,7 +284,7 @@ In addition to common metadata entries, function type metadata stores informatio
 
 Mangling is used to produce unique symbols. It applies to both external (public) symbols as well as internal or hidden symbols. Only the mangling scheme for external symbols is part of ABI.
 
-ABI stability means a stable mangling scheme, fully specified so that future compilers and tools can honor it. For a potentially out-of-date specification of what the mangling currently looks like, see the [Name Mangling docs](https://github.com/apple/swift/blob/master/docs/ABI.rst#mangling).
+ABI stability means a stable mangling scheme, fully specified so that future compilers and tools can honor it. For a potentially out-of-date specification of what the mangling currently looks like, see the [Name Mangling docs](https://github.com/apple/swift/blob/master/docs/ABI/Mangling.rst).
 
 There are some corner cases currently in the mangling scheme that should be fixed before declaring ABI stability. We need to come up with a canonicalization of generic and protocol requirements to allow for order-agnostic mangling [[SR-3733](https://bugs.swift.org/browse/SR-3733)]. We also may decide to more carefully mangle variadicity of function parameters, etc [[SR-3734](https://bugs.swift.org/browse/SR-3734)]. Most often, though, mangling improvements focus on reducing symbol size.
 

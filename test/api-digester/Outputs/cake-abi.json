@@ -212,7 +212,6 @@
           "usr": "s:4cake2C1C4foo1yyFZ",
           "moduleName": "cake",
           "static": true,
-          "fixedbinaryorder": 0,
           "funcSelfKind": "NonMutating"
         },
         {
@@ -246,7 +245,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C3InsACSgXwvg",
+              "usr": "s:4cake2C1C3InsACSgvg",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -279,7 +278,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C3InsACSgXwvs",
+              "usr": "s:4cake2C1C3InsACSgvs",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -288,11 +287,12 @@
             }
           ],
           "declKind": "Var",
-          "usr": "s:4cake2C1C3InsACSgXwvp",
+          "usr": "s:4cake2C1C3InsACSgvp",
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "ReferenceOwnership"
+            "ReferenceOwnership",
+            "HasStorage"
           ],
           "fixedbinaryorder": 0,
           "ownership": 1,
@@ -321,7 +321,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C4Ins2ACXovg",
+              "usr": "s:4cake2C1C4Ins2ACvg",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -346,7 +346,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C4Ins2ACXovs",
+              "usr": "s:4cake2C1C4Ins2ACvs",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -355,11 +355,12 @@
             }
           ],
           "declKind": "Var",
-          "usr": "s:4cake2C1C4Ins2ACXovp",
+          "usr": "s:4cake2C1C4Ins2ACvp",
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "ReferenceOwnership"
+            "ReferenceOwnership",
+            "HasStorage"
           ],
           "fixedbinaryorder": 1,
           "ownership": 2,
@@ -473,64 +474,6 @@
           "usr": "s:4cake6NumberO3oneyA2CmF",
           "moduleName": "cake",
           "fixedbinaryorder": 0
-        },
-        {
-          "kind": "Var",
-          "name": "hashValue",
-          "printedName": "hashValue",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int",
-                  "usr": "s:Si"
-                }
-              ],
-              "declKind": "Accessor",
-              "usr": "s:4cake6NumberO9hashValueSivg",
-              "moduleName": "cake",
-              "implicit": true
-            }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake6NumberO9hashValueSivp",
-          "moduleName": "cake",
-          "implicit": true
-        },
-        {
-          "kind": "Function",
-          "name": "hash",
-          "printedName": "hash(into:)",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Void",
-              "printedName": "()"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "Hasher",
-              "printedName": "Hasher",
-              "paramValueOwnership": "InOut",
-              "usr": "s:s6HasherV"
-            }
-          ],
-          "declKind": "Func",
-          "usr": "s:4cake6NumberO4hash4intoys6HasherVz_tF",
-          "moduleName": "cake",
-          "implicit": true,
-          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Constructor",
@@ -743,7 +686,8 @@
           "usr": "s:4cake17fixedLayoutStructV1aSivp",
           "moduleName": "cake",
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 0,
           "hasStorage": true
@@ -786,7 +730,8 @@
           "moduleName": "cake",
           "isInternal": true,
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 1,
           "hasStorage": true,
@@ -831,7 +776,8 @@
           "moduleName": "cake",
           "isInternal": true,
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 2,
           "hasStorage": true
@@ -873,7 +819,8 @@
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "Available"
+            "Available",
+            "HasStorage"
           ],
           "fixedbinaryorder": 3,
           "isLet": true,
@@ -1135,7 +1082,8 @@
       "usr": "s:4cake9GlobalVarSivp",
       "moduleName": "cake",
       "declAttributes": [
-        "HasInitialValue"
+        "HasInitialValue",
+        "HasStorage"
       ],
       "isLet": true,
       "hasStorage": true
@@ -1193,7 +1141,8 @@
           "moduleName": "cake",
           "isInternal": true,
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 0,
           "hasStorage": true
@@ -1344,6 +1293,11 @@
         },
         {
           "kind": "Conformance",
+          "name": "AdditiveArithmetic",
+          "printedName": "AdditiveArithmetic"
+        },
+        {
+          "kind": "Conformance",
           "name": "ExpressibleByIntegerLiteral",
           "printedName": "ExpressibleByIntegerLiteral",
           "children": [
@@ -1411,6 +1365,104 @@
           "kind": "Conformance",
           "name": "MirrorPath",
           "printedName": "MirrorPath"
+        },
+        {
+          "kind": "Conformance",
+          "name": "SIMDScalar",
+          "printedName": "SIMDScalar",
+          "children": [
+            {
+              "kind": "TypeWitness",
+              "name": "SIMDMaskScalar",
+              "printedName": "SIMDMaskScalar",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD2Storage",
+              "printedName": "SIMD2Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD2Storage",
+                  "printedName": "Int.SIMD2Storage",
+                  "usr": "s:Si12SIMD2StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD4Storage",
+              "printedName": "SIMD4Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD4Storage",
+                  "printedName": "Int.SIMD4Storage",
+                  "usr": "s:Si12SIMD4StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD8Storage",
+              "printedName": "SIMD8Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD8Storage",
+                  "printedName": "Int.SIMD8Storage",
+                  "usr": "s:Si12SIMD8StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD16Storage",
+              "printedName": "SIMD16Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD16Storage",
+                  "printedName": "Int.SIMD16Storage",
+                  "usr": "s:Si13SIMD16StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD32Storage",
+              "printedName": "SIMD32Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD32Storage",
+                  "printedName": "Int.SIMD32Storage",
+                  "usr": "s:Si13SIMD32StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD64Storage",
+              "printedName": "SIMD64Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD64Storage",
+                  "printedName": "Int.SIMD64Storage",
+                  "usr": "s:Si13SIMD64StorageV"
+                }
+              ]
+            }
+          ]
         },
         {
           "kind": "Conformance",

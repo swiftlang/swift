@@ -10,20 +10,21 @@ ATTRIBUTE_NODES = [
     Node('NonEmptyTokenList', kind='SyntaxCollection',
          element='Token', omit_when_empty=True),
 
-    # attribute -> '@' identifier '('? 
-    #              ( identifier 
-    #                | string-literal 
+    # attribute -> '@' identifier '('?
+    #              ( identifier
+    #                | string-literal
     #                | integer-literal
     #                | availability-spec-list
     #                | specialize-attr-spec-list
     #                | implements-attr-arguments
+    #                | named-attribute-string-argument
     #              )? ')'?
     Node('Attribute', kind='Syntax',
          description='''
          An `@` attribute.
          ''',
          children=[
-             Child('AtSignToken', kind='AtSignToken', 
+             Child('AtSignToken', kind='AtSignToken',
                    description='The `@` sign.'),
              Child('AttributeName', kind='Token', classification='Attribute',
                    description='The name of the attribute.'),
@@ -37,11 +38,13 @@ ATTRIBUTE_NODES = [
                        Child('String', kind='StringLiteralToken'),
                        Child('Integer', kind='IntegerLiteralToken'),
                        Child('Availability', kind='AvailabilitySpecList'),
-                       Child('SpecializeArguments', 
+                       Child('SpecializeArguments',
                              kind='SpecializeAttributeSpecList'),
                        Child('ObjCName', kind='ObjCSelector'),
-                       Child('ImplementsArguments', 
+                       Child('ImplementsArguments',
                              kind='ImplementsAttributeArguments'),
+                       Child('NamedAttributeString',
+                             kind='NamedAttributeStringArgument'),
                    ], description='''
                    The arguments of the attribute. In case the attribute  \
                    takes multiple arguments, they are gather in the \
@@ -61,9 +64,9 @@ ATTRIBUTE_NODES = [
          element='Attribute'),
 
     # The argument of '@_specialize(...)'
-    # specialize-attr-spec-list -> labeled-specialize-entry 
+    # specialize-attr-spec-list -> labeled-specialize-entry
     #                                  specialize-spec-attr-list?
-    #                            | generic-where-clause 
+    #                            | generic-where-clause
     #                                  specialize-spec-attr-list?
     Node('SpecializeAttributeSpecList', kind='SyntaxCollection',
          description='''
@@ -84,20 +87,51 @@ ATTRIBUTE_NODES = [
          ''',
          traits=['WithTrailingComma'],
          children=[
-             Child('Label', kind='IdentifierToken', 
+             Child('Label', kind='IdentifierToken',
                    description='The label of the argument'),
-             Child('Colon', kind='ColonToken', 
+             Child('Colon', kind='ColonToken',
                    description='The colon separating the label and the value'),
-             Child('Value', kind='Token', 
+             Child('Value', kind='Token',
                    description='The value for this argument'),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True, description='''
                    A trailing comma if this argument is followed by another one
                    '''),
          ]),
-
+    # The argument of '@_dynamic_replacement(for:)' or '@_private(sourceFile:)'
+    # named-attribute-string-arg -> 'name': string-literal
+    Node('NamedAttributeStringArgument', kind='Syntax',
+         description='''
+         The argument for the `@_dynamic_replacement` or `@_private` \
+         attribute of the form `for: "function()"` or `sourceFile: \
+         "Src.swift"`
+         ''',
+         children=[
+             Child('NameTok', kind='Token',
+                   description='The label of the argument'),
+             Child('Colon', kind='ColonToken',
+                   description='The colon separating the label and the value'),
+             Child('StringOrDeclname', kind='Syntax', node_choices=[
+                 Child('String', kind='StringLiteralToken'),
+                 Child('Declname', kind='DeclName'),
+             ]),
+         ]),
+    Node('DeclName', kind='Syntax', children=[
+         Child('DeclBaseName', kind='Syntax', description='''
+               The base name of the protocol\'s requirement.
+               ''',
+               node_choices=[
+                   Child('Identifier', kind='IdentifierToken'),
+                   Child('Operator', kind='PrefixOperatorToken'),
+               ]),
+         Child('DeclNameArguments', kind='DeclNameArguments',
+               is_optional=True, description='''
+               The argument labels of the protocol\'s requirement if it \
+               is a function requirement.
+               '''),
+         ]),
     # The argument of '@_implements(...)'
-    # implements-attr-arguments -> simple-type-identifier ',' 
+    # implements-attr-arguments -> simple-type-identifier ','
     #                              (identifier | operator) decl-name-arguments
     Node('ImplementsAttributeArguments', kind='Syntax',
          description='''
@@ -109,7 +143,7 @@ ATTRIBUTE_NODES = [
                    The type for which the method with this attribute \
                    implements a requirement.
                    '''),
-             Child('Comma', kind='CommaToken', 
+             Child('Comma', kind='CommaToken',
                    description='''
                    The comma separating the type and method name
                    '''),
@@ -120,7 +154,7 @@ ATTRIBUTE_NODES = [
                        Child('Identifier', kind='IdentifierToken'),
                        Child('Operator', kind='PrefixOperatorToken'),
                    ]),
-             Child('DeclNameArguments', kind='DeclNameArguments', 
+             Child('DeclNameArguments', kind='DeclNameArguments',
                    is_optional=True, description='''
                    The argument labels of the protocol\'s requirement if it \
                    is a function requirement.

@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 import Swift
 
-// CHECK-64: @"$s13indirect_enum5TreeAOWV" = internal constant {{.*}} i8* inttoptr ([[WORD:i64]] 8 to i8*), i8* inttoptr (i64 2162695 to i8*), i8* inttoptr (i64 8 to i8*)
-// CHECK-32: @"$s13indirect_enum5TreeAOWV" = internal constant {{.*}} i8* inttoptr ([[WORD:i32]] 4 to i8*), i8* inttoptr (i32 2162691 to i8*), i8* inttoptr (i32 4 to i8*)
+// CHECK-64: @"$s13indirect_enum5TreeAOWV" = internal constant %swift.enum_vwtable { {{.*}}, i64 8, i64 8, i32 2162695, 
+// CHECK-32: @"$s13indirect_enum5TreeAOWV" = internal constant %swift.enum_vwtable { {{.*}}, i32 4, i32 4, i32 2162691,
 
 // CHECK-NOT: define{{( protected)?}} private %swift.type** @get_field_types_TreeA
 indirect enum TreeA<T> {

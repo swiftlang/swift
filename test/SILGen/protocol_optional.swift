@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name protocol_optional -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name protocol_optional -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 @objc protocol P1 {
   @objc optional func method(_ x: Int)
@@ -9,7 +9,7 @@
   @objc optional subscript (i: Int) -> Int { get }
 }
 
-// CHECK-LABEL: sil hidden @$s17protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF : $@convention(thin) <T where T : P1> (@guaranteed T) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s17protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF : $@convention(thin) <T where T : P1> (@guaranteed T) -> ()
 func optionalMethodGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
@@ -27,7 +27,7 @@ func optionalMethodGeneric<T : P1>(t t : T) {
 }
 // CHECK: } // end sil function '$s17protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF'
 
-// CHECK-LABEL: sil hidden @$s17protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@guaranteed T) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s17protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@guaranteed T) -> ()
 func optionalPropertyGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
@@ -45,7 +45,7 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
 }
 // CHECK: } // end sil function '$s17protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @$s17protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@guaranteed T) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s17protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@guaranteed T) -> ()
 func optionalSubscriptGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):

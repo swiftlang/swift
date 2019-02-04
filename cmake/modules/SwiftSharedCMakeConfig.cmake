@@ -7,6 +7,8 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   precondition_translate_flag(${product}_PATH_TO_LLVM_SOURCE PATH_TO_LLVM_SOURCE)
   precondition_translate_flag(${product}_PATH_TO_LLVM_BUILD PATH_TO_LLVM_BUILD)
 
+  file(TO_CMAKE_PATH "${PATH_TO_LLVM_BUILD}" PATH_TO_LLVM_BUILD)
+
   set(SWIFT_LLVM_CMAKE_PATHS
       "${PATH_TO_LLVM_BUILD}/share/llvm/cmake"
       "${PATH_TO_LLVM_BUILD}/lib/cmake/llvm")
@@ -139,6 +141,9 @@ macro(swift_common_standalone_build_config_clang product is_cross_compiling)
   set(PATH_TO_CLANG_SOURCE "${${product}_PATH_TO_CLANG_SOURCE}")
   set(PATH_TO_CLANG_BUILD "${${product}_PATH_TO_CLANG_BUILD}")
 
+  file(TO_CMAKE_PATH "${PATH_TO_CLANG_SOURCE}" PATH_TO_CLANG_SOURCE)
+  file(TO_CMAKE_PATH "${PATH_TO_CLANG_BUILD}" PATH_TO_CLANG_BUILD)
+
   # Add all Clang CMake paths to our cmake module path.
   set(SWIFT_CLANG_CMAKE_PATHS
     "${PATH_TO_CLANG_BUILD}/share/clang/cmake"
@@ -188,12 +193,17 @@ macro(swift_common_standalone_build_config_cmark product)
     ABSOLUTE)
   get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
     ABSOLUTE)
+
   set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src")
   set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
+
+  file(TO_CMAKE_PATH "${CMARK_MAIN_INCLUDE_DIR}" CMARK_MAIN_INCLUDE_DIR)
+  file(TO_CMAKE_PATH "${CMARK_BUILD_INCLUDE_DIR}" CMARK_BUILD_INCLUDE_DIR)
+
   include_directories("${CMARK_MAIN_INCLUDE_DIR}"
                       "${CMARK_BUILD_INCLUDE_DIR}")
 
-  include(${${product}_PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
+  include(${PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
   add_definitions(-DCMARK_STATIC_DEFINE)
 endmacro()
 
@@ -226,7 +236,7 @@ macro(swift_common_unified_build_config product)
   set(PATH_TO_LLVM_BUILD "${CMAKE_BINARY_DIR}")
   set(${product}_PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
   set(PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
-  set(CLANG_MAIN_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/tools/clang/include")
+  set(CLANG_MAIN_INCLUDE_DIR "${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include")
   set(CLANG_BUILD_INCLUDE_DIR "${CMAKE_BINARY_DIR}/tools/clang/include")
   set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
@@ -235,8 +245,8 @@ macro(swift_common_unified_build_config product)
 
   # If cmark was checked out into tools/cmark, expect to build it as
   # part of the unified build.
-  if(EXISTS "${CMAKE_SOURCE_DIR}/tools/cmark/")
-    set(${product}_PATH_TO_CMARK_SOURCE "${CMAKE_SOURCE_DIR}/tools/cmark")
+  if(EXISTS "${LLVM_EXTERNAL_CMARK_SOURCE_DIR}")
+    set(${product}_PATH_TO_CMARK_SOURCE "${LLVM_EXTERNAL_CMARK_SOURCE_DIR}")
     set(${product}_PATH_TO_CMARK_BUILD "${CMAKE_BINARY_DIR}/tools/cmark")
     set(${product}_CMARK_LIBRARY_DIR "${CMAKE_BINARY_DIR}/lib")
 

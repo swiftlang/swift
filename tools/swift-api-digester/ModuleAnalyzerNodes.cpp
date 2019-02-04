@@ -1,3 +1,4 @@
+#include "llvm/ADT/STLExtras.h"
 #include <ModuleAnalyzerNodes.h>
 #include <algorithm>
 
@@ -391,6 +392,10 @@ StringRef SDKNodeDecl::getFullyQualifiedName() const {
   llvm::raw_svector_ostream OS(Buffer);
   printFullyQualifiedName(OS);
   return getSDKContext().buffer(OS.str());
+}
+
+bool SDKNodeDecl::isNonOptionalProtocolRequirement() const {
+  return isProtocolRequirement() && !hasDeclAttribute(DAK_Optional);
 }
 
 bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
@@ -880,7 +885,7 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty,
   if (Ty->isVoid()) {
     return Ctx.buffer("Void");
   }
-  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+  if (auto *NAT = dyn_cast<TypeAliasType>(Ty.getPointer())) {
     return NAT->getDecl()->getNameStr();
   }
   if (Ty->getAnyNominal()) {
@@ -1069,29 +1074,16 @@ Optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
     }
     return false;
   };
-  // The relative order of non-final instance functions matters for non-resilient
-  // class.
-  auto isNonfinalFunc = [](Decl *M) {
-    if (auto *FD = dyn_cast<FuncDecl>(M)) {
-      return !isa<AccessorDecl>(FD) && !FD->isFinal();
-    }
-    return false;
-  };
+
   switch (NTD->getKind()) {
   case DeclKind::Enum: {
     return getSimilarMemberCount(NTD, VD, [](Decl *M) {
       return isa<EnumElementDecl>(M);
     });
   }
+  case DeclKind::Class:
   case DeclKind::Struct: {
     return getSimilarMemberCount(NTD, VD, isStored);
-  }
-  case DeclKind::Class: {
-    if (auto count = getSimilarMemberCount(NTD, VD, isStored)) {
-      return count;
-    } else {
-      return getSimilarMemberCount(NTD, VD, isNonfinalFunc);
-    }
   }
   default:
     llvm_unreachable("bad nominal type kind.");
@@ -1207,7 +1199,7 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
     T = T->getCanonicalType();
   }
 
-  if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
+  if (auto NAT = dyn_cast<TypeAliasType>(T.getPointer())) {
     SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeAlias);
     Root->addChild(constructTypeNode(NAT->getSinglyDesugaredType()));
     return Root;
@@ -1376,11 +1368,31 @@ SwiftDeclCollector::constructExternalExtensionNode(NominalTypeDecl *NTD,
                                             ArrayRef<ExtensionDecl*> AllExts) {
   auto *TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
   addConformancesToTypeDecl(cast<SDKNodeDeclType>(TypeNode), NTD);
+
+  bool anyConformancesAdded = false;
   // The members of the extensions are the only members of this synthesized type.
   for (auto *Ext: AllExts) {
     HandledExtensions.insert(Ext);
     addMembersToRoot(TypeNode, Ext);
+
+    // Keep track if we've declared any conformances in this extension.
+    // FIXME: This is too conservative. We only _really_ care if this extension
+    //        declares a conformance to any public protocols outside the module
+    //        where the extended type originated. Eventually this should be
+    //        updated to filter extensions that declare conformances to internal
+    //        protocols that either don't inherit from any protocols or only
+    //        inherit from other internal protocols. It should also consider
+    //        conditional conformances with internal requirements that are still
+    //        part of the ABI.
+    if (!Ext->getInherited().empty())
+      anyConformancesAdded = true;
   }
+
+  // If none of the extensions added any public members or conformances, don't
+  // synthesize the type node.
+  if (TypeNode->getChildrenCount() == 0 && !anyConformancesAdded)
+    return nullptr;
+
   return TypeNode;
 }
 
@@ -1531,12 +1543,17 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
   for (auto *D: KnownDecls) {
     if (auto *Ext = dyn_cast<ExtensionDecl>(D)) {
       if (HandledExtensions.find(Ext) == HandledExtensions.end()) {
-        ExtensionMap[Ext->getExtendedNominal()].push_back(Ext);
+        auto *NTD = Ext->getExtendedNominal();
+        // Check if the extension is from other modules.
+        if (!llvm::is_contained(Modules, NTD->getModuleContext())) {
+          ExtensionMap[NTD].push_back(Ext);
+        }
       }
     }
   }
   for (auto Pair: ExtensionMap) {
-    RootNode->addChild(constructExternalExtensionNode(Pair.first, Pair.second));
+    if (auto child = constructExternalExtensionNode(Pair.first, Pair.second))
+      RootNode->addChild(child);
   }
 }
 

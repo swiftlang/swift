@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -41,14 +41,14 @@ class Bar: NSObject {
   @objc dynamic func bar(_: Any) {}
 }
 
-// CHECK-LABEL: sil hidden @$s42objc_bridged_using_protocol_extension_impl7callBar3bar3fooyAA0H0C_AA3FooVtF
+// CHECK-LABEL: sil hidden [ossa] @$s42objc_bridged_using_protocol_extension_impl7callBar3bar3fooyAA0H0C_AA3FooVtF
 func callBar(bar: Bar, foo: Foo) {
   // CHECK: [[BRIDGE:%.*]] = function_ref @$s42objc_bridged_using_protocol_extension_impl7FooablePAAs21_ObjectiveCBridgeableRzrlE09_bridgeToH1C01_H5CTypesADPQzyF
   // CHECK: apply [[BRIDGE]]<Foo>
   bar.bar(foo)
 }
 
-// CHECK-LABEL:sil hidden @$s42objc_bridged_using_protocol_extension_impl7callBar3bar3genyAA0H0C_AA3GenVySiSSGtF
+// CHECK-LABEL:sil hidden [ossa] @$s42objc_bridged_using_protocol_extension_impl7callBar3bar3genyAA0H0C_AA3GenVySiSSGtF
 func callBar(bar: Bar, gen: Gen<Int, String>) {
   // CHECK: [[BRIDGE:%.*]] = function_ref @$s42objc_bridged_using_protocol_extension_impl7FooablePAAs21_ObjectiveCBridgeableRzrlE09_bridgeToH1C01_H5CTypesADPQzyF
   // CHECK: apply [[BRIDGE]]<Gen<Int, String>>

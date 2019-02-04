@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Osize -import-objc-header %S/Inputs/Outliner.h %s -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend -Osize -g -import-objc-header %S/Inputs/Outliner.h %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -Osize -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
+// RUN: %target-swift-frontend -Osize -g -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -53,6 +53,12 @@ public func testOutlining() {
   gizmo.doSomething(arr)
   gizmo.doSomething(arr)
 }
+
+// CHECK-LABEL: sil @$s8outliner9dontCrash1ayyp_tF : $@convention(thin) (@in_guaranteed Any) -> () {
+// CHECK:  [[OBJ:%.*]] = open_existential_ref {{.*}} : $AnyObject to $@opened("{{.*}}") (AnyObject)
+// CHECK:  [[METH:%.*]] = objc_method [[OBJ]] : $@opened("{{.*}}") (AnyObject), #Treeish.treeishChildren!1.foreign : <Self where Self : Treeish> (Self) -> () -> [Any]?
+// CHECK:  [[RES:%.*]] = apply [[METH]]([[OBJ]]) : $@convention(objc_method)
+// CHECK:  switch_enum [[RES]]
 
 // CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvgToTeab_ : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $*Gizmo):
@@ -175,3 +181,6 @@ extension Operation {
   }
 }
 
+public func dontCrash(a: Any)  {
+  (a as AnyObject).treeishChildren()
+}

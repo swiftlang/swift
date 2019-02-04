@@ -398,6 +398,7 @@ struct DocEntityInfo {
   llvm::SmallString<64> ProvideImplementationOfUSR;
   llvm::SmallString<64> DocComment;
   llvm::SmallString<64> FullyAnnotatedDecl;
+  llvm::SmallString<64> FullyAnnotatedGenericSig;
   llvm::SmallString<64> LocalizationKey;
   std::vector<DocGenericParam> GenericParams;
   std::vector<std::string> GenericRequirements;
@@ -507,6 +508,29 @@ public:
   virtual bool finishSourceEntity(UIdent Kind) = 0;
 
   virtual bool handleDiagnostic(const DiagnosticEntryInfo &Info) = 0;
+};
+
+struct TypeContextInfoItem {
+  StringRef TypeName;
+  StringRef TypeUSR;
+
+  struct Member {
+    StringRef Name;
+    StringRef Description;
+    StringRef SourceText;
+    StringRef DocBrief;
+  };
+  ArrayRef<Member> ImplicitMembers;
+};
+
+class TypeContextInfoConsumer {
+  virtual void anchor();
+
+public:
+  virtual ~TypeContextInfoConsumer() {}
+
+  virtual void handleResult(const TypeContextInfoItem &Result) = 0;
+  virtual void failed(StringRef ErrDescription) = 0;
 };
 
 class LangSupport {
@@ -663,6 +687,11 @@ public:
                           StringRef ModuleName,
                           ArrayRef<const char *> Args,
                           DocInfoConsumer &Consumer) = 0;
+
+  virtual void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf,
+                                        unsigned Offset,
+                                        ArrayRef<const char *> Args,
+                                        TypeContextInfoConsumer &Consumer) = 0;
 
   virtual void getStatistics(StatisticsReceiver) = 0;
 };

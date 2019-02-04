@@ -44,15 +44,15 @@ inline ValueBaseUserRange makeUserRange(
 
 using DeadInstructionSet = llvm::SmallSetVector<SILInstruction *, 8>;
 
-/// \brief Create a retain of \p Ptr before the \p InsertPt.
+/// Create a retain of \p Ptr before the \p InsertPt.
 NullablePtr<SILInstruction> createIncrementBefore(SILValue Ptr,
                                                   SILInstruction *InsertPt);
 
-/// \brief Create a release of \p Ptr before the \p InsertPt.
+/// Create a release of \p Ptr before the \p InsertPt.
 NullablePtr<SILInstruction> createDecrementBefore(SILValue Ptr,
                                                   SILInstruction *InsertPt);
 
-/// \brief For each of the given instructions, if they are dead delete them
+/// For each of the given instructions, if they are dead delete them
 /// along with their dead operands.
 ///
 /// \param I The ArrayRef of instructions to be deleted.
@@ -64,7 +64,7 @@ recursivelyDeleteTriviallyDeadInstructions(
   ArrayRef<SILInstruction*> I, bool Force = false,
   llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
-/// \brief For each of the given instructions, if they are dead delete them
+/// For each of the given instructions, if they are dead delete them
 /// along with their dead operands.
 ///
 /// \param I The ArrayRef of instructions to be deleted.
@@ -78,7 +78,7 @@ void recursivelyDeleteTriviallyDeadInstructions(
     bool Force = false,
     llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *) {});
 
-/// \brief If the given instruction is dead, delete it along with its dead
+/// If the given instruction is dead, delete it along with its dead
 /// operands.
 ///
 /// \param I The instruction to be deleted.
@@ -92,27 +92,27 @@ SILBasicBlock::iterator recursivelyDeleteTriviallyDeadInstructions(
     SILInstruction *I, bool Force = false,
     llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *) {});
 
-/// \brief Perform a fast local check to see if the instruction is dead.
+/// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
 bool isInstructionTriviallyDead(SILInstruction *I);
 
-/// \brief Return true if this is a release instruction that's not going to
+/// Return true if this is a release instruction that's not going to
 /// free the object.
 bool isIntermediateRelease(SILInstruction *I, EpilogueARCFunctionInfo *ERFI);
 
-/// \brief Recursively collect all the uses and transitive uses of the
+/// Recursively collect all the uses and transitive uses of the
 /// instruction.
 void
 collectUsesOfValue(SILValue V, llvm::SmallPtrSetImpl<SILInstruction *> &Insts);
 
-/// \brief Recursively erase all of the uses of the instruction (but not the
+/// Recursively erase all of the uses of the instruction (but not the
 /// instruction itself)
 void eraseUsesOfInstruction(
     SILInstruction *Inst,
     llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
-/// \brief Recursively erase all of the uses of the value (but not the
+/// Recursively erase all of the uses of the value (but not the
 /// value itself)
 void eraseUsesOfValue(SILValue V);
 
@@ -127,23 +127,30 @@ SILValue castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
                                       SILValue Value,
                                       SILType SrcTy,
                                       SILType DestTy);
+/// Peek through trivial Enum initialization, typically for pointless
+/// Optionals.
+///
+/// The returned InitEnumDataAddr dominates the given
+/// UncheckedTakeEnumDataAddrInst.
+InitEnumDataAddrInst *
+findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *UTEDAI);
 
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
 /// after \p ABI and returns it.
 ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
 
-/// \brief Return true if any call inside the given function may bind dynamic
+/// Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.
 bool mayBindDynamicSelf(SILFunction *F);
 
 /// Check whether the \p addr is an address of a tail-allocated array element.
 bool isAddressOfArrayElement(SILValue addr);
 
-/// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
+/// Move an ApplyInst's FuncRef so that it dominates the call site.
 void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
 
-/// \brief Add an argument, \p val, to the branch-edge that is pointing into
+/// Add an argument, \p val, to the branch-edge that is pointing into
 /// block \p Dest. Return a new instruction and do not erase the old
 /// instruction.
 TermInst *addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
@@ -156,7 +163,7 @@ void removeDeadBlock(SILBasicBlock *BB);
 /// undef.
 void clearBlockBody(SILBasicBlock *BB);
 
-/// \brief Get the linkage to be used for specializations of a function with
+/// Get the linkage to be used for specializations of a function with
 /// the given linkage.
 SILLinkage getSpecializedLinkage(SILFunction *F, SILLinkage L);
 
@@ -204,6 +211,12 @@ tryDeleteDeadClosure(SingleValueInstruction *Closure,
 void releasePartialApplyCapturedArg(
     SILBuilder &Builder, SILLocation Loc, SILValue Arg, SILParameterInfo PInfo,
     InstModCallbacks Callbacks = InstModCallbacks());
+
+/// Insert destroys of captured arguments of partial_apply [stack].
+void insertDestroyOfCapturedArguments(
+    PartialApplyInst *PAI, SILBuilder &B,
+    llvm::function_ref<bool(SILValue)> shouldInsertDestroy =
+        [](SILValue arg) -> bool { return true; });
 
 /// This computes the lifetime of a single SILValue.
 ///
@@ -274,6 +287,9 @@ public:
   bool isAliveAtBeginOfBlock(SILBasicBlock *BB) {
     return LiveBlocks.count(BB) && BB != DefValue->getParent();
   }
+
+  /// Checks if there is a dealloc_ref inside the value's live range.
+  bool containsDeallocRef(const Frontier &Frontier);
 
   /// For debug dumping.
   void dump() const;
@@ -640,7 +656,8 @@ struct LLVM_LIBRARY_VISIBILITY FindLocalApplySitesResult {
 ///
 /// 1. We discovered that the function_ref never escapes.
 /// 2. We were able to find either a partial apply or a full apply site.
-Optional<FindLocalApplySitesResult> findLocalApplySites(FunctionRefInst *FRI);
+Optional<FindLocalApplySitesResult>
+findLocalApplySites(FunctionRefBaseInst *FRI);
 
 } // end namespace swift
 

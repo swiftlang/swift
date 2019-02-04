@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -emit-sil -enforce-exclusivity=unchecked -primary-file %s | %FileCheck %s
 
 // Check that values of static let and global let variables are propagated into their uses
 // and enable further optimizations like constant propagation, simplifications, etc.
@@ -16,7 +16,7 @@ let S = "String1"
 let VOLUME1 = I * J
 let VOLUME2 = J * 2
 let VOLUME3 = I + 10
- 
+let maxSize = Int.max >> 1
 
 
 struct IntWrapper1 {
@@ -74,6 +74,8 @@ struct B {
 
  static let VOLUME3 = I + 10
  
+ static let maxSize = Int.max >> 1
+
  static var PROP1: Double { 
    return PI
  }
@@ -110,6 +112,8 @@ class C {
  static let VOLUME2 = J * 2
 
  static let VOLUME3 = I + 10
+
+ static let maxSize = Int.max >> 1
  
  static var PROP1: Double { 
    return PI
@@ -172,7 +176,7 @@ public func test_let_double_complex() -> Double {
 // CHECK: return
 @inline(never)
 public func test_let_int_complex() -> Int {
-  return I + J + VOLUME1 + VOLUME2 + VOLUME3 + PROP2
+  return I + J + VOLUME1 + VOLUME2 + VOLUME3 + PROP2 + maxSize
 }
 
 // CHECK-LABEL: sil [noinline] @$s25globalopt_let_propagation019test_static_struct_B7_doubleSdyF
@@ -218,9 +222,8 @@ public func test_static_struct_let_double_complex() -> Double {
 // CHECK: return
 @inline(never)
 public func test_static_struct_let_int_complex() -> Int {
-  return B.I + B.J + B.VOLUME1 + B.VOLUME2 + B.VOLUME3 + B.PROP2
+  return B.I + B.J + B.VOLUME1 + B.VOLUME2 + B.VOLUME3 + B.maxSize + B.PROP2
 }
-
 
 // CHECK-LABEL: sil [noinline] @$s25globalopt_let_propagation018test_static_class_B7_doubleSdyF
 // CHECK: bb0:
@@ -265,7 +268,7 @@ public func test_static_class_let_double_complex() -> Double {
 // CHECK: return
 @inline(never)
 public func test_static_class_let_int_complex() -> Int {
-  return C.I + C.J + C.VOLUME1 + C.VOLUME2 + C.VOLUME3 + C.PROP2
+  return C.I + C.J + C.VOLUME1 + C.VOLUME2 + C.VOLUME3 + C.maxSize + C.PROP2
 }
 
 // CHECK-LABEL: sil [noinline] @$s25globalopt_let_propagation15test_var_doubleSdyF

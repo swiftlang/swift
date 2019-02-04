@@ -561,7 +561,7 @@ namespace {
 
     void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
                    SILValue addr, StoreOwnershipQualifier qual) const override {
-      if (B.getFunction().hasQualifiedOwnership()) {
+      if (B.getFunction().hasOwnership()) {
         B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
         return;
       }
@@ -570,7 +570,7 @@ namespace {
 
     SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                       LoadOwnershipQualifier qual) const override {
-      if (B.getFunction().hasQualifiedOwnership())
+      if (B.getFunction().hasOwnership())
         return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
       return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
     }
@@ -638,7 +638,7 @@ namespace {
 
     void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
                    SILValue addr, StoreOwnershipQualifier qual) const override {
-      if (B.getFunction().hasQualifiedOwnership()) {
+      if (B.getFunction().hasOwnership()) {
         B.createStore(loc, value, addr, qual);
         return;
       }
@@ -662,7 +662,7 @@ namespace {
 
     SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                       LoadOwnershipQualifier qual) const override {
-      if (B.getFunction().hasQualifiedOwnership())
+      if (B.getFunction().hasOwnership())
         return B.createLoad(loc, addr, qual);
 
       SILValue loadValue =
@@ -760,7 +760,7 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      if (B.getFunction().hasQualifiedOwnership())
+      if (B.getFunction().hasOwnership())
         return B.createCopyValue(loc, value);
       B.createRetainValue(loc, value, B.getDefaultAtomicity());
       return value;
@@ -793,7 +793,7 @@ namespace {
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue aggValue) const override {
-      if (B.getFunction().hasQualifiedOwnership()) {
+      if (B.getFunction().hasOwnership()) {
         B.createDestroyValue(loc, aggValue);
         return;
       }
@@ -898,7 +898,7 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      if (B.getFunction().hasQualifiedOwnership())
+      if (B.getFunction().hasOwnership())
         return B.createCopyValue(loc, value);
       B.createRetainValue(loc, value, B.getDefaultAtomicity());
       return value;
@@ -907,7 +907,7 @@ namespace {
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                   SILValue value,
                                   TypeExpansionKind style) const override {
-      if (B.getFunction().hasQualifiedOwnership())
+      if (B.getFunction().hasOwnership())
         return B.createCopyValue(loc, value);
       B.createRetainValue(loc, value, B.getDefaultAtomicity());
       return value;
@@ -915,7 +915,7 @@ namespace {
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
-      if (B.getFunction().hasQualifiedOwnership()) {
+      if (B.getFunction().hasOwnership()) {
         B.createDestroyValue(loc, value);
         return;
       }
@@ -957,10 +957,11 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      if (isa<FunctionRefInst>(value))
+      if (isa<FunctionRefInst>(value) || isa<DynamicFunctionRefInst>(value) ||
+          isa<PreviousDynamicFunctionRefInst>(value))
         return value;
 
-      if (B.getFunction().hasQualifiedOwnership())
+      if (B.getFunction().hasOwnership())
         return B.createCopyValue(loc, value);
 
       B.createStrongRetain(loc, value, B.getDefaultAtomicity());
@@ -969,7 +970,7 @@ namespace {
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
-      if (B.getFunction().hasQualifiedOwnership()) {
+      if (B.getFunction().hasOwnership()) {
         B.createDestroyValue(loc, value);
         return;
       }
@@ -986,14 +987,14 @@ namespace {
                                  IsReferenceCounted) {} \
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc, \
                            SILValue value) const override { \
-      if (B.getFunction().hasQualifiedOwnership()) \
+      if (B.getFunction().hasOwnership()) \
         return B.createCopyValue(loc, value); \
       B.create##Name##Retain(loc, value, B.getDefaultAtomicity()); \
       return value; \
     } \
     void emitDestroyValue(SILBuilder &B, SILLocation loc, \
                           SILValue value) const override { \
-      if (B.getFunction().hasQualifiedOwnership()) { \
+      if (B.getFunction().hasOwnership()) { \
         B.createDestroyValue(loc, value); \
         return; \
       } \
@@ -1138,7 +1139,7 @@ namespace {
   /// Build the appropriate TypeLowering subclass for the given type,
   /// which is assumed to already have been lowered.
   class LowerType
-    : public TypeClassifierBase<LowerType, const TypeLowering *>
+    : public TypeClassifierBase<LowerType, TypeLowering *>
   {
     TypeConverter &TC;
     IsDependent_t Dependent;
@@ -1148,18 +1149,18 @@ namespace {
       : TypeClassifierBase(TC.M, Sig, Expansion),
         TC(TC), Dependent(Dependent) {}
 
-    const TypeLowering *
+    TypeLowering *
     handleTrivial(CanType type) {
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC, Dependent) TrivialTypeLowering(silType);
     }
 
-    const TypeLowering *handleReference(CanType type) {
+    TypeLowering *handleReference(CanType type) {
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC, Dependent) ReferenceTypeLowering(silType);
     }
 
-    const TypeLowering *handleAddressOnly(CanType type, 
+    TypeLowering *handleAddressOnly(CanType type,
                                           RecursiveProperties properties) {
       if (SILModuleConventions(M).useLoweredAddresses()) {
         auto silType = SILType::getPrimitiveAddressType(type);
@@ -1170,20 +1171,20 @@ namespace {
     }
 
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-    const TypeLowering * \
+    TypeLowering * \
     visitLoadable##Name##StorageType(Can##Name##StorageType type) { \
       return new (TC, Dependent) Loadable##Name##TypeLowering( \
                                   SILType::getPrimitiveObjectType(type)); \
     }
 #include "swift/AST/ReferenceStorage.def"
 
-    const TypeLowering *
+    TypeLowering *
     visitBuiltinUnsafeValueBufferType(CanBuiltinUnsafeValueBufferType type) {
       auto silType = SILType::getPrimitiveAddressType(type);
       return new (TC, Dependent) UnsafeValueBufferTypeLowering(silType);
     }
 
-    const TypeLowering *visitTupleType(CanTupleType tupleType) {
+    TypeLowering *visitTupleType(CanTupleType tupleType) {
       RecursiveProperties properties;
       for (auto eltType : tupleType.getElementTypes()) {
         auto &lowering = TC.getTypeLowering(eltType);
@@ -1194,13 +1195,13 @@ namespace {
                                                                     properties);
     }
 
-    const TypeLowering *visitAnyStructType(CanType structType, StructDecl *D) {
+    TypeLowering *visitAnyStructType(CanType structType, StructDecl *D) {
 
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
       if (D->isResilient(M.getSwiftModule(), Expansion))
         return handleAddressOnly(structType,
-                                 RecursiveProperties::forOpaque());
+                                 RecursiveProperties::forResilient());
 
       // Classify the type according to its stored properties.
       RecursiveProperties properties;
@@ -1215,11 +1216,11 @@ namespace {
                                                                     properties);
     }
         
-    const TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
+    TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
       // For now, if the type does not have a fixed layout in all resilience
       // domains, we will treat it as address-only in SIL.
       if (D->isResilient(M.getSwiftModule(), Expansion))
-        return handleAddressOnly(enumType, RecursiveProperties::forOpaque());
+        return handleAddressOnly(enumType, RecursiveProperties::forResilient());
 
       // If the whole enum is indirect, we lower it as if all payload
       // cases were indirect. This means a fixed-layout indirect enum
@@ -1256,7 +1257,7 @@ namespace {
     }
 
     template <class LoadableLoweringClass>
-    const TypeLowering *handleAggregateByProperties(CanType type,
+    TypeLowering *handleAggregateByProperties(CanType type,
                                                     RecursiveProperties props) {
       if (props.isAddressOnly()) {
         return handleAddressOnly(type, props);
@@ -1450,7 +1451,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     AbstractionPattern(getCurGenericContext(), loweredSubstType);
   auto loweredKey = getTypeKey(origTypeForCaching, loweredSubstType);
 
-  auto &lowering = getTypeLoweringForLoweredType(loweredKey);
+  auto &lowering = getTypeLoweringForLoweredType(loweredKey,
+                                                 ResilienceExpansion::Minimal);
   insert(key, &lowering);
   return lowering;
 }
@@ -1471,9 +1473,16 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
     auto extInfo = substFnType->getExtInfo();
     if (getSILFunctionLanguage(extInfo.getSILRepresentation())
           == SILFunctionLanguage::C) {
+      // The importer only applies fully-reversible bridging to the
+      // component types of C function pointers.
+      auto bridging = Bridgeability::Full;
+      if (extInfo.getSILRepresentation()
+                        == SILFunctionTypeRepresentation::CFunctionPointer)
+        bridging = Bridgeability::None;
+
       // Bridge the parameters and result of the function type.
       auto bridgedFnType = getBridgedFunctionType(origType, substFnType,
-                                                  extInfo);
+                                                  extInfo, bridging);
       substFnType = bridgedFnType;
 
       // Also rewrite the type of the abstraction pattern.
@@ -1557,16 +1566,18 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
   return substType;
 }
 
-const TypeLowering &TypeConverter::getTypeLowering(SILType type) {
+const TypeLowering &
+TypeConverter::getTypeLowering(SILType type, ResilienceExpansion forExpansion) {
   auto loweredType = type.getASTType();
   auto key = getTypeKey(AbstractionPattern(getCurGenericContext(), loweredType),
                         loweredType);
 
-  return getTypeLoweringForLoweredType(key);
+  return getTypeLoweringForLoweredType(key, forExpansion);
 }
 
 const TypeLowering &
-TypeConverter::getTypeLoweringForLoweredType(TypeKey key) {
+TypeConverter::getTypeLoweringForLoweredType(TypeKey key,
+                                             ResilienceExpansion forExpansion) {
   auto type = key.SubstType;
   assert(type->isLegalSILType() && "type is not lowered!");
   (void)type;
@@ -1574,10 +1585,39 @@ TypeConverter::getTypeLoweringForLoweredType(TypeKey key) {
   // Re-using uncurry level 0 is reasonable because our uncurrying
   // transforms are idempotent at this level.  This means we don't
   // need a ton of redundant entries in the map.
-  if (auto existing = find(key))
-    return *existing;
+  const TypeLowering *lowering = find(key);
+  if (!lowering) {
+    lowering = &getTypeLoweringForUncachedLoweredType(key);
+  }
+  assert(lowering->forExpansion == ResilienceExpansion::Minimal &&
+         "the first lowering in the list must be for minimal expansion");
 
-  return getTypeLoweringForUncachedLoweredType(key);
+  if (key.isDependent() || !lowering->isResilient()) {
+    // Don't try to refine the lowering for other resilience expansions if
+    // we don't expect to get a different lowering anyway.
+    return *lowering;
+  }
+
+  // Search for a matching lowering in the linked list of lowerings.
+  while (true) {
+    if (lowering->forExpansion == forExpansion)
+      return *lowering;
+    if (lowering->nextExpansion) {
+      // Continue searching.
+      lowering = lowering->nextExpansion;
+      continue;
+    }
+
+    // Create a new lowering for the resilience expansion.
+    TypeLowering *theInfo = LowerType(*this,
+                              CanGenericSignature(),
+                              forExpansion,
+                              key.isDependent()).visit(key.SubstType);
+
+    lowering->nextExpansion = theInfo;
+    theInfo->forExpansion = forExpansion;
+    return *theInfo;
+  }
 }
 
 /// Do type-lowering for a lowered type which is not already in the cache,
@@ -1619,7 +1659,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      ValueDecl *VD,
                                                      DeclContext *DC,
                                                      unsigned DefaultArgIndex) {
-  auto resultTy = getDefaultArgumentInfo(VD, DefaultArgIndex).second;
+  auto resultTy = getParameterAt(VD, DefaultArgIndex)->getInterfaceType();
   assert(resultTy && "Didn't find default argument?");
 
   // The result type might be written in terms of type parameters
@@ -1779,7 +1819,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
 
     FuncDecl *func = cast<FuncDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
-        func->getInterfaceType()->eraseDynamicSelfType()->getCanonicalType());
+        func->getInterfaceType()->getCanonicalType());
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
 
@@ -2091,7 +2131,11 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
 
           // We're capturing a 'self' value with dynamic 'Self' type;
           // handle it specially.
-          if (captureType->getClassOrBoundGenericClass()) {
+          //
+          // However, only do this if its a 'let'; if the capture is
+          // mutable, we're going to be capturing a box or an address.
+          if (captureType->getClassOrBoundGenericClass() &&
+              capturedVar->isLet()) {
             if (selfCapture)
               selfCapture = selfCapture->mergeFlags(capture);
             else

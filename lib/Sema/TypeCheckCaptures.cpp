@@ -80,7 +80,7 @@ public:
     CaptureLoc = getCaptureLoc(AFR);
   }
 
-  /// \brief Check if the type of an expression references any generic
+  /// Check if the type of an expression references any generic
   /// type parameters, or the dynamic Self type.
   ///
   /// Note that we do not need to distinguish inner from outer generic
@@ -283,15 +283,14 @@ public:
         // recontextualized into it, so treat it as if it's already there.
         if (auto init = dyn_cast<PatternBindingInitializer>(TmpDC)) {
           if (auto lazyVar = init->getInitializedLazyVar()) {
-            // Referring to the 'self' parameter is fine.
-            if (D == init->getImplicitSelfDecl())
-              return { false, DRE };
-
-            // Otherwise, act as if we're in the getter.
-            auto getter = lazyVar->getGetter();
-            assert(getter && "lazy variable without getter");
-            TmpDC = getter;
-            continue;
+            // If we have a getter with a body, we're already re-parented
+            // everything so pretend we're inside the getter.
+            if (auto getter = lazyVar->getGetter()) {
+              if (getter->getBody(/*canSynthesize=*/false)) {
+                TmpDC = getter;
+                continue;
+              }
+            }
           }
         }
 
@@ -402,7 +401,9 @@ public:
     if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
       if (D->getBaseName() == D->getASTContext().Id_self) {
         TC.diagnose(DRE->getLoc(),
-          diag::closure_implicit_capture_mutating_self);
+                    diag::closure_implicit_capture_mutating_self);
+        TC.diagnose(DRE->getLoc(),
+                    diag::create_mutating_copy_or_capture_self);
       } else {
         TC.diagnose(DRE->getLoc(),
           diag::closure_implicit_capture_without_noescape);
@@ -416,10 +417,13 @@ public:
     // If this is a direct reference to underlying storage, then this is a
     // capture of the storage address - not a capture of the getter/setter.
     if (auto var = dyn_cast<VarDecl>(D)) {
+      auto *DC = AFR.getAsDeclContext();
       if (var->getAccessStrategy(DRE->getAccessSemantics(),
                                  var->supportsMutation()
-                                   ? AccessKind::ReadWrite : AccessKind::Read,
-                                 AFR.getAsDeclContext())
+                                   ? AccessKind::ReadWrite
+                                   : AccessKind::Read,
+                                 DC->getParentModule(),
+                                 DC->getResilienceExpansion())
           .getKind() == AccessStrategy::Storage)
         Flags |= CapturedValue::IsDirect;
     }

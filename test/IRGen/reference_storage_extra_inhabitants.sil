@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-interop -emit-ir -primary-file %s | %FileCheck %s -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-objc-interop -emit-ir -primary-file %s | %FileCheck %s -DWORD=i%target-ptrsize
 
 sil_stage canonical
 
@@ -9,7 +9,7 @@ class C { }
 sil_vtable C { }
 
 struct S {
-  @sil_stored unowned(unsafe) var uu: @sil_unmanaged C? { get set }
+  @_hasStorage unowned(unsafe) var uu: @sil_unmanaged C? { get set }
 }
 
 func example(_ os: S?)

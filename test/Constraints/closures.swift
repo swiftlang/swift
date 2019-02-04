@@ -356,7 +356,7 @@ func f19997471(_ x: Int) {}
 func someGeneric19997471<T>(_ x: T) {
   takeVoidVoidFn {
     f19997471(x) // expected-error {{cannot invoke 'f19997471' with an argument list of type '(T)'}}
-    // expected-note @-1 {{overloads for 'f19997471' exist with these partially matching parameter lists: (String), (Int)}}
+    // expected-note @-1 {{overloads for 'f19997471' exist with these partially matching parameter lists: (Int), (String)}}
   }
 }
 
@@ -556,6 +556,7 @@ r32432145 { _,_ in
 // rdar://problem/30106822 - Swift ignores type error in closure and presents a bogus error about the caller
 [1, 2].first { $0.foo = 3 }
 // expected-error@-1 {{value of type 'Int' has no member 'foo'}}
+// expected-error@-2 {{cannot convert value of type '()' to closure result type 'Bool'}}
 
 // rdar://problem/32433193, SR-5030 - Higher-order function diagnostic mentions the wrong contextual type conversion problem
 protocol A_SR_5030 {
@@ -747,7 +748,7 @@ takesTwoInOut { _ in } // expected-error {{contextual closure type '(Int, inout 
 func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
-  _ = x.filter { ($0 + y)  > 42 } // expected-error {{'+' is unavailable}}
+  _ = x.filter { ($0 + y)  > 42 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UInt, UInt)}}
 }
 
 // rdar://problem/42337247
@@ -798,10 +799,79 @@ func test<Instances : Collection>(
 
 test([1]) { _, _ in fatalError(); () }
 
+// rdar://problem/40537960 - Misleading diagnostic when using closure with wrong type
+
+protocol P_40537960 {}
+func rdar_40537960() {
+  struct S {
+    var v: String
+  }
+
+  struct L : P_40537960 {
+    init(_: String) {}
+  }
+
+  struct R<T : P_40537960> {
+    init(_: P_40537960) {}
+  }
+
+  struct A<T: Collection, P: P_40537960> {
+    typealias Data = T.Element
+    init(_: T, fn: (Data) -> R<P>) {}
+  }
+
+  var arr: [S] = []
+  _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<T>'}}
+}
+
 // rdar://problem/45659733
 func rdar_45659733() {
   func foo<T : BinaryInteger>(_: AnyHashable, _: T) {}
   func bar(_ a: Int, _ b: Int) {
     _ = (a ..< b).map { i in foo(i, i) } // Ok
+  }
+
+  struct S<V> {
+    func map<T>(
+      get: @escaping (V) -> T,
+      set: @escaping (inout V, T) -> Void
+    ) -> S<T> {
+      fatalError()
+    }
+
+    subscript<T>(
+      keyPath: WritableKeyPath<V, T?>,
+      default defaultValue: T
+    ) -> S<T> {
+      return map(
+        get: { $0[keyPath: keyPath] ?? defaultValue },
+        set: { $0[keyPath: keyPath] = $1 }
+      ) // Ok, make sure that we deduce result to be S<T>
+    }
+  }
+}
+
+func rdar45771997() {
+  struct S {
+    mutating func foo() {}
+  }
+
+  let _: Int = { (s: inout S) in s.foo() }
+  // expected-error@-1 {{cannot convert value of type '(inout S) -> ()' to specified type 'Int'}}
+}
+
+struct rdar30347997 {
+  func withUnsafeMutableBufferPointer(body : (inout Int) -> ()) {}
+  func foo() {
+    withUnsafeMutableBufferPointer {
+      (b : Int) in // expected-error {{'Int' is not convertible to 'inout Int'}}
+    }
+  }
+}
+
+struct rdar43866352<Options> {
+  func foo() {
+    let callback: (inout Options) -> Void
+    callback = { (options: Options) in } // expected-error {{cannot assign value of type '(inout Options) -> ()' to type '(inout _) -> Void'}}
   }
 }

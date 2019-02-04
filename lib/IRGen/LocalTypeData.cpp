@@ -41,8 +41,7 @@ LocalTypeDataKind LocalTypeDataKind::getCachingKind() const {
 
   // Map protocol conformances to their root normal conformance.
   auto conformance = getConcreteProtocolConformance();
-  return forConcreteProtocolWitnessTable(
-                                     conformance->getRootNormalConformance());
+  return forConcreteProtocolWitnessTable(conformance->getRootConformance());
 }
 
 LocalTypeDataCache &IRGenFunction::getOrCreateLocalTypeData() {
@@ -337,7 +336,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   auto type = dyn_cast<ArchetypeType>(key.Type);
   if (!type)
     return;
-  if (type->getOpenedExistentialType())
+  if (isa<OpenedArchetypeType>(type))
     return;
 
   llvm::Value *data = value.getMetadata();

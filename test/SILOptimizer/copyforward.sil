@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -copy-forwarding -enable-copyforwarding -enable-destroyhoisting | %FileCheck %s
+// RUN: %target-sil-opt -enforce-exclusivity=none -enable-sil-verify-all %s -copy-forwarding -enable-copyforwarding -enable-destroyhoisting | %FileCheck %s
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -604,8 +604,8 @@ bb0(%0 : $*P, %1 : $*T):
 }
 
 public struct S<T> {
-  @sil_stored var f: T { get set }
-  @sil_stored var g: T { get set }
+  @_hasStorage var f: T { get set }
+  @_hasStorage var g: T { get set }
   init(f: T, g: T)
 }
 

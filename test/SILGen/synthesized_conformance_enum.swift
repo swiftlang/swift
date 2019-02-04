@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 | %FileCheck -check-prefix CHECK -check-prefix CHECK-FRAGILE %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 -enable-resilience | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
+// RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 | %FileCheck -check-prefix CHECK -check-prefix CHECK-FRAGILE %s
+// RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 -enable-resilience | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
 
 enum Enum<T> {
     case a(T), b(T)
@@ -36,20 +36,20 @@ enum NoValues {
 
 extension Enum: Equatable where T: Equatable {}
 // CHECK-FRAGILE-LABEL: // static Enum<A>.__derived_enum_equals(_:_:)
-// CHECK-FRAGILE-NEXT: sil hidden @$s28synthesized_conformance_enum4EnumOAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
+// CHECK-FRAGILE-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
 // CHECK-RESILIENT-LABEL: // static Enum<A>.== infix(_:_:)
-// CHECK-RESILIENT-NEXT: sil hidden @$s28synthesized_conformance_enum4EnumOAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
+// CHECK-RESILIENT-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
 
 extension Enum: Hashable where T: Hashable {}
 // CHECK-LABEL: // Enum<A>.hashValue.getter
-// CHECK-NEXT: sil hidden @$s28synthesized_conformance_enum4EnumOAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Enum<T>) -> Int {
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Enum<T>) -> Int {
 
 // CHECK-LABEL: // Enum<A>.hash(into:)
-// CHECK-NEXT: sil hidden @$s28synthesized_conformance_enum4EnumOAASHRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Enum<T>) -> () {
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASHRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Enum<T>) -> () {
 
 extension NoValues: CaseIterable {}
 // CHECK-LABEL: // static NoValues.allCases.getter
-// CHECK-NEXT: sil hidden @$s28synthesized_conformance_enum8NoValuesO8allCasesSayACGvgZ : $@convention(method) (@thin NoValues.Type) -> @owned Array<NoValues> {
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum8NoValuesO8allCasesSayACGvgZ : $@convention(method) (@thin NoValues.Type) -> @owned Array<NoValues> {
 
 
 // Witness tables for Enum
@@ -60,12 +60,12 @@ extension NoValues: CaseIterable {}
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table hidden <T where T : Hashable> Enum<T>: Hashable module synthesized_conformance_enum {
-// CHECK-NEXT:   base_protocol Equatable: <T where T : Equatable> Enum<T>: Equatable module synthesized_conformance_enum
-// CHECK-NEXT:   method #Hashable.hashValue!getter.1: <Self where Self : Hashable> (Self) -> () -> Int : @$s28synthesized_conformance_enum4EnumOyxGSHAASHRzlSH9hashValueSivgTW	// protocol witness for Hashable.hashValue.getter in conformance <A> Enum<A>
-// CHECK-NEXT:   method #Hashable.hash!1: <Self where Self : Hashable> (Self) -> (inout Hasher) -> () : @$s28synthesized_conformance_enum4EnumOyxGSHAASHRzlSH4hash4intoys6HasherVz_tFTW	// protocol witness for Hashable.hash(into:) in conformance <A> Enum<A>
-// CHECK-NEXT:   method #Hashable._rawHashValue!1: <Self where Self : Hashable> (Self) -> (Int) -> Int : @$s28synthesized_conformance_enum4EnumOyxGSHAASHRzlSH13_rawHashValue4seedS2i_tFTW // protocol witness for Hashable._rawHashValue(seed:) in conformance <A> Enum<A>
-// CHECK-NEXT:   conditional_conformance (T: Hashable): dependent
-// CHECK-NEXT: }
+// CHECK-DAG:   base_protocol Equatable: <T where T : Equatable> Enum<T>: Equatable module synthesized_conformance_enum
+// CHECK-DAG:   method #Hashable.hashValue!getter.1: <Self where Self : Hashable> (Self) -> () -> Int : @$s28synthesized_conformance_enum4EnumOyxGSHAASHRzlSH9hashValueSivgTW	// protocol witness for Hashable.hashValue.getter in conformance <A> Enum<A>
+// CHECK-DAG:   method #Hashable.hash!1: <Self where Self : Hashable> (Self) -> (inout Hasher) -> () : @$s28synthesized_conformance_enum4EnumOyxGSHAASHRzlSH4hash4intoys6HasherVz_tFTW	// protocol witness for Hashable.hash(into:) in conformance <A> Enum<A>
+// CHECK-DAG:   method #Hashable._rawHashValue!1: <Self where Self : Hashable> (Self) -> (Int) -> Int : @$s28synthesized_conformance_enum4EnumOyxGSHAASHRzlSH13_rawHashValue4seedS2i_tFTW // protocol witness for Hashable._rawHashValue(seed:) in conformance <A> Enum<A>
+// CHECK-DAG:   conditional_conformance (T: Hashable): dependent
+// CHECK: }
 
 // Witness tables for NoValues
 

@@ -34,13 +34,8 @@ extension Dictionary {
   @usableFromInline
   @_fixed_layout
   internal struct _Variant {
-#if _runtime(_ObjC)
     @usableFromInline
-    internal var object: _BridgeStorage<_RawDictionaryStorage, _NSDictionary>
-#else
-    @usableFromInline
-    internal var object: _BridgeStorage<_RawDictionaryStorage, AnyObject>
-#endif
+    internal var object: _BridgeStorage<__RawDictionaryStorage>
 
     @inlinable
     @inline(__always)
@@ -61,7 +56,7 @@ extension Dictionary {
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
-    init(cocoa: __owned _CocoaDictionary) {
+    init(cocoa: __owned __CocoaDictionary) {
       self.object = _BridgeStorage(objC: cocoa.object)
     }
 #endif
@@ -100,15 +95,15 @@ extension Dictionary._Variant {
     _modify {
       var native = _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
+      defer { object = .init(native: native._storage) }
       yield &native
-      object = .init(native: native._storage)
     }
   }
 
 #if _runtime(_ObjC)
   @inlinable
-  internal var asCocoa: _CocoaDictionary {
-    return _CocoaDictionary(object.objCInstance)
+  internal var asCocoa: __CocoaDictionary {
+    return __CocoaDictionary(object.objCInstance)
   }
 #endif
 
@@ -284,6 +279,31 @@ extension Dictionary._Variant: _DictionaryBuffer {
 }
 
 extension Dictionary._Variant {
+  @inlinable
+  internal subscript(key: Key) -> Value? {
+    @inline(__always)
+    get {
+      return lookup(key)
+    }
+    @inline(__always)
+    _modify {
+#if _runtime(_ObjC)
+      guard isNative else {
+        let cocoa = asCocoa
+        var native = _NativeDictionary<Key, Value>(
+          cocoa, capacity: cocoa.count + 1)
+        self = .init(native: native)
+        yield &native[key, isUnique: true]
+        return
+      }
+#endif
+      let isUnique = isUniquelyReferenced()
+      yield &asNative[key, isUnique: isUnique]
+    }
+  }
+}
+
+extension Dictionary._Variant {
   /// Same as find(_:), except assume a corresponding key/value pair will be
   /// inserted if it doesn't already exist, and mutated if it does exist. When
   /// this function returns, the storage is guaranteed to be native, uniquely
@@ -362,6 +382,7 @@ extension Dictionary._Variant {
   }
 
   @inlinable
+  @_semantics("optimize.sil.specialize.generic.size.never")
   internal mutating func remove(at index: Index) -> Element {
     // FIXME(performance): fuse data migration and element deletion into one
     // operation.
@@ -392,6 +413,7 @@ extension Dictionary._Variant {
   }
 
   @inlinable
+  @_semantics("optimize.sil.specialize.generic.size.never")
   internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
     if !keepCapacity {
       self = .init(native: _NativeDictionary())

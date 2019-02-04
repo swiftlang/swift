@@ -226,14 +226,19 @@ PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
      "Eliminate Ownership Annotation of SIL")
+PASS(NonTransparentFunctionOwnershipModelEliminator,
+     "non-transparent-func-ownership-model-eliminator",
+     "Eliminate Ownership Annotations from non-transparent SIL Functions")
 PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
 PASS(PerfInliner, "inline",
      "Performance Function Inlining")
 PASS(PerformanceConstantPropagation, "performance-constant-propagation",
      "Constant Propagation for Performance without Diagnostics")
-PASS(PredictableMemoryOptimizations, "predictable-memopt",
-     "Predictable Memory Optimization for Diagnostics")
+PASS(PredictableMemoryAccessOptimizations, "predictable-memaccess-opts",
+     "Predictable Memory Access Optimizations for Diagnostics")
+PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
+     "Eliminate dead temporary allocations after diagnostics")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",

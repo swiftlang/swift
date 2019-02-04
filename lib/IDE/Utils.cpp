@@ -104,16 +104,9 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
   ParserUnit Parse(SM, SFKind, BufferID);
-  Parser &P = Parse.getParser();
-
-  bool Done;
-  do {
-    P.parseTopLevel();
-    Done = P.Tok.is(tok::eof);
-  } while (!Done);
-
+  Parse.parse();
   SourceCompleteResult SCR;
-  SCR.IsComplete = !P.isInputIncomplete();
+  SCR.IsComplete = !Parse.getParser().isInputIncomplete();
 
   // Use the same code that was in the REPL code to track the indent level
   // for now. In the future we should get this from the Parser if possible.
@@ -226,7 +219,8 @@ static std::string adjustClangTriple(StringRef TripleStr) {
     }
     break;
   }
-  OS << '-' << Triple.getVendorName() << '-' << Triple.getOSName();
+  OS << '-' << Triple.getVendorName() << '-' <<
+      Triple.getOSAndEnvironmentName();
   OS.flush();
   return Result;
 }

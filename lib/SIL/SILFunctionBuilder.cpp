@@ -11,14 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILFunctionBuilder.h"
-
+#include "swift/AST/Decl.h"
 using namespace swift;
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
     SILLocation loc, StringRef name, SILLinkage linkage,
     CanSILFunctionType type, IsBare_t isBareSILFunction,
     IsTransparent_t isTransparent, IsSerialized_t isSerialized,
-    ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope) {
+    IsDynamicallyReplaceable_t isDynamic, ProfileCounter entryCount,
+    IsThunk_t isThunk, SubclassScope subclassScope) {
   assert(!type->isNoEscape() && "Function decls always have escaping types.");
   if (auto fn = mod.lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
@@ -29,13 +30,16 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
   auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
                                 isBareSILFunction, isTransparent, isSerialized,
-                                entryCount, isThunk, subclassScope);
+                                entryCount, isDynamic, isThunk, subclassScope);
   fn->setDebugScope(new (mod) SILDebugScope(loc, fn));
   return fn;
 }
 
-static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
-                                  SILModule &M) {
+void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
+                                               DeclAttributes &Attrs,
+                                               SILModule &M,
+                                               SILDeclRef constant) {
+
   for (auto *A : Attrs.getAttributes<SemanticsAttr>())
     F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
 
@@ -57,6 +61,38 @@ static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
   // @_silgen_name and @_cdecl functions may be called from C code somewhere.
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
+
+  // Propagate @_dynamicReplacement(for:).
+  if (constant.isNull())
+    return;
+  auto *decl = constant.getDecl();
+
+  // Only emit replacements for the objc entry point of objc methods.
+  if (decl->isObjC() &&
+      F->getLoweredFunctionType()->getExtInfo().getRepresentation() !=
+          SILFunctionTypeRepresentation::ObjCMethod)
+    return;
+
+  auto *replacedFuncAttr = Attrs.getAttribute<DynamicReplacementAttr>();
+  if (!replacedFuncAttr)
+    return;
+
+  auto *replacedDecl = replacedFuncAttr->getReplacedFunction();
+  assert(replacedDecl);
+
+  if (decl->isObjC()) {
+    F->setObjCReplacement(replacedDecl);
+    return;
+  }
+
+  if (constant.isInitializerOrDestroyer())
+    return;
+
+  SILDeclRef declRef(replacedDecl, constant.kind, false);
+  auto *replacedFunc =
+      getOrCreateFunction(replacedDecl, declRef, NotForDefinition);
+  assert(replacedFunc->getLoweredFunctionType() == F->getLoweredFunctionType());
+  F->setDynamicallyReplacedFunction(replacedFunc);
 }
 
 SILFunction *
@@ -99,10 +135,16 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     inlineStrategy = AlwaysInline;
 
   StringRef name = mod.allocateCopy(nameTmp);
-  auto *F =
-      SILFunction::create(mod, linkage, name, constantType, nullptr, None,
-                          IsNotBare, IsTrans, IsSer, entryCount, IsNotThunk,
-                          constant.getSubclassScope(), inlineStrategy, EK);
+  IsDynamicallyReplaceable_t IsDyn = IsNotDynamic;
+  if (constant.isDynamicallyReplaceable()) {
+    IsDyn = IsDynamic;
+    IsTrans = IsNotTransparent;
+  }
+
+  auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
+                                IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
+                                IsNotThunk, constant.getSubclassScope(),
+                                inlineStrategy, EK);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
   F->setGlobalInit(constant.isGlobal());
@@ -120,7 +162,7 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
       // Add attributes for e.g. computed properties.
       addFunctionAttributes(F, storage->getAttrs(), mod);
     }
-    addFunctionAttributes(F, decl->getAttrs(), mod);
+    addFunctionAttributes(F, decl->getAttrs(), mod, constant);
   }
 
   return F;
@@ -129,21 +171,24 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
 SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
     SILLocation loc, StringRef name, CanSILFunctionType type,
     IsBare_t isBareSILFunction, IsTransparent_t isTransparent,
-    IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk) {
+    IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
+    IsDynamicallyReplaceable_t isDynamic) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared, type,
                              isBareSILFunction, isTransparent, isSerialized,
-                             entryCount, isThunk, SubclassScope::NotApplicable);
+                             isDynamic, entryCount, isThunk,
+                             SubclassScope::NotApplicable);
 }
 
 SILFunction *SILFunctionBuilder::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
     GenericEnvironment *genericEnv, Optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-    IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
-    SubclassScope subclassScope, Inline_t inlineStrategy, EffectsKind EK,
-    SILFunction *InsertBefore, const SILDebugScope *DebugScope) {
+    IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
+    ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope,
+    Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
+    const SILDebugScope *DebugScope) {
   return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
                              isBareSILFunction, isTrans, isSerialized,
-                             entryCount, isThunk, subclassScope, inlineStrategy,
-                             EK, InsertBefore, DebugScope);
+                             entryCount, isDynamic, isThunk, subclassScope,
+                             inlineStrategy, EK, InsertBefore, DebugScope);
 }

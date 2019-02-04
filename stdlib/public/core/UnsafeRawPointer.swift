@@ -78,7 +78,7 @@
 /// offset by that number of bytes. The following example allocates four bytes
 /// of memory and stores `0xFF` in all four bytes:
 ///
-///     let bytesPointer = UnsafeMutableRawPointer.allocate(byteCount: 4, alignment: 1)
+///     let bytesPointer = UnsafeMutableRawPointer.allocate(byteCount: 4, alignment: 4)
 ///     bytesPointer.storeBytes(of: 0xFFFF_FFFF, as: UInt32.self)
 ///
 ///     // Load a value from the memory referenced by 'bytesPointer'
@@ -235,13 +235,43 @@ public struct UnsafeRawPointer: _Pointer {
     _rawValue = unwrapped._rawValue
   }
 
+  /// Creates a new raw pointer from the given typed pointer.		
+  ///		
+  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`		
+  /// instance. This initializer creates a new pointer to the same address as		
+  /// `other` and performs no allocation or copying.		
+  ///		
+  /// - Parameter other: The typed pointer to convert.		
+  @_transparent		
+  public init<T>(_ other: UnsafeMutablePointer<T>) {		
+   _rawValue = other._rawValue		
+  }		
+
+  /// Creates a new raw pointer from the given typed pointer.		
+  ///		
+  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`		
+  /// instance. This initializer creates a new pointer to the same address as		
+  /// `other` and performs no allocation or copying.		
+  ///		
+  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the		
+  ///   result is `nil`.		
+  @_transparent		
+  public init?<T>(_ other: UnsafeMutablePointer<T>?) {		
+   guard let unwrapped = other else { return nil }		
+   _rawValue = unwrapped._rawValue		
+  }		
+
   /// Deallocates the previously allocated memory block referenced by this pointer.
   ///
   /// The memory to be deallocated must be uninitialized or initialized to a
   /// trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+    // Passing zero alignment to the runtime forces "aligned
+    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
+    // always uses the "aligned allocation" path, this ensures that the
+    // runtime's allocation and deallocation paths are compatible.
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
   /// Binds the memory to the specified type and returns a typed pointer to the
@@ -332,7 +362,7 @@ public struct UnsafeRawPointer: _Pointer {
 
 extension UnsafeRawPointer: Strideable {
   // custom version for raw pointers
-  @inlinable
+  @_transparent
   public func advanced(by n: Int) -> UnsafeRawPointer {
     return UnsafeRawPointer(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
@@ -577,6 +607,21 @@ public struct UnsafeMutableRawPointer: _Pointer {
   public static func allocate(
     byteCount: Int, alignment: Int
   ) -> UnsafeMutableRawPointer {
+    // For any alignment <= _minAllocationAlignment, force alignment = 0.
+    // This forces the runtime's "aligned" allocation path so that
+    // deallocation does not require the original alignment.
+    //
+    // The runtime guarantees:
+    //
+    // align == 0 || align > _minAllocationAlignment:
+    //   Runtime uses "aligned allocation".
+    //
+    // 0 < align <= _minAllocationAlignment:
+    //   Runtime may use either malloc or "aligned allocation".
+    var alignment = alignment
+    if alignment <= _minAllocationAlignment() {
+      alignment = 0
+    }
     return UnsafeMutableRawPointer(Builtin.allocRaw(
         byteCount._builtinWordValue, alignment._builtinWordValue))
   }
@@ -587,7 +632,11 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+    // Passing zero alignment to the runtime forces "aligned
+    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
+    // always uses the "aligned allocation" path, this ensures that the
+    // runtime's allocation and deallocation paths are compatible.
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
   /// Binds the memory to the specified type and returns a typed pointer to the
@@ -937,30 +986,30 @@ public struct UnsafeMutableRawPointer: _Pointer {
 
 extension UnsafeMutableRawPointer: Strideable {
   // custom version for raw pointers
-  @inlinable
+  @_transparent
   public func advanced(by n: Int) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
 }
 
 extension OpaquePointer {
-  @inlinable
+  @_transparent
   public init(_ from: UnsafeMutableRawPointer) {
     self._rawValue = from._rawValue
   }
 
-  @inlinable
+  @_transparent
   public init?(_ from: UnsafeMutableRawPointer?) {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue
   }
 
-  @inlinable
+  @_transparent
   public init(_ from: UnsafeRawPointer) {
     self._rawValue = from._rawValue
   }
 
-  @inlinable
+  @_transparent
   public init?(_ from: UnsafeRawPointer?) {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue

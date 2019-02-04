@@ -22,7 +22,7 @@ sil_vtable Purebred {}
 // CHECK:         [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_PTR]]
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
-sil @purebred_method : $@convention(thin) (@owned Purebred) -> () {
+sil [ossa] @purebred_method : $@convention(thin) (@owned Purebred) -> () {
 entry(%0 : @owned $Purebred):
   %m = class_method %0 : $Purebred, #Purebred.method!1 : (Purebred) -> () -> (), $@convention(method) (@guaranteed Purebred) -> ()
   %z = apply %m(%0) : $@convention(method) (@guaranteed Purebred) -> ()
@@ -46,7 +46,7 @@ sil_vtable Mongrel {}
 // CHECK:         [[ISA:%.*]] = inttoptr i64 [[T3]] to %swift.type*
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
-sil @mongrel_method : $@convention(thin) (@owned Mongrel) -> () {
+sil [ossa] @mongrel_method : $@convention(thin) (@owned Mongrel) -> () {
 entry(%0 : @owned $Mongrel):
   %m = class_method %0 : $Mongrel, #Mongrel.method!1 : (Mongrel) -> () -> (), $@convention(method) (@guaranteed Mongrel) -> ()
   %z = apply %m(%0) : $@convention(method) (@guaranteed Mongrel) -> ()
@@ -55,15 +55,15 @@ entry(%0 : @owned $Mongrel):
 
 // ObjC stubs expected by ObjC metadata emission
 
-sil private @$s18class_isa_pointers7MongrelC6methodyyFTo : $@convention(objc_method) (Purebred) -> () {
+sil private [ossa] @$s18class_isa_pointers7MongrelC6methodyyFTo : $@convention(objc_method) (Purebred) -> () {
 entry(%0 : @unowned $Purebred):
   unreachable
 }
-sil private @$s18class_isa_pointers7MongrelC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
-entry(%0 : @trivial $Int, %1 : @unowned $Purebred):
+sil private [ossa] @$s18class_isa_pointers7MongrelC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
+entry(%0 : $Int, %1 : @unowned $Purebred):
   unreachable
 }
-sil private @$s18class_isa_pointers7MongrelCACycfcTo : $@convention(objc_method) (Purebred) -> () {
+sil private [ossa] @$s18class_isa_pointers7MongrelCACycfcTo : $@convention(objc_method) (Purebred) -> () {
 entry(%0 : @unowned $Purebred):
   unreachable
 }

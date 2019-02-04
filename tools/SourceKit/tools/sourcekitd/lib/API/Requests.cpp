@@ -166,6 +166,10 @@ codeCompleteUpdate(StringRef name, int64_t Offset,
 
 static sourcekitd_response_t codeCompleteClose(StringRef name, int64_t Offset);
 
+static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
+                                             int64_t Offset,
+                                             ArrayRef<const char *> Args);
+
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
            SKEditorConsumerOptions Opts, ArrayRef<const char *> Args);
@@ -857,6 +861,17 @@ handleSemanticRequest(RequestDict Req,
     return Rec(codeCompleteUpdate(*Name, Offset, options));
   }
 
+  if (ReqUID == RequestTypeContextInfo) {
+    std::unique_ptr<llvm::MemoryBuffer> InputBuf =
+        getInputBufForRequest(SourceFile, SourceText, ErrBuf);
+    if (!InputBuf)
+      return Rec(createErrorRequestFailed(ErrBuf.c_str()));
+    int64_t Offset;
+    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
+      return Rec(createErrorRequestInvalid("missing 'key.offset'"));
+    return Rec(typeContextInfo(InputBuf.get(), Offset, Args));
+  }
+
   if (!SourceFile.hasValue())
     return Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
 
@@ -1410,6 +1425,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyDocFullAsXML, Info.DocComment);
   if (!Info.FullyAnnotatedDecl.empty())
     Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDecl);
+  if (!Info.FullyAnnotatedGenericSig.empty())
+    Elem.set(KeyFullyAnnotatedGenericSignature, Info.FullyAnnotatedGenericSig);
   if (!Info.LocalizationKey.empty())
     Elem.set(KeyLocalizationKey, Info.LocalizationKey);
 
@@ -2027,6 +2044,56 @@ void SKGroupedCodeCompletionConsumer::endGroup() {
 void SKGroupedCodeCompletionConsumer::setNextRequestStart(unsigned offset) {
   assert(!Response.isNull());
   Response.set(KeyNextRequestStart, offset);
+}
+
+//===----------------------------------------------------------------------===//
+// Type Context Info
+//===----------------------------------------------------------------------===//
+
+static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
+                                             int64_t Offset,
+                                             ArrayRef<const char *> Args) {
+  ResponseBuilder RespBuilder;
+
+  class Consumer : public TypeContextInfoConsumer {
+    ResponseBuilder::Array SKResults;
+    Optional<std::string> ErrorDescription;
+
+  public:
+    Consumer(ResponseBuilder Builder)
+        : SKResults(Builder.getDictionary().setArray(KeyResults)) {}
+
+    void handleResult(const TypeContextInfoItem &Item) override {
+      auto SKElem = SKResults.appendDictionary();
+      SKElem.set(KeyTypeName, Item.TypeName);
+      SKElem.set(KeyTypeUsr, Item.TypeUSR);
+      auto members = SKElem.setArray(KeyImplicitMembers);
+      for (auto member : Item.ImplicitMembers) {
+        auto memberElem = members.appendDictionary();
+        memberElem.set(KeyName, member.Name);
+        memberElem.set(KeyDescription, member.Description);
+        memberElem.set(KeySourceText, member.SourceText);
+        if (!member.DocBrief.empty())
+          memberElem.set(KeyDocBrief, member.DocBrief);
+      }
+    }
+
+    void failed(StringRef ErrDescription) override {
+      ErrorDescription = ErrDescription;
+    }
+
+    bool isError() const { return ErrorDescription.hasValue(); }
+    const char *getErrorDescription() const {
+      return ErrorDescription->c_str();
+    }
+  } Consumer(RespBuilder);
+
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+  Lang.getExpressionContextInfo(InputBuf, Offset, Args, Consumer);
+
+  if (Consumer.isError())
+    return createErrorRequestFailed(Consumer.getErrorDescription());
+  return RespBuilder.createResponse();
 }
 
 //===----------------------------------------------------------------------===//

@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %S/Inputs/multithread_module/main.swift -emit-ir -o %t/main.ll %s -o %t/mt_module.ll -num-threads 2 -O -g -module-name test
+// RUN: %target-swift-frontend %S/Inputs/multithread_module/main.swift -emit-ir -o %t/main.ll %/s -o %t/mt_module.ll -num-threads 2 -O -g -module-name test
 // RUN: %FileCheck --check-prefix=CHECK-MAINLL %s <%t/main.ll
 // RUN: %FileCheck --check-prefix=CHECK-MODULELL %s <%t/mt_module.ll
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -c %S/Inputs/multithread_module/main.swift -o %t/main.o %s -o %t/mt_module.o -num-threads 2 -O -g -module-name test
+// RUN: %target-swift-frontend -c %S/Inputs/multithread_module/main.swift -o %t/main.o %s -o %t/mt_module.o -num-threads 2 -O -g -module-name test
 // RUN: %target-build-swift %t/main.o %t/mt_module.o -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s

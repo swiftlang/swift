@@ -25,7 +25,7 @@ bool compareKeyAgainstDefaultKey(const std::pair<KeyT, ValueT> &Pair) {
   return Pair.first == KeyT();
 }
 
-/// \brief An associative container with fast insertion-order (deterministic)
+/// An associative container with fast insertion-order (deterministic)
 /// iteration over its elements. Plus the special blot operation.
 template <typename KeyT, typename ValueT,
           typename MapT = llvm::DenseMap<KeyT, size_t>,

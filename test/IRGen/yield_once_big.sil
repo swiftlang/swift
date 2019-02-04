@@ -30,7 +30,7 @@ sil @make_big : $<T: SomeClass> () -> (@owned Big<T>)
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %T14yield_once_big3BigV* } @test_simple
 // CHECK-32-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:16]]), %swift.type* %C)
 // CHECK-64-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:32]]), %swift.type* %C)
-sil @test_simple : $@yield_once <C: SomeClass> () -> (@yields @owned Big<C>) {
+sil [ossa] @test_simple : $@yield_once <C: SomeClass> () -> (@yields @owned Big<C>) {
 entry:
   //   Allocate space for the return value of make_big.
   // CHECK:         [[TEMP:%.*]] = alloca [[BIG:%T14yield_once_big3BigV]]
@@ -90,8 +90,8 @@ unwind:
 // CHECK-SAME:      (i8* noalias dereferenceable([[BUFFER_SIZE]]), i1)
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_simple_call(i1)
-sil @test_simple_call : $(Builtin.Int1) -> () {
-entry(%flag : @trivial $Builtin.Int1):
+sil [ossa] @test_simple_call : $(Builtin.Int1) -> () {
+entry(%flag : $Builtin.Int1):
   //   Allocate the buffer.
   // CHECK:         [[T0:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
   // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds {{\[}}[[BUFFER_SIZE]] x i8], {{\[}}[[BUFFER_SIZE]] x i8]* [[T0]], i32 0, i32 0

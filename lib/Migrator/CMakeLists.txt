@@ -4,6 +4,11 @@ set(datafiles
   tvos4.json
   watchos4.json
   overlay4.json
+  macos42.json
+  ios42.json
+  tvos42.json
+  watchos42.json
+  overlay42.json
 )
 set(SWIFTLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
@@ -48,9 +53,9 @@ add_swift_host_library(swiftMigrator STATIC
   FixitApplyDiagnosticConsumer.cpp
   Migrator.cpp
   MigrationState.cpp
+  OptionalTryMigratorPass.cpp
   RewriteBufferEditsReceiver.cpp
-  LINK_LIBS
-    swiftSyntax swiftIDE)
+  LINK_LIBRARIES swiftSyntax swiftIDE)
 
 add_dependencies(swiftMigrator
   "symlink_migrator_data")

@@ -1,4 +1,3 @@
-.. @raise litre.TestsAreMissing
 .. highlight:: none
 
 Swift Intermediate Language (SIL)
@@ -984,6 +983,7 @@ Linkage
   sil-linkage ::= 'private'
   sil-linkage ::= 'public_external'
   sil-linkage ::= 'hidden_external'
+  sil-linkage ::= 'non_abi'
 
 A linkage specifier controls the situations in which two objects in
 different SIL modules are *linked*, i.e. treated as the same object.
@@ -1047,6 +1047,25 @@ not needed.
 
 If an object has any uses, then it must be linked to a definition
 with non-external linkage.
+
+Public non-ABI linkage
+``````````````````````
+
+The `non_abi` linkage is a special linkage used for definitions which
+only exist in serialized SIL, and do not define visible symbols in the
+object file.
+
+A definition with `non_abi` linkage behaves like it has `shared` linkage,
+except that it must be serialized in the SIL module even if not referenced
+from anywhere else in the module. For example, this means it is considered
+a root for dead function elimination.
+
+When a `non_abi` definition is deserialized, it will have `shared_external`
+linkage.
+
+There is no `non_abi_external` linkage. Instead, when referencing a
+`non_abi` declaration that is defined in a different translation unit from
+the same Swift module, you must use `hidden_external` linkage.
 
 Summary
 ```````
@@ -2325,6 +2344,7 @@ mark_uninitialized
   mu_kind ::= 'derivedself'
   mu_kind ::= 'derivedselfonly'
   mu_kind ::= 'delegatingself'
+  mu_kind ::= 'delegatingselfallocated'
 
   %2 = mark_uninitialized [var] %1 : $*T
   // $T must be an address
@@ -2345,6 +2365,7 @@ the mark_uninitialized instruction refers to:
 - ``derivedself``: designates ``self`` in a derived (non-root) class
 - ``derivedselfonly``: designates ``self`` in a derived (non-root) class whose stored properties have already been initialized
 - ``delegatingself``: designates ``self`` on a struct, enum, or class in a delegating constructor (one that calls self.init)
+- ``delegatingselfallocated``: designates ``self`` on a class convenience initializer's initializing entry point
 
 The purpose of the ``mark_uninitialized`` instruction is to enable
 definitive initialization analysis for global variables (when marked as
@@ -2806,6 +2827,13 @@ which must be an initialized weak reference.  The result is value of type
 ``$Optional<T>``, except that it is ``null`` if the heap object has begun
 deallocation.
 
+If ``[take]`` is specified then the underlying weak reference is invalidated
+implying that the weak reference count of the loaded value is decremented. If
+``[take]`` is not specified then the underlying weak reference count is not
+affected by this operation (i.e. it is a +0 weak ref count operation). In either
+case, the strong reference count will be incremented before any changes to the
+weak reference count.
+
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand heap object.  It need not be atomic with respect to ``store_weak``
 operations on the same address.
@@ -2824,7 +2852,13 @@ Initializes or reassigns a weak reference.  The operand may be ``nil``.
 
 If ``[initialization]`` is given, the weak reference must currently either be
 uninitialized or destroyed.  If it is not given, the weak reference must
-currently be initialized.
+currently be initialized. After the evaluation:
+
+* The value that was originally referenced by the weak reference will have
+  its weak reference count decremented by 1.
+* If the optionally typed operand is non-nil, the strong reference wrapped in
+  the optional has its weak reference count incremented by 1. In contrast, the reference's
+  strong reference count is not touched.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
@@ -3326,11 +3360,12 @@ partial_apply
 `````````````
 ::
 
-  sil-instruction ::= 'partial_apply' callee-ownership-attr? sil-value
+  sil-instruction ::= 'partial_apply' callee-ownership-attr? on-stack-attr? sil-value
                         sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
   callee-ownership-attr ::= '[callee_guaranteed]'
+  on-stack-attr ::= '[on_stack]'
 
   %c = partial_apply %0(%1, %2, ...) : $(Z..., A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
@@ -3348,12 +3383,18 @@ partial_apply
 Creates a closure by partially applying the function ``%0`` to a partial
 sequence of its arguments. In the instruction syntax, the type of the callee is
 specified after the argument list; the types of the argument and of the defined
-value are derived from the function type of the callee. The closure context will
-be allocated with retain count 1 and initialized to contain the values ``%1``,
+value are derived from the function type of the callee. If the ``partial_apply``
+has an escaping function type (not ``[on_stack]``) the closure context will be
+allocated with retain count 1 and initialized to contain the values ``%1``,
 ``%2``, etc.  The closed-over values will not be retained; that must be done
-separately before the ``partial_apply``. The closure does however take
-ownership of the partially applied arguments; when the closure reference
-count reaches zero, the contained values will be destroyed.
+separately before the ``partial_apply``. The closure does however take ownership
+of the partially applied arguments; when the closure reference count reaches
+zero, the contained values will be destroyed. If the ``partial_apply`` has a
+``@noescape`` function type (``partial_apply [on_stack]``) the closure context
+is allocated on the stack and intialized to contain the closed-over values. The
+closed-over values are not retained, lifetime of the closed-over values must be
+managed separately. The lifetime of the stack context of a ``partial_apply
+[on_stack]`` must be terminated with a ``dealloc_stack``.
 
 If the callee is generic, all of its generic parameters must be bound by the
 given substitution list. The arguments are given with these generic
@@ -4750,7 +4791,7 @@ A ``convert_escape_to_noescape [not_guaranteed] %opd`` indicates that the
 lifetime of its operand was not guaranteed by SILGen and a mandatory pass must
 be run to ensure the lifetime of ``%opd``` for the conversion's uses.
 
-A ``convert_escape_to_noescape [escaped]`` indiciates that the result was
+A ``convert_escape_to_noescape [escaped]`` indicates that the result was
 passed to a function (materializeForSet) which escapes the closure in a way not
 expressed by the convert's users. The mandatory pass must ensure the lifetime
 in a conservative way.

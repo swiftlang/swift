@@ -1,8 +1,8 @@
 // Make sure project_box gets assigned the correct lexical scope when we create it.
 // RUN: %target-swift-frontend -primary-file %s -Onone -emit-sil -Xllvm -sil-print-after=capture-promotion -Xllvm \
-// RUN:   -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
+// RUN:   -sil-print-debuginfo -o /dev/null -module-name null 2>&1 | %FileCheck %s
 
-// CHECK: sil hidden @$s4null19captureStackPromoteSiycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> Int {
+// CHECK: sil hidden [ossa] @$s4null19captureStackPromoteSiycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> Int {
 // CHECK: bb0:
 // CHECK:   %0 = alloc_box ${ var Int }, var, name "x", loc {{.*}}:32:7, scope 3
 // CHECK:   %1 = project_box %0 : ${ var Int }, 0, loc {{.*}}:32:7, scope 3

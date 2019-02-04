@@ -21,10 +21,8 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Syntax/SyntaxBuilders.h"
-#include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/SyntaxNodes.h"
+#include "swift/Parse/ParsedSyntaxBuilders.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -218,11 +216,14 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   auto makeMetatypeTypeSyntax = [&]() {
     if (!SyntaxContext->isEnabled())
       return;
-    MetatypeTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+    ParsedMetatypeTypeSyntaxBuilder Builder(*SyntaxContext);
+    auto TypeOrProtocol = SyntaxContext->popToken();
+    auto Period = SyntaxContext->popToken();
+    auto BaseType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
     Builder
-      .useTypeOrProtocol(SyntaxContext->popToken())
-      .usePeriod(SyntaxContext->popToken())
-      .useBaseType(SyntaxContext->popIf<TypeSyntax>().getValue());
+      .useTypeOrProtocol(TypeOrProtocol)
+      .usePeriod(Period)
+      .useBaseType(BaseType);
     SyntaxContext->addSyntax(Builder.build());
   };
   
@@ -424,22 +425,25 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       return nullptr;
 
     if (SyntaxContext->isEnabled()) {
-      FunctionTypeSyntaxBuilder Builder(Context.getSyntaxArena());
-      Builder.useReturnType(SyntaxContext->popIf<TypeSyntax>().getValue());
+      ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
+      Builder.useReturnType(SyntaxContext->popIf<ParsedTypeSyntax>().getValue());
       Builder.useArrow(SyntaxContext->popToken());
       if (throwsLoc.isValid())
         Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
 
-      auto InputNode = SyntaxContext->popIf<TypeSyntax>().getValue();
-      if (auto TupleTypeNode = InputNode.getAs<TupleTypeSyntax>()) {
+      auto InputNode = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+      if (auto TupleTypeNode = InputNode.getAs<ParsedTupleTypeSyntax>()) {
         // Decompose TupleTypeSyntax and repack into FunctionType.
+        auto LeftParen = TupleTypeNode->getDeferredLeftParen();
+        auto Arguments = TupleTypeNode->getDeferredElements();
+        auto RightParen = TupleTypeNode->getDeferredRightParen();
         Builder
-          .useLeftParen(TupleTypeNode->getLeftParen())
-          .useArguments(TupleTypeNode->getElements())
-          .useRightParen(TupleTypeNode->getRightParen());
+          .useLeftParen(LeftParen)
+          .useArguments(Arguments)
+          .useRightParen(RightParen);
       } else {
-        Builder.addTupleTypeElement(SyntaxFactory::makeTupleTypeElement(
-            InputNode, /*TrailingComma=*/None, Context.getSyntaxArena()));
+        Builder.addTupleTypeElement(ParsedSyntaxRecorder::makeTupleTypeElement(
+            InputNode, /*TrailingComma=*/None, *SyntaxContext));
       }
       SyntaxContext->addSyntax(Builder.build());
     }
@@ -502,9 +506,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                                specifierLoc));
 }
 
-bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
-                                   SourceLoc &LAngleLoc,
-                                   SourceLoc &RAngleLoc) {
+ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
+                                           SourceLoc &LAngleLoc,
+                                           SourceLoc &RAngleLoc) {
   SyntaxParsingContext GenericArgumentsContext(
       SyntaxContext, SyntaxKind::GenericArgumentClause);
 
@@ -523,7 +527,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
       if (Ty.isNull() || Ty.hasCodeCompletion()) {
         // Skip until we hit the '>'.
         RAngleLoc = skipUntilGreaterInTypeList();
-        return true;
+        return ParserStatus(Ty);
       }
 
       Args.push_back(Ty.get());
@@ -540,12 +544,12 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 
     // Skip until we hit the '>'.
     RAngleLoc = skipUntilGreaterInTypeList();
-    return true;
+    return makeParserError();
   } else {
     RAngleLoc = consumeStartingGreater();
   }
 
-  return false;
+  return makeParserSuccess();
 }
 
 /// parseTypeIdentifier
@@ -597,8 +601,9 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       SourceLoc LAngle, RAngle;
       SmallVector<TypeRepr*, 8> GenericArgs;
       if (startsWithLess(Tok)) {
-        if (parseGenericArguments(GenericArgs, LAngle, RAngle))
-          return nullptr;
+        auto genericArgsStatus = parseGenericArguments(GenericArgs, LAngle, RAngle);
+        if (genericArgsStatus.isError())
+          return genericArgsStatus;
       }
       EndLoc = Loc;
 
@@ -703,10 +708,12 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     consumeToken(); // consume '&'
 
     if (SyntaxContext->isEnabled() && Status.isSuccess()) {
-      CompositionTypeElementSyntaxBuilder Builder(Context.getSyntaxArena());
+      ParsedCompositionTypeElementSyntaxBuilder Builder(*SyntaxContext);
+      auto Ampersand = SyntaxContext->popToken();
+      auto Type = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
       Builder
-        .useAmpersand(SyntaxContext->popToken())
-        .useType(SyntaxContext->popIf<TypeSyntax>().getValue());
+        .useAmpersand(Ampersand)
+        .useType(Type);
       SyntaxContext->addSyntax(Builder.build());
     }
 
@@ -720,9 +727,9 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   } while (Tok.isContextualPunctuator("&"));
 
   if (SyntaxContext->isEnabled() && Status.isSuccess()) {
-    auto LastNode = SyntaxFactory::makeCompositionTypeElement(
-        SyntaxContext->popIf<TypeSyntax>().getValue(), None,
-        SyntaxContext->getArena());
+    auto LastNode = ParsedSyntaxRecorder::makeCompositionTypeElement(
+        SyntaxContext->popIf<ParsedTypeSyntax>().getValue(), None,
+        *SyntaxContext);
     SyntaxContext->addSyntax(LastNode);
   }
   SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
@@ -853,6 +860,9 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ///     type
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::TupleType);
+  // Create it as deferred because when parseType gets this it may need to turn
+  // it into a FunctionType.
+  TypeContext.setDeferSyntax(SyntaxKind::TupleType);
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
    
   if (ParsingTypeTuple.isFailed()) {
@@ -1065,7 +1075,7 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   return makeParserResult(ATR);
 }
 
-SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeCollection() {
+SyntaxParserResult<ParsedTypeSyntax, TypeRepr> Parser::parseTypeCollection() {
   ParserStatus Status;
   // Parse the leading '['.
   assert(Tok.is(tok::l_square));
@@ -1104,7 +1114,7 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     return makeParserError();
 
   TypeRepr *TyR;
-  llvm::Optional<TypeSyntax> SyntaxNode;
+  llvm::Optional<ParsedTypeSyntax> SyntaxNode;
 
   SourceRange brackets(lsquareLoc, rsquareLoc);
   if (colonLoc.isValid()) {
@@ -1112,24 +1122,32 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     TyR = new (Context)
         DictionaryTypeRepr(firstTy.get(), secondTy.get(), colonLoc, brackets);
     if (SyntaxContext->isEnabled()) {
-      DictionaryTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+      ParsedDictionaryTypeSyntaxBuilder Builder(*SyntaxContext);
+      auto RightSquareBracket = SyntaxContext->popToken();
+      auto ValueType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+      auto Colon = SyntaxContext->popToken();
+      auto KeyType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+      auto LeftSquareBracket = SyntaxContext->popToken();
       Builder
-        .useRightSquareBracket(SyntaxContext->popToken())
-        .useValueType(SyntaxContext->popIf<TypeSyntax>().getValue())
-        .useColon(SyntaxContext->popToken())
-        .useKeyType(SyntaxContext->popIf<TypeSyntax>().getValue())
-        .useLeftSquareBracket(SyntaxContext->popToken());
+        .useRightSquareBracket(RightSquareBracket)
+        .useValueType(ValueType)
+        .useColon(Colon)
+        .useKeyType(KeyType)
+        .useLeftSquareBracket(LeftSquareBracket);
       SyntaxNode.emplace(Builder.build());
     }
   } else {
     // Form the array type.
     TyR = new (Context) ArrayTypeRepr(firstTy.get(), brackets);
     if (SyntaxContext->isEnabled()) {
-      ArrayTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+      ParsedArrayTypeSyntaxBuilder Builder(*SyntaxContext);
+      auto RightSquareBracket = SyntaxContext->popToken();
+      auto ElementType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+      auto LeftSquareBracket = SyntaxContext->popToken();
       Builder
-        .useRightSquareBracket(SyntaxContext->popToken())
-        .useElementType(SyntaxContext->popIf<TypeSyntax>().getValue())
-        .useLeftSquareBracket(SyntaxContext->popToken());
+        .useRightSquareBracket(RightSquareBracket)
+        .useElementType(ElementType)
+        .useLeftSquareBracket(LeftSquareBracket);
       SyntaxNode.emplace(Builder.build());
     }
   }
@@ -1179,15 +1197,15 @@ SourceLoc Parser::consumeImplicitlyUnwrappedOptionalToken() {
 
 /// Parse a single optional suffix, given that we are looking at the
 /// question mark.
-SyntaxParserResult<TypeSyntax, OptionalTypeRepr>
+SyntaxParserResult<ParsedTypeSyntax, OptionalTypeRepr>
 Parser::parseTypeOptional(TypeRepr *base) {
   SourceLoc questionLoc = consumeOptionalToken();
   auto TyR = new (Context) OptionalTypeRepr(base, questionLoc);
-  llvm::Optional<TypeSyntax> SyntaxNode;
+  llvm::Optional<ParsedTypeSyntax> SyntaxNode;
   if (SyntaxContext->isEnabled()) {
     auto QuestionMark = SyntaxContext->popToken();
-    if (auto WrappedType = SyntaxContext->popIf<TypeSyntax>()) {
-      OptionalTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+    if (auto WrappedType = SyntaxContext->popIf<ParsedTypeSyntax>()) {
+      ParsedOptionalTypeSyntaxBuilder Builder(*SyntaxContext);
       Builder
         .useQuestionMark(QuestionMark)
         .useWrappedType(WrappedType.getValue());
@@ -1202,18 +1220,19 @@ Parser::parseTypeOptional(TypeRepr *base) {
 
 /// Parse a single implicitly unwrapped optional suffix, given that we
 /// are looking at the exclamation mark.
-SyntaxParserResult<TypeSyntax, ImplicitlyUnwrappedOptionalTypeRepr>
+SyntaxParserResult<ParsedTypeSyntax, ImplicitlyUnwrappedOptionalTypeRepr>
 Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
   SourceLoc exclamationLoc = consumeImplicitlyUnwrappedOptionalToken();
   auto TyR =
       new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base, exclamationLoc);
-  llvm::Optional<TypeSyntax> SyntaxNode;
+  llvm::Optional<ParsedTypeSyntax> SyntaxNode;
   if (SyntaxContext->isEnabled()) {
-    ImplicitlyUnwrappedOptionalTypeSyntaxBuilder Builder(
-        Context.getSyntaxArena());
+    ParsedImplicitlyUnwrappedOptionalTypeSyntaxBuilder Builder(*SyntaxContext);
+    auto ExclamationMark = SyntaxContext->popToken();
+    auto WrappedType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
     Builder
-      .useExclamationMark(SyntaxContext->popToken())
-      .useWrappedType(SyntaxContext->popIf<TypeSyntax>().getValue());
+      .useExclamationMark(ExclamationMark)
+      .useWrappedType(WrappedType);
     SyntaxNode.emplace(Builder.build());
   }
   return makeSyntaxResult(SyntaxNode, TyR);

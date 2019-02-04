@@ -13,9 +13,9 @@ struct DidSetWillSetTests: ForceAccessors {
   }
 
   var a: Int {
-    // CHECK-LABEL: sil private @$s10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
+    // CHECK-LABEL: sil private [ossa] @$s10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
     willSet(newA) {
-      // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $*DidSetWillSetTests):
+      // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
 
       a = zero  // reassign, but don't infinite loop.
 
@@ -57,7 +57,7 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: end_access [[WRITE]] : $*DidSetWillSetTests
     }
 
-    // CHECK-LABEL: sil private @$s10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
+    // CHECK-LABEL: sil private [ossa] @$s10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
     didSet {
       (self).a = zero  // reassign, but don't infinite loop.
 

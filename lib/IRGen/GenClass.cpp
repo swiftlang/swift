@@ -200,8 +200,8 @@ namespace {
     bool ClassHasGenericLayout = false;
 
     // Is this class or any of its superclasses resilient from the viewpoint
-    // of the current module? This means that their metadata can change size
-    // and field offsets, generic arguments and virtual methods must be
+    // of the current module? This means that their metadata can change size,
+    // hence field offsets, generic arguments and virtual methods must be
     // accessed relative to a metadata base global variable.
     bool ClassHasResilientAncestry = false;
 
@@ -261,14 +261,11 @@ namespace {
       return Elements;
     }
 
-    /// Does the class metadata have a completely known, static layout that
-    /// does not require initialization at runtime beyond registeration of
-    /// the class with the Objective-C runtime?
+    /// Do instances of the class have a completely known, static layout?
     bool isFixedSize() const {
       return !(ClassHasMissingMembers ||
                ClassHasResilientMembers ||
                ClassHasGenericLayout ||
-               ClassHasResilientAncestry ||
                ClassHasObjCAncestry);
     }
 
@@ -276,7 +273,8 @@ namespace {
       return (ClassHasMissingMembers ||
               ClassHasResilientMembers ||
               ClassHasResilientAncestry ||
-              ClassHasGenericAncestry);
+              ClassHasGenericAncestry ||
+              IGM.getOptions().LazyInitializeClassMetadata);
     }
 
     bool doesMetadataRequireRelocation() const {
@@ -331,19 +329,21 @@ namespace {
         auto superclassDecl = superclassType.getClassOrBoundGenericClass();
         assert(superclassType && superclassDecl);
 
-        if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
-          // If the class is resilient, don't walk over its fields; we have to
-          // calculate the layout at runtime.
+        if (IGM.hasResilientMetadata(superclassDecl, ResilienceExpansion::Maximal))
           ClassHasResilientAncestry = true;
 
-          // Furthermore, if the superclass is generic, we have to assume
-          // that its layout depends on its generic parameters. But this only
-          // propagates down to subclasses whose superclass type depends on the
-          // subclass's generic context.
+        // If the superclass has resilient storage, don't walk its fields.
+        if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+          ClassHasResilientMembers = true;
+
+          // If the superclass is generic, we have to assume that its layout
+          // depends on its generic parameters. But this only propagates down to
+          // subclasses whose superclass type depends on the subclass's generic
+          // context.
           if (superclassType.hasArchetype())
             ClassHasGenericLayout = true;
         } else {
-          // Otherwise, we have total knowledge of the class and its
+          // Otherwise, we are allowed to have total knowledge of the superclass
           // fields, so walk them to compute the layout.
           addFieldsForClass(superclassDecl, superclassType, /*superclass=*/true);
         }
@@ -355,8 +355,11 @@ namespace {
       if (classHasIncompleteLayout(IGM, theClass))
         ClassHasMissingMembers = true;
 
-      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal)) {
+      if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal))
         ClassHasResilientAncestry = true;
+
+      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal)) {
+        ClassHasResilientMembers = true;
         return;
       }
 
@@ -1647,7 +1650,7 @@ namespace {
     }
 
     llvm::Constant *buildOptExtendedMethodTypes() {
-      if (!isBuildingProtocol()) return null();
+      assert(isBuildingProtocol());
 
       ConstantInitBuilder builder(IGM);
       auto array = builder.beginArray();
@@ -1667,6 +1670,8 @@ namespace {
 
     void buildExtMethodTypes(ConstantArrayBuilder &array,
                              ArrayRef<MethodDescriptor> methods) {
+      assert(isBuildingProtocol());
+
       for (auto descriptor : methods) {
         assert(descriptor.getKind() == MethodDescriptor::Kind::Method &&
                "cannot emit descriptor for non-method");
@@ -1862,6 +1867,7 @@ namespace {
       llvm::raw_svector_ostream outs(out);
 
       auto propTy = prop->getValueInterfaceType();
+      auto propDC = prop->getDeclContext();
 
       // Emit the type encoding for the property.
       outs << 'T';
@@ -1879,13 +1885,13 @@ namespace {
       if (prop->getAttrs().hasAttribute<NSManagedAttr>())
         outs << ",D";
       
-      auto isObject = prop->getDeclContext()->mapTypeIntoContext(propTy)
+      auto isObject = propDC->mapTypeIntoContext(propTy)
           ->hasRetainablePointerRepresentation();
       auto hasObjectEncoding = typeEnc[0] == '@';
       
       // Determine the assignment semantics.
       // Get-only properties are (readonly).
-      if (!prop->isSettable(prop->getDeclContext()))
+      if (!prop->isSettable(propDC))
         outs << ",R";
       // Weak and Unowned properties are (weak).
       else if (prop->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
@@ -1903,8 +1909,12 @@ namespace {
       else
         (void)0;
       
-      // If the property has storage, emit the ivar name last.
-      if (prop->hasStorage())
+      // If the property is an instance property and has storage, and meanwhile
+      // its type is trivially representable in ObjC, emit the ivar name last.
+      bool isTriviallyRepresentable =
+          propTy->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC,
+                                             propDC);
+      if (!prop->isStatic() && prop->hasStorage() && isTriviallyRepresentable)
         outs << ",V" << prop->getName();
     }
 
@@ -2049,9 +2059,10 @@ namespace {
         var->setSection(".data");
         break;
       case llvm::Triple::ELF:
+      case llvm::Triple::Wasm:
         var->setSection(".data");
         break;
-      default:
+      case llvm::Triple::UnknownObjectFormat:
         llvm_unreachable("Don't know how to emit private global constants for "
                          "the selected object format.");
       }

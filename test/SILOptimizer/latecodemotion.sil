@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -late-codemotion -release-hoisting -retain-sinking | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -late-codemotion -release-hoisting -retain-sinking | %FileCheck %s
 
 import Builtin
 import Swift

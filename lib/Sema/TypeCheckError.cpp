@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 
 using namespace swift;
 
@@ -146,11 +147,19 @@ public:
       // Look through closure capture lists.
       } else if (auto captureList = dyn_cast<CaptureListExpr>(fn)) {
         fn = captureList->getClosureBody();
+        // Look through optional evaluations.
+      } else if (auto optionalEval = dyn_cast<OptionalEvaluationExpr>(fn)) {
+        fn = optionalEval->getSubExpr()->getValueProvidingExpr();
       } else {
         break;
       }
     }
     
+    // Constructor delegation.
+    if (auto otherCtorDeclRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
+      return AbstractFunction(otherCtorDeclRef->getDecl());
+    }
+
     // Normal function references.
     if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
       ValueDecl *decl = declRef->getDecl();
@@ -670,6 +679,16 @@ private:
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
 
+    // If this argument is `nil` literal or `.none`,
+    // it doesn't cause the call to throw.
+    if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(arg)) {
+      if (auto *DE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+        auto &ctx = paramType->getASTContext();
+        if (DE->getDecl() == ctx.getOptionalNoneDecl())
+          return Classification();
+      }
+    }
+
     // If the parameter was structurally a tuple, try to look through the
     // various tuple operations.
     if (auto paramTupleType = dyn_cast<TupleType>(paramType.getPointer())) {
@@ -710,7 +729,10 @@ private:
 
     // If it doesn't have function type, we must have invalid code.
     Type argType = fn.getType();
-    auto argFnType = (argType ? argType->getAs<AnyFunctionType>() : nullptr);
+    if (!argType) return Classification::forInvalidCode();
+
+    auto argFnType =
+        argType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
     if (!argFnType) return Classification::forInvalidCode();
 
     // If it doesn't throw, this argument does not cause the call to throw.
@@ -896,7 +918,7 @@ private:
   Kind TheKind;
   bool DiagnoseErrorOnTry = false;
   DeclContext *RethrowsDC = nullptr;
-  InterpolatedStringLiteralExpr * InterpolatedString;
+  InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
   explicit Context(Kind kind) : TheKind(kind) {}
 
@@ -1054,7 +1076,9 @@ public:
       insertLoc = loc;
       highlight = e->getSourceRange();
       
-      if (InterpolatedString && e->getCalledValue()->getBaseName() ==
+      if (InterpolatedString &&
+          e->getCalledValue() &&
+          e->getCalledValue()->getBaseName() ==
           TC.Context.Id_appendInterpolation) {
         message = diag::throwing_interpolation_without_try;
         insertLoc = InterpolatedString->getLoc();
@@ -1641,6 +1665,10 @@ void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
   // In some cases, we won't have validated the signature
   // by the time we got here.
   if (!fn->hasInterfaceType()) return;
+
+#ifndef NDEBUG
+  PrettyStackTraceDecl debugStack("checking error handling for", fn);
+#endif
 
   CheckErrorCoverage checker(*this, Context::forFunction(fn));
 

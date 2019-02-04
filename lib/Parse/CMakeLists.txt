@@ -1,7 +1,19 @@
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+  set(SWIFT_GYB_FLAGS --line-directive "^\"#line %(line)d \\\"%(file)s\\\"^\"")
+else()
+  set(SWIFT_GYB_FLAGS --line-directive "\'#line" "%(line)d" "\"%(file)s\"\'")
+endif()
+
 add_swift_host_library(swiftParse STATIC
   Confusables.cpp
   Lexer.cpp
   ParseDecl.cpp
+  ParsedRawSyntaxNode.cpp
+  ParsedRawSyntaxRecorder.cpp
+  ParsedSyntaxBuilders.cpp.gyb
+  ParsedSyntaxNodes.cpp.gyb
+  ParsedSyntaxRecorder.cpp.gyb
+  ParsedTrivia.cpp
   ParseExpr.cpp
   ParseGeneric.cpp
   ParseIfConfig.cpp
@@ -13,8 +25,9 @@ add_swift_host_library(swiftParse STATIC
   Scope.cpp
   SyntaxParsingCache.cpp
   SyntaxParsingContext.cpp
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftAST
     swiftSyntax
 )
 
+add_dependencies(swiftParse swift-parse-syntax-generated-headers)

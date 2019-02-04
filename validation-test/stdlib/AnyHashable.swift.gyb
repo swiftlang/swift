@@ -214,6 +214,9 @@ ${kw} HasCustomRepresentation_${name}
   var hashValue: Int {
     return value
   }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
   func _toCustomAnyHashable() -> AnyHashable? {
     if hasDefaultAnyHashableRepresentation {
       return nil
@@ -247,6 +250,9 @@ ${kw} HasCustomRepresentation_Generic${name}<Wrapped>
   }
   var hashValue: Int {
     return asGenericMinimalHashableValue.hashValue
+  }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(asGenericMinimalHashableValue)
   }
   func _toCustomAnyHashable() -> AnyHashable? {
     if hasDefaultAnyHashableRepresentation {
@@ -360,6 +366,9 @@ struct HasCustomRepresentationRecursively
   var hashValue: Int {
     return value
   }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
   func _toCustomAnyHashable() -> AnyHashable? {
     if value == 0 {
       return AnyHashable(HasCustomRepresentationRecursively(value + 1))
@@ -456,6 +465,9 @@ class ${hashable_base.full_name} : ${', '.join([b.full_name for b in bases])} {
 %   else:
   var hashValue: Int {
     return value
+  }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
   static func == ${hashable_base.generic_parameters_decl} (
     lhs: ${hashable_base.full_name},
@@ -697,14 +709,14 @@ enum MinimalHashableRCSwiftError : Error, Hashable {
   case caseB(LifetimeTracked)
   case caseC(LifetimeTracked)
 
-  var hashValue: Int {
+  func hash(into hasher: inout Hasher) {
     switch self {
     case .caseA:
-      return 10
+      hasher.combine(10)
     case .caseB:
-      return 20
+      hasher.combine(20)
     case .caseC:
-      return 30
+      hasher.combine(30)
     }
   }
 

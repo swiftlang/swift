@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize
 
 protocol A {}
 
@@ -20,7 +20,7 @@ struct SB: B {
   func foo() {}
 }
 // CHECK-LABEL: @"$s34witness_table_objc_associated_type2SBVAA1BAAWP" = hidden global [4 x i8*] [
-// CHECK:         i8* bitcast (i8** ()* @"$s34witness_table_objc_associated_type2SAVAcA1AAAWl
+// CHECK:         @"associated conformance 34witness_table_objc_associated_type2SBVAA1BAA2AAAaDP_AA1A"
 // CHECK:         @"symbolic 34witness_table_objc_associated_type2SAV"
 // CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SBVAA1BA2aDP3fooyyFTW"
 // CHECK:       ]

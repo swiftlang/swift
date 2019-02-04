@@ -1,16 +1,16 @@
 // RUN: %empty-directory(%t)
 //
 // Build swift modules this test depends on.
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/foo_swift_module.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/foo_swift_module.swift -enable-objc-interop -disable-objc-attr-requires-foundation-module
 //
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -enable-objc-interop -disable-objc-attr-requires-foundation-module
 // FIXME: END -enable-source-import hackaround
 //
 // This file should not have any syntax or type checker errors.
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -typecheck -verify %s -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -typecheck -verify %s -F %S/Inputs/mock-sdk -enable-objc-interop -disable-objc-attr-requires-foundation-module
 //
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
@@ -21,7 +21,7 @@
 // RUN: %FileCheck %s -check-prefix=PREFER_TYPE_PRINTING -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 //
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -print-implicit-attrs=true -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
@@ -32,8 +32,8 @@
 // RUN: %FileCheck %s -check-prefix=PREFER_TYPE_REPR_PRINTING -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 //
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -emit-module -o %t -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module %s
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -module-to-print=print_ast_tc_decls -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -emit-module -o %t -F %S/Inputs/mock-sdk -enable-objc-interop -disable-objc-attr-requires-foundation-module %s
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -module-to-print=print_ast_tc_decls -print-implicit-attrs=true -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_NO_GET_SET -strict-whitespace < %t.printed.txt
@@ -45,20 +45,20 @@
 // RUN: %FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
 //
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -synthesize-sugar-on-types=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -synthesize-sugar-on-types=true -print-implicit-attrs=true -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=SYNTHESIZE_SUGAR_ON_TYPES -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -synthesize-sugar-on-types=true -fully-qualified-types-if-ambiguous=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -synthesize-sugar-on-types=true -fully-qualified-types-if-ambiguous=true -print-implicit-attrs=true -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_QUAL_IF_AMBIGUOUS -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=SYNTHESIZE_SUGAR_ON_TYPES -strict-whitespace < %t.printed.txt
 // FIXME: %FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux, freebsd
+// REQUIRES: objc_interop
 
 import Bar
 import ObjectiveC
@@ -1072,12 +1072,10 @@ enum d2300_EnumDeclWithValues1 : Int {
 // PASS_COMMON: {{^}}enum d2300_EnumDeclWithValues1 : Int {{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV2_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV2_Second{{$}}
-// PASS_COMMON-NEXT: {{^}}  typealias RawValue = Int
-// PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
-// PASS_COMMON-NEXT: {{^}}  func hash(into hasher: inout Hasher)
-// PASS_COMMON-NEXT: {{^}}  init?(rawValue: Int){{$}}
-// PASS_COMMON-NEXT: {{^}}  var rawValue: Int { get }{{$}}
-// PASS_COMMON-NEXT: {{^}}}{{$}}
+// PASS_COMMON-DAG: {{^}}  typealias RawValue = Int
+// PASS_COMMON-DAG: {{^}}  init?(rawValue: Int){{$}}
+// PASS_COMMON-DAG: {{^}}  var rawValue: Int { get }{{$}}
+// PASS_COMMON: {{^}}}{{$}}
 
 enum d2400_EnumDeclWithValues2 : Double {
   case EDV3_First = 10
@@ -1086,12 +1084,10 @@ enum d2400_EnumDeclWithValues2 : Double {
 // PASS_COMMON: {{^}}enum d2400_EnumDeclWithValues2 : Double {{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV3_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV3_Second{{$}}
-// PASS_COMMON-NEXT: {{^}}  typealias RawValue = Double
-// PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
-// PASS_COMMON-NEXT: {{^}}  func hash(into hasher: inout Hasher)
-// PASS_COMMON-NEXT: {{^}}  init?(rawValue: Double){{$}}
-// PASS_COMMON-NEXT: {{^}}  var rawValue: Double { get }{{$}}
-// PASS_COMMON-NEXT: {{^}}}{{$}}
+// PASS_COMMON-DAG: {{^}}  typealias RawValue = Double
+// PASS_COMMON-DAG: {{^}}  init?(rawValue: Double){{$}}
+// PASS_COMMON-DAG: {{^}}  var rawValue: Double { get }{{$}}
+// PASS_COMMON: {{^}}}{{$}}
 
 //===---
 //===--- Custom operator printing.
@@ -1362,7 +1358,7 @@ protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int {
 
   // FIXME: this same type requirement with Self should be printed here
   associatedtype A2 : QuxProtocol where A2.Qux == Self
-// PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A2 : QuxProtocol where Self.A2.Qux == Self{{$}}
+// PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A2 : QuxProtocol where Self == Self.A2.Qux{{$}}
 }
 
 #if true

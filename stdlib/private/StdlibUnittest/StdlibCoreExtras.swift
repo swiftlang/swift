@@ -16,6 +16,8 @@ import SwiftPrivateLibcExtras
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
 #endif
 
 #if _runtime(_ObjC)
@@ -73,6 +75,7 @@ func findSubstring(_ string: String, _ substring: String) -> String.Index? {
 #endif
 }
 
+#if !os(Windows)
 public func createTemporaryFile(
   _ fileNamePrefix: String, _ fileNameSuffix: String, _ contents: String
 ) -> String {
@@ -95,6 +98,7 @@ public func createTemporaryFile(
   }
   return fileName
 }
+#endif
 
 public final class Box<T> {
   public init(_ value: T) { self.value = value }
@@ -110,14 +114,20 @@ public func <=> <T: Comparable>(lhs: T, rhs: T) -> ExpectedComparisonResult {
 }
 
 public struct TypeIdentifier : Hashable, Comparable {
+  public var value: Any.Type
+
   public init(_ value: Any.Type) {
     self.value = value
   }
 
   public var hashValue: Int { return objectID.hashValue }
-  public var value: Any.Type
-  
-  internal var objectID : ObjectIdentifier { return ObjectIdentifier(value) }
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(objectID)
+  }
+
+  internal var objectID : ObjectIdentifier {
+    return ObjectIdentifier(value)
+  }
 }
 
 public func < (lhs: TypeIdentifier, rhs: TypeIdentifier) -> Bool {

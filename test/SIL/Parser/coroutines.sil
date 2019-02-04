@@ -19,8 +19,8 @@ bb0:
   return %0 : $()
 }
 
-sil @yield : $@yield_once (Int, Float) -> (@yields Int, @yields Float) {
-bb0(%0 : @trivial $Int, %1 : @trivial $Float):
+sil [ossa] @yield : $@yield_once (Int, Float) -> (@yields Int, @yields Float) {
+bb0(%0 : $Int, %1 : $Float):
   yield (%0 : $Int, %1 : $Float), resume bb1, unwind bb2
 
 bb1:
@@ -31,8 +31,8 @@ bb2:
   unwind
 }
 
-sil @yield_many : $@yield_many (Int, Float) -> (@yields Int, @yields Float) {
-bb0(%0 : @trivial $Int, %1 : @trivial $Float):
+sil [ossa] @yield_many : $@yield_many (Int, Float) -> (@yields Int, @yields Float) {
+bb0(%0 : $Int, %1 : $Float):
   yield (%0 : $Int, %1 : $Float), resume bb1, unwind bb3
 
 bb1:
@@ -52,8 +52,8 @@ bb5:
   unwind
 }
 
-sil @begin_apply : $(Int, Float) -> () {
-bb0(%0 : @trivial $Int, %1 : @trivial $Float):
+sil [ossa] @begin_apply : $(Int, Float) -> () {
+bb0(%0 : $Int, %1 : $Float):
   %coro = function_ref @yield : $@convention(thin) @yield_once (Int, Float) -> (@yields Int, @yields Float)
   (%int, %float, %token) = begin_apply %coro(%0, %1) : $@convention(thin) @yield_once (Int, Float) -> (@yields Int, @yields Float)
 

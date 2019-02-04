@@ -502,3 +502,31 @@ define void @call_recursive_funcs(i32 %x) {
   ret void
 }
 
+; Ensure that we do not merge functions which make use of distinct dtrace
+; probes. Each call to a dtrace probe must resolve to a unique patchpoint.
+
+declare void @"__dtrace_probe$Apple$Probe1$v1$696e74"(i32) local_unnamed_addr
+
+; CHECK-LABEL: define i32 @use_dtrace_probe1
+; CHECK: call void @"__dtrace_probe$Apple$Probe1$v1$696e74"
+define i32 @use_dtrace_probe1(i32 %x, i32 %y) {
+  %sum = add i32 %x, %y
+  %sum2 = add i32 %sum, %y
+  %l = load i32, i32* @g1, align 4
+  %sum3 = add i32 %sum2, %y
+  tail call void @"__dtrace_probe$Apple$Probe1$v1$696e74"(i32 undef)
+  ret i32 %sum3
+}
+
+declare void @"__dtrace_probe$Apple$Probe2$v1$696e74"(i32) local_unnamed_addr
+
+; CHECK-LABEL: define i32 @use_dtrace_probe2
+; CHECK: call void @"__dtrace_probe$Apple$Probe2$v1$696e74"
+define i32 @use_dtrace_probe2(i32 %x, i32 %y) {
+  %sum = add i32 %x, %y
+  %sum2 = add i32 %sum, %y
+  %l = load i32, i32* @g2, align 4
+  %sum3 = add i32 %sum2, %y
+  tail call void @"__dtrace_probe$Apple$Probe2$v1$696e74"(i32 undef)
+  ret i32 %sum3
+}

@@ -384,6 +384,7 @@ extension Array {
   }
 
   @_semantics("array.get_element")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public // @testable
   func _getElement(
@@ -440,6 +441,7 @@ extension Array: _ArrayProtocol {
   @inlinable
   public // @testable
   var _owner: AnyObject? {
+    @inlinable // FIXME(inline-always)
     @inline(__always)
     get {
       return _buffer.owner      
@@ -1027,7 +1029,7 @@ extension Array: RangeReplaceableCollection {
       _buffer = _Buffer(
         _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
-    _sanityCheck(capacity >= minimumCapacity)
+    _internalInvariant(capacity >= minimumCapacity)
   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
@@ -1054,9 +1056,9 @@ extension Array: RangeReplaceableCollection {
   @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // This is a performance optimization. This code used to be in an ||
-    // statement in the _sanityCheck below.
+    // statement in the _internalInvariant below.
     //
-    //   _sanityCheck(_buffer.capacity == 0 ||
+    //   _internalInvariant(_buffer.capacity == 0 ||
     //                _buffer.isMutableAndUniquelyReferenced())
     //
     // SR-6437
@@ -1071,7 +1073,7 @@ extension Array: RangeReplaceableCollection {
     // This specific case is okay because we will make the buffer unique in this
     // function because we request a capacity > 0 and therefore _copyToNewBuffer
     // will be called creating a new buffer.
-    _sanityCheck(capacity ||
+    _internalInvariant(capacity ||
                  _buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
@@ -1085,8 +1087,8 @@ extension Array: RangeReplaceableCollection {
     _ oldCount: Int,
     newElement: __owned Element
   ) {
-    _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
-    _sanityCheck(_buffer.capacity >= _buffer.count + 1)
+    _internalInvariant(_buffer.isMutableAndUniquelyReferenced())
+    _internalInvariant(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
     (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
@@ -1280,11 +1282,50 @@ extension Array: RangeReplaceableCollection {
   }
 
   @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeMutableBufferPointer {
+      (bufferPointer) -> R in
+      return try body(&bufferPointer)
+    }
+  }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeBufferPointer {
+      (bufferPointer) -> R in
+      return try body(bufferPointer)
+    }
+  }
+
+  @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
       return ContiguousArray(_buffer: n)
     }
     return _copyCollectionToContiguousArray(_buffer)
+  }
+}
+
+// Implementations of + and += for same-type arrays. This combined
+// with the operator declarations for these operators designating this
+// type as a place to prefer this operator help the expression type
+// checker speed up cases where there is a large number of uses of the
+// operator in the same expression.
+extension Array {
+  @inlinable
+  public static func + (lhs: Array, rhs: Array) -> Array {
+    var lhs = lhs
+    lhs.append(contentsOf: rhs)
+    return lhs
+  }
+
+  @inlinable
+  public static func += (lhs: inout Array, rhs: Array) {
+    lhs.append(contentsOf: rhs)
   }
 }
 
@@ -1447,6 +1488,7 @@ extension Array {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
+  @inlinable // FIXME(inline-always)
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
@@ -1607,8 +1649,8 @@ extension Array: Equatable where Element: Equatable {
     }
 
 
-    _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
-    _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
+    _internalInvariant(lhs.startIndex == 0 && rhs.startIndex == 0)
+    _internalInvariant(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
 
     // We know that lhs.count == rhs.count, compare element wise.
     for idx in 0..<lhsCount {
@@ -1725,7 +1767,7 @@ extension Array {
 // to do the bridging in an ABI safe way. Even though this looks useless,
 // DO NOT DELETE!
 @usableFromInline internal
-func _bridgeCocoaArray<T>(_ _immutableCocoaArray: _NSArrayCore) -> Array<T> {
+func _bridgeCocoaArray<T>(_ _immutableCocoaArray: AnyObject) -> Array<T> {
   return Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
 }
 
@@ -1761,7 +1803,7 @@ extension Array {
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   @inlinable
-  public init(_immutableCocoaArray: _NSArrayCore) {
+  public init(_immutableCocoaArray: AnyObject) {
     self = _bridgeCocoaArray(_immutableCocoaArray)
   }
 }

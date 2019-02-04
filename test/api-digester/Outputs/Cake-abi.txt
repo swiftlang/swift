@@ -57,16 +57,13 @@ cake1: Var GlobalVarChangedToLet changes from var to let
 /* Fixed-layout Type changes */
 cake1: EnumElement FrozenKind.Fixed in a non-resilient type changes position from 1 to 2
 cake1: EnumElement FrozenKind.Rigid in a non-resilient type changes position from 2 to 1
-cake1: Func _NoResilientClass.FuncPositionChange0() in a non-resilient type changes position from 0 to 2
-cake1: Func _NoResilientClass.NoLongerFinalFunc() is now a non-final instance function
 cake1: Var fixedLayoutStruct.a in a non-resilient type changes position from 1 to 0
 cake1: Var fixedLayoutStruct.b in a non-resilient type changes position from 0 to 1
 cake1: Var fixedLayoutStruct2.BecomeFixedBinaryOrder is now a stored property
 cake1: Var fixedLayoutStruct2.NoLongerWithFixedBinaryOrder is no longer a stored property
 cake2: EnumElement FrozenKind.AddedCase is added to a non-resilient type
-cake2: Func _NoResilientClass.FuncPositionChange2() is added to a non-resilient type
+cake2: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is added to a non-resilient type
 cake2: Var fixedLayoutStruct.c is added to a non-resilient type
-cake2: Var fixedLayoutStruct.lazy_d.storage is added to a non-resilient type
 
 /* Conformance changes */
 cake1: Func ObjCProtocol.addOptional() is now an optional requirement

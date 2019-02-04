@@ -8,8 +8,10 @@ add_sourcekit_library(SourceKitSwiftLang
   SwiftIndexing.cpp
   SwiftLangSupport.cpp
   SwiftSourceDocInfo.cpp
+  SwiftTypeContextInfo.cpp
   LINK_LIBS
-    SourceKitCore swiftDriver swiftFrontend swiftClangImporter swiftIDE
+    SourceKitCore swiftDriver swiftFrontend
+    swiftDWARFImporter swiftClangImporter swiftIDE
     swiftAST swiftMarkup swiftParse swiftParseSIL swiftSIL swiftSILGen
     swiftSILOptimizer swiftIRGen swiftSema swiftBasic swiftSerialization
     swiftSyntax swiftOption libcmark_static

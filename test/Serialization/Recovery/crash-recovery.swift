@@ -17,4 +17,4 @@ public class Sub: Base {
 // CHECK-CRASH-4_2: note: compiling as Swift 4.2, with 'Lib' built as Swift 4.1.50
 // CHECK-CRASH-LABEL: *** DESERIALIZATION FAILURE (please include this section in any bug report) ***
 // CHECK-CRASH: could not find 'disappearingMethod()' in parent class
-// CHECK-CRASH: While loading members for 'Sub' in module 'Lib'
+// CHECK-CRASH: While loading members for 'Sub' (in module 'Lib')

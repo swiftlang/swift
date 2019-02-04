@@ -113,6 +113,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::IS_TESTABLE:
       extendedInfo.setIsTestable(true);
       break;
+    case options_block::ARE_PRIVATE_IMPORTS_ENABLED:
+      extendedInfo.setPrivateImportsEnabled(true);
+      break;
     case options_block::RESILIENCE_STRATEGY:
       unsigned Strategy;
       options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
@@ -251,7 +254,7 @@ static bool validateInputBlock(
     switch (kind) {
     case input_block::FILE_DEPENDENCY:
       dependencies.push_back(SerializationOptions::FileDependency{
-          scratch[0], llvm::sys::toTimePoint(scratch[1]), blobData});
+          scratch[0], scratch[1], blobData});
       break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
@@ -452,7 +455,8 @@ public:
       StringRef moduleNameOrMangledBase;
       if (nameIDOrLength < 0) {
         const ModuleDecl *module = File.getModule(-nameIDOrLength);
-        moduleNameOrMangledBase = module->getName().str();
+        if (module)
+          moduleNameOrMangledBase = module->getName().str();
       } else {
         moduleNameOrMangledBase =
             StringRef(reinterpret_cast<const char *>(data), nameIDOrLength);
@@ -1012,7 +1016,7 @@ ModuleFile::readGroupTable(ArrayRef<uint64_t> Fields, StringRef BlobData) {
     new ModuleFile::GroupNameTable);
   auto Data = reinterpret_cast<const uint8_t *>(BlobData.data());
   unsigned GroupCount = endian::readNext<uint32_t, little, unaligned>(Data);
-  for (unsigned I = 0; I < GroupCount; I++) {
+  for (unsigned I = 0; I < GroupCount; ++I) {
     auto RawSize = endian::readNext<uint32_t, little, unaligned>(Data);
     auto RawText = StringRef(reinterpret_cast<const char *>(Data), RawSize);
     Data += RawSize;
@@ -1494,7 +1498,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       assert(!modulePath.back().empty() &&
              "invalid module name (submodules not yet supported)");
     }
-    auto module = getModule(modulePath);
+    auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
       // If we're missing the module we're shadowing, treat that specially.
       if (modulePath.size() == 1 &&
@@ -1732,7 +1736,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (AccessPath.size() == 1 && AccessPath[0].first == Ctx.StdlibModuleName)
         continue;
 
-      ModuleDecl *M = Ctx.getModule(AccessPath);
+      ModuleDecl *M = Ctx.getLoadedModule(AccessPath);
 
       auto Kind = ImportKind::Module;
       if (!ScopePath.empty()) {

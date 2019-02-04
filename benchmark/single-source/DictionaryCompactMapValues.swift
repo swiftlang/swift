@@ -2,8 +2,14 @@
 import TestsUtils
 
 public let DictionaryCompactMapValues = [
-  BenchmarkInfo(name: "DictionaryCompactMapValuesOfNilValue", runFunction: run_DictionaryCompactMapValuesOfNilValue, tags: [.validation, .api, .Dictionary]),
-  BenchmarkInfo(name: "DictionaryCompactMapValuesOfCastValue", runFunction: run_DictionaryCompactMapValuesOfCastValue, tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name: "DictionaryCompactMapValuesOfNilValue",
+    runFunction: run_DictionaryCompactMapValuesOfNilValue,
+    tags: [.validation, .api, .Dictionary],
+    legacyFactor: 50),
+  BenchmarkInfo(name: "DictionaryCompactMapValuesOfCastValue",
+    runFunction: run_DictionaryCompactMapValuesOfCastValue,
+    tags: [.validation, .api, .Dictionary],
+    legacyFactor: 50),
 ]
 
 @inline(never)
@@ -27,7 +33,7 @@ public func run_DictionaryCompactMapValuesOfNilValue(_ N: Int) {
   }
 
   var newDict = [Int: Int]()
-  for _ in 1...1000*N {
+  for _ in 1...20*N {
     newDict = dict.compactMapValues({$0})
     if newDict != refDict {
       break
@@ -41,7 +47,7 @@ public func run_DictionaryCompactMapValuesOfNilValue(_ N: Int) {
 public func run_DictionaryCompactMapValuesOfCastValue(_ N: Int) {
   let size = 100
   var dict = [Int: String](minimumCapacity: size)
-  
+
   // Fill Dictionary
   for i in 1...size {
     if i % 2 == 0 {
@@ -50,7 +56,7 @@ public func run_DictionaryCompactMapValuesOfCastValue(_ N: Int) {
       dict[i] = "\(i)"
     }
   }
-  
+
   CheckResults(dict.count == size)
 
   var refDict = [Int: Int]()
@@ -59,13 +65,12 @@ public func run_DictionaryCompactMapValuesOfCastValue(_ N: Int) {
   }
 
   var newDict = [Int: Int]()
-  for _ in 1...1000*N {
+  for _ in 1...20*N {
     newDict = dict.compactMapValues(Int.init)
     if newDict != refDict {
       break
     }
   }
-  
+
   CheckResults(newDict == refDict)
 }
-

@@ -13,6 +13,7 @@
 #ifndef SWIFT_DRIVER_DEPENDENCYGRAPH_H
 #define SWIFT_DRIVER_DEPENDENCYGRAPH_H
 
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -153,6 +154,8 @@ protected:
     (void)newlyInserted;
   }
 
+  /// See DependencyGraph::markTransitive.
+
   void markTransitive(SmallVectorImpl<const void *> &visited,
                       const void *node, MarkTracerImpl *tracer = nullptr);
   bool markIntransitive(const void *node) {
@@ -228,7 +231,10 @@ public:
   /// ("depends") are not cleared; new dependencies are considered additive.
   ///
   /// If \p node has already been marked, only its outgoing edges are updated.
-  LoadResult loadFromPath(T node, StringRef path) {
+  /// The third argument is ignored here, but must be present so that the same
+  /// call site can polymorphically call \ref
+  /// experimental_dependencies::ModuleDepGraph::loadFromPath
+  LoadResult loadFromPath(T node, StringRef path, DiagnosticEngine &) {
     return DependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
                                              path);
   }
@@ -254,7 +260,7 @@ public:
   /// Marks \p node and all nodes that depend on \p node, and places any nodes
   /// that get transitively marked into \p visited.
   ///
-  /// Nodes that have been previously marked are not included in \p newlyMarked,
+  /// Nodes that have been previously marked are not included in \p visited,
   /// nor are their successors traversed, <em>even if their "provides" set has
   /// been updated since it was marked.</em> (However, nodes that depend on the
   /// given \p node are always traversed.)
@@ -264,6 +270,14 @@ public:
   ///
   /// If you want to see how each node gets added to \p visited, pass a local
   /// MarkTracer instance to \p tracer.
+  ///
+  /// Conservatively assumes that there exists a "cascading" edge into the
+  /// starting node. Therefore, mark the start. For each visited node, add it to
+  /// \p visited, and mark it if some incoming edge cascades. The start node is
+  /// NOT added to \p visited.
+  ///
+  /// The traversal routines use
+  /// \p visited to avoid endless recursion.
   template <unsigned N>
   void markTransitive(SmallVector<T, N> &visited, T node,
                       MarkTracer *tracer = nullptr) {

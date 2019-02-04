@@ -105,6 +105,11 @@ private:
     bool Changed = false;
 
     SILFunction *F = getFunction();
+
+    // FIXME: Add ownership support.
+    if (F->hasOwnership())
+      return;
+
     for (SILBasicBlock &BB : *F) {
       if (auto *SEI = dyn_cast<SwitchEnumInst>(BB.getTerminator())) {
         Changed |= tryOptimize(SEI);

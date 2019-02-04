@@ -40,7 +40,7 @@ class Klass : SuperKlass {
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Block: bb0
-sil @double_consume_same_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @double_consume_same_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
@@ -55,7 +55,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Block: bb0
-sil @double_consume_jump_thread_blocks : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @double_consume_jump_thread_blocks : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   br bb1
@@ -72,7 +72,7 @@ bb1:
 // CHECK: Found over consume?!
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: Block: bb0
-sil @double_consume_loop_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @double_consume_loop_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
   store %0 to [init] %1 : $*Builtin.NativeObject
@@ -104,7 +104,7 @@ bb5:
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Conv: guaranteed
-sil @consumed_guaranteed_arg : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+sil [ossa] @consumed_guaranteed_arg : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
@@ -120,7 +120,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   %4 = apply %2(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: Block: bb0
-sil @use_after_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @use_after_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
@@ -140,7 +140,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK: Block: bb0
-sil @destroy_before_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @destroy_before_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
@@ -155,7 +155,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // CHECK: Value:   %0 = argument of bb0 : $RefWithInt
 // CHECK: User:   %1 = ref_element_addr %0 : $RefWithInt, #RefWithInt.value
 // CHECK: Conv: owned
-sil @ref_element_addr_requires_borrow : $@convention(thin) (@owned RefWithInt) -> () {
+sil [ossa] @ref_element_addr_requires_borrow : $@convention(thin) (@owned RefWithInt) -> () {
 bb0(%0 : @owned $RefWithInt):
   %1 = ref_element_addr %0 : $RefWithInt, #RefWithInt.value
   destroy_value %0 : $RefWithInt
@@ -171,7 +171,7 @@ bb0(%0 : @owned $RefWithInt):
 // CHECK: Value: %0 = argument of bb0 : $Optional<Builtin.NativeObject>
 // CHECK: User: destroy_value %0 : $Optional<Builtin.NativeObject>
 // CHECK: Block: bb0
-sil @unchecked_enum_data_propagates_ownership : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
+sil [ossa] @unchecked_enum_data_propagates_ownership : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   %1 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
   destroy_value %0 : $Optional<Builtin.NativeObject>
@@ -186,12 +186,11 @@ bb0(%0 : @owned $Optional<Builtin.NativeObject>):
 // CHECK: Conv: guaranteed
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
-// CHECK: trivial:  Yes. Liveness: MustBeLive
 // CHECK: unowned:  No.
 // CHECK: owned: Yes. Liveness: MustBeInvalidated
 // CHECK: guaranteed:  No.
 // CHECK: any: Yes. Liveness: MustBeLive
-sil @switch_enum_mismatching_argument_guaranteed_to_owned : $@convention(thin) (@guaranteed Optional<Builtin.NativeObject>) -> () {
+sil [ossa] @switch_enum_mismatching_argument_guaranteed_to_owned : $@convention(thin) (@guaranteed Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @guaranteed $Optional<Builtin.NativeObject>):
   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
@@ -214,12 +213,11 @@ bb3:
 // CHECK: Conv: owned
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
-// CHECK: trivial:  Yes. Liveness: MustBeLive
 // CHECK: unowned:  No.
 // CHECK: owned:  No.
 // CHECK: guaranteed: Yes. Liveness: MustBeLive
 // CHECK: any: Yes. Liveness: MustBeLive
-sil @switch_enum_mismatching_argument_owned_to_guaranteed : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
+sil [ossa] @switch_enum_mismatching_argument_owned_to_guaranteed : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
@@ -242,7 +240,7 @@ bb3:
 // CHECK: Consuming User:   end_borrow %1 : $Optional<Builtin.NativeObject>
 // CHECK: Non Consuming User:   end_borrow %3 : $Builtin.NativeObject
 // CHECK: Block: bb1
-sil @switch_enum_guaranteed_arg_outlives_original_value : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
+sil [ossa] @switch_enum_guaranteed_arg_outlives_original_value : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   %1 = begin_borrow %0 : $Optional<Builtin.NativeObject>
   switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
@@ -269,12 +267,11 @@ bb3:
 // CHECK: Conv: guaranteed
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
-// CHECK: trivial:  No.
 // CHECK: unowned:  No.
 // CHECK: owned: Yes. Liveness: MustBeInvalidated
 // CHECK: guaranteed:  No.
 // CHECK: any: Yes. Liveness: MustBeLive
-sil @checked_cast_br_mismatching_argument_guaranteed_to_owned_1 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+sil [ossa] @checked_cast_br_mismatching_argument_guaranteed_to_owned_1 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 
@@ -297,7 +294,7 @@ bb3:
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 // CHECK: Conv: guaranteed
-sil @checked_cast_br_mismatching_argument_guaranteed_to_owned_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+sil [ossa] @checked_cast_br_mismatching_argument_guaranteed_to_owned_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 
@@ -320,7 +317,7 @@ bb3:
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 // CHECK: Conv: guaranteed
-sil @checked_cast_br_mismatching_argument_guaranteed_to_owned_3 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+sil [ossa] @checked_cast_br_mismatching_argument_guaranteed_to_owned_3 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 
@@ -344,12 +341,11 @@ bb3:
 // CHECK: Conv: owned
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
-// CHECK: trivial:  No.
 // CHECK: unowned:  No.
 // CHECK: owned:  No.
 // CHECK: guaranteed: Yes. Liveness: MustBeLive
 // CHECK: any: Yes. Liveness: MustBeLive
-sil @checked_cast_br_mismatching_argument_owned_to_guaranteed_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @checked_cast_br_mismatching_argument_owned_to_guaranteed_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 
@@ -373,7 +369,7 @@ bb3:
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 // CHECK: Conv: owned
-sil @checked_cast_br_mismatching_argument_owned_to_guaranteed_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @checked_cast_br_mismatching_argument_owned_to_guaranteed_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 
@@ -396,7 +392,7 @@ bb3:
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 // CHECK: Conv: owned
-sil @checked_cast_br_mismatching_argument_owned_to_guaranteed_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @checked_cast_br_mismatching_argument_owned_to_guaranteed_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 
@@ -419,7 +415,7 @@ bb3:
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   end_borrow %7 : $Builtin.NativeObject
 // CHECK: Block: bb2
-sil @checked_cast_br_guaranteed_arg_outlives_original_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @checked_cast_br_guaranteed_arg_outlives_original_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   checked_cast_br %1 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
@@ -446,7 +442,7 @@ bb3:
 // CHECK: Consuming User:   store %2 to [init] %1 : $*SuperKlass
 // CHECK: Non Consuming User:   %4 = class_method %2 : $SuperKlass, #SuperKlass.doSomething!1 : (SuperKlass) -> () -> (), $@convention(method) (@guaranteed SuperKlass) -> ()
 // CHECK: Block: bb0
-sil @consume_with_classmethod : $@convention(thin) (@owned Klass) -> () {
+sil [ossa] @consume_with_classmethod : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   %1 = alloc_stack $SuperKlass
   %2 = upcast %0 : $Klass to $SuperKlass

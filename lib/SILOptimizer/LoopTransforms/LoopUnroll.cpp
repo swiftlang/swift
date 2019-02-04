@@ -99,27 +99,42 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   // Match an add 1 recurrence.
-  SILPhiArgument *RecArg;
-  IntegerLiteralInst *End;
-  SILValue RecNext;
+
+  auto *Cmp = dyn_cast<BuiltinInst>(CondBr->getCondition());
+  if (!Cmp)
+    return None;
 
   unsigned Adjust = 0;
+  SILBasicBlock *Exit = CondBr->getTrueBB();
 
-  if (!match(CondBr->getCondition(),
-             m_BuiltinInst(BuiltinValueKind::ICMP_EQ, m_SILValue(RecNext),
-                           m_IntegerLiteralInst(End))) &&
-      !match(CondBr->getCondition(),
-             m_BuiltinInst(BuiltinValueKind::ICMP_SGE, m_SILValue(RecNext),
-                           m_IntegerLiteralInst(End)))) {
-    if (!match(CondBr->getCondition(),
-               m_BuiltinInst(BuiltinValueKind::ICMP_SGT, m_SILValue(RecNext),
-                             m_IntegerLiteralInst(End))))
-      return None;
-    // Otherwise, we have a greater than comparison.
-    else
+  switch (Cmp->getBuiltinInfo().ID) {
+    case BuiltinValueKind::ICMP_EQ:
+    case BuiltinValueKind::ICMP_SGE:
+      break;
+    case BuiltinValueKind::ICMP_SGT:
       Adjust = 1;
+      break;
+    case BuiltinValueKind::ICMP_SLE:
+      Exit = CondBr->getFalseBB();
+      Adjust = 1;
+      break;
+    case BuiltinValueKind::ICMP_NE:
+    case BuiltinValueKind::ICMP_SLT:
+      Exit = CondBr->getFalseBB();
+      break;
+    default:
+      return None;
   }
 
+  if (Loop->contains(Exit))
+    return None;
+
+  auto *End = dyn_cast<IntegerLiteralInst>(Cmp->getArguments()[1]);
+  if (!End)
+    return None;
+
+  SILValue RecNext = Cmp->getArguments()[0];
+  SILPhiArgument *RecArg;
   if (!match(RecNext,
              m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
                                             m_SILPhiArgument(RecArg), m_One()),
@@ -194,7 +209,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
 /// iterations header or if this is the last iteration remove the backedge to
 /// the header.
 static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
-                               unsigned LastLoopIter, SILBasicBlock *OrigHeader,
+                               unsigned LastLoopIter, SILBasicBlock *CurrentHeader,
                                SILBasicBlock *NextIterationsHeader) {
 
   auto *CurrentTerminator = Latch->getTerminator();
@@ -245,22 +260,25 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   // On the last iteration change the conditional exit to an unconditional
   // one.
   if (CurLoopIter == LastLoopIter) {
-    if (CondBr->getTrueBB() != OrigHeader)
-      SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getTrueBB(),
-                                      CondBr->getTrueArgs());
-    else
+    if (CondBr->getTrueBB() == CurrentHeader) {
       SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getFalseBB(),
                                       CondBr->getFalseArgs());
+    } else {
+      assert(CondBr->getFalseBB() == CurrentHeader);
+      SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getTrueBB(),
+                                      CondBr->getTrueArgs());
+    }
     CondBr->eraseFromParent();
     return;
   }
 
   // Otherwise, branch to the next iteration's header.
-  if (CondBr->getTrueBB() == OrigHeader) {
+  if (CondBr->getTrueBB() == CurrentHeader) {
     SILBuilder(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), NextIterationsHeader,
         CondBr->getTrueArgs(), CondBr->getFalseBB(), CondBr->getFalseArgs());
   } else {
+    assert(CondBr->getFalseBB() == CurrentHeader);
     SILBuilder(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), CondBr->getTrueBB(),
         CondBr->getTrueArgs(), NextIterationsHeader, CondBr->getFalseArgs());
@@ -305,9 +323,9 @@ void LoopCloner::collectLoopLiveOutValues(
 }
 
 static void
-updateSSA(SILLoop *Loop,
+updateSSA(SILModule &M, SILLoop *Loop,
           DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
-  SILSSAUpdater SSAUp;
+  SILSSAUpdater SSAUp(M);
   for (auto &MapEntry : LoopLiveOutValues) {
     // Collect out of loop uses of this value.
     auto OrigValue = MapEntry.first;
@@ -335,6 +353,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
   auto *Preheader = Loop->getLoopPreheader();
   if (!Preheader)
     return false;
+  SILModule &M = Preheader->getParent()->getModule();
 
   auto *Latch = Loop->getLoopLatch();
   if (!Latch)
@@ -400,16 +419,16 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
        ++Iteration) {
     auto *CurrentLatch = Latches[Iteration];
     auto LastIteration = End - 1;
-    auto *OriginalHeader = Headers[0];
+    auto *CurrentHeader = Headers[Iteration];
     auto *NextIterationsHeader =
         Iteration == LastIteration ? nullptr : Headers[Iteration + 1];
 
-    redirectTerminator(CurrentLatch, Iteration, LastIteration, OriginalHeader,
+    redirectTerminator(CurrentLatch, Iteration, LastIteration, CurrentHeader,
                        NextIterationsHeader);
   }
 
   // Fixup SSA form for loop values used outside the loop.
-  updateSSA(Loop, LoopLiveOutValues);
+  updateSSA(M, Loop, LoopLiveOutValues);
   return true;
 }
 

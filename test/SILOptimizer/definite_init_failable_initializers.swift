@@ -38,12 +38,8 @@ struct FailableStruct {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers14FailableStructV24failBeforeInitializationACSgyt_tcfC
 // CHECK:       bb0(%0 : $@thin FailableStruct.Type):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
-// CHECK:         br bb1
-// CHECK:       bb1:
-// CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
+// CHECK:         dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK-NEXT:    return [[SELF]]
   init?(failBeforeInitialization: ()) {
     return nil
@@ -57,14 +53,10 @@ struct FailableStruct {
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
 // CHECK-NEXT:    store [[CANARY]] to [[X_ADDR]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*FailableStruct
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
 // CHECK-NEXT:    destroy_addr [[X_ADDR]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK-NEXT:    return [[SELF]]
   init?(failAfterPartialInitialization: ()) {
     x = Canary()
@@ -84,13 +76,9 @@ struct FailableStruct {
 // CHECK-NEXT:    [[Y_ADDR:%.*]] = struct_element_addr [[WRITE]]
 // CHECK-NEXT:    store [[CANARY2]] to [[Y_ADDR]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*FailableStruct
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK-NEXT:    return [[NEW_SELF]]
   init?(failAfterFullInitialization: ()) {
     x = Canary()
@@ -105,13 +93,9 @@ struct FailableStruct {
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableStruct
 // CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*FailableStruct
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = enum $Optional<FailableStruct>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK-NEXT:    return [[SELF_VALUE]]
   init?(failAfterWholeObjectInitializationByAssignment: ()) {
     self = FailableStruct(noFail: ())
@@ -124,13 +108,9 @@ struct FailableStruct {
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers14FailableStructV6noFailACyt_tcfC
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%0)
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK-NEXT:    return [[NEW_SELF]]
   init?(failAfterWholeObjectInitializationByDelegation: ()) {
     self.init(noFail: ())
@@ -147,7 +127,9 @@ struct FailableStruct {
 //
 // CHECK:       [[FAIL_BB]]:
 // CHECK-NEXT:    release_value [[SELF_OPTIONAL]]
-// CHECK-NEXT:    br [[FAIL_EPILOG_BB:bb[0-9]+]]
+// CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
+// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.none!enumelt
+// CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<FailableStruct>)
 //
 // CHECK:       [[SUCC_BB]]:
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = unchecked_enum_data [[SELF_OPTIONAL]]
@@ -157,11 +139,6 @@ struct FailableStruct {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<FailableStruct>)
-//
-// CHECK:       [[FAIL_EPILOG_BB]]:
-// CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.none!enumelt
-// CHECK-NEXT:    br [[EPILOG_BB]]([[NEW_SELF]] : $Optional<FailableStruct>)
 //
 // CHECK:       [[EPILOG_BB]]([[NEW_SELF:%.*]] : $Optional<FailableStruct>)
 // CHECK-NEXT:    return [[NEW_SELF]]
@@ -212,12 +189,8 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers22FailableAddrOnlyStructV{{[_0-9a-zA-Z]*}}failBeforeInitialization{{.*}}tcfC
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
-// CHECK:         br bb1
-// CHECK:       bb1:
-// CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
+// CHECK:         dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    inject_enum_addr %0
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK:         return
   init?(failBeforeInitialization: ()) {
     return nil
@@ -235,14 +208,10 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-NEXT:    copy_addr [take] [[X_BOX]] to [initialization] [[X_ADDR]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    dealloc_stack [[X_BOX]]
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
 // CHECK-NEXT:    destroy_addr [[X_ADDR]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    inject_enum_addr %0
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK:         return
   init?(failAfterPartialInitialization: ()) {
     x = T()
@@ -270,13 +239,9 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-NEXT:    copy_addr [take] [[Y_BOX]] to [initialization] [[Y_ADDR]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    dealloc_stack [[Y_BOX]]
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    inject_enum_addr %0
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK:         return
   init?(failAfterFullInitialization: ()) {
     x = T()
@@ -548,8 +513,10 @@ struct ThrowStruct {
 // CHECK-NEXT:    cond_br [[COND]], [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
 //
 // CHECK:       [[FAIL_BB]]:
-// CHECK-NEXT:    release_value [[SELF_OPTIONAL]]
-// CHECK-NEXT:    br [[FAIL_EPILOG_BB:bb[0-9]+]]
+// CHECK:         release_value [[SELF_OPTIONAL]]
+// CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
+// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
+// CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<ThrowStruct>)
 //
 // CHECK:       [[SUCC_BB]]:
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = unchecked_enum_data [[SELF_OPTIONAL]]
@@ -560,21 +527,13 @@ struct ThrowStruct {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<ThrowStruct>)
 //
-// CHECK:       [[FAIL_EPILOG_BB]]:
-// CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
-// CHECK-NEXT:    br [[EPILOG_BB]]([[NEW_SELF]] : $Optional<ThrowStruct>)
-//
 // CHECK:       [[EPILOG_BB]]([[NEW_SELF:%.*]] : $Optional<ThrowStruct>):
 // CHECK-NEXT:    return [[NEW_SELF]] : $Optional<ThrowStruct>
 //
-// CHECK:       [[TRY_APPLY_FAIL_TRAMPOLINE_BB:bb[0-9]+]]:
+// CHECK:       [[TRY_APPLY_FAIL_BB]]([[ERROR]] : $Error):
 // CHECK-NEXT:    strong_release [[ERROR:%.*]] : $Error
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
 // CHECK-NEXT:    br [[TRY_APPLY_CONT]]([[NEW_SELF]] : $Optional<ThrowStruct>)
-//
-// CHECK:       [[TRY_APPLY_FAIL_BB]]([[ERROR]] : $Error):
-// CHECK-NEXT:    br [[TRY_APPLY_FAIL_TRAMPOLINE_BB]]
   init?(throwsToOptional: Int) {
     try? self.init(failDuringDelegation: throwsToOptional)
   }
@@ -767,12 +726,8 @@ class FailableBaseClass {
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [dynamic] [[MEMBER_ADDR]] : $*Canary
 // CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*Canary
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    strong_release %0
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK-NEXT:    return [[NEW_SELF]]
   init?(failAfterFullInitialization: ()) {
     member = Canary()
@@ -782,12 +737,8 @@ class FailableBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17FailableBaseClassC20failBeforeDelegationACSgyt_tcfC
 // CHECK:       bb0(%0 : $@thick FailableBaseClass.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $FailableBaseClass
-// CHECK:         br bb1
-// CHECK:       bb1:
-// CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
+// CHECK:         dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[RESULT:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK-NEXT:    return [[RESULT]]
   convenience init?(failBeforeDelegation: ()) {
     return nil
@@ -799,13 +750,9 @@ class FailableBaseClass {
 // CHECK:         [[INIT_FN:%.*]] = class_method %0
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%0)
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[RESULT:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK-NEXT:    return [[RESULT]]
   convenience init?(failAfterDelegation: ()) {
     self.init(noFail: ())
@@ -834,8 +781,8 @@ class FailableBaseClass {
 // CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<FailableBaseClass>)
 //
 // CHECK:       [[FAIL_TRAMPOLINE_BB]]:
-// CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
+// CHECK:         dealloc_stack [[SELF_BOX]]
+// CHECK:         [[NEW_SELF:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
 // CHECK-NEXT:    br [[EPILOG_BB]]([[NEW_SELF]] : $Optional<FailableBaseClass>)
 //
 // CHECK:       [[EPILOG_BB]]([[NEW_SELF:%.*]] : $Optional<FailableBaseClass>):
@@ -875,14 +822,10 @@ class FailableDerivedClass : FailableBaseClass {
 // CHECK:       bb0(%0 : $FailableDerivedClass):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableDerivedClass
 // CHECK:         store %0 to [[SELF_BOX]]
-// CHECK-NEXT:    br bb1
-// CHECK:       bb1:
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thick FailableDerivedClass.Type
 // CHECK-NEXT:    dealloc_partial_ref %0 : $FailableDerivedClass, [[METATYPE]] : $@thick FailableDerivedClass.Type
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[RESULT:%.*]] = enum $Optional<FailableDerivedClass>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb2
-// CHECK:       bb2:
 // CHECK-NEXT:    return [[RESULT]]
   init?(derivedFailBeforeDelegation: ()) {
     return nil
@@ -905,7 +848,9 @@ class FailableDerivedClass : FailableBaseClass {
 //
 // CHECK:       [[FAIL_BB]]:
 // CHECK-NEXT:    release_value [[SELF_OPTIONAL]]
-// CHECK-NEXT:    br [[FAIL_TRAMPOLINE_BB:bb[0-9]+]]
+// CHECK:         dealloc_stack [[SELF_BOX]]
+// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableDerivedClass>, #Optional.none!enumelt
+// CHECK-NEXT:    br [[EPILOG_BB]]([[NEW_SELF]] : $Optional<FailableDerivedClass>)
 //
 // CHECK:       [[SUCC_BB]]:
 // CHECK-NEXT:    [[BASE_SELF_VALUE:%.*]] = unchecked_enum_data [[SELF_OPTIONAL]]
@@ -916,11 +861,6 @@ class FailableDerivedClass : FailableBaseClass {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<FailableDerivedClass>)
-//
-// CHECK:       [[FAIL_TRAMPOLINE_BB]]:
-// CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableDerivedClass>, #Optional.none!enumelt
-// CHECK-NEXT:    br [[EPILOG_BB]]([[NEW_SELF]] : $Optional<FailableDerivedClass>)
 //
 // CHECK:       [[EPILOG_BB]]([[NEW_SELF:%.*]] : $Optional<FailableDerivedClass>):
 // CHECK-NEXT:    return [[NEW_SELF]] : $Optional<FailableDerivedClass>

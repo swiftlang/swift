@@ -379,7 +379,7 @@ class COWArrayOpt {
   // Set of all blocks that may reach the loop, not including loop blocks.
   llvm::SmallPtrSet<SILBasicBlock*,32> ReachingBlocks;
 
-  /// \brief Transient per-Array user set.
+  /// Transient per-Array user set.
   ///
   /// Track all known array users with the exception of struct_extract users
   /// (checkSafeArrayElementUse prohibits struct_extract users from mutating the
@@ -1160,6 +1160,10 @@ namespace {
 
 class COWArrayOptPass : public SILFunctionTransform {
   void run() override {
+    // FIXME: Update for ownership.
+    if (getFunction()->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "COW Array Opts in Func "
                             << getFunction()->getName() << "\n");
 
@@ -1619,7 +1623,7 @@ protected:
   }
 
   void updateSSAForm() {
-    SILSSAUpdater SSAUp;
+    SILSSAUpdater SSAUp(StartBB->getParent()->getModule());
     for (auto *origBB : originalPreorderBlocks()) {
       // Update outside used phi values.
       for (auto *arg : origBB->getArguments())
@@ -1846,6 +1850,10 @@ class SwiftArrayOptPass : public SILFunctionTransform {
       return;
 
     auto *Fn = getFunction();
+
+    // FIXME: Add support for ownership.
+    if (Fn->hasOwnership())
+      return;
 
     // Don't hoist array property calls at Osize.
     if (Fn->optimizeForSize())

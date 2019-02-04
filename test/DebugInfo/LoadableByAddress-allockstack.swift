@@ -46,4 +46,4 @@ struct h<i>{
   }
 }
 
-// CHECK: define linkonce_odr hidden %swift.opaque* @"$s4main1mVwCP"
+// CHECK: define internal %swift.opaque* @"$s4main1mVwCP"

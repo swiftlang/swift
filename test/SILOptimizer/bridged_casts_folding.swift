@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -enforce-exclusivity=unchecked %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -923,10 +923,8 @@ class MyThing: Hashable {
     deinit {
         Swift.print("Deinit \(name)")
     }
-    
-    var hashValue: Int {
-        return 0
-    }
+
+    func hash(into hasher: inout Hasher) {}
     
     static func ==(lhs: MyThing, rhs: MyThing) -> Bool {
         return false

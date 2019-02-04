@@ -83,7 +83,10 @@ public protocol P {
 }
 
 @_weakLinked
-public struct WeakS {}
+public struct WeakS {
+  public init() {}
+  public func weakMember() {}
+}
 
 @_weakLinked
 public enum WeakE {}
@@ -114,4 +117,19 @@ public protocol ProtocolWithWeakMembers {
 
 extension ProtocolWithWeakMembers {
   @_weakLinked public func f() {}
+}
+
+public protocol BaseP {}
+@_weakLinked extension S : BaseP {}
+
+
+public func getVersion() -> Int {
+  // Used to return 0.
+  return 1
+}
+
+@_weakLinked public struct ResilientStruct {
+  public init() {}
+
+  public func fn(_ x: Int) {}
 }

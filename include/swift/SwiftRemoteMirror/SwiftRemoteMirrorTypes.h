@@ -26,13 +26,13 @@ extern "C" {
 
 typedef uintptr_t swift_typeref_t;
 
-/// \brief Represents one of the Swift reflection sections of an image.
+/// Represents one of the Swift reflection sections of an image.
 typedef struct swift_reflection_section {
   void *Begin;
   void *End;
 } swift_reflection_section_t;
 
-/// \brief Represents the set of Swift reflection sections of an image.
+/// Represents the set of Swift reflection sections of an image.
 /// Not all sections may be present.
 typedef struct swift_reflection_info {
   struct {
@@ -108,9 +108,9 @@ typedef enum swift_layout_kind {
 
   // References to other objects in the heap.
   SWIFT_STRONG_REFERENCE,
-#define REF_STORAGE(Name, name, NAME) \
-  SWIFT_##NAME##_REFERENCE,
-#include "swift/AST/ReferenceStorage.def"
+  SWIFT_UNOWNED_REFERENCE,
+  SWIFT_WEAK_REFERENCE,
+  SWIFT_UNMANAGED_REFERENCE,
 
   // Layouts of heap objects. These are only ever returned from
   // swift_reflection_infoFor{Instance,Metadata}(), and not
@@ -140,7 +140,7 @@ typedef struct swift_childinfo {
   swift_typeref_t TR;
 } swift_childinfo_t;
 
-/// \brief An opaque pointer to a context which maintains state and
+/// An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.
 typedef struct SwiftReflectionContext *SwiftReflectionContextRef;
 

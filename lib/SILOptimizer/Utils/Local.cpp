@@ -89,7 +89,7 @@ swift::createDecrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
   return B.createReleaseValue(Loc, Ptr, B.getDefaultAtomicity());
 }
 
-/// \brief Perform a fast local check to see if the instruction is dead.
+/// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
 bool
@@ -121,8 +121,6 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   // mark_uninitialized is never dead.
   if (isa<MarkUninitializedInst>(I))
     return false;
-  if (isa<MarkUninitializedBehaviorInst>(I))
-    return false;
 
   if (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I))
     return false;
@@ -138,7 +136,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   return false;
 }
 
-/// \brief Return true if this is a release instruction and the released value
+/// Return true if this is a release instruction and the released value
 /// is a part of a guaranteed parameter.
 bool swift::isIntermediateRelease(SILInstruction *I,
                                   EpilogueARCFunctionInfo *EAFI) {
@@ -220,6 +218,14 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
       auto *FRI = dyn_cast<FunctionRefInst>(I);
       if (FRI && FRI->getReferencedFunction())
         FRI->dropReferencedFunction();
+
+      auto *DFRI = dyn_cast<DynamicFunctionRefInst>(I);
+      if (DFRI && DFRI->getReferencedFunction())
+        DFRI->dropReferencedFunction();
+
+      auto *PFRI = dyn_cast<PreviousDynamicFunctionRefInst>(I);
+      if (PFRI && PFRI->getReferencedFunction())
+        PFRI->dropReferencedFunction();
     }
 
     for (auto I : DeadInsts) {
@@ -232,7 +238,7 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
   }
 }
 
-/// \brief If the given instruction is dead, delete it along with its dead
+/// If the given instruction is dead, delete it along with its dead
 /// operands.
 ///
 /// \param I The instruction to be deleted.
@@ -388,7 +394,7 @@ void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
     FuncRef->moveBefore(&*DomBB->begin());
 }
 
-/// \brief Add an argument, \p val, to the branch-edge that is pointing into
+/// Add an argument, \p val, to the branch-edge that is pointing into
 /// block \p Dest. Return a new instruction and do not erase the old
 /// instruction.
 TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
@@ -645,6 +651,51 @@ ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index){
   return B.createProjectBox(ABI->getLoc(), ABI, Index);
 }
 
+// Peek through trivial Enum initialization, typically for pointless
+// Optionals.
+//
+// Given an UncheckedTakeEnumDataAddrInst, check that there are no
+// other uses of the Enum value and return the address used to initialized the
+// enum's payload:
+//
+//   %stack_adr = alloc_stack
+//   %data_adr  = init_enum_data_addr %stk_adr
+//   %enum_adr  = inject_enum_addr %stack_adr
+//   %copy_src  = unchecked_take_enum_data_addr %enum_adr
+//   dealloc_stack %stack_adr
+//   (No other uses of %stack_adr.)
+InitEnumDataAddrInst *
+swift::findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *UTEDAI) {
+  auto *ASI = dyn_cast<AllocStackInst>(UTEDAI->getOperand());
+  if (!ASI)
+    return nullptr;
+
+  SILInstruction *singleUser = nullptr;
+  for (auto use : ASI->getUses()) {
+    auto *user = use->getUser();
+    if (user == UTEDAI)
+      continue;
+
+    // As long as there's only one UncheckedTakeEnumDataAddrInst and one
+    // InitEnumDataAddrInst, we don't care how many InjectEnumAddr and
+    // DeallocStack users there are.
+    if (isa<InjectEnumAddrInst>(user) || isa<DeallocStackInst>(user))
+      continue;
+
+    if (singleUser)
+      return nullptr;
+
+    singleUser = user;
+  }
+  if (!singleUser)
+    return nullptr;
+
+  // Assume, without checking, that the returned InitEnumDataAddr dominates the
+  // given UncheckedTakeEnumDataAddrInst, because that's how SIL is defined. I
+  // don't know where this is actually verified.
+  return dyn_cast<InitEnumDataAddrInst>(singleUser);
+}
+
 //===----------------------------------------------------------------------===//
 //                       String Concatenation Optimizer
 //===----------------------------------------------------------------------===//
@@ -895,7 +946,6 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   switch (I->getKind()) {
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::StrongReleaseInst:
-  case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::ReleaseValueInst:
@@ -909,7 +959,12 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
 static bool useHasTransitiveOwnership(const SILInstruction *I) {
   // convert_escape_to_noescape is used to convert to a @noescape function type.
   // It does not change ownership of the function value.
-  return isa<ConvertEscapeToNoEscapeInst>(I);
+  if (isa<ConvertEscapeToNoEscapeInst>(I))
+    return true;
+
+  // Look through copy_value. It is inert for our purposes, but we need to look
+  // through it.
+  return isa<CopyValueInst>(I);
 }
 
 static SILValue createLifetimeExtendedAllocStack(
@@ -988,7 +1043,7 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
   // possible for that value.
 
   // If we have qualified ownership, we should just emit a destroy value.
-  if (Arg->getFunction()->hasQualifiedOwnership()) {
+  if (Arg->getFunction()->hasOwnership()) {
     Callbacks.CreatedNewInst(Builder.createDestroyValue(Loc, Arg));
     return;
   }
@@ -1087,13 +1142,49 @@ static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
   return true;
 }
 
+static bool
+deadMarkDependenceUser(SILInstruction *Inst,
+                       SmallVectorImpl<SILInstruction *> &DeleteInsts) {
+  if (!isa<MarkDependenceInst>(Inst))
+    return false;
+  DeleteInsts.push_back(Inst);
+  for (auto *Use : cast<SingleValueInstruction>(Inst)->getUses()) {
+    if (!deadMarkDependenceUser(Use->getUser(), DeleteInsts))
+      return false;
+  }
+  return true;
+}
+
 /// TODO: Generalize this to general objects.
 bool swift::tryDeleteDeadClosure(SingleValueInstruction *Closure,
                                  InstModCallbacks Callbacks) {
+  auto *PA = dyn_cast<PartialApplyInst>(Closure);
+
   // We currently only handle locally identified values that do not escape. We
   // also assume that the partial apply does not capture any addresses.
-  if (!isa<PartialApplyInst>(Closure) && !isa<ThinToThickFunctionInst>(Closure))
+  if (!PA && !isa<ThinToThickFunctionInst>(Closure))
     return false;
+
+  // A stack allocated partial apply does not have any release users. Delete it
+  // if the only users are the dealloc_stack and mark_dependence instructions.
+  if (PA && PA->isOnStack()) {
+    SmallVector<SILInstruction*, 8> DeleteInsts;
+    for (auto *Use : PA->getUses()) {
+      if (isa<DeallocStackInst>(Use->getUser()) ||
+          isa<DebugValueInst>(Use->getUser()))
+        DeleteInsts.push_back(Use->getUser());
+      else if (!deadMarkDependenceUser(Use->getUser(), DeleteInsts))
+        return false;
+    }
+    for (auto *Inst : reverse(DeleteInsts))
+      Callbacks.DeleteInst(Inst);
+    Callbacks.DeleteInst(PA);
+
+    // Note: the lifetime of the captured arguments is managed outside of the
+    // trivial closure value i.e: there will already be releases for the
+    // captured arguments. Releasing captured arguments is not necessary.
+    return true;
+  }
 
   // We only accept a user if it is an ARC object that can be removed if the
   // object is dead. This should be expanded in the future. This also ensures
@@ -1316,6 +1407,44 @@ bool ValueLifetimeAnalysis::isWithinLifetime(SILInstruction *Inst) {
       return false;
   }
   llvm_unreachable("Expected to find use of value in block!");
+}
+
+// Searches \p BB backwards from the instruction before \p FrontierInst
+// to the beginning of the list and returns true if we find a dealloc_ref
+// /before/ we find \p DefValue (the instruction that defines our target value).
+static bool blockContainsDeallocRef(SILBasicBlock *BB, SILInstruction *DefValue,
+                                    SILInstruction *FrontierInst) {
+  SILBasicBlock::reverse_iterator End = BB->rend();
+  SILBasicBlock::reverse_iterator Iter = FrontierInst->getReverseIterator();
+  for (++Iter; Iter != End; ++Iter) {
+    SILInstruction *I = &*Iter;
+    if (isa<DeallocRefInst>(I))
+      return true;
+    if (I == DefValue)
+      return false;
+  }
+  return false;
+}
+
+bool ValueLifetimeAnalysis::containsDeallocRef(const Frontier &Frontier) {
+  SmallPtrSet<SILBasicBlock *, 8> FrontierBlocks;
+  // Search in live blocks where the value is not alive until the end of the
+  // block, i.e. the live range is terminated by a frontier instruction.
+  for (SILInstruction *FrontierInst : Frontier) {
+    SILBasicBlock *BB = FrontierInst->getParent();
+    if (blockContainsDeallocRef(BB, DefValue, FrontierInst))
+      return true;
+    FrontierBlocks.insert(BB);
+  }
+  // Search in all other live blocks where the value is alive until the end of
+  // the block.
+  for (SILBasicBlock *BB : LiveBlocks) {
+    if (FrontierBlocks.count(BB) == 0) {
+      if (blockContainsDeallocRef(BB, DefValue, BB->getTerminator()))
+        return true;
+    }
+  }
+  return false;
 }
 
 void ValueLifetimeAnalysis::dump() const {
@@ -1561,8 +1690,9 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   if (!AFD->isChildContextOf(AssocDC))
     return false;
 
-  if (AFD->isDynamic())
+  if (AFD->isDynamic()) {
     return false;
+  }
 
   if (!AFD->hasAccess())
     return false;
@@ -1634,7 +1764,7 @@ StaticInitCloner::clone(SingleValueInstruction *InitVal) {
 }
 
 Optional<FindLocalApplySitesResult>
-swift::findLocalApplySites(FunctionRefInst *FRI) {
+swift::findLocalApplySites(FunctionRefBaseInst *FRI) {
   SmallVector<Operand *, 32> worklist(FRI->use_begin(), FRI->use_end());
 
   Optional<FindLocalApplySitesResult> f;
@@ -1678,6 +1808,13 @@ swift::findLocalApplySites(FunctionRefInst *FRI) {
            std::back_inserter(worklist));
       continue;
 
+    // A partial_apply [stack] marks its captured arguments with
+    // mark_dependence.
+    case SILInstructionKind::MarkDependenceInst:
+      copy(cast<SingleValueInstruction>(user)->getUses(),
+           std::back_inserter(worklist));
+      continue;
+
     // Look through any reference count instructions since these are not
     // escapes:
     case SILInstructionKind::CopyValueInst:
@@ -1688,6 +1825,8 @@ swift::findLocalApplySites(FunctionRefInst *FRI) {
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::ReleaseValueInst:
     case SILInstructionKind::DestroyValueInst:
+    // A partial_apply [stack] is deallocated with a dealloc_stack.
+    case SILInstructionKind::DeallocStackInst:
       continue;
     default:
       break;
@@ -1702,4 +1841,23 @@ swift::findLocalApplySites(FunctionRefInst *FRI) {
   if (f->escapes && f->partialApplySites.empty() && f->fullApplySites.empty())
     return None;
   return f;
+}
+
+/// Insert destroys of captured arguments of partial_apply [stack].
+void swift::insertDestroyOfCapturedArguments(
+    PartialApplyInst *PAI, SILBuilder &B,
+    llvm::function_ref<bool(SILValue)> shouldInsertDestroy) {
+  assert(PAI->isOnStack());
+
+  ApplySite site(PAI);
+  SILFunctionConventions calleeConv(site.getSubstCalleeType(),
+                                    PAI->getModule());
+  auto loc = RegularLocation::getAutoGeneratedLocation();
+  for (auto &arg : PAI->getArgumentOperands()) {
+    if (!shouldInsertDestroy(arg.get())) continue;
+    unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
+    assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
+    auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
+    releasePartialApplyCapturedArg(B, loc, arg.get(), paramInfo);
+  }
 }

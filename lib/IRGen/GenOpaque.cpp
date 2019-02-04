@@ -28,6 +28,7 @@
 #include "swift/IRGen/ValueWitness.h"
 
 #include "Callee.h"
+#include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -85,28 +86,6 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false);
   }
       
-  /// void (*storeExtraInhabitant)(T *obj, unsigned index, M *self);
-  case ValueWitness::StoreExtraInhabitant: {
-    llvm::Type *ptrTy = IGM.OpaquePtrTy;
-    llvm::Type *indexTy = IGM.Int32Ty;
-    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
-    llvm::Type *voidTy = IGM.VoidTy;
-    llvm::Type *args[] = {ptrTy, indexTy, metaTy};
-    
-    return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false);
-  }
-      
-  /// int (*getExtraInhabitantIndex)(T *obj, M *self);
-  case ValueWitness::GetExtraInhabitantIndex: {
-    llvm::Type *ptrTy = IGM.OpaquePtrTy;
-    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
-    llvm::Type *indexTy = IGM.Int32Ty;
-    
-    llvm::Type *args[] = {ptrTy, metaTy};
-    
-    return llvm::FunctionType::get(indexTy, args, /*isVarArg*/ false);
-  }
-  
   /// unsigned (*getEnumTag)(T *obj, M *self);
   case ValueWitness::GetEnumTag: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
@@ -166,11 +145,11 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
   }
 
   case ValueWitness::Size:
-  case ValueWitness::Flags:
   case ValueWitness::Stride:
-  case ValueWitness::ExtraInhabitantFlags:
-    // Non-function witnesses all have type size_t.
     return IGM.SizeTy;
+  case ValueWitness::Flags:
+  case ValueWitness::ExtraInhabitantCount:
+    return IGM.Int32Ty;
   }
 
   llvm_unreachable("bad value witness!");
@@ -196,8 +175,6 @@ static llvm::AttributeList getValueWitnessAttrs(IRGenModule &IGM,
   case ValueWitness::DestructiveInjectEnumTag:
   case ValueWitness::DestructiveProjectEnumData:
   case ValueWitness::GetEnumTag:
-  case ValueWitness::GetExtraInhabitantIndex:
-  case ValueWitness::StoreExtraInhabitant:
   case ValueWitness::StoreEnumTagSinglePayload:
     return attrs.addAttribute(ctx, 1, llvm::Attribute::NoAlias);
 
@@ -217,8 +194,8 @@ static llvm::AttributeList getValueWitnessAttrs(IRGenModule &IGM,
 
   case ValueWitness::Size:
   case ValueWitness::Flags:
+  case ValueWitness::ExtraInhabitantCount:
   case ValueWitness::Stride:
-  case ValueWitness::ExtraInhabitantFlags:
     llvm_unreachable("not a function value witness");
   }
   llvm_unreachable("bad witness");
@@ -260,14 +237,10 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
     return "size";
   case ValueWitness::Flags:
     return "flags";
+  case ValueWitness::ExtraInhabitantCount:
+    return "extraInhabitantCount";
   case ValueWitness::Stride:
     return "stride";
-  case ValueWitness::StoreExtraInhabitant:
-    return "storeExtraInhabitant";
-  case ValueWitness::GetExtraInhabitantIndex:
-    return "getExtraInhabitantIndex";
-  case ValueWitness::ExtraInhabitantFlags:
-    return "extraInhabitantFlags";
   case ValueWitness::GetEnumTag:
     return "getEnumTag";
   case ValueWitness::DestructiveProjectEnumData:
@@ -280,6 +253,58 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
     return "storeEnumTagSinglePayload";
   }
   llvm_unreachable("bad value witness index");
+}
+
+static llvm::PointerType *
+getOrCreateValueWitnessTablePtrTy(IRGenModule &IGM, llvm::PointerType *&cache,
+                                  StringRef name, bool includeEnumWitnesses) {
+  if (cache) return cache;
+
+  SmallVector<llvm::Type*, 16> types;
+
+#define FUNC(lowerId, upperId, retTy, paramTys) \
+  types.push_back(IGM.Int8PtrTy);
+#define DATA(lowerId, upperId, ty) \
+  types.push_back(IGM.getValueWitnessTy(ValueWitness::upperId));
+
+  // Add the base value witnesses.
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define FUNCTION_VALUE_WITNESS FUNC
+#define DATA_VALUE_WITNESS DATA
+#include "swift/ABI/ValueWitness.def"
+
+  // Add the enum value witnesses.
+  if (includeEnumWitnesses) {
+#define WANT_ONLY_ENUM_VALUE_WITNESSES
+#define FUNCTION_VALUE_WITNESS FUNC
+#define DATA_VALUE_WITNESS DATA
+#include "swift/ABI/ValueWitness.def"
+  }
+
+#undef DATA
+#undef FUNC
+
+  auto structTy = llvm::StructType::create(types, name);
+  auto ptrTy = structTy->getPointerTo();
+  cache = ptrTy;
+  return ptrTy;
+}
+
+llvm::StructType *IRGenModule::getValueWitnessTableTy() {
+  return cast<llvm::StructType>(getValueWitnessTablePtrTy()->getElementType());
+}
+llvm::PointerType *IRGenModule::getValueWitnessTablePtrTy() {
+  return getOrCreateValueWitnessTablePtrTy(*this, ValueWitnessTablePtrTy,
+                                           "swift.vwtable", false);
+}
+
+llvm::StructType *IRGenModule::getEnumValueWitnessTableTy() {
+  return cast<llvm::StructType>(getEnumValueWitnessTablePtrTy()
+           ->getElementType());
+}
+llvm::PointerType *IRGenModule::getEnumValueWitnessTablePtrTy() {
+  return getOrCreateValueWitnessTablePtrTy(*this, EnumValueWitnessTablePtrTy,
+                                           "swift.enum_vwtable", true);
 }
 
 /// Load a specific witness from a known table.  The result is
@@ -321,12 +346,31 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
 /// The result has the appropriate type for the witness.
 static llvm::Value *emitLoadOfValueWitnessValue(IRGenFunction &IGF,
                                                 llvm::Value *table,
-                                                ValueWitness index) {
-  assert(!isValueWitnessFunction(index));
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, table, index);
-  auto label = getValueWitnessLabel(index);
-  auto type = IGF.IGM.getValueWitnessTy(index);
-  return IGF.Builder.CreatePtrToInt(witness, type, label);
+                                                ValueWitness witness) {
+  assert(!isValueWitnessFunction(witness));
+  assert(unsigned(witness) <= unsigned(ValueWitness::ExtraInhabitantCount) &&
+         "extraInhabitantCount not the last non-function value witness");
+
+  auto pointerSize = IGF.IGM.getPointerSize();
+
+  // Most of the witnesses are at an offset that's just a multiple of the
+  // pointer size, but the extra-inhabitant count is packed in after the
+  // 32-bit flags.
+  // This computation is correct for all pointer sizes, including 16.
+  // It would be wrong if size_t is ever a different size from the pointer
+  // size, though.
+  Size offset =
+    (witness == ValueWitness::ExtraInhabitantCount
+       ? unsigned(ValueWitness::Flags) * pointerSize + Size(4)
+       : unsigned(witness) * pointerSize);
+
+  Address addr = Address(table, IGF.IGM.getPointerAlignment());
+  addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.getValueWitnessTablePtrTy());
+  addr = IGF.Builder.CreateStructGEP(addr, unsigned(witness), offset);
+
+  auto load = IGF.Builder.CreateLoad(addr, getValueWitnessLabel(witness));
+  IGF.setInvariantLoad(load);
+  return load;
 }
 
 /// Given a type metadata pointer, load one of the value witnesses from its
@@ -345,7 +389,23 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
                                                       llvm::Value *table,
                                                       ValueWitness index) {
   assert(isValueWitnessFunction(index));
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, table, index);
+
+  WitnessIndex windex = [&] {
+    unsigned i = unsigned(index);
+    if (i > unsigned(ValueWitness::Flags)) {
+      if (IGF.IGM.getPointerSize() == Size(8)) {
+        i--; // one pointer width skips both flags and xiCount
+      } else if (IGF.IGM.getPointerSize() == Size(4)) {
+        // no adjustment required
+      } else {
+        assert(IGF.IGM.getPointerSize() == Size(2));
+        i += 2; // flags and xiCount take up two pointers apiece
+      }
+    }
+    return WitnessIndex(i, false);
+  }();
+
+  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, table, windex);
   auto label = getValueWitnessLabel(index);
   auto signature = IGF.IGM.getValueWitnessSignature(index);
 
@@ -495,7 +555,10 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 /// location before the dynamic alloca's call.
 void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
   // In coroutines, unconditionally call llvm.coro.alloca.free.
-  if (isCoroutine()) {
+  // Except if the address is invalid, this happens when this is a StackAddress
+  // for a partial_apply [stack] that did not need a context object on the
+  // stack.
+  if (isCoroutine() && address.getAddress().isValid()) {
     auto allocToken = address.getExtraInfo();
     assert(allocToken && "dynamic alloca in coroutine without alloc token?");
     auto freeFn = llvm::Intrinsic::getDeclaration(
@@ -503,7 +566,6 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
     Builder.CreateCall(freeFn, allocToken);
     return;
   }
-
   // Otherwise, call llvm.stackrestore if an address was saved.
   auto savedSP = address.getExtraInfo();
   if (savedSP == nullptr)
@@ -665,36 +727,6 @@ void irgen::emitDestroyArrayCall(IRGenFunction &IGF,
   IGF.Builder.CreateCall(IGF.IGM.getArrayDestroyFn(), {obj, count, metadata});
 }
 
-/// Emit a call to the 'getExtraInhabitantIndex' operation.
-/// The type must be dynamically known to have extra inhabitant witnesses.
-llvm::Value *irgen::emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,
-                                                    SILType T,
-                                                    Address srcObject) {
-  llvm::Value *metadata;
-  auto fn = IGF.emitValueWitnessFunctionRef(T, metadata,
-                                       ValueWitness::GetExtraInhabitantIndex);
-
-  auto src = emitCastToOpaquePtr(IGF, srcObject);
-  llvm::CallInst *call =
-    IGF.Builder.CreateCall(fn, {src, metadata});
-  return call;
-}
-
-/// Emit a call to the 'storeExtraInhabitant' operation.
-/// The type must be dynamically known to have extra inhabitant witnesses.
-llvm::Value *irgen::emitStoreExtraInhabitantCall(IRGenFunction &IGF,
-                                                 SILType T,
-                                                 llvm::Value *index,
-                                                 Address destObject) {
-  llvm::Value *metadata;
-  auto fn = IGF.emitValueWitnessFunctionRef(T, metadata,
-                                          ValueWitness::StoreExtraInhabitant);
-  auto dest = emitCastToOpaquePtr(IGF, destObject);
-  llvm::CallInst *call =
-    IGF.Builder.CreateCall(fn, {dest, index, metadata});
-  return call;
-}
-
 /// Emit a trampoline to call the getEnumTagSinglePayload witness. API:
 /// UINT_TYPE (const T* enum, UINT_TYPE emptyCases, M *self)
 static llvm::Constant *
@@ -774,7 +806,7 @@ llvm::Value *irgen::emitGetEnumTagSinglePayloadCall(IRGenFunction &IGF,
   return result;
 }
 
-llvm::Value *irgen::emitStoreEnumTagSinglePayloadCall(
+void irgen::emitStoreEnumTagSinglePayloadCall(
     IRGenFunction &IGF, SILType T, llvm::Value *whichCase,
     llvm::Value *numEmptyCases, Address destObject) {
   if (!IGF.optimizeForSize()) {
@@ -782,17 +814,14 @@ llvm::Value *irgen::emitStoreEnumTagSinglePayloadCall(
     auto fn = IGF.emitValueWitnessFunctionRef(
         T, metadata, ValueWitness::StoreEnumTagSinglePayload);
     auto dest = emitCastToOpaquePtr(IGF, destObject);
-    llvm::CallInst *call = IGF.Builder.CreateCall(
-        fn, {dest, whichCase, numEmptyCases, metadata});
-    return call;
+    IGF.Builder.CreateCall(fn, {dest, whichCase, numEmptyCases, metadata});
+    return;
   }
 
   auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
   auto *func = getStoreEnumTagSinglePayloadTrampolineFn(IGF.IGM);
   auto dest = emitCastToOpaquePtr(IGF, destObject);
-  auto *result = IGF.Builder.CreateCall(func,
-                                    {dest, whichCase, numEmptyCases, metadata});
-  return result;
+  IGF.Builder.CreateCall(func, {dest, whichCase, numEmptyCases, metadata});
 }
 
 /// Emit a call to the 'getEnumTag' operation.
@@ -842,45 +871,34 @@ llvm::Value *irgen::emitLoadOfSize(IRGenFunction &IGF, SILType T) {
 /// Load the 'alignmentMask' value witness from the given table as a size_t.
 llvm::Value *irgen::emitLoadOfAlignmentMask(IRGenFunction &IGF, SILType T) {
   auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
-  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::AlignmentMask));
-  return IGF.Builder.CreateAnd(flags, mask,
-                               flags->getName() + ".alignmentMask");
+  return emitAlignMaskFromFlags(IGF, flags);
 }
 
 /// Load the 'isPOD' valueWitness from the given table as an i1.
 llvm::Value *irgen::emitLoadOfIsPOD(IRGenFunction &IGF, SILType T) {
   auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
-  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::IsNonPOD));
+  auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsNonPOD);
   auto masked = IGF.Builder.CreateAnd(flags, mask);
-  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getSize(Size(0)),
+  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getInt32(0),
                                   flags->getName() + ".isPOD");
 }
 
 /// Load the 'isBitwiseTakable' valueWitness from the given table as an i1.
 llvm::Value *irgen::emitLoadOfIsBitwiseTakable(IRGenFunction &IGF, SILType T) {
   auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
-  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::IsNonBitwiseTakable));
+  auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsNonBitwiseTakable);
   auto masked = IGF.Builder.CreateAnd(flags, mask);
-  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getSize(Size(0)),
+  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getInt32(0),
                                   flags->getName() + ".isBitwiseTakable");
 }
 
 /// Load the 'isInline' valueWitness from the given table as an i1.
 llvm::Value *irgen::emitLoadOfIsInline(IRGenFunction &IGF, SILType T) {
   auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
-  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::IsNonInline));
+  auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsNonInline);
   auto masked = IGF.Builder.CreateAnd(flags, mask);
-  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getSize(Size(0)),
+  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getInt32(0),
                                   flags->getName() + ".isInline");
-}
-
-/// Load the 'hasExtraInhabitants' valueWitness from the given table as an i1.
-llvm::Value *irgen::emitLoadOfHasExtraInhabitants(IRGenFunction &IGF, SILType T) {
-  auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
-  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::HasExtraInhabitants));
-  auto masked = IGF.Builder.CreateAnd(flags, mask);
-  return IGF.Builder.CreateICmpNE(masked, IGF.IGM.getSize(Size(0)),
-                                  flags->getName() + ".hasExtraInhabitants");
 }
 
 /// Load the 'stride' value witness from the given table as a size_t.
@@ -890,22 +908,17 @@ llvm::Value *irgen::emitLoadOfStride(IRGenFunction &IGF, SILType T) {
 
 llvm::Value *irgen::emitLoadOfExtraInhabitantCount(IRGenFunction &IGF,
                                                    SILType T) {
-  auto xiFlags =
-    IGF.emitValueWitnessValue(T, ValueWitness::ExtraInhabitantFlags);
-  auto mask = IGF.IGM.getSize(
-                          Size(ExtraInhabitantFlags::NumExtraInhabitantsMask));
-  return IGF.Builder.CreateAnd(xiFlags, mask,
-                               xiFlags->getName() + ".extraInhabitantCount");
+  return IGF.emitValueWitnessValue(T, ValueWitness::ExtraInhabitantCount);
 }
 
 std::pair<llvm::Value *, llvm::Value *>
 irgen::emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *metadata) {
   auto *flags = emitLoadOfValueWitnessValueFromMetadata(IGF, metadata,
                                                         ValueWitness::Flags);
-  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::IsNonInline));
+  auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsNonInline);
   auto masked = IGF.Builder.CreateAnd(flags, mask);
   return std::make_pair(
-      IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getSize(Size(0)),
+      IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getInt32(0),
                                flags->getName() + ".isInline"),
       flags);
 }
@@ -918,8 +931,9 @@ llvm::Value *irgen::emitLoadOfSize(IRGenFunction &IGF, llvm::Value *metadata) {
 
 llvm::Value *irgen::emitAlignMaskFromFlags(IRGenFunction &IGF,
                                            llvm::Value *flags) {
+  auto flagsAsSize = IGF.Builder.CreateZExtOrTrunc(flags, IGF.IGM.SizeTy);
   auto *alignMask = IGF.IGM.getSize(Size(ValueWitnessFlags::AlignmentMask));
-  return IGF.Builder.CreateAnd(flags, alignMask,
+  return IGF.Builder.CreateAnd(flagsAsSize, alignMask,
                                flags->getName() + ".alignmentMask");
 }
 
@@ -1245,4 +1259,191 @@ void irgen::emitDeallocateValueInBuffer(IRGenFunction &IGF,
       {metadata, Builder.CreateBitCast(buffer.getAddress(), IGM.OpaquePtrTy)});
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
+}
+
+llvm::Value *
+irgen::emitGetEnumTagSinglePayloadGenericCall(IRGenFunction &IGF,
+                                              SILType payloadType,
+                                              const TypeInfo &payloadTI,
+                                              llvm::Value *numExtraCases,
+                                              Address address,
+                                         GetExtraInhabitantTagEmitter emitter) {
+  auto getExtraInhabitantTagFn =
+    getOrCreateGetExtraInhabitantTagFunction(IGF.IGM, payloadType,
+                                             payloadTI, emitter);
+
+  // We assume this is never a reabstracted type.
+  auto type = payloadType.getASTType();
+  assert(type->isLegalFormalType());
+  auto metadata = IGF.emitTypeMetadataRef(type);
+
+  auto ptr = IGF.Builder.CreateBitCast(address.getAddress(),
+                                       IGF.IGM.OpaquePtrTy);
+
+  auto getEnumTagGenericFn =
+    IGF.IGM.getGetEnumTagSinglePayloadGenericFn();
+  auto call = IGF.Builder.CreateCall(getEnumTagGenericFn,
+                                     {ptr,
+                                      numExtraCases,
+                                      metadata,
+                                      getExtraInhabitantTagFn});
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return call;
+}
+
+llvm::Constant *
+irgen::getOrCreateGetExtraInhabitantTagFunction(IRGenModule &IGM,
+                                                SILType objectType,
+                                                const TypeInfo &objectTI,
+                                         GetExtraInhabitantTagEmitter emitter) {
+  // We assume this is never a reabstracted type.
+  CanType type = objectType.getASTType();
+  assert(type->isLegalFormalType());
+
+  auto fnTy = llvm::FunctionType::get(IGM.Int32Ty,
+                                      {IGM.OpaquePtrTy,
+                                       IGM.Int32Ty,
+                                       IGM.TypeMetadataPtrTy},
+                                      false);
+
+  // TODO: use a meaningful mangled name and internal/shared linkage.
+  auto fn = llvm::Function::Create(fnTy, llvm::Function::PrivateLinkage,
+                                   "__swift_get_extra_inhabitant_index",
+                                   &IGM.Module);
+  fn->setCallingConv(IGM.SwiftCC);
+  IRGenFunction IGF(IGM, fn);
+  auto parameters = IGF.collectParameters();
+  auto ptr = parameters.claimNext();
+  auto xiCount = parameters.claimNext();
+  auto metadata = parameters.claimNext();
+
+  // Bind the metadata to make any archetypes available.
+  IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, metadata,
+                                        MetadataState::Complete);
+
+  // Form a well-typed address from the opaque pointer.
+  ptr = IGF.Builder.CreateBitCast(ptr,
+                                  objectTI.getStorageType()->getPointerTo());
+  Address addr = objectTI.getAddressForPointer(ptr);
+
+  auto tag = emitter(IGF, addr, xiCount);
+  IGF.Builder.CreateRet(tag);
+
+  return fn;
+}
+
+void
+irgen::emitStoreEnumTagSinglePayloadGenericCall(IRGenFunction &IGF,
+                                                SILType payloadType,
+                                                const TypeInfo &payloadTI,
+                                                llvm::Value *whichCase,
+                                                llvm::Value *numExtraCases,
+                                                Address address,
+                                       StoreExtraInhabitantTagEmitter emitter) {
+  auto storeExtraInhabitantTagFn =
+    getOrCreateStoreExtraInhabitantTagFunction(IGF.IGM, payloadType,
+                                               payloadTI, emitter);
+
+  // We assume this is never a reabstracted type.
+  auto type = payloadType.getASTType();
+  assert(type->isLegalFormalType());
+  auto metadata = IGF.emitTypeMetadataRef(type);
+
+  auto ptr = IGF.Builder.CreateBitCast(address.getAddress(),
+                                       IGF.IGM.OpaquePtrTy);
+
+  auto storeEnumTagGenericFn =
+    IGF.IGM.getStoreEnumTagSinglePayloadGenericFn();
+  auto call = IGF.Builder.CreateCall(storeEnumTagGenericFn,
+                                     {ptr,
+                                      whichCase,
+                                      numExtraCases,
+                                      metadata,
+                                      storeExtraInhabitantTagFn});
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+llvm::Constant *
+irgen::getOrCreateStoreExtraInhabitantTagFunction(IRGenModule &IGM,
+                                                  SILType objectType,
+                                                  const TypeInfo &objectTI,
+                                       StoreExtraInhabitantTagEmitter emitter) {
+  // We assume this is never a reabstracted type.
+  CanType type = objectType.getASTType();
+  assert(type->isLegalFormalType());
+
+  auto fnTy = llvm::FunctionType::get(IGM.VoidTy,
+                                      {IGM.OpaquePtrTy,
+                                       IGM.Int32Ty,
+                                       IGM.Int32Ty,
+                                       IGM.TypeMetadataPtrTy},
+                                      false);
+
+  // TODO: use a meaningful mangled name and internal/shared linkage.
+  auto fn = llvm::Function::Create(fnTy, llvm::Function::PrivateLinkage,
+                                   "__swift_get_extra_inhabitant_index",
+                                   &IGM.Module);
+  fn->setCallingConv(IGM.SwiftCC);
+  IRGenFunction IGF(IGM, fn);
+  auto parameters = IGF.collectParameters();
+  auto ptr = parameters.claimNext();
+  auto tag = parameters.claimNext();
+  auto xiCount = parameters.claimNext();
+  auto metadata = parameters.claimNext();
+
+  // Bind the metadata to make any archetypes available.
+  IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, metadata,
+                                        MetadataState::Complete);
+
+  // Form a well-typed address from the opaque pointer.
+  ptr = IGF.Builder.CreateBitCast(ptr,
+                                  objectTI.getStorageType()->getPointerTo());
+  Address addr = objectTI.getAddressForPointer(ptr);
+
+  emitter(IGF, addr, tag, xiCount);
+  IGF.Builder.CreateRetVoid();
+
+  return fn;
+}
+
+llvm::Value *TypeInfo::getExtraInhabitantTagDynamic(IRGenFunction &IGF,
+                                                    Address address,
+                                                    SILType T,
+                                                    llvm::Value *knownXICount,
+                                                    bool isOutlined) const {
+  if (auto fixedTI = dyn_cast<FixedTypeInfo>(this)) {
+    auto index = fixedTI->getExtraInhabitantIndex(IGF, address, T, isOutlined);
+    // The runtime APIs expect that 0 means the payload case and 1+
+    // means the extra cases, but in IRGen, getExtraInhabitantIndex
+    // returns -1 for the payload case and 0+ for extra inhabitants.
+    // This is an easy adjustment to make.
+    auto one = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1);
+    auto tag = IGF.Builder.CreateAdd(index, one);
+    return tag;
+  } else {
+    if (!knownXICount)
+      knownXICount = emitLoadOfExtraInhabitantCount(IGF, T);
+
+    auto tag = getEnumTagSinglePayload(IGF, /*num extra cases*/ knownXICount,
+                                       address, T, isOutlined);
+    return tag;
+  }
+}
+
+void TypeInfo::storeExtraInhabitantTagDynamic(IRGenFunction &IGF,
+                                              llvm::Value *tag,
+                                              Address address,
+                                              SILType T,
+                                              bool isOutlined) const {
+  if (auto fixedTI = dyn_cast<FixedTypeInfo>(this)) {
+    // The runtime APIs expect that 0 means the payload case and 1+
+    // means the extra cases, but in IRGen, storeExtraInhabitant
+    // expects extra inhabitants to be indexed as 0+.
+    // This is an easy adjustment to make.
+    auto one = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1);
+    auto index = IGF.Builder.CreateSub(tag, one);
+    fixedTI->storeExtraInhabitant(IGF, index, address, T, isOutlined);
+  } else {
+    storeEnumTagSinglePayload(IGF, tag, tag, address, T, isOutlined);
+  }
 }

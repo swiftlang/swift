@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Provides extra type-checking entry points for use during code
+/// Provides extra type-checking entry points for use during code
 /// completion, which happens *without* type-checking an entire file at once.
 //
 //===----------------------------------------------------------------------===//
@@ -36,10 +36,10 @@ namespace swift {
   class ValueDecl;
   class DeclName;
 
-  /// \brief Typecheck a declaration parsed during code completion.
+  /// Typecheck a declaration parsed during code completion.
   void typeCheckCompletionDecl(Decl *D);
 
-  /// \brief Check if T1 is convertible to T2.
+  /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
   bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
@@ -74,7 +74,7 @@ namespace swift {
   ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
                                          DeclName Name);
 
-  /// \brief Given a type and an extension to the original type decl of that type,
+  /// Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
   /// extension have been fulfilled.
   /// \returns True on applied, false on not applied.
@@ -89,7 +89,7 @@ namespace swift {
     KeyPath,
   };
 
-  /// \brief Return the type of an expression parsed during code completion, or
+  /// Return the type of an expression parsed during code completion, or
   /// None on error.
   Optional<Type> getTypeOfCompletionContextExpr(
                    ASTContext &Ctx,
@@ -98,19 +98,16 @@ namespace swift {
                    Expr *&parsedExpr,
                    ConcreteDeclRef &referencedDecl);
 
-  /// Typecheck the sequence expression \p parsedExpr for code completion.
+  /// Resolve type of operator function with \c opName appending it to \c LHS.
   ///
-  /// This requires that \p parsedExpr is a SequenceExpr and that it contains:
-  ///   * ... leading sequence  LHS
-  ///   * UnresolvedDeclRefExpr operator
-  ///   * CodeCompletionExpr    RHS
-  ///
-  /// On success, returns false, and replaces parsedExpr with the binary
-  /// expression corresponding to the operator.  The type of the operator and
-  /// RHS are also set, but the rest of the expression may not be typed
-  ///
-  /// The LHS should already be type-checked or this will be very slow.
-  bool typeCheckCompletionSequence(DeclContext *DC, Expr *&parsedExpr);
+  /// For \p refKind, use \c DeclRefKind::PostfixOperator for postfix operator,
+  /// or \c DeclRefKind::BinaryOperator for infix operator.
+  /// On success, returns resolved function type of the operator. The LHS should
+  /// already be type-checked. This function guarantees LHS not to be modified.
+  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                            Identifier opName,
+                                            DeclRefKind refKind,
+                                            ConcreteDeclRef &referencedDecl);
 
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
@@ -119,7 +116,7 @@ namespace swift {
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
 
-  /// \brief Typecheck top-level code parsed during code completion.
+  /// Typecheck top-level code parsed during code completion.
   ///
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);

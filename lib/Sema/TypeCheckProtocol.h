@@ -18,6 +18,8 @@
 #ifndef SWIFT_SEMA_PROTOCOL_H
 #define SWIFT_SEMA_PROTOCOL_H
 
+#include "TypeChecker.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -149,53 +151,58 @@ struct InferredTypeWitnessesSolution {
 
 class RequirementEnvironment;
 
-/// \brief The result of matching a particular declaration to a given
+/// The result of matching a particular declaration to a given
 /// requirement.
 enum class MatchKind : uint8_t {
-  /// \brief The witness matched the requirement exactly.
+  /// The witness matched the requirement exactly.
   ExactMatch,
 
-  /// \brief There is a difference in optionality.
+  /// There is a difference in optionality.
   OptionalityConflict,
 
-  /// \brief The witness matched the requirement with some renaming.
+  /// The witness matched the requirement with some renaming.
   RenamedMatch,
 
-  /// \brief The witness is invalid or has an invalid type.
+  /// The witness is invalid or has an invalid type.
   WitnessInvalid,
 
-  /// \brief The kind of the witness and requirement differ, e.g., one
+  /// The witness is currently being type checked and this type checking in turn
+  /// triggered conformance checking, so the witness cannot be considered as a
+  /// candidate.
+  Circularity,
+
+  /// The kind of the witness and requirement differ, e.g., one
   /// is a function and the other is a variable.
   KindConflict,
 
-  /// \brief The types conflict.
+  /// The types conflict.
   TypeConflict,
 
-  /// \brief The witness would match if an additional requirement were met.
+  /// The witness would match if an additional requirement were met.
   MissingRequirement,
 
   /// The witness throws, but the requirement does not.
   ThrowsConflict,
 
-  /// \brief The witness did not match due to static/non-static differences.
+  /// The witness did not match due to static/non-static differences.
   StaticNonStaticConflict,
 
-  /// \brief The witness is not settable, but the requirement is.
+  /// The witness is not settable, but the requirement is.
   SettableConflict,
 
-  /// \brief The witness did not match due to prefix/non-prefix differences.
+  /// The witness did not match due to prefix/non-prefix differences.
   PrefixNonPrefixConflict,
 
-  /// \brief The witness did not match due to postfix/non-postfix differences.
+  /// The witness did not match due to postfix/non-postfix differences.
   PostfixNonPostfixConflict,
 
-  /// \brief The witness did not match because of mutating conflicts.
+  /// The witness did not match because of mutating conflicts.
   MutatingConflict,
 
-  /// \brief The witness did not match because of nonmutating conflicts.
+  /// The witness did not match because of nonmutating conflicts.
   NonMutatingConflict,
 
-  /// \brief The witness did not match because of __consuming conflicts.
+  /// The witness did not match because of __consuming conflicts.
   ConsumingConflict,
 
   /// The witness is not rethrows, but the requirement is.
@@ -249,6 +256,9 @@ enum class CheckKind : unsigned {
   /// The witness is storage whose setter is less accessible than the
   /// requirement.
   AccessOfSetter,
+
+  /// The witness needs to be @usableFromInline.
+  UsableFromInline,
 
   /// The witness is less available than the requirement.
   Availability,
@@ -337,7 +347,7 @@ public:
   SourceLoc getOptionalityLoc(TypeRepr *tyR) const;
 };
 
-/// \brief Describes a match between a requirement and a witness.
+/// Describes a match between a requirement and a witness.
 struct RequirementMatch {
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    Optional<RequirementEnvironment> env = None)
@@ -369,19 +379,19 @@ struct RequirementMatch {
            "Should have witness type and requirement");
   }
 
-  /// \brief The witness that matches the (implied) requirement.
+  /// The witness that matches the (implied) requirement.
   ValueDecl *Witness;
 
-  /// \brief The kind of match.
+  /// The kind of match.
   MatchKind Kind;
 
-  /// \brief The type of the witness when it is referenced.
+  /// The type of the witness when it is referenced.
   Type WitnessType;
 
-  /// \brief Requirement not met.
+  /// Requirement not met.
   Optional<Requirement> MissingRequirement;
 
-  /// \brief The requirement environment to use for the witness thunk.
+  /// The requirement environment to use for the witness thunk.
   Optional<RequirementEnvironment> ReqEnv;
 
   /// The set of optional adjustments performed on the witness.
@@ -391,7 +401,7 @@ struct RequirementMatch {
   /// environment.
   SubstitutionMap WitnessSubstitutions;
 
-  /// \brief Determine whether this match is viable.
+  /// Determine whether this match is viable.
   bool isViable() const {
     switch(Kind) {
     case MatchKind::ExactMatch:
@@ -400,6 +410,7 @@ struct RequirementMatch {
       return true;
 
     case MatchKind::WitnessInvalid:
+    case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
@@ -419,7 +430,7 @@ struct RequirementMatch {
     llvm_unreachable("Unhandled MatchKind in switch.");
   }
 
-  /// \brief Determine whether this requirement match has a witness type.
+  /// Determine whether this requirement match has a witness type.
   bool hasWitnessType() const {
     switch(Kind) {
     case MatchKind::ExactMatch:
@@ -430,6 +441,7 @@ struct RequirementMatch {
       return true;
 
     case MatchKind::WitnessInvalid:
+    case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::StaticNonStaticConflict:
     case MatchKind::SettableConflict:
@@ -447,7 +459,7 @@ struct RequirementMatch {
     llvm_unreachable("Unhandled MatchKind in switch.");
   }
 
-  /// \brief Determine whether this requirement match has a requirement.
+  /// Determine whether this requirement match has a requirement.
   bool hasRequirement() { return Kind == MatchKind::MissingRequirement; }
 
   swift::Witness getWitness(ASTContext &ctx) const;
@@ -475,10 +487,20 @@ protected:
 
   RequirementEnvironmentCache ReqEnvironmentCache;
 
+  Optional<std::pair<AccessScope, bool>> RequiredAccessScopeAndUsableFromInline;
+
   WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                  Type adoptee, DeclContext *dc);
 
   bool isMemberOperator(FuncDecl *decl, Type type);
+
+  AccessScope getRequiredAccessScope();
+
+  bool isUsableFromInlineRequired() {
+    assert(RequiredAccessScopeAndUsableFromInline.hasValue() &&
+           "must check access first using getRequiredAccessScope");
+    return RequiredAccessScopeAndUsableFromInline.getValue().second;
+  }
 
   /// Gather the value witnesses for the given requirement.
   ///
@@ -501,8 +523,7 @@ protected:
                        unsigned &bestIdx,
                        bool &doNotDiagnoseMatches);
 
-  bool checkWitnessAccess(AccessScope &requiredAccessScope,
-                          ValueDecl *requirement,
+  bool checkWitnessAccess(ValueDecl *requirement,
                           ValueDecl *witness,
                           bool *isSetter);
 
@@ -510,8 +531,7 @@ protected:
                                 ValueDecl *witness,
                                 AvailabilityContext *requirementInfo);
 
-  RequirementCheck checkWitness(AccessScope requiredAccessScope,
-                                ValueDecl *requirement,
+  RequirementCheck checkWitness(ValueDecl *requirement,
                                 const RequirementMatch &match);
 };
 
@@ -616,6 +636,11 @@ class ConformanceChecker : public WitnessChecker {
   /// Resolve a (non-type) witness via default definition or optional.
   ResolveWitnessResult resolveWitnessViaDefault(ValueDecl *requirement);
 
+  /// Resolve a (non-type) witness by trying each standard strategy until one
+  /// of them produces a result.
+  ResolveWitnessResult
+  resolveWitnessTryingAllStrategies(ValueDecl *requirement);
+
   /// Attempt to resolve a type witness via member name lookup.
   ResolveWitnessResult resolveTypeWitnessViaLookup(
                          AssociatedTypeDecl *assocType);
@@ -661,6 +686,9 @@ public:
 
   /// Resolve all of the type witnesses.
   void resolveTypeWitnesses();
+
+  /// Resolve all of the non-type witnesses.
+  void resolveValueWitnesses();
 
   /// Resolve the witness for the given non-type requirement as
   /// directly as possible, only resolving other witnesses if
@@ -865,7 +893,7 @@ public:
                                                  AssociatedTypeDecl *assocType);
 };
 
-/// \brief Match the given witness to the given requirement.
+/// Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
 RequirementMatch matchWitness(

@@ -15,11 +15,133 @@ import SwiftPrivate
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
+import WinSDK
 #endif
 
-
+internal func _signalToString(_ signal: Int) -> String {
+  switch CInt(signal) {
+  case SIGILL:  return "SIGILL"
+  case SIGABRT: return "SIGABRT"
+  case SIGFPE:  return "SIGFPE"
+  case SIGSEGV: return "SIGSEGV"
 #if !os(Windows)
-// posix_spawn is not available on Windows.
+  case SIGTRAP: return "SIGTRAP"
+  case SIGBUS:  return "SIGBUS"
+  case SIGSYS:  return "SIGSYS"
+#endif
+  default:      return "SIG???? (\(signal))"
+  }
+}
+
+public enum ProcessTerminationStatus : CustomStringConvertible {
+  case exit(Int)
+  case signal(Int)
+
+  public var description: String {
+    switch self {
+    case .exit(let status):
+      return "Exit(\(status))"
+    case .signal(let signal):
+      return "Signal(\(_signalToString(signal)))"
+    }
+  }
+}
+
+
+#if os(Windows)
+public func spawnChild(_ args: [String])
+    -> (process: HANDLE, stdin: HANDLE, stdout: HANDLE, stderr: HANDLE) {
+  var _stdin: (read: HANDLE?, write: HANDLE?)
+  var _stdout: (read: HANDLE?, write: HANDLE?)
+  var _stderr: (read: HANDLE?, write: HANDLE?)
+
+  var saAttributes: SECURITY_ATTRIBUTES = SECURITY_ATTRIBUTES()
+  saAttributes.nLength = DWORD(MemoryLayout<SECURITY_ATTRIBUTES>.size)
+  saAttributes.bInheritHandle = TRUE
+  saAttributes.lpSecurityDescriptor = nil
+
+  if CreatePipe(&_stdin.read, &_stdin.write, &saAttributes, 0) == FALSE {
+    fatalError("CreatePipe() failed")
+  }
+  if SetHandleInformation(_stdin.write, HANDLE_FLAG_INHERIT, 0) == FALSE {
+    fatalError("SetHandleInformation() failed")
+  }
+
+  if CreatePipe(&_stdout.read, &_stdout.write, &saAttributes, 0) == FALSE {
+    fatalError("CreatePipe() failed")
+  }
+  if SetHandleInformation(_stdout.read, HANDLE_FLAG_INHERIT, 0) == FALSE {
+    fatalError("SetHandleInformation() failed")
+  }
+
+  if CreatePipe(&_stderr.read, &_stderr.write, &saAttributes, 0) == FALSE {
+    fatalError("CreatePipe() failed")
+  }
+  if SetHandleInformation(_stderr.read, HANDLE_FLAG_INHERIT, 0) == FALSE {
+    fatalError("SetHandleInformation() failed")
+  }
+
+  var siStartupInfo: STARTUPINFOW = STARTUPINFOW()
+  siStartupInfo.cb = DWORD(MemoryLayout<STARTUPINFOW>.size)
+  siStartupInfo.hStdError = _stderr.write
+  siStartupInfo.hStdOutput = _stdout.write
+  siStartupInfo.hStdInput = _stdin.read
+  siStartupInfo.dwFlags |= STARTF_USESTDHANDLES
+
+  var piProcessInfo: PROCESS_INFORMATION = PROCESS_INFORMATION()
+
+  // TODO(compnerd): properly quote the command line being invoked here.  See
+  // https://blogs.msdn.microsoft.com/twistylittlepassagesallalike/2011/04/23/everyone-quotes-command-line-arguments-the-wrong-way/
+  // for more details on how to properly quote the command line for Windows.
+  let command: String =
+      ([CommandLine.arguments[0]] + args).joined(separator: " ")
+  command.withCString(encodedAs: UTF16.self) { cString in
+    if CreateProcessW(nil, UnsafeMutablePointer<WCHAR>(mutating: cString),
+                      nil, nil, TRUE, 0, nil, nil,
+                      &siStartupInfo, &piProcessInfo) == FALSE {
+      let dwError: DWORD = GetLastError()
+      fatalError("CreateProcessW() failed \(dwError)")
+    }
+  }
+
+  if CloseHandle(_stdin.read) == FALSE {
+    fatalError("CloseHandle() failed")
+  }
+  if CloseHandle(_stdout.write) == FALSE {
+    fatalError("CloseHandle() failed")
+  }
+  if CloseHandle(_stderr.write) == FALSE {
+    fatalError("CloseHandle() failed")
+  }
+
+  // CloseHandle(piProcessInfo.hProcess)
+  CloseHandle(piProcessInfo.hThread)
+
+  return (piProcessInfo.hProcess,
+          _stdin.write ?? INVALID_HANDLE_VALUE,
+          _stdout.read ?? INVALID_HANDLE_VALUE,
+          _stderr.read ?? INVALID_HANDLE_VALUE)
+}
+
+public func waitProcess(_ process: HANDLE) -> ProcessTerminationStatus {
+  let result = WaitForSingleObject(process, INFINITE)
+  if result != WAIT_OBJECT_0 {
+    fatalError("WaitForSingleObject() failed")
+  }
+
+  var status: DWORD = 0
+  if GetExitCodeProcess(process, &status) == FALSE {
+    fatalError("GetExitCodeProcess() failed")
+  }
+
+  if status & DWORD(0x80000000) == DWORD(0x80000000) {
+    return .signal(Int(status))
+  }
+  return .exit(Int(status))
+}
+#else
 // posix_spawn is not available on Android.
 // posix_spawn is not available on Haiku.
 #if !os(Android) && !os(Haiku)
@@ -236,33 +358,6 @@ internal func _make_posix_spawn_file_actions_t()
 }
 #endif
 #endif
-
-internal func _signalToString(_ signal: Int) -> String {
-  switch CInt(signal) {
-  case SIGILL:  return "SIGILL"
-  case SIGTRAP: return "SIGTRAP"
-  case SIGABRT: return "SIGABRT"
-  case SIGFPE:  return "SIGFPE"
-  case SIGBUS:  return "SIGBUS"
-  case SIGSEGV: return "SIGSEGV"
-  case SIGSYS:  return "SIGSYS"
-  default:      return "SIG???? (\(signal))"
-  }
-}
-
-public enum ProcessTerminationStatus : CustomStringConvertible {
-  case exit(Int)
-  case signal(Int)
-
-  public var description: String {
-    switch self {
-    case .exit(let status):
-      return "Exit(\(status))"
-    case .signal(let signal):
-      return "Signal(\(_signalToString(signal)))"
-    }
-  }
-}
 
 public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
   var status: CInt = 0

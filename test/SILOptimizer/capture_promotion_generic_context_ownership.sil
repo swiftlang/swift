@@ -13,7 +13,7 @@ typealias Int = Builtin.Int32
 // invariants.
 
 // CHECK-LABEL: sil @$s14promotable_boxTf2i_n : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
-sil @promotable_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+sil [ossa] @promotable_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 entry(%b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %v = load [trivial] %a : $*Int
@@ -25,8 +25,8 @@ entry(%b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
 // CHECK:         [[F:%.*]] = function_ref @$s14promotable_boxTf2i_n
 // CHECK:         partial_apply [callee_guaranteed] [[F]](
 
-sil @call_promotable_box_from_generic : $@convention(thin) <T> (@in T, Int) -> @owned @callee_guaranteed () -> Int {
-entry(%0 : @trivial $*T, %1 : @trivial $Int):
+sil [ossa] @call_promotable_box_from_generic : $@convention(thin) <T> (@in T, Int) -> @owned @callee_guaranteed () -> Int {
+entry(%0 : $*T, %1 : $Int):
   destroy_addr %0 : $*T
   %f = function_ref @promotable_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
@@ -42,8 +42,8 @@ protocol P {}
 // CHECK:       bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $Builtin.Int32):
 // CHECK-NEXT:    return [[ARG1]] : $Builtin.Int32
 
-sil @generic_promotable_box : $@convention(thin) <T> (@in T, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
-entry(%0 : @trivial $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
+sil [ossa] @generic_promotable_box : $@convention(thin) <T> (@in T, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+entry(%0 : $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %v = load [trivial] %a : $*Int
   destroy_value %b : $<τ_0_0> { var τ_0_0 } <Int>
@@ -58,8 +58,8 @@ entry(%0 : @trivial $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
 // CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[F]]<U>([[ARG2]])
 // CHECK-NEXT:    return [[CLOSURE]]
 
-sil @call_generic_promotable_box_from_different_generic : $@convention(thin) <T, U: P> (@in T, @in U, Int) -> @owned @callee_guaranteed (@in U) -> Int {
-entry(%0 : @trivial $*T, %1 : @trivial $*U, %2 : @trivial $Int):
+sil [ossa] @call_generic_promotable_box_from_different_generic : $@convention(thin) <T, U: P> (@in T, @in U, Int) -> @owned @callee_guaranteed (@in U) -> Int {
+entry(%0 : $*T, %1 : $*U, %2 : $Int):
   destroy_addr %0 : $*T
   destroy_addr %1 : $*U
   %f = function_ref @generic_promotable_box : $@convention(thin) <V> (@in V, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
@@ -87,8 +87,8 @@ struct R<T> {
 // CHECK:         switch_enum [[ARG2]] : $E<(R<T>) -> Builtin.Int32>
 // CHECK-NOT:     project_box
 // CHECK:       } // end sil function '$s23generic_promotable_box2Tf2nni_n'
-sil @generic_promotable_box2 : $@convention(thin) <T> (@in R<T>, @in Int, @owned <τ_0_0> { var E<(R<τ_0_0>) -> Int> } <T>) -> () {
-entry(%0 : @trivial $*R<T>, %1 : @trivial $*Int, %b : @owned $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>):
+sil [ossa] @generic_promotable_box2 : $@convention(thin) <T> (@in R<T>, @in Int, @owned <τ_0_0> { var E<(R<τ_0_0>) -> Int> } <T>) -> () {
+entry(%0 : $*R<T>, %1 : $*Int, %b : @owned $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>):
   %a = project_box %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>, 0
   %e = load [copy] %a : $*E<(R<T>)->Int>
   switch_enum %e : $E<(R<T>)->Int>, case #E.Some!enumelt.1 : bb1, default bb2
@@ -119,8 +119,8 @@ exit:
 // CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[F]]<U>(%2, %3)
 // CHECK-NEXT:    return [[CLOSURE]]
 
-sil @call_generic_promotable_box_from_different_generic2 : $@convention(thin) <T, U: P> (@in R<T>, @in E<(R<U>)->Int>, @in Int) -> @owned @callee_guaranteed (@in R<U>) -> () {
-entry(%0 : @trivial $*R<T>, %1 : @trivial $*E<(R<U>)->Int>, %2 : @trivial $*Int):
+sil [ossa] @call_generic_promotable_box_from_different_generic2 : $@convention(thin) <T, U: P> (@in R<T>, @in E<(R<U>)->Int>, @in Int) -> @owned @callee_guaranteed (@in R<U>) -> () {
+entry(%0 : $*R<T>, %1 : $*E<(R<U>)->Int>, %2 : $*Int):
   destroy_addr %0 : $*R<T>
   %f = function_ref @generic_promotable_box2 : $@convention(thin) <V> (@in R<V>, @in Int, @owned <τ_0_0> { var E<(R<τ_0_0>)->Int> } <V>) -> ()
   %b = alloc_box $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <U>

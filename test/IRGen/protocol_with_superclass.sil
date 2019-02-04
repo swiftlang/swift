@@ -27,8 +27,8 @@ class MoreDerived : Concrete, SubProto {}
 
 // CHECK-objc-LABEL: define hidden swiftcc void @checkExistentialDowncast(%T24protocol_with_superclass8ConcreteC*, {{.*}} {
 // CHECK-native-LABEL: define hidden swiftcc void @checkExistentialDowncast(%T24protocol_with_superclass8ConcreteC*, %swift.refcounted*, i8**, %T24protocol_with_superclass8ConcreteC*, i8**, %T24protocol_with_superclass8ConcreteC*, i8**, %T24protocol_with_superclass8ConcreteC*, i8**) {{.*}} {
-sil hidden @checkExistentialDowncast : $@convention(thin) (@owned Concrete, @owned SuperProto, @owned SuperProto & Concrete, @owned ProtoRefinesClass, @owned SubProto) -> () {
-bb0(%0 : @owned $Concrete, %1 : @owned $SuperProto, %2 : @owned $SuperProto & Concrete, %3 : @owned $ProtoRefinesClass, %4 : @owned $SubProto):
+sil hidden [ossa] @checkExistentialDowncast : $@convention(thin) (@owned Concrete, @owned SuperProto, @owned SuperProto & Concrete, @owned ProtoRefinesClass, @owned SubProto) -> () {
+bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRefinesClass, %4 : $SubProto):
 
   // CHECK:             [[ISA_ADDR:%.*]] = bitcast %T24protocol_with_superclass8ConcreteC* %0 to %swift.type**
   // CHECK-NEXT:        [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
@@ -104,7 +104,7 @@ bb0(%0 : @owned $Concrete, %1 : @owned $SuperProto, %2 : @owned $SuperProto & Co
   // CHECK-NEXT:        [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s24protocol_with_superclass7DerivedCMa"(i{{[0-9]+}} 0)
   // CHECK-NEXT:        [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
   // CHECK-NEXT:        [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
-  // CHECK-NEXT:        [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[OBJECT]], i8* [[METADATA_PTR]])
+  // CHECK-NEXT:        [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[OBJECT]], i8* [[METADATA_PTR]], {{.*}})
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[RESULT]] to %T24protocol_with_superclass7DerivedC*
   %11 = unconditional_checked_cast %3 : $ProtoRefinesClass to $Derived
 
@@ -115,7 +115,7 @@ bb0(%0 : @owned $Concrete, %1 : @owned $SuperProto, %2 : @owned $SuperProto & Co
   // CHECK-NEXT:        [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s24protocol_with_superclass10SubDerivedCMa"(i{{[0-9]+}} 0)
   // CHECK-NEXT:        [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
   // CHECK-NEXT:        [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
-  // CHECK-NEXT:        [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[OBJECT]], i8* [[METADATA_PTR]])
+  // CHECK-NEXT:        [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[OBJECT]], i8* [[METADATA_PTR]], {{.*}})
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[RESULT]] to %T24protocol_with_superclass10SubDerivedC*
   %12 = unconditional_checked_cast %3 : $ProtoRefinesClass to $SubDerived
 
@@ -150,7 +150,7 @@ bb0(%0 : @owned $Concrete, %1 : @owned $SuperProto, %2 : @owned $SuperProto & Co
   // CHECK-NEXT:        [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s24protocol_with_superclass11MoreDerivedCMa"(i{{[0-9]+}} 0)
   // CHECK-NEXT:        [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
   // CHECK-NEXT:        [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
-  // CHECK-NEXT:        [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[OBJECT]], i8* [[METADATA_PTR]])
+  // CHECK-NEXT:        [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[OBJECT]], i8* [[METADATA_PTR]], {{.*}})
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[RESULT]] to %T24protocol_with_superclass11MoreDerivedC*
   %15 = unconditional_checked_cast %4 : $SubProto to $MoreDerived
 

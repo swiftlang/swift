@@ -37,7 +37,7 @@ import resilient_class
 sil @allocResilientOutsideParent : $@convention(thin) () -> () {
 bb0:
   %c = alloc_ref $ResilientOutsideParent
-  dealloc_ref %c : $ResilientOutsideParent
+  strong_release %c : $ResilientOutsideParent
   %result = tuple ()
   return %result : $()
 }

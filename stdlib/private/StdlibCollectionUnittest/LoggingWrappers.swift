@@ -83,9 +83,8 @@ public class SequenceLog {
   public static var prefixWhile = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
   public static var suffixMaxLength = TypeIndexed(0)
-  public static var split = TypeIndexed(0)
+  public static var withContiguousStorageIfAvailable = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
-  public static var _preprocessingPass = TypeIndexed(0)
   public static var _copyToContiguousArray = TypeIndexed(0)
   public static var _copyContents = TypeIndexed(0)  
   // Collection
@@ -113,6 +112,9 @@ public class SequenceLog {
   public static var partitionBy = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupported = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupportedNonNilReturns =
+    TypeIndexed(0)
+  public static var withContiguousMutableStorageIfAvailable = TypeIndexed(0)
+  public static var withContiguousMutableStorageIfAvailableNonNilReturns =
     TypeIndexed(0)
   // RangeReplaceableCollection
   public static var init_ = TypeIndexed(0)
@@ -202,7 +204,6 @@ extension LoggingSequence: LoggingType {
 extension LoggingSequence: Sequence {
   public typealias Element = Base.Element
   public typealias Iterator = LoggingIterator<Base.Iterator>
-  public typealias SubSequence = Base.SubSequence
 
   public func makeIterator() -> Iterator {
     SequenceLog.makeIterator[selfType] += 1
@@ -213,66 +214,17 @@ extension LoggingSequence: Sequence {
     SequenceLog.underestimatedCount[selfType] += 1
     return base.underestimatedCount
   }
-
-  public func dropFirst(_ n: Int) -> SubSequence {
-    SequenceLog.dropFirst[selfType] += 1
-    return base.dropFirst(n)
-  }
-
-  public func dropLast(_ n: Int) -> SubSequence {
-    SequenceLog.dropLast[selfType] += 1
-    return base.dropLast(n)
-  }
-
-  public func drop(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    SequenceLog.dropWhile[selfType] += 1
-    return try base.drop(while: predicate)
-  }
-
-  public func prefix(_ maxLength: Int) -> SubSequence {
-    SequenceLog.prefixMaxLength[selfType] += 1
-    return base.prefix(maxLength)
-  }
-
-  public func prefix(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    SequenceLog.prefixWhile[selfType] += 1
-    return try base.prefix(while: predicate)
-  }
-
-  public func suffix(_ maxLength: Int) -> SubSequence {
-    SequenceLog.suffixMaxLength[selfType] += 1
-    return base.suffix(maxLength)
-  }
-
-  public func split(
-    maxSplits: Int = Int.max,
-    omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [SubSequence] {
-    SequenceLog.split[selfType] += 1
-    return try base.split(
-      maxSplits: maxSplits,
-      omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: isSeparator)
+  
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    SequenceLog.withContiguousStorageIfAvailable[selfType] += 1
+    return try base.withContiguousStorageIfAvailable(body)
   }
 
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     SequenceLog._customContainsEquatableElement[selfType] += 1
     return base._customContainsEquatableElement(element)
-  }
-
-  /// If `self` is multi-pass (i.e., a `Collection`), invoke
-  /// `preprocess` on `self` and return its result.  Otherwise, return
-  /// `nil`.
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    SequenceLog._preprocessingPass[selfType] += 1
-    return try base._preprocessingPass(preprocess)
   }
 
   /// Create a native array buffer containing the elements of `self`,
@@ -297,6 +249,7 @@ public typealias LoggingCollection<Base: Collection> = LoggingSequence<Base>
 extension LoggingCollection: Collection {  
   public typealias Index = Base.Index
   public typealias Indices = Base.Indices
+  public typealias SubSequence = Base.SubSequence
 
   public var startIndex: Index {
     CollectionLog.startIndex[selfType] += 1
@@ -443,6 +396,17 @@ extension LoggingMutableCollection: MutableCollection {
     return result
   }
 
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    MutableCollectionLog.withContiguousMutableStorageIfAvailable[selfType] += 1
+    let result = try base.withContiguousMutableStorageIfAvailable(body)
+    if result != nil {
+      Log.withContiguousMutableStorageIfAvailable[selfType] += 1
+    }
+    return result
+  }
+
 }
 
 public typealias LoggingMutableBidirectionalCollection<
@@ -559,10 +523,10 @@ public typealias LoggingRangeReplaceableRandomAccessCollection<
 > = LoggingRangeReplaceableCollection<Base>
 
 //===----------------------------------------------------------------------===//
-// Collections that count calls to `_withUnsafeMutableBufferPointerIfSupported`
+// Collections that count calls to `withContiguousMutableStorageIfAvailable`
 //===----------------------------------------------------------------------===//
 
-/// Interposes between `_withUnsafeMutableBufferPointerIfSupported` method calls
+/// Interposes between `withContiguousMutableStorageIfAvailable` method calls
 /// to increment a counter. Calls to this method from within dispatched methods
 /// are uncounted by the standard logging collection wrapper.
 public struct BufferAccessLoggingMutableCollection<
@@ -642,6 +606,17 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
     if result != nil {
       Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType] += 1
+    }
+    return result
+  }
+  
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    Log.withContiguousMutableStorageIfAvailable[selfType] += 1
+    let result = try base.withContiguousMutableStorageIfAvailable(body)
+    if result != nil {
+      Log.withContiguousMutableStorageIfAvailable[selfType] += 1
     }
     return result
   }

@@ -10,5 +10,9 @@
 // CHECK-SWIFTC-elf: 2: swift-autolink-extract, {1}, autolink
 // CHECK-SWIFTC-elf: 3: link, {1, 2}, image
 
+// CHECK-SWIFTC-coff: 0: input, "{{.*}}driver_mode.swift", swift
+// CHECK-SWIFTC-coff: 1: compile, {0}, object
+// CHECK-SWIFTC-coff: 2: link, {1}, image
+
 // CHECK-SWIFT: 0: input, "{{.*}}driver_mode.swift", swift
 // CHECK-SWIFT: 1: interpret, {0}, none

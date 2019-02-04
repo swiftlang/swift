@@ -13,14 +13,14 @@ import Swift
 // }
 // CopyPropagation should leave behind a single copy and no destroys.
 //
-// CHECK-LABEL: sil @testVarAssign : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil [ossa] @testVarAssign : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : @guaranteed $T):
 // CHECK-NOT: destroy
 // CHECK:   [[CPY:%.*]] = copy_value %0 : $T
 // CHECK-NOT: destroy
 // CHECK:   return [[CPY]] : $T
 // CHECK-LABEL: } // end sil function 'testVarAssign'
-sil @testVarAssign : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+sil [ossa] @testVarAssign : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%0 : @guaranteed $T):
   %1 = copy_value %0 : $T
   %2 = copy_value %1 : $T
@@ -28,7 +28,7 @@ bb0(%0 : @guaranteed $T):
   return %2 : $T
 }
 
-// CHECK: sil @multiReturnValue : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
+// CHECK: sil [ossa] @multiReturnValue : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
 // CHECK: bb0(%0 : @guaranteed $T):
 // CHECK-NOT: destroy
 // CHECK:   [[CPY1:%.*]] = copy_value %0 : $T
@@ -39,7 +39,7 @@ bb0(%0 : @guaranteed $T):
 // CHECK-NOT: destroy
 // CHECK:   return [[R]] : $(T, T)
 // CHECK-LABEL: } // end sil function 'multiReturnValue'
-sil @multiReturnValue : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
+sil [ossa] @multiReturnValue : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T) {
 bb0(%0 : @guaranteed $T):
   %1 = copy_value %0 : $T
   %2 = copy_value %1 : $T
@@ -49,7 +49,7 @@ bb0(%0 : @guaranteed $T):
   return %4 : $(T, T)
 }
 
-// CHECK-LABEL: sil @multiCallResult : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil [ossa] @multiCallResult : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : @guaranteed $T):
 // CHECK-NEXT: // function_ref multiReturnValue
 // CHECK-NEXT: [[F:%.*]] = function_ref @multiReturnValue : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
@@ -58,7 +58,7 @@ bb0(%0 : @guaranteed $T):
 // CHECK-NEXT: destroy_value [[D2]] : $T
 // CHECK-NEXT: return [[D1]] : $T
 // CHECK-LABEL: } // end sil function 'multiCallResult'
-sil @multiCallResult : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+sil [ossa] @multiCallResult : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%0 : @guaranteed $T):
   %1 = copy_value %0 : $T
   %2 = function_ref @multiReturnValue : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0)
@@ -73,8 +73,8 @@ bb0(%0 : @guaranteed $T):
   return %6 : $T
 }
 
-// CHECK-LABEL: sil @testPhi : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Bool) -> @out T {
-// CHECK: bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : @trivial $Bool):
+// CHECK-LABEL: sil [ossa] @testPhi : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Bool) -> @out T {
+// CHECK: bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : $Bool):
 // CHECK-NEXT: %3 = struct_extract %2 : $Bool, #Bool._value
 // CHECK-NEXT: cond_br %3, bb1, bb2
 //
@@ -89,8 +89,8 @@ bb0(%0 : @guaranteed $T):
 // CHECK: bb3(%9 : @owned $T):
 // CHECK-NEXT: return %9 : $T
 // CHECK-LABEL: } // end sil function 'testPhi'
-sil @testPhi : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Bool) -> @out T {
-bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : @trivial $Bool):
+sil [ossa] @testPhi : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Bool) -> @out T {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : $Bool):
   %3 = copy_value %0 : $T
   %4 = copy_value %1 : $T
   %5 = struct_extract %2 : $Bool, #Bool._value
@@ -110,8 +110,8 @@ bb3(%11 : @owned $T):
   return %11 : $T
 }
 
-// CHECK-LABEL: sil @testConsume : $@convention(thin) <T> (@in T, @inout T) -> () {
-// CHECK: bb0(%0 : @owned $T, %1 : @trivial $*T):
+// CHECK-LABEL: sil [ossa] @testConsume : $@convention(thin) <T> (@in T, @inout T) -> () {
+// CHECK: bb0(%0 : @owned $T, %1 : $*T):
 //
 // The original copy_value is deleted.
 // CHECK-NEXT:   debug_value %0 : $T
@@ -131,8 +131,8 @@ bb3(%11 : @owned $T):
 // CHECK-NEXT:   %8 = tuple ()
 // CHECK-NEXT:   return %8 : $()
 // CHECK-LABEL: // end sil function 'testConsume'
-sil @testConsume : $@convention(thin) <T> (@in T, @inout T) -> () {
-bb0(%arg : @owned $T, %addr : @trivial $*T):
+sil [ossa] @testConsume : $@convention(thin) <T> (@in T, @inout T) -> () {
+bb0(%arg : @owned $T, %addr : $*T):
   %copy = copy_value %arg : $T
   debug_value %copy : $T
   store %copy to [init] %addr : $*T
@@ -143,8 +143,8 @@ bb0(%arg : @owned $T, %addr : @trivial $*T):
   return %v : $()
 }
 
-// CHECK-LABEL: sil @testDestroyEdge : $@convention(thin) <T> (@in T, @inout T, Builtin.Int1) -> () {
-// CHECK: bb0(%0 : @owned $T, %1 : @trivial $*T, %2 : @trivial $Builtin.Int1):
+// CHECK-LABEL: sil [ossa] @testDestroyEdge : $@convention(thin) <T> (@in T, @inout T, Builtin.Int1) -> () {
+// CHECK: bb0(%0 : @owned $T, %1 : $*T, %2 : $Builtin.Int1):
 // CHECK-NEXT:   cond_br %2, bb2, bb1
 //
 // CHECK: bb1:
@@ -164,8 +164,8 @@ bb0(%arg : @owned $T, %addr : @trivial $*T):
 // CHECK-NEXT:   %9 = tuple ()
 // CHECK-NEXT:   return %9 : $()
 // CHECK-LABEL: } // end sil function 'testDestroyEdge'
-sil @testDestroyEdge : $@convention(thin) <T> (@in T, @inout T, Builtin.Int1) -> () {
-bb0(%arg : @owned $T, %addr : @trivial $*T, %z : @trivial $Builtin.Int1):
+sil [ossa] @testDestroyEdge : $@convention(thin) <T> (@in T, @inout T, Builtin.Int1) -> () {
+bb0(%arg : @owned $T, %addr : $*T, %z : $Builtin.Int1):
   cond_br %z, bb1, bb2
 
 bb1:
@@ -180,12 +180,12 @@ bb2:
   return %10 : $()
 }
 
-sil @takeGuaranteedAndOwnedArg : $@convention(thin) <T> (@in_guaranteed T, @in T) -> ()
+sil [ossa] @takeGuaranteedAndOwnedArg : $@convention(thin) <T> (@in_guaranteed T, @in T) -> ()
 
 // Test the same user instruction with both @guaranteed and @owned operands taking the same copied value.
 // We need to keep the value alive to the end of the instruction.
 //
-// CHECK-LABEL: sil @testGuaranteedAndOwnedArg : $@convention(thin) <T> (@in T) -> () {
+// CHECK-LABEL: sil [ossa] @testGuaranteedAndOwnedArg : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0(%0 : @owned $T):
 // CHECK-NEXT: // function_ref takeGuaranteedAndOwnedArg
 // CHECK-NEXT: function_ref @takeGuaranteedAndOwnedArg : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @in τ_0_0) -> ()
@@ -194,7 +194,7 @@ sil @takeGuaranteedAndOwnedArg : $@convention(thin) <T> (@in_guaranteed T, @in T
 // CHECK-NEXT: destroy_value %0 : $T
 // CHECK-NEXT: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'testGuaranteedAndOwnedArg'
-sil @testGuaranteedAndOwnedArg : $@convention(thin) <T> (@in T) -> () {
+sil [ossa] @testGuaranteedAndOwnedArg : $@convention(thin) <T> (@in T) -> () {
 bb(%0 : @owned $T):
   %copy = copy_value %0 : $T
   %f = function_ref @takeGuaranteedAndOwnedArg : $@convention(thin) <T> (@in_guaranteed T, @in T) -> ()

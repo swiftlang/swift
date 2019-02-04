@@ -1,24 +1,33 @@
-set(SWIFT_API_NOTES_INPUTS
-  Accelerate
-  Dispatch
-  ScriptingBridge
-  os
+set(sources
+  Accelerate.apinotes
+  Dispatch.apinotes
+  ScriptingBridge.apinotes
+  os.apinotes
 )
 
-if(NOT DEFINED SWIFT_API_NOTES_PATH)
-  message(FATAL_ERROR "Define SWIFT_API_NOTES_PATH before including this file")
-endif()
+set(output_dir "${SWIFTLIB_DIR}/apinotes")
 
-foreach(module ${SWIFT_API_NOTES_INPUTS})
-  if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/${module}.apinotes")
-    message(SEND_ERROR "Missing apinotes for ${module}")
-  endif()
+set(inputs)
+set(outputs)
+foreach(input ${sources})
+  list(APPEND inputs "${CMAKE_CURRENT_SOURCE_DIR}/${input}")
+  list(APPEND outputs "${output_dir}/${input}")
 endforeach()
 
-file(GLOB SWIFT_API_NOTES_INPUT_FILES "${SWIFT_API_NOTES_PATH}/*.apinotes")
-foreach(file ${SWIFT_API_NOTES_INPUT_FILES})
-  get_filename_component(name "${file}" NAME_WE)
-  if(NOT "${name}" IN_LIST SWIFT_API_NOTES_INPUTS)
-    message(SEND_ERROR "Found apinotes for ${name}; please add to CMakeLists.txt")
-  endif()
-endforeach()
+add_custom_command(
+    OUTPUT "${output_dir}"
+    COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
+add_custom_command(
+    OUTPUT ${outputs}
+    DEPENDS ${inputs} "${output_dir}"
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "copy_if_different" ${inputs} "${output_dir}/")
+
+add_custom_target("copy_apinotes"
+    DEPENDS "${outputs}" "${output_dir}"
+    COMMENT "Copying API notes to ${output_dir}"
+    SOURCES "${sources}")
+
+swift_install_in_component(sdk-overlay
+    FILES ${sources}
+    DESTINATION "lib/swift/apinotes")

@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4.2
-// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-testing
-// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-resilience
-// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-resilience -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience -enable-testing
 @inlinable struct TestInlinableStruct {}
 // expected-error@-1 {{'@inlinable' attribute cannot be applied to this declaration}}
 
@@ -20,7 +20,7 @@ public func publicFunction() {}
 private struct PrivateStruct {}
 // expected-note@-1 3{{struct 'PrivateStruct' is not '@usableFromInline' or public}}
 struct InternalStruct {}
-// expected-note@-1 4{{struct 'InternalStruct' is not '@usableFromInline' or public}}
+// expected-note@-1 3{{struct 'InternalStruct' is not '@usableFromInline' or public}}
 @usableFromInline struct VersionedStruct {
   @usableFromInline init() {}
 }
@@ -79,18 +79,6 @@ public struct Struct {
     // expected-error@-1 {{struct 'PrivateStruct' is private and cannot be referenced from an '@inlinable' function}}
   }
 
-  @inline(__always)
-  public func publicInlineAlwaysMethod(x: Any) {
-    struct Nested {}
-    // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inline(__always)' function}}
-
-    switch x {
-      case is InternalStruct:
-      // expected-error@-1 {{struct 'InternalStruct' is internal and cannot be referenced from an '@inline(__always)' function}}
-        _ = ()
-    }
-  }
-
   private func privateMethod() {}
   // expected-note@-1 {{instance method 'privateMethod()' is not '@usableFromInline' or public}}
 
@@ -107,13 +95,6 @@ public struct Struct {
   func internalInlinableMethod() {
     struct Nested {}
     // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inlinable' function}}
-  }
-
-  @inline(__always)
-  @usableFromInline
-  func versionedInlineAlwaysMethod() {
-    struct Nested {}
-    // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inline(__always)' function}}
   }
 
   @_transparent
@@ -176,7 +157,7 @@ enum InternalEnum {
   case apple
   case orange
   case pear(InternalEnum)
-  // expected-warning@-1 {{type of enum case in '@usableFromInline' enum should be '@usableFromInline' or public}}
+  // expected-error@-1 {{type of enum case in '@usableFromInline' enum must be '@usableFromInline' or public}}
   case persimmon(String)
 }
 
@@ -267,3 +248,22 @@ public struct KeypathStruct {
     // expected-error@-1 {{property 'x' is internal and cannot be referenced from an '@inlinable' function}}
   }
 }
+
+public struct HasInternalSetProperty {
+  public internal(set) var x: Int // expected-note {{setter for 'x' is not '@usableFromInline' or public}}
+
+  @inlinable public mutating func setsX() {
+    x = 10 // expected-error {{setter for 'x' is internal and cannot be referenced from an '@inlinable' function}}
+  }
+}
+
+@usableFromInline protocol P {
+  typealias T = Int
+}
+
+extension P {
+  @inlinable func f() {
+    _ = T.self // ok, typealias inherits @usableFromInline from P
+  }
+}
+

@@ -250,12 +250,14 @@ class BuildScriptInvocation(object):
                     args.android_icu_uc is None or \
                     args.android_icu_uc_include is None or \
                     args.android_icu_i18n is None or \
-                    args.android_icu_i18n_include is None:
+                    args.android_icu_i18n_include is None or \
+                    args.android_icu_data is None:
                 diagnostics.fatal(
                     "when building for Android, --android-ndk, "
-                    "--android-ndk-version, --android-icu-uc, "
+                    "--android-api-level, --android-icu-uc, "
                     "--android-icu-uc-include, --android-icu-i18n, "
-                    "and --android-icu-i18n-include must be specified")
+                    "--android-icu-i18n-include, and --android-icu-data "
+                    "must be specified")
 
     @staticmethod
     def apply_default_arguments(toolchain, args):
@@ -292,8 +294,12 @@ class BuildScriptInvocation(object):
 
         # Add optional stdlib-deployment-targets
         if args.android:
-            args.stdlib_deployment_targets.append(
-                StdlibDeploymentTarget.Android.armv7.name)
+            if args.android_arch == "armv7":
+                args.stdlib_deployment_targets.append(
+                    StdlibDeploymentTarget.Android.armv7.name)
+            elif args.android_arch == "aarch64":
+                args.stdlib_deployment_targets.append(
+                    StdlibDeploymentTarget.Android.aarch64.name)
 
         # Infer platform flags from manually-specified configure targets.
         # This doesn't apply to Darwin platforms, as they are
@@ -398,6 +404,7 @@ class BuildScriptInvocation(object):
         if not args.test_watchos_host:
             self.platforms_to_skip_test_host.add(
                 StdlibDeploymentTarget.AppleWatch)
+        self.build_libparser_only = args.build_libparser_only
 
     def initialize_runtime_environment(self):
         """Change the program environment for building."""
@@ -414,6 +421,9 @@ class BuildScriptInvocation(object):
                 'TVOS_DEPLOYMENT_TARGET',
                 'WATCHOS_DEPLOYMENT_TARGET']:
             os.environ.pop(v, None)
+
+        # Set NINJA_STATUS to format ninja output
+        os.environ['NINJA_STATUS'] = '[%f/%t][%p][%es] '
 
     def build_ninja(self):
         if not os.path.exists(self.workspace.source_dir("ninja")):
@@ -474,6 +484,8 @@ class BuildScriptInvocation(object):
             "--xctest-build-type", args.build_variant,
             "--swiftpm-build-type", args.build_variant,
             "--swiftsyntax-build-type", args.build_variant,
+            "--skstresstester-build-type", args.build_variant,
+            "--swiftevolve-build-type", args.build_variant,
             "--llbuild-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
@@ -519,9 +531,11 @@ class BuildScriptInvocation(object):
             # just invoke cmake from build-script directly rather than futzing
             # with build-script-impl. This makes even more sense since there
             # really isn't a security issue here.
-            impl_args += [
-                "--%s-cmake-options=%s" % (product_name, ' '.join(cmake_opts))
-            ]
+            if cmake_opts:
+                impl_args += [
+                    "--{}-cmake-options={}".format(
+                        product_name, ' '.join(cmake_opts))
+                ]
 
         if args.build_stdlib_deployment_targets:
             impl_args += [
@@ -593,6 +607,10 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-swiftpm"]
         if not args.build_swiftsyntax:
             impl_args += ["--skip-build-swiftsyntax"]
+        if not args.build_skstresstester:
+            impl_args += ["--skip-build-skstresstester"]
+        if not args.build_swiftevolve:
+            impl_args += ["--skip-build-swiftevolve"]
         if not args.build_playgroundsupport:
             impl_args += ["--skip-build-playgroundsupport"]
         if args.build_swift_dynamic_stdlib:
@@ -637,6 +655,8 @@ class BuildScriptInvocation(object):
                           "--skip-test-llbuild",
                           "--skip-test-swiftpm",
                           "--skip-test-swiftsyntax",
+                          "--skip-test-skstresstester",
+                          "--skip-test-swiftevolve",
                           "--skip-test-xctest",
                           "--skip-test-foundation",
                           "--skip-test-libdispatch",
@@ -680,17 +700,19 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-optimized"]
         if not args.test_optimize_for_size:
             impl_args += ["--skip-test-optimize-for-size"]
-
+        if args.build_libparser_only:
+            impl_args += ["--build-libparser-only"]
         if args.android:
             impl_args += [
+                "--android-arch", args.android_arch,
                 "--android-ndk", args.android_ndk,
                 "--android-api-level", args.android_api_level,
-                "--android-ndk-gcc-version",
-                args.android_ndk_gcc_version,
+                "--android-ndk-gcc-version", args.android_ndk_gcc_version,
                 "--android-icu-uc", args.android_icu_uc,
                 "--android-icu-uc-include", args.android_icu_uc_include,
                 "--android-icu-i18n", args.android_icu_i18n,
                 "--android-icu-i18n-include", args.android_icu_i18n_include,
+                "--android-icu-data", args.android_icu_data,
             ]
         if args.android_deploy_device_path:
             impl_args += [
@@ -824,16 +846,20 @@ class BuildScriptInvocation(object):
         product_classes.append(products.Swift)
         if self.args.build_lldb:
             product_classes.append(products.LLDB)
-        if self.args.build_llbuild:
-            product_classes.append(products.LLBuild)
         if self.args.build_libdispatch:
             product_classes.append(products.LibDispatch)
         if self.args.build_foundation:
             product_classes.append(products.Foundation)
         if self.args.build_xctest:
             product_classes.append(products.XCTest)
+        if self.args.build_llbuild:
+            product_classes.append(products.LLBuild)
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
+        if self.args.build_swiftsyntax:
+            product_classes.append(products.SwiftSyntax)
+        if self.args.build_skstresstester:
+            product_classes.append(products.SKStressTester)
         return product_classes
 
     def execute(self):
@@ -858,7 +884,7 @@ class BuildScriptInvocation(object):
                         name == "merged-hosts-lipo"), "invalid action"
                 action_name = name
             elif product_class is None:
-                assert name == "package", "invalid action"
+                assert name in ("package", "extractsymbols"), "invalid action"
                 action_name = "{}-{}".format(host.name, name)
             else:
                 assert name is not None, "invalid action"
@@ -909,6 +935,10 @@ class BuildScriptInvocation(object):
         for host_target in all_hosts:
             for product_class in product_classes:
                 execute_one_impl_action(host_target, product_class, "install")
+
+        # Extract symbols...
+        for host_target in all_hosts:
+            execute_one_impl_action(host_target, name="extractsymbols")
 
         # Package...
         for host_target in all_hosts:
@@ -973,8 +1003,13 @@ def main_preset():
         help="Print the expanded build-script invocation generated "
              "by the preset, but do not run the preset",
         action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--swiftsyntax-install-prefix",
+        help="specify the directory to where SwiftSyntax should be installed")
+    parser.add_argument(
+        "--build-dir",
+        help="specify the directory where build artifact should be stored")
     args = parser.parse_args()
-
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
             os.path.join(
@@ -1024,6 +1059,12 @@ def main_preset():
         build_script_args += ["--distcc"]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
+    if args.swiftsyntax_install_prefix:
+        build_script_args += ["--install-swiftsyntax",
+                              "--install-destdir",
+                              args.swiftsyntax_install_prefix]
+    if args.build_dir:
+        build_script_args += ["--build-dir", args.build_dir]
 
     diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
         args.preset, shell.quote_command(build_script_args)))

@@ -17,53 +17,9 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
-
-/// Does the given coroutine make any stack allocations that are live across
-/// its yields?
-static bool allocatesStackAcrossYields(SILFunction *F) {
-  assert(F->getLoweredFunctionType()->isCoroutine());
-
-  return hasStackDifferencesAt(&F->getEntryBlock()->front(),
-                               [](SILInstruction *i) -> InstructionMatchResult {
-    if (isa<YieldInst>(i)) {
-      return {
-        /*matches*/ true,
-        /*halt*/ i->getFunction()->getLoweredFunctionType()->getCoroutineKind()
-                       == SILCoroutineKind::YieldOnce
-      };
-    }
-
-    // Otherwise, search until the end of the function.
-    return { false, false };
-  });
-}
-
-static bool isEndOfApply(SILInstruction *i, BeginApplyInst *beginApply) {
-  if (auto endApply = dyn_cast<EndApplyInst>(i)) {
-    return endApply->getBeginApply() == beginApply;
-  } else if (auto abortApply = dyn_cast<AbortApplyInst>(i)) {
-    return abortApply->getBeginApply() == beginApply;
-  } else {
-    return false;
-  }
-}
-
-/// Are there any stack differences from the given begin_apply to any
-/// corresponding end_apply/abort_apply?
-static bool hasStackDifferencesAtEnds(BeginApplyInst *apply) {
-  return hasStackDifferencesAt(apply, [apply](SILInstruction *i)
-                                                     -> InstructionMatchResult {
-    // Search for ends of the original apply.  We can stop searching
-    // at these points.
-    if (isEndOfApply(i, apply))
-      return { true, true };
-    return { false, false };
-  });
-}
 
 static bool canInlineBeginApply(BeginApplyInst *BA) {
   // Don't inline if we have multiple resumption sites (i.e. end_apply or
@@ -106,6 +62,9 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
 }
 
 bool SILInliner::canInlineApplySite(FullApplySite apply) {
+  if (!apply.canOptimize())
+    return false;
+
   if (auto BA = dyn_cast<BeginApplyInst>(apply))
     return canInlineBeginApply(BA);
 
@@ -119,7 +78,6 @@ class BeginApplySite {
   SILBuilder *Builder;
   BeginApplyInst *BeginApply;
   bool HasYield = false;
-  bool NeedsStackCorrection;
 
   EndApplyInst *EndApply = nullptr;
   SILBasicBlock *EndApplyBB = nullptr;
@@ -131,31 +89,15 @@ class BeginApplySite {
 
 public:
   BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
-                 SILBuilder *Builder, bool NeedsStackCorrection)
-      : Loc(Loc), Builder(Builder), BeginApply(BeginApply),
-        NeedsStackCorrection(NeedsStackCorrection) {}
+                 SILBuilder *Builder)
+      : Loc(Loc), Builder(Builder), BeginApply(BeginApply) {}
 
   static Optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
                                       SILBuilder *Builder) {
     auto *BeginApply = dyn_cast<BeginApplyInst>(AI);
     if (!BeginApply)
       return None;
-
-    // We need stack correction if there are both:
-    //   - stack allocations in the callee that are live across the yield and
-    //   - stack differences in the caller from the begin_apply to any
-    //     end_apply or abort_apply.
-    // In these cases, naive cloning will cause the allocations to become
-    // improperly nested.
-    //
-    // We need to compute this here before we do any splitting in the parent
-    // function.
-    bool NeedsStackCorrection = false;
-    if (allocatesStackAcrossYields(BeginApply->getReferencedFunction()) &&
-        hasStackDifferencesAtEnds(BeginApply))
-      NeedsStackCorrection = true;
-
-    return BeginApplySite(BeginApply, Loc, Builder, NeedsStackCorrection);
+    return BeginApplySite(BeginApply, Loc, Builder);
   }
 
   void preprocess(SILBasicBlock *returnToBB) {
@@ -283,11 +225,6 @@ public:
       AbortApply->eraseFromParent();
 
     assert(!BeginApply->hasUsesOfAnyResult());
-
-    // Correct the stack if necessary.
-    if (NeedsStackCorrection) {
-      StackNesting().correctStackNesting(BeginApply->getFunction());
-    }
   }
 };
 } // namespace swift
@@ -310,7 +247,7 @@ class SILInlineCloner
 
   SILInliner::DeletionFuncTy DeletionCallback;
 
-  /// \brief The location representing the inlined instructions.
+  /// The location representing the inlined instructions.
   ///
   /// This location wraps the call site AST node that is being inlined.
   /// Alternatively, it can be the SIL file location of the call site (in case
@@ -385,7 +322,7 @@ protected:
 };
 } // namespace swift
 
-SILBasicBlock::iterator
+std::pair<SILBasicBlock::iterator, SILBasicBlock *>
 SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                            ArrayRef<SILValue> appliedArgs) {
   assert(canInlineApplySite(apply)
@@ -393,7 +330,8 @@ SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
 
   SILInlineCloner cloner(calleeFunction, apply, FuncBuilder, IKind, ApplySubs,
                          OpenedArchetypesTracker, DeletionCallback);
-  return cloner.cloneInline(appliedArgs);
+  auto nextI = cloner.cloneInline(appliedArgs);
+  return std::make_pair(nextI, cloner.getLastClonedBB());
 }
 
 SILInlineCloner::SILInlineCloner(
@@ -509,23 +447,16 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   // NextIter is initialized during `fixUp`.
   cloneFunctionBody(getCalleeFunction(), callerBB, entryArgs);
 
-  // As a trivial optimization, if the apply block falls through, merge it. The
-  // fall through is likely the ReturnToBB, but that is not guaranteed.
-  if (auto *BI = dyn_cast<BranchInst>(callerBB->getTerminator())) {
-    // FIXME: should be an assert once critical edges are fixed.
-    // assert(BI->getDestBB()->getSinglePredecessorBlock() &&
-    //       "the return block cannot have other predecessors.");
-    if (BI->getDestBB()->getSinglePredecessorBlock()) {
-      SILInstruction *firstInlinedInst = &*NextIter;
-      if (firstInlinedInst == BI)
-        firstInlinedInst = &BI->getDestBB()->front();
-
-      mergeBasicBlockWithSuccessor(BI->getParent(), /*DT*/ nullptr,
-                                   /*LI*/ nullptr);
-      NextIter = firstInlinedInst->getIterator();
-      ReturnToBB = nullptr;
-    }
-  }
+  // For non-throwing applies, the inlined body now unconditionally branches to
+  // the returned-to-code, which was previously part of the call site's basic
+  // block. We could trivially merge these blocks now, however, this would be
+  // quadratic: O(num-calls-in-block * num-instructions-in-block). Also,
+  // guaranteeing that caller instructions following the inlined call are in a
+  // separate block gives the inliner control over revisiting only the inlined
+  // instructions.
+  //
+  // Once all calls in a function are inlined, unconditional branches are
+  // eliminated by mergeBlocks.
   return NextIter;
 }
 
@@ -596,7 +527,7 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
                                                  FullApplySite AI) {
-  if (!AI.getFunction()->hasQualifiedOwnership()
+  if (!AI.getFunction()->hasOwnership()
       || callArg.getOwnershipKind() != ValueOwnershipKind::Owned) {
     return callArg;
   }
@@ -686,6 +617,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::PreviousDynamicFunctionRefInst:
+  case SILInstructionKind::DynamicFunctionRefInst:
   case SILInstructionKind::FunctionRefInst:
   case SILInstructionKind::AllocGlobalInst:
   case SILInstructionKind::GlobalAddrInst:
@@ -911,7 +844,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   }
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::MarkUninitializedInst:
-  case SILInstructionKind::MarkUninitializedBehaviorInst:
     llvm_unreachable("not valid in canonical sil");
   case SILInstructionKind::ObjectInst:
     llvm_unreachable("not valid in a function");

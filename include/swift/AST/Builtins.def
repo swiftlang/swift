@@ -423,9 +423,29 @@ BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
+///
+/// Parameters: object size, object alignment.
+///
+/// This alignment is not a mask; the compiler decrements by one to provide
+/// a mask to the runtime.
+///
+/// If alignment == 0, then the runtime will use "aligned" allocation,
+/// and the memory will be aligned to _swift_MinAllocationAlignment.
 BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", "", Special)
 
 /// DeallocRaw has type (Builtin.RawPointer, Int, Int) -> ()
+///
+/// Parameters: object address, object size, object alignment.
+///
+/// This alignment is not a mask; the compiler decrements by one to provide
+/// a mask to the runtime.
+///
+/// If alignment == 0, then the runtime will use the "aligned" deallocation
+/// path, which assumes that "aligned" allocation was used.
+///
+/// Note that the alignment value provided to `deallocRaw` must be identical to
+/// the alignment value provided to `allocRaw` when the memory at this address
+/// was allocated.
 BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 
 /// Fence has type () -> ().
@@ -478,14 +498,6 @@ BUILTIN_MISC_OPERATION(SToSCheckedTrunc, "s_to_s_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(SToUCheckedTrunc, "s_to_u_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(UToUCheckedTrunc, "u_to_u_checked_trunc", "n", Special)
 
-/// Checked conversions for signed <-> unsigned integers of the same size.
-/// Returns a tuple containing the conversion result as well as
-/// the sign error / overflow bit.
-BUILTIN_MISC_OPERATION(SUCheckedConversion,
-                       "s_to_u_checked_conversion", "n", Special)
-BUILTIN_MISC_OPERATION(USCheckedConversion,
-                       "u_to_s_checked_conversion", "n", Special)
-
 /// IntToFPWithOverflow has type (Integer) -> Float
 BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
 
@@ -536,6 +548,9 @@ BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoi
 /// willThrow: Error -> ()
 BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
+/// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
+BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
+
 #undef BUILTIN_MISC_OPERATION
 
 /// Builtins for instrumentation added by sanitizers during SILGen.
@@ -557,6 +572,7 @@ BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoin, type_join)
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinInout, type_join_inout)
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinMeta, type_join_meta)
+BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagnostic)
 
 #undef BUILTIN_TYPE_CHECKER_OPERATION
 

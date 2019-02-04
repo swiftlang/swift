@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Contains various constants and helper types to deal with serialized
+/// Contains various constants and helper types to deal with serialized
 /// modules.
 ///
 //===----------------------------------------------------------------------===//
@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 458; // Last change: enrich FILE_DEPENDENCY records.
+const uint16_t SWIFTMODULE_VERSION_MINOR = 472; // Last change: partial_apply [stack]
 
 using DeclIDField = BCFixed<31>;
 
@@ -108,6 +108,7 @@ using CharOffsetField = BitOffsetField;
 
 using FileSizeField = BCVBR<16>;
 using FileModTimeField = BCVBR<16>;
+using FileHashField = BCVBR<16>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -287,13 +288,6 @@ enum MetatypeRepresentation : uint8_t {
 };
 using MetatypeRepresentationField = BCFixed<2>;
 
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum class AddressorKind : uint8_t {
-  NotAddressor, Unsafe, Owning, NativeOwning
-};
-using AddressorKindField = BCFixed<3>;
- 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class SelfAccessKind : uint8_t {
@@ -592,7 +586,8 @@ namespace options_block {
     XCC,
     IS_SIB,
     IS_TESTABLE,
-    RESILIENCE_STRATEGY
+    RESILIENCE_STRATEGY,
+    ARE_PRIVATE_IMPORTS_ENABLED
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -612,6 +607,10 @@ namespace options_block {
 
   using IsTestableLayout = BCRecordLayout<
     IS_TESTABLE
+  >;
+
+  using ArePrivateImportsEnabledLayout = BCRecordLayout<
+    ARE_PRIVATE_IMPORTS_ENABLED
   >;
 
   using ResilienceStrategyLayout = BCRecordLayout<
@@ -654,7 +653,7 @@ namespace input_block {
     IMPORTED_HEADER,
     BCFixed<1>, // exported?
     FileSizeField, // file size (for validation)
-    FileModTimeField, // file mtime (for validation)
+    FileHashField, // file hash (for validation)
     BCBlob // file path
   >;
 
@@ -694,7 +693,7 @@ namespace decls_block {
     TypeIDField  // canonical type (a fallback)
   >;
 
-  using NameAliasTypeLayout = BCRecordLayout<
+  using TypeAliasTypeLayout = BCRecordLayout<
     NAME_ALIAS_TYPE,
     DeclIDField,      // typealias decl
     TypeIDField,      // parent type
@@ -739,7 +738,6 @@ namespace decls_block {
     FUNCTION_TYPE,
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
-    BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // noescape?
     BCFixed<1>   // throws?
 
@@ -1026,6 +1024,7 @@ namespace decls_block {
     VarDeclSpecifierField, // specifier
     TypeIDField,           // interface type
     BCFixed<1>,            // isVariadic?
+    BCFixed<1>,            // isAutoClosure?
     DefaultArgumentField,  // default argument kind
     BCBlob                 // default argument text
   >;
@@ -1077,7 +1076,6 @@ namespace decls_block {
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
-    AddressorKindField, // addressor kind
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // default argument resilience expansion
@@ -1254,13 +1252,8 @@ namespace decls_block {
   >;
 
   using GenericParamListLayout = BCRecordLayout<
-    GENERIC_PARAM_LIST
-    // The actual parameters and requirements trail the record.
-  >;
-
-  using GenericParamLayout = BCRecordLayout<
-    GENERIC_PARAM,
-    DeclIDField // Typealias
+    GENERIC_PARAM_LIST,
+    BCArray<DeclIDField>        // the GenericTypeParamDecls
   >;
 
   using GenericSignatureLayout = BCRecordLayout<
@@ -1309,6 +1302,11 @@ namespace decls_block {
     BCVBR<2> // context-scoped discriminator counter
   >;
 
+  using FilenameForPrivateLayout = BCRecordLayout<
+    FILENAME_FOR_PRIVATE,
+    IdentifierIDField  // the file name, as an identifier
+  >;
+
   /// A placeholder for lack of concrete conformance information.
   using AbstractProtocolConformanceLayout = BCRecordLayout<
     ABSTRACT_PROTOCOL_CONFORMANCE,
@@ -1331,6 +1329,11 @@ namespace decls_block {
     // The array contains type witnesses, then value witnesses.
     // Requirement signature conformances follow, then the substitution records
     // for the associated types.
+  >;
+
+  using SelfProtocolConformanceLayout = BCRecordLayout<
+    SELF_PROTOCOL_CONFORMANCE,
+    DeclIDField // the protocol
   >;
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
@@ -1513,6 +1516,7 @@ namespace decls_block {
     = BCRecordLayout<RestatedObjCConformance_DECL_ATTR>;
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
+  using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,
@@ -1543,6 +1547,7 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCFixed<1>, // is unconditionally unavailable?
     BCFixed<1>, // is unconditionally deprecated?
+    BCFixed<1>, // is this PackageDescription version-specific kind?
     BC_AVAIL_TUPLE, // Introduced
     BC_AVAIL_TUPLE, // Deprecated
     BC_AVAIL_TUPLE, // Obsoleted
@@ -1575,6 +1580,14 @@ namespace decls_block {
     BCFixed<1> /* implicit flag */ \
   >;
 #include "swift/AST/Attr.def"
+
+  using DynamicReplacementDeclAttrLayout = BCRecordLayout<
+    DynamicReplacement_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    DeclIDField, // replaced function
+    BCVBR<4>,   // # of arguments (+1) or zero if no name
+    BCArray<IdentifierIDField>
+  >;
 
 }
 

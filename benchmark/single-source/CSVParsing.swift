@@ -4,19 +4,19 @@ public let CSVParsing = BenchmarkInfo(
     runFunction: run_CSVParsing,
     tags: [.miniapplication, .api, .String],
     setUpFunction: { buildWorkload() },
-    tearDownFunction: nil)
+    legacyFactor: 11)
 public let CSVParsingAlt = BenchmarkInfo(
     name: "CSVParsingAlt2",
     runFunction: run_CSVParsingAlt,
     tags: [.miniapplication, .api, .String],
     setUpFunction: { buildWorkload() },
-    tearDownFunction: nil)
+    legacyFactor: 11)
 public let CSVParsingAltIndices = BenchmarkInfo(
     name: "CSVParsingAltIndices2",
     runFunction: run_CSVParsingAltIndices,
     tags: [.miniapplication, .api, .String],
     setUpFunction: { buildWorkload() },
-    tearDownFunction: nil)
+    legacyFactor: 11)
 
 struct ParseError: Error {
     var message: String
@@ -198,7 +198,7 @@ let workloadBase = """
     一,二,三,四,五,六,七,
     saquui,ta'lo,tso'i,nvgi,hisgi,sudali,galiquogi
     """
-let targetRowNumber = 500
+let targetRowNumber = 50
 let repeatCount = targetRowNumber / workloadBase.split(separator: "\n").count
 let workload: String = repeatElement(workloadBase, count: repeatCount).joined()
 
@@ -247,4 +247,3 @@ public func run_CSVParsingAltIndices(_ N: Int) {
         blackHole(contents.parseAltIndices())
     }
 }
-

@@ -208,3 +208,19 @@ func ??= <T>(lhs: inout T?, rhs: T?) {}
 var c: Int = 0
 c ??= 5 // expected-error{{binary operator '??=' cannot be applied to two 'Int' operands}}
 // expected-note@-1{{expected an argument list of type '(inout T?, T?)'}}
+
+func rdar46459603() {
+  enum E {
+  case foo(value: String)
+  }
+
+  let e = E.foo(value: "String")
+  var arr = ["key": e]
+
+  _ = arr.values == [e]
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'Dictionary<String, E>.Values' and '[E]'}}
+  // expected-note@-2  {{expected an argument list of type '(Self, Self)'}}
+  _ = [arr.values] == [[e]]
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type '[Dictionary<String, E>.Values]' and '[[E]]'}}
+  // expected-note@-2  {{expected an argument list of type '(Self, Self)'}}
+}

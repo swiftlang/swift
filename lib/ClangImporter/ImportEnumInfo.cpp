@@ -33,19 +33,6 @@ STATISTIC(EnumInfoNumCacheMisses, "# of times the enum info cache was missed");
 using namespace swift;
 using namespace importer;
 
-static void rememberToChangeThisBehaviorInSwift5() {
-  // Note: Once the compiler starts advertising itself as Swift 5, even
-  // Swift 4 mode is supposed to treat C enums as non-exhaustive. Because
-  // it's Swift 4 mode, failing to switch over the whole enum will only
-  // produce a warning, not an error.
-  //
-  // This is an assertion rather than a condition because we /want/ to be
-  // reminded to take it out when we're ready for the Swift 5 release.
-  assert(version::getSwiftNumericVersion().first < 5 &&
-         "When the compiler starts advertising itself as Swift 5, even "
-         "Swift 4 mode is supposed to treat C enums as non-exhaustive.");
-}
-
 /// Find the last extensibility attribute on \p decl as arranged by source
 /// location...unless there's an API note, in which case that one wins.
 ///
@@ -59,18 +46,6 @@ getBestExtensibilityAttr(clang::Preprocessor &pp, const clang::EnumDecl *decl) {
     if (next->getLocation().isInvalid()) {
       // This is from API notes -- use it!
       return next;
-    }
-
-    // Temporarily ignore enum_extensibility attributes inside CF_ENUM and
-    // similar. In the Swift 5 release we can start respecting this annotation,
-    // meaning this entire block can be dropped.
-    {
-      rememberToChangeThisBehaviorInSwift5();
-      auto loc = next->getLocation();
-      if (loc.isMacroID() &&
-          pp.getImmediateMacroName(loc) == "__CF_ENUM_ATTRIBUTES") {
-        continue;
-      }
     }
 
     if (!bestSoFar ||

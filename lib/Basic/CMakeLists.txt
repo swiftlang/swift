@@ -1,11 +1,14 @@
 
 # On non-Darwin require UUID.
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(UUID_INCLUDE "")
   set(UUID_LIBRARIES "")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(UUID_INCLUDE "")
   set(UUID_LIBRARIES "rpcrt4.lib")
 else()
   find_package(UUID REQUIRED)
+  set(UUID_INCLUDE "-I${UUID_INCLUDE_DIRS}")
 endif()
 
 # Figure out if we can track VC revisions.
@@ -99,16 +102,13 @@ add_swift_host_library(swiftBasic STATIC
   # Platform-agnostic fallback TaskQueue implementation
   Default/TaskQueue.inc
 
-  GYB_SOURCES
-    UnicodeExtendedGraphemeClusters.cpp.gyb
-  LINK_LIBS
+  UnicodeExtendedGraphemeClusters.cpp.gyb
+
+  C_COMPILE_FLAGS ${UUID_INCLUDE}
+  LINK_LIBRARIES
     swiftDemangling
     ${UUID_LIBRARIES}
-  LINK_COMPONENTS
-    support)
-target_include_directories(swiftBasic
-                           PRIVATE
-                             ${UUID_INCLUDE_DIRS})
+  LLVM_COMPONENT_DEPENDS support)
 
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")

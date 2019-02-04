@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
+// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
+// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
 import Builtin
 import Swift
@@ -62,7 +62,7 @@ enum Optional<T> {
 }
 
 struct Unowned {
-  @sil_stored unowned let x: @sil_unowned Builtin.NativeObject
+  @_hasStorage unowned let x: @sil_unowned Builtin.NativeObject
 }
 
 sil @createS : $@convention(thin) () -> @owned S
@@ -265,7 +265,7 @@ bb3:
 }
 
 final class MyArrayBuffer {
-  @sil_stored var dummyElements: Int32
+  @_hasStorage var dummyElements: Int32
   init()
 }
 

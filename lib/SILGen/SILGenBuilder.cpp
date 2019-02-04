@@ -218,8 +218,7 @@ SILGenBuilder::createConvertFunction(SILLocation loc, ManagedValue fn,
 }
 
 ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
-    SILLocation loc, ManagedValue fn, SILType resultTy,
-    bool isEscapedByUser) {
+    SILLocation loc, ManagedValue fn, SILType resultTy) {
 
   auto fnType = fn.getType().castTo<SILFunctionType>();
   auto resultFnType = resultTy.castTo<SILFunctionType>();
@@ -234,8 +233,8 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
   (void)fnType;
   (void)resultFnType;
   SILValue fnValue = fn.getValue();
-  SILValue result = createConvertEscapeToNoEscape(
-      loc, fnValue, resultTy, isEscapedByUser, false);
+  SILValue result =
+      createConvertEscapeToNoEscape(loc, fnValue, resultTy, false);
   return ManagedValue::forTrivialObjectRValue(result);
 }
 
@@ -295,7 +294,7 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
          "value");
 
   if (ty.isObject() &&
-      originalValue.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+      originalValue.getOwnershipKind() == ValueOwnershipKind::Any) {
     return originalValue;
   }
 
@@ -436,7 +435,7 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
                                       "address only type");
 
   if (ty.isObject() &&
-      originalValue.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+      originalValue.getOwnershipKind() == ValueOwnershipKind::Any) {
     return originalValue;
   }
 
@@ -712,7 +711,7 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
 
 ManagedValue SILGenBuilder::createManagedFunctionRef(SILLocation loc,
                                                      SILFunction *f) {
-  return ManagedValue::forUnmanaged(createFunctionRef(loc, f));
+  return ManagedValue::forUnmanaged(createFunctionRefFor(loc, f));
 }
 
 ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
@@ -810,7 +809,7 @@ ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
                                         StoreOwnershipQualifier qualifier) {
   SILModule &M = SGF.F.getModule();
   CleanupCloner cloner(*this, value);
-  if (value.getType().isTrivial(M) || value.getOwnershipKind() == ValueOwnershipKind::Trivial)
+  if (value.getType().isTrivial(M) || value.getOwnershipKind() == ValueOwnershipKind::Any)
     qualifier = StoreOwnershipQualifier::Trivial;
   createStore(loc, value.forward(SGF), address, qualifier);
   return cloner.clone(address);
@@ -848,7 +847,7 @@ void SILGenBuilder::createStoreBorrow(SILLocation loc, ManagedValue value,
 void SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
                                                ManagedValue value,
                                                SILValue address) {
-  if (value.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+  if (value.getOwnershipKind() == ValueOwnershipKind::Any) {
     createStore(loc, value, address, StoreOwnershipQualifier::Trivial);
     return;
   }

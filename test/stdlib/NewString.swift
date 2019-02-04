@@ -108,7 +108,7 @@ func nonASCII() {
 
   // The storage of the slice implements NSString directly
   // CHECK-NOT: @[[utf16address]] = "❅❆❄︎⛄️"
-  // CHECK-NEXT: Swift._StringStorage@[[sliceAddress]] = "❅❆❄︎⛄️"
+  // CHECK-NEXT: {{.*}}StringStorage@[[sliceAddress]] = "❅❆❄︎⛄️"
   let nsSlice = slice as NSString
   print("  \(repr(nsSlice))")
 

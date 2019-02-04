@@ -20,14 +20,15 @@ import Darwin
 public let StringMatch = BenchmarkInfo(
   name: "StringMatch",
   runFunction: run_StringMatch,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  legacyFactor: 100)
 
 /* match: search for regexp anywhere in text */
 func match(regexp: String, text: String) -> Bool {
   if regexp.first == "^" {
     return matchHere(regexp.dropFirst(), text[...])
   }
-  
+
   var idx = text.startIndex
   while true {  // must look even if string is empty
     if matchHere(regexp[...], text[idx..<text.endIndex]) {
@@ -37,7 +38,7 @@ func match(regexp: String, text: String) -> Bool {
     // do while sufficed in the original C version...
     text.formIndex(after: &idx)
   } // while idx++ != string.endIndex
-  
+
   return false
 }
 
@@ -46,19 +47,19 @@ func matchHere(_ regexp: Substring, _ text: Substring) -> Bool {
   if regexp.isEmpty {
     return true
   }
-  
+
   if let c = regexp.first, regexp.dropFirst().first == "*" {
     return matchStar(c, regexp.dropFirst(2), text)
   }
-  
+
   if regexp.first == "$" && regexp.dropFirst().isEmpty {
     return text.isEmpty
   }
-  
+
   if let tc = text.first, let rc = regexp.first, rc == "." || tc == rc {
     return matchHere(regexp.dropFirst(), text.dropFirst())
   }
-  
+
   return false
 }
 
@@ -87,10 +88,9 @@ let tests: KeyValuePairs = [
 
 @inline(never)
 public func run_StringMatch(_ N: Int) {
-  for _ in 1...N*100 {
+  for _ in 1...N {
     for (regex, text) in tests {
       _ = match(regexp: regex,text: text)
     }
   }
 }
-

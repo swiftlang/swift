@@ -409,6 +409,7 @@ static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
   return true;
 }
 
+/// Returns true on error.
 static bool populateOutOfDateMap(InputInfoMap &map,
                                  llvm::sys::TimePoint<> &LastBuildTime,
                                  StringRef argsHashStr,
@@ -417,8 +418,11 @@ static bool populateOutOfDateMap(InputInfoMap &map,
                                  bool ShowIncrementalBuildDecisions) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
-  if (!buffer)
+  if (!buffer) {
+    if (ShowIncrementalBuildDecisions)
+      llvm::outs() << "Incremental compilation could not read build record.\n";
     return false;
+  }
 
   namespace yaml = llvm::yaml;
   using InputInfo = CompileJobAction::InputInfo;
@@ -912,7 +916,8 @@ Driver::buildCompilation(const ToolChain &TC,
   std::unique_ptr<Compilation> C;
   {
     const unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
-    const Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
+    const Optional<unsigned> DriverBatchCount =
+        getDriverBatchCount(*ArgList, Diags);
     const Optional<unsigned> DriverBatchSizeLimit =
       getDriverBatchSizeLimit(*ArgList, Diags);
     const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
@@ -922,7 +927,16 @@ Driver::buildCompilation(const ToolChain &TC,
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
     const bool EnableExperimentalDependencies =
         ArgList->hasArg(options::OPT_enable_experimental_dependencies);
+    const bool VerifyExperimentalDependencyGraphAfterEveryImport = ArgList->hasArg(
+        options::
+            OPT_driver_verify_experimental_dependency_graph_after_every_import);
+    const bool EmitExperimentalDependencyDotFileAfterEveryImport = ArgList->hasArg(
+        options::
+            OPT_driver_emit_experimental_dependency_dot_file_after_every_import);
+    const bool ExperimentalDependenciesIncludeIntrafileOnes = ArgList->hasArg(
+        options::OPT_experimental_dependency_include_intrafile);
 
+    // clang-format off
     C = llvm::make_unique<Compilation>(
         Diags, TC, OI, Level,
         std::move(ArgList),
@@ -942,7 +956,11 @@ Driver::buildCompilation(const ToolChain &TC,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
-        EnableExperimentalDependencies);
+        EnableExperimentalDependencies,
+        VerifyExperimentalDependencyGraphAfterEveryImport,
+        EmitExperimentalDependencyDotFileAfterEveryImport,
+        ExperimentalDependenciesIncludeIntrafileOnes);
+    // clang-format on
   }
 
   // Construct the graph of Actions.
@@ -972,7 +990,7 @@ Driver::buildCompilation(const ToolChain &TC,
     C->setContinueBuildingAfterErrors();
 
   if (ShowIncrementalBuildDecisions || ShowJobLifecycle)
-    C->setShowsIncrementalBuildDecisions();
+    C->setShowIncrementalBuildDecisions();
 
   if (ShowJobLifecycle)
     C->setShowJobLifecycle();
@@ -1171,7 +1189,7 @@ Driver::translateInputAndPathArgs(const InputArgList &ArgList,
   return DAL;
 }
 
-/// \brief Check that the file referenced by \p Input exists. If it doesn't,
+/// Check that the file referenced by \p Input exists. If it doesn't,
 /// issue a diagnostic and return false.
 static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
                                 DiagnosticEngine &Diags, StringRef Input) {
@@ -1389,6 +1407,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_LLVM_BC;
       break;
 
+    case options::OPT_dump_ast:
+      OI.CompilerOutputType = file_types::TY_ASTDump;
+      break;
+
     case options::OPT_emit_pch:
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       OI.CompilerOutputType = file_types::TY_PCH;
@@ -1411,11 +1433,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_Remapping;
       OI.LinkAction = LinkKind::None;
       break;
+
     case options::OPT_parse:
     case options::OPT_resolve_imports:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
-    case options::OPT_dump_ast:
     case options::OPT_emit_syntax:
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
@@ -1764,6 +1786,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
           break;
         }
         LLVM_FALLTHROUGH;
+      case file_types::TY_ASTDump:
       case file_types::TY_Image:
       case file_types::TY_dSYM:
       case file_types::TY_Dependencies:

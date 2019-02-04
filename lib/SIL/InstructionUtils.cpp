@@ -22,15 +22,30 @@
 
 using namespace swift;
 
+SILValue swift::stripOwnershipInsts(SILValue v) {
+  while (true) {
+    switch (v->getKind()) {
+    default:
+      return v;
+    case ValueKind::CopyValueInst:
+    case ValueKind::BeginBorrowInst:
+      v = cast<SingleValueInstruction>(v)->getOperand(0);
+    }
+  }
+}
+
 /// Strip off casts/indexing insts/address projections from V until there is
 /// nothing left to strip.
 /// FIXME: Why don't we strip projections after stripping indexes?
-SILValue swift::getUnderlyingObject(SILValue V) {
+SILValue swift::getUnderlyingObject(SILValue v) {
   while (true) {
-    SILValue V2 = stripIndexingInsts(stripAddressProjections(stripCasts(V)));
-    if (V2 == V)
-      return V2;
-    V = V2;
+    SILValue v2 = stripCasts(v);
+    v2 = stripAddressProjections(v2);
+    v2 = stripIndexingInsts(v2);
+    v2 = stripOwnershipInsts(v2);
+    if (v2 == v)
+      return v2;
+    v = v2;
   }
 }
 
@@ -56,12 +71,15 @@ SILValue swift::getUnderlyingAddressRoot(SILValue V) {
 }
 
 
-SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue V) {
+SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue v) {
   while (true) {
-    SILValue V2 = stripIndexingInsts(stripAddressProjections(stripCastsWithoutMarkDependence(V)));
-    if (V2 == V)
-      return V2;
-    V = V2;
+    SILValue v2 = stripCastsWithoutMarkDependence(v);
+    v2 = stripAddressProjections(v2);
+    v2 = stripIndexingInsts(v2);
+    v2 = stripOwnershipInsts(v2);
+    if (v2 == v)
+      return v2;
+    v = v2;
   }
 }
 
@@ -138,47 +156,68 @@ SILValue swift::stripCastsWithoutMarkDependence(SILValue V) {
   }
 }
 
-SILValue swift::stripCasts(SILValue V) {
+SILValue swift::stripCasts(SILValue v) {
   while (true) {
-    V = stripSinglePredecessorArgs(V);
+    v = stripSinglePredecessorArgs(v);
     
-    auto K = V->getKind();
-    if (isRCIdentityPreservingCast(K)
-        || K == ValueKind::UncheckedTrivialBitCastInst
-        || K == ValueKind::MarkDependenceInst) {
-      V = cast<SingleValueInstruction>(V)->getOperand(0);
+    auto k = v->getKind();
+    if (isRCIdentityPreservingCast(k)
+        || k == ValueKind::UncheckedTrivialBitCastInst
+        || k == ValueKind::MarkDependenceInst) {
+      v = cast<SingleValueInstruction>(v)->getOperand(0);
       continue;
     }
-    
-    return V;
+
+    SILValue v2 = stripOwnershipInsts(v);
+    if (v2 != v) {
+      v = v2;
+      continue;
+    }
+
+    return v;
   }
 }
 
-SILValue swift::stripUpCasts(SILValue V) {
-  assert(V->getType().isClassOrClassMetatype() &&
+SILValue swift::stripUpCasts(SILValue v) {
+  assert(v->getType().isClassOrClassMetatype() &&
          "Expected class or class metatype!");
   
-  V = stripSinglePredecessorArgs(V);
+  v = stripSinglePredecessorArgs(v);
   
-  while (auto upcast = dyn_cast<UpcastInst>(V))
-    V = stripSinglePredecessorArgs(upcast->getOperand());
-  
-  return V;
+  while (true) {
+    if (auto *ui = dyn_cast<UpcastInst>(v)) {
+      v = ui->getOperand();
+      continue;
+    }
+
+    SILValue v2 = stripSinglePredecessorArgs(v);
+    v2 = stripOwnershipInsts(v2);
+    if (v2 == v) {
+      return v2;
+    }
+    v = v2;
+  }
 }
 
-SILValue swift::stripClassCasts(SILValue V) {
+SILValue swift::stripClassCasts(SILValue v) {
   while (true) {
-    if (auto *UI = dyn_cast<UpcastInst>(V)) {
-      V = UI->getOperand();
+    if (auto *ui = dyn_cast<UpcastInst>(v)) {
+      v = ui->getOperand();
       continue;
     }
     
-    if (auto *UCCI = dyn_cast<UnconditionalCheckedCastInst>(V)) {
-      V = UCCI->getOperand();
+    if (auto *ucci = dyn_cast<UnconditionalCheckedCastInst>(v)) {
+      v = ucci->getOperand();
       continue;
     }
-    
-    return V;
+
+    SILValue v2 = stripOwnershipInsts(v);
+    if (v2 != v) {
+      v = v2;
+      continue;
+    }
+
+    return v;
   }
 }
 
@@ -296,6 +335,10 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
   }
 }
 
+bool swift::mayCheckRefCount(SILInstruction *User) {
+  return isa<IsUniqueInst>(User) || isa<IsEscapingClosureInst>(User);
+}
+
 bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
   auto *BI = dyn_cast<BuiltinInst>(Instruction);
   if (!BI)
@@ -307,22 +350,6 @@ bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
 
   return false;
 }
-
-SILValue swift::stripConvertFunctions(SILValue V) {
-  while (true) {
-    if (auto CFI = dyn_cast<ConvertFunctionInst>(V)) {
-      V = CFI->getOperand();
-      continue;
-    }
-    else if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(V)) {
-      V = Cvt->getOperand();
-      continue;
-    }
-    break;
-  }
-  return V;
-}
-
 
 SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   if (PAI->getNumArguments() != 1)
@@ -535,7 +562,7 @@ bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
   case OwnershipQualifiedKind::Unqualified: {
     // If we already know that the function has unqualified ownership, just
     // return early.
-    if (!F.get()->hasQualifiedOwnership())
+    if (!F.get()->hasOwnership())
       return true;
 
     // Ok, so we know at this point that we have qualified ownership. If we have
@@ -547,7 +574,7 @@ bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
     // Otherwise, set the function to have unqualified ownership. This will
     // ensure that no more Qualified instructions can be added to the given
     // function.
-    F.get()->setUnqualifiedOwnership();
+    F.get()->setOwnershipEliminated();
     return true;
   }
   case OwnershipQualifiedKind::Qualified: {
@@ -555,7 +582,7 @@ bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
     // have unqualified ownership, then we know that we have already seen an
     // unqualified ownership instruction. This means the function has both
     // qualified and unqualified instructions. =><=.
-    if (!F.get()->hasQualifiedOwnership())
+    if (!F.get()->hasOwnership())
       return false;
 
     // Ok, at this point we know that we are still qualified. Since functions

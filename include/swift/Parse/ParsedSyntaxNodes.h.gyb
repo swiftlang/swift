@@ -1,0 +1,88 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From ParsedSyntaxNodes.h.gyb.
+//// Do Not Edit Directly!
+//===--- ParsedSyntaxNodes.h - Parsed Syntax Node definitions -------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_PARSE_PARSEDSYNTAXNODES_H
+#define SWIFT_PARSE_PARSEDSYNTAXNODES_H
+
+#include "swift/Parse/ParsedSyntax.h"
+#include "swift/Syntax/SyntaxKind.h"
+
+namespace swift {
+
+% # Emit the non-collection classes first, then emit the collection classes
+% # that reference these classes.
+
+% for node in SYNTAX_NODES:
+%   if not node.is_syntax_collection():
+class Parsed${node.name};
+%   end
+% end
+
+% for node in SYNTAX_NODES:
+%   if node.is_syntax_collection():
+using Parsed${node.name} =
+  ParsedSyntaxCollection<syntax::SyntaxKind::${node.syntax_kind}>;
+%   end
+% end
+
+% for node in SYNTAX_NODES:
+%   if not node.is_syntax_collection():
+%     qualifier = "" if node.is_base() else "final"
+%     for line in dedented_lines(node.description):
+/// ${line}
+%     end
+class Parsed${node.name} ${qualifier} : public Parsed${node.base_type} {
+%     if node.is_buildable():
+      friend class Parsed${node.name}Builder;
+%     end
+
+public:
+  explicit Parsed${node.name}(ParsedRawSyntaxNode rawNode)
+    : Parsed${node.base_type}(std::move(rawNode)) {
+  }
+
+%     for child in node.children:
+%       for line in dedented_lines(child.description):
+  /// ${line}
+%       end
+%       if child.is_optional:
+  llvm::Optional<Parsed${child.type_name}> getDeferred${child.name}();
+%       else:
+  Parsed${child.type_name} getDeferred${child.name}();
+%       end
+%     end
+
+  static bool kindof(syntax::SyntaxKind Kind) {
+%   if node.is_base():
+    return is${node.syntax_kind}Kind(Kind);
+%   else:
+    return Kind == syntax::SyntaxKind::${node.syntax_kind};
+%   end
+  }
+
+  static bool classof(const ParsedSyntax *S) {
+    return kindof(S->getKind());
+  }
+};
+
+%   end
+% end
+}
+
+#endif // SWIFT_PARSE_PARSEDSYNTAXNODES_H

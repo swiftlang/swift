@@ -174,7 +174,7 @@ public struct Set<Element: Hashable> {
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_cocoa: __owned _CocoaSet) {
+  internal init(_cocoa: __owned __CocoaSet) {
     _variant = _Variant(cocoa: _cocoa)
   }
 
@@ -187,10 +187,10 @@ public struct Set<Element: Hashable> {
   ///   is a reference type).
   @inlinable
   public // SPI(Foundation)
-  init(_immutableCocoaSet: __owned _NSSet) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
+  init(_immutableCocoaSet: __owned AnyObject) {
+    _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
-    self.init(_cocoa: _CocoaSet(_immutableCocoaSet))
+    self.init(_cocoa: __CocoaSet(_immutableCocoaSet))
   }
 #endif
 }
@@ -712,7 +712,8 @@ extension Set: SetAlgebra {
   @inlinable
   public func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
   where S.Element == Element {
-    // FIXME(performance): isEmpty fast path, here and elsewhere.
+    guard !isEmpty else { return true }
+    
     let other = Set(possibleSuperset)
     return isSubset(of: other)
   }
@@ -763,10 +764,12 @@ extension Set: SetAlgebra {
   @inlinable
   public func isSuperset<S: Sequence>(of possibleSubset: __owned S) -> Bool
     where S.Element == Element {
-    // FIXME(performance): Don't build a set; just ask if every element is in
-    // `self`.
-    let other = Set(possibleSubset)
-    return other.isSubset(of: self)
+    for member in possibleSubset {
+      if !contains(member) {
+        return false
+      }
+    }
+    return true
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict
@@ -811,9 +814,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func isDisjoint<S: Sequence>(with other: S) -> Bool
   where S.Element == Element {
-    // FIXME(performance): Don't need to build a set.
-    let otherSet = Set(other)
-    return isDisjoint(with: otherSet)
+    return _isDisjoint(with: other)
   }
 
   /// Returns a new set with the elements of both this set and the given
@@ -920,6 +921,10 @@ extension Set: SetAlgebra {
   @inlinable
   internal mutating func _subtract<S: Sequence>(_ other: S)
   where S.Element == Element {
+    // If self is empty we don't need to iterate over `other` because there's
+    // nothing to remove on self.
+    guard !isEmpty else { return }
+
     for item in other {
       remove(item)
     }
@@ -1121,8 +1126,16 @@ extension Set {
   ///   otherwise, `false`.
   @inlinable
   public func isDisjoint(with other: Set<Element>) -> Bool {
-    for member in self {
-      if other.contains(member) {
+    return _isDisjoint(with: other)
+  }
+    
+  @inlinable
+  internal func _isDisjoint<S: Sequence>(with other: S) -> Bool
+  where S.Element == Element {
+    guard !isEmpty else { return true }
+
+    for member in other {
+      if contains(member) {
         return false
       }
     }
@@ -1266,7 +1279,7 @@ extension Set {
     internal enum _Variant {
       case native(_HashTable.Index)
 #if _runtime(_ObjC)
-      case cocoa(_CocoaSet.Index)
+      case cocoa(__CocoaSet.Index)
 #endif
     }
 
@@ -1288,7 +1301,7 @@ extension Set {
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
-    internal init(_cocoa index: __owned _CocoaSet.Index) {
+    internal init(_cocoa index: __owned __CocoaSet.Index) {
       self.init(_variant: .cocoa(index))
     }
 #endif
@@ -1349,7 +1362,7 @@ extension Set.Index {
 
 #if _runtime(_ObjC)
   @usableFromInline
-  internal var _asCocoa: _CocoaSet.Index {
+  internal var _asCocoa: __CocoaSet.Index {
     @_transparent
     get {
       switch _variant {
@@ -1367,8 +1380,8 @@ extension Set.Index {
       }
       let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
       _variant = .native(dummy)
+      defer { _variant = .cocoa(cocoa) }
       yield &cocoa
-      _variant = .cocoa(cocoa)
     }
   }
 #endif
@@ -1454,7 +1467,7 @@ extension Set {
     internal enum _Variant {
       case native(_NativeSet<Element>.Iterator)
 #if _runtime(_ObjC)
-      case cocoa(_CocoaSet.Iterator)
+      case cocoa(__CocoaSet.Iterator)
 #endif
     }
 
@@ -1473,7 +1486,7 @@ extension Set {
 
 #if _runtime(_ObjC)
     @usableFromInline
-    internal init(_cocoa: __owned _CocoaSet.Iterator) {
+    internal init(_cocoa: __owned __CocoaSet.Iterator) {
       self.init(_variant: .cocoa(_cocoa))
     }
 #endif
@@ -1518,7 +1531,7 @@ extension Set.Iterator {
         return nativeIterator
 #if _runtime(_ObjC)
       case .cocoa:
-        _sanityCheckFailure("internal error: does not contain a native index")
+        _internalInvariantFailure("internal error: does not contain a native index")
 #endif
       }
     }
@@ -1529,11 +1542,11 @@ extension Set.Iterator {
 
 #if _runtime(_ObjC)
   @usableFromInline @_transparent
-  internal var _asCocoa: _CocoaSet.Iterator {
+  internal var _asCocoa: __CocoaSet.Iterator {
     get {
       switch _variant {
       case .native:
-        _sanityCheckFailure("internal error: does not contain a Cocoa index")
+        _internalInvariantFailure("internal error: does not contain a Cocoa index")
       case .cocoa(let cocoa):
         return cocoa
       }
@@ -1613,7 +1626,7 @@ extension Set {
   public // FIXME(reserveCapacity): Should be inlinable
   mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variant.reserveCapacity(minimumCapacity)
-    _sanityCheck(self.capacity >= minimumCapacity)
+    _internalInvariant(self.capacity >= minimumCapacity)
   }
 }
 

@@ -30,7 +30,7 @@ getSelfParameterConvention(ApplyInst *SemanticsCall) {
   return FnTy->getSelfParameter().getConvention();
 }
 
-/// \brief Make sure that all parameters are passed with a reference count
+/// Make sure that all parameters are passed with a reference count
 /// neutral parameter convention except for self.
 bool swift::ArraySemanticsCall::isValidSignature() {
   assert(SemanticsCall && getKind() != ArrayCallKind::kNone &&
@@ -380,7 +380,7 @@ static ApplyInst *hoistOrCopyCall(ApplyInst *AI, SILInstruction *InsertBefore,
 }
 
 
-/// \brief Hoist or copy the self argument of the semantics call.
+/// Hoist or copy the self argument of the semantics call.
 /// Return the hoisted self argument.
 static SILValue hoistOrCopySelf(ApplyInst *SemanticsCall,
                                 SILInstruction *InsertBefore,
@@ -731,12 +731,13 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
   SILValue ArrRef = SemanticsCall->getArgument(1);
   SILBuilderWithScope Builder(SemanticsCall);
   auto Loc = SemanticsCall->getLoc();
-  auto *FnRef = Builder.createFunctionRef(Loc, AppendFn);
+  auto *FnRef = Builder.createFunctionRefFor(Loc, AppendFn);
 
   if (Vals.size() > 1) {
     // Create a call to reserveCapacityForAppend() to reserve space for multiple
     // elements.
-    FunctionRefInst *ReserveFnRef = Builder.createFunctionRef(Loc, ReserveFn);
+    FunctionRefBaseInst *ReserveFnRef =
+        Builder.createFunctionRefFor(Loc, ReserveFn);
     SILFunctionType *ReserveFnTy =
       ReserveFnRef->getType().castTo<SILFunctionType>();
     assert(ReserveFnTy->getNumParameters() == 2);

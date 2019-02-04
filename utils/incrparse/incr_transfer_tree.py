@@ -16,11 +16,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description='Utility for testing incremental syntax tree transfer',
         epilog='''
-    Based of a single template the utility generates a pre-edit and a post-edit 
-    file. It then verifies that the incrementally transferred syntax tree 
+    Based of a single template the utility generates a pre-edit and a post-edit
+    file. It then verifies that the incrementally transferred syntax tree
     matches the syntax tree passed as --expected-incremental-syntax-tree.
 
-    To generate the pre-edit and the post-edit file from the template, it 
+    To generate the pre-edit and the post-edit file from the template, it
     operates on markers of the form:
 
         <<test_case<pre|||post>>>
@@ -65,18 +65,18 @@ def main():
         + test_case + '.incr.json'
 
     try:
-        serializeIncrParseMarkupFile(test_file=test_file, 
-                                     test_case=test_case, 
-                                     mode='incremental', 
+        serializeIncrParseMarkupFile(test_file=test_file,
+                                     test_case=test_case,
+                                     mode='incremental',
                                      serialization_mode='incremental',
                                      serialization_format='json',
                                      omit_node_ids=False,
-                                     output_file=incremental_serialized_file, 
-                                     temp_dir=temp_dir + '/temp', 
-                                     swift_syntax_test=swift_syntax_test, 
+                                     output_file=incremental_serialized_file,
+                                     temp_dir=temp_dir + '/temp',
+                                     swift_syntax_test=swift_syntax_test,
                                      print_visual_reuse_info=False)
     except TestFailedError as e:
-        print('Test case "%s" of %s FAILed' % (test_case, test_file), 
+        print('Test case "%s" of %s FAILed' % (test_case, test_file),
               file=sys.stderr)
         print(e.message, file=sys.stderr)
         sys.exit(1)
@@ -90,7 +90,7 @@ def main():
                 expected_syntax_tree_file
             ])
     except subprocess.CalledProcessError as e:
-        print('Test case "%s" of %s FAILed' % (test_case, test_file), 
+        print('Test case "%s" of %s FAILed' % (test_case, test_file),
               file=sys.stderr)
         print('Syntax tree of incremental parsing does not match expected '
               'incrementally transfer syntax tree:\n\n', file=sys.stderr)

@@ -4,28 +4,22 @@
 public enum HasRawValue: Int {
   // CHECK-NEXT: case a, b, c
   case a, b = 5, c
-  // CHECK-NEXT: public typealias RawValue = Swift.Int
-  // CHECK-NEXT: public var hashValue: Swift.Int {
-  // CHECK-NEXT:   get{{$}}
-  // CHECK-NEXT: }
-  // CHECK-NEXT: public func hash(into hasher: inout Swift.Hasher)
-  // CHECK-NEXT: @inlinable public init?(rawValue: Swift.Int)
-  // CHECK-NEXT: public var rawValue: Swift.Int {
-  // CHECK-NEXT:   @inlinable get{{$}}
-  // CHECK-NEXT: }
-} // CHECK-NEXT: {{^}$}}
+  // CHECK-DAG: public typealias RawValue = Swift.Int
+  // CHECK-DAG: @inlinable public init?(rawValue: Swift.Int)
+  // CHECK-DAG: public var rawValue: Swift.Int {
+  // CHECK-DAG:   @inlinable get{{$}}
+  // CHECK-DAG: }
+} // CHECK: {{^}$}}
 
-// CHECK-LABEL: @objc public enum ObjCEnum : Int {
-@objc public enum ObjCEnum: Int {
-  // CHECK-NEXT: case a, b, c
+@objc public enum ObjCEnum: Int32 {
   case a, b = 5, c
-  // CHECK-NEXT: public typealias RawValue = Swift.Int
-  // CHECK-NEXT: public var hashValue: Swift.Int {
-  // CHECK-NEXT:   get{{$}}
-  // CHECK-NEXT: }
-  // CHECK-NEXT: public func hash(into hasher: inout Swift.Hasher)
-  // CHECK-NEXT: @inlinable public init?(rawValue: Swift.Int)
-  // CHECK-NEXT: public var rawValue: Swift.Int {
-  // CHECK-NEXT:   @inlinable get{{$}}
-  // CHECK-NEXT: }
-} // CHECK-NEXT: {{^}$}}
+}
+
+// CHECK-LABEL: @objc public enum ObjCEnum : Int32 {
+// CHECK-NEXT: case a, b, c
+// CHECK-DAG: public typealias RawValue = Swift.Int32
+// CHECK-DAG: @inlinable public init?(rawValue: Swift.Int32)
+// CHECK-DAG: public var rawValue: Swift.Int32 {
+// CHECK-DAG:   @inlinable get{{$}}
+// CHECK-DAG: }
+// CHECK: {{^}$}}

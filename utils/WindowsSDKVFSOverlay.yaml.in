@@ -17,12 +17,33 @@ roots:
       - name: wtypesbase.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/WTypesbase.h"
+      - name: ConcurrencySal.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/concurrencysal.h"
   - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um"
     type: directory
     contents:
+      - name: commctrl.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/CommCtrl.h"
+      - name: docobj.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/DocObj.h"
+      - name: exdisp.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ExDisp.h"
+      - name: isguids.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/IsGuids.h"
+      - name: knownfolders.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/KnownFolders.h"
       - name: oaidl.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/OAIdl.h"
+      - name: ocidl.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/OCIdl.h"
       - name: objidl.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ObjIdl.h"
@@ -44,6 +65,24 @@ roots:
       - name: psapi.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/Psapi.h"
+      - name: shldisp.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ShlDisp.h"
+      - name: shlguid.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ShlGuid.h"
+      - name: shlobj.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ShlObj.h"
+      - name: shlobj_core.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ShlObj_core.h"
+      - name: shobjidl.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ShObjIdl.h"
+      - name: shobjidl_core.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ShObjIdl_core.h"
       - name: unknwn.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/Unknwn.h"

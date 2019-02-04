@@ -1,5 +1,5 @@
 from Node import error
-from kinds import lowercase_first_word
+from kinds import lowercase_first_word  # noqa: I201
 
 
 class SyntaxClassification(object):

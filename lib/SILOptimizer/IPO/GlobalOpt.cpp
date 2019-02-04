@@ -200,7 +200,7 @@ public:
 // If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
   SILFunction *F = AI->getReferencedFunction();
-  if (!F || !F->isGlobalInit())
+  if (!F || !F->isGlobalInit() || !ApplySite(AI).canOptimize())
     return;
 
   GlobalInitCallMap[F].push_back(AI);
@@ -253,12 +253,14 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
   if (auto *F = M.lookUpFunction(getterNameTmp))
     return F;
 
-  auto Linkage = (varDecl->getEffectiveAccess() >= AccessLevel::Public
-                  ? SILLinkage::PublicNonABI
-                  : SILLinkage::Private);
-  auto Serialized = (varDecl->getEffectiveAccess() >= AccessLevel::Public
-                     ? IsSerialized
-                     : IsNotSerialized);
+  auto Linkage = SILLinkage::Private;
+  auto Serialized = IsNotSerialized;
+
+  if (varDecl->getEffectiveAccess() >= AccessLevel::Public &&
+      !varDecl->isResilient()) {
+    Linkage = SILLinkage::PublicNonABI;
+    Serialized = IsSerialized;
+  }
 
   auto refType = M.Types.getLoweredType(varDecl->getInterfaceType());
 
@@ -274,9 +276,9 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
                          /*params*/ {}, /*yields*/ {}, Results, None,
                          M.getASTContext());
   auto getterName = M.allocateCopy(getterNameTmp);
-  return FunctionBuilder.getOrCreateFunction(loc, getterName, Linkage,
-                                             LoweredType, IsBare,
-                                             IsNotTransparent, Serialized);
+  return FunctionBuilder.getOrCreateFunction(
+      loc, getterName, Linkage, LoweredType, IsBare, IsNotTransparent,
+      Serialized, IsNotDynamic);
 }
 
 /// Generate getter from the initialization code whose result is stored by a
@@ -303,8 +305,8 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
                                           varDecl);
 
   GetterF->setDebugScope(Store->getFunction()->getDebugScope());
-  if (!Store->getFunction()->hasQualifiedOwnership())
-    GetterF->setUnqualifiedOwnership();
+  if (!Store->getFunction()->hasOwnership())
+    GetterF->setOwnershipEliminated();
   auto *EntryBB = GetterF->createBasicBlock();
 
   // Copy instructions into GetterF
@@ -545,8 +547,8 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
                                           InitF->getModule(),
                                           InitF->getLocation(),
                                           varDecl);
-  if (!InitF->hasQualifiedOwnership())
-    GetterF->setUnqualifiedOwnership();
+  if (!InitF->hasOwnership())
+    GetterF->setOwnershipEliminated();
 
   // Copy InitF into GetterF, including the entry arguments.
   SILFunctionCloner Cloner(GetterF);
@@ -690,7 +692,16 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
       auto *PTAI = dyn_cast<PointerToAddressInst>(Use->getUser());
       assert(PTAI && "All uses should be pointer_to_address");
       for (auto PTAIUse : PTAI->getUses()) {
-        replaceLoadSequence(PTAIUse->getUser(), NewAI, B);
+        SILInstruction *Load = PTAIUse->getUser();
+        if (auto *CA = dyn_cast<CopyAddrInst>(Load)) {
+          // The result of the initializer is stored to another location.
+          SILBuilder B(CA);
+          B.createStore(CA->getLoc(), NewAI, CA->getDest(),
+                        StoreOwnershipQualifier::Unqualified);
+        } else {
+          // The result of the initializer is used as a value.
+          replaceLoadSequence(Load, NewAI, B);
+        }
       }
     }
 

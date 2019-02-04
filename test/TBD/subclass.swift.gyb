@@ -14,7 +14,7 @@
 
 // Other-module superclass is not resilient:
 // RUN: %empty-directory(%t/super)
-// RUN: %target-build-swift %S/Inputs/subclass_super.swift -emit-library -emit-module -o %t/super/subclass_super.%target-dylib-extension
+// RUN: %target-build-swift %S/Inputs/subclass_super.swift -emit-library -emit-module -o %t/super/subclass_super%{target-shared-library-suffix}
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
 // RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing
@@ -27,7 +27,7 @@
 
 // Other-module superclass is resilient:
 // RUN: %empty-directory(%t/super)
-// RUN: %target-build-swift %S/Inputs/subclass_super.swift -emit-library -emit-module -o %t/super/subclass_super.%target-dylib-extension -Xfrontend -enable-resilience
+// RUN: %target-build-swift %S/Inputs/subclass_super.swift -emit-library -emit-module -o %t/super/subclass_super%{target-shared-library-suffix} -Xfrontend -enable-resilience
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
 // RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing

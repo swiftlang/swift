@@ -168,7 +168,7 @@ namespace {
                                        DominanceInfo *DT);
     bool dominatorBasedSimplify(DominanceAnalysis *DA);
 
-    /// \brief Remove the basic block if it has no predecessors. Returns true
+    /// Remove the basic block if it has no predecessors. Returns true
     /// If the block was removed.
     bool removeIfDead(SILBasicBlock *BB);
 
@@ -207,7 +207,7 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
 /// Helper function to perform SSA updates in case of jump threading.
 void swift::updateSSAAfterCloning(BasicBlockCloner &Cloner,
                                   SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
-  SILSSAUpdater SSAUp;
+  SILSSAUpdater SSAUp(SrcBB->getParent()->getModule());
   for (auto AvailValPair : Cloner.AvailVals) {
     ValueBase *Inst = AvailValPair.first;
     if (Inst->use_empty())
@@ -1296,7 +1296,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   return Simplified;
 }
 
-/// \brief Check if replacing an existing edge of the terminator by another
+/// Check if replacing an existing edge of the terminator by another
 /// one which has a DestBB as its destination would create a critical edge.
 static bool wouldIntroduceCriticalEdge(TermInst *T, SILBasicBlock *DestBB) {
   auto SrcSuccs = T->getSuccessors();
@@ -1345,7 +1345,7 @@ static SILValue skipInvert(SILValue Cond, bool &Inverted,
   return Cond;
 }
 
-/// \brief Returns the first cond_fail if it is the first side-effect
+/// Returns the first cond_fail if it is the first side-effect
 /// instruction in this block.
 static CondFailInst *getFirstCondFail(SILBasicBlock *BB) {
   auto It = BB->begin();
@@ -1384,7 +1384,7 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
   return nullptr;
 }
 
-/// \brief Creates a new cond_fail instruction, optionally with an xor inverted
+/// Creates a new cond_fail instruction, optionally with an xor inverted
 /// condition.
 static void createCondFail(CondFailInst *Orig, SILValue Cond, bool inverted,
                            SILBuilder &Builder) {
@@ -1843,6 +1843,26 @@ bool SimplifyCFG::simplifySwitchValueBlock(SwitchValueInst *SVI) {
   return simplifyTermWithIdenticalDestBlocks(ThisBB);
 }
 
+bool onlyContainsRefcountAndDeallocStackInst(
+    SILBasicBlock::reverse_iterator I, SILBasicBlock::reverse_iterator End) {
+  while (I != End) {
+    auto MaybeDead = I++;
+    switch (MaybeDead->getKind()) {
+      // These technically have side effects, but not ones that matter
+      // in a block that we shouldn't really reach...
+    case SILInstructionKind::StrongRetainInst:
+    case SILInstructionKind::StrongReleaseInst:
+    case SILInstructionKind::RetainValueInst:
+    case SILInstructionKind::ReleaseValueInst:
+    case SILInstructionKind::DeallocStackInst:
+      break;
+
+    default:
+      return false;
+    }
+  }
+  return true;
+}
 /// simplifyUnreachableBlock - Simplify blocks ending with unreachable by
 /// removing instructions that are safe to delete backwards until we
 /// hit an instruction we cannot delete.
@@ -1852,6 +1872,8 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
   auto I = std::next(BB->rbegin());
   auto End = BB->rend();
   SmallVector<SILInstruction *, 8> DeadInstrs;
+
+  bool canIgnoreRestOfBlock = false;
 
   // Walk backwards deleting instructions that should be safe to delete
   // in a block that ends with unreachable.
@@ -1866,10 +1888,19 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::ReleaseValueInst:
       break;
-
+    // We can only ignore a dealloc_stack instruction if we can ignore all
+    // instructions in the block.
+    case SILInstructionKind::DeallocStackInst: {
+      if (canIgnoreRestOfBlock ||
+          onlyContainsRefcountAndDeallocStackInst(MaybeDead, End)) {
+        canIgnoreRestOfBlock = true;
+        break;
+      }
+      LLVM_FALLTHROUGH;
+    }
     default:
       if (MaybeDead->mayHaveSideEffects()) {
-        if (Changed)
+         if (Changed)
           for (auto Dead : DeadInstrs)
             Dead->eraseFromParent();
         return Changed;
@@ -3560,6 +3591,10 @@ namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
+    // FIXME: We should be able to handle ownership.
+    if (getFunction()->hasOwnership())
+      return;
+
     if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
                     /*EnableJumpThread=*/false)
             .run())
@@ -3577,6 +3612,9 @@ namespace {
 class JumpThreadSimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
+    // FIXME: Handle ownership.
+    if (getFunction()->hasOwnership())
+      return;
     if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
                     /*EnableJumpThread=*/true)
             .run())

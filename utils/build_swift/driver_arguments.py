@@ -275,8 +275,8 @@ def create_argument_parser():
     option(['-n', '--dry-run'], store_true,
            help='print the commands that would be executed, but do not '
                 'execute them')
-    option('--no-legacy-impl', store_false('legacy_impl'),
-           help='avoid legacy implementation')
+    option('--legacy-impl', store_true('legacy_impl'),
+           help='use legacy implementation')
 
     option('--build-runtime-with-host-compiler', toggle_true,
            help='Use the host compiler, not the self-built one to compile the '
@@ -518,6 +518,12 @@ def create_argument_parser():
     option(['--swiftsyntax'], store_true('build_swiftsyntax'),
            help='build swiftSyntax')
 
+    option(['--skstresstester'], store_true('build_skstresstester'),
+           help='build the SourceKit stress tester')
+
+    option(['--swiftevolve'], store_true('build_swiftevolve'),
+           help='build the swift-evolve tool')
+
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
 
@@ -535,6 +541,9 @@ def create_argument_parser():
 
     option('--build-ninja', toggle_true,
            help='build the Ninja tool')
+
+    option(['--build-libparser-only'], store_true('build_libparser_only'),
+           help='build only libParser for SwiftSyntax')
 
     # -------------------------------------------------------------------------
     in_group('Extra actions to perform before or in addition to building')
@@ -898,19 +907,28 @@ def create_argument_parser():
                 'Swift')
 
     option('--android-icu-uc', store_path,
-           help='Path to a directory containing libicuuc.so')
+           help='Path to libicuuc.so')
     option('--android-icu-uc-include', store_path,
            help='Path to a directory containing headers for libicuuc')
     option('--android-icu-i18n', store_path,
-           help='Path to a directory containing libicui18n.so')
+           help='Path to libicui18n.so')
     option('--android-icu-i18n-include', store_path,
            help='Path to a directory containing headers libicui18n')
+    option('--android-icu-data', store_path,
+           help='Path to libicudata.so')
     option('--android-deploy-device-path', store_path,
            default=android.adb.commands.DEVICE_TEMP_DIR,
            help='Path on an Android device to which built Swift stdlib '
                 'products will be deployed. If running host tests, specify '
                 'the "{}" directory.'.format(
                     android.adb.commands.DEVICE_TEMP_DIR))
+
+    option('--android-arch', store,
+           choices=['armv7', 'aarch64'],
+           default='armv7',
+           help='The Android target architecture when building for Android. '
+                'Currently only armv7 and aarch64 are supported. '
+                '%(default)s is the default.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')
@@ -985,6 +1003,8 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /llbuild                    (optional)
                      /swiftpm                    (optional, requires llbuild)
                      /swift-syntax               (optional, requires swiftpm)
+                     /swift-stress-tester        (optional,
+                                                   requires swift-syntax)
                      /compiler-rt                (optional)
                      /swift-corelibs-xctest      (optional)
                      /swift-corelibs-foundation  (optional)

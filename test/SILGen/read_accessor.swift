@@ -4,7 +4,7 @@ struct SimpleTest {
   var stored: String
 
   var readable: String {
-// CHECK-LABEL: sil hidden @$s13read_accessor10SimpleTestV8readableSSvr
+// CHECK-LABEL: sil hidden [ossa] @$s13read_accessor10SimpleTestV8readableSSvr
 // CHECK-SAME:    : $@yield_once @convention(method) (@guaranteed SimpleTest) -> @yields @guaranteed String {
 // CHECK:         [[T0:%.*]] = struct_extract %0 : $SimpleTest, #SimpleTest.stored
 // CHECK-NEXT:    yield [[T0]] : $String, resume bb1, unwind bb2
@@ -18,7 +18,7 @@ struct SimpleTest {
     }
   }
 
-// CHECK-LABEL: sil hidden @$s13read_accessor10SimpleTestV3getSSyF
+// CHECK-LABEL: sil hidden [ossa] @$s13read_accessor10SimpleTestV3getSSyF
 // CHECK:         [[T0:%.*]] = begin_access [read] [unknown] %0
 // CHECK-NEXT:    [[SELF:%.*]] = load [copy] [[T0]] : $*SimpleTest
 // CHECK-NEXT:    end_access [[T0]]
@@ -39,7 +39,7 @@ struct SimpleTest {
 class GetterSynthesis {
   var stored: String = "hello"
   var readable: String {
-// CHECK-LABEL: sil hidden [transparent] @$s13read_accessor15GetterSynthesisC8readableSSvg
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s13read_accessor15GetterSynthesisC8readableSSvg
 // CHECK:         [[READFN:%.*]] = function_ref @$s13read_accessor15GetterSynthesisC8readableSSvr
 // CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READFN]](%0)
 // CHECK-NEXT:    [[RET:%.*]] = copy_value [[VALUE]] : $String
@@ -64,7 +64,7 @@ struct TupleReader {
   func index() -> Int { return 0 }
 
   var readable: ((String, ()), String, ()) {
-// CHECK-LABEL: sil hidden @$s13read_accessor11TupleReaderV8readableSS_ytt_SSyttvr
+// CHECK-LABEL: sil hidden [ossa] @$s13read_accessor11TupleReaderV8readableSS_ytt_SSyttvr
 // CHECK:         debug_value %0
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[INDEXFN:%.*]] = function_ref @$s13read_accessor11TupleReaderV5indexSiyF
@@ -95,7 +95,7 @@ struct TupleReader {
     }
   }
 
-// CHECK-LABEL: sil hidden @$s13read_accessor11TupleReaderV11useReadableyyF
+// CHECK-LABEL: sil hidden [ossa] @$s13read_accessor11TupleReaderV11useReadableyyF
 // CHECK:         [[READFN:%.*]] = function_ref @$s13read_accessor11TupleReaderV8readableSS_ytt_SSyttvr
 // CHECK-NEXT:    ([[FIRST:%.*]], [[SECOND:%.*]], [[TOKEN:%.*]]) = begin_apply [[READFN]](%0)
 //   FIXME: this materialization is silly
@@ -122,7 +122,7 @@ struct TupleReader {
     return compute()
   }
 
-// CHECK-LABEL: sil hidden @$s13read_accessor11TupleReaderV0A8ComputedSSvr
+// CHECK-LABEL: sil hidden [ossa] @$s13read_accessor11TupleReaderV0A8ComputedSSvr
 // CHECK:         [[GETTER:%.*]] = function_ref @$s13read_accessor11TupleReaderV8computedSSvg
 // CHECK-NEXT:    [[VALUE:%.]] = apply [[GETTER]](%0)
 // CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[VALUE]] : $String
@@ -149,8 +149,8 @@ struct TestKeyPath {
   }
 }
 //   Key-path getter for TestKeyPath.readable
-// CHECK-LABEL: sil shared [thunk] @$s13read_accessor11TestKeyPathV8readableSSvpACTK
-// CHECK:       bb0(%0 : @trivial $*String, %1 : @trivial $*TestKeyPath):
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s13read_accessor11TestKeyPathV8readableSSvpACTK
+// CHECK:       bb0(%0 : $*String, %1 : $*TestKeyPath):
 // CHECK-NEXT:    [[SELF:%.*]] = load [trivial] %1
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[READ:%.*]] = function_ref @$s13read_accessor11TestKeyPathV8readableSSvr
@@ -161,3 +161,47 @@ struct TestKeyPath {
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 // CHECK-LABEL: } // end sil function '$s13read_accessor11TestKeyPathV8readableSSvpACTK'
+
+//   Check that we emit a read coroutine but not a getter for this.
+//   This test assumes that we emit accessors in a particular order.
+// CHECK-LABEL: sil [transparent] [ossa] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvpfi
+// CHECK-NOT:   sil [transparent] [serialized] [ossa] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvg
+// CHECK:       sil [transparent] [serialized] [ossa] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvr
+// CHECK-NOT:   sil [transparent] [serialized] [ossa] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvg
+// CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvs
+public struct TestBorrowedProperty {
+  @_borrowed
+  public var borrowedString = ""
+}
+
+protocol ReadableTitle {
+  @_borrowed
+  var title: String { get }
+}
+class OverridableGetter : ReadableTitle {
+  var title: String = ""
+}
+//   The concrete read accessor is generated on-demand and does a class dispatch to the getter.
+// CHECK-LABEL: sil shared [ossa] @$s13read_accessor17OverridableGetterC5titleSSvr
+// CHECK:       class_method %0 : $OverridableGetter, #OverridableGetter.title!getter.1
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableGetterC5titleSSvr'
+//   The read witness thunk does a direct call to the concrete read accessor.
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s13read_accessor17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW
+// CHECK:       function_ref @$s13read_accessor17OverridableGetterC5titleSSvr
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW'
+
+protocol GettableTitle {
+  var title: String { get }
+}
+class OverridableReader : GettableTitle {
+  @_borrowed
+  var title: String = ""
+}
+//   The concrete getter is generated on-demand and does a class dispatch to the read accessor.
+// CHECK-LABEL: sil shared [ossa] @$s13read_accessor17OverridableReaderC5titleSSvg
+// CHECK:       class_method %0 : $OverridableReader, #OverridableReader.title!read.1
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableReaderC5titleSSvg'
+//   The getter witness thunk does a direct call to the concrete getter.
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s13read_accessor17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW
+// CHECK:       function_ref @$s13read_accessor17OverridableReaderC5titleSSvg
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW'

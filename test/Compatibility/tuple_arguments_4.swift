@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
-// See test/Compatibility/tuple_arguments_3.swift for the Swift 3 behavior.
-
 func concrete(_ x: Int) {}
 func concreteLabeled(x: Int) {}
 func concreteTwo(_ x: Int, _ y: Int) {} // expected-note 5 {{'concreteTwo' declared here}}
@@ -1671,7 +1669,6 @@ do {
   h() // expected-error {{missing argument for parameter #1 in call}}
 }
 
-
 // https://bugs.swift.org/browse/SR-7191
 class Mappable<T> {
   init(_: T) { }
@@ -1680,3 +1677,9 @@ class Mappable<T> {
 
 let x = Mappable(())
 _ = x.map { (_: Void) in return () }
+
+// https://bugs.swift.org/browse/SR-9470
+do {
+  func f(_: Int...) {}
+  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot invoke 'map' with an argument list of type '((Int...) -> ())'}}
+}

@@ -45,7 +45,7 @@ struct ReferenceMetaData {
     Kind(Kind), AccKind(AccKind) {}
 };
 
-/// \brief An abstract class used to traverse an AST.
+/// An abstract class used to traverse an AST.
 class ASTWalker {
 public:
   enum class ParentKind {
@@ -92,7 +92,7 @@ public:
     }
   };
 
-  /// \brief The parent of the node we are visiting.
+  /// The parent of the node we are visiting.
   ParentTy Parent;
 
   /// This method is called when first visiting an expression
@@ -173,26 +173,26 @@ public:
   /// returns failure.
   virtual bool walkToDeclPost(Decl *D) { return true; }
 
-  /// \brief This method is called when first visiting a TypeLoc, before
+  /// This method is called when first visiting a TypeLoc, before
   /// walking into its TypeRepr children.  If it returns false, the subtree is
   /// skipped.
   ///
   /// \param TL The TypeLoc to check.
   virtual bool walkToTypeLocPre(TypeLoc &TL) { return true; }
 
-  /// \brief This method is called after visiting the children of a TypeLoc.
+  /// This method is called after visiting the children of a TypeLoc.
   /// If it returns false, the remaining traversal is terminated and returns
   /// failure.
   virtual bool walkToTypeLocPost(TypeLoc &TL) { return true; }
 
 
-  /// \brief This method is called when first visiting a TypeRepr, before
+  /// This method is called when first visiting a TypeRepr, before
   /// walking into its children.  If it returns false, the subtree is skipped.
   ///
   /// \param T The TypeRepr to check.
   virtual bool walkToTypeReprPre(TypeRepr *T) { return true; }
 
-  /// \brief This method is called after visiting the children of a TypeRepr.
+  /// This method is called after visiting the children of a TypeRepr.
   /// If it returns false, the remaining traversal is terminated and returns
   /// failure.
   virtual bool walkToTypeReprPost(TypeRepr *T) { return true; }

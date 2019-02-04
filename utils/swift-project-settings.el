@@ -395,7 +395,7 @@ of arguments that are passed to swiftc when compiling it."
   (cond ((string-match-p "^stdlib/public/core/" relative-file)
          swift-project-stdlib-swiftc-args)
         ((string-match-p
-          "^stdlib/\(public/SwiftOnoneSupport\|internal\|private/SwiftPrivate\(PthreadExtras\|LibcExtras\)?\)/"
+          "^stdlib/\(public/SwiftOnoneSupport\|internal\|private/SwiftPrivate\(ThreadExtras\|LibcExtras\)?\)/"
           relative-file)
          swift-project-stdlib-aux-swiftc-args)
         (t swift-project-single-frontend-swiftc-args)))

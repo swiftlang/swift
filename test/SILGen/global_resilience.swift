@@ -7,7 +7,7 @@ import resilient_global
 
 public struct MyEmptyStruct {}
 
-// CHECK-LABEL: sil_global @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvp : $MyEmptyStruct
+// CHECK-LABEL: sil_global private @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvp : $MyEmptyStruct
 
 public var myEmptyGlobal = MyEmptyStruct()
 
@@ -17,21 +17,21 @@ public var myEmptyGlobal = MyEmptyStruct()
 
 // Mutable addressor for resilient global
 
-// CHECK-LABEL: sil hidden [global_init] @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK-LABEL: sil hidden [global_init] [ossa] @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:         global_addr @$s17global_resilience13myEmptyGlobalAA02MyD6StructVv
 // CHECK:         return
 
 // Synthesized accessors for our resilient global variable
 
-// CHECK-LABEL: sil @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvg
+// CHECK-LABEL: sil [ossa] @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvg
 // CHECK:         function_ref @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvau
 // CHECK:         return
 
-// CHECK-LABEL: sil @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvs
+// CHECK-LABEL: sil [ossa] @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvs
 // CHECK:         function_ref @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvau
 // CHECK:         return
 
-// CHECK-LABEL: sil @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvM
+// CHECK-LABEL: sil [ossa] @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvM
 // CHECK:         function_ref @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvau
 // CHECK:         begin_access [modify] [dynamic]
 // CHECK:         yield
@@ -39,7 +39,7 @@ public var myEmptyGlobal = MyEmptyStruct()
 
 // Mutable addressor for fixed-layout global
 
-// CHECK-LABEL: sil [global_init] @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvau
+// CHECK-LABEL: sil [global_init] [ossa] @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvau
 // CHECK:         global_addr @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
 // CHECK:         return
 
@@ -55,7 +55,7 @@ public var myEmptyGlobal = MyEmptyStruct()
 // Accessing resilient global from our resilience domain --
 // call the addressor directly
 
-// CHECK-LABEL: sil @$s17global_resilience16getMyEmptyGlobalAA0dE6StructVyF
+// CHECK-LABEL: sil [ossa] @$s17global_resilience16getMyEmptyGlobalAA0dE6StructVyF
 // CHECK:         function_ref @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvau
 // CHECK:         return
 public func getMyEmptyGlobal() -> MyEmptyStruct {
@@ -65,14 +65,14 @@ public func getMyEmptyGlobal() -> MyEmptyStruct {
 // Accessing resilient global from a different resilience domain --
 // access it with accessors
 
-// CHECK-LABEL: sil @$s17global_resilience14getEmptyGlobal010resilient_A00D15ResilientStructVyF
+// CHECK-LABEL: sil [ossa] @$s17global_resilience14getEmptyGlobal010resilient_A00D15ResilientStructVyF
 // CHECK:         function_ref @$s16resilient_global11emptyGlobalAA20EmptyResilientStructVvg
 // CHECK:         return
 public func getEmptyGlobal() -> EmptyResilientStruct {
   return emptyGlobal
 }
 
-// CHECK-LABEL: sil @$s17global_resilience17modifyEmptyGlobalyyF
+// CHECK-LABEL: sil [ossa] @$s17global_resilience17modifyEmptyGlobalyyF
 // CHECK:         [[MODIFY:%.*]] = function_ref @$s16resilient_global11emptyGlobalAA20EmptyResilientStructVvM
 // CHECK-NEXT:    ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]()
 // CHECK-NEXT:    // function_ref
@@ -88,7 +88,7 @@ public func modifyEmptyGlobal() {
 // Accessing fixed-layout global from a different resilience domain --
 // call the addressor directly
 
-// CHECK-LABEL: sil @$s17global_resilience20getFixedLayoutGlobal010resilient_A020EmptyResilientStructVyF
+// CHECK-LABEL: sil [ossa] @$s17global_resilience20getFixedLayoutGlobal010resilient_A020EmptyResilientStructVyF
 // CHECK:         function_ref @$s16resilient_global17fixedLayoutGlobalAA20EmptyResilientStructVvau
 // CHECK:         return
 public func getFixedLayoutGlobal() -> EmptyResilientStruct {

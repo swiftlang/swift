@@ -41,7 +41,7 @@ const SILDebugScope *SILInstruction::getDebugScope() const {
   return Location.getScope();
 }
 
-void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
+void SILInstruction::setDebugScope(const SILDebugScope *DS) {
   if (getDebugScope() && getDebugScope()->InlinedCallSite)
     assert(DS->InlinedCallSite && "throwing away inlined scope info");
 
@@ -86,8 +86,10 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   if (ThisParent == L2.getContainingBlock()) return;
 
   // Update the parent fields in the instructions.
-  for (; first != last; ++first)
+  for (; first != last; ++first) {
+    SWIFT_FUNC_STAT_NAMED("sil");
     first->ParentBB = ThisParent;
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -155,7 +157,7 @@ void SILInstruction::dropAllReferences() {
 
   // If we have a function ref inst, we need to especially drop its function
   // argument so that it gets a proper ref decrement.
-  if (auto *FRI = dyn_cast<FunctionRefInst>(this)) {
+  if (auto *FRI = dyn_cast<FunctionRefBaseInst>(this)) {
     if (!FRI->getReferencedFunction())
       return;
     FRI->dropReferencedFunction();
@@ -449,6 +451,15 @@ namespace {
 
     bool visitFunctionRefInst(const FunctionRefInst *RHS) {
       auto *X = cast<FunctionRefInst>(LHS);
+      return X->getReferencedFunction() == RHS->getReferencedFunction();
+    }
+    bool visitDynamicFunctionRefInst(const DynamicFunctionRefInst *RHS) {
+      auto *X = cast<DynamicFunctionRefInst>(LHS);
+      return X->getReferencedFunction() == RHS->getReferencedFunction();
+    }
+    bool visitPreviousDynamicFunctionRefInst(
+        const PreviousDynamicFunctionRefInst *RHS) {
+      auto *X = cast<PreviousDynamicFunctionRefInst>(LHS);
       return X->getReferencedFunction() == RHS->getReferencedFunction();
     }
 
@@ -1106,6 +1117,10 @@ bool SILInstruction::isAllocatingStack() const {
     if (ARI->canAllocOnStack())
       return true;
   }
+
+  if (auto *PA = dyn_cast<PartialApplyInst>(this))
+    return PA->isOnStack();
+
   return false;
 }
 
@@ -1172,6 +1187,14 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // corresponding end_apply and abort_apply.
   if (isa<BeginApplyInst>(this))
     return false;
+
+  // dynamic_method_br is not duplicatable because IRGen does not support phi
+  // nodes of objc_method type.
+  if (isa<DynamicMethodBranchInst>(this))
+    return false;
+
+  if (auto *PA = dyn_cast<PartialApplyInst>(this))
+    return !PA->isOnStack();
 
   // If you add more cases here, you should also update SILLoop:canDuplicate.
 

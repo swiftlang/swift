@@ -17,7 +17,8 @@ public let Chars = BenchmarkInfo(
   name: "Chars2",
   runFunction: run_Chars,
   tags: [.validation, .api, .String],
-  setUpFunction: { blackHole(alphabetInput) })
+  setUpFunction: { blackHole(alphabetInput) },
+  legacyFactor: 50)
 
 var alphabetInput: [Character] = [
     "A", "B", "C", "D", "E", "F", "G",
@@ -33,7 +34,7 @@ public func run_Chars(_ N: Int) {
   // Permute some characters.
   let alphabet: [Character] = alphabetInput
 
-  for _ in 0..<50*N {
+  for _ in 0..<N {
     for firstChar in alphabet {
       for lastChar in alphabet {
         blackHole(firstChar < lastChar)

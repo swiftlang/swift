@@ -87,11 +87,6 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
   return true;
 }
 
-bool swift::mayCheckRefCount(SILInstruction *User) {
-  return isa<IsUniqueInst>(User) ||
-         isa<IsEscapingClosureInst>(User);
-}
-
 //===----------------------------------------------------------------------===//
 //                                Use Analysis
 //===----------------------------------------------------------------------===//
@@ -136,6 +131,8 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   // These instructions do not use other values.
   case SILInstructionKind::FunctionRefInst:
+  case SILInstructionKind::DynamicFunctionRefInst:
+  case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::IntegerLiteralInst:
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::StringLiteralInst:
@@ -1058,7 +1055,7 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
 
     // Try to speed up the trivial case of single release/dealloc.
     if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User) ||
-        isa<DestroyValueInst>(User)) {
+        isa<DestroyValueInst>(User) || isa<ReleaseValueInst>(User)) {
       if (!seenRelease)
         OneRelease = User;
       else

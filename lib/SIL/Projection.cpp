@@ -599,20 +599,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
 
     LLVM_DEBUG(llvm::dbgs() << "Visiting type: " << Ty << "\n");
 
-    // Get the first level projection of the current type.
-    Projections.clear();
-    Projection::getFirstLevelProjections(Ty, *Mod, Projections);
-
-    // Reached the end of the projection tree, this field can not be expanded
-    // anymore.
-    if (Projections.empty()) {
-      LLVM_DEBUG(llvm::dbgs() << "    No projections. "
-                 "Finished projection list\n");
-      Paths.push_back(PP);
-      continue;
-    }
-
-    // If this is a class type, we also have reached the end of the type
+    // If this is a class type, we have reached the end of the type
     // tree for this type.
     //
     // We do not push its next level projection into the worklist,
@@ -631,6 +618,19 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
     //
     if (Ty.getClassOrBoundGenericClass()) {
       LLVM_DEBUG(llvm::dbgs() << "    Found class. Finished projection list\n");
+      Paths.push_back(PP);
+      continue;
+    }
+
+    // Get the first level projection of the current type.
+    Projections.clear();
+    Projection::getFirstLevelProjections(Ty, *Mod, Projections);
+
+    // Reached the end of the projection tree, this field can not be expanded
+    // anymore.
+    if (Projections.empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "    No projections. "
+                 "Finished projection list\n");
       Paths.push_back(PP);
       continue;
     }
@@ -1127,7 +1127,7 @@ public:
 ProjectionTree::ProjectionTree(
     SILModule &Mod, SILType BaseTy,
     llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
-    : Mod(Mod), Allocator(Allocator) {
+    : Mod(&Mod), Allocator(&Allocator) {
   LLVM_DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy
                           << "\n");
 

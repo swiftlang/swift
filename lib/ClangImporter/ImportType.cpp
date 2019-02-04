@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -198,7 +199,7 @@ namespace {
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.def"
     
-    // Given a loaded type like CInt, look through the name alias sugar that the
+    // Given a loaded type like CInt, look through the type alias sugar that the
     // stdlib uses to show the underlying type.  We want to import the signature
     // of the exit(3) libc function as "func exit(Int32)", not as
     // "func exit(CInt)".
@@ -206,7 +207,7 @@ namespace {
       // Handle missing or invalid stdlib declarations
       if (!T || T->hasError())
         return Type();
-      if (auto *NAT = dyn_cast<NameAliasType>(T.getPointer()))
+      if (auto *NAT = dyn_cast<TypeAliasType>(T.getPointer()))
         return NAT->getSinglyDesugaredType();
       return T;
     }
@@ -480,10 +481,17 @@ namespace {
           Bridgeability::None);
       if (!elementType)
         return Type();
+
+      auto size = type->getSize().getZExtValue();
+      // An array of size N is imported as an N-element tuple which
+      // takes very long to compile. We chose 4096 as the upper limit because
+      // we don't want to break arrays of size PATH_MAX. 
+      if (size > 4096)
+        return Type();
       
       TupleTypeElt elt(elementType);
       SmallVector<TupleTypeElt, 8> elts;
-      for (size_t i = 0, size = type->getSize().getZExtValue(); i < size; ++i)
+      for (size_t i = 0; i < size; ++i)
         elts.push_back(elt);
       
       return TupleType::get(elts, elementType->getASTContext());
@@ -2435,13 +2443,21 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
   // Match generic parameters against their bounds.
   if (auto *genericTy = type->getAs<GenericTypeParamType>()) {
     if (auto *generic = genericTy->getDecl()) {
-      type = generic->getSuperclass();
-      if (!type)
-        return false;
+      auto genericSig =
+        generic->getDeclContext()->getGenericSignatureOfContext();
+      if (genericSig && genericSig->getConformsTo(type).empty()) {
+        type = genericSig->getSuperclassBound(type);
+        if (!type)
+          return false;
+      }
     }
   }
 
-  // Class type or existential that inherits from NSObject.
+  // Existentials cannot match the Hashable bound.
+  if (type->isAnyExistentialType())
+    return false;
+
+  // Class type that inherits from NSObject.
   if (NSObjectType->isExactSuperclassOf(type))
     return true;
 
@@ -2496,7 +2512,7 @@ Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
         parentType = nominal->getDeclaredInterfaceType();
     }
 
-    return NameAliasType::get(typealias, parentType, SubstitutionMap(),
+    return TypeAliasType::get(typealias, parentType, SubstitutionMap(),
                               typealias->getUnderlyingTypeLoc().getType());
   }
 

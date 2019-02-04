@@ -54,20 +54,6 @@ static inline IntRange<AccessorKind> allAccessorKinds() {
                                 AccessorKind(NumAccessorKinds));
 }
 
-/// The safety semantics of this addressor.
-enum class AddressorKind : uint8_t {
-  /// \brief This is not an addressor.
-  NotAddressor,
-  /// \brief This is an unsafe addressor; it simply returns an address.
-  Unsafe,
-  /// \brief This is an owning addressor; it returns an AnyObject
-  /// which should be released when the caller is done with the object.
-  Owning,
-  /// \brief This is an owning addressor; it returns a Builtin.NativeObject
-  /// which should be released when the caller is done with the object.
-  NativeOwning,
-};
-
 /// Whether an access to storage is for reading, writing, or both.
 enum class AccessKind : uint8_t {
   /// The access is just to read the current value.
@@ -94,10 +80,6 @@ public:
     /// that storage directly.
     Storage,
 
-    /// The decl is a VarDecl with storage defined by a property behavior;
-    /// this access may initialize or reassign the storage based on dataflow.
-    BehaviorStorage,
-
     /// Directly call an accessor of some sort.  The strategy includes
     /// an accessor kind.
     DirectToAccessor,
@@ -121,7 +103,7 @@ private:
 
   AccessStrategy(Kind kind)
     : TheKind(kind) {
-    assert(kind == Storage || kind == BehaviorStorage);
+    assert(kind == Storage);
   }
 
   AccessStrategy(Kind kind, AccessorKind accessor)
@@ -145,10 +127,6 @@ public:
     return { Storage };
   }
 
-  static AccessStrategy getBehaviorStorage() {
-    return { BehaviorStorage };
-  }
-
   static AccessStrategy getAccessor(AccessorKind accessor, bool dispatched) {
     return { dispatched ? DispatchToAccessor : DirectToAccessor, accessor };
   }
@@ -160,8 +138,12 @@ public:
 
   Kind getKind() const { return TheKind; }
 
+  bool hasAccessor() const {
+    return TheKind == DirectToAccessor || TheKind == DispatchToAccessor;
+  }
+
   AccessorKind getAccessor() const {
-    assert(TheKind == DirectToAccessor || TheKind == DispatchToAccessor);
+    assert(hasAccessor());
     return FirstAccessor;
   }
 

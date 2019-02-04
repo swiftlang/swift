@@ -42,8 +42,8 @@ static ASTContext *Context = nullptr;
 
 // FIXME: swiftcall
 /// func printType(forMetadata: Any.Type)
-LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI
-extern "C" void printMetadataType(const Metadata *typeMetadata) {
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+printMetadataType(const Metadata *typeMetadata) {
   assert(Context && "context was not set");
 
   std::shared_ptr<MemoryReader> reader(new InProcessMemoryReader());
@@ -64,8 +64,8 @@ extern "C" void printMetadataType(const Metadata *typeMetadata) {
 
 // FIXME: swiftcall
 /// func printDynamicType(_: AnyObject)
-LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI
-extern "C" void printHeapMetadataType(void *object) {
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+printHeapMetadataType(void *object) {
   assert(Context && "context was not set");
 
   std::shared_ptr<MemoryReader> reader(new InProcessMemoryReader());
@@ -127,8 +127,8 @@ static void printMemberOffset(const Metadata *typeMetadata,
 
 // FIXME: swiftcall
 /// func printTypeMemberOffset(forType: Any.Type, memberName: StaticString)
-LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI
-extern "C" void printTypeMemberOffset(const Metadata *typeMetadata,
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+printTypeMemberOffset(const Metadata *typeMetadata,
                                       const char *memberName) {
   printMemberOffset(typeMetadata, memberName, /*pass metadata*/ false);
 }
@@ -136,15 +136,15 @@ extern "C" void printTypeMemberOffset(const Metadata *typeMetadata,
 // FIXME: swiftcall
 /// func printTypeMetadataMemberOffset(forType: Any.Type,
 ///                                    memberName: StaticString)
-LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI
-extern "C" void printTypeMetadataMemberOffset(const Metadata *typeMetadata,
-                                              const char *memberName) {
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+printTypeMetadataMemberOffset(const Metadata *typeMetadata,
+                              const char *memberName) {
   printMemberOffset(typeMetadata, memberName, /*pass metadata*/ true);
 }
 
 // FIXME: swiftcall
 /// func printDynamicTypeAndAddressForExistential<T>(_: T)
-LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI extern "C" void
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
 printDynamicTypeAndAddressForExistential(void *object,
                                          const Metadata *typeMetadata) {
   assert(Context && "context was not set");
@@ -178,7 +178,7 @@ printDynamicTypeAndAddressForExistential(void *object,
 namespace {
 
 struct Observer : public FrontendObserver {
-  void aboutToRunImmediately(CompilerInstance &instance) override {
+  void configuredCompiler(CompilerInstance &instance) override {
     Context = &instance.getASTContext();
   }
 };

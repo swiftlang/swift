@@ -664,6 +664,7 @@ bool IndexSwiftASTWalker::visitImports(
         IsClangModuleOpt = false;
         break;
       case FileUnitKind::ClangModule:
+      case FileUnitKind::DWARFModule:
         assert(!IsClangModuleOpt.hasValue() &&
                "cannot handle multi-file modules");
         IsClangModuleOpt = true;
@@ -704,7 +705,11 @@ bool IndexSwiftASTWalker::handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWit
     if (conf->isInvalid())
       continue;
 
-    auto normal = conf->getRootNormalConformance();
+    // Ignore self-conformances; they're not interesting to show to users.
+    auto normal = dyn_cast<NormalProtocolConformance>(conf->getRootConformance());
+    if (!normal)
+      continue;
+
     normal->forEachValueWitness(nullptr,
                                 [&](ValueDecl *req, Witness witness) {
       if (Cancelled)
@@ -1458,6 +1463,7 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(
             Info += "\"";
             break;
           case FileUnitKind::ClangModule:
+          case FileUnitKind::DWARFModule:
             Info += "clang module, file=\"";
             Info += cast<LoadedFile>(FU)->getFilename();
             Info += "\"";
@@ -1494,7 +1500,8 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
   // need to hash the clang module.
   // FIXME: This is a bit of a hack.
   if (TopMod.getFiles().size() == 1)
-    if (TopMod.getFiles().front()->getKind() == FileUnitKind::ClangModule)
+    if (TopMod.getFiles().front()->getKind() == FileUnitKind::ClangModule ||
+        TopMod.getFiles().front()->getKind() == FileUnitKind::DWARFModule)
       return;
 
   auto It = ImportsMap.find(&TopMod);

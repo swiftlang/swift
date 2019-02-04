@@ -257,13 +257,34 @@ public:
   bool isLoadable(SILModule &M) const {
     return !isAddressOnly(M);
   }
+
+  /// Like isLoadable(SILModule), but specific to a function.
+  ///
+  /// This takes the resilience expansion of the function into account. If the
+  /// type is not loadable in general (because it's resilient), it still might
+  /// be loadable inside a resilient function in the module.
+  /// In other words: isLoadable(SILModule) is the conservative default, whereas
+  /// isLoadable(SILFunction) might give a more optimistic result.
+  bool isLoadable(SILFunction *inFunction) const {
+    return !isAddressOnly(inFunction);
+  }
+
   /// True if either:
   /// 1) The type, or the referenced type of an address type, is loadable.
   /// 2) The SIL Module conventions uses lowered addresses
   bool isLoadableOrOpaque(SILModule &M) const;
+
+  /// Like isLoadableOrOpaque(SILModule), but takes the resilience expansion of
+  /// \p inFunction into account (see isLoadable(SILFunction)).
+  bool isLoadableOrOpaque(SILFunction *inFunction) const;
+
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(SILModule &M) const;
+
+  /// Like isAddressOnly(SILModule), but takes the resilience expansion of
+  /// \p inFunction into account (see isLoadable(SILFunction)).
+  bool isAddressOnly(SILFunction *inFunction) const;
 
   /// True if the type, or the referenced type of an address type, is trivial.
   bool isTrivial(SILModule &M) const;

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -accessed-storage-dump -enable-sil-verify-all -o /dev/null -assume-parsing-unqualified-ownership-sil | %FileCheck %s
+// RUN: %target-sil-opt %s -accessed-storage-dump -enable-sil-verify-all -o /dev/null | %FileCheck %s
 
 sil_stage canonical
 
@@ -333,14 +333,14 @@ bb0:
 }
 
 class C {
-  @sil_stored var property: Int
+  @_hasStorage var property: Int
   deinit
   init()
 }
 
 // CHECK-LABEL: @readIdentifiedClass
 // CHECK: [read] Class %0 = argument of bb0 : $C
-// CHECK: Field: @sil_stored var property: Int
+// CHECK: Field: var property: Int
 sil @readIdentifiedClass : $@convention(thin) (@guaranteed C) -> Int {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.property
@@ -352,7 +352,7 @@ bb0(%0 : $C):
 
 // CHECK-LABEL: @writeIdentifiedClass
 // CHECK: [modify] Class %0 = argument of bb0 : $C
-// CHECK: Field: @sil_stored var property: Int
+// CHECK: Field: var property: Int
 sil @writeIdentifiedClass : $@convention(thin) (@guaranteed C, Int) -> () {
 bb0(%0 : $C, %1 : $Int):
   %2 = ref_element_addr %0 : $C, #C.property
@@ -365,7 +365,7 @@ bb0(%0 : $C, %1 : $Int):
 
 // CHECK-LABEL: @readWriteIdentifiedClass
 // CHECK: [modify] Class   %1 = alloc_ref $C
-// CHECK: Field: @sil_stored var property: Int
+// CHECK: Field: var property: Int
 sil @readWriteIdentifiedClass : $@convention(thin) (Int) -> (Int) {
 bb0(%0 : $Int):
   %1 = alloc_ref $C
@@ -380,7 +380,7 @@ bb0(%0 : $Int):
 
 // CHECK-LABEL: @readIdentifiedNestedClass
 // CHECK: [read] Class %0 = argument of bb0 : $C
-// CHECK: Field: @sil_stored var property: Int
+// CHECK: Field: var property: Int
 sil @readIdentifiedNestedClass : $@convention(thin) (@guaranteed C) -> Int {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.property
@@ -394,7 +394,7 @@ bb0(%0 : $C):
 
 // CHECK-LABEL: @writeIdentifiedNestedClass
 // CHECK: [modify] Class %0 = argument of bb0 : $C
-// CHECK: Field: @sil_stored var property: Int
+// CHECK: Field: var property: Int
 sil @writeIdentifiedNestedClass : $@convention(thin) (@guaranteed C, Int) -> () {
 bb0(%0 : $C, %1 : $Int):
   %2 = ref_element_addr %0 : $C, #C.property
@@ -409,7 +409,7 @@ bb0(%0 : $C, %1 : $Int):
 
 // CHECK-LABEL: @readWriteIdentifiedNestedClass
 // CHECK: [modify] Class   %1 = alloc_ref $C
-// CHECK: Field: @sil_stored var property: Int
+// CHECK: Field: var property: Int
 sil @readWriteIdentifiedNestedClass : $@convention(thin) (Int) -> (Int) {
 bb0(%0 : $Int):
   %1 = alloc_ref $C
@@ -541,7 +541,7 @@ bb0(%0 : $*Int, %1 : $*Int):
 // Test directly recursive argument access.
 // CHECK-LABEL: @readRecursiveArgument
 // CHECK:   [read] Class %0 = argument of bb0 : $C
-// CHECK:   Field: @sil_stored var property: Int
+// CHECK:   Field: var property: Int
 sil @readRecursiveArgument : $@convention(thin) (@guaranteed C, Int) -> Int {
 bb0(%0 : $C, %1 : $Int):
   %propaddr = ref_element_addr %0 : $C, #C.property
@@ -556,7 +556,7 @@ bb0(%0 : $C, %1 : $Int):
 // Test a class argument access from an optional caller value.
 // CHECK-LABEL: @readOptionalArgumentInCallee
 // CHECK:   [read] Class   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
-// CHECK:   Field: @sil_stored var property: Int
+// CHECK:   Field: var property: Int
 sil @readOptionalArgumentInCallee : $@convention(thin) (@guaranteed Optional<C>) -> Int {
 bb0(%0 : $Optional<C>):
   %c = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
@@ -567,7 +567,7 @@ bb0(%0 : $Optional<C>):
 
 // CHECK-LABEL: @readOptionalArgumentInCalleeHelper
 // CHECK:   [read] Class %0 = argument of bb0 : $C
-// CHECK:   Field: @sil_stored var property: Int
+// CHECK:   Field: var property: Int
 sil private @readOptionalArgumentInCalleeHelper : $@convention(thin) (@guaranteed C) -> Int {
 bb0(%0 : $C):
   %propaddr = ref_element_addr %0 : $C, #C.property
@@ -625,4 +625,77 @@ bb2(%7 : ${ var Int }):
 
 bb3(%result : $Int):
   return %result : $Int
+}
+
+// Make sure findAccessedStorage returns a valid storage object for an address-phi
+// that feeds ref_element_addr instructions. The ref_element_addr's need to have the
+// same base object and same field id.
+// <rdar://problem/46114512> SIL verification failed: Unknown formal access pattern: storage
+class BaseClass {
+  var f: Float = 0.0
+}
+
+class SubClass : BaseClass {}
+
+// CHECK-LABEL: @testElementAddressPhiAccess
+// CHECK: [read] [no_nested_conflict] Class %{{.*}} = upcast %0 : $SubClass to $BaseClass
+// CHECK: Field: @_hasInitialValue var f: Float
+sil @testElementAddressPhiAccess : $@convention(thin) (@guaranteed SubClass) -> () {
+bb0(%0 : $SubClass):
+  %base = upcast %0 : $SubClass to $BaseClass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %ref1 = ref_element_addr %base : $BaseClass, #BaseClass.f
+  br bb3(%ref1 : $*Float)
+
+bb2:
+  %ref2 = ref_element_addr %base : $BaseClass, #BaseClass.f
+  br bb3(%ref2 : $*Float)
+
+bb3(%phi : $*Float):
+  %access = begin_access [read] [dynamic] [no_nested_conflict] %phi : $*Float
+  %addr = struct_element_addr %access : $*Float, #Float._value
+  %val = load %addr : $*Builtin.FPIEEE32
+  end_access %access : $*Float
+  %v = tuple ()
+  return %v : $()
+}
+
+// Test an inlined global variable addressor after simplify-cfg has
+// cloned the call to the addressor.
+// <rdar://problem/47555992> SIL verification failed: Unknown formal access pattern
+// CHECK-LABEL: @testClonedGlobalAddressor
+// CHECK: [read] [no_nested_conflict] Global // gvar
+// CHECK: sil_global hidden @gvar
+var gvar: Int64
+
+public func foo() -> Int64
+
+sil_global hidden @gvar : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 0
+  %initval = struct $Int (%0 : $Builtin.Int64)
+}
+
+sil @testClonedGlobalAddressor : $@convention(thin) () -> Int64 {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = global_addr @gvar : $*Int64
+  %2 = address_to_pointer %1 : $*Int64 to $Builtin.RawPointer
+  br bb3(%2 : $Builtin.RawPointer)
+
+bb2:
+  %4 = global_addr @gvar : $*Int64
+  %5 = address_to_pointer %4 : $*Int64 to $Builtin.RawPointer
+  br bb3(%5 : $Builtin.RawPointer)
+
+// %7
+bb3(%7 : $Builtin.RawPointer):
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Int64
+  %9 = begin_access [read] [dynamic] [no_nested_conflict] %8 : $*Int64
+  %10 = load %9 : $*Int64
+  end_access %9 : $*Int64
+  return %10 : $Int64
 }

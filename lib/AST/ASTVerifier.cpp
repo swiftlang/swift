@@ -189,7 +189,7 @@ struct LazyGenericEnvironment {
     return false;
   }
 
-  bool containsPrimaryArchetype(ArchetypeType *archetype) const {
+  bool containsPrimaryArchetype(PrimaryArchetypeType *archetype) const {
     // Assume true so we don't deserialize.
     if (isLazy()) return true;
 
@@ -222,25 +222,25 @@ class Verifier : public ASTWalker {
   const bool HadError;
   SmallVector<bool, 8> InImplicitBraceStmt;
 
-  /// \brief The stack of functions we're visiting.
+  /// The stack of functions we're visiting.
   SmallVector<DeclContext *, 4> Functions;
 
-  /// \brief The stack of scopes we're visiting.
+  /// The stack of scopes we're visiting.
   using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
   SmallVector<ScopeLike, 4> Scopes;
 
   /// The stack of generic environments.
   SmallVector<LazyGenericEnvironment, 2> GenericEnv;
 
-  /// \brief The stack of optional evaluations active at this point.
+  /// The stack of optional evaluations active at this point.
   SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
 
-  /// \brief The set of opaque value expressions active at this point.
+  /// The set of opaque value expressions active at this point.
   llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
 
   /// The set of opened existential archetypes that are currently
   /// active.
-  llvm::DenseSet<ArchetypeType *> OpenedExistentialArchetypes;
+  llvm::DenseSet<OpenedArchetypeType *> OpenedExistentialArchetypes;
 
   /// The set of inout to pointer expr that match the following pattern:
   ///
@@ -627,8 +627,8 @@ public:
 
           // We should know about archetypes corresponding to opened
           // existential archetypes.
-          if (archetype->getOpenedExistentialType()) {
-            if (OpenedExistentialArchetypes.count(archetype) == 0) {
+          if (auto opened = dyn_cast<OpenedArchetypeType>(archetype)) {
+            if (OpenedExistentialArchetypes.count(opened) == 0) {
               Out << "Found opened existential archetype "
                   << archetype->getString()
                   << " outside enclosing OpenExistentialExpr\n";
@@ -750,6 +750,7 @@ public:
     FUNCTION_LIKE(ConstructorDecl)
     FUNCTION_LIKE(DestructorDecl)
     FUNCTION_LIKE(FuncDecl)
+    FUNCTION_LIKE(EnumElementDecl)
     SCOPE_LIKE(NominalTypeDecl)
     SCOPE_LIKE(ExtensionDecl)
 
@@ -869,7 +870,8 @@ public:
 
       if (D->hasAccess()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
-        if (D->getFormalAccessScope().isPublic() &&
+        if (!D->getASTContext().isAccessControlDisabled() &&
+            D->getFormalAccessScope().isPublic() &&
             D->getFormalAccess() < AccessLevel::Public) {
           Out << "non-public decl has no formal access scope\n";
           D->dump(Out);
@@ -996,7 +998,7 @@ public:
       case StmtConditionElement::CK_Boolean: {
         auto *E = elt.getBoolean();
         if (shouldVerifyChecked(E))
-          checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
+          checkSameType(E->getType(), Ctx.getBoolDecl()->getDeclaredType(),
                         "condition type");
         break;
       }
@@ -1958,15 +1960,21 @@ public:
     void verifyChecked(OptionalTryExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying OptionalTryExpr", E);
 
-      Type unwrappedType = E->getType()->getOptionalObjectType();
-      if (!unwrappedType) {
-        Out << "OptionalTryExpr result type is not optional\n";
-        abort();
+      if (Ctx.LangOpts.isSwiftVersionAtLeast(5)) {
+        checkSameType(E->getType(), E->getSubExpr()->getType(),
+                      "OptionalTryExpr and sub-expression");
       }
-
-      checkSameType(unwrappedType, E->getSubExpr()->getType(),
-                    "OptionalTryExpr and sub-expression");
-
+      else {
+        Type unwrappedType = E->getType()->getOptionalObjectType();
+        if (!unwrappedType) {
+          Out << "OptionalTryExpr result type is not optional\n";
+          abort();
+        }
+        
+        checkSameType(unwrappedType, E->getSubExpr()->getType(),
+                      "OptionalTryExpr and sub-expression");
+      }
+      
       verifyCheckedBase(E);
     }
 
@@ -2064,8 +2072,8 @@ public:
       PrettyStackTraceExpr debugStack(Ctx, "verifying IfExpr", E);
 
       auto condTy = E->getCondExpr()->getType();
-      if (!condTy->isBuiltinIntegerType(1)) {
-        Out << "IfExpr condition is not an i1\n";
+      if (!condTy->isBool()) {
+        Out << "IfExpr condition is not Bool\n";
         abort();
       }
 
@@ -2738,6 +2746,55 @@ public:
       verifyCheckedBase(nominal);
     }
 
+    void verifyCheckedAlways(GenericTypeParamDecl *GTPD) {
+      PrettyStackTraceDecl debugStack("verifying GenericTypeParamDecl", GTPD);
+
+      const DeclContext *DC = GTPD->getDeclContext();
+      if (!GTPD->getDeclContext()->isInnermostContextGeneric()) {
+        Out << "DeclContext of GenericTypeParamDecl does not have "
+               "generic params\n";
+        abort();
+      }
+
+      GenericParamList *paramList =
+          static_cast<const GenericContext *>(DC)->getGenericParams();
+      if (!paramList) {
+        Out << "DeclContext of GenericTypeParamDecl does not have "
+               "generic params\n";
+        abort();
+      }
+
+      if (paramList->getOuterParameters() &&
+          !isa<ExtensionDecl>(DC)) {
+        Out << "GenericParamList can only have outer parameters in an "
+               "extension\n";
+        abort();
+      }
+
+      unsigned currentDepth = DC->getGenericContextDepth();
+      if (currentDepth < GTPD->getDepth()) {
+        Out << "GenericTypeParamDecl has incorrect depth\n";
+        abort();
+      }
+      while (currentDepth > GTPD->getDepth()) {
+        paramList = paramList->getOuterParameters();
+        --currentDepth;
+      }
+      assert(paramList && "this is guaranteed by the parameter list's depth");
+
+      if (paramList->size() <= GTPD->getIndex() ||
+          paramList->getParams()[GTPD->getIndex()] != GTPD) {
+        if (llvm::is_contained(paramList->getParams(), GTPD))
+          Out << "GenericTypeParamDecl has incorrect index\n";
+        else
+          Out << "GenericTypeParamDecl not found in GenericParamList; "
+                 "incorrect depth or wrong DeclContext\n";
+        abort();
+      }
+
+      verifyCheckedBase(GTPD);
+    }
+
     void verifyChecked(ExtensionDecl *ext) {
       // Make sure that the protocol conformances are complete.
       for (auto conformance : ext->getLocalConformances()) {
@@ -3033,10 +3090,9 @@ public:
           abort();
         }
 
-        if (AD->getAccessorKind() != AccessorKind::Read &&
-            AD->getAccessorKind() != AccessorKind::Modify) {
-          Out << "hasForcedStaticDispatch() set on accessor other than "
-                 "read or modify\n";
+        if (AD->getStorage()->requiresOpaqueAccessor(AD->getAccessorKind())) {
+          Out << "hasForcedStaticDispatch() set on accessor that's opaque "
+                 "for its storage\n";
           abort();
         }
       }
@@ -3100,9 +3156,28 @@ public:
           Out << "Property and accessor do not match for 'final'\n";
           abort();
         }
-        if (FD->isDynamic() != storageDecl->isDynamic()) {
+        if (FD->isDynamic() != storageDecl->isDynamic() &&
+            // We allow a non dynamic setter if there is a dynamic modify,
+            // observer, or mutable addressor.
+            !(FD->isSetter() &&
+              (storageDecl->getWriteImpl() == WriteImplKind::Modify ||
+               storageDecl->getWriteImpl() ==
+                   WriteImplKind::StoredWithObservers ||
+               storageDecl->getWriteImpl() == WriteImplKind::MutableAddress) &&
+              storageDecl->isNativeDynamic()) &&
+            // We allow a non dynamic getter if there is a dynamic read.
+            !(FD->isGetter() &&
+              (storageDecl->getReadImpl() == ReadImplKind::Read ||
+               storageDecl->getReadImpl() == ReadImplKind::Address) &&
+              storageDecl->isNativeDynamic())) {
           Out << "Property and accessor do not match for 'dynamic'\n";
           abort();
+        }
+        if (FD->isDynamic()) {
+          if (FD->isObjC() != storageDecl->isObjC()) {
+            Out << "Property and accessor do not match for '@objc'\n";
+            abort();
+          }
         }
       }
 
@@ -3110,28 +3185,6 @@ public:
       if (storedAccessor != FD) {
         Out << "storage declaration has different accessor for this kind\n";
         abort();
-      }
-
-      switch (FD->getAccessorKind()) {
-      case AccessorKind::Get:
-      case AccessorKind::Set:
-      case AccessorKind::WillSet:
-      case AccessorKind::DidSet:
-      case AccessorKind::Read:
-      case AccessorKind::Modify:
-        if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
-          Out << "non-addressor accessor has an addressor kind\n";
-          abort();
-        }
-        break;
-
-      case AccessorKind::Address:
-      case AccessorKind::MutableAddress:
-        if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
-          Out << "addressor does not have an addressor kind\n";
-          abort();
-        }
-        break;
       }
 
       verifyCheckedBase(FD);
@@ -3536,7 +3589,7 @@ public:
                         [&]{ D->print(Out); });
     }
 
-    /// \brief Verify that the given source ranges is contained within the
+    /// Verify that the given source ranges is contained within the
     /// parent's source range.
     void checkSourceRanges(SourceRange Current, ASTWalker::ParentTy Parent,
                            llvm::function_ref<void()> printEntity) {
