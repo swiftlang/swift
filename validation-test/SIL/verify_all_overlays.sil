@@ -1,6 +1,11 @@
-// RUN: for x in %platform-sdk-overlay-dir/*.swiftmodule; do [[ $(basename "$x") = Swift.swiftmodule ]] && continue; llvm-bcanalyzer $x | %FileCheck %s; %target-sil-opt -sdk %sdk -enable-sil-verify-all $x > /dev/null; done
+// RUN: %empty-directory(%t)
+// RUN: for x in %platform-sdk-overlay-dir/*.swiftmodule; do [[ $(basename "$x") = Swift.swiftmodule ]] && continue; llvm-bcanalyzer $x | %FileCheck %s || echo "$x (bcanalyzer)" >> %t.txt; %target-sil-opt -sdk %sdk -enable-sil-verify-all $x > /dev/null || echo "$x (sil-opt)" >> %t/failures.txt; done
+// RUN: not cat %t/failures.txt
 
 // CHECK-NOT: Unknown
 
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test
+
+// XFAIL: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// https://bugs.swift.org/browse/SR-9847
