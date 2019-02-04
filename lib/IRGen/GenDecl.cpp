@@ -4070,7 +4070,8 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(resultTy, paramTys, false);
 
-  llvm::Constant *fn = Module.getOrInsertFunction(fnName, fnTy);
+  llvm::Constant *fn = cast<llvm::Function>(
+      Module.getOrInsertFunction(fnName, fnTy).getCallee());
 
   if (llvm::Function *def = shouldDefineHelper(*this, fn, setIsNoInline)) {
     IRGenFunction IGF(*this, def);
