@@ -194,7 +194,7 @@ cmake -G "Visual Studio 2017" -A x64 -T "host=x64"^ ...
 ```cmd
 mkdir "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
 pushd "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
-cmake -G Ninja
+cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=Debug^
   -DLLDB_ALLOW_STATIC_BINDINGS=YES^
   -DLLDB_PATH_TO_LLVM_SOURCE="S:/llvm"^
