@@ -1489,6 +1489,7 @@ bool MissingMemberFailure::diagnoseAsError() {
 bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getAnchor()->getLoc();
   auto &cs = getConstraintSystem();
+  auto locator = getLocator();
 
   if (loc.isInvalid()) {
     return true;
@@ -1496,12 +1497,22 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
   Expr *expr = getParentExpr();
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
-  auto resolvedOverloadChoice = getResolvedOverload(getLocator())->Choice;
+  auto resolvedOverloadChoice = getResolvedOverload(locator)->Choice;
+
+  ValueDecl *decl = nullptr;
 
   if (!resolvedOverloadChoice.isDecl()) {
-    return true;
+    if (auto MT = resolvedOverloadChoice.getBaseType()->getAs<MetatypeType>()) {
+      if (auto VD = dyn_cast<ValueDecl>(
+              MT->getMetatypeInstanceType()->getAnyNominal()->getAsDecl())) {
+        decl = VD;
+      }
+    } else {
+      return true;
+    }
   }
-  auto member = resolvedOverloadChoice.getDecl();
+
+  auto member = decl ? decl : resolvedOverloadChoice.getDecl();
 
   // If the base is an implicit self type reference, and we're in a
   // an initializer, then the user wrote something like:
