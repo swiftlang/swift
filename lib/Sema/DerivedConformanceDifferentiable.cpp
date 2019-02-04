@@ -699,7 +699,8 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
                                    ConformanceCheckFlags::Used)) {
           // Diagnose error types only once.
           if (errorMemberAssocTypes.insert(memberAssocType).second)
-            TC.diagnose(member, diag::broken_differentiable_generic_signature,
+            TC.diagnose(member,
+                        diag::differentiable_need_explicit_addarith_conformance,
                         memberAssocType);
         }
       }
