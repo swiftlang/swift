@@ -227,13 +227,57 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   return member->getAccessSemanticsFromContext(DC, isAccessOnSelf);
 }
 
+/// This effectively duplicates logic of `Expr::isTypeReference` with
+/// one significant difference - support for `UnresolvedDotExpr` and
+/// `UnresolvedMemberExpr`. This method could be used on not yet
+/// fully type-checked AST.
 bool ConstraintSystem::isTypeReference(const Expr *E) {
-  return E->isTypeReference([&](const Expr *E) -> Type { return getType(E); });
+  // If the result isn't a metatype, there's nothing else to do.
+  if (!getType(E)->is<AnyMetatypeType>())
+    return false;
+
+  Expr *expr = const_cast<Expr *>(E);
+  do {
+    // Skip syntax.
+    expr = expr->getSemanticsProvidingExpr();
+
+    // Direct reference to a type.
+    if (auto declRef = dyn_cast<DeclRefExpr>(expr))
+      if (isa<TypeDecl>(declRef->getDecl()))
+        return true;
+
+    if (isa<TypeExpr>(expr))
+      return true;
+
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+      return isa<TypeDecl>(findResolvedMemberRef(
+          getConstraintLocator(UDE, ConstraintLocator::Member)));
+    }
+
+    if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr)) {
+      return isa<TypeDecl>(findResolvedMemberRef(
+          getConstraintLocator(UME, ConstraintLocator::UnresolvedMember)));
+    }
+
+    // A "." expression that refers to a member.
+    if (auto memberRef = dyn_cast<MemberRefExpr>(expr))
+      return isa<TypeDecl>(memberRef->getMember().getDecl());
+
+    // When the base of a "." expression is ignored, look at the member.
+    if (auto ignoredDot = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr)) {
+      expr = ignoredDot->getRHS();
+      continue;
+    }
+
+    // Anything else is not statically derived.
+    return false;
+  } while (true);
 }
 
 bool ConstraintSystem::isStaticallyDerivedMetatype(const Expr *E) {
   return E->isStaticallyDerivedMetatype(
-      [&](const Expr *E) -> Type { return getType(E); });
+      [&](const Expr *E) -> Type { return getType(E); },
+      [&](const Expr *E) -> bool { return isTypeReference(E); });
 }
 
 Type ConstraintSystem::getInstanceType(const TypeExpr *E) {
@@ -317,10 +361,6 @@ static bool isNonFinalClass(Type type) {
   return false;
 }
 
-// Non-required constructors may not be not inherited. Therefore when
-// constructing a class object, either the metatype must be statically
-// derived (rather than an arbitrary value of metatype type) or the referenced
-// constructor must be required.
 static bool
 diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
                                             Expr *base,
@@ -877,14 +917,6 @@ namespace {
       if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
         baseIsInstance = false;
         baseTy = baseMeta->getInstanceType();
-
-        // If the member is a constructor, verify that it can be legally
-        // referenced from this base.
-        if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-          if (!diagnoseInvalidDynamicConstructorReferences(cs, base, memberLoc,
-                                           ctor, SuppressDiagnostics))
-            return nullptr;
-        }
       }
 
       // Build a member reference.
@@ -2638,18 +2670,6 @@ namespace {
           if (dre->getDecl()->getFullName() == cs.getASTContext().Id_self) {
             // We have a reference to 'self'.
             diagnoseBadInitRef = false;
-
-            // Special case -- in a protocol extension initializer with a class
-            // constrainted Self type, 'self' has archetype type, and only
-            // required initializers can be called.
-            if (cs.getType(dre)->getRValueType()->is<ArchetypeType>()) {
-              if (!diagnoseInvalidDynamicConstructorReferences(cs, base,
-                                                               nameLoc,
-                                                               ctor,
-                                                               SuppressDiagnostics))
-                return nullptr;
-            }
-
             // Make sure the reference to 'self' occurs within an initializer.
             if (!dyn_cast_or_null<ConstructorDecl>(
                    cs.DC->getInnermostMethodContext())) {

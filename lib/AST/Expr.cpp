@@ -474,9 +474,10 @@ bool Expr::isTypeReference(
 }
 
 bool Expr::isStaticallyDerivedMetatype(
-    llvm::function_ref<Type(const Expr *)> getType) const {
+    llvm::function_ref<Type(const Expr *)> getType,
+    llvm::function_ref<bool(const Expr *)> isTypeReference) const {
   // The expression must first be a type reference.
-  if (!isTypeReference(getType))
+  if (!isTypeReference(this))
     return false;
 
   auto type = getType(this)
