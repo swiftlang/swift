@@ -107,9 +107,14 @@ SILFunctionType::getDefaultWitnessMethodProtocol() const {
     auto superclass = GenericSig->getSuperclassBound(paramTy);
     if (superclass)
       return nullptr;
-    auto protos = GenericSig->getConformsTo(paramTy);
-    assert(protos.size() == 1);
-    return protos[0];
+
+    assert(!GenericSig->getRequirements().empty());
+    assert(GenericSig->getRequirements().front().getKind() ==
+             RequirementKind::Conformance);
+    assert(GenericSig->getRequirements().front().getFirstType()
+             ->isEqual(paramTy));
+    return GenericSig->getRequirements().front().getSecondType()
+             ->castTo<ProtocolType>()->getDecl();
   }
 
   return nullptr;

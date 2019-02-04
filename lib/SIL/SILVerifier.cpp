@@ -2542,10 +2542,9 @@ public:
             selfRequirement->getKind() == RequirementKind::Conformance,
             "first non-same-typerequirement should be conformance requirement");
     auto conformsTo = genericSig->getConformsTo(selfGenericParam);
-    require(conformsTo.size() == 1,
-            "requirement Self parameter must conform to exactly one protocol");
-    require(conformsTo[0] == protocol,
-            "requirement Self parameter should be constrained by protocol");
+    require(std::find(conformsTo.begin(), conformsTo.end(), protocol)
+              != conformsTo.end(),
+            "requirement Self parameter must conform to called protocol");
 
     auto lookupType = AMI->getLookupType();
     if (getOpenedArchetypeOf(lookupType)) {
