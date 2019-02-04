@@ -262,7 +262,7 @@ void SourceFileDepGraph::verifySame(const SourceFileDepGraph &other) const {
 namespace llvm {
 namespace yaml {
 // This introduces a redefinition for Linux.
-#if !defined(__linux__)
+#if !(defined(__linux__) || defined(_WIN64))
 void ScalarTraits<size_t>::output(const size_t &Val, void *, raw_ostream &out) {
   out << Val;
 }
