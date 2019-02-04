@@ -420,33 +420,39 @@ Type TypeChecker::getUnsafeMutablePointerType(SourceLoc loc, Type pointeeType) {
   return getPointerType(*this, loc, pointeeType, PTK_UnsafeMutablePointer);
 }
 
-static Type getStdlibType(TypeChecker &TC, Type &cached, DeclContext *dc,
-                          StringRef name) {
-  if (cached.isNull()) {
-    ModuleDecl *stdlib = TC.Context.getStdlibModule();
-    LookupTypeResult lookup = TC.lookupMemberType(dc, ModuleType::get(stdlib),
-                                                  TC.Context.getIdentifier(
-                                                    name));
-    if (lookup)
-      cached = lookup.back().MemberType;
-  }
-  return cached;
+Type TypeChecker::getStringType(DeclContext *dc) {
+  if (auto typeDecl = Context.getStringDecl())
+    return typeDecl->getDeclaredInterfaceType();
+
+  return Type();
 }
 
-Type TypeChecker::getStringType(DeclContext *dc) {
-  return ::getStdlibType(*this, StringType, dc, "String");
-}
 Type TypeChecker::getSubstringType(DeclContext *dc) {
-  return ::getStdlibType(*this, SubstringType, dc, "Substring");
+  if (auto typeDecl = Context.getSubstringDecl())
+    return typeDecl->getDeclaredInterfaceType();
+
+  return Type();
 }
+
 Type TypeChecker::getIntType(DeclContext *dc) {
-  return ::getStdlibType(*this, IntType, dc, "Int");
+  if (auto typeDecl = Context.getIntDecl())
+    return typeDecl->getDeclaredInterfaceType();
+
+  return Type();
 }
+
 Type TypeChecker::getInt8Type(DeclContext *dc) {
-  return ::getStdlibType(*this, Int8Type, dc, "Int8");
+  if (auto typeDecl = Context.getInt8Decl())
+    return typeDecl->getDeclaredInterfaceType();
+
+  return Type();
 }
+
 Type TypeChecker::getUInt8Type(DeclContext *dc) {
-  return ::getStdlibType(*this, UInt8Type, dc, "UInt8");
+  if (auto typeDecl = Context.getUInt8Decl())
+    return typeDecl->getDeclaredInterfaceType();
+
+  return Type();
 }
 
 /// Find the standard type of exceptions.
@@ -454,12 +460,7 @@ Type TypeChecker::getUInt8Type(DeclContext *dc) {
 /// We call this the "exception type" to try to avoid confusion with
 /// the AST's ErrorType node.
 Type TypeChecker::getExceptionType(DeclContext *dc, SourceLoc loc) {
-  if (NominalTypeDecl *decl = Context.getErrorDecl())
-    return decl->getDeclaredType();
-
-  // Not really sugar, but the actual diagnostic text is fine.
-  diagnose(loc, diag::sugar_type_not_found, 4);
-  return Type();
+  return Context.getErrorDecl()->getDeclaredType();
 }
 
 Type
