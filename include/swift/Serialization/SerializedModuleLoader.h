@@ -224,6 +224,7 @@ public:
   bool hasEntryPoint() const override;
 
   virtual const clang::Module *getUnderlyingClangModule() const override;
+  const ModuleDecl *getShadowedModule() const;
 
   virtual bool getAllGenericSignatures(
                    SmallVectorImpl<GenericSignature*> &genericSignatures)
