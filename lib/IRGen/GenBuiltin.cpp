@@ -940,7 +940,11 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     (void)args.claimAll();
     Type valueTy = substitutions.getReplacementTypes()[0];
     // Get the type encoding for the associated clang type.
-    auto clangTy = IGF.IGM.getClangType(valueTy->getCanonicalType());
+    auto clangTy = IGF.IGM.getClangType(valueTy->getCanonicalType(), true);
+    if (clangTy.isNull()) {
+      out.add(llvm::Constant::getNullValue(IGF.IGM.Int8PtrTy));
+      return;
+    }
     std::string encoding;
     IGF.IGM.getClangASTContext().getObjCEncodingForType(clangTy, encoding);
     

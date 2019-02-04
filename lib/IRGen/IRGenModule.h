@@ -772,7 +772,7 @@ public:
   llvm::PointerType *getStoragePointerType(SILType T);
   llvm::StructType *createNominalType(CanType type);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
-  clang::CanQual<clang::Type> getClangType(CanType type);
+  clang::CanQual<clang::Type> getClangType(CanType type, bool mayFail = false);
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
 

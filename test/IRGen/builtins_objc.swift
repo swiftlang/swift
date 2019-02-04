@@ -14,6 +14,18 @@ import CoreGraphics
 @objc class ObjCClass: NSObject {}
 class NonObjCClass {}
 
+struct AStruct {
+  var x: String
+}
+struct Tuple {
+  var x: (Int, Float)
+}
+
+enum AnEnum {
+  case a
+  case b
+}
+
 @_silgen_name("use")
 func use(_: Builtin.RawPointer)
 
@@ -34,5 +46,15 @@ func getObjCTypeEncoding<T>(_: T) {
   use(Builtin.getObjCTypeEncoding(ObjCClass.self))
   // CHECK: call swiftcc void @use({{.* i8]\*}} [[OBJECT]]
   use(Builtin.getObjCTypeEncoding(NonObjCClass.self))
+  // CHECK: call swiftcc void @use(i8* null
+  use(Builtin.getObjCTypeEncoding(String.self))
+  // CHECK: call swiftcc void @use(i8* null
+  use(Builtin.getObjCTypeEncoding(Array<Int>.self))
+  // CHECK: call swiftcc void @use(i8* null
+  use(Builtin.getObjCTypeEncoding(AStruct.self))
+  // CHECK: call swiftcc void @use(i8* null
+  use(Builtin.getObjCTypeEncoding(AnEnum.self))
+  // CHECK: call swiftcc void @use(i8* null
+  use(Builtin.getObjCTypeEncoding(Tuple.self))
 }
 

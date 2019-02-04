@@ -45,9 +45,9 @@ class swift::irgen::ClangTypeConverter {
 
 public:
   ClangTypeConverter() = default;
-  clang::CanQualType convert(IRGenModule &IGM, CanType type);
-  clang::CanQualType reverseBuiltinTypeMapping(IRGenModule &IGM,
-                                               CanStructType type);
+  clang::CanQualType convert(IRGenModule &IGM, CanType type, bool mayFail = false);
+  clang::CanQualType
+  reverseBuiltinTypeMapping(IRGenModule &IGM, CanStructType type, bool mayFail);
 };
 
 static CanType getNamedSwiftType(ModuleDecl *stdlib, StringRef name) {
@@ -124,14 +124,18 @@ namespace {
 class GenClangType : public CanTypeVisitor<GenClangType, clang::CanQualType> {
   IRGenModule &IGM;
   ClangTypeConverter &Converter;
+  bool MayFail;
+  bool Failed;
 
 public:
-  GenClangType(IRGenModule &IGM, ClangTypeConverter &converter)
-    : IGM(IGM), Converter(converter) {}
+  GenClangType(IRGenModule &IGM, ClangTypeConverter &converter, bool mayFail)
+      : IGM(IGM), Converter(converter), MayFail(mayFail), Failed(false) {}
 
   const clang::ASTContext &getClangASTContext() const {
     return IGM.getClangASTContext();
   }
+
+  bool hasFailed() const { return Failed; }
 
   /// Return the Clang struct type which was imported and resulted in
   /// this Swift struct type. We do not currently handle generating a
@@ -232,7 +236,7 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
 #include "swift/ClangImporter/SIMDMappedTypes.def"
 
   // Everything else we see here ought to be a translation of a builtin.
-  return Converter.reverseBuiltinTypeMapping(IGM, type);
+  return Converter.reverseBuiltinTypeMapping(IGM, type, MayFail);
 }
 
 static clang::CanQualType getClangBuiltinTypeFromTypedef(
@@ -255,9 +259,8 @@ static clang::CanQualType getClangBuiltinTypeFromTypedef(
   return {};
 }
 
-clang::CanQualType
-ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
-                                              CanStructType type) {
+clang::CanQualType ClangTypeConverter::reverseBuiltinTypeMapping(
+    IRGenModule &IGM, CanStructType type, bool mayFail) {
   // Handle builtin types by adding entries to the cache that reverse
   // the mapping done by the importer.  We could try to look at the
   // members of the struct instead, but even if that's ABI-equivalent
@@ -333,6 +336,8 @@ ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
   // The above code sets up a bunch of mappings in the cache; just
   // assume that we hit one of them.
   auto it = Cache.find(type);
+  if (mayFail && it == Cache.end())
+    return {};
   assert(it != Cache.end() &&
          "cannot translate Swift type to C! type is not specially known");
   return it->second;
@@ -345,6 +350,8 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
 
   CanType eltTy = type.getElementType(0);
   for (unsigned i = 1; i < e; i++) {
+    if (MayFail && eltTy != type.getElementType(i))
+      return {};
     assert(eltTy == type.getElementType(i) &&
            "Only tuples where all element types are equal "
            "map to fixed-size arrays");
@@ -466,12 +473,16 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     .Default(StructKind::Invalid);
   
   auto args = type.getGenericArgs();
+  if (MayFail && args.size() != 1)
+    return {};
   assert(args.size() == 1 &&
          "should have a single generic argument!");
   auto loweredArgTy = IGM.getLoweredType(args[0]).getASTType();
 
   switch (kind) {
   case StructKind::Invalid:
+    if (MayFail)
+      return {};
     llvm_unreachable("Unexpected non-pointer generic struct type in imported"
                      " Clang module!");
     
@@ -508,6 +519,8 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     numEltsString.consume_front("SIMD");
     unsigned numElts;
     bool failedParse = numEltsString.getAsInteger<unsigned>(10, numElts);
+    if (MayFail && failedParse)
+      return {};
     assert(!failedParse && "SIMD type name didn't end in count?");
     (void) failedParse;
     auto vectorTy = getClangASTContext().getVectorType(scalarTy, numElts,
@@ -515,7 +528,8 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     return getCanonicalType(vectorTy);
   }
   }
-
+  if (MayFail)
+    return {};
   llvm_unreachable("Not a valid StructKind.");
 }
 
@@ -525,6 +539,9 @@ clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
   if (type->isUninhabited())
     return Converter.convert(IGM, IGM.Context.TheEmptyTupleType);
 
+  if (!type->getDecl()->isObjC() && MayFail)
+    return {};
+
   assert(type->getDecl()->isObjC() && "not an @objc enum?!");
   
   // @objc enums lower to their raw types.
@@ -533,6 +550,8 @@ clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
 }
 
 clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
+  if (MayFail)
+    return {};
   llvm_unreachable("FunctionType should have been lowered away");
 }
 
@@ -560,11 +579,15 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::Closure:
+    if (MayFail)
+      return {};
     llvm_unreachable("not an ObjC-compatible function");
   }
   
   // Convert the return and parameter types.
   auto allResults = type->getResults();
+  if (MayFail && allResults.size() > 1)
+      return {};
   assert(allResults.size() <= 1 && "multiple results with C convention");
   clang::QualType resultType;
   if (allResults.empty()) {
@@ -585,12 +608,16 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
       break;
 
     case ParameterConvention::Direct_Owned:
+      if (MayFail)
+        return {};
       llvm_unreachable("block takes owned parameter");
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_Guaranteed:
+      if (MayFail)
+        return {};
       llvm_unreachable("block takes indirect parameter");
     }
     auto param = Converter.convert(IGM, paramTy.getType());
@@ -631,6 +658,8 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
   // FIXME. Eventually, this will have its own helper routine.
   SmallVector<const clang::ObjCProtocolDecl *, 4> Protocols;
   auto layout = type.getExistentialLayout();
+  if (MayFail && !layout.isObjC())
+    return {};
   assert(layout.isObjC() && "Cannot represent opaque existential in Clang");
 
   // AnyObject -> id.
@@ -683,6 +712,8 @@ clang::CanQualType GenClangType::visitBuiltinIntegerType(
     if (width == 1) return ctx.BoolTy;
     return ctx.getCanonicalType(ctx.getIntTypeForBitwidth(width, /*signed*/ 0));
   }
+  if (MayFail)
+    return {};
   llvm_unreachable("");
 }
 
@@ -695,6 +726,8 @@ clang::CanQualType GenClangType::visitBuiltinFloatType(
   if (format == &clangTargetInfo.getFloatFormat()) return ctx.FloatTy;
   if (format == &clangTargetInfo.getDoubleFormat()) return ctx.DoubleTy;
   if (format == &clangTargetInfo.getLongDoubleFormat()) return ctx.LongDoubleTy;
+  if (MayFail)
+    return {};
   llvm_unreachable("cannot translate floating-point format to C");
 }
 
@@ -725,10 +758,13 @@ clang::CanQualType GenClangType::visitGenericTypeParamType(
 }
 
 clang::CanQualType GenClangType::visitType(CanType type) {
+  if (MayFail)
+    return {};
   llvm_unreachable("Unexpected type in Clang type generation.");
 }
 
-clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
+clang::CanQualType
+ClangTypeConverter::convert(IRGenModule &IGM, CanType type, bool mayFail) {
   // Try to do this without making cache entries for obvious cases.
   if (auto nominal = dyn_cast<NominalType>(type)) {
     auto decl = nominal->getDecl();
@@ -761,13 +797,17 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
   }
 
   // If that failed, convert the type, cache, and return.
-  clang::CanQualType result = GenClangType(IGM, *this).visit(type);
+  GenClangType generator(IGM, *this, mayFail);
+  clang::CanQualType result = generator.visit(type);
+  if (generator.hasFailed())
+    return {};
+
   Cache.insert({type, result});
   return result;
 }
 
-clang::CanQualType IRGenModule::getClangType(CanType type) {
-  return ClangTypes->convert(*this, type);
+clang::CanQualType IRGenModule::getClangType(CanType type, bool mayFail) {
+  return ClangTypes->convert(*this, type, mayFail);
 }
 
 clang::CanQualType IRGenModule::getClangType(SILType type) {
