@@ -158,7 +158,7 @@ public:
               bool removeCondFails)
       : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist(), MadeChange(false),
         RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
-        CastOpt(FuncBuilder,
+        CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
                 /* ReplaceValueUsesAction */
                 [&](SILValue Original, SILValue Replacement) {
                   replaceValueUsesWith(Original, Replacement);

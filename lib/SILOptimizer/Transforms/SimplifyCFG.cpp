@@ -1935,7 +1935,7 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
 
   bool MadeChange = false;
   CastOptimizer CastOpt(
-      FuncBuilder,
+      FuncBuilder, nullptr /*SILBuilderContext*/,
       /* ReplaceValueUsesAction */
       [&MadeChange](SILValue oldValue, SILValue newValue) {
         MadeChange = true;
@@ -1970,7 +1970,7 @@ bool SimplifyCFG::simplifyCheckedCastValueBranchBlock(
 
   bool MadeChange = false;
   CastOptimizer CastOpt(
-      FuncBuilder,
+      FuncBuilder, nullptr /*SILBuilderContext*/,
       /* ReplaceValueUsesAction */
       [&MadeChange](SILValue oldValue, SILValue newValue) {
         MadeChange = true;
@@ -2006,7 +2006,7 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
 
   bool MadeChange = false;
   CastOptimizer CastOpt(
-      FuncBuilder,
+      FuncBuilder, nullptr /*SILBuilderContext*/,
       /* ReplaceValueUsesAction */
       [&MadeChange](SILValue, SILValue) { MadeChange = true; },
       /* ReplaceInstUsesAction */

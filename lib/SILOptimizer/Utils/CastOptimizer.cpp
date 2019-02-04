@@ -98,7 +98,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   CanType CanBridgedTy = BridgedTargetTy->getCanonicalType();
   SILType SILBridgedTy = SILType::getPrimitiveObjectType(CanBridgedTy);
 
-  SILBuilderWithScope Builder(Inst);
+  SILBuilderWithScope Builder(Inst, BuilderContext);
   SILValue SrcOp;
   SILInstruction *NewI = nullptr;
 
@@ -349,7 +349,7 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
   (void)Conf;
 
   // Generate code to invoke _bridgeToObjectiveC
-  SILBuilderWithScope Builder(Inst);
+  SILBuilderWithScope Builder(Inst, BuilderContext);
 
   auto *NTD = Source.getNominalOrBoundGenericNominal();
   assert(NTD);
@@ -702,7 +702,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
   auto *FailureBB = Inst->getFailureBB();
   auto &Mod = Inst->getModule();
 
-  SILBuilderWithScope Builder(Inst);
+  SILBuilderWithScope Builder(Inst, BuilderContext);
 
   // Try to determine the outcome of the cast from a known type
   // to a protocol type at compile-time.
@@ -816,7 +816,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       return nullptr;
 
     // We know the dynamic type of the operand.
-    SILBuilderWithScope Builder(Inst);
+    SILBuilderWithScope Builder(Inst, BuilderContext);
     auto Loc = Inst->getLoc();
     auto *SuccessBB = Inst->getSuccessBB();
     auto *FailureBB = Inst->getFailureBB();
@@ -858,7 +858,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(), SourceType,
                                          TargetType, isSourceTypeExact);
 
-  SILBuilderWithScope Builder(Inst);
+  SILBuilderWithScope Builder(Inst, BuilderContext);
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     auto *NewI = Builder.createBranch(Loc, FailureBB);
@@ -943,7 +943,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
   auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(), SourceType,
                                          TargetType, isSourceTypeExact);
 
-  SILBuilderWithScope Builder(Inst);
+  SILBuilderWithScope Builder(Inst, BuilderContext);
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     auto *NewI = Builder.createBranch(Loc, FailureBB);
@@ -1065,7 +1065,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
             canUseScalarCheckedCastInstructions(
                 Inst->getModule(), MI->getType().getASTType(),
                 Inst->getTargetType())) {
-          SILBuilderWithScope B(Inst);
+          SILBuilderWithScope B(Inst, BuilderContext);
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, MI, Dest->getType().getObjectType(),
               SuccessBB, FailureBB, Inst->getTrueBBCount(),
@@ -1114,7 +1114,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   // checked_cast_br %0 to ...
   if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Op)) {
     if (auto *MI = dyn_cast<MetatypeInst>(IEMI->getOperand())) {
-      SILBuilderWithScope B(Inst);
+      SILBuilderWithScope B(Inst, BuilderContext);
       auto *NewI = B.createCheckedCastBranch(
           Loc, /* isExact */ false, MI, LoweredTargetType, SuccessBB, FailureBB,
           Inst->getTrueBBCount(), Inst->getFalseBBCount());
@@ -1177,7 +1177,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                          EMT->getRepresentation());
         auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
-        SILBuilderWithScope B(Inst);
+        SILBuilderWithScope B(Inst, BuilderContext);
         B.getOpenedArchetypes().addOpenedArchetypeOperands(
             FoundIEI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
@@ -1236,7 +1236,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         auto *MetaTy = MetatypeType::get(ConcreteTy, EMT->getRepresentation());
         auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
-        SILBuilderWithScope B(Inst);
+        SILBuilderWithScope B(Inst, BuilderContext);
         B.getOpenedArchetypes().addOpenedArchetypeOperands(
             FoundIERI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
@@ -1271,7 +1271,7 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
-    SILBuilderWithScope Builder(Inst);
+    SILBuilderWithScope Builder(Inst, BuilderContext);
     auto *Trap = Builder.createBuiltinTrap(Loc);
     Inst->replaceAllUsesWithUndef();
     EraseInstAction(Inst);
@@ -1296,7 +1296,7 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     }
   }
 
-  SILBuilderWithScope Builder(Inst);
+  SILBuilderWithScope Builder(Inst, BuilderContext);
 
   // Try to apply the bridged casts optimizations
   auto SourceType = LoweredSourceType.getASTType();
@@ -1481,7 +1481,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
-    SILBuilderWithScope Builder(Inst);
+    SILBuilderWithScope Builder(Inst, BuilderContext);
     // mem2reg's invariants get unhappy if we don't try to
     // initialize a loadable result.
     auto DestType = Dest->getType();
@@ -1529,7 +1529,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     }
 
     if (ResultNotUsed) {
-      SILBuilderWithScope B(Inst);
+      SILBuilderWithScope B(Inst, BuilderContext);
       B.createDestroyAddr(Inst->getLoc(), Inst->getSrc());
       if (DestroyDestInst)
         EraseInstAction(DestroyDestInst);
@@ -1561,7 +1561,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     if (isBridgingCast(SourceType, TargetType))
       return nullptr;
 
-    SILBuilderWithScope Builder(Inst);
+    SILBuilderWithScope Builder(Inst, BuilderContext);
     if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
                                                  Loc, Src, SourceType, Dest,
                                                  TargetType, Inst)) {
@@ -1596,19 +1596,21 @@ SILInstruction *CastOptimizer::optimizeMetatypeConversion(
     return NewCast;
   };
   if (auto *MI = dyn_cast<MetatypeInst>(Op)) {
-    return replaceCast(
-        SILBuilderWithScope(MCI).createMetatype(MCI->getLoc(), Ty));
+    return replaceCast(SILBuilderWithScope(MCI, BuilderContext)
+                           .createMetatype(MCI->getLoc(), Ty));
   }
   // For metatype instructions that require an operand, generate the new
   // metatype at the same position as the original to avoid extending the
   // lifetime of `Op` past its destroy.
   if (auto *VMI = dyn_cast<ValueMetatypeInst>(Op)) {
-    return replaceCast(SILBuilderWithScope(VMI).createValueMetatype(
-        MCI->getLoc(), Ty, VMI->getOperand()));
+    return replaceCast(
+        SILBuilderWithScope(VMI, BuilderContext)
+            .createValueMetatype(MCI->getLoc(), Ty, VMI->getOperand()));
   }
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op)) {
-    return replaceCast(SILBuilderWithScope(EMI).createExistentialMetatype(
-        MCI->getLoc(), Ty, EMI->getOperand()));
+    return replaceCast(
+        SILBuilderWithScope(EMI, BuilderContext)
+            .createExistentialMetatype(MCI->getLoc(), Ty, EMI->getOperand()));
   }
   return nullptr;
 }
