@@ -30,6 +30,8 @@ add_swift_host_library(swiftAST STATIC
   DiagnosticList.cpp
   DocComment.cpp
   Evaluator.cpp
+  ExperimentalDependencies.cpp
+  ExperimentalDependenciesSourceFileDepGraphConstructor.cpp
   Expr.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp
