@@ -366,7 +366,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
 func _vjpLog<T : Differentiable & FloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
-  return (x, { v in v / x })
+  return (log(x), { v in v / x })
 }
 
 @inlinable
@@ -440,7 +440,7 @@ func _vjpSqrt<T : Differentiable & FloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = sqrt(x)
-  return (sqrt(x), { v in v / (2 * value) })
+  return (value, { v in v / (2 * value) })
 }
 
 @inlinable
