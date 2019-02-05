@@ -106,6 +106,9 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.CollapseSingleGetterProperty = false;
   result.VarInitializers = true;
 
+  // We should print __consuming, __owned, etc for the module interface file.
+  result.SkipUnderscoredKeywords = false;
+
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
     if (!AFD || !AFD->hasInlinableBodyText()) return;
