@@ -242,7 +242,7 @@
                 "icu": "release-61-1",
                 "tensorflow": "95f8fd4f30b1e59ea3cb64fbf0036bd7474842cc",
                 "tensorflow-swift-bindings": "10e591340134c37a6c3a1df735a7334a77d5cbc7",
-                "tensorflow-swift-apis": "18cc613db5ff03a510e3ba835a8932531b4a1a84"
+                "tensorflow-swift-apis": "da143b91b2e170aee4835caddb75b37c98db3c40"
             }
         }
     }
