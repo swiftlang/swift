@@ -516,11 +516,15 @@ extension _StringObject {
 
  */
 extension _StringObject {
-#if arch(i386) || arch(arm)
   @inlinable @inline(__always)
   internal init(_ small: _SmallString) {
+    // Small strings are encoded as _StringObjects in reverse byte order
+    // on big-endian platforms. This is to match the discriminator to the
+    // spare bits (the most significant nibble) in a pointer.
+    let word1 = small.rawBits.0.littleEndian
+    let word2 = small.rawBits.1.littleEndian
+#if arch(i386) || arch(arm)
     // On 32-bit, we need to unpack the small string.
-    let (word1, word2) = small.rawBits
     let smallStringDiscriminatorAndCount: UInt64 = 0xFF00_0000_0000_0000
 
     let leadingFour = Int(truncatingIfNeeded: word1)
@@ -532,15 +536,12 @@ extension _StringObject {
       variant: .immortal(nextFour),
       discriminator: smallDiscriminatorAndCount,
       flags: trailingTwo)
-    _internalInvariant(isSmall)
-  }
 #else
-  @inlinable @inline(__always)
-  internal init(_ small: _SmallString) {
-    self.init(rawValue: small.rawBits)
+    // On 64-bit, we copy the raw bits (to host byte order).
+    self.init(rawValue: (word1, word2))
+#endif
     _internalInvariant(isSmall)
   }
-#endif
 
   @inlinable
   internal static func getSmallCount(fromRaw x: UInt64) -> Int {
