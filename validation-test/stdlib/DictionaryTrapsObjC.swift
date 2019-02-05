@@ -62,6 +62,18 @@ DictionaryTraps.test("sanity") {
   _ = d as NSDictionary
 }
 
+DictionaryTraps.test("overrelease") {
+  //we should defend the empty dictionary singleton against overreleases
+  let d = Dictionary<BridgedVerbatimRefTy, BridgedVerbatimRefTy>()
+  let u = Unmanaged.passUnretained(d as NSDictionary)
+  expectCrashLater()
+  u.release()
+  u.release()
+  u.release()
+  let _ = u.takeRetainedValue() as?
+      Dictionary<BridgedVerbatimRefTy, BridgedVerbatimRefTy>
+}
+
 class TestObjCKeyTy : NSObject {
   init(_ value: Int) {
     self.value = value

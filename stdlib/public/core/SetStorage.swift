@@ -124,6 +124,10 @@ internal class __EmptySetSingleton: __RawSetStorage {
     _internalInvariantFailure("This class cannot be directly initialized")
   }
 #endif
+  
+  deinit {
+    fatalError("The empty Set should never be deinited")
+  }
 }
 
 extension __RawSetStorage {

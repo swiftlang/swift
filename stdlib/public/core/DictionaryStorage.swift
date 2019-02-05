@@ -133,6 +133,10 @@ internal class __EmptyDictionarySingleton: __RawDictionaryStorage {
     _internalInvariantFailure("This class cannot be directly initialized")
   }
 #endif
+  
+  deinit {
+    fatalError("The empty Dictionary should never be deinited")
+  }
 }
 
 #if _runtime(_ObjC)
