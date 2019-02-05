@@ -2474,10 +2474,10 @@ static void initObjCClass(ClassMetadata *self,
 /// corresponding entry in \p fieldOffsets, before asking the Objective-C
 /// runtime to realize the class. The Objective-C runtime will then slide the
 /// offsets in \p fieldOffsets.
-static void initGenericObjCClass(ClassMetadata *self,
-                                 size_t numFields,
-                                 const TypeLayout * const *fieldTypes,
-                                 size_t *fieldOffsets) {
+static MetadataDependency
+initGenericObjCClass(ClassMetadata *self, size_t numFields,
+                     const TypeLayout * const *fieldTypes,
+                     size_t *fieldOffsets) {
   // If the class is generic, we need to give it a name for Objective-C.
   initGenericClassObjCName(self);
 
@@ -2580,15 +2580,14 @@ static void initGenericObjCClass(ClassMetadata *self,
       delete [] _globalIvarOffsets;
     }
   }
+
+  return MetadataDependency();
 }
 #endif
 
-void
-swift::swift_initClassMetadata(ClassMetadata *self,
-                               ClassLayoutFlags layoutFlags,
-                               size_t numFields,
-                               const TypeLayout * const *fieldTypes,
-                               size_t *fieldOffsets) {
+SWIFT_CC(swift)
+static std::pair<MetadataDependency, const ClassMetadata *>
+getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
   // If there is a mangled superclass name, demangle it to the superclass
   // type.
   const ClassMetadata *super = nullptr;
@@ -2596,8 +2595,10 @@ swift::swift_initClassMetadata(ClassMetadata *self,
     StringRef superclassName =
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
     SubstGenericParametersFromMetadata substitutions(self);
-    MetadataRequest request(/*FIXME*/MetadataState::Abstract,
-                            /*non-blocking*/ false);
+    MetadataRequest request(allowDependency
+                              ? MetadataState::NonTransitiveComplete
+                              : /*FIXME*/ MetadataState::Abstract,
+                            /*non-blocking*/ allowDependency);
     MetadataResponse response =
       swift_getTypeByMangledName(request, superclassName,
                                  substitutions, substitutions).getResponse();
@@ -2609,6 +2610,13 @@ swift::swift_initClassMetadata(ClassMetadata *self,
                  superclassName.str().c_str());
     }
 
+    // If the request isn't satisfied, we have a new dependency.
+    if (!request.isSatisfiedBy(response.State)) {
+      assert(allowDependency);
+      return {MetadataDependency(superclass, request.getState()),
+              cast<ClassMetadata>(superclass)};
+    }
+
 #if SWIFT_OBJC_INTEROP
     if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
       superclass = objcWrapper->Class;
@@ -2616,6 +2624,22 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 
     super = cast<ClassMetadata>(superclass);
   }
+
+  return {MetadataDependency(), super};
+}
+
+static SWIFT_CC(swift) MetadataDependency
+_swift_initClassMetadataImpl(ClassMetadata *self,
+                             ClassLayoutFlags layoutFlags,
+                             size_t numFields,
+                             const TypeLayout * const *fieldTypes,
+                             size_t *fieldOffsets,
+                             bool allowDependency) {
+  // Try to install the superclass.
+  auto superDependencyAndSuper = getSuperclassMetadata(self, allowDependency);
+  if (superDependencyAndSuper.first)
+    return superDependencyAndSuper.first;
+  auto super = superDependencyAndSuper.second;
 
   self->Superclass = super;
 
@@ -2657,6 +2681,29 @@ swift::swift_initClassMetadata(ClassMetadata *self,
     swift_instantiateObjCClass(self);
   }
 #endif
+
+  return MetadataDependency();
+}
+
+void swift::swift_initClassMetadata(ClassMetadata *self,
+                                    ClassLayoutFlags layoutFlags,
+                                    size_t numFields,
+                                    const TypeLayout * const *fieldTypes,
+                                    size_t *fieldOffsets) {
+  (void) _swift_initClassMetadataImpl(self, layoutFlags, numFields,
+                                      fieldTypes, fieldOffsets,
+                                      /*allowDependency*/ false);
+}
+
+MetadataDependency
+swift::swift_initClassMetadata2(ClassMetadata *self,
+                                ClassLayoutFlags layoutFlags,
+                                size_t numFields,
+                                const TypeLayout * const *fieldTypes,
+                                size_t *fieldOffsets) {
+  return _swift_initClassMetadataImpl(self, layoutFlags, numFields,
+                                      fieldTypes, fieldOffsets,
+                                      /*allowDependency*/ true);
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -2666,12 +2713,14 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunguarded-availability-new"
 
-void
-swift::swift_updateClassMetadata(ClassMetadata *self,
-                                 ClassLayoutFlags layoutFlags,
-                                 size_t numFields,
-                                 const TypeLayout * const *fieldTypes,
-                                 size_t *fieldOffsets) {
+
+static SWIFT_CC(swift) MetadataDependency
+_swift_updateClassMetadataImpl(ClassMetadata *self,
+                               ClassLayoutFlags layoutFlags,
+                               size_t numFields,
+                               const TypeLayout * const *fieldTypes,
+                               size_t *fieldOffsets,
+                               bool allowDependency) {
 #ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
   // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
   static auto _objc_realizeClassFromSwift =
@@ -2684,30 +2733,10 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
   // If we're on a newer runtime, we're going to be initializing the
   // field offset vector. Realize the superclass metadata first, even
   // though our superclass field references it statically.
-  const ClassMetadata *super = nullptr;
-
-  if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
-    StringRef superclassName =
-      Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
-    SubstGenericParametersFromMetadata substitutions(self);
-    MetadataRequest request(/*FIXME*/MetadataState::Abstract,
-                            /*non-blocking*/ false);
-    MetadataResponse response =
-      swift_getTypeByMangledName(request, superclassName,
-                                 substitutions, substitutions).getResponse();
-    const Metadata *superclass = response.Value;
-    if (!superclass) {
-      fatalError(0,
-                 "failed to demangle superclass of %s from mangled name '%s'\n",
-                 self->getDescription()->Name.get(),
-                 superclassName.str().c_str());
-    }
-
-    if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
-      superclass = objcWrapper->Class;
-
-    super = cast<ClassMetadata>(superclass);
-  }
+  auto superDependencyAndSuper = getSuperclassMetadata(self, allowDependency);
+  if (superDependencyAndSuper.first)
+    return superDependencyAndSuper.first;
+  const ClassMetadata *super = superDependencyAndSuper.second;
 
   // Check that it matches what's already in there.
   if (!super)
@@ -2741,6 +2770,29 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
     // See remark above about how this slides field offset globals.
     _objc_realizeClassFromSwift((Class)self, (Class)self);
   }
+
+  return MetadataDependency();
+}
+
+void swift::swift_updateClassMetadata(ClassMetadata *self,
+                                      ClassLayoutFlags layoutFlags,
+                                      size_t numFields,
+                                      const TypeLayout * const *fieldTypes,
+                                      size_t *fieldOffsets) {
+  (void) _swift_updateClassMetadataImpl(self, layoutFlags, numFields,
+                                        fieldTypes, fieldOffsets,
+                                        /*allowDependency*/ false);
+}
+
+MetadataDependency
+swift::swift_updateClassMetadata2(ClassMetadata *self,
+                                  ClassLayoutFlags layoutFlags,
+                                  size_t numFields,
+                                  const TypeLayout * const *fieldTypes,
+                                  size_t *fieldOffsets) {
+  return _swift_updateClassMetadataImpl(self, layoutFlags, numFields,
+                                        fieldTypes, fieldOffsets,
+                                        /*allowDependency*/ true);
 }
 
 #pragma clang diagnostic pop
