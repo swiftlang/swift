@@ -228,7 +228,6 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   }
 
   assert(StdlibModule && "no main module found");
-  Context.recordKnownProtocols(StdlibModule);
   return StdlibModule;
 }
 
