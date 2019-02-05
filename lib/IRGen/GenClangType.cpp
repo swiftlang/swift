@@ -125,17 +125,14 @@ class GenClangType : public CanTypeVisitor<GenClangType, clang::CanQualType> {
   IRGenModule &IGM;
   ClangTypeConverter &Converter;
   bool MayFail;
-  bool Failed;
 
 public:
   GenClangType(IRGenModule &IGM, ClangTypeConverter &converter, bool mayFail)
-      : IGM(IGM), Converter(converter), MayFail(mayFail), Failed(false) {}
+      : IGM(IGM), Converter(converter), MayFail(mayFail) {}
 
   const clang::ASTContext &getClangASTContext() const {
     return IGM.getClangASTContext();
   }
-
-  bool hasFailed() const { return Failed; }
 
   /// Return the Clang struct type which was imported and resulted in
   /// this Swift struct type. We do not currently handle generating a
@@ -799,8 +796,6 @@ ClangTypeConverter::convert(IRGenModule &IGM, CanType type, bool mayFail) {
   // If that failed, convert the type, cache, and return.
   GenClangType generator(IGM, *this, mayFail);
   clang::CanQualType result = generator.visit(type);
-  if (generator.hasFailed())
-    return {};
 
   Cache.insert({type, result});
   return result;
