@@ -9,3 +9,19 @@ add_swift_target_library(swiftSwiftOnoneSupport ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
   SWIFT_COMPILE_FLAGS "-parse-stdlib" "-Xllvm" "-sil-inline-generics=false" "-Xfrontend" "-validate-tbd-against-ir=none" "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib)
+if(CMAKE_BUILD_TYPE STREQUAL Debug AND WINDOWS IN_LIST SWIFT_SDKS)
+  # When building in Debug mode, the standard library provides the symbols that
+  # we need and as such SwiftOnoneSupport does not need to provide any exported
+  # interfaces.  This results in the import library beinging elided.  However,
+  # we explicitly link against the SwiftOnoneSupport library when building
+  # programs in Debug mode, and need the import library to be generated even if
+  # nothing is exported.  Because we will still generate the DLL, create an
+  # empty import library.
+  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/SwiftOnoneSupport.def
+    "LIBRARY SwiftOnoneSupport\n"
+    "EXPORTS")
+  foreach(architecture ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
+    target_sources(swiftSwiftOnoneSupport-windows-${architecture} PRIVATE
+      ${CMAKE_CURRENT_BINARY_DIR}/SwiftOnoneSupport.def)
+  endforeach()
+endif()
