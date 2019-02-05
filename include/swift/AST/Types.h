@@ -4007,11 +4007,6 @@ public:
 
   CanType getSelfInstanceType() const;
 
-  /// If this is a @convention(witness_method) function with a protocol
-  /// constrained self parameter, return the protocol constraint for
-  /// the Self type.
-  ProtocolDecl *getDefaultWitnessMethodProtocol() const;
-
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the
   /// Self type.
