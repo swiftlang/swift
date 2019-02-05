@@ -67,6 +67,13 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl) {
   // Create array of key path expressions to stored properties.
   llvm::SmallVector<Expr *, 2> keyPathExprs;
   for (auto member : nominal->getStoredProperties()) {
+    // FIXME(TF-123): Skip generating keypaths to `@differentiable` functions
+    // because of SILGen crash. Robust fix involves changing
+    // `createAutoDiffThunk`.
+    if (auto fnType = member->getType()->getAs<AnyFunctionType>())
+      if (fnType->getExtInfo().isDifferentiable())
+        continue;
+
     auto *dotExpr = new (C)
         UnresolvedDotExpr(nominalTypeExpr, SourceLoc(), member->getFullName(),
                           DeclNameLoc(), /*Implicit*/ true);
