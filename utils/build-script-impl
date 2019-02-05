@@ -1551,21 +1551,6 @@ eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 eval BUILD_ARGS=(${BUILD_ARGS})
 
-if [[ -n "${DISTCC}" ]]; then
-    if [[ "$(uname -s)" == "Darwin" ]] ; then
-        # These are normally deduced by CMake, but when the compiler is set to
-        # distcc which is installed elsewhere, we need to set them explicitly.
-        COMMON_CMAKE_OPTIONS=(
-            "${COMMON_CMAKE_OPTIONS[@]}" "-DCMAKE_AR=$(xcrun_find_tool ar)"
-            "-DCMAKE_LINKER=$(xcrun_find_tool ld)"
-            "-DCMAKE_NM=$(xcrun_find_tool nm)"
-            "-DCMAKE_OBJDUMP=$(xcrun_find_tool objdump)"
-            "-DCMAKE_RANLIB=$(xcrun_find_tool ranlib)"
-            "-DCMAKE_STRIP=$(xcrun_find_tool strip)"
-        )
-    fi
-fi
-
 eval CMAKE_BUILD=("${DISTCC_PUMP}" "${CMAKE}" "--build")
 
 
