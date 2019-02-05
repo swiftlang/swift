@@ -113,7 +113,7 @@ class Z4 {
 
   convenience init(other: Z4) {
     other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}} 
-    type(of: other).init() // expected-error{{must use a 'required' initializer}} expected-warning{{unused}}
+    type(of: other).init() // expected-error{{must use a 'required' initializer}}
   }
 }
 

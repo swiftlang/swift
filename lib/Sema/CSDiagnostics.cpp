@@ -1506,3 +1506,27 @@ bool PartialApplicationFailure::diagnoseAsError() {
   emitDiagnostic(anchor->getNameLoc(), diagnostic, kind);
   return true;
 }
+
+bool InvalidDynamicInitOnMetatypeFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::dynamic_construct_class,
+                 BaseType->getMetatypeInstanceType())
+      .highlight(BaseRange);
+  emitDiagnostic(Init, diag::note_nonrequired_initializer, Init->isImplicit(),
+                 Init->getFullName());
+  return true;
+}
+
+bool InitOnProtocolMetatypeFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  if (IsStaticallyDerived) {
+    emitDiagnostic(anchor->getLoc(), diag::construct_protocol_by_name,
+                   BaseType->getMetatypeInstanceType())
+        .highlight(BaseRange);
+  } else {
+    emitDiagnostic(anchor->getLoc(), diag::construct_protocol_value, BaseType)
+        .highlight(BaseRange);
+  }
+
+  return true;
+}

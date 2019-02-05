@@ -277,7 +277,20 @@ AllowInvalidPartialApplication::create(bool isWarning, ConstraintSystem &cs,
 }
 
 bool AllowInvalidInitRef::diagnose(Expr *root, bool asNote) const {
-  return false;
+  switch (Kind) {
+  case RefKind::DynamicOnMetatype: {
+    InvalidDynamicInitOnMetatypeFailure failure(
+        root, getConstraintSystem(), BaseType, Init, BaseRange, getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::ProtocolMetatype: {
+    InitOnProtocolMetatypeFailure failure(root, getConstraintSystem(), BaseType,
+                                          Init, IsStaticallyDerived, BaseRange,
+                                          getLocator());
+    return failure.diagnose(asNote);
+  }
+  }
 }
 
 AllowInvalidInitRef *AllowInvalidInitRef::dynamicOnMetatype(
