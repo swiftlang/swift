@@ -41,7 +41,7 @@ print(", \(glob_b)", terminator: "")
 print(", \(glob_s)", terminator: "")
 var unused: Int32 = -1
 
-// CHECK-DAG: ![[RT:[0-9]+]] ={{.*}}"Swift.swiftmodule"
+// CHECK-DAG: ![[RT:[0-9]+]] ={{.*}}"{{.*}}Swift.swiftmodule"
 
 
 // Stack variables.
@@ -114,4 +114,4 @@ func myprint(_ value: TriValue) {
 }
 myprint(unknown)
 
-// CHECK-DAG: !DIFile(filename: "variables.swift"
+// CHECK-DAG: !DIFile(filename: "{{.*}}variables.swift"

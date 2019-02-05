@@ -348,28 +348,66 @@ private:
     }
 
     // Detect the main file.
-    if (MainFile && Filename.endswith(MainFile->getFilename())) {
+    StringRef MainFileName = MainFile->getFilename();
+    if (MainFile && Filename.endswith(MainFileName)) {
       SmallString<256> AbsThisFile, AbsMainFile;
       AbsThisFile = Filename;
       llvm::sys::fs::make_absolute(AbsThisFile);
-      llvm::sys::path::append(AbsMainFile, MainFile->getDirectory(),
-                              MainFile->getFilename());
-      if (AbsThisFile == AbsMainFile) {
+      if (llvm::sys::path::is_absolute(MainFileName))
+        AbsMainFile = MainFileName;
+      else
+        llvm::sys::path::append(AbsMainFile, MainFile->getDirectory(),
+                                MainFileName);
+      if (AbsThisFile == DebugPrefixMap.remapPath(AbsMainFile)) {
         DIFileCache[Filename] = llvm::TrackingMDNodeRef(MainFile);
         return MainFile;
       }
     }
 
-    // Create a new one.
-    StringRef File = llvm::sys::path::filename(Filename);
-    llvm::SmallString<512> Path(Filename);
-    llvm::sys::path::remove_filename(Path);
-    llvm::sys::path::remove_dots(Path);
-    llvm::DIFile *F = DBuilder.createFile(DebugPrefixMap.remapPath(File),
-                                          DebugPrefixMap.remapPath(Path));
+    return createFile(Filename, None, None);
+  }
 
-    // Cache it.
-    DIFileCache[Filename] = llvm::TrackingMDNodeRef(F);
+  /// This is effectively \p clang::CGDebugInfo::createFile().
+  llvm::DIFile *
+  createFile(StringRef FileName,
+             Optional<llvm::DIFile::ChecksumInfo<StringRef>> CSInfo,
+             Optional<StringRef> Source) {
+    StringRef Dir;
+    StringRef File;
+    SmallString<128> DirBuf;
+    SmallString<128> FileBuf;
+    std::string RemappedFileString = DebugPrefixMap.remapPath(FileName);
+    SmallString<128> RemappedFile = StringRef(RemappedFileString);
+    llvm::sys::path::remove_dots(RemappedFile);
+    std::string CurDir = DebugPrefixMap.remapPath(Opts.DebugCompilationDir);
+    if (llvm::sys::path::is_absolute(RemappedFile)) {
+      // Strip the common prefix (if it is more than just "/") from current
+      // directory and FileName for a more space-efficient encoding.
+      auto FileIt = llvm::sys::path::begin(RemappedFile);
+      auto FileE = llvm::sys::path::end(RemappedFile);
+      auto CurDirIt = llvm::sys::path::begin(CurDir);
+      auto CurDirE = llvm::sys::path::end(CurDir);
+      for (; CurDirIt != CurDirE && *CurDirIt == *FileIt; ++CurDirIt, ++FileIt)
+        llvm::sys::path::append(DirBuf, *CurDirIt);
+      if (std::distance(llvm::sys::path::begin(CurDir), CurDirIt) == 1) {
+        // Don't strip the common prefix if it is only the root "/"
+        // since that would make LLVM diagnostic locations confusing.
+        Dir = {};
+        File = RemappedFile;
+      } else {
+        for (; FileIt != FileE; ++FileIt)
+          llvm::sys::path::append(FileBuf, *FileIt);
+        Dir = DirBuf;
+        File = FileBuf;
+      }
+    } else {
+      File = RemappedFile;
+      // Leave <compiler-generated> & friends as is, without directory.
+      if (!(File.startswith("<") && File.endswith(">")))
+        Dir = CurDir;
+    }
+    llvm::DIFile *F = DBuilder.createFile(File, Dir, CSInfo, Source);
+    DIFileCache[FileName.data()].reset(F);
     return F;
   }
 
@@ -1562,16 +1600,17 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // No split DWARF on Darwin.
   StringRef SplitName = StringRef();
   // Note that File + Dir need not result in a valid path.
-  // Clang is doing the same thing here.
+  // The directory part of the main file is the current working directory.
+  MainFile =
+      DBuilder.createFile(DebugPrefixMap.remapPath(SourcePath),
+                          DebugPrefixMap.remapPath(Opts.DebugCompilationDir));
+
   TheCU = DBuilder.createCompileUnit(
-      Lang, DBuilder.createFile(
-          DebugPrefixMap.remapPath(SourcePath),
-          DebugPrefixMap.remapPath(Opts.DebugCompilationDir)),
+      Lang, MainFile,
       Producer, Opts.shouldOptimize(), Flags, MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly);
-  MainFile = getOrCreateFile(SourcePath);
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
