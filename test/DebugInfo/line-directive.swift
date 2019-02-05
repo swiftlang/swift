@@ -12,7 +12,7 @@ func f() {
   markUsed("jump directly to def")
 }
 
-// RUN: %target-swift-frontend -primary-file %s -S -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %/s -S -g -o - | %FileCheck %s
 // CHECK: .file	[[MAIN:.*]] "{{.*}}line-directive.swift"
 // CHECK: .loc	[[MAIN]] 1
 // CHECK: .file	[[ABC:.*]] "abc.swift"
@@ -24,8 +24,8 @@ func f() {
 // CHECK: .asciz "{{.*}}test/DebugInfo"
 
 // RUN: %empty-directory(%t)
-// RUN: sed -e "s:LINE_DIRECTIVE_DIR:%S:g" %S/Inputs/vfsoverlay.yaml > %t/overlay.yaml
-// RUN: %target-swift-frontend -vfsoverlay %t/overlay.yaml -primary-file %S/vfs-relocated-line-directive.swift -S -g -o - | %FileCheck -check-prefix=VFS %s
+// RUN: sed -e "s|LINE_DIRECTIVE_DIR|%/S|g" %S/Inputs/vfsoverlay.yaml > %t/overlay.yaml
+// RUN: %target-swift-frontend -vfsoverlay %t/overlay.yaml -primary-file %/S/vfs-relocated-line-directive.swift -S -g -o - | %FileCheck -check-prefix=VFS %s
 // VFS: .file  [[MAIN:.*]] "{{.*}}vfs-relocated-line-directive.swift"
 // VFS: .loc  [[MAIN]] 1
 // VFS: .file  [[ABC:.*]] "abc.swift"
