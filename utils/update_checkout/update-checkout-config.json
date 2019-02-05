@@ -240,7 +240,7 @@
                 "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "ninja": "253e94c1fa511704baeb61cf69995bbf09ba435e",
                 "icu": "release-61-1",
-                "tensorflow": "a6924e6affd935f537cdaf8977094df0e15a7957",
+                "tensorflow": "95f8fd4f30b1e59ea3cb64fbf0036bd7474842cc",
                 "tensorflow-swift-bindings": "10e591340134c37a6c3a1df735a7334a77d5cbc7",
                 "tensorflow-swift-apis": "18cc613db5ff03a510e3ba835a8932531b4a1a84"
             }
