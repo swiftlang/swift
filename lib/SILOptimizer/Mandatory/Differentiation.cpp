@@ -2893,7 +2893,7 @@ private:
   DenseMap<SILValue, AdjointValue> valueMap;
 
   /// Mapping from original buffers to their corresponding adjoint buffers.
-  DenseMap<SILValue, SILValue> bufferMap;
+  DenseMap<SILValue, ValueWithCleanup> bufferMap;
 
   /// Mapping from original basic blocks to their corresponding adjoint basic
   /// blocks.
@@ -3097,14 +3097,17 @@ private:
   // Buffer mapping
   //--------------------------------------------------------------------------//
 
-  void setAdjointBuffer(SILValue originalBuffer, SILValue adjointBuffer) {
+  void setAdjointBuffer(SILValue originalBuffer,
+                        ValueWithCleanup adjointBuffer) {
     assert(originalBuffer->getType().isAddress());
-    bufferMap[originalBuffer] = adjointBuffer;
+    auto insertion = bufferMap.try_emplace(originalBuffer, adjointBuffer);
+    assert(insertion.second); (void)insertion;
   }
 
-  SILValue getAdjointBuffer(SILValue originalBuffer) {
+  ValueWithCleanup getAdjointBuffer(SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
-    auto insertion = bufferMap.try_emplace(originalBuffer);
+    auto insertion = bufferMap.try_emplace(originalBuffer,
+                                           ValueWithCleanup(SILValue()));
     if (!insertion.second) // not inserted
       return insertion.first->getSecond();
     auto *newBuf = builder.createAllocStack(originalBuffer.getLoc(),
@@ -3117,8 +3120,7 @@ private:
     emitZeroIndirect(access->getType().getASTType(), access, access->getLoc());
     builder.createEndAccess(access->getLoc(), access, /*aborted*/ false);
     localAllocations.push_back(newBuf);
-    insertion.first->getSecond() = newBuf;
-    return newBuf;
+    return (insertion.first->getSecond() = ValueWithCleanup(newBuf, nullptr));
   }
 
   void addToAdjointBuffer(SILValue originalBuffer,
@@ -3656,7 +3658,8 @@ public:
                                              /*fromBuiltin*/ false);
     emitZeroIndirect(bufType.getASTType(), access, dsi->getLoc());
     builder.createEndAccess(dsi->getLoc(), access, /*aborted*/ false);
-    setAdjointBuffer(dsi->getOperand(), adjBuf);
+    setAdjointBuffer(dsi->getOperand(),
+                     ValueWithCleanup(adjBuf, /*cleanup*/ nullptr));
   }
 
   // Handle `load` instruction.
@@ -3684,11 +3687,11 @@ public:
   //    Adjoint: adj[x] += load adj[y]; adj[y] = 0
   void visitStoreInst(StoreInst *si) {
     auto adjBuf = getAdjointBuffer(si->getDest());
-    auto bufType = remapType(adjBuf->getType());
+    auto bufType = remapType(adjBuf.getType());
     auto adjVal = builder.createLoad(si->getLoc(), adjBuf,
         getBufferLOQ(bufType.getASTType(), getAdjoint()));
     addAdjointValue(si->getSrc(), makeConcreteAdjointValue(
-        ValueWithCleanup(adjVal, /*cleanup*/ nullptr)));
+        ValueWithCleanup(adjVal, adjBuf.getCleanup())));
     emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
   }
 
@@ -3733,7 +3736,8 @@ public:
         eai->getLoc(), adjBuf, kind, eai->getBeginAccess()->getEnforcement(),
         eai->getBeginAccess()->hasNoNestedConflict(),
         eai->getBeginAccess()->isFromBuiltin());
-    setAdjointBuffer(eai->getOperand(), adjAccess);
+    setAdjointBuffer(eai->getOperand(),
+                     ValueWithCleanup(adjAccess, adjBuf.getCleanup()));
   }
 
 #define NOT_DIFFERENTIABLE(INST, DIAG) \
