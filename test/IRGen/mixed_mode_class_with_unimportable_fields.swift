@@ -92,8 +92,8 @@ public func invokeMethod(on holder: SubButtHolder) {
 }
 
 // CHECK-V4-LABEL: define internal swiftcc %swift.metadata_response @"$s4main13SubButtHolderCMr"(%swift.type*, i8*, i8**)
-// CHECK-V4:   call void @swift_initClassMetadata(
+// CHECK-V4:   call swiftcc %swift.metadata_response @swift_initClassMetadata(
 
 // CHECK-V4-LABEL: define internal swiftcc %swift.metadata_response @"$s4main03SubB10ButtHolderCMr"(%swift.type*, i8*, i8**)
-// CHECK-V4:   call void @swift_initClassMetadata(
+// CHECK-V4:   call swiftcc %swift.metadata_response @swift_initClassMetadata(
 

@@ -590,12 +590,13 @@ swift_relocateClassMetadata(const ClassDescriptor *descriptor,
 /// - The class is generic.
 ///   In this case the class metadata was allocated from a generic
 ///   class metadata pattern by swift_allocateGenericClassMetadata().
-SWIFT_RUNTIME_EXPORT
-void swift_initClassMetadata(ClassMetadata *self,
-                             ClassLayoutFlags flags,
-                             size_t numFields,
-                             const TypeLayout * const *fieldTypes,
-                             size_t *fieldOffsets);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataDependency
+swift_initClassMetadata(ClassMetadata *self,
+                        ClassLayoutFlags flags,
+                        size_t numFields,
+                        const TypeLayout * const *fieldTypes,
+                        size_t *fieldOffsets);
 
 #if SWIFT_OBJC_INTEROP
 /// Initialize various fields of the class metadata.
@@ -606,12 +607,13 @@ void swift_initClassMetadata(ClassMetadata *self,
 /// This means the class does not have generic or resilient ancestry,
 /// and is itself not generic. However, it might have fields whose
 /// size is not known at compile time.
-SWIFT_RUNTIME_EXPORT
-void swift_updateClassMetadata(ClassMetadata *self,
-                               ClassLayoutFlags flags,
-                               size_t numFields,
-                               const TypeLayout * const *fieldTypes,
-                               size_t *fieldOffsets);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataDependency
+swift_updateClassMetadata(ClassMetadata *self,
+                          ClassLayoutFlags flags,
+                          size_t numFields,
+                          const TypeLayout * const *fieldTypes,
+                          size_t *fieldOffsets);
 #endif
 
 /// Given class metadata, a class descriptor and a method descriptor, look up

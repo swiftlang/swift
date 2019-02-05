@@ -230,7 +230,13 @@ bb0(%0 : $ClassWithResilientField):
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      void @swift_updateClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-NEXT: [[INITDEP_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: [[INITDEP_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-NEXT: [[INITDEP_PRESENT:%.*]] = icmp eq %swift.type* [[INITDEP_METADATA]], null
+// CHECK-NEXT: br i1 [[INITDEP_PRESENT]], label %dependency-satisfied1, label %metadata-dependencies.cont
+
+// CHECK: dependency-satisfied1:
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$s31completely_fragile_class_layout23ClassWithResilientFieldC1s16resilient_struct4SizeVvpWvd"
@@ -242,8 +248,8 @@ bb0(%0 : $ClassWithResilientField):
 
 // CHECK: metadata-dependencies.cont:
 
-// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[SIZE_METADATA]], %entry ], [ null, %dependency-satisfied ]
-// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 63, %entry ], [ 0, %dependency-satisfied ]
+// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[SIZE_METADATA]], %entry ], [ [[INITDEP_METADATA]], %dependency-satisfied ], [ null, %dependency-satisfied1 ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 63, %entry ], [ [[INITDEP_STATUS]], %dependency-satisfied ], [ 0, %dependency-satisfied1 ]
 // CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
 // CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
@@ -262,9 +268,21 @@ bb0(%0 : $ClassWithResilientField):
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [0 x i8**], [0 x i8**]* [[FIELDS]], i32 0, i32 0
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      void @swift_updateClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 0, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 0, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-NEXT: [[INITDEP_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: [[INITDEP_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-NEXT: [[INITDEP_PRESENT:%.*]] = icmp eq %swift.type* [[INITDEP_METADATA]], null
+// CHECK-NEXT: br i1 [[INITDEP_PRESENT]], label %dependency-satisfied, label %metadata-dependencies.cont
 
-// CHECK: ret %swift.metadata_response zeroinitializer
+// CHECK: dependency-satisfied:
+// CHECK:      br label %metadata-dependencies.cont
+
+// CHECK: metadata-dependencies.cont:
+// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[INITDEP_METADATA]], %entry ], [ null, %dependency-satisfied ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ [[INITDEP_STATUS]], %entry ], [ 0, %dependency-satisfied ]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
 // Metadata accessor for ClassWithResilientEnum looks like singleton initialization:
 

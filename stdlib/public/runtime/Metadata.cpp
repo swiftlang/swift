@@ -2474,10 +2474,10 @@ static void initObjCClass(ClassMetadata *self,
 /// corresponding entry in \p fieldOffsets, before asking the Objective-C
 /// runtime to realize the class. The Objective-C runtime will then slide the
 /// offsets in \p fieldOffsets.
-static void initGenericObjCClass(ClassMetadata *self,
-                                 size_t numFields,
-                                 const TypeLayout * const *fieldTypes,
-                                 size_t *fieldOffsets) {
+static MetadataDependency
+initGenericObjCClass(ClassMetadata *self, size_t numFields,
+                     const TypeLayout * const *fieldTypes,
+                     size_t *fieldOffsets) {
   // If the class is generic, we need to give it a name for Objective-C.
   initGenericClassObjCName(self);
 
@@ -2580,15 +2580,14 @@ static void initGenericObjCClass(ClassMetadata *self,
       delete [] _globalIvarOffsets;
     }
   }
+
+  return MetadataDependency();
 }
 #endif
 
-void
-swift::swift_initClassMetadata(ClassMetadata *self,
-                               ClassLayoutFlags layoutFlags,
-                               size_t numFields,
-                               const TypeLayout * const *fieldTypes,
-                               size_t *fieldOffsets) {
+SWIFT_CC(swift)
+static std::pair<const ClassMetadata *, MetadataDependency>
+getSuperclassMetadata(ClassMetadata *self) {
   // If there is a mangled superclass name, demangle it to the superclass
   // type.
   const ClassMetadata *super = nullptr;
@@ -2596,13 +2595,23 @@ swift::swift_initClassMetadata(ClassMetadata *self,
     StringRef superclassName =
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
     SubstGenericParametersFromMetadata substitutions(self);
-    const Metadata *superclass =
-      swift_getTypeByMangledName(superclassName, substitutions, substitutions);
+    MetadataRequest request(MetadataState::NonTransitiveComplete,
+                            /*non-blocking*/ true);
+    MetadataResponse response =
+      swift_getTypeByMangledName(request, superclassName,
+                                 substitutions, substitutions).getResponse();
+    auto superclass = response.Value;
     if (!superclass) {
       fatalError(0,
                  "failed to demangle superclass of %s from mangled name '%s'\n",
                  self->getDescription()->Name.get(),
                  superclassName.str().c_str());
+    }
+
+    // If the request isn't satisfied, we have a new dependency.
+    if (!request.isSatisfiedBy(response.State)) {
+      return {cast<ClassMetadata>(superclass),
+              MetadataDependency(superclass, request.getState())};
     }
 
 #if SWIFT_OBJC_INTEROP
@@ -2612,6 +2621,21 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 
     super = cast<ClassMetadata>(superclass);
   }
+
+  return {super, MetadataDependency()};
+}
+
+MetadataDependency
+swift::swift_initClassMetadata(ClassMetadata *self,
+                               ClassLayoutFlags layoutFlags,
+                               size_t numFields,
+                               const TypeLayout * const *fieldTypes,
+                               size_t *fieldOffsets) {
+  // Try to install the superclass.
+  auto superAndSuperDependency = getSuperclassMetadata(self);
+  if (superAndSuperDependency.second)
+    return superAndSuperDependency.second;
+  auto super = superAndSuperDependency.first;
 
   self->Superclass = super;
 
@@ -2653,6 +2677,8 @@ swift::swift_initClassMetadata(ClassMetadata *self,
     swift_instantiateObjCClass(self);
   }
 #endif
+
+  return MetadataDependency();
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -2662,7 +2688,7 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunguarded-availability-new"
 
-void
+MetadataDependency
 swift::swift_updateClassMetadata(ClassMetadata *self,
                                  ClassLayoutFlags layoutFlags,
                                  size_t numFields,
@@ -2680,26 +2706,10 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
   // If we're on a newer runtime, we're going to be initializing the
   // field offset vector. Realize the superclass metadata first, even
   // though our superclass field references it statically.
-  const ClassMetadata *super = nullptr;
-
-  if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
-    StringRef superclassName =
-      Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
-    SubstGenericParametersFromMetadata substitutions(self);
-    const Metadata *superclass =
-      swift_getTypeByMangledName(superclassName, substitutions, substitutions);
-    if (!superclass) {
-      fatalError(0,
-                 "failed to demangle superclass of %s from mangled name '%s'\n",
-                 self->getDescription()->Name.get(),
-                 superclassName.str().c_str());
-    }
-
-    if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
-      superclass = objcWrapper->Class;
-
-    super = cast<ClassMetadata>(superclass);
-  }
+  auto superAndSuperDependency = getSuperclassMetadata(self);
+  if (superAndSuperDependency.second)
+    return superAndSuperDependency.second;
+  const ClassMetadata *super = superAndSuperDependency.first;
 
   // Check that it matches what's already in there.
   if (!super)
@@ -2733,6 +2743,8 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
     // See remark above about how this slides field offset globals.
     _objc_realizeClassFromSwift((Class)self, (Class)self);
   }
+
+  return MetadataDependency();
 }
 
 #pragma clang diagnostic pop
@@ -4139,6 +4151,7 @@ static StringRef findAssociatedTypeName(const ProtocolDescriptor *protocol,
   return StringRef();
 }
 
+SWIFT_CC(swift)
 static MetadataResponse
 swift_getAssociatedTypeWitnessSlowImpl(
                                       MetadataRequest request,
@@ -4191,12 +4204,12 @@ swift_getAssociatedTypeWitnessSlowImpl(
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
   // Demangle the associated type.
-  const Metadata *assocTypeMetadata;
+  MetadataResponse response;
   if (inProtocolContext) {
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
-    assocTypeMetadata =
-      swift_getTypeByMangledName(mangledName,
+    response =
+      swift_getTypeByMangledName(request, mangledName,
         [conformingType](unsigned depth, unsigned index) -> const Metadata * {
           if (depth == 0 && index == 0)
             return conformingType;
@@ -4213,7 +4226,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
           return swift_getAssociatedConformanceWitness(wtable, conformingType,
                                                        type, reqBase,
                                                        dependentDescriptor);
-        });
+        }).getResponse();
   } else {
     // The generic parameters in the associated type name are those of the
     // conforming type.
@@ -4223,9 +4236,10 @@ swift_getAssociatedTypeWitnessSlowImpl(
     auto originalConformingType = findConformingSuperclass(conformingType,
                                                            conformance);
     SubstGenericParametersFromMetadata substitutions(originalConformingType);
-    assocTypeMetadata = swift_getTypeByMangledName(mangledName, substitutions,
-                                                   substitutions);
+    response = swift_getTypeByMangledName(request, mangledName, substitutions,
+                                          substitutions).getResponse();
   }
+  auto assocTypeMetadata = response.Value;
 
   if (!assocTypeMetadata) {
     auto conformingTypeNameInfo = swift_getTypeName(conformingType, true);
@@ -4241,12 +4255,8 @@ swift_getAssociatedTypeWitnessSlowImpl(
                mangledName.str().c_str());
   }
 
-
   assert((uintptr_t(assocTypeMetadata) &
             ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0);
-
-  // Check the metadata state.
-  auto response = swift_checkMetadataState(request, assocTypeMetadata);
 
   // If the metadata was completed, record it in the witness table.
   if (response.State == MetadataState::Complete) {
@@ -4275,6 +4285,7 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                             reqBase, assocType);
 }
 
+SWIFT_CC(swift)
 static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
                                   WitnessTable *wtable,
                                   const Metadata *conformingType,
@@ -4968,10 +4979,11 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   
   auto mangledName = Demangle::mangleNode(node);
   auto result =
-    swift_getTypeByMangledName(
+    swift_getTypeByMangledName(MetadataState::Abstract,
                           mangledName,
                           [](unsigned, unsigned){ return nullptr; },
-                          [](const Metadata *, unsigned) { return nullptr; });
+                          [](const Metadata *, unsigned) { return nullptr; })
+      .getMetadata();
   if (metadata != result)
     swift::warning(RuntimeErrorFlagNone,
                    "Metadata mangled name failed to roundtrip: %p -> %s -> %p\n",

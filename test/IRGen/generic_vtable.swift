@@ -158,7 +158,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable7DerivedCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
-// CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
+// CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
 
 // CHECK: ret %swift.metadata_response
 
@@ -171,5 +171,5 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMr"(%swift.type*, i8*, i8**)
 // -- ClassLayoutFlags is 256 / 0x100, HasStaticVTable
-// CHECK: call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, {{.*}})
+// CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, {{.*}})
 // CHECK: ret %swift.metadata_response

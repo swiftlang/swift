@@ -781,28 +781,28 @@ FUNCTION(RelocateClassMetadata,
          ATTRS(NoUnwind))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };
-// void swift_initClassMetadata(Metadata *self,
-//                              ClassLayoutFlags flags,
-//                              size_t numFields,
-//                              TypeLayout * const *fieldTypes,
-//                              size_t *fieldOffsets);
+// MetadataDependency swift_initClassMetadata(Metadata *self,
+//                                            ClassLayoutFlags flags,
+//                                            size_t numFields,
+//                                            TypeLayout * const *fieldTypes,
+//                                            size_t *fieldOffsets);
 FUNCTION(InitClassMetadata,
-         swift_initClassMetadata, C_CC,
-         RETURNS(VoidTy),
+         swift_initClassMetadata, SwiftCC,
+         RETURNS(TypeMetadataDependencyTy),
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };
-// void swift_updateClassMetadata(Metadata *self,
-//                                ClassLayoutFlags flags,
-//                                size_t numFields,
-//                                TypeLayout * const *fieldTypes,
-//                                size_t *fieldOffsets);
+// MetadataDependency swift_updateClassMetadata(Metadata *self,
+//                                              ClassLayoutFlags flags,
+//                                              size_t numFields,
+//                                              TypeLayout * const *fieldTypes,
+//                                              size_t *fieldOffsets);
 FUNCTION(UpdateClassMetadata,
-         swift_updateClassMetadata, C_CC,
-         RETURNS(VoidTy),
+         swift_updateClassMetadata, SwiftCC,
+         RETURNS(TypeMetadataDependencyTy),
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),
