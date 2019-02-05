@@ -841,7 +841,6 @@ class BuildScriptInvocation(object):
         product_classes = []
         product_classes.append(products.CMark)
         product_classes.append(products.LLVM)
-        product_classes.append(products.LibCXX)
         if self.args.build_libicu:
             product_classes.append(products.LibICU)
         product_classes.append(products.Swift)
