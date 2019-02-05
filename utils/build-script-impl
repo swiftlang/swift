@@ -2541,12 +2541,12 @@ for host in "${ALL_HOSTS[@]}"; do
                       -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
                   )
 
-                  if [[ ${LLDB_BUILD_ON_MACOS} ]] ; then
+                  if [[ "$(uname -s)" == "Darwin" ]] ; then
                     cmake_options+=(
                       -DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
                       -DLLDB_CODESIGN_IDENTITY=""
                     )
-                    if "${ENABLE_ASAN}" ]] ; then
+                    if [[ "${ENABLE_ASAN}" ]] ; then
                       # Limit the number of parallel tests
                       LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --threads=$(sysctl hw.physicalcpu | awk '{ print $2 }')"
                     fi
