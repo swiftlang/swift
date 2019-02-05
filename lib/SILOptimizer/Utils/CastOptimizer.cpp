@@ -1577,40 +1577,45 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
 }
 
 /// Simplify conversions between thick and objc metatypes.
-SILInstruction *CastOptimizer::optimizeMetatypeConversion(
-    ConversionInst *MCI, MetatypeRepresentation Representation) {
-  SILValue Op = MCI->getOperand(0);
+SILValue CastOptimizer::optimizeMetatypeConversion(
+    ConversionInst *mci, MetatypeRepresentation representation) {
+  SILValue op = mci->getOperand(0);
   // Instruction has a proper target type already.
-  SILType Ty = MCI->getType();
-  auto MetatypeTy = Op->getType().getAs<AnyMetatypeType>();
+  SILType ty = mci->getType();
+  auto metatypeTy = op->getType().getAs<AnyMetatypeType>();
 
-  if (MetatypeTy->getRepresentation() != Representation)
-    return nullptr;
+  if (metatypeTy->getRepresentation() != representation)
+    return SILValue();
+
+  auto loc = mci->getLoc();
 
   // Rematerialize the incoming metatype instruction with the outgoing type.
-  auto replaceCast = [&](SingleValueInstruction *NewCast) {
-    assert(Ty.getAs<AnyMetatypeType>()->getRepresentation()
-           == NewCast->getType().getAs<AnyMetatypeType>()->getRepresentation());
-    MCI->replaceAllUsesWith(NewCast);
-    EraseInstAction(MCI);
-    return NewCast;
+  auto replaceCast = [&](SILValue newValue) -> SILValue {
+    assert(ty.getAs<AnyMetatypeType>()->getRepresentation() ==
+           newValue->getType().getAs<AnyMetatypeType>()->getRepresentation());
+    ReplaceValueUsesAction(mci, newValue);
+    EraseInstAction(mci);
+    return newValue;
   };
-  if (auto *MI = dyn_cast<MetatypeInst>(Op)) {
-    return replaceCast(SILBuilderWithScope(MCI, BuilderContext)
-                           .createMetatype(MCI->getLoc(), Ty));
+
+  if (auto *mi = dyn_cast<MetatypeInst>(op)) {
+    return replaceCast(
+        SILBuilderWithScope(mci, BuilderContext).createMetatype(loc, ty));
   }
+
   // For metatype instructions that require an operand, generate the new
   // metatype at the same position as the original to avoid extending the
-  // lifetime of `Op` past its destroy.
-  if (auto *VMI = dyn_cast<ValueMetatypeInst>(Op)) {
-    return replaceCast(
-        SILBuilderWithScope(VMI, BuilderContext)
-            .createValueMetatype(MCI->getLoc(), Ty, VMI->getOperand()));
+  // lifetime of `op` past its destroy.
+  if (auto *vmi = dyn_cast<ValueMetatypeInst>(op)) {
+    return replaceCast(SILBuilderWithScope(vmi, BuilderContext)
+                           .createValueMetatype(loc, ty, vmi->getOperand()));
   }
-  if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op)) {
+
+  if (auto *emi = dyn_cast<ExistentialMetatypeInst>(op)) {
     return replaceCast(
-        SILBuilderWithScope(EMI, BuilderContext)
-            .createExistentialMetatype(MCI->getLoc(), Ty, EMI->getOperand()));
+        SILBuilderWithScope(emi, BuilderContext)
+            .createExistentialMetatype(loc, ty, emi->getOperand()));
   }
-  return nullptr;
+
+  return SILValue();
 }
