@@ -2049,9 +2049,6 @@ namespace {
     }
 
     Expr *handleStringLiteralExpr(LiteralExpr *expr) {
-      if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable())
-        return expr;
-      
       auto stringLiteral = dyn_cast<StringLiteralExpr>(expr);
       auto magicLiteral = dyn_cast<MagicIdentifierLiteralExpr>(expr);
       assert(bool(stringLiteral) != bool(magicLiteral) &&
@@ -7264,7 +7261,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 }
 
 // Resolve @dynamicCallable applications.
-static Expr *finishApplyDynamicCallable(ConstraintSystem &cs,
+static Expr *finishApplyDynamicCallable(ExprRewriter &rewriter,
+                                        ConstraintSystem &cs,
                                         const Solution &solution,
                                         ApplyExpr *apply,
                                         ConstraintLocatorBuilder locator) {
@@ -7279,7 +7277,8 @@ static Expr *finishApplyDynamicCallable(ConstraintSystem &cs,
   auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
   auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
   auto *method = dyn_cast<FuncDecl>(selected.choice.getDecl());
-  auto methodType = selected.openedType->castTo<AnyFunctionType>();
+  auto methodType =
+      solution.simplifyType(selected.openedType)->castTo<AnyFunctionType>();
   assert(method->getName() == ctx.Id_dynamicallyCall &&
          "Expected 'dynamicallyCall' method");
   assert(methodType->getParams().size() == 1 &&
@@ -7295,39 +7294,113 @@ static Expr *finishApplyDynamicCallable(ConstraintSystem &cs,
   bool useKwargsMethod = argumentLabel == ctx.Id_withKeywordArguments;
 
   // Construct expression referencing the `dynamicallyCall` method.
-  Expr *member =
-    new (ctx) MemberRefExpr(fn, fn->getEndLoc(), ConcreteDeclRef(method),
-                            DeclNameLoc(method->getNameLoc()),
-                            /*Implicit*/ true);
+  MemberRefExpr *member =
+      new (ctx) MemberRefExpr(fn, fn->getEndLoc(), ConcreteDeclRef(method),
+                              DeclNameLoc(method->getNameLoc()),
+                              /*Implicit*/ true);
+
+  cs.setType(member, methodType);
+
+  bool isDynamic =
+      selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+  Expr *memberExpr = rewriter.buildMemberRef(
+      member->getBase(), selected.openedFullType, member->getDotLoc(),
+      selected.choice, member->getNameLoc(), selected.openedType,
+      cs.getConstraintLocator(member), loc, true,
+      selected.choice.getFunctionRefKind(), member->getAccessSemantics(),
+      isDynamic);
 
   // Construct argument to the method (either an array or dictionary
   // expression).
   Expr *argument = nullptr;
   if (!useKwargsMethod) {
-    argument = ArrayExpr::create(ctx, SourceLoc(), arg->getElements(),
-                                 {}, SourceLoc());
+    auto paramArrayType = methodType->getParams()[0].getParameterType();
+    auto arrayLitProto = cs.TC.getProtocol(
+        fn->getLoc(), KnownProtocolKind::ExpressibleByArrayLiteral);
+    auto conformance =
+        cs.TC.conformsToProtocol(paramArrayType, arrayLitProto, cs.DC,
+                                 ConformanceCheckFlags::InExpression);
+    auto paramType = ProtocolConformanceRef::getTypeWitnessByName(
+                         paramArrayType, *conformance,
+                         cs.getASTContext().Id_ArrayLiteralElement, &cs.TC)
+                         ->getDesugaredType();
+
+    std::vector<Expr *> convertedElements;
+    for (Expr *dynamicArg : arg->getElements()) {
+      convertedElements.push_back(rewriter.coerceToType(
+          dynamicArg, paramType,
+          loc.withPathElement(LocatorPathElt::getApplyArgToParam(0, 0))));
+    }
+    auto *argumentTmp =
+        ArrayExpr::create(ctx, SourceLoc(), convertedElements, {}, SourceLoc());
+    argument = argumentTmp;
+
+    cs.setType(argument, paramArrayType);
+    rewriter.finishArrayExpr(argumentTmp);
   } else {
+    // Get Key and Value associated types.
+    auto paramDictType = methodType->getParams()[0].getParameterType();
+    auto dictLitProto = cs.TC.getProtocol(
+        fn->getLoc(), KnownProtocolKind::ExpressibleByDictionaryLiteral);
+    auto conformance =
+        cs.TC.conformsToProtocol(paramDictType, dictLitProto, cs.DC,
+                                 ConformanceCheckFlags::InExpression);
+    auto keyAssocType =
+        ProtocolConformanceRef::getTypeWitnessByName(
+            paramDictType, *conformance, cs.getASTContext().Id_Key, &cs.TC)
+            ->getDesugaredType();
+    auto valueAssocType =
+        ProtocolConformanceRef::getTypeWitnessByName(
+            paramDictType, *conformance, cs.getASTContext().Id_Value, &cs.TC)
+            ->getDesugaredType();
+
     SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
     for (unsigned i = 0, n = arg->getNumElements(); i < n; i++) {
-      Expr *labelExpr =
-        new (ctx) StringLiteralExpr(arg->getElementName(i).get(),
-                                    arg->getElementNameLoc(i),
-                                    /*Implicit*/ true);
-      Expr *pair =
-        TupleExpr::createImplicit(ctx, { labelExpr, arg->getElement(i) }, {});
+      auto *labelExpr = new (ctx) StringLiteralExpr(
+          arg->getElementName(i).get(), arg->getElementNameLoc(i),
+          /*Implicit*/ true);
+      cs.setType(labelExpr, keyAssocType);
+
+      Expr *pair = TupleExpr::createImplicit(
+          ctx,
+          {rewriter.visitStringLiteralExpr(labelExpr),
+           rewriter.coerceToType(
+               arg->getElement(i), valueAssocType,
+               loc.withPathElement(LocatorPathElt::getApplyArgToParam(0, 0)))},
+          {});
+
+      cs.setType(pair, TupleType::get({TupleTypeElt{keyAssocType},
+                                       TupleTypeElt{valueAssocType}},
+                                      ctx));
       dictElements.push_back(pair);
     }
-    argument = DictionaryExpr::create(ctx, SourceLoc(), dictElements, {},
-                                      SourceLoc());
+    auto *argumentTmp =
+        DictionaryExpr::create(ctx, SourceLoc(), dictElements, {}, SourceLoc());
+
+    cs.setType(argumentTmp, paramDictType);
+    rewriter.finishDictionaryExpr(argumentTmp);
+    argument = argumentTmp;
   }
   argument->setImplicit();
 
+  auto getType = [&](const Expr *E) -> Type { return cs.getType(E); };
+
   // Construct call to the `dynamicallyCall` method.
-  Expr *result = CallExpr::createImplicit(ctx, member, argument,
-                                          { argumentLabel });
-  cs.TC.typeCheckExpression(result, cs.DC);
-  cs.cacheExprTypes(result);
+  CallExpr *result = CallExpr::createImplicit(ctx, memberExpr, argument,
+                                              {argumentLabel}, getType);
+
+  cs.setType(result, methodType->getResult());
+
+  {
+    // The implicitly constructed tuple_expr may have a type, but this type
+    // is not known in the constraint system.
+    Expr *arg = result->getArg();
+    if (arg->getType()) {
+      cs.setType(arg, arg->getType());
+    }
+  }
+
   return result;
 }
 
@@ -7702,7 +7775,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // Handle @dynamicCallable applications.
   // At this point, all other ApplyExpr cases have been handled.
-  return finishApplyDynamicCallable(cs, solution, apply, locator);
+  return finishApplyDynamicCallable(*this, cs, solution, apply, locator);
 }
 
 
