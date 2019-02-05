@@ -11,7 +11,7 @@ public enum E: Int {
   case sacrificial = -500
 
   case normal = -1000
-  @available(macOS 10.8, iOS 8, watchOS 1, tvOS 8, *)
+  @available(macOS 10.8, iOS 7, watchOS 1, tvOS 7, *)
   case alwaysAvailable = -2000
   @available(macOS 500.600.700, iOS 500.600.700, watchOS 500.600.700, tvOS 500.600.700, *)
   case potentiallyUnavailable = -3000
