@@ -49,4 +49,26 @@ ModelADTests.testAllBackends("XORTraining") {
   print(classifier.applied(to: [[0, 0], [0, 1], [1, 0], [1, 1]]))
 }
 
+ModelADTests.testAllBackends("WithRespectToModel") {
+  struct Foo<Scalar>: Differentiable
+    where Scalar: FloatingPoint & Differentiable & TensorFlowScalar {
+  
+    var bar: Tensor<Scalar>
+    var baz: Tensor<Scalar>
+  
+    @differentiable(wrt: (self, input))
+    func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
+        return bar + input
+    }
+  }
+  
+  let x = Tensor<Float>(0)
+  var model = Foo<Float>(bar: x, baz: x)
+  
+  let d = gradient(at: model) { model in
+      model.applied(to: x)
+  }
+  expectEqual(Foo<Float>.AllDifferentiableVariables(bar: Tensor(1.0), baz: Tensor(0.0)), d)
+}
+
 runAllTests()

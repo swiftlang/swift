@@ -3820,13 +3820,18 @@ ValueWithCleanup AdjointEmitter::materializeAdjointDirect(
       elements.push_back(eltVal.getValue());
       cleanups.push_back(eltVal.getCleanup());
     }
-    auto *newCleanup = makeCleanupFromChildren(cleanups);
     if (val.getType().is<TupleType>())
       return ValueWithCleanup(
-          builder.createTuple(loc, val.getType(), elements), newCleanup);
-    else
-      return ValueWithCleanup(
-          builder.createStruct(loc, val.getType(), elements), newCleanup);
+          builder.createTuple(loc, val.getType(), elements),
+                              makeCleanupFromChildren(cleanups));
+    else {
+      auto *adj = builder.createStruct(loc, val.getType(), elements);
+      builder.createRetainValue(loc, adj, builder.getDefaultAtomicity());
+      auto cleanupFn = [](SILBuilder &b, SILLocation l, SILValue v) {
+        b.createReleaseValue(l, v, b.getDefaultAtomicity());
+      };
+      return ValueWithCleanup(adj, makeCleanup(adj, cleanupFn, cleanups));
+    }
   }
   case AdjointValueKind::Concrete:
     return val.getConcreteValue();
@@ -4451,7 +4456,7 @@ void DifferentiationTask::createEmptyAdjoint() {
   // pullback's closure context.
   auto pvType = getPrimalInfo()->getPrimalValueStruct()
       ->getDeclaredInterfaceType()->getCanonicalType();
-  adjParams.push_back(getFormalParameterInfo(pvType));
+  adjParams.push_back({pvType, ParameterConvention::Direct_Guaranteed});
 
   // Add adjoint result for the wrt self parameter, if it was requested.
   auto selfParamIndex = origParams.size() - 1;
@@ -4593,8 +4598,7 @@ void DifferentiationTask::createVJP() {
                           IsNotTransparent, original->isSerialized(),
                           original->isDynamicallyReplaceable());
   vjp->setUnqualifiedOwnership();
-  vjp->setDebugScope(new (module)
-                         SILDebugScope(original->getLocation(), vjp));
+  vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
   attr->setVJPName(vjpName);
 
   LLVM_DEBUG(llvm::dbgs() << "  vjp type: "
