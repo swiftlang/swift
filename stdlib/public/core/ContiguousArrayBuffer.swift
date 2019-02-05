@@ -60,6 +60,10 @@ internal final class __EmptyArrayStorage
   override internal var staticElementType: Any.Type {
     return Void.self
   }
+  
+  deinit {
+    fatalError("The empty Array should never be deinited")
+  }
 }
 
 /// The empty array prototype.  We use the same object for all empty
