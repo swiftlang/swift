@@ -2542,10 +2542,9 @@ public:
             selfRequirement->getKind() == RequirementKind::Conformance,
             "first non-same-typerequirement should be conformance requirement");
     auto conformsTo = genericSig->getConformsTo(selfGenericParam);
-    require(conformsTo.size() == 1,
-            "requirement Self parameter must conform to exactly one protocol");
-    require(conformsTo[0] == protocol,
-            "requirement Self parameter should be constrained by protocol");
+    require(std::find(conformsTo.begin(), conformsTo.end(), protocol)
+              != conformsTo.end(),
+            "requirement Self parameter must conform to called protocol");
 
     auto lookupType = AMI->getLookupType();
     if (getOpenedArchetypeOf(lookupType)) {
@@ -5028,8 +5027,6 @@ void SILWitnessTable::verify(const SILModule &M) const {
     assert(getEntries().empty() &&
            "A witness table declaration should not have any entries.");
 
-  auto *protocol = getConformance()->getProtocol();
-
   for (const Entry &E : getEntries())
     if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
       SILFunction *F = E.getMethodWitness().Witness;
@@ -5045,15 +5042,6 @@ void SILWitnessTable::verify(const SILModule &M) const {
         assert(F->getLoweredFunctionType()->getRepresentation() ==
                SILFunctionTypeRepresentation::WitnessMethod &&
                "Witnesses must have witness_method representation.");
-        auto *witnessSelfProtocol = F->getLoweredFunctionType()
-            ->getDefaultWitnessMethodProtocol();
-        assert((witnessSelfProtocol == nullptr ||
-                witnessSelfProtocol == protocol) &&
-               "Witnesses must either have a concrete Self, or an "
-               "an abstract Self that is constrained to their "
-               "protocol.");
-        (void)protocol;
-        (void)witnessSelfProtocol;
       }
     }
 }
@@ -5078,12 +5066,6 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
     assert(F->getLoweredFunctionType()->getRepresentation() ==
            SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
-
-    auto *witnessSelfProtocol = F->getLoweredFunctionType()
-        ->getDefaultWitnessMethodProtocol();
-    assert(witnessSelfProtocol == getProtocol() &&
-           "Default witnesses must have an abstract Self parameter "
-           "constrained to their protocol.");
   }
 #endif
 }
