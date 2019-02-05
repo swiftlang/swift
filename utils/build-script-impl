@@ -2370,10 +2370,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                    -DSWIFT_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                    -DSWIFT_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                    -DSWIFT_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                    -DSWIFT_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                    -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
+                    -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
                     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
                     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
@@ -2512,9 +2510,9 @@ for host in "${ALL_HOSTS[@]}"; do
                       -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                       -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                       -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                      -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
+                      -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
                       -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                      -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                      -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                       -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
                       -DLLDB_IS_BUILDBOT_BUILD:BOOL="${LLDB_IS_BUILDBOT_BUILD}"
                       -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
