@@ -21,7 +21,7 @@ func one_to_one_0(_ x: Float) -> Float {
 _ = gradient(at: 0, in: one_to_one_0) // okay!
 
 //===----------------------------------------------------------------------===//
-// Generics
+// Indirect parameters/results (generics)
 //===----------------------------------------------------------------------===//
 
 // expected-note @+3 {{differentiating functions with parameters or result of unknown size is not supported yet}}
@@ -29,6 +29,19 @@ _ = gradient(at: 0, in: one_to_one_0) // okay!
 @differentiable()
 func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
   return x + 1
+}
+
+struct Tensor<Scalar> {
+  static func + (_ lhs: Tensor, rhs: Scalar) -> Tensor { return lhs }
+}
+extension Tensor : Differentiable where Scalar : Differentiable & FloatingPoint {}
+extension Tensor where Scalar : BinaryFloatingPoint {
+  // expected-note @+3 {{differentiating functions with parameters or result of unknown size is not supported yet}}
+  // expected-error @+2 {{function is not differentiable}}
+  @differentiable(wrt: (self) where Scalar : Differentiable)
+  func TF_6(_ x: Float) -> Tensor {
+    return self + Scalar(x)
+  }
 }
 
 //===----------------------------------------------------------------------===//
