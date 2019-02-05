@@ -197,6 +197,9 @@ public:
   /// Enable chaining of dynamic replacements.
   unsigned EnableDynamicReplacementChaining : 1;
 
+  /// Disable round-trip verification of mangled debug types.
+  unsigned DisableRoundTripDebugTypes : 1;
+
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
@@ -232,6 +235,7 @@ public:
         EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
         UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
+        DisableRoundTripDebugTypes(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
