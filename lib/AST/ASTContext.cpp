@@ -1472,23 +1472,6 @@ ClangModuleLoader *ASTContext::getClangModuleLoader() const {
   return getImpl().TheClangModuleLoader;
 }
 
-static void recordKnownProtocol(ModuleDecl *Stdlib, StringRef Name,
-                                KnownProtocolKind Kind) {
-  Identifier ID = Stdlib->getASTContext().getIdentifier(Name);
-  UnqualifiedLookup Lookup(ID, Stdlib, nullptr, SourceLoc(),
-                           UnqualifiedLookup::Flags::KnownPrivate |
-                               UnqualifiedLookup::Flags::TypeLookup);
-  if (auto Proto
-        = dyn_cast_or_null<ProtocolDecl>(Lookup.getSingleTypeResult()))
-    Proto->setKnownProtocolKind(Kind);
-}
-
-void ASTContext::recordKnownProtocols(ModuleDecl *Stdlib) {
-#define PROTOCOL_WITH_NAME(Id, Name) \
-  recordKnownProtocol(Stdlib, Name, KnownProtocolKind::Id);
-#include "swift/AST/KnownProtocols.def"
-}
-
 ModuleDecl *ASTContext::getLoadedModule(
     ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) const {
   assert(!ModulePath.empty());
@@ -1761,10 +1744,6 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
   auto moduleID = ModulePath[0];
   for (auto &importer : getImpl().ModuleLoaders) {
     if (ModuleDecl *M = importer->loadModule(moduleID.second, ModulePath)) {
-      if (ModulePath.size() == 1 &&
-          (ModulePath[0].first == StdlibModuleName ||
-           ModulePath[0].first == Id_Foundation))
-        recordKnownProtocols(M);
       return M;
     }
   }

@@ -4053,14 +4053,20 @@ public:
     Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
   }
 
+private:
+  void computeKnownProtocolKind() const;
+
+public:
   /// If this is known to be a compiler-known protocol, returns the kind.
   /// Otherwise returns None.
-  ///
-  /// Note that this is only valid after type-checking.
   Optional<KnownProtocolKind> getKnownProtocolKind() const {
     if (Bits.ProtocolDecl.KnownProtocol == 0)
+      computeKnownProtocolKind();
+
+    if (Bits.ProtocolDecl.KnownProtocol == 1)
       return None;
-    return static_cast<KnownProtocolKind>(Bits.ProtocolDecl.KnownProtocol - 1);
+    
+    return static_cast<KnownProtocolKind>(Bits.ProtocolDecl.KnownProtocol - 2);
   }
 
   /// Check whether this protocol is of a specific, known protocol kind.
@@ -4069,15 +4075,6 @@ public:
       return *knownKind == kind;
 
     return false;
-  }
-
-  /// Records that this is a compiler-known protocol.
-  void setKnownProtocolKind(KnownProtocolKind kind) {
-    assert((!getKnownProtocolKind() || *getKnownProtocolKind() == kind) &&
-           "can't reset known protocol kind");
-    Bits.ProtocolDecl.KnownProtocol = static_cast<unsigned>(kind) + 1;
-    assert(getKnownProtocolKind() && *getKnownProtocolKind() == kind &&
-           "not enough bits");
   }
 
   /// Retrieve the status of circularity checking for protocol inheritance.

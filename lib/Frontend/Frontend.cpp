@@ -803,11 +803,6 @@ void CompilerInstance::parseAndCheckTypesUpTo(
                         options.SwitchCheckingInvocationThreshold);
   });
 
-  // Even if there were no source files, we should still record known
-  // protocols.
-  if (auto *stdlib = Context->getStdlibModule())
-    Context->recordKnownProtocols(stdlib);
-
   if (Invocation.isCodeCompletion()) {
     performDelayedParsing(MainModule, PersistentState,
                           Invocation.getCodeCompletionFactory());
