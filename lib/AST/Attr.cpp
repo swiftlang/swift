@@ -382,15 +382,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Effects:
   case DAK_Optimize:
     if (DeclAttribute::isDeclModifier(getKind())) {
-      Printer.printKeyword(getAttrName());
+      Printer.printKeyword(getAttrName(), Options);
     } else {
       Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
     return true;
 
   case DAK_SetterAccess:
-    Printer.printKeyword(getAttrName());
-    Printer << "(set)";
+    Printer.printKeyword(getAttrName(), Options, "(set)");
     return true;
 
   default:
