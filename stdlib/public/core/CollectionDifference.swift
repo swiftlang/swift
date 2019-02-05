@@ -57,8 +57,20 @@ public struct CollectionDifference<ChangeElement> {
     }
   }
 
-  // The public initializer calls this function to ensure that its parameter
-  // meets the conditions set in its documentation.
+  /// The public initializer calls this function to ensure that its parameter
+  /// meets the conditions set in its documentation.
+  ///
+  /// - Parameter changes: a collection of `CollectionDifference.Change`
+  ///   instances intended to represent a valid state transition for
+  ///   `CollectionDifference`.
+  ///
+  /// - Returns: whether the parameter meets the following criteria:
+  ///
+  ///   1. All insertion offsets are unique
+  ///   2. All removal offsets are unique
+  ///   3. All associations between insertions and removals are symmetric
+  ///
+  /// Complexity: O(`changes.count`)
   private static func validateChanges<C>(_ changes : C) -> Bool where C:Collection, C.Element == Change {
     if changes.count == 0 { return true }
 
@@ -105,11 +117,11 @@ public struct CollectionDifference<ChangeElement> {
   /// states, this initializer will fail unless its parameter meets to the
   /// following requirements:
   ///
-  /// 1) All insertion offsets are unique
-  /// 2) All removal offsets are unique
-  /// 3) All offset associations between insertions and removals are symmetric
+  /// 1. All insertion offsets are unique
+  /// 2. All removal offsets are unique
+  /// 3. All associations between insertions and removals are symmetric
   ///
-  /// - Parameter changes: A collection of changes that represent a transition
+  /// - Parameter c: A collection of changes that represent a transition
   ///   between two states.
   ///
   /// - Complexity: O(*n* * log(*n*)), where *n* is the length of the
@@ -122,9 +134,18 @@ public struct CollectionDifference<ChangeElement> {
     self.init(validatedChanges: c)
   }
 
-  // Internal initializer for use by algorithms that cannot produce invalid
-  // collections of changes. These include the Myers' diff algorithm and
-  // the move inferencer.
+  /// Internal initializer for use by algorithms that cannot produce invalid
+  /// collections of changes. These include the Myers' diff algorithm and
+  /// the move inferencer.
+  ///
+  /// If parameter validity cannot be guaranteed by the caller then
+  /// `CollectionDifference.init?(_:)` should be used instead.
+  ///
+  /// - Parameter c: A valid collection of changes that represent a transition
+  ///   between two states.
+  ///
+  /// - Complexity: O(*n* * log(*n*)), where *n* is the length of the
+  ///   parameter.
   init<C>(validatedChanges c: C) where C:Collection, C.Element == Change {
     let changes = c.sorted { (a, b) -> Bool in
       switch (a, b) {
