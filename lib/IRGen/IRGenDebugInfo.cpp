@@ -698,7 +698,8 @@ private:
 
     Mangle::ASTMangler Mangler;
     std::string Name = Mangler.mangleTypeForDebugger(
-        Ty, DbgTy.getDeclContext());
+        Ty, DbgTy.getDeclContext(),
+        !Opts.DisableRoundTripDebugTypes);
     return BumpAllocatedString(Name);
   }
 
