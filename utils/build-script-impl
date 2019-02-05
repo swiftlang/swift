@@ -208,6 +208,7 @@ KNOWN_SETTINGS=(
     install-swiftevolve         ""               "whether to install the swift-evolve tool"
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
+    install-libcxx              ""               "whether to install libc++"
     install-libdispatch         ""               "whether to install libdispatch"
     install-libicu              ""               "whether to install libicu"
     install-playgroundsupport   ""               "whether to install PlaygroundSupport"
@@ -3498,6 +3499,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/;/ install-/g')
                 ;;
             libcxx)
+                if [[ -z "${INSTALL_LIBCXX}" ]] ; then
+                    continue
+                fi
                 INSTALL_TARGETS=install-cxx-headers
                 ;;
             swift)
