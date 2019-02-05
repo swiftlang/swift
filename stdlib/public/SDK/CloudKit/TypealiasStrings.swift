@@ -111,6 +111,15 @@ extension CKDatabase {
 @available(macOS 10.10, iOS 8.0, *) @available(watchOS, unavailable)
 extension CKSubscription {
     @available(swift 4.2)
+    @available(macOS, deprecated: 10.12, message: "Use CKQuerySubscription instead")
+    @available(iOS, deprecated: 10.0, message: "Use CKQuerySubscription instead")
+    @available(tvOS, deprecated: 10.0, message: "Use CKQuerySubscription instead")
+    @available(watchOS, unavailable)
+    public var compatibilityRecordType: CKRecord.RecordType? {
+        get { return self.__recordType }
+    }
+
+    @available(swift 4.2)
     public var subscriptionID: CKSubscription.ID {
         get { return self.__subscriptionID }
     }
@@ -121,7 +130,7 @@ extension CKSubscription {
 extension CKQuerySubscription {
     /// The record type that this subscription watches
     @available(swift 4.2)
-    public var recordType: CKRecord.RecordType? {
+    public var recordType: CKRecord.RecordType {
         get { return self.__recordType }
     }
 }
