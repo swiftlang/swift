@@ -175,14 +175,15 @@ TEST_F(CompatibilityOverrideTest, test_swift_conformsToSwiftProtocol) {
 
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledNode) {
   Demangler demangler;
-  auto Result = swift_getTypeByMangledNode(demangler, nullptr, nullptr,
-                                           nullptr);
-  ASSERT_EQ((const Metadata *)Result, nullptr);
+  auto Result = swift_getTypeByMangledNode(MetadataState::Abstract,
+                                           demangler, nullptr, nullptr,nullptr);
+  ASSERT_EQ(Result.getMetadata(), nullptr);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledName) {
-  auto Result = swift_getTypeByMangledName("", nullptr, nullptr);
-  ASSERT_EQ((const Metadata *)Result, nullptr);
+  auto Result = swift_getTypeByMangledName(MetadataState::Abstract,
+                                           "", nullptr, nullptr);
+  ASSERT_EQ(Result.getMetadata(), nullptr);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getAssociatedTypeWitnessSlow) {
