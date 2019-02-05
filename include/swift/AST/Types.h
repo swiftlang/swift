@@ -4010,7 +4010,7 @@ public:
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the
   /// Self type.
-  ClassDecl *getWitnessMethodClass(ModuleDecl &M) const;
+  ClassDecl *getWitnessMethodClass() const;
 
   /// If this is a @convention(witness_method) function, return the conformance
   /// for which the method is a witness.

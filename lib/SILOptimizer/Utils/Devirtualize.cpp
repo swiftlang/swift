@@ -950,7 +950,7 @@ swift::getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI,
   auto *mod = Module.getSwiftModule();
   bool isSelfAbstract =
     witnessFnTy->getSelfInstanceType()->is<GenericTypeParamType>();
-  auto *classWitness = witnessFnTy->getWitnessMethodClass(*mod);
+  auto *classWitness = witnessFnTy->getWitnessMethodClass();
 
   return ::getWitnessMethodSubstitutions(mod, CRef, requirementSig,
                                          witnessThunkSig, origSubs,

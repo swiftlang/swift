@@ -99,7 +99,7 @@ CanType SILFunctionType::getSelfInstanceType() const {
 }
 
 ClassDecl *
-SILFunctionType::getWitnessMethodClass(ModuleDecl &M) const {
+SILFunctionType::getWitnessMethodClass() const {
   auto selfTy = getSelfInstanceType();
   auto genericSig = getGenericSignature();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
