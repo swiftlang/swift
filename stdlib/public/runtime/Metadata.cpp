@@ -4139,6 +4139,7 @@ static StringRef findAssociatedTypeName(const ProtocolDescriptor *protocol,
   return StringRef();
 }
 
+SWIFT_CC(swift)
 static MetadataResponse
 swift_getAssociatedTypeWitnessSlowImpl(
                                       MetadataRequest request,
@@ -4275,6 +4276,7 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                             reqBase, assocType);
 }
 
+SWIFT_CC(swift)
 static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
                                   WitnessTable *wtable,
                                   const Metadata *conformingType,

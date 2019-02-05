@@ -41,13 +41,13 @@ namespace  {
   }
 }
 
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
-  static ret name ## Override(COMPATIBILITY_UNPAREN typedArgs,      \
-                          Original_ ## name originalImpl) {         \
-    if (!EnableOverride)                                            \
-      return originalImpl namedArgs;                                \
-    Ran = true;                                                     \
-    return getEmptyValue<ret>();                                    \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
+  static ccAttrs ret name ## Override(COMPATIBILITY_UNPAREN typedArgs,       \
+                                       Original_ ## name originalImpl) {     \
+    if (!EnableOverride)                                                     \
+      return originalImpl namedArgs;                                         \
+    Ran = true;                                                              \
+    return getEmptyValue<ret>();                                             \
   }
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 
@@ -55,14 +55,14 @@ namespace  {
 struct OverrideSection {
   uintptr_t version;
   
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
 
 OverrideSection Overrides __attribute__((section("__DATA,__swift_hooks"))) = {
   0,
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   name ## Override,
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
