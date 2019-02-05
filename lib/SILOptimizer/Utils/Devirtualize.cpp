@@ -820,7 +820,8 @@ swift::tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
 /// \param requirementSig The generic signature of the requirement
 /// \param witnessThunkSig The generic signature of the witness method
 /// \param origSubMap The substitutions from the call instruction
-/// \param isDefaultWitness True if this is a default witness method
+/// \param isSelfAbstract True if the Self type of the witness method is
+/// still abstract (i.e., not a concrete type).
 /// \param classWitness The ClassDecl if this is a class witness method
 static SubstitutionMap
 getWitnessMethodSubstitutions(
@@ -829,13 +830,13 @@ getWitnessMethodSubstitutions(
     GenericSignature *requirementSig,
     GenericSignature *witnessThunkSig,
     SubstitutionMap origSubMap,
-    bool isDefaultWitness,
+    bool isSelfAbstract,
     ClassDecl *classWitness) {
 
   if (witnessThunkSig == nullptr)
     return SubstitutionMap();
 
-  if (isDefaultWitness)
+  if (isSelfAbstract && !classWitness)
     return origSubMap;
 
   assert(!conformanceRef.isAbstract());
@@ -896,14 +897,13 @@ getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
   SubstitutionMap origSubs = AI.getSubstitutionMap();
 
   auto *mod = Module.getSwiftModule();
-  bool isDefaultWitness =
-    (witnessFnTy->getDefaultWitnessMethodProtocol()
-      == CRef.getRequirement());
+  bool isSelfAbstract =
+    witnessFnTy->getSelfInstanceType()->is<GenericTypeParamType>();
   auto *classWitness = witnessFnTy->getWitnessMethodClass(*mod);
 
   return getWitnessMethodSubstitutions(
       mod, CRef, requirementSig, witnessThunkSig,
-      origSubs, isDefaultWitness, classWitness);
+      origSubs, isSelfAbstract, classWitness);
 }
 
 /// Generate a new apply of a function_ref to replace an apply of a
