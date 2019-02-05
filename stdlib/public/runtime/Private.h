@@ -55,16 +55,22 @@ public:
 /// since we don't represent ownership attributes in the metadata
 /// itself related info has to be bundled with it.
 class TypeInfo {
-  const Metadata *Type;
+  MetadataResponse Response;
   TypeReferenceOwnership ReferenceOwnership;
 
 public:
-  TypeInfo() : Type(nullptr), ReferenceOwnership() {}
+  TypeInfo()
+    : Response{nullptr, MetadataState::Abstract}, ReferenceOwnership() {}
 
+  TypeInfo(MetadataResponse response, TypeReferenceOwnership ownership)
+    : Response(response), ReferenceOwnership(ownership) {}
+
+  // FIXME: remove this constructor and require a response in all cases.
   TypeInfo(const Metadata *type, TypeReferenceOwnership ownership)
-      : Type(type), ReferenceOwnership(ownership) {}
+    : Response{type, MetadataState::Abstract}, ReferenceOwnership(ownership) {}
 
-  operator const Metadata *() { return Type; }
+  const Metadata *getMetadata() const { return Response.Value; }
+  MetadataResponse getResponse() const { return Response; }
 
   bool isWeak() const { return ReferenceOwnership.isWeak(); }
   bool isUnowned() const { return ReferenceOwnership.isUnowned(); }
@@ -322,7 +328,9 @@ public:
   /// given a particular generic parameter specified by depth/index.
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
+  SWIFT_CC(swift)
   TypeInfo swift_getTypeByMangledNode(
+                               MetadataRequest request,
                                Demangler &demangler,
                                Demangle::NodePointer node,
                                SubstGenericParameterFn substGenericParam,
@@ -334,7 +342,9 @@ public:
   /// given a particular generic parameter specified by depth/index.
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
+  SWIFT_CC(swift)
   TypeInfo swift_getTypeByMangledName(
+                               MetadataRequest request,
                                StringRef typeName,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);

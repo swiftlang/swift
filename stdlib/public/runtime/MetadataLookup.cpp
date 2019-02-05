@@ -1208,18 +1208,30 @@ public:
 
 }
 
+SWIFT_CC(swift)
 static TypeInfo swift_getTypeByMangledNodeImpl(
+                              MetadataRequest request,
                               Demangler &demangler,
                               Demangle::NodePointer node,
                               SubstGenericParameterFn substGenericParam,
                               SubstDependentWitnessTableFn substWitnessTable) {
+  // TODO: propagate the request down to the builder instead of calling
+  // swift_checkMetadataState after the fact.
   DecodedMetadataBuilder builder(demangler, substGenericParam,
                                  substWitnessTable);
   auto type = Demangle::decodeMangledType(builder, node);
-  return {type, builder.getReferenceOwnership()};
+  if (!type) {
+    return {MetadataResponse{nullptr, MetadataState::Complete},
+            TypeReferenceOwnership()};
+  }
+
+  return {swift_checkMetadataState(request, type),
+          builder.getReferenceOwnership()};
 }
 
-TypeInfo swift_getTypeByMangledNameImpl(
+SWIFT_CC(swift)
+static TypeInfo swift_getTypeByMangledNameImpl(
+                              MetadataRequest request,
                               StringRef typeName,
                               SubstGenericParameterFn substGenericParam,
                               SubstDependentWitnessTableFn substWitnessTable) {
@@ -1267,7 +1279,7 @@ TypeInfo swift_getTypeByMangledNameImpl(
       return TypeInfo();
   }
 
-  return swift_getTypeByMangledNode(demangler, node, substGenericParam,
+  return swift_getTypeByMangledNode(request, demangler, node, substGenericParam,
                                     substWitnessTable);
 }
 
@@ -1280,11 +1292,8 @@ swift_getTypeByMangledNameInEnvironment(
                         const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
-  auto metadata = swift_getTypeByMangledName(typeName, substitutions,
-                                             substitutions);
-  if (!metadata) return nullptr;
-
-  return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
+  return swift_getTypeByMangledName(MetadataState::Complete, typeName,
+                                    substitutions, substitutions).getMetadata();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
@@ -1296,11 +1305,8 @@ swift_getTypeByMangledNameInContext(
                         const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(context, genericArgs);
-  auto metadata = swift_getTypeByMangledName(typeName, substitutions,
-                                             substitutions);
-  if (!metadata) return nullptr;
-
-  return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
+  return swift_getTypeByMangledName(MetadataState::Complete, typeName,
+                                    substitutions, substitutions).getMetadata();
 }
 
 /// Demangle a mangled name, but don't allow symbolic references.
@@ -1314,10 +1320,8 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
       return nullptr;
   }
   
-  auto metadata = swift_getTypeByMangledName(typeName, {}, {});
-  if (!metadata) return nullptr;
-
-  return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
+  return swift_getTypeByMangledName(MetadataState::Complete, typeName,
+                                    {}, {}).getMetadata();
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -1637,8 +1641,9 @@ void swift::gatherWrittenGenericArgs(
       SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
                                                           genericParamCounts);
       allGenericArgs[*lhsFlatIndex] =
-          swift_getTypeByMangledName(req.getMangledTypeName(), substitutions,
-                                     substitutions);
+          swift_getTypeByMangledName(MetadataState::Abstract,
+                                     req.getMangledTypeName(), substitutions,
+                                     substitutions).getMetadata();
       continue;
     }
 
