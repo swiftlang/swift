@@ -3232,6 +3232,10 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
         TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
                     instanceType, UDE->getName())
           .highlight(baseExpr->getSourceRange());
+      } else {
+        TC.diagnose(UDE->getLoc(), diag::could_not_use_instance_member_on_type,
+                    instanceType, UDE->getName(), instanceType, false)
+        .highlight(baseExpr->getSourceRange());
       }
       return true;
     }

@@ -497,7 +497,7 @@ class rdar27013358 {
   func returnTwo() -> Int {
     return 2
   }
-  init(defaulted value: Int = defaultValue) {} // expected-error {{cannot use instance member 'defaultValue' as a default parameter}}
+  init(defaulted value: Int = defaultValue) {} // expected-error {{instance member 'defaultValue' cannot be used on type 'rdar27013358'}}
   init(another value: Int = returnTwo()) {} // expected-error {{cannot use instance member 'returnTwo' as a default parameter}}
 }
 
@@ -506,14 +506,14 @@ class rdar27013358G<T> {
   func returnTwo() -> Int {
     return 2
   }
-  init(defaulted value: Int = defaultValue) {} // expected-error {{cannot use instance member 'defaultValue' as a default parameter}}
+  init(defaulted value: Int = defaultValue) {} // expected-error {{instance member 'defaultValue' cannot be used on type 'rdar27013358G<T>}}
   init(another value: Int = returnTwo()) {} // expected-error {{cannot use instance member 'returnTwo' as a default parameter}}
 }
 
 // <rdar://problem/23904262> QoI: ivar default initializer cannot reference other default initialized ivars?
 class r23904262 {
   let x = 1
-  let y = x // expected-error {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
+  let y = x // expected-error {{instance member 'x' cannot be used on type 'r23904262'}}
 }
 
 

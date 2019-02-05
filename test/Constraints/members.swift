@@ -530,7 +530,7 @@ enum B {
 
 class C {
   static func foo() {
-    bar(0)
+    bar(0) // expected-error {{instance member 'bar' cannot be used on type 'C'}}
   }
 
   func bar(_: Int) {}

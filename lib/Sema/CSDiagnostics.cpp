@@ -1673,11 +1673,6 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     
     Diag->highlight(getAnchor()->getSourceRange());
     
-    // No fix-it if the lookup was qualified
-    if (getAnchor() && !getAnchor()->isImplicit()) {
-      return true;
-    }
-    
     // Determine the contextual type of the expression
     Type contextualType;
     for (auto iterateCS = &cs; contextualType.isNull() && iterateCS;
