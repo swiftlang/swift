@@ -251,6 +251,9 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
+  /// Whether to skip keywords with a prefix of underscore such as __consuming.
+  bool SkipUnderscoredKeywords = false;
+
   /// Whether to print decl attributes that are only used internally,
   /// such as _silgen_name, transparent, etc.
   bool PrintUserInaccessibleAttrs = true;
@@ -447,6 +450,7 @@ struct PrintOptions {
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
     result.PrintDocumentationComments = true;
+    result.SkipUnderscoredKeywords = true;
     return result;
   }
 
