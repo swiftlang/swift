@@ -27,12 +27,11 @@
 // RUN: %{python} %S/Inputs/make-old.py %t/modulecache/OtherModule-*.swiftmodule
 //
 //
-// Actual test: Change a byte in OtherModule.swiftinterface, check we only rebuild its cached module.
+// Actual test: Change the mtime of OtherModule.swiftinterface, check we only rebuild its cached module.
 //
 // RUN: %{python} %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
-// RUN: sed -e 's/OtherFunc2/OtterFunc2/' -i.prev %t/OtherModule.swiftinterface
-// RUN: %{python} %S/Inputs/make-old.py %t/OtherModule.swiftinterface
+// RUN: touch %t/OtherModule.swiftinterface
 // RUN: rm %t/TestModule.swiftmodule
 // RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
 // RUN: %{python} %S/Inputs/check-is-new.py %t/modulecache/OtherModule-*.swiftmodule
