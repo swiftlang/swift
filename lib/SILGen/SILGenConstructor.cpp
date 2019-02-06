@@ -908,7 +908,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
 
               return Type(type);
             },
-            MakeAbstractConformanceForGenericType());
+            LookUpConformanceInModule(dc->getParentModule()));
         }
 
         // Get the type of the initialization result, in terms
