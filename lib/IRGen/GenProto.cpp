@@ -1114,7 +1114,7 @@ static llvm::Value *emitWitnessTableAccessorCall(
 
   // Emit the source metadata if we haven't yet.
   if (!*srcMetadataCache) {
-    *srcMetadataCache = IGF.emitTypeMetadataRef(
+    *srcMetadataCache = IGF.emitAbstractTypeMetadataRef(
       conformance->getType()->getCanonicalType());
   }
 
