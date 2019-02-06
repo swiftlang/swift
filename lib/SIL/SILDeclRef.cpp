@@ -444,81 +444,112 @@ bool SILDeclRef::isTransparent() const {
 
 /// True if the function should have its body serialized.
 IsSerialized_t SILDeclRef::isSerialized() const {
-  // Native-to-foreign thunks are only referenced from the Objective-C
-  // method table.
-  if (isForeign)
-    return IsNotSerialized;
-
   DeclContext *dc;
-  if (auto closure = getAbstractClosureExpr())
+  if (auto closure = getAbstractClosureExpr()) {
     dc = closure->getLocalContext();
-  else {
-    auto *d = getDecl();
 
-    // Default argument generators are serialized if the function was
-    // type-checked in Swift 4 mode.
-    if (kind == SILDeclRef::Kind::DefaultArgGenerator) {
-      auto *afd = cast<AbstractFunctionDecl>(d);
-      switch (afd->getDefaultArgumentResilienceExpansion()) {
-      case ResilienceExpansion::Minimal:
-        return IsSerialized;
-      case ResilienceExpansion::Maximal:
-        return IsNotSerialized;
-      }
-    }
-
-    // 'read' and 'modify' accessors synthesized on-demand are serialized if
-    // visible outside the module.
-    if (auto fn = dyn_cast<FuncDecl>(d))
-      if (!isClangImported() &&
-          fn->hasForcedStaticDispatch() &&
-          fn->getEffectiveAccess() >= AccessLevel::Public)
-        return IsSerialized;
-
-    dc = getDecl()->getInnermostDeclContext();
-
-    // Enum element constructors are serialized if the enum is
-    // @usableFromInline or public.
-    if (isEnumElement())
-      if (d->getEffectiveAccess() >= AccessLevel::Public)
-        return IsSerialized;
-
-    // Currying thunks are serialized if referenced from an inlinable
-    // context -- Sema's semantic checks ensure the serialization of
-    // such a thunk is valid, since it must in turn reference a public
-    // symbol, or dispatch via class_method or witness_method.
-    if (isCurried)
-      if (d->getEffectiveAccess() >= AccessLevel::Public)
+    // Otherwise, ask the AST if we're inside an @inlinable context.
+    if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      if (isForeign)
         return IsSerializable;
 
-    if (isForeignToNativeThunk())
-      return IsSerializable;
-
-    // The allocating entry point for designated initializers are serialized
-    // if the class is @usableFromInline or public.
-    if (kind == SILDeclRef::Kind::Allocator) {
-      auto *ctor = cast<ConstructorDecl>(d);
-      if (ctor->isDesignatedInit() &&
-          ctor->getDeclContext()->getSelfClassDecl()) {
-        if (ctor->getEffectiveAccess() >= AccessLevel::Public &&
-            !ctor->hasClangNode())
-          return IsSerialized;
-      }
-    }
-
-    // Stored property initializers are inlinable if the type is explicitly
-    // marked as @_fixed_layout.
-    if (isStoredPropertyInitializer()) {
-      auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
-      auto scope =
-        nominal->getFormalAccessScope(/*useDC=*/nullptr,
-                                      /*treatUsableFromInlineAsPublic=*/true);
-      if (!scope.isPublic())
-        return IsNotSerialized;
-      if (nominal->isFormallyResilient())
-        return IsNotSerialized;
       return IsSerialized;
     }
+
+    return IsNotSerialized;
+  }
+
+  if (isIVarInitializerOrDestroyer())
+    return IsNotSerialized;
+
+  auto *d = getDecl();
+
+  // Default argument generators are serialized if the function was
+  // type-checked in Swift 4 mode.
+  if (isDefaultArgGenerator()) {
+    auto *afd = cast<AbstractFunctionDecl>(d);
+    switch (afd->getDefaultArgumentResilienceExpansion()) {
+    case ResilienceExpansion::Minimal:
+      return IsSerialized;
+    case ResilienceExpansion::Maximal:
+      return IsNotSerialized;
+    }
+  }
+
+  // Stored property initializers are inlinable if the type is explicitly
+  // marked as @_fixed_layout.
+  if (isStoredPropertyInitializer()) {
+    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
+    auto scope =
+      nominal->getFormalAccessScope(/*useDC=*/nullptr,
+                                    /*treatUsableFromInlineAsPublic=*/true);
+    if (!scope.isPublic())
+      return IsNotSerialized;
+    if (nominal->isFormallyResilient())
+      return IsNotSerialized;
+    return IsSerialized;
+  }
+
+  // Note: if 'd' is a function, then 'dc' is the function itself, not
+  // its parent context.
+  dc = d->getInnermostDeclContext();
+
+  // Local functions are serializable if their parent function is
+  // serializable.
+  if (d->getDeclContext()->isLocalContext()) {
+    if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
+      return IsSerializable;
+
+    return IsNotSerialized;
+  }
+
+  // Anything else that is not public is not serializable.
+  if (d->getEffectiveAccess() < AccessLevel::Public)
+    return IsNotSerialized;
+
+  // 'read' and 'modify' accessors synthesized on-demand are serialized if
+  // visible outside the module.
+  if (auto fn = dyn_cast<FuncDecl>(d))
+    if (!isClangImported() &&
+        fn->hasForcedStaticDispatch())
+      return IsSerialized;
+
+  // Enum element constructors are serializable if the enum is
+  // @usableFromInline or public.
+  if (isEnumElement())
+    return IsSerializable;
+
+  // Currying thunks are serialized if referenced from an inlinable
+  // context -- Sema's semantic checks ensure the serialization of
+  // such a thunk is valid, since it must in turn reference a public
+  // symbol, or dispatch via class_method or witness_method.
+  if (isCurried)
+    return IsSerializable;
+
+  if (isForeignToNativeThunk())
+    return IsSerializable;
+
+  // The allocating entry point for designated initializers are serialized
+  // if the class is @usableFromInline or public.
+  if (kind == SILDeclRef::Kind::Allocator) {
+    auto *ctor = cast<ConstructorDecl>(d);
+    if (ctor->isDesignatedInit() &&
+        ctor->getDeclContext()->getSelfClassDecl()) {
+      if (!ctor->hasClangNode())
+        return IsSerialized;
+    }
+  }
+
+  if (isForeign) {
+    // @objc thunks for methods are not serializable since they're only
+    // referenced from the method table.
+    if (d->getDeclContext()->isTypeContext())
+      return IsNotSerialized;
+
+    // @objc thunks for top-level functions are serializable since they're
+    // referenced from @convention(c) conversions inside inlinable
+    // functions.
+    return IsSerializable;
   }
 
   // Declarations imported from Clang modules are serialized if

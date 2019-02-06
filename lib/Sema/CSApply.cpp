@@ -1999,18 +1999,14 @@ namespace {
                         { tc.Context.Id_booleanLiteral });
       DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinBooleanLiteral });
-      return convertLiteral(
+      return convertLiteralInPlace(
                expr,
                type,
-               cs.getType(expr),
                protocol,
                tc.Context.Id_BooleanLiteralType,
                initName,
                builtinProtocol,
-               Type(BuiltinIntegerType::get(BuiltinIntegerWidth::fixed(1), 
-                                            tc.Context)),
                builtinInitName,
-               nullptr,
                diag::boolean_literal_broken_proto,
                diag::builtin_boolean_literal_broken_proto);
     }
@@ -7053,6 +7049,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     // Set the builtin initializer.
     if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
       stringLiteral->setBuiltinInitializer(witness);
+    else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
+      booleanLiteral->setBuiltinInitializer(witness);
     else {
       cast<MagicIdentifierLiteralExpr>(literal)
         ->setBuiltinInitializer(witness);
@@ -7100,6 +7098,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     nilLiteral->setInitializer(witness);
   else if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
     stringLiteral->setInitializer(witness);
+  else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
+    booleanLiteral->setInitializer(witness);
   else
     cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(witness);
 

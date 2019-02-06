@@ -4384,6 +4384,24 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
   }
 }
 
+void ProtocolDecl::computeKnownProtocolKind() const {
+  auto module = getModuleContext();
+  if (module != module->getASTContext().getStdlibModule() &&
+      !module->getName().is("Foundation")) {
+    const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
+    return;
+  }
+
+  unsigned value =
+    llvm::StringSwitch<unsigned>(getBaseName().userFacingName())
+#define PROTOCOL_WITH_NAME(Id, Name) \
+      .Case(Name, static_cast<unsigned>(KnownProtocolKind::Id) + 2)
+#include "swift/AST/KnownProtocols.def"
+      .Default(1);
+
+  const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = value;
+}
+
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
   setFieldsFromImplInfo(implInfo);
   Accessors.getPointer()->overwriteImplInfo(implInfo);

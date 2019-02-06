@@ -106,15 +106,15 @@ Warning: Creating the above links usually requires adminstrator privileges. The 
 - This must be done from within a developer command prompt. CMark is a fairly
   small project and should only take a few minutes to build.
 ```cmd
-mkdir "S:\build\Ninja-DebugAssert\cmark-windows-amd64"
-pushd "S:\build\Ninja-DebugAssert\cmark-windows-amd64"
+mkdir "S:\build\Ninja-RelWithDebInfoAssert\cmark-windows-amd64"
+pushd "S:\build\Ninja-RelWithDebInfoAssert\cmark-windows-amd64"
 cmake -G Ninja^
-  -DCMAKE_BUILD_TYPE=Debug^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DCMAKE_C_COMPILER=cl^
   -DCMAKE_CXX_COMPILER=cl^
   S:/cmark
 popd
-cmake --build "S:\build\Ninja-DebugAssert\cmark-windows-amd64"
+cmake --build "S:\build\Ninja-RelWithDebInfoAssert\cmark-windows-amd64"
 ```
 
 ### 6. Build LLVM/Clang
@@ -123,25 +123,26 @@ cmake --build "S:\build\Ninja-DebugAssert\cmark-windows-amd64"
   type (e.g. `Debug`, `Release`, `RelWithDebInfoAssert`) for LLVM/Clang matches the
   build type for Swift.
 ```cmd
-mkdir "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
-pushd "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
+mkdir "S:\build\Ninja-RelWithDebInfoAssert\llvm-windows-amd64"
+pushd "S:\build\Ninja-RelWithDebInfoAssert\llvm-windows-amd64"
 cmake -G Ninja^
- -DCMAKE_BUILD_TYPE=Debug^
+ -DCMAKE_BUILD_TYPE=Release^
  -DCMAKE_C_COMPILER=cl^
  -DCMAKE_CXX_COMPILER=cl^
  -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
  -DLLVM_ENABLE_ASSERTIONS=ON^
+ -DLLVM_ENABLE_PDB=YES^
  -DLLVM_ENABLE_PROJECTS=clang^
  -DLLVM_TARGETS_TO_BUILD=X86^
  S:/llvm
 popd
-cmake --build "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
+cmake --build "S:\build\Ninja-RelWithDebInfoAssert\llvm-windows-amd64"
 ```
 
 - Update your path to include the LLVM tools.
 
 ```cmd
-PATH S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin;%PATH%
+PATH S:\build\Ninja-RelWithDebInfoAssert\llvm-windows-amd64\bin;%PATH%
 ```
 
 ### 7. Build Swift
@@ -150,10 +151,10 @@ PATH S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin;%PATH%
 - You may need to adjust the `SWIFT_WINDOWS_LIB_DIRECTORY` parameter depending on
   your target platform or Windows SDK version.
 ```cmd
-mkdir "S:\build\Ninja-DebugAssert\swift-windows-amd64"
-pushd "S:\build\Ninja-DebugAssert\swift-windows-amd64"
+mkdir "S:\build\Ninja-RelWithDebInfoAssert\swift-windows-amd64"
+pushd "S:\build\Ninja-RelWithDebInfoAssert\swift-windows-amd64"
 cmake -G Ninja^
- -DCMAKE_BUILD_TYPE=Debug^
+ -DCMAKE_BUILD_TYPE=RelWithDebInfo^
  -DCMAKE_C_COMPILER=clang-cl^
  -DCMAKE_CXX_COMPILER=clang-cl^
  -DCMAKE_CXX_FLAGS:STRING="-Wno-c++98-compat -Wno-c++98-compat-pedantic"^
@@ -161,11 +162,11 @@ cmake -G Ninja^
  -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
  -DSWIFT_INCLUDE_DOCS=OFF^
  -DSWIFT_PATH_TO_CMARK_SOURCE="S:\cmark"^
- -DSWIFT_PATH_TO_CMARK_BUILD="S:\build\Ninja-DebugAssert\cmark-windows-amd64"^
+ -DSWIFT_PATH_TO_CMARK_BUILD="S:\build\Ninja-RelWithDebInfoAssert\cmark-windows-amd64"^
  -DSWIFT_PATH_TO_LLVM_SOURCE="S:\llvm"^
- -DSWIFT_PATH_TO_LLVM_BUILD="S:\build\Ninja-DebugAssert\llvm-windows-amd64"^
+ -DSWIFT_PATH_TO_LLVM_BUILD="S:\build\Ninja-RelWithDebInfoAssert\llvm-windows-amd64"^
  -DSWIFT_PATH_TO_CLANG_SOURCE="S:\clang"^
- -DSWIFT_PATH_TO_CLANG_BUILD="S:\build\Ninja-DebugAssert\llvm-windows-amd64"^
+ -DSWIFT_PATH_TO_CLANG_BUILD="S:\build\Ninja-RelWithDebInfoAssert\llvm-windows-amd64"^
  -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:\icu\include"^
  -DSWIFT_WINDOWS_x86_64_ICU_UC="S:\icu\lib64\icuuc.lib"^
@@ -174,7 +175,7 @@ cmake -G Ninja^
  -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr"^
  S:/swift
 popd
-cmake --build "S:\build\Ninja-DebugAssert\swift-windows-amd64"
+cmake --build "S:\build\Ninja-RelWithDebInfoAssert\swift-windows-amd64"
 ```
 
 - To create a Visual Studio project, you'll need to change the generator and,
@@ -192,23 +193,23 @@ cmake -G "Visual Studio 2017" -A x64 -T "host=x64"^ ...
 - This must be done from within a developer command prompt and could take hours
   depending on your system.
 ```cmd
-mkdir "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
-pushd "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
-cmake -G Ninja
-  -DCMAKE_BUILD_TYPE=Debug^
+mkdir "S:/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
+pushd "S:/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
+cmake -G Ninja^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DLLDB_ALLOW_STATIC_BINDINGS=YES^
   -DLLDB_PATH_TO_LLVM_SOURCE="S:/llvm"^
   -DLLDB_PATH_TO_CLANG_SOURCE="S:/clang"^
   -DLLDB_PATH_TO_SWIFT_SOURCE="S:/swift"^
-  -DLLDB_PATH_TO_CMARK_BUILD="S:/build/Ninja-DebugAssert/cmark-windows-amd64"^
-  -DLLDB_PATH_TO_CLANG_BUILD="S:/build/Ninja-DebugAssert/llvm-windows-amd64"^
-  -DLLDB_PATH_TO_LLVM_BUILD="S:/build/Ninja-DebugAssert/llvm-windows-amd64"^
-  -DLLDB_PATH_TO_SWIFT_BUILD="S:/build/Ninja-DebugAssert/swift-windows-amd64"^
+  -DLLDB_PATH_TO_CMARK_BUILD="S:/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"^
+  -DLLDB_PATH_TO_CLANG_BUILD="S:/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
+  -DLLDB_PATH_TO_LLVM_BUILD="S:/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
+  -DLLDB_PATH_TO_SWIFT_BUILD="S:/build/Ninja-RelWithDebInfoAssert/swift-windows-amd64"^
   -DLLVM_ENABLE_ASSERTIONS=ON^
   -DPYTHON_HOME=%ProgramFiles(x86)%\Microsoft Visual Studio\Shared\Python37_64^
   S:/lldb
 popd
-cmake --build "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
+cmake --build "S:/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
 ```
 
 ### 9. Running tests on Windows
@@ -222,21 +223,21 @@ Running the testsuite on Windows has additional external dependencies.  You must
   5. sed
   
 ```cmd
-set PATH=S:\build\Ninja-DebugAssert\swift-windows-amd64\bin;S:\build\Ninja-DebugAssert\swift-windows-amd64\libdispatch-prefix\bin;%PATH%;C:\Program Files (x86)\GnuWin32\bin
-ninja -C "S:/build/Ninja-DebugAssert/swift-windows-amd64" check-swift
+set PATH=S:\build\Ninja-RelWithDebInfoAssert\swift-windows-amd64\bin;S:\build\Ninja-RelWithDebInfoAssert\swift-windows-amd64\libdispatch-prefix\bin;%PATH%;C:\Program Files (x86)\GnuWin32\bin
+ninja -C "S:/build/Ninja-RelWithDebInfoAssert/swift-windows-amd64" check-swift
 ```
 
 ### 10. Build swift-corelibs-libdispatch
 
 ```cmd
-mkdir "S:/build/Ninja-DebugAssert/swift-corelibs-libdispatch-windows-amd64"
-pushd "S:/build/Ninja-DebugAssert/swift-corelibs-libdispatch-windows-amd64"
+mkdir "S:/build/Ninja-RelWithDebInfoAssert/swift-corelibs-libdispatch-windows-amd64"
+pushd "S:/build/Ninja-RelWithDebInfoAssert/swift-corelibs-libdispatch-windows-amd64"
 cmake -G Ninja^
-  -DCMAKE_BUILD_TYPE=Debug^
-  -DCMAKE_C_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/bin/clang-cl.exe"^
-  -DCMAKE_CXX_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/bin/clang-cl.exe"^
-  -DCMAKE_SWIFT_COMPILER="S:/build/Ninja-DebugAssert/swift-windows-amd64/bin/swiftc.exe"^
-  -DSwift_DIR="S:/build/Ninja-DebugAssert/swift-windows-amd64/lib/cmake/swift"^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DCMAKE_C_COMPILER="S:/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64/bin/clang-cl.exe"^
+  -DCMAKE_CXX_COMPILER="S:/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64/bin/clang-cl.exe"^
+  -DCMAKE_SWIFT_COMPILER="S:/build/Ninja-RelWithDebInfoAssert/swift-windows-amd64/bin/swiftc.exe"^
+  -DSwift_DIR="S:/build/Ninja-RelWithDebInfoAssert/swift-windows-amd64/lib/cmake/swift"^
   -DENABLE_SWIFT=ON^
   -DENABLE_TESTING=OFF^
   S:/swift-corelibs-libdispatch
@@ -252,21 +253,21 @@ To build Foundation you will need builds of:
 - `libcurl` (https://curl.haxx.se, download the source, `cd` into `winbuild`, and run `nmake /f Makefile.vc mode=static VC=15 MACHINE=x64`)
 
 ```cmd
-mkdir "S:/build/Ninja-DebugAssert/swift-corelibs-foundation-windows-amd64"
-pushd "S:/build/Ninja-DebugAssert/swift-corelibs-foundation-windows-amd64"
+mkdir "S:/build/Ninja-RelWithDebInfoAsset/swift-corelibs-foundation-windows-amd64"
+pushd "S:/build/Ninja-RelWithDebInfoAssert/swift-corelibs-foundation-windows-amd64"
 cmake -G Ninja^
-  -DCMAKE_BUILD_TYPE=Debug^
-  -DCMAKE_C_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/bin/clang-cl.exe"^
-  -DCMAKE_SWIFT_COMPILER="S:/build/Ninja-DebugAssert/swift-windows-amd64/bin/swiftc.exe"^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DCMAKE_C_COMPILER="S:/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64/bin/clang-cl.exe"^
+  -DCMAKE_SWIFT_COMPILER="S:/build/Ninja-RelWithDebInfoAssert/swift-windows-amd64/bin/swiftc.exe"^
   -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
   -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
   -DICU_ROOT="S:/thirdparty/icu4c-63_1-Win64-MSVC2017"^
   -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE="S:/swift-corelibs-libdispatch"^
-  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD="S:/build/Ninja-DebugAssert/swift-corelibs-libdispatch-windows-amd64"^
+  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD="S:/build/Ninja-RelWithDebInfoAssert/swift-corelibs-libdispatch-windows-amd64"^
    S:/swift-corelibs-foundation
- cmake --build "S:/build/Ninja-DebugAssert/swift-corelibs-foundation-windows-amd64"
+ cmake --build "S:/build/Ninja-RelWithDebInfoAssert/swift-corelibs-foundation-windows-amd64"
 
 ```
 
@@ -275,7 +276,7 @@ cmake -G Ninja^
 - Run ninja install:
 
 ```cmd 
-ninja -C "S:/build/Ninja-DebugAssert/swift-windows-amd64" install
+ninja -C "S:/build/Ninja-RelWithDebInfoAssert/swift-windows-amd64" install
 ```
 
 - Add the Swift on Windows binaries path (`C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin`)  to the `PATH` environment variable.

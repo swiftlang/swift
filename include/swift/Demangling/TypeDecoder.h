@@ -301,7 +301,7 @@ class TypeDecoder {
       if (!decodeMangledTypeDecl(Node, typeDecl, parent, typeAlias))
         return BuiltType();
 
-      if (typeAlias && Node->getKind() == NodeKind::TypeAlias)
+      if (typeAlias)
         return Builder.createTypeAliasType(typeDecl, parent);
 
       return Builder.createNominalType(typeDecl, parent);

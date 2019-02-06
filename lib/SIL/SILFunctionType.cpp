@@ -98,25 +98,8 @@ CanType SILFunctionType::getSelfInstanceType() const {
   return selfTy;
 }
 
-ProtocolDecl *
-SILFunctionType::getDefaultWitnessMethodProtocol() const {
-  assert(getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod);
-  auto selfTy = getSelfInstanceType();
-  if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
-    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
-    auto superclass = GenericSig->getSuperclassBound(paramTy);
-    if (superclass)
-      return nullptr;
-    auto protos = GenericSig->getConformsTo(paramTy);
-    assert(protos.size() == 1);
-    return protos[0];
-  }
-
-  return nullptr;
-}
-
 ClassDecl *
-SILFunctionType::getWitnessMethodClass(ModuleDecl &M) const {
+SILFunctionType::getWitnessMethodClass() const {
   auto selfTy = getSelfInstanceType();
   auto genericSig = getGenericSignature();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {

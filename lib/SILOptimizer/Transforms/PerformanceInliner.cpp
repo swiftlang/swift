@@ -40,8 +40,8 @@ llvm::cl::opt<bool> EnableSILInliningOfGenerics(
   llvm::cl::desc("Enable inlining of generics"));
 
 llvm::cl::opt<bool>
-    EnableSILAgressiveInlining("sil-agressive-inline", llvm::cl::init(false),
-                               llvm::cl::desc("Enable agressive inlining"));
+    EnableSILAggressiveInlining("sil-aggressive-inline", llvm::cl::init(false),
+                               llvm::cl::desc("Enable aggressive inlining"));
 
 //===----------------------------------------------------------------------===//
 //                           Performance Inliner
@@ -327,7 +327,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   // if AllAccessesBeneficialToInline is true
   int ExclusivityBenefitWeight = 0;
   int ExclusivityBenefitBase = ExclusivityBenefit;
-  if (EnableSILAgressiveInlining) {
+  if (EnableSILAggressiveInlining) {
     ExclusivityBenefitBase += 500;
   }
 
