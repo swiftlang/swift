@@ -606,20 +606,12 @@ SILGenModule::getOrCreateProfilerForConstructors(DeclContext *ctx,
   return profiler;
 }
 
-SILFunction *SILGenModule::getFunction(SILDeclRef constant,
-                                       ForDefinition_t forDefinition) {
-  // If we already emitted the function, return it (potentially preparing it
-  // for definition).
-  if (auto emitted = getEmittedFunction(constant, forDefinition))
-    return emitted;
+/// Set up the function for profiling instrumentation.
+static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
+                              ForDefinition_t forDefinition) {
+  if (!forDefinition)
+    return;
 
-  // Note: Do not provide any SILLocation. You can set it afterwards.
-  SILGenFunctionBuilder builder(*this);
-  auto *F = builder.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
-                                                           : (Decl *)nullptr,
-                                        constant, forDefinition);
-
-  // Set up the function for profiling instrumentation.
   ASTNode profiledNode;
   if (!haveProfiledAssociatedFunction(constant)) {
     if (constant.hasDecl()) {
@@ -637,6 +629,23 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     if (SILProfiler *SP = F->getProfiler())
       F->setEntryCount(SP->getExecutionCount(profiledNode));
   }
+}
+
+SILFunction *SILGenModule::getFunction(SILDeclRef constant,
+                                       ForDefinition_t forDefinition) {
+  // If we already emitted the function, return it (potentially preparing it
+  // for definition).
+  if (auto emitted = getEmittedFunction(constant, forDefinition)) {
+    setUpForProfiling(constant, emitted, forDefinition);
+    return emitted;
+  }
+
+  // Note: Do not provide any SILLocation. You can set it afterwards.
+  SILGenFunctionBuilder builder(*this);
+  auto *F = builder.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
+                                                           : (Decl *)nullptr,
+                                        constant, forDefinition);
+  setUpForProfiling(constant, F, forDefinition);
 
   assert(F && "SILFunction should have been defined");
 
