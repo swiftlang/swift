@@ -123,6 +123,7 @@ KNOWN_SETTINGS=(
     skip-build-android          ""               "set to skip building Swift stdlibs for Android"
     skip-build-lldb             ""               "set to skip building LLDB"
     skip-build-llbuild          ""               "set to skip building llbuild"
+    skip-build-libcxx           ""               "set to skip building libcxx"
     skip-build-swiftpm          ""               "set to skip building swiftpm"
     skip-build-swiftsyntax      ""               "set to skip building swiftSyntax"
     skip-build-skstresstester   ""               "set to skip building the SourceKit stress tester"
@@ -199,6 +200,7 @@ KNOWN_SETTINGS=(
     install-skstresstester      ""               "whether to install the SourceKit stress tester"
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
+    install-libcxx              ""               "whether to install libc++"
     install-libdispatch         ""               "whether to install libdispatch"
     install-libicu              ""               "whether to install libicu"
     install-playgroundsupport   ""               "whether to install PlaygroundSupport"
@@ -255,6 +257,7 @@ KNOWN_SETTINGS=(
     swiftpm-cmake-options              ""        "CMake options used for all swiftpm targets"
     xctest-cmake-options               ""        "CMake options used for all xctest targets"
     playgroundsupport-cmake-options    ""        "CMake options used for all playgroundsupport targets"
+    libcxx-cmake-options               ""        "CMake options used for all libcxx targets"
     # TODO: Remove this some time later.
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
@@ -1180,6 +1183,7 @@ XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
+LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
@@ -1212,12 +1216,6 @@ if [ -e "${WORKSPACE}/compiler-rt" ] ; then
     if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
         make_relative_symlink "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
     fi
-fi
-
-# Build libcxx, unless it doesn't exist.
-LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
-if [[ ! -e "${LIBCXX_SOURCE_DIR}" ]] ; then
-  SKIP_BUILD_LIBCXX=1
 fi
 
 PRODUCTS=(cmark llvm)
@@ -3446,6 +3444,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/;/ install-/g')
                 ;;
             libcxx)
+                if [[ -z "${INSTALL_LIBCXX}" ]] ; then
+                    continue
+                fi
                 INSTALL_TARGETS=install-cxx-headers
                 ;;
             swift)

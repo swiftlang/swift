@@ -142,6 +142,7 @@ def _apply_default_arguments(args):
         args.build_external_benchmarks = False
         args.build_lldb = False
         args.build_llbuild = False
+        args.build_libcxx = False
         args.build_swiftpm = False
         args.build_xctest = False
         args.build_foundation = False
@@ -511,6 +512,9 @@ def create_argument_parser():
 
     option(['-b', '--llbuild'], store_true('build_llbuild'),
            help='build llbuild')
+
+    option(['--libcxx'], store_true('build_libcxx'),
+           help='build libcxx')
 
     option(['-p', '--swiftpm'], store_true('build_swiftpm'),
            help='build swiftpm')
