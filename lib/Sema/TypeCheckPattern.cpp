@@ -773,13 +773,6 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
     }
   }
 
-  // If this parameter declaration is marked as `@autoclosure`
-  // let's make sure that its parameter type is indeed a function,
-  // this decision couldn't be made based on type representative
-  // alone because it may be later resolved into an invalid type.
-  if (decl->isAutoClosure())
-    hadError |= !(Ty && Ty->is<FunctionType>());
-
   if (hadError)
     TL.setInvalidType(TC.Context);
 
