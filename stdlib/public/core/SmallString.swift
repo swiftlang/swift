@@ -261,6 +261,11 @@ extension _SmallString {
   // Direct from UTF-8
   @inlinable @inline(__always)
   internal init?(_ input: UnsafeBufferPointer<UInt8>) {
+    if input.isEmpty {
+      self.init()
+      return
+    }
+
     let count = input.count
     guard count <= _SmallString.capacity else { return nil }
 
