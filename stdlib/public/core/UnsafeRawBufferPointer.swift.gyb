@@ -185,13 +185,13 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
     get {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
-      return _position!.load(fromByteOffset: i, as: UInt8.self)
+      return _position._unsafelyUnwrappedUnchecked.load(fromByteOffset: i, as: UInt8.self)
     }
 %  if mutable:
     nonmutating set {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
-      _position!.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
+      _position._unsafelyUnwrappedUnchecked.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
     }
 %  end # mutable
   }
