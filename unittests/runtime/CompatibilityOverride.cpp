@@ -41,13 +41,13 @@ namespace  {
   }
 }
 
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
-  static ret name ## Override(COMPATIBILITY_UNPAREN typedArgs,      \
-                          Original_ ## name originalImpl) {         \
-    if (!EnableOverride)                                            \
-      return originalImpl namedArgs;                                \
-    Ran = true;                                                     \
-    return getEmptyValue<ret>();                                    \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
+  static ccAttrs ret name ## Override(COMPATIBILITY_UNPAREN typedArgs,       \
+                                       Original_ ## name originalImpl) {     \
+    if (!EnableOverride)                                                     \
+      return originalImpl namedArgs;                                         \
+    Ran = true;                                                              \
+    return getEmptyValue<ret>();                                             \
   }
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 
@@ -55,14 +55,14 @@ namespace  {
 struct OverrideSection {
   uintptr_t version;
   
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
 
 OverrideSection Overrides __attribute__((section("__DATA,__swift_hooks"))) = {
   0,
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   name ## Override,
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
@@ -175,14 +175,15 @@ TEST_F(CompatibilityOverrideTest, test_swift_conformsToSwiftProtocol) {
 
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledNode) {
   Demangler demangler;
-  auto Result = swift_getTypeByMangledNode(demangler, nullptr, nullptr,
-                                           nullptr);
-  ASSERT_EQ((const Metadata *)Result, nullptr);
+  auto Result = swift_getTypeByMangledNode(MetadataState::Abstract,
+                                           demangler, nullptr, nullptr,nullptr);
+  ASSERT_EQ(Result.getMetadata(), nullptr);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledName) {
-  auto Result = swift_getTypeByMangledName("", nullptr, nullptr);
-  ASSERT_EQ((const Metadata *)Result, nullptr);
+  auto Result = swift_getTypeByMangledName(MetadataState::Abstract,
+                                           "", nullptr, nullptr);
+  ASSERT_EQ(Result.getMetadata(), nullptr);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getAssociatedTypeWitnessSlow) {
