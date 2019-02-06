@@ -201,6 +201,8 @@ cmake -G Ninja^
   -DLLDB_PATH_TO_LLVM_SOURCE="S:/llvm"^
   -DLLDB_PATH_TO_CLANG_SOURCE="S:/clang"^
   -DLLDB_PATH_TO_SWIFT_SOURCE="S:/swift"^
+  -DCMAKE_C_COMPILER="S:/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64/bin/clang-cl.exe"^
+  -DCMAKE_CXX_COMPILER="S:/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64/bin/clang-cl.exe"^
   -DLLDB_PATH_TO_CMARK_BUILD="S:/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"^
   -DLLDB_PATH_TO_CLANG_BUILD="S:/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
   -DLLDB_PATH_TO_LLVM_BUILD="S:/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
