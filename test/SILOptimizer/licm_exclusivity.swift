@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -whole-module-optimization %s | %FileCheck %s --check-prefix=TESTSIL2
 
 // REQUIRES: optimized_stdlib,asserts
+// REQUIRES: PTRSIZE=64
 
 // TEST1-LABEL: Processing loops in {{.*}}run_ReversedArray{{.*}}
 // TEST1: Hoist and Sink pairs attempt
