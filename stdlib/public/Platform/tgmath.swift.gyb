@@ -91,6 +91,42 @@ public func ldexp(_ x: ${T}, _ n : Int) -> ${T} {
 
 %end
 
+// SWIFT_ENABLE_TENSORFLOW
+%for T in ['Float', 'Double', 'Float80']:
+%   if T == 'Float80':
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
+%   end
+@usableFromInline
+func _vjpExp(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  let value = exp(x)
+  return (value, { v in value * v })
+}
+
+@usableFromInline
+func _vjpLog(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (log(x), { v in v / x })
+}
+
+@usableFromInline
+func _vjpSin(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (sin(x), { v in v * cos(x) })
+}
+
+@usableFromInline
+func _vjpCos(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (cos(x), { v in -v * sin(x) })
+}
+
+@usableFromInline
+func _vjpTan(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  let value = tan(x)
+  return (value, { v in v * (1 + value * value) })
+}
+%   if T == 'Float80':
+#endif
+%   end
+%end
+
 //  Floating-point properties that are exposed as functions in the C math
 //  library. Mark those function names unavailable and direct users to the
 //  properties instead.
@@ -180,8 +216,11 @@ OtherFunctions = [
     'scalbn', 'lgamma', 'remquo', 'nan', 'jn', 'yn'
 ]
 
+# SWIFT_ENABLE_TENSORFLOW
 # These functions are imported correctly as-is.
 OkayFunctions = ['j0', 'j1', 'y0', 'y1']
+
+HasVJP = ["exp", "log", "tan", "cos", "sin"]
 
 # These functions are not supported for various reasons.
 UnhandledFunctions = [
@@ -225,6 +264,10 @@ def TypedBinaryFunctions():
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
 @_transparent
+// SWIFT_ENABLE_TENSORFLOW
+%   if ufunc in HasVJP:
+@differentiable(vjp: _vjp${ufunc.capitalize()}(_:))
+%   end
 public func ${ufunc}(_ x: ${T}) -> ${T} {
   return ${T}(${ufunc}${f}(${CT}(x)))
 }
@@ -242,6 +285,10 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
 @_transparent
+// SWIFT_ENABLE_TENSORFLOW
+%   if ufunc in HasVJP:
+@differentiable(vjp: _vjp${ufunc.capitalize()}(_:))
+%   end
 public func ${ufunc}(_ x: ${T}) -> ${T} {
   return _${ufunc}(x)
 }
@@ -261,6 +308,10 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 %   end
 @_transparent
+// SWIFT_ENABLE_TENSORFLOW
+%   if ufunc in HasVJP:
+@differentiable(vjp: _vjp${ufunc.capitalize()}(_:))
+%   end
 public func ${ufunc}(_ x: ${T}) -> ${T} {
   return ${T}(${ufunc}${f}(${CT}(x)))
 }
