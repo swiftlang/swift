@@ -227,51 +227,25 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   return member->getAccessSemanticsFromContext(DC, isAccessOnSelf);
 }
 
-/// This effectively duplicates logic of `Expr::isTypeReference` with
-/// one significant difference - support for `UnresolvedDotExpr` and
-/// `UnresolvedMemberExpr`. This method could be used on not yet
-/// fully type-checked AST.
+/// This extends functionality of `Expr::isTypeReference` with
+/// support for `UnresolvedDotExpr` and `UnresolvedMemberExpr`.
+/// This method could be used on not yet fully type-checked AST.
 bool ConstraintSystem::isTypeReference(const Expr *E) {
-  // If the result isn't a metatype, there's nothing else to do.
-  if (!getType(E)->is<AnyMetatypeType>())
-    return false;
+  return E->isTypeReference(
+      [&](const Expr *E) -> Type { return getType(E); },
+      [&](const Expr *E) -> Decl * {
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+          return findResolvedMemberRef(
+              getConstraintLocator(UDE, ConstraintLocator::Member));
+        }
 
-  Expr *expr = const_cast<Expr *>(E);
-  do {
-    // Skip syntax.
-    expr = expr->getSemanticsProvidingExpr();
+        if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
+          return findResolvedMemberRef(
+              getConstraintLocator(UME, ConstraintLocator::UnresolvedMember));
+        }
 
-    // Direct reference to a type.
-    if (auto declRef = dyn_cast<DeclRefExpr>(expr))
-      if (isa<TypeDecl>(declRef->getDecl()))
-        return true;
-
-    if (isa<TypeExpr>(expr))
-      return true;
-
-    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-      return isa<TypeDecl>(findResolvedMemberRef(
-          getConstraintLocator(UDE, ConstraintLocator::Member)));
-    }
-
-    if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr)) {
-      return isa<TypeDecl>(findResolvedMemberRef(
-          getConstraintLocator(UME, ConstraintLocator::UnresolvedMember)));
-    }
-
-    // A "." expression that refers to a member.
-    if (auto memberRef = dyn_cast<MemberRefExpr>(expr))
-      return isa<TypeDecl>(memberRef->getMember().getDecl());
-
-    // When the base of a "." expression is ignored, look at the member.
-    if (auto ignoredDot = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr)) {
-      expr = ignoredDot->getRHS();
-      continue;
-    }
-
-    // Anything else is not statically derived.
-    return false;
-  } while (true);
+        return nullptr;
+      });
 }
 
 bool ConstraintSystem::isStaticallyDerivedMetatype(const Expr *E) {
