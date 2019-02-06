@@ -599,6 +599,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-lldb"]
         if not args.build_llbuild:
             impl_args += ["--skip-build-llbuild"]
+        if not args.build_libcxx:
+            impl_args += ["--skip-build-libcxx"]
         if not args.build_libdispatch:
             impl_args += ["--skip-build-libdispatch"]
         if not args.build_libicu:
@@ -841,7 +843,8 @@ class BuildScriptInvocation(object):
         product_classes = []
         product_classes.append(products.CMark)
         product_classes.append(products.LLVM)
-        product_classes.append(products.LibCXX)
+        if self.args.build_libcxx:
+            product_classes.append(products.LibCXX)
         if self.args.build_libicu:
             product_classes.append(products.LibICU)
         product_classes.append(products.Swift)
