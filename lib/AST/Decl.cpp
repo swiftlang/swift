@@ -3383,9 +3383,11 @@ TypeLoc &AssociatedTypeDecl::getDefaultDefinitionLoc() {
 
 SourceRange AssociatedTypeDecl::getSourceRange() const {
   SourceLoc endLoc;
-  if (auto TWC = getTrailingWhereClause())
+  if (auto TWC = getTrailingWhereClause()) {
     endLoc = TWC->getSourceRange().End;
-  else if (!getInherited().empty()) {
+  } else if (getDefaultDefinitionLoc().hasLocation()) {
+    endLoc = getDefaultDefinitionLoc().getSourceRange().End;
+  } else if (!getInherited().empty()) {
     endLoc = getInherited().back().getSourceRange().End;
   } else {
     endLoc = getNameLoc();
