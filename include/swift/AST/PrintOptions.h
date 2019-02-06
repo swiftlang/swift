@@ -449,7 +449,6 @@ struct PrintOptions {
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
     result.PrintDocumentationComments = true;
-    result.SkipUnderscoredKeywords = true;
     return result;
   }
 
