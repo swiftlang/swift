@@ -4,9 +4,9 @@
 import Swift
 import StdlibUnittest
 
-let suite = "Diffing"
+let suite = TestSuite("Diffing")
 
-TestSuite(suite).test("Diffing empty collections") {
+suite.test("Diffing empty collections") {
   let a = [Int]()
   let b = [Int]()
   let diff = b.difference(from: a)
@@ -14,7 +14,7 @@ TestSuite(suite).test("Diffing empty collections") {
   expectTrue(diff.isEmpty)
 }
 
-TestSuite(suite).test("Basic diffing algorithm validators") {
+suite.test("Basic diffing algorithm validators") {
   let expectedChanges: [(
     source: [String],
     target: [String],
@@ -340,7 +340,7 @@ TestSuite(suite).test("Basic diffing algorithm validators") {
   }
 }
 
-TestSuite(suite).test("Empty diffs have sane behaviour") {
+suite.test("Empty diffs have sane behaviour") {
   guard let diff = CollectionDifference<String>([]) else {
     expectUnreachable()
     return
@@ -354,7 +354,7 @@ TestSuite(suite).test("Empty diffs have sane behaviour") {
   expectEqual(0, c)
 }
 
-TestSuite(suite).test("Happy path tests for the change validator") {
+suite.test("Happy path tests for the change validator") {
   // Base case: one insert and one remove with legal offsets
   expectNotNil(CollectionDifference<Int>.init([
     .insert(offset: 0, element: 0, associatedWith: nil),
@@ -372,7 +372,7 @@ TestSuite(suite).test("Happy path tests for the change validator") {
   ]))
 }
 
-TestSuite(suite).test("Exhaustive edge case tests for the change validator") {
+suite.test("Exhaustive edge case tests for the change validator") {
   // Base case: two inserts sharing the same offset
   expectNil(CollectionDifference<Int>.init([
     .insert(offset: 0, element: 0, associatedWith: nil),
@@ -430,7 +430,7 @@ TestSuite(suite).test("Exhaustive edge case tests for the change validator") {
   ]))
 }
 
-TestSuite(suite).test("Enumeration order is safe") {
+suite.test("Enumeration order is safe") {
   let safelyOrderedChanges: [CollectionDifference<Int>.Change] = [
     .remove(offset: 2, element: 0, associatedWith: nil),
     .remove(offset: 1, element: 0, associatedWith: 0),
@@ -447,7 +447,7 @@ TestSuite(suite).test("Enumeration order is safe") {
   expectEqual(safelyOrderedChanges, enumerationOrderedChanges)
 }
 
-TestSuite(suite).test("Change validator rejects bad associations") {
+suite.test("Change validator rejects bad associations") {
   // .remove(1) → .insert(1)
   //   ↑      ↓
   // .insert(0) ← .remove(0)
@@ -472,7 +472,7 @@ TestSuite(suite).test("Change validator rejects bad associations") {
 }
 
 // Full-coverage test for CollectionDifference.Change.==()
-TestSuite(suite).test("Exhaustive testing for equatable conformance") {
+suite.test("Exhaustive testing for equatable conformance") {
   // Differs by type:
   expectNotEqual(
     CollectionDifference<Int>.Change.insert(offset: 0, element: 0, associatedWith: 0),
@@ -522,11 +522,11 @@ TestSuite(suite).test("Exhaustive testing for equatable conformance") {
   )
 }
 
-TestSuite(suite).test("Compile-time test of hashable conformance") {
+suite.test("Compile-time test of hashable conformance") {
   let _ = Set<CollectionDifference<String>>();
 }
 
-TestSuite(suite).test("Move inference") {
+suite.test("Move inference") {
   let n = CollectionDifference<String>.init([
     .insert(offset: 3, element: "Sike", associatedWith: nil),
     .insert(offset: 4, element: "Sike", associatedWith: nil),
@@ -546,7 +546,7 @@ TestSuite(suite).test("Move inference") {
   expectEqual(w, n?.inferringMoves())
 }
 
-TestSuite(suite).test("Three way diff demo code") {
+suite.test("Three way diff demo code") {
   let base = "Is\nit\ntime\nalready?"
   let theirs = "Hi\nthere\nis\nit\ntime\nalready?"
   let mine = "Is\nit\nreview\ntime\nalready?"
@@ -571,7 +571,7 @@ TestSuite(suite).test("Three way diff demo code") {
   // print(patched)
 }
 
-TestSuite(suite).test("Diff reversal demo code") {
+suite.test("Diff reversal demo code") {
   let diff = CollectionDifference<Int>([])!
   let _ = CollectionDifference<Int>(
     diff.map({(change) -> CollectionDifference<Int>.Change in
@@ -585,7 +585,7 @@ TestSuite(suite).test("Diff reversal demo code") {
   )!
 }
 
-TestSuite(suite).test("Naive application by enumeration") {
+suite.test("Naive application by enumeration") {
   let base = "Is\nit\ntime\nalready?"
   let theirs = "Hi\nthere\nis\nit\ntime\nalready?"
 
@@ -608,7 +608,7 @@ TestSuite(suite).test("Naive application by enumeration") {
   expectEqual(arr, theirLines)
 }
 
-TestSuite(suite).test("Fast applicator boundary conditions") {
+suite.test("Fast applicator boundary conditions") {
   let a = [1, 2, 3, 4, 5, 6, 7, 8]
   for removeMiddle in [false, true] {
   for insertMiddle in [false, true] {
@@ -634,7 +634,7 @@ TestSuite(suite).test("Fast applicator boundary conditions") {
   }}}}}}
 }
 
-TestSuite(suite).test("Fast applicator fuzzer") {
+suite.test("Fast applicator fuzzer") {
   func makeArray() -> [Int] {
     var arr = [Int]()
     for _ in 0..<Int.random(in: 0..<10) {
