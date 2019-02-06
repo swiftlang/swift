@@ -158,8 +158,7 @@ public:
                                       GenericSignature *signature,
                                       ResilienceExpansion expansion);
 
-  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC,
-                                    bool verify=false);
+  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
   std::string mangleDeclType(const ValueDecl *decl);
   
