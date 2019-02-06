@@ -56,7 +56,6 @@ set(SWIFT_BENCH_MODULES
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/Combos
-    single-source/CountAlgo
     single-source/DataBenchmarks
     single-source/DeadArray
     single-source/DictOfArraysToArrayOfDicts
