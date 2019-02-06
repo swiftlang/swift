@@ -129,6 +129,7 @@ KNOWN_SETTINGS=(
     skip-build-android          ""               "set to skip building Swift stdlibs for Android"
     skip-build-lldb             ""               "set to skip building LLDB"
     skip-build-llbuild          ""               "set to skip building llbuild"
+    skip-build-libcxx           ""               "set to skip building libcxx"
     skip-build-swiftpm          ""               "set to skip building swiftpm"
     skip-build-swiftsyntax      ""               "set to skip building swiftSyntax"
     skip-build-skstresstester   ""               "set to skip building the SourceKit stress tester"
@@ -1203,6 +1204,7 @@ FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
+LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
@@ -1235,12 +1237,6 @@ if [ -e "${WORKSPACE}/compiler-rt" ] ; then
     if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
         make_relative_symlink "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
     fi
-fi
-
-# Build libcxx, unless it doesn't exist.
-LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
-if [[ ! -e "${LIBCXX_SOURCE_DIR}" ]] ; then
-  SKIP_BUILD_LIBCXX=1
 fi
 
 PRODUCTS=(cmark llvm)
