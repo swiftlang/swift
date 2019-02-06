@@ -378,7 +378,7 @@ namespace {
         if (CompletelyFragileLayout && !eltType->isFixedSize()) {
           // For staging purposes, only do the new thing if the path flag
           // is provided.
-          auto mode = (IGM.IRGen.Opts.ReadTypeInfoPath.empty()
+          auto mode = (IGM.IRGen.Opts.ReadLegacyTypeInfoPath.empty()
                        ? TypeConverter::Mode::CompletelyFragile
                        : TypeConverter::Mode::Legacy);
           LoweringModeScope scope(IGM, mode);

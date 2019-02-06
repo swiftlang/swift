@@ -179,7 +179,7 @@ public:
   unsigned LazyInitializeClassMetadata : 1;
 
   /// The path to load legacy type layouts from.
-  StringRef ReadTypeInfoPath;
+  StringRef ReadLegacyTypeInfoPath;
 
   /// Should we try to build incrementally by not emitting an object file if it
   /// has the same IR hash as the module that we are preparing to emit?

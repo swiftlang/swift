@@ -177,8 +177,8 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
    HelpText<"Enable resilient layout for classes containing resilient value types">;
 
-def read_type_info_path_EQ : Joined<["-"], "read-type-info-path=">,
-  HelpText<"Read legacy type layout from the given path">;
+def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
+  HelpText<"Read legacy type layout from the given path instead of default path">;
 }
 
 

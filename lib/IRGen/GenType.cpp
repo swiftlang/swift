@@ -1125,7 +1125,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   if (IGM.IRGen.Opts.EnableResilienceBypass)
     LoweringMode = Mode::CompletelyFragile;
 
-  StringRef path = IGM.IRGen.Opts.ReadTypeInfoPath;
+  StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
   if (!path.empty()) {
     bool error = readLegacyTypeInfo(path);
     if (error) {

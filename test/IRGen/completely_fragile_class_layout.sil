@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
-// RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s -read-type-info-path=%S/Inputs/legacy_type_info/a.yaml | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s -read-legacy-type-info-path=%S/Inputs/legacy_type_info/a.yaml | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience -O %s
 
