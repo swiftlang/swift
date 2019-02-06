@@ -808,6 +808,34 @@ FUNCTION(UpdateClassMetadata,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
+// struct FieldInfo { size_t Size; size_t AlignMask; };
+// MetadataDependency swift_initClassMetadata2(Metadata *self,
+//                                             ClassLayoutFlags flags,
+//                                             size_t numFields,
+//                                             TypeLayout * const *fieldTypes,
+//                                             size_t *fieldOffsets);
+FUNCTION(InitClassMetadata2,
+         swift_initClassMetadata2, SwiftCC,
+         RETURNS(TypeMetadataDependencyTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
+              Int8PtrPtrTy->getPointerTo(),
+              SizeTy->getPointerTo()),
+         ATTRS(NoUnwind))
+
+// struct FieldInfo { size_t Size; size_t AlignMask; };
+// MetadataDependency swift_updateClassMetadata2(Metadata *self,
+//                                               ClassLayoutFlags flags,
+//                                               size_t numFields,
+//                                               TypeLayout * const *fieldTypes,
+//                                               size_t *fieldOffsets);
+FUNCTION(UpdateClassMetadata2,
+         swift_updateClassMetadata2, SwiftCC,
+         RETURNS(TypeMetadataDependencyTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
+              Int8PtrPtrTy->getPointerTo(),
+              SizeTy->getPointerTo()),
+         ATTRS(NoUnwind))
+
 // void *swift_lookUpClassMethod(Metadata *metadata,
 //                               ClassDescriptor *description,
 //                               MethodDescriptor *method);
