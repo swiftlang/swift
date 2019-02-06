@@ -1,11 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 
-// RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
-
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s -read-legacy-type-info-path=%S/Inputs/legacy_type_info/a.yaml | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
-
-// RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience -O %s
+// RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience -O %s -read-legacy-type-info-path=%S/Inputs/legacy_type_info/a.yaml
 
 // We only use fragile class layouts when Objective-C interop is enabled.
 

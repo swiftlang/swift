@@ -376,9 +376,9 @@ namespace {
         // Lower the field type.
         auto *eltType = &IGM.getTypeInfo(type);
         if (CompletelyFragileLayout && !eltType->isFixedSize()) {
-          // For staging purposes, only do the new thing if the path flag
-          // is provided.
-          auto mode = (IGM.IRGen.Opts.ReadLegacyTypeInfoPath.empty()
+          // For staging purposes, only do the new thing if we're going
+          // to load a YAML file describing legacy type layouts.
+          auto mode = (IGM.IRGen.Opts.DisableLegacyTypeInfo
                        ? TypeConverter::Mode::CompletelyFragile
                        : TypeConverter::Mode::Legacy);
           LoweringModeScope scope(IGM, mode);

@@ -1079,6 +1079,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // (e.g. NativeObject).  Force the lazy initialization of the VWT always.
   Opts.LazyInitializeClassMetadata = Triple.isOSBinFormatCOFF();
 
+  if (Args.hasArg(OPT_disable_legacy_type_info)) {
+    Opts.DisableLegacyTypeInfo = true;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {
     Opts.ReadLegacyTypeInfoPath = A->getValue();
   }

@@ -178,6 +178,11 @@ public:
   /// Used on Windows to avoid cross-module references.
   unsigned LazyInitializeClassMetadata : 1;
 
+  /// Normally if the -read-legacy-type-info flag is not specified, we look for
+  /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
+  /// Passing this flag completely disables this behavior.
+  unsigned DisableLegacyTypeInfo : 1;
+
   /// The path to load legacy type layouts from.
   StringRef ReadLegacyTypeInfoPath;
 
@@ -233,6 +238,7 @@ public:
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         EnableClassResilience(false),
         EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
+        DisableLegacyTypeInfo(false),
         UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false),

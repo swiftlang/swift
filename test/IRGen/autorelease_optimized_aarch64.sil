@@ -1,4 +1,4 @@
-// RUN: %swift -gnone -O -target arm64-apple-ios7 -emit-assembly %s -o - | %FileCheck %s
+// RUN: %swift -gnone -O -disable-legacy-type-info -target arm64-apple-ios7 -emit-assembly %s -o - | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=AArch64
 
