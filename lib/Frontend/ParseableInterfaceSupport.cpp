@@ -134,11 +134,12 @@ static std::string getCacheHash(ASTContext &Ctx,
   // pathname, and probably all we can get from the VFS in this regard anyways.
   H = hash_combine(H, InPath);
 
-  // Include the target CPU. In practice, .swiftinterface files will be in
-  // architecture-specific subdirectories and would have target-specific pieces
-  // #if'd out. However, it doesn't hurt to include it, and it guards against
-  // mistakenly reusing cached modules across targets.
-  H = hash_combine(H, SubInvocation.getTargetTriple());
+  // Include the target CPU architecture. In practice, .swiftinterface files
+  // will be in architecture-specific subdirectories and would have
+  // architecture-specific pieces #if'd out. However, it doesn't hurt to
+  // include it, and it guards against mistakenly reusing cached modules across
+  // architectures.
+  H = hash_combine(H, SubInvocation.getLangOptions().Target.getArchName());
 
   // The SDK path is going to affect how this module is imported, so include it.
   H = hash_combine(H, SubInvocation.getSDKPath());

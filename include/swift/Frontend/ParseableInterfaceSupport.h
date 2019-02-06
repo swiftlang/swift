@@ -15,6 +15,8 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/Errc.h"
 #include "llvm/Support/Regex.h"
 
 namespace swift {
@@ -27,6 +29,25 @@ struct ParseableInterfaceOptions {
   /// generation time, re-applied to CompilerInvocation when reading
   /// back .swiftinterface and reconstructing .swiftmodule.
   std::string ParseableInterfaceFlags;
+};
+
+class PrebuiltModuleCache {
+  StringRef cacheDir;
+  llvm::DenseMap<StringRef, uint64_t> hashedContents;
+  PrebuiltModuleCache(StringRef cacheDir): cacheDir(cacheDir) {}
+
+  std::error_code loadHashes();
+public:
+  static llvm::ErrorOr<PrebuiltModuleCache>
+  loadFromDirectory(StringRef directory);
+
+  StringRef getDirectory() { return cacheDir; }
+
+  Optional<uint64_t> getInterfaceHash(StringRef moduleName) {
+    auto it = hashedContents.find(moduleName);
+    if (it == hashedContents.end()) return None;
+    return it->second;
+  }
 };
 
 llvm::Regex getSwiftInterfaceFormatVersionRegex();
