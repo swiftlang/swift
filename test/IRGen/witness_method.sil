@@ -70,7 +70,7 @@ struct SyncUp<Deliverable> : Synergy {
 // CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[WTABLE]], i32 2
 // CHECK:   [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK:   [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, i8**)*
-// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 0, %swift.type* [[METADATA]])
+// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState([[INT]] 0, %swift.type* [[METADATA]])
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:   [[ARG:%.*]] = bitcast %T14witness_method6SyncUpV* %1 to %swift.opaque*
 // CHECK:   call swiftcc void [[WITNESS]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture swiftself [[ARG]], %swift.type* [[METADATA]], i8** [[WTABLE]])
