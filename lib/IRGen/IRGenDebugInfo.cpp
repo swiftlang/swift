@@ -57,6 +57,10 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
 
+#ifndef NDEBUG
+#include "swift/AST/ASTDemangler.h"
+#endif
+
 using namespace swift;
 using namespace irgen;
 
@@ -688,6 +692,28 @@ private:
     return Size(size);
   }
 
+#ifndef NDEBUG
+  static bool areTypesReallyEqual(Type lhs, Type rhs) {
+    // Due to an oversight, escaping and non-escaping @convention(block)
+    // are mangled identically.
+    auto eraseEscapingBlock = [](Type t) -> Type {
+      return t.transform([](Type t) -> Type {
+        if (auto *fnType = t->getAs<FunctionType>()) {
+          if (fnType->getExtInfo().getRepresentation()
+                == FunctionTypeRepresentation::Block) {
+            return FunctionType::get(fnType->getParams(),
+                                    fnType->getResult(),
+                                    fnType->getExtInfo().withNoEscape(true));
+          }
+        }
+        return t;
+      });
+    };
+
+    return eraseEscapingBlock(lhs)->isEqual(eraseEscapingBlock(rhs));
+  }
+#endif
+
   StringRef getMangledName(DebugTypeInfo DbgTy) {
     if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
       return BumpAllocatedString(DbgTy.getDecl()->getName().str());
@@ -697,10 +723,33 @@ private:
       Ty = Ty->mapTypeOutOfContext();
 
     Mangle::ASTMangler Mangler;
-    std::string Name = Mangler.mangleTypeForDebugger(
-        Ty, DbgTy.getDeclContext(),
-        !Opts.DisableRoundTripDebugTypes);
-    return BumpAllocatedString(Name);
+    std::string Result = Mangler.mangleTypeForDebugger(
+        Ty, DbgTy.getDeclContext());
+
+    if (!Opts.DisableRoundTripDebugTypes) {
+      // Make sure we can reconstruct mangled types for the debugger.
+#ifndef NDEBUG
+      auto &Ctx = Ty->getASTContext();
+      Type Reconstructed = Demangle::getTypeForMangling(Ctx, Result);
+      if (!Reconstructed) {
+        llvm::errs() << "Failed to reconstruct type for " << Result << "\n";
+        llvm::errs() << "Original type:\n";
+        Ty->dump();
+        abort();
+      } else if (!Reconstructed->isEqual(Ty)) {
+        if (!areTypesReallyEqual(Reconstructed, Ty)) {
+          llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
+          llvm::errs() << "Original type:\n";
+          Ty->dump();
+          llvm::errs() << "Reconstructed type:\n";
+          Reconstructed->dump();
+          abort();
+        }
+      }
+#endif
+    }
+
+    return BumpAllocatedString(Result);
   }
 
   llvm::DIDerivedType *createMemberType(DebugTypeInfo DbgTy, StringRef Name,

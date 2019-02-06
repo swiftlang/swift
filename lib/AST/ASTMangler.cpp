@@ -42,10 +42,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CommandLine.h"
 
-#ifndef NDEBUG
-#include "swift/AST/ASTDemangler.h"
-#endif
-
 using namespace swift;
 using namespace swift::Mangle;
 
@@ -364,30 +360,7 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
-#ifndef NDEBUG
-static bool areTypesReallyEqual(Type lhs, Type rhs) {
-  // Due to an oversight, escaping and non-escaping @convention(block)
-  // are mangled identically.
-  auto eraseEscapingBlock = [](Type t) -> Type {
-    return t.transform([](Type t) -> Type {
-      if (auto *fnType = t->getAs<FunctionType>()) {
-        if (fnType->getExtInfo().getRepresentation()
-              == FunctionTypeRepresentation::Block) {
-          return FunctionType::get(fnType->getParams(),
-                                   fnType->getResult(),
-                                   fnType->getExtInfo().withNoEscape(true));
-        }
-      }
-      return t;
-    });
-  };
-
-  return eraseEscapingBlock(lhs)->isEqual(eraseEscapingBlock(rhs));
-}
-#endif
-
-std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC,
-                                              bool verify) {
+std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
                                         "mangling type for debugger", Ty);
 
@@ -400,33 +373,7 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC,
 
   appendType(Ty);
   appendOperator("D");
-  std::string result = finalize();
-
-  if (!verify)
-    return result;
-
-  // Make sure we can reconstruct mangled types for the debugger.
-#ifndef NDEBUG
-  auto &Ctx = Ty->getASTContext();
-  Type Reconstructed = Demangle::getTypeForMangling(Ctx, result);
-  if (!Reconstructed) {
-    llvm::errs() << "Failed to reconstruct type for " << result << "\n";
-    llvm::errs() << "Original type:\n";
-    Ty->dump();
-    abort();
-  } else if (!Reconstructed->isEqual(Ty)) {
-    if (!areTypesReallyEqual(Reconstructed, Ty)) {
-      llvm::errs() << "Incorrect reconstructed type for " << result << "\n";
-      llvm::errs() << "Original type:\n";
-      Ty->dump();
-      llvm::errs() << "Reconstructed type:\n";
-      Reconstructed->dump();
-      abort();
-    }
-  }
-#endif
-
-  return result;
+  return finalize();
 }
 
 std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
