@@ -360,8 +360,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     }
                         
     // '...'?
-    if (Tok.isEllipsis())
+    if (Tok.isEllipsis()) {
+      Tok.setKind(tok::ellipsis);
       param.EllipsisLoc = consumeToken();
+    }
 
     // ('=' expr)?
     if (Tok.is(tok::equal)) {
