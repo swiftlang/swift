@@ -531,18 +531,20 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   }
 
   // Create the new apply inst.
-  SILInstruction *NAI;
-  if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    NAI = Builder.createTryApply(AI.getLoc(), FRI, 
-                                 SubstitutionMap(), Args,
-                                 TAI->getNormalBB(), TAI->getErrorBB());
-  else {
-    NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(), Args,
-                              cast<ApplyInst>(AI)->isNonThrowing());
-    assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
-           AI.getSubstCalleeType()->getAllResultsType() &&
-           "Function types should be the same");
+  if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
+    return Builder.createTryApply(AI.getLoc(), FRI, SubstitutionMap(), Args,
+                                  TAI->getNormalBB(), TAI->getErrorBB());
   }
+
+  // Match the throwing bit of the underlying function_ref. We assume that if
+  // we got this far it is legal to perform the transformation (since
+  // otherwise, we would be creating malformed SIL).
+  bool setNonThrowing = FRI->getFunctionType()->hasErrorResult();
+  SILInstruction *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
+                                            Args, setNonThrowing);
+  assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
+             AI.getSubstCalleeType()->getAllResultsType() &&
+         "Function types should be the same");
   return NAI;
 }
 
