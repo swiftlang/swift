@@ -2121,7 +2121,7 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   // Handle redeclarable Clang decls by checking each redeclaration.
   bool IsTagDecl = isa<clang::TagDecl>(D);
   if (!(IsTagDecl || isa<clang::FunctionDecl>(D) || isa<clang::VarDecl>(D) ||
-        isa<clang::TypedefNameDecl>(D))) {
+        isa<clang::TypedefNameDecl>(D) || isa<clang::ObjCInterfaceDecl>(D))) {
     return false;
   }
 
