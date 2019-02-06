@@ -162,15 +162,6 @@ void MetadataDependencyCollector::checkDependency(IRGenFunction &IGF,
 
   // Otherwise, we need to pull out the response state and compare it against
   // the request state.
-
-  // Lazily create the continuation block and phis.
-  if (!RequiredMetadata) {
-    auto contBB = IGF.createBasicBlock("metadata-dependencies.cont");
-    RequiredMetadata =
-      llvm::PHINode::Create(IGF.IGM.TypeMetadataPtrTy, 4, "", contBB);
-    RequiredState = llvm::PHINode::Create(IGF.IGM.SizeTy, 4, "", contBB);
-  }
-
   llvm::Value *requiredState = request.getRequiredState(IGF);
 
   // More advanced metadata states are lower numbers.
@@ -178,6 +169,42 @@ void MetadataDependencyCollector::checkDependency(IRGenFunction &IGF,
                 "relying on the ordering of MetadataState here");
   auto satisfied = IGF.Builder.CreateICmpULE(metadataState, requiredState);
 
+  emitCheckBranch(IGF, satisfied, metadata, requiredState);
+}
+
+void MetadataDependencyCollector::collect(IRGenFunction &IGF,
+                                          llvm::Value *dependency) {
+  // Having either both or neither of the PHIs is normal.
+  // Having just RequiredState means that we already finalized this collector
+  // and shouldn't be using it anymore.
+  assert((!RequiredMetadata || RequiredState) &&
+         "checking dependencies on a finished collector");
+
+  assert(dependency->getType() == IGF.IGM.TypeMetadataDependencyTy);
+
+  // Split the dependency.
+  auto metadata = IGF.Builder.CreateExtractValue(dependency, 0);
+  auto requiredState = IGF.Builder.CreateExtractValue(dependency, 1);
+
+  // We have a dependency if the metadata is non-null; otherwise we're
+  // satisfied and can continue.
+  auto satisfied = IGF.Builder.CreateIsNull(metadata);
+  emitCheckBranch(IGF, satisfied, metadata, requiredState);
+}
+
+void MetadataDependencyCollector::emitCheckBranch(IRGenFunction &IGF,
+                                                  llvm::Value *satisfied,
+                                                  llvm::Value *metadata,
+                                                  llvm::Value *requiredState) {
+  // Lazily create the final continuation block and phis.
+  if (!RequiredMetadata) {
+    auto contBB = IGF.createBasicBlock("metadata-dependencies.cont");
+    RequiredMetadata =
+      llvm::PHINode::Create(IGF.IGM.TypeMetadataPtrTy, 4, "", contBB);
+    RequiredState = llvm::PHINode::Create(IGF.IGM.SizeTy, 4, "", contBB);
+  }
+
+  // Conditionally branch to the final continuation block.
   auto satisfiedBB = IGF.createBasicBlock("dependency-satisfied");
   auto curBB = IGF.Builder.GetInsertBlock();
   RequiredMetadata->addIncoming(metadata, curBB);
@@ -185,6 +212,7 @@ void MetadataDependencyCollector::checkDependency(IRGenFunction &IGF,
   IGF.Builder.CreateCondBr(satisfied, satisfiedBB,
                            RequiredMetadata->getParent());
 
+  // Otherwise resume emitting code on the main path.
   IGF.Builder.emitBlock(satisfiedBB);
 }
 
