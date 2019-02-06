@@ -528,12 +528,8 @@ const ClassLayout &
 ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType,
                               bool forBackwardDeployment) const {
   // Perform fragile layout only if Objective-C interop is enabled.
-  //
-  // FIXME: EnableClassResilience staging flag will go away once we can do
-  // in-place re-initialization of class metadata.
   bool completelyFragileLayout = (forBackwardDeployment &&
-                                  IGM.Context.LangOpts.EnableObjCInterop &&
-                                  !IGM.IRGen.Opts.EnableClassResilience);
+                                  IGM.Context.LangOpts.EnableObjCInterop);
 
   // Return the cached layout if available.
   auto &Layout = completelyFragileLayout ? FragileLayout : ResilientLayout;

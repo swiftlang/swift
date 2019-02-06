@@ -168,9 +168,6 @@ public:
   /// Emit mangled names of anonymous context descriptors.
   unsigned EnableAnonymousContextMangledNames : 1;
 
-  /// Enables resilient class layout.
-  unsigned EnableClassResilience : 1;
-
   /// Bypass resilience when accessing resilient frameworks.
   unsigned EnableResilienceBypass : 1;
 
@@ -236,7 +233,6 @@ public:
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
-        EnableClassResilience(false),
         EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
         DisableLegacyTypeInfo(false),
         UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),

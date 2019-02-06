@@ -1067,10 +1067,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = false;
   }
 
-  if (Args.hasArg(OPT_enable_class_resilience)) {
-    Opts.EnableClassResilience = true;
-  }
-
   if (Args.hasArg(OPT_enable_resilience_bypass)) {
     Opts.EnableResilienceBypass = true;
   }
