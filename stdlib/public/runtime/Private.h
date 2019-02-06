@@ -63,7 +63,7 @@ public:
     : Response{nullptr, MetadataState::Abstract}, ReferenceOwnership() {}
 
   TypeInfo(MetadataResponse response, TypeReferenceOwnership ownership)
-    : Response(response), ReferenceOwnership() {}
+    : Response(response), ReferenceOwnership(ownership) {}
 
   // FIXME: remove this constructor and require a response in all cases.
   TypeInfo(const Metadata *type, TypeReferenceOwnership ownership)
