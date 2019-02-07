@@ -1,4 +1,4 @@
-//===--- LLVMSwift.def ----------------------------------------------------===//
+//===--- LLVMSwift.def ----------------------------------*- C++ -*---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -142,7 +142,6 @@ SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(EndBorrow, ModRef, endBorrow)
 /// or is a call to something we don't care about.
 KIND(Unknown, ModRef)
 
-#undef OBJC_NEVER_NONATOMIC_FUNC
 #undef SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC
 #undef SWIFT_NEVER_NONATOMIC_FUNC
 #undef OBJC_FUNC
