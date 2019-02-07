@@ -1110,35 +1110,17 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
   FoundVersionCheckNode =
       findInnermostAncestor(ReferenceRange, SM, SearchRoot, IsGuardable);
 
-  // Find some Decl that contains the reference range. We use this declaration
-  // as a starting place to climb the DeclContext hierarchy to find
-  // places to suggest adding @available() annotations.
-  InnermostAncestorFinder::MatchPredicate IsDeclaration = [](
-      ASTNode Node, ASTWalker::ParentTy Parent) { return Node.is<Decl *>(); };
-
-  Optional<ASTNode> FoundDeclarationNode =
-      findInnermostAncestor(ReferenceRange, SM, SearchRoot, IsDeclaration);
-
-  const Decl *ContainingDecl = nullptr;
-  if (FoundDeclarationNode.hasValue()) {
-    ContainingDecl = FoundDeclarationNode.getValue().get<Decl *>();
-  }
-
-  if (!ContainingDecl) {
-    ContainingDecl = ReferenceDC->getInnermostMethodContext();
-  }
-
   // Try to find declarations on which @available attributes can be added.
   // The heuristics for finding these declarations are biased towards deeper
   // nodes in the AST to limit the scope of suggested availability regions
   // and provide a better IDE experience (it can get jumpy if Fix-It locations
   // are far away from the error needing the Fix-It).
-  if (ContainingDecl) {
+  if (DeclarationToSearch) {
     FoundMemberLevelDecl =
-        ancestorMemberLevelDeclForAvailabilityFixit(ContainingDecl);
+        ancestorMemberLevelDeclForAvailabilityFixit(DeclarationToSearch);
 
     FoundTypeLevelDecl =
-        ancestorTypeLevelDeclForAvailabilityFixit(ContainingDecl);
+        ancestorTypeLevelDeclForAvailabilityFixit(DeclarationToSearch);
   }
 }
 
