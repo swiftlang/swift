@@ -5,5 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+// TODO: Remove REQUIRES in https://github.com/apple/swift/pull/22440#issuecomment-461300284 is resolved.
+// REQUIRES: swift_ast_verifier
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 switch{case.b(u){
