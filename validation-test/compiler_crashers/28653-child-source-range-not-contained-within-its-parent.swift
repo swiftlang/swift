@@ -5,5 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
+// TODO: Re-enable after the situation discussed in https://github.com/apple/swift/pull/22440#issuecomment-461300284 is resolved.
+// UN: not --crash %target-swift-frontend %s -emit-ir
 switch{case.b(u){
