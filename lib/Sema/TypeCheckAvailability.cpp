@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeRefinementContext.h"
@@ -1408,6 +1409,30 @@ someEnclosingDeclMatches(SourceRange ReferenceRange,
   // Climb the DeclContext hierarchy to see if any of the containing
   // declarations matches the predicate.
   const DeclContext *DC = ReferenceDC;
+
+  if (auto *InitializerDC = dyn_cast<PatternBindingInitializer>(DC)) {
+    const PatternBindingDecl *BindingDecl = InitializerDC->getBinding();
+    assert(BindingDecl);
+
+    const Pattern *RelevantPattern =
+        BindingDecl->getPattern(InitializerDC->getBindingIndex());
+
+    // FIXME: Every variable in the same pattern will have the same attributes,
+    // so for all the predicates we care about it's a waste to test more than
+    // one.
+    // FIXME: If there are /no/ variables in the pattern, we won't be able to
+    // check anything, even though there may have been attributes syntactically
+    // written on the PatternBindingDecl (`var` or `let`).
+    bool SatisfiesPredicate = false;
+    RelevantPattern->forEachVariable([&](const VarDecl *Var) {
+      SatisfiesPredicate |= Pred(Var);
+    });
+    if (SatisfiesPredicate)
+      return true;
+
+    DC = InitializerDC->getParent();
+  }
+
   do {
     auto *D = DC->getInnermostDeclarationDeclContext();
     if (!D)
