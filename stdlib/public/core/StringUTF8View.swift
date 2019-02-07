@@ -241,11 +241,7 @@ extension String {
   @inlinable
   public var utf8: UTF8View {
     @inline(__always) get { return UTF8View(self._guts) }
-    set {
-      // TODO(String testing): test suite doesn't currenlty exercise this code at
-      // all, test it.
-      self = String(utf8._guts)
-    }
+    set { self = String(newValue._guts) }
   }
 
   /// A contiguously stored null-terminated UTF-8 representation of the string.
