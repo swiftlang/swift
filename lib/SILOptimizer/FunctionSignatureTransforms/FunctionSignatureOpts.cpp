@@ -641,18 +641,6 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
       TransformDescriptor.hasOnlyDirectInModuleCallers;
   SILFunction *F = TransformDescriptor.OriginalFunction;
 
-  // Never repeat the same function signature optimization on the same function.
-  // Multiple function signature optimizations are composed by successively
-  // optmizing the newly created functions. Each optimization creates a new
-  // level of thunk. Those should all be ultimately inlined away.
-  //
-  // This happens, for example, when a new reference to the original function is
-  // discovered during devirtualization. That will cause the original function
-  // (now and FSO thunk) to be pushed back on the function pass pipeline.
-  if (F->isThunk() == IsSignatureOptimizedThunk) {
-    LLVM_DEBUG(llvm::dbgs() << "  FSO already performed on this thunk\n");
-    return false;
-  }
 
   // If we are asked to assume a caller for testing purposes, set the flag.
   hasCaller |= FSOOptimizeIfNotCalled;
@@ -811,6 +799,19 @@ public:
     if (OptForPartialApply &&
         !canSpecializeFunction(F, &FuncInfo, OptForPartialApply)) {
       LLVM_DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
+      return;
+    }
+
+    // Never repeat the same function signature optimization on the same
+    // function. Multiple function signature optimizations are composed by
+    // successively optmizing the newly created functions. Each optimization
+    // creates a new level of thunk which are all ultimately inlined away.
+    //
+    // This happens, for example, when a reference to the original function is
+    // discovered during devirtualization. That will cause the original function
+    // (now an FSO thunk) to be pushed back on the function pass pipeline.
+    if (F->isThunk() == IsSignatureOptimizedThunk) {
+      LLVM_DEBUG(llvm::dbgs() << "  FSO already performed on this thunk\n");
       return;
     }
 
