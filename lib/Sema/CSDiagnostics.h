@@ -707,6 +707,70 @@ public:
   bool diagnoseAsError() override;
 };
 
+class InvalidInitRefFailure : public FailureDiagnostic {
+protected:
+  Type BaseType;
+  const ConstructorDecl *Init;
+  SourceRange BaseRange;
+
+  InvalidInitRefFailure(Expr *root, ConstraintSystem &cs, Type baseTy,
+                        const ConstructorDecl *init, SourceRange baseRange,
+                        ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseTy), Init(init),
+        BaseRange(baseRange) {}
+
+public:
+  bool diagnoseAsError() override = 0;
+};
+
+/// Diagnose an attempt to construct an object of class type with a metatype
+/// value without using 'required' initializer:
+///
+/// ```swift
+///  class C {
+///    init(value: Int) {}
+///  }
+///
+///  func make<T: C>(type: T.Type) -> T {
+///    return T.init(value: 42)
+///  }
+/// ```
+class InvalidDynamicInitOnMetatypeFailure final : public InvalidInitRefFailure {
+public:
+  InvalidDynamicInitOnMetatypeFailure(Expr *root, ConstraintSystem &cs,
+                                      Type baseTy, const ConstructorDecl *init,
+                                      SourceRange baseRange,
+                                      ConstraintLocator *locator)
+      : InvalidInitRefFailure(root, cs, baseTy, init, baseRange, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to call initializer on protocol metatype:
+///
+/// ```swift
+///  protocol P {
+///    init(value: Int)
+///  }
+///
+///  func make(type: P.Type) -> P {
+///    return type.init(value: 42)
+///  }
+/// ```
+class InitOnProtocolMetatypeFailure final : public InvalidInitRefFailure {
+  bool IsStaticallyDerived;
+
+public:
+  InitOnProtocolMetatypeFailure(Expr *root, ConstraintSystem &cs, Type baseTy,
+                                const ConstructorDecl *init,
+                                bool isStaticallyDerived, SourceRange baseRange,
+                                ConstraintLocator *locator)
+      : InvalidInitRefFailure(root, cs, baseTy, init, baseRange, locator),
+        IsStaticallyDerived(isStaticallyDerived) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

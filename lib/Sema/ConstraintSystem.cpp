@@ -1703,6 +1703,129 @@ isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
   return {true, level};
 }
 
+/// Determine whether the given type refers to a non-final class (or
+/// dynamic self of one).
+static bool isNonFinalClass(Type type) {
+  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
+    type = dynamicSelf->getSelfType();
+
+  if (auto classDecl = type->getClassOrBoundGenericClass())
+    return !classDecl->isFinal();
+
+  if (auto archetype = type->getAs<ArchetypeType>())
+    if (auto super = archetype->getSuperclass())
+      return isNonFinalClass(super);
+
+  if (type->isExistentialType())
+    return true;
+
+  return false;
+}
+
+/// Determine whether given constructor reference is valid or does it require
+/// any fixes e.g. when base is a protocol metatype.
+static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
+                                   ConstraintLocator *locator) {
+  auto *anchor = locator->getAnchor();
+  if (!anchor)
+    return;
+
+  auto getType = [&cs](const Expr *expr) -> Type {
+    return cs.simplifyType(cs.getType(expr))->getRValueType();
+  };
+
+  auto locatorEndsWith =
+      [](ConstraintLocator *locator,
+         ConstraintLocator::PathElementKind eltKind) -> bool {
+    auto path = locator->getPath();
+    return !path.empty() && path.back().getKind() == eltKind;
+  };
+
+  Expr *baseExpr = nullptr;
+  Type baseType;
+
+  // Explicit initializer reference e.g. `T.init(...)` or `T.init`.
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    baseExpr = UDE->getBase();
+    baseType = getType(baseExpr);
+  // Initializer call e.g. `T(...)`
+  } else if (auto *CE = dyn_cast<CallExpr>(anchor)) {
+    baseExpr = CE->getFn();
+    baseType = getType(baseExpr);
+  // Initializer reference which requires contextual base type e.g. `.init(...)`.
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    // We need to find type variable which represents contextual base.
+    auto *baseLocator = cs.getConstraintLocator(
+        UME, locatorEndsWith(locator, ConstraintLocator::ConstructorMember)
+                 ? ConstraintLocator::UnresolvedMember
+                 : ConstraintLocator::MemberRefBase);
+
+    // FIXME: Type variables responsible for contextual base could be cached
+    // in the constraint system to speed up lookup.
+    auto result = llvm::find_if(
+        cs.getTypeVariables(), [&baseLocator](const TypeVariableType *typeVar) {
+          return typeVar->getImpl().getLocator() == baseLocator;
+        });
+
+    assert(result != cs.getTypeVariables().end());
+    baseType = cs.simplifyType(*result)->getRValueType();
+    // Constraint for member base is formed as '$T.Type[.<member] = ...`
+    // which means MetatypeType has to be added after finding a type variable.
+    if (locatorEndsWith(baseLocator, ConstraintLocator::MemberRefBase))
+      baseType = MetatypeType::get(baseType);
+  }
+
+  if (!baseType)
+    return;
+
+  if (!baseType->is<AnyMetatypeType>()) {
+    bool applicable = false;
+    // Special case -- in a protocol extension initializer with a class
+    // constrainted Self type, 'self' has archetype type, and only
+    // required initializers can be called.
+    if (baseExpr && !baseExpr->isSuperExpr()) {
+      auto &ctx = cs.getASTContext();
+      if (auto *DRE =
+              dyn_cast<DeclRefExpr>(baseExpr->getSemanticsProvidingExpr())) {
+        if (DRE->getDecl()->getFullName() == ctx.Id_self) {
+          if (getType(DRE)->is<ArchetypeType>())
+            applicable = true;
+        }
+      }
+    }
+
+    if (!applicable)
+      return;
+  }
+
+  auto instanceType = baseType->getMetatypeInstanceType();
+  bool isStaticallyDerived = true;
+  // If this is expression like `.init(...)` where base type is
+  // determined by a contextual type.
+  if (!baseExpr) {
+    isStaticallyDerived = !(instanceType->is<DynamicSelfType>() ||
+                            instanceType->is<ArchetypeType>());
+  // Otherwise this is something like `T.init(...)`
+  } else {
+    isStaticallyDerived = cs.isStaticallyDerivedMetatype(baseExpr);
+  }
+
+  auto baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
+  // FIXME: The "hasClangNode" check here is a complete hack.
+  if (isNonFinalClass(instanceType) && !isStaticallyDerived &&
+      !init->hasClangNode() &&
+      !(init->isRequired() || init->getDeclContext()->getSelfProtocolDecl())) {
+    (void)cs.recordFix(AllowInvalidInitRef::dynamicOnMetatype(
+        cs, baseType, init, baseRange, locator));
+  // Constructors cannot be called on a protocol metatype, because there is no
+  // metatype to witness it.
+  } else if (baseType->is<MetatypeType>() &&
+             instanceType->isExistentialType()) {
+    (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
+        cs, baseType, init, isStaticallyDerived, baseRange, locator));
+  }
+}
+
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice,
@@ -1955,6 +2078,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         boundType = boundFunctionType->withExtInfo(
             boundFunctionType->getExtInfo().withThrows());
       }
+
+      validateInitializerRef(*this, CD, locator);
     }
 
     // Check whether applying this overload would result in invalid
