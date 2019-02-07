@@ -1191,9 +1191,8 @@ class COWArrayOptPass : public SILFunctionTransform {
     for (auto *L : Loops)
       HasChanged |= COWArrayOpt(RCIA, L, DA).run();
 
-      if (HasChanged) {
-        invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
-      }
+    if (HasChanged)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }
 
 };
