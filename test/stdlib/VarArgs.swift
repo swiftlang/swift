@@ -4,18 +4,20 @@
 import Swift
 
 #if _runtime(_ObjC)
-import Darwin
-import CoreGraphics
-#elseif os(Linux) || os(FreeBSD) || os(Android) || os(Haiku) || os(PS4)
-import Glibc
-typealias CGFloat = Double
+  import Darwin
+  import CoreGraphics
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+  typealias CGFloat = Double
 #elseif os(Windows)
-import MSVCRT
-#if arch(x86_64) || arch(arm64)
-typealias CGFloat = Double
+  import MSVCRT
+  #if arch(x86_64) || arch(arm64)
+    typealias CGFloat = Double
+  #else
+    typealias CGFloat = Float
+  #endif
 #else
-typealias CGFloat = Float
-#endif
+#error("Unsupported platform")
 #endif
 
 func my_printf(_ format: String, _ arguments: CVarArg...) {
