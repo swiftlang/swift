@@ -532,9 +532,9 @@ def create_argument_parser():
     option(['--swiftevolve'], store_true('build_swiftevolve'),
            help='build the swift-evolve tool')
 
-    option(['--indexstore-db'], store_true('build_indexstoredb'),
+    option(['--indexstore-db'], toggle_true('build_indexstoredb'),
            help='build IndexStoreDB')
-    option(['--sourcekit-lsp'], store_true('build_sourcekitlsp'),
+    option(['--sourcekit-lsp'], toggle_true('build_sourcekitlsp'),
            help='build SourceKitLSP')
 
     option('--xctest', toggle_true('build_xctest'),
