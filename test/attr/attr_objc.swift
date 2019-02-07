@@ -2326,4 +2326,18 @@ extension MyObjCClass {
         }
         set {}
     }
+
+    // CHECK: {{^}} @objc private dynamic func stillExposedToObjCDespiteBeingPrivate()
+    private func stillExposedToObjCDespiteBeingPrivate() {}
 }
+
+@objc private extension MyObjCClass {
+  // CHECK: {{^}} @objc dynamic func alsoExposedToObjCDespiteBeingPrivate()
+  func alsoExposedToObjCDespiteBeingPrivate() {}
+}
+
+@objcMembers class VeryObjCClass: NSObject {
+  // CHECK: {{^}} private func notExposedToObjC()
+  private func notExposedToObjC() {}
+}
+
