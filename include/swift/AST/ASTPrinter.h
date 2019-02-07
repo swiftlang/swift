@@ -186,10 +186,13 @@ public:
     return *this << StringRef(&c, 1);
   }
 
-  void printKeyword(StringRef name) {
+  void printKeyword(StringRef name, PrintOptions Opts, StringRef Suffix = "") {
+    if (Opts.SkipUnderscoredKeywords && name.startswith("_"))
+      return;
     callPrintNamePre(PrintNameContext::Keyword);
     *this << name;
     printNamePost(PrintNameContext::Keyword);
+    *this << Suffix;
   }
 
   void printAttrName(StringRef name, bool needAt = false) {
