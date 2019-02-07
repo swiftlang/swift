@@ -4634,9 +4634,9 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         subjectType = resolveDependentMemberTypes(*this, subjectType);
       }
 
-      auto invalidConstraint = InvalidConstraint(
-          subjectType, constraintType, source.getSource(*this, subjectType));
-      invalidConstraints.push_back(invalidConstraint);
+      auto invalidConstraint = Constraint<Type>(
+          {subject, constraintType, source.getSource(*this, subjectType)});
+      invalidIsaConstraints.push_back(invalidConstraint);
     }
 
     return ConstraintResult::Conflicting;
@@ -5760,11 +5760,11 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   // Emit a diagnostic if we recorded any constraints where the constraint
   // type was not constrained to a protocol or class. Provide a fix-it if
   // allowConcreteGenericParams is true or the subject type is a member type.
-  if (!invalidConstraints.empty()) {
-    for (auto constraint : invalidConstraints) {
-      auto subjectType = constraint.subjectType;
-      auto constraintType = constraint.constraintType;
-      auto source = constraint.reqSource;
+  if (!invalidIsaConstraints.empty()) {
+    for (auto constraint : invalidIsaConstraints) {
+      auto subjectType = constraint.getSubjectDependentType(getGenericParams());
+      auto constraintType = constraint.value;
+      auto source = constraint.source;
       auto loc = source->getLoc();
 
       Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
@@ -5790,8 +5790,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
              .fixItReplace(loc, " == ");
       }
     }
-    
-    invalidConstraints.clear();
+
+    invalidIsaConstraints.clear();
   }
 }
 
