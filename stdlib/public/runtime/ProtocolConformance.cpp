@@ -689,7 +689,7 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::BaseClass: {
       // Demangle the base type under the given substitutions.
       auto baseType =
-        swift_getTypeByMangledName(MetadataState::Complete,
+        swift_getTypeByMangledName(MetadataState::Abstract,
                                    req.getMangledTypeName(), substGenericParam,
                                    substWitnessTable).getMetadata();
       if (!baseType) return true;
