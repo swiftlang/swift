@@ -2691,10 +2691,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (conformance.isConcrete()) {
       unsigned index = 0;
       for (const auto &req : conformance.getConditionalRequirements()) {
-        addConstraint(
-          req,
-          locator.withPathElement(
-            LocatorPathElt::getConditionalRequirementComponent(index++)));
+        addConstraint(req,
+                      locator.withPathElement(
+                          LocatorPathElt::getConditionalRequirementComponent(
+                              index++, req.getKind())));
       }
     }
 

@@ -106,6 +106,25 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     }
   }
 
+  auto dumpReqKind = [&out](RequirementKind kind) {
+    out << " (";
+    switch (kind) {
+    case RequirementKind::Conformance:
+      out << "conformance";
+      break;
+    case RequirementKind::Superclass:
+      out << "superclass";
+      break;
+    case RequirementKind::SameType:
+      out << "same-type";
+      break;
+    case RequirementKind::Layout:
+      out << "layout";
+      break;
+    }
+    out << ")";
+  };
+
   for (auto elt : getPath()) {
     out << " -> ";
     switch (elt.getKind()) {
@@ -222,26 +241,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case ConditionalRequirement:
       out << "conditional requirement #" << llvm::utostr(elt.getValue());
+      dumpReqKind(static_cast<RequirementKind>(elt.getValue2()));
       break;
 
     case TypeParameterRequirement: {
-      out << "type parameter requirement #" << llvm::utostr(elt.getValue())
-          << " (";
-      switch (static_cast<RequirementKind>(elt.getValue2())) {
-      case RequirementKind::Conformance:
-        out << "conformance";
-        break;
-      case RequirementKind::Superclass:
-        out << "superclass";
-        break;
-      case RequirementKind::SameType:
-        out << "same-type";
-        break;
-      case RequirementKind::Layout:
-        out << "layout";
-        break;
-      }
-      out << ")";
+      out << "type parameter requirement #" << llvm::utostr(elt.getValue());
+      dumpReqKind(static_cast<RequirementKind>(elt.getValue2()));
       break;
     }
 
