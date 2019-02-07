@@ -918,8 +918,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
   } else if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::None) {
-    // If -g was specified but not -debug-info-format, DWARF is assumed.
-    Opts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+    if (Triple.isWindowsMSVCEnvironment()) {
+      Opts.DebugInfoFormat = IRGenDebugInfoFormat::CodeView;
+    } else {
+      Opts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+    }
   }
   if (Args.hasArg(options::OPT_debug_info_format) &&
       !Args.hasArg(options::OPT_g_Group)) {
