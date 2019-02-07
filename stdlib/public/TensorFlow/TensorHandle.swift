@@ -21,7 +21,7 @@ import CTensorFlow
 /// handles in the compiler.
 @_fixed_layout // required because the compiler accesses _cTensorHandle directly.
 public class _AnyTensorHandle {
-  /// The underlying `TF_TensorHandle *`.
+  /// The underlying `TFE_TensorHandle *`.
   ///
   /// - Note: The compiler knows that `_AnyTensorHandle` has a single stored
   /// property, and assumes that this is it. Changing the design of
