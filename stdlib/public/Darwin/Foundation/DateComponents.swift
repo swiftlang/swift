@@ -64,7 +64,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     // MARK: - Properties
     
     /// Translate from the NSDateComponentUndefined value into a proper Swift optional
-    private func _getter(_ x : Int) -> Int? { return x == NSDateComponentUndefined ? nil : x }
+    private static func _getter(_ x : Int) -> Int? { return x == NSDateComponentUndefined ? nil : x }
     
     /// Translate from the proper Swift optional value into an NSDateComponentUndefined
     private static func _setter(_ x : Int?) -> Int { if let xx = x { return xx } else { return NSDateComponentUndefined } }
@@ -87,63 +87,63 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     /// An era or count of eras.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var era: Int? {
-        get { return _handle.map { _getter($0.era) } }
+        get { return _handle.map { DateComponents._getter($0.era) } }
         set { _applyMutation { $0.era = DateComponents._setter(newValue) } }
     }
     
     /// A year or count of years.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var year: Int? {
-        get { return _handle.map { _getter($0.year) } }
+        get { return _handle.map { DateComponents._getter($0.year) } }
         set { _applyMutation { $0.year = DateComponents._setter(newValue) } }
     }
     
     /// A month or count of months.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var month: Int? {
-        get { return _handle.map { _getter($0.month) } }
+        get { return _handle.map { DateComponents._getter($0.month) } }
         set { _applyMutation { $0.month = DateComponents._setter(newValue) } }
     }
     
     /// A day or count of days.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var day: Int? {
-        get { return _handle.map { _getter($0.day) } }
+        get { return _handle.map { DateComponents._getter($0.day) } }
         set { _applyMutation { $0.day = DateComponents._setter(newValue) } }
     }
     
     /// An hour or count of hours.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var hour: Int? {
-        get { return _handle.map { _getter($0.hour) } }
+        get { return _handle.map { DateComponents._getter($0.hour) } }
         set { _applyMutation { $0.hour = DateComponents._setter(newValue) } }
     }
     
     /// A minute or count of minutes.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var minute: Int? {
-        get { return _handle.map { _getter($0.minute) } }
+        get { return _handle.map { DateComponents._getter($0.minute) } }
         set { _applyMutation { $0.minute = DateComponents._setter(newValue) } }
     }
     
     /// A second or count of seconds.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var second: Int? {
-        get { return _handle.map { _getter($0.second) } }
+        get { return _handle.map { DateComponents._getter($0.second) } }
         set { _applyMutation { $0.second = DateComponents._setter(newValue) } }
     }
     
     /// A nanosecond or count of nanoseconds.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var nanosecond: Int? {
-        get { return _handle.map { _getter($0.nanosecond) } }
+        get { return _handle.map { DateComponents._getter($0.nanosecond) } }
         set { _applyMutation { $0.nanosecond = DateComponents._setter(newValue) } }
     }
     
     /// A weekday or count of weekdays.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var weekday: Int? {
-        get { return _handle.map { _getter($0.weekday) } }
+        get { return _handle.map { DateComponents._getter($0.weekday) } }
         set { _applyMutation { $0.weekday = DateComponents._setter(newValue) } }
     }
     
@@ -151,28 +151,28 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     /// Weekday ordinal units represent the position of the weekday within the next larger calendar unit, such as the month. For example, 2 is the weekday ordinal unit for the second Friday of the month.///
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var weekdayOrdinal: Int? {
-        get { return _handle.map { _getter($0.weekdayOrdinal) } }
+        get { return _handle.map { DateComponents._getter($0.weekdayOrdinal) } }
         set { _applyMutation { $0.weekdayOrdinal = DateComponents._setter(newValue) } }
     }
     
     /// A quarter or count of quarters.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var quarter: Int? {
-        get { return _handle.map { _getter($0.quarter) } }
+        get { return _handle.map { DateComponents._getter($0.quarter) } }
         set { _applyMutation { $0.quarter = DateComponents._setter(newValue) } }
     }
     
     /// A week of the month or a count of weeks of the month.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var weekOfMonth: Int? {
-        get { return _handle.map { _getter($0.weekOfMonth) } }
+        get { return _handle.map { DateComponents._getter($0.weekOfMonth) } }
         set { _applyMutation { $0.weekOfMonth = DateComponents._setter(newValue) } }
     }
     
     /// A week of the year or count of the weeks of the year.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var weekOfYear: Int? {
-        get { return _handle.map { _getter($0.weekOfYear) } }
+        get { return _handle.map { DateComponents._getter($0.weekOfYear) } }
         set { _applyMutation { $0.weekOfYear = DateComponents._setter(newValue) } }
     }
     
@@ -183,7 +183,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     /// You can use the yearForWeekOfYear property with the weekOfYear and weekday properties to get the date corresponding to a particular weekday of a given week of a year. For example, the 6th day of the 53rd week of the year 2005 (ISO 2005-W53-6) corresponds to Sat 1 January 2005 on the Gregorian calendar.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var yearForWeekOfYear: Int? {
-        get { return _handle.map { _getter($0.yearForWeekOfYear) } }
+        get { return _handle.map { DateComponents._getter($0.yearForWeekOfYear) } }
         set { _applyMutation { $0.yearForWeekOfYear = DateComponents._setter(newValue) } }
     }
     

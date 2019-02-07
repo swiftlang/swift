@@ -26,7 +26,7 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
     internal var _handle: _MutableHandle<NSMutableURLRequest>
     
     internal mutating func _applyMutation<ReturnType>(_ whatToDo : (NSMutableURLRequest) -> ReturnType) -> ReturnType {
-        if !isKnownUniquelyReferenced(&_handle) {
+        if !isKnownUniquelyReferenced(&_handle._pointer) {
             let ref = _handle._uncopiedReference()
             _handle = _MutableHandle(reference: ref)
         }

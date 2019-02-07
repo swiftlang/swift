@@ -15,9 +15,9 @@
 /// A class type which acts as a handle (pointer-to-pointer) to a Foundation reference type which has only a mutable class (e.g., NSURLComponents).
 ///
 /// Note: This assumes that the result of calling copy() is mutable. The documentation says that classes which do not have a mutable/immutable distinction should just adopt NSCopying instead of NSMutableCopying.
-internal final class _MutableHandle<MutableType : NSObject>
+internal struct _MutableHandle<MutableType : NSObject>
   where MutableType : NSCopying {
-    fileprivate var _pointer : MutableType
+    internal var _pointer : MutableType
     
     init(reference : __shared MutableType) {
         _pointer = reference.copy() as! MutableType
@@ -48,17 +48,17 @@ internal protocol _MutableBoxing : ReferenceConvertible {
     /// Apply a mutating closure to the reference type, regardless if it is mutable or immutable.
     ///
     /// This function performs the correct copy-on-write check for efficient mutation.
-    mutating func _applyMutation<ReturnType>(_ whatToDo : (ReferenceType) -> ReturnType) -> ReturnType
+    mutating func _applyMutation<ReturnType>(_ whatToDo : (inout ReferenceType) -> ReturnType) -> ReturnType
 }
 
 extension _MutableBoxing {
     @inline(__always)
-    mutating func _applyMutation<ReturnType>(_ whatToDo : (ReferenceType) -> ReturnType) -> ReturnType {
+    mutating func _applyMutation<ReturnType>(_ whatToDo : (inout ReferenceType) -> ReturnType) -> ReturnType {
         // Only create a new box if we are not uniquely referenced
-        if !isKnownUniquelyReferenced(&_handle) {
+        if !isKnownUniquelyReferenced(&_handle._pointer) {
             let ref = _handle._pointer
             _handle = _MutableHandle(reference: ref)
         }
-        return whatToDo(_handle._pointer)
+        return whatToDo(&_handle._pointer)
     }
 }
