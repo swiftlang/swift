@@ -1,9 +1,6 @@
 // RUN: %target-run-eager-swift
 // REQUIRES: executable_test
 //
-// FIXME: `XORTraining` segfaults with `-O`, possibly due to AD refcounting bugs.
-// UNSUPPORTED: swift_test_mode_optimize
-//
 // Machine learning API AD runtime tests.
 
 import TensorFlow
