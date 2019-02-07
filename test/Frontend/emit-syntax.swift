@@ -13,6 +13,31 @@ struct Foo {
 // CHECK: "kind":"r_brace"
 }
 
+// CHECK: "kind":"kw_func"
+// CHECK: "kind":"identifier"
+// CHECK: "text":"Bar"
+// CHECK: "kind":"l_paren"
+// CHECK: "kind":"FunctionParameterList"
+// CHECK: "kind":"FunctionParameter"
+// CHECK: "kind":"identifier"
+// CHECK: "text":"arg1"
+// CHECK: "kind":"colon"
+// CHECK: "kind":"identifier"
+// CHECK: "text":"String"
+// CHECK: "kind":"comma"
+// CHECK: "null"
+// CHECK: "kind":"identifier"
+// CHECK: "text":"arg2"
+// CHECK-NEXT: "null"
+// CHECK: "kind":"colon"
+// CHECK: "kind":"identifier"
+// CHECK: "text":"Int"
+// CHECK: "kind":"r_paren"
+// CHECK: "kind":"l_brace"
+func Bar(arg1: String, arg2: Int) {
+// CHECK: "kind":"r_brace"
+}
+
 // CHECK: "leadingTrivia":[
 // CHECK: "kind":"LineComment",
 // CHECK: "value":"\/\/ Comment at the end of the file"
