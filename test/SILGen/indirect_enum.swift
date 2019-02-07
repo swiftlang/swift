@@ -541,3 +541,35 @@ func dontDisableCleanupOfIndirectPayload(_ x: TrivialButIndirect) {
   guard case .Indirect(let bar) = x else { return }
 }
 // CHECK: } // end sil function '$s13indirect_enum35dontDisableCleanupOfIndirectPayloadyyAA010TrivialButG0OF'
+
+// Make sure that in these cases we do not break any ownership invariants.
+class Box<T> {
+  var value: T
+  init(_ inputValue: T) { value = inputValue }
+}
+
+enum ValueWithInlineStorage<T> {
+case inline(T)
+indirect case box(Box<T>)
+}
+
+func switchValueWithInlineStorage<U>(v: ValueWithInlineStorage<U>) {
+  switch v {
+  case .inline:
+    return
+  case .box(let box):
+    return
+  }
+}
+
+func guardValueWithInlineStorage<U>(v: ValueWithInlineStorage<U>) {
+  do {
+    guard case .inline = v else { return }
+    guard case .box(let box) = v else { return }
+  }
+
+  do {
+    if case .inline = v { return }
+    if case .box(let box) = v { return }
+  }
+}
