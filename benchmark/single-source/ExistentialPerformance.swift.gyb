@@ -19,6 +19,15 @@
 
 import TestsUtils
 
+// The purpose of these benchmarks is to evaluate different scenarios when
+// moving the implementation of existentials (protocol values) to heap based
+// copy-on-write buffers.
+//
+// The performance boost of `Ref4` vs `Ref3` is expected because copying the
+// existential only involves copying one reference of the heap based
+// copy-on-write buffer (outline case) that holds the struct vs copying the
+// individual fields of the struct in the inline case of `Ref3`.
+
 let t: [BenchmarkCategory] = [.existential]
 let ta: [BenchmarkCategory] = [.api, .Array, .existential]
 
@@ -64,7 +73,7 @@ Workloads = [
       fatalError("expected true")
     }
 """),
-  ('Array.init', Setup[0], '20', """
+  ('Array.init', Setup[0], '100', """
     blackHole(Array(repeating: existentialType.init(), count: 128))
 """),
   ('Array.method.1x', Setup[4], '100', """
@@ -88,12 +97,12 @@ Workloads = [
       }
     }
 """),
-  ('Array.Shift', Setup[5], '10', """
+  ('Array.Shift', Setup[5], '25', """
     for i in 0 ..< existentialArray.count-1 {
       existentialArray.swapAt(i, i+1)
     }
 """),
-  ('Array.ConditionalShift', Setup[5], '10', """
+  ('Array.ConditionalShift', Setup[5], '25', """
     for i in 0 ..< existentialArray.count-1 {
       let curr = existentialArray[i]
       if curr.doIt() {
