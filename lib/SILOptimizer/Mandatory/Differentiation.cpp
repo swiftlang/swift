@@ -1729,6 +1729,8 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     DifferentiationInvoker invoker,
     std::function<void(DifferentiationTask *)> taskCallback) {
 
+  SILValue functionSource = original;
+
   // If `original` is itself an `AutoDiffFunctionExtractInst` whose kind matches
   // the given kind and desired differentiation parameter indices, simply
   // extract the associated function of its function operand, retain the
@@ -1736,20 +1738,25 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
   if (auto *inst = original->getDefiningInstruction()) {
     if (auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(inst)) {
       if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original) {
-        SILValue assocFn = builder.createAutoDiffFunctionExtract(
-            original.getLoc(), kind, /*differentiationOrder*/ 1,
-            adfei->getFunctionOperand());
-        auto autodiffFnType =
-            adfei->getFunctionOperand()->getType().castTo<SILFunctionType>();
-        if (autodiffFnType->getDifferentiationParameterIndices().test(
-                desiredIndices.parameters)) {
-          context.emitNondifferentiabilityError(original, parentTask,
-              diag::autodiff_function_subset_indices_not_differentiable);
-          return None;
-        }
-        SILAutoDiffIndices indices(0, desiredIndices.parameters);
-        return std::make_pair(assocFn, indices);
+        functionSource = adfei->getFunctionOperand();
       }
+    }
+  }
+
+  // If functionSource is a @differentiable function, just extract it.
+  if (auto autodiffFnType = original->getType().castTo<SILFunctionType>()) {
+    if (autodiffFnType->isDifferentiable()) {
+      SILValue assocFn = builder.createAutoDiffFunctionExtract(
+          original.getLoc(), kind, /*differentiationOrder*/ 1, functionSource);
+      if (autodiffFnType->getDifferentiationParameterIndices().test(
+              desiredIndices.parameters)) {
+        context.emitNondifferentiabilityError(
+            original, parentTask,
+            diag::autodiff_function_subset_indices_not_differentiable);
+        return None;
+      }
+      SILAutoDiffIndices indices(0, desiredIndices.parameters);
+      return std::make_pair(assocFn, indices);
     }
   }
 
