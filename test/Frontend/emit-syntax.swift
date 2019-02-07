@@ -24,11 +24,10 @@ struct Foo {
 // CHECK: "kind":"colon"
 // CHECK: "kind":"identifier"
 // CHECK: "text":"String"
+// CHECK: null,null
 // CHECK: "kind":"comma"
-// CHECK: "null"
 // CHECK: "kind":"identifier"
 // CHECK: "text":"arg2"
-// CHECK-NEXT: "null"
 // CHECK: "kind":"colon"
 // CHECK: "kind":"identifier"
 // CHECK: "text":"Int"
