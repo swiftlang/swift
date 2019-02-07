@@ -780,7 +780,6 @@ FUNCTION(RelocateClassMetadata,
          ARGS(TypeContextDescriptorPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
-// struct FieldInfo { size_t Size; size_t AlignMask; };
 // void swift_initClassMetadata(Metadata *self,
 //                              ClassLayoutFlags flags,
 //                              size_t numFields,
@@ -794,7 +793,6 @@ FUNCTION(InitClassMetadata,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
-// struct FieldInfo { size_t Size; size_t AlignMask; };
 // void swift_updateClassMetadata(Metadata *self,
 //                                ClassLayoutFlags flags,
 //                                size_t numFields,
@@ -808,7 +806,6 @@ FUNCTION(UpdateClassMetadata,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
-// struct FieldInfo { size_t Size; size_t AlignMask; };
 // MetadataDependency swift_initClassMetadata2(Metadata *self,
 //                                             ClassLayoutFlags flags,
 //                                             size_t numFields,
@@ -822,7 +819,6 @@ FUNCTION(InitClassMetadata2,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
-// struct FieldInfo { size_t Size; size_t AlignMask; };
 // MetadataDependency swift_updateClassMetadata2(Metadata *self,
 //                                               ClassLayoutFlags flags,
 //                                               size_t numFields,
