@@ -466,9 +466,11 @@ public:
   /// This distinguishes static references to types, like Int, from metatype
   /// values, "someTy: Any.Type".
   bool isTypeReference(llvm::function_ref<Type(const Expr *)> getType =
-                           [](const Expr *E) -> Type {
-    return E->getType();
-  }) const;
+                           [](const Expr *E) -> Type { return E->getType(); },
+                       llvm::function_ref<Decl *(const Expr *)> getDecl =
+                           [](const Expr *E) -> Decl * {
+                         return nullptr;
+                       }) const;
 
   /// Determine whether this expression refers to a statically-derived metatype.
   ///
@@ -476,7 +478,9 @@ public:
   /// is not an archetype or dependent type.
   bool isStaticallyDerivedMetatype(
       llvm::function_ref<Type(const Expr *)> getType =
-          [](const Expr *E) -> Type { return E->getType(); }) const;
+          [](const Expr *E) -> Type { return E->getType(); },
+      llvm::function_ref<bool(const Expr *)> isTypeReference =
+          [](const Expr *E) { return E->isTypeReference(); }) const;
 
   /// isImplicit - Determines whether this expression was implicitly-generated,
   /// rather than explicitly written in the AST.
