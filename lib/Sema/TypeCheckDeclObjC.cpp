@@ -1054,7 +1054,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
       protocolContext && protocolContext->isObjC();
 
   // Local function to determine whether we can implicitly infer @objc.
-  auto canInferImplicitObjC = [&] {
+  auto canInferImplicitObjC = [&](bool allowAnyAccess) {
     if (VD->isInvalid())
       return false;
     if (VD->isOperator())
@@ -1064,7 +1064,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     if (!allowImplicit && VD->isImplicit())
       return false;
 
-    if (VD->getFormalAccess() <= AccessLevel::FilePrivate)
+    if (!allowAnyAccess && VD->getFormalAccess() <= AccessLevel::FilePrivate)
       return false;
 
     if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
@@ -1115,6 +1115,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   // A member of an @objc protocol is implicitly @objc.
   if (isMemberOfObjCProtocol)
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
+
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
@@ -1122,10 +1123,14 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
        cast<ExtensionDecl>(VD->getDeclContext())->getAttrs()
         .hasAttribute<NonObjCAttr>()))
     return None;
-  if (isMemberOfObjCClassExtension(VD) && canInferImplicitObjC())
+
+  if (isMemberOfObjCClassExtension(VD) && 
+      canInferImplicitObjC(/*allowAnyAccess*/true))
     return ObjCReason(ObjCReason::MemberOfObjCExtension);
-  if (isMemberOfObjCMembersClass(VD) && canInferImplicitObjC())
+  if (isMemberOfObjCMembersClass(VD) && 
+      canInferImplicitObjC(/*allowAnyAccess*/false))
     return ObjCReason(ObjCReason::MemberOfObjCMembersClass);
+
   // An override of an @objc declaration is implicitly @objc.
   if (VD->getOverriddenDecl() && VD->getOverriddenDecl()->isObjC())
     return ObjCReason(ObjCReason::OverridesObjC);
@@ -1177,7 +1182,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   // (and extensions thereof) whose class hierarchies originate in Objective-C,
   // e.g., which derive from NSObject, so long as the members have internal
   // access or greater.
-  if (!canInferImplicitObjC())
+  if (!canInferImplicitObjC(/*allowAnyAccess*/false))
     return None;
 
   // If this declaration is part of a class with implicitly @objc members,
