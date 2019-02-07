@@ -16,8 +16,7 @@ func apply() {
 
 // CHECK-AST-LABEL:  (func_decl {{.*}} "myfunction(_:)"
 // CHECK-AST:          (call_expr type='(Float)'
-// CHECK-AST:            (autodiff_function_extract_original implicit type='(Float) -> (Float)'
-// CHECK-AST:              (declref_expr type='@differentiable (Float) -> (Float)'
+// CHECK-AST:            (declref_expr type='@differentiable (Float) -> (Float)'
 // CHECK-AST:          (return_stmt
 // CHECK-AST:            (function_conversion_expr implicit type='(Float) -> Float'
 // CHECK-AST:              (autodiff_function_extract_original implicit type='(Float) -> (Float)'
@@ -29,11 +28,10 @@ func apply() {
 
 // CHECK-SILGEN-LABEL: @{{.*}}myfunction{{.*}}
 // CHECK-SILGEN: bb0([[DIFFED:%.*]] : @guaranteed $@differentiable @callee_guaranteed (Float) -> Float):
-// CHECK-SILGEN:   [[DIFFED_COPY:%.*]] = copy_value [[DIFFED]] : $@differentiable @callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   [[ORIG:%.*]] = autodiff_function_extract [original] [[DIFFED_COPY]] : $@differentiable @callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   [[BORROWED_ORIG:%.*]] = begin_borrow [[ORIG]] : $@callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   apply [[BORROWED_ORIG]]({{%.*}}) : $@callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   destroy_value [[ORIG]] : $@callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   [[ORIG:%.*]] = copy_value [[DIFFED]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   [[BORROWED_ORIG:%.*]] = begin_borrow [[ORIG]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   apply [[BORROWED_ORIG]]({{%.*}}) : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   destroy_value [[ORIG]] : $@differentiable @callee_guaranteed (Float) -> Float
 // CHECK-SILGEN:   [[DIFFED_COPY:%.*]] = copy_value [[DIFFED]] : $@differentiable @callee_guaranteed (Float) -> Float
 // CHECK-SILGEN:   [[ORIG:%.*]] = autodiff_function_extract [original] [[DIFFED_COPY]] : $@differentiable @callee_guaranteed (Float) -> Float
 // CHECK-SILGEN:   return [[ORIG]] : $@callee_guaranteed (Float) -> Float

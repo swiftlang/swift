@@ -7566,17 +7566,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     }
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  if (auto *fnTy = cs.getType(fn)->getAs<AnyFunctionType>()) {
-    if (fnTy->isDifferentiable()) {
-      auto fnTyNoDiff =
-          fnTy->withExtInfo(fnTy->getExtInfo().withDifferentiable(false));
-      fn = new (tc.Context) AutoDiffFunctionExtractOriginalExpr(fn, fnTyNoDiff);
-      cs.setType(fn, fnTyNoDiff);
-      cs.cacheExprTypes(fn);
-    }
-  }
-
   bool unwrapResult = false;
   if (auto *IUOFnTy = dyn_cast<ImplicitlyUnwrappedFunctionConversionExpr>(fn)) {
     unwrapResult = true;
