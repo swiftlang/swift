@@ -77,6 +77,7 @@ PrintOptions PrintOptions::printDocInterface() {
   result.PrintDocumentationComments = false;
   result.PrintRegularClangComments = false;
   result.PrintFunctionRepresentationAttrs = false;
+  result.SkipUnderscoredKeywords = true;
   return result;
 }
 
