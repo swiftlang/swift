@@ -110,6 +110,12 @@ TracerTests.testAllBackends("AllDtypeSupport") {
   traceAndCheckEqual(ui64)
   let i64: Int64 = 8
   traceAndCheckEqual(i64)
+
+  // Bool
+  let boolTF = _graph(with: Tensor<Bool>(true), in: tracee)
+  let (bs, bd) = boolTF(Tensor<Bool>(true), Tensor<Bool>(false))
+  expectTrue(bs.scalarized())
+  expectFalse(bd.scalarized())
 }
 
 TracerTests.testAllBackends("Basic_IntermediateTensors") {
