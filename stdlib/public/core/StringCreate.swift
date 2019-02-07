@@ -13,6 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
+  if input.isEmpty { return true }
+
   // NOTE: Avoiding for-in syntax to avoid bounds checks
   //
   // TODO(String performance): SIMD-ize
@@ -146,9 +148,8 @@ extension String {
     _ body: (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeBytes { rawBufPtr in
-      let rawPtr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
       return try body(UnsafeBufferPointer(
-        start: rawPtr.assumingMemoryBound(to: UInt8.self),
+        start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
         count: rawBufPtr.count))
     }
   }
