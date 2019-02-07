@@ -2165,15 +2165,14 @@ void PatternMatchEmission::emitEnumElementDispatch(
           auto accessMV = ManagedValue::forUnmanaged(accessAddress);
           ManagedValue newLoadedBoxValue;
           if (accessAddress == boxedValue) {
-            newLoadedBoxValue = SGF.B.createLoadBorrow(loc, accessMV);
+            eltCMV = {SGF.B.createLoadBorrow(loc, accessMV),
+                      CastConsumptionKind::BorrowAlways};
           } else {
-            newLoadedBoxValue = SGF.B.createLoadCopy(loc, accessMV);
+            // Since we made a copy, send down TakeAlways.
+            eltCMV = {SGF.B.createLoadCopy(loc, accessMV),
+                      CastConsumptionKind::TakeAlways};
           }
-          boxedValue = newLoadedBoxValue.getUnmanagedValue();
           access.endAccess(SGF);
-
-          // Since we made a copy, send down TakeAlways.
-          eltCMV = {newLoadedBoxValue, CastConsumptionKind::TakeAlways};
         } else {
           // The boxed value may be shared, so we always have to copy it.
           eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
