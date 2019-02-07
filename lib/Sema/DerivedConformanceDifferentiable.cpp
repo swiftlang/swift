@@ -864,6 +864,8 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
   auto *diffableProto =
       TC.Context.getProtocol(KnownProtocolKind::Differentiable);
   for (auto *vd : nominal->getStoredProperties()) {
+    if (!vd->hasInterfaceType())
+      TC.resolveDeclSignature(vd);
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>() ||
         TC.conformsToProtocol(varType, diffableProto, nominal,
