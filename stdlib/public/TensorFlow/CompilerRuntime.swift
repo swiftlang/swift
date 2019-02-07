@@ -1771,6 +1771,20 @@ func _TFCOpSetAttrString(_ op: CTFEOp,
   }
 }
 
+/// Wrapper around TFE_OpSetAttrString that handles converting the Swift Stdlib
+/// String into a buffer that TFE_OpSetAttrString can read.
+@usableFromInline
+@_silgen_name("_swift_tfc_OpSetAttrFunctionName")
+func _TFCOpSetAttrFunctionName(_ op: CTFEOp,
+                               _ attrName: UnsafePointer<Int8>,
+                               _ value: String) {
+  value.utf8CString.withUnsafeBufferPointer { buffer in
+    // utf8CString is null-terminated; TFE_OpSetAttrString wants
+    // non-null-terminated.
+    TFE_OpSetAttrFunctionName(op, attrName, buffer.baseAddress, buffer.count - 1)
+  }
+}
+
 /// Wrapper around TFE_OpSetAttrStringList that handles converting the Swift
 /// Strings into buffers that TFE_OpSetAttrStringList can read.
 @usableFromInline

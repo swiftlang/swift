@@ -161,6 +161,10 @@ namespace tf {
     static constexpr char tfDataTypeSupportedTypesDesc[] =
         "TensorDataType or [TensorDataType]";
 
+    /// An English list of all the types that TFFunctionAttribute supports, for
+    /// use in diagnostics.
+    static constexpr char tfFunctionSupportedTypesDesc[] = "String";
+
     /// Classify `type` for use as a NormalAttribute.
     Normal classifyNormalAttribute(Type type);
 

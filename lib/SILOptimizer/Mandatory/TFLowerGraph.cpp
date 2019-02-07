@@ -1610,6 +1610,12 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         llvm_unreachable(
             "only integers and arrays are possible for TF_DataType attrs");
       }
+      break;
+    case GraphOperationInfo::ArgumentLowering::TFFunctionAttribute:
+      assert(attrValue.getKind() == SymbolicValue::String);
+      auto fname = attrValue.getStringValue();
+      TF_SetAttrFuncName(op, name.c_str(), fname.data(), fname.size());
+      break;
     }
   }
 

@@ -2442,6 +2442,21 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       break;
     }
+    case GraphOperationInfo::ArgumentLowering::TFFunctionAttribute: {
+      auto silValue = structuredArgument.getSingleArgument();
+      auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
+      // Swift Strings are passed in LLVM IR by passing the 2 LLVM values that
+      // are inside them, so we get the 2 LLVM values from the explosion and
+      // pass them to the runtime function.
+      auto attrExplosion = getLoweredExplosion(silValue);
+      assert(attrExplosion.size() == 2 &&
+             "expected 2 LLVM values in Swift String");
+      auto *setAttrFn = IGM.getTFC_OpSetAttrFunctionNameFn();
+      Builder.CreateCall(setAttrFn,
+                         {op, attrNameValAddr, attrExplosion.claimNext(),
+                          attrExplosion.claimNext()});
+      break;
+    }
     case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
       assert(structuredArgument.getKind() == GraphOperationInfo::SAK_Single &&
              "deabstraction should not generate ShapeAttribute lists");
@@ -2836,6 +2851,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
             "only integers and arrays are possible for TF_DataType attrs");
       }
       break;
+    }
+    case GraphOperationInfo::ArgumentLowering::TFFunctionAttribute: {
+      assert(0 && "TODO: Implement TFFunctionAttribute");
     }
     case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
       assert(0 && "TODO: implement shape attr");

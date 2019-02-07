@@ -110,6 +110,8 @@ GraphOperationInfo::getArgumentLoweringSuffix(ArgumentLowering lowering) {
     return "$shape";
   case ArgumentLowering::TFDataTypeAttribute:
     return "$dtype";
+  case ArgumentLowering::TFFunctionAttribute:
+    return "$func";
   case ArgumentLowering::Out:
     return "$out";
   }
@@ -137,6 +139,7 @@ GraphOperationInfo::decodeArgumentName(StringRef Name) {
           .Case("tensor", ArgumentLowering::TensorAttribute)
           .Case("shape", ArgumentLowering::ShapeAttribute)
           .Case("dtype", ArgumentLowering::TFDataTypeAttribute)
+          .Case("func", ArgumentLowering::TFFunctionAttribute)
           .Case("out", ArgumentLowering::Out)
           .Default(None);
     if (!loweringOpt)

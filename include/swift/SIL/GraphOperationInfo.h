@@ -86,6 +86,12 @@ public:
     /// Written as named argument with "$dtype" suffix.
     TFDataTypeAttribute,
 
+    /// A string representing the TFFunction name to be passed to a function
+    /// attribute of a tfop.
+    ///
+    /// Written as named argument with "$func" suffix.
+    TFFunctionAttribute,
+
     /// An argument specifying the address where an indirect output should be
     /// stored. This occurs when the graph_op exists in a context where its
     /// output is address-only.

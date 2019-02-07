@@ -2398,6 +2398,17 @@ namespace {
               return nullptr;
             }
             break;
+          case tf::GraphOperationInfo::ArgumentLowering::TFFunctionAttribute:
+            if (atc.classifyNormalAttribute(argType) !=
+                tf::AttributeTypeClassifier::Normal::String) {
+              diagnose(
+                  argLoc,
+                  StringRef("$func attribute requires ") +
+                      tf::AttributeTypeClassifier::tfFunctionSupportedTypesDesc +
+                      ", but got type '" + argType->getString() + "'");
+              return nullptr;
+            }
+            break;
           case tf::GraphOperationInfo::ArgumentLowering::Out:
             // SILGen generates $out attributes. It does not make sense to
             // specify them in code.
