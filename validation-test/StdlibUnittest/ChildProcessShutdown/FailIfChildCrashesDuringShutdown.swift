@@ -4,10 +4,14 @@
 // UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
-#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Windows)
-import Glibc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
 #else
-import Darwin
+#error("Unsupported platform")
 #endif
 
 _setTestSuiteFailedCallback() { print("abort()") }
