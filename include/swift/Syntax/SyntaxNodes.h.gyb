@@ -122,6 +122,10 @@ public:
 
 %   end
 % end
+
+/// Calculating an identifier for all syntax nodes' structures for verification
+/// purposes.
+const char* getSyntaxStructureVersioningIdentifier();
 }
 }
 

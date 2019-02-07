@@ -139,3 +139,7 @@ def dedented_lines(description):
     if not description:
         return []
     return textwrap.dedent(description).split('\n')
+
+
+def calculate_node_hash():
+    return "abc"
