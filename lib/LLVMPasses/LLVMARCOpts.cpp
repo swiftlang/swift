@@ -413,7 +413,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
   BasicBlock::iterator BBI = Retain.getIterator(),
                        BBE = BB.getTerminator()->getIterator();
 
-  bool isObjCRetain = Retain.getCalledFunction()->getName() == "objc_retain";
+  bool isObjCRetain = Retain.getIntrinsicID() == llvm::Intrinsic::objc_retain;
 
   bool MadeProgress = false;
 

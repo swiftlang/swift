@@ -194,6 +194,10 @@ public:
   }
 
   bool isNonAtomic(CallInst *I) {
+    // If we have an intrinsic, we know it must be an objc intrinsic. All objc
+    // intrinsics are atomic today.
+    if (I->getIntrinsicID() != llvm::Intrinsic::not_intrinsic)
+      return false;
     return (I->getCalledFunction()->getName().find("nonatomic") !=
             llvm::StringRef::npos);
   }

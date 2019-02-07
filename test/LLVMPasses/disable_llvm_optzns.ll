@@ -13,8 +13,8 @@ target triple = "x86_64-apple-macosx10.9"
 
 declare %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* returned)
 declare void @swift_unknownObjectRelease(%swift.refcounted*)
-declare %objc_object* @objc_retain(%objc_object*)
-declare void @objc_release(%objc_object*)
+declare i8* @llvm.objc.retain(i8*)
+declare void @llvm.objc.release(i8*)
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
 declare void @swift_release(%swift.refcounted* nocapture)
 declare %swift.refcounted* @swift_retain(%swift.refcounted* returned) nounwind
@@ -23,7 +23,7 @@ declare void @swift_bridgeObjectRelease(%swift.bridge*)
 declare %swift.refcounted* @swift_retainUnowned(%swift.refcounted* returned)
 
 declare void @user(%swift.refcounted *) nounwind
-declare void @user_objc(%objc_object*) nounwind
+declare void @user_objc(i8*) nounwind
 declare void @unknown_func()
 
 ; CHECK-LABEL: @trivial_retain_release(
@@ -37,7 +37,7 @@ declare void @unknown_func()
 ; NEGATIVE-NEXT: entry:
 ; NEGATIVE-NEXT: call void @user(
 ; NEGATIVE-NEXT: ret void
-define void @trivial_retain_release(%swift.refcounted* %P, %objc_object* %O, %swift.bridge * %B) {
+define void @trivial_retain_release(%swift.refcounted* %P, i8* %O, %swift.bridge * %B) {
 entry:
   call %swift.refcounted* @swift_retain(%swift.refcounted* %P)
   call void @swift_release(%swift.refcounted* %P) nounwind
