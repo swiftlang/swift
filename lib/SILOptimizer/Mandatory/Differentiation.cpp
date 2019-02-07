@@ -94,8 +94,10 @@ static void createEntryArguments(SILFunction *f) {
         f->mapTypeIntoContext(indResultTy).getAddressType(),
         createDummyParamDecl());
   for (auto paramTy : conv.getParameterSILTypes()) {
-    entry->createFunctionArgument(f->mapTypeIntoContext(paramTy),
-                                  createDummyParamDecl());
+    auto *decl = createDummyParamDecl();
+    auto ty = f->mapTypeIntoContext(paramTy);
+    decl->setType(ty.getASTType());
+    entry->createFunctionArgument(ty, decl);
   }
 }
 
