@@ -181,33 +181,6 @@ public:
   Type deriveKeyPathIterable(AssociatedTypeDecl *assocType);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Derive a Parameterized requirement for a nominal type.
-  ///
-  /// \returns the derived member, which will also be added to the type.
-  ValueDecl *deriveParameterized(ValueDecl *requirement);
-
-  /// Derive a Parameterized type witness for a nominal type, if it has
-  /// parameters (stored properties marked with @TFParameter).
-  ///
-  /// \returns the derived member, which will also be added to the type.
-  Type deriveParameterized(AssociatedTypeDecl *assocType);
-
-  /// Determine if a ParameterGroup requirement can be derived for a type.
-  ///
-  /// \returns True if the requirement can be derived.
-  static bool canDeriveParameterGroup(NominalTypeDecl *type);
-
-  /// Derive a ParameterGroup requirement for a nominal type.
-  ///
-  /// \returns the derived member, which will also be added to the type.
-  ValueDecl *deriveParameterGroup(ValueDecl *requirement);
-
-  /// Derive a ParameterGroup type witness for a nominal type.
-  ///
-  /// \returns the derived member, which will also be added to the type.
-  Type deriveParameterGroup(AssociatedTypeDecl *assocType);
-
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if an AdditiveArithmetic requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
@@ -246,8 +219,7 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDifferentiable(ValueDecl *requirement);
 
-  /// Derive a Differentiable type witness for a nominal type, if it has
-  /// parameters (stored properties marked with @TFParameter).
+  /// Derive a Differentiable type witness for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.
   Type deriveDifferentiable(AssociatedTypeDecl *assocType);

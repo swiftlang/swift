@@ -3078,14 +3078,6 @@ bool NominalTypeDecl::isOptionalDecl() const {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-void
-NominalTypeDecl::getAllTFParameters(SmallVectorImpl<VarDecl *> &result) const {
-  for (auto member : getStoredProperties())
-    if (member->getAttrs().hasAttribute<TFParameterAttr>())
-      result.push_back(member);
-}
-
-// SWIFT_ENABLE_TENSORFLOW
 ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() {
   ConstructorDecl *memberwiseInitDecl = nullptr;
   auto ctorDecls = lookupDirect(DeclBaseName::createConstructor());

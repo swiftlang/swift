@@ -3264,11 +3264,6 @@ public:
   Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Retrieve all parameters of the nominal type (instance stored properties
-  /// declared with @TFParameter).
-  void getAllTFParameters(SmallVectorImpl<VarDecl *> &result) const;
-
-  // SWIFT_ENABLE_TENSORFLOW
   /// Get the memberwise initializer of the nominal type, if it exists.
   ConstructorDecl *getMemberwiseInitializer();
 
