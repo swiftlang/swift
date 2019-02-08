@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/IDE/ConformingMethodList.h"
 #include "ExprContextAnalysis.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/IDE/ConformingMethodList.h"
-#include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/Attr.h"
@@ -106,9 +106,8 @@ void ConformingMethodListCallbacks::resolveExpectedTypes(
   auto &ctx = CurDeclContext->getASTContext();
 
   for (auto name : names) {
-    std::string err;
-    if (auto D = getDeclFromMangledSymbolName(ctx, name, err)) {
-      if (auto Proto = dyn_cast<ProtocolDecl>(D))
+    if (auto ty = Demangle::getTypeForMangling(ctx, name)) {
+      if (auto Proto = dyn_cast_or_null<ProtocolDecl>(ty->getAnyGeneric()))
         result.push_back(Proto);
     }
   }
