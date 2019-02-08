@@ -105,7 +105,7 @@ namespace {
 } // end anonymous namespace
 
 /// Return the lowered type for the class's 'self' type within its context.
-static SILType getSelfType(ClassDecl *base) {
+static SILType getSelfType(const ClassDecl *base) {
   auto loweredTy = base->getDeclaredTypeInContext()->getCanonicalType();
   return SILType::getPrimitiveObjectType(loweredTy);
 }
@@ -2131,10 +2131,17 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
   builder.buildMetaclassStub();
 
   HasUpdateCallback_t hasUpdater = DoesNotHaveUpdateCallback;
-  if (doesClassMetadataRequireUpdate(IGM, cls) &&
-      !doesClassMetadataRequireInitialization(IGM, cls)) {
+
+  switch (IGM.getClassMetadataStrategy(cls)) {
+  case ClassMetadataStrategy::Resilient:
+  case ClassMetadataStrategy::Singleton:
+  case ClassMetadataStrategy::Fixed:
+    break;
+  case ClassMetadataStrategy::Update:
+  case ClassMetadataStrategy::FixedOrUpdate:
     hasUpdater = HasUpdateCallback;
     emitObjCMetadataUpdateFunction(IGM, cls);
+    break;
   }
 
   // Then build the class RO-data.
@@ -2293,40 +2300,26 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
                                      IGM.Context.Id_SwiftObject);
 }
 
-bool irgen::doesClassMetadataRequireRelocation(IRGenModule &IGM,
-                                               ClassDecl *theClass) {
+ClassMetadataStrategy
+IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
   SILType selfType = getSelfType(theClass);
-  auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &selfTI = getTypeInfo(selfType).as<ClassTypeInfo>();
 
-  // A completely fragile layout does not change whether the metadata
-  // requires *relocation*, since that only depends on resilient class
-  // ancestry, or the class itself being generic.
-  auto &layout = selfTI.getClassLayout(IGM, selfType,
-                                       /*forBackwardDeployment=*/false);
-  return layout.doesMetadataRequireRelocation();
-}
+  auto &resilientLayout = selfTI.getClassLayout(*this, selfType,
+                                              /*forBackwardDeployment=*/false);
+  auto &fragileLayout = selfTI.getClassLayout(*this, selfType,
+                                              /*forBackwardDeployment=*/true);
 
-bool irgen::doesClassMetadataRequireInitialization(IRGenModule &IGM,
-                                                   ClassDecl *theClass) {
-  SILType selfType = getSelfType(theClass);
-  auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+  if (resilientLayout.doesMetadataRequireRelocation())
+    return ClassMetadataStrategy::Resilient;
 
-  // If we have a fragile layout used for backward deployment, we must use
-  // idempotent initialization; swift_initClassMetadata() does not work with
-  // statically registered classes.
-  auto &layout = selfTI.getClassLayout(IGM, selfType,
-                                       /*forBackwardDeployment=*/true);
-  return layout.doesMetadataRequireInitialization();
-}
+  if (fragileLayout.doesMetadataRequireInitialization())
+    return ClassMetadataStrategy::Singleton;
 
-bool irgen::doesClassMetadataRequireUpdate(IRGenModule &IGM,
-                                           ClassDecl *theClass) {
-  SILType selfType = getSelfType(theClass);
-  auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+  if (resilientLayout.doesMetadataRequireInitialization())
+    return ClassMetadataStrategy::FixedOrUpdate;
 
-  auto &layout = selfTI.getClassLayout(IGM, selfType,
-                                       /*forBackwardDeployment=*/false);
-  return layout.doesMetadataRequireInitialization();
+  return ClassMetadataStrategy::Fixed;
 }
 
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
