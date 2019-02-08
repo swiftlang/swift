@@ -74,3 +74,25 @@ _ = pullback(at: Vector.zero, in: side_effect_release_zero)
 // CHECK:  release_value_addr [[BUF]] : $*Vector
 // CHECK:  dealloc_stack [[BUF]] : $*Vector
 // CHECK:  release_value [[SEED:%.*]] : $Vector
+// CHECK: }
+
+func subset_adjoint_releases_unused_ones(_ x: Vector) -> Vector {
+  let y = x + .zero
+  return .zero + y
+}
+_ = pullback(at: .zero, in: subset_adjoint_releases_unused_ones)
+
+// CHECK-LABEL @{{.*}}subset_adjoint_releases_unused_ones{{.*}}__adjoint_src_0_wrt_0
+// CHECK: bb0({{%.*}} : $Vector, [[PRIMVALS:%.*]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}__Type__src_0_wrt_0):
+// CHECK:   [[PB:%.*]] = struct_extract [[PRIMVALS]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}, #{{.*}}subset_adjoint_releases_unused_ones{{.*}}__Type__src_0_wrt_0.pullback_1
+// CHECK:   [[TUPLE:%.*]] = apply [[PB]]({{.*}}) : $@callee_guaranteed (@guaranteed Vector) -> (@owned Vector, @owned Vector)
+// CHECK:   [[UNNEEDED_COTAN:%.*]] = tuple_extract [[TUPLE]] : $(Vector, Vector), 0
+// CHECK:   [[NEEDED_COTAN:%.*]] = tuple_extract [[TUPLE]] : $(Vector, Vector), 1
+// CHECK:   release_value [[UNNEEDED_COTAN]] : $Vector
+// CHECK-NOT:  release_value [[NEEDED_COTAN]] : $Vector
+// CHECK:  [[PB:%.*]] = struct_extract [[PRIMVALS]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}__Type__src_0_wrt_0, #{{.*}}subset_adjoint_releases_unused_ones{{.*}}__Type__src_0_wrt_0.pullback_0
+// CHECK:  [[TUPLE:%.*]] = apply [[PB]]([[NEEDED_COTAN]]) : $@callee_guaranteed (@guaranteed Vector) -> (@owned Vector, @owned Vector)
+// CHECK:  [[NEEDED_COTAN:%.*]] = tuple_extract [[TUPLE]] : $(Vector, Vector), 0
+// CHECK:  [[UNNEEDED_COTAN:%.*]] = tuple_extract [[TUPLE]] : $(Vector, Vector), 1
+// CHECK-NOT:  release_value [[NEEDED_COTAN]] : $Vector
+// CHECK:  release_value [[UNNEEDED_COTAN]] : $Vector

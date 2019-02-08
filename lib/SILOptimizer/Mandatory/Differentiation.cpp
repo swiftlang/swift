@@ -513,8 +513,10 @@ enum class FunctionSynthesisState {
 /// Stores activity information about `apply` instructions that `PrimalGen`
 /// calculates.
 struct NestedApplyActivity {
+  /// The differentiation indices that are desired by activity analysis.
+  SILAutoDiffIndices desiredIndices;
   /// The differentiation indices that are used to differentiate this apply.
-  SILAutoDiffIndices indices;
+  SILAutoDiffIndices actualIndices;
 };
 
 /// Specifies how we should differentiate a `struct_extract` instruction.
@@ -2441,7 +2443,7 @@ public:
 
     // Record the VJP's indices.
     getDifferentiationTask()->getNestedApplyActivities().insert(
-        {ai, {vjpAndVJPIndices->second}});
+        {ai, {indices, vjpAndVJPIndices->second}});
 
     // Call the VJP using the original parameters.
     SmallVector<SILValue, 8> newArgs;
@@ -3386,7 +3388,7 @@ public:
       SILValue seedEltAddr;
       if (auto tupleTy = av.getType().getAs<TupleType>())
         seedEltAddr = builder.createTupleElementAddr(
-            loc, access, applyInfo.indices.source);
+            loc, access, applyInfo.actualIndices.source);
       else
         seedEltAddr = access;
       args.push_back(builder.createLoad(
@@ -3427,29 +3429,52 @@ public:
     auto cleanupFn = [](SILBuilder &b, SILLocation l, SILValue v) {
       b.createReleaseValue(l, v, b.getDefaultAtomicity());
     };
+    auto cleanupFnAddr = [](SILBuilder &b, SILLocation l, SILValue v) {
+      b.createReleaseValueAddr(l, v, b.getDefaultAtomicity());
+    };
 
     // If the applied adjoint returns the adjoint of the original self
     // parameter, then it returns it first. Set the adjoint of the original
     // self parameter.
     auto selfParamIndex = originalParams.size() - 1;
     if (ai->hasSelfArgument() &&
-        applyInfo.indices.isWrtParameter(selfParamIndex)) {
+        applyInfo.actualIndices.isWrtParameter(selfParamIndex)) {
       auto cotanWrtSelf = *allResultsIt++;
-      addAdjointValue(ai->getArgument(origNumIndRes + selfParamIndex),
-          makeConcreteAdjointValue(ValueWithCleanup(
-              cotanWrtSelf,
-              makeCleanup(cotanWrtSelf, cleanupFn, {seedBuf.getCleanup()}))));
+      auto origArg = ai->getArgument(origNumIndRes + selfParamIndex);
+      if (cotanWrtSelf->getType().isAddress())
+        setAdjointBuffer(origArg, ValueWithCleanup(
+            cotanWrtSelf, makeCleanup(cotanWrtSelf, cleanupFnAddr)));
+      else
+        addAdjointValue(origArg,
+            makeConcreteAdjointValue(ValueWithCleanup(
+                cotanWrtSelf,
+                makeCleanup(cotanWrtSelf, cleanupFn, {seedBuf.getCleanup()}))));
     }
     // Set adjoints for the remaining non-self original parameters.
-    for (unsigned i : applyInfo.indices.parameters.set_bits()) {
+    for (unsigned i : applyInfo.actualIndices.parameters.set_bits()) {
       // Do not set the adjoint of the original self parameter because we
       // already added it at the beginning.
       if (ai->hasSelfArgument() && i == selfParamIndex)
         continue;
+      auto origArg = ai->getArgument(origNumIndRes + i);
       auto cotan = *allResultsIt++;
-      addAdjointValue(ai->getArgument(origNumIndRes + i),
-          makeConcreteAdjointValue(ValueWithCleanup(
-              cotan, makeCleanup(cotan, cleanupFn, {seedBuf.getCleanup()}))));
+      // If a cotangent value corresponds to a non-desired parameter, it won't
+      // be used, so release it.
+      if (i >= applyInfo.desiredIndices.parameters.size() ||
+          !applyInfo.desiredIndices.parameters[i]) {
+        if (cotan->getType().isAddress())
+          builder.createReleaseValueAddr(loc, cotan,
+                                         builder.getDefaultAtomicity());
+        else
+          builder.createReleaseValue(loc, cotan,
+                                     builder.getDefaultAtomicity());
+      }
+      if (cotan->getType().isAddress())
+        setAdjointBuffer(origArg, ValueWithCleanup(
+            cotan, makeCleanup(cotan, cleanupFnAddr)));
+      else
+        addAdjointValue(origArg, makeConcreteAdjointValue(ValueWithCleanup(
+            cotan, makeCleanup(cotan, cleanupFn, {seedBuf.getCleanup()}))));
     }
   }
 
