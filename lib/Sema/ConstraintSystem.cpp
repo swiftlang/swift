@@ -1752,6 +1752,16 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
   } else if (auto *CE = dyn_cast<CallExpr>(anchor)) {
     baseExpr = CE->getFn();
     baseType = getType(baseExpr);
+    // If this is an initializer call without explicit mention
+    // of `.init` on metatype value.
+    if (auto *MTT = baseType->getAs<MetatypeType>()) {
+      auto instanceType = MTT->getInstanceType();
+      if (!cs.isTypeReference(baseExpr) && !instanceType->isExistentialType()) {
+        (void)cs.recordFix(AllowInvalidInitRef::onNonConstMetatype(
+            cs, baseType, init, locator));
+        return;
+      }
+    }
   // Initializer reference which requires contextual base type e.g. `.init(...)`.
   } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
     // We need to find type variable which represents contextual base.

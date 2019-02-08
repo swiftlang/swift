@@ -1530,3 +1530,11 @@ bool InitOnProtocolMetatypeFailure::diagnoseAsError() {
 
   return true;
 }
+
+bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
+  auto *apply = cast<ApplyExpr>(getRawAnchor());
+  auto loc = apply->getArg()->getStartLoc();
+  emitDiagnostic(loc, diag::missing_init_on_metatype_initialization)
+      .fixItInsert(loc, ".init");
+  return true;
+}

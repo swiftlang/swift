@@ -232,7 +232,7 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
 /// This method could be used on not yet fully type-checked AST.
 bool ConstraintSystem::isTypeReference(const Expr *E) {
   return E->isTypeReference(
-      [&](const Expr *E) -> Type { return getType(E); },
+      [&](const Expr *E) -> Type { return simplifyType(getType(E)); },
       [&](const Expr *E) -> Decl * {
         if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
           return findResolvedMemberRef(
@@ -244,13 +244,17 @@ bool ConstraintSystem::isTypeReference(const Expr *E) {
               getConstraintLocator(UME, ConstraintLocator::UnresolvedMember));
         }
 
+        if (isa<OverloadSetRefExpr>(E))
+          return findResolvedMemberRef(
+              getConstraintLocator(const_cast<Expr *>(E)));
+
         return nullptr;
       });
 }
 
 bool ConstraintSystem::isStaticallyDerivedMetatype(const Expr *E) {
   return E->isStaticallyDerivedMetatype(
-      [&](const Expr *E) -> Type { return getType(E); },
+      [&](const Expr *E) -> Type { return simplifyType(getType(E)); },
       [&](const Expr *E) -> bool { return isTypeReference(E); });
 }
 
@@ -7394,24 +7398,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // We have a type constructor.
   if (auto metaTy = cs.getType(fn)->getAs<AnyMetatypeType>()) {
     auto ty = metaTy->getInstanceType();
-
-    if (!cs.isTypeReference(fn)) {
-      bool isExistentialType = false;
-      // If this is an attempt to initialize existential type.
-      if (auto metaType = cs.getType(fn)->getAs<MetatypeType>()) {
-        auto instanceType = metaType->getInstanceType();
-        isExistentialType = instanceType->isExistentialType();
-      }
-
-      if (!isExistentialType) {
-        // If the metatype value isn't a type expression,
-        // the user should reference '.init' explicitly, for clarity.
-        cs.TC
-            .diagnose(apply->getArg()->getStartLoc(),
-                      diag::missing_init_on_metatype_initialization)
-            .fixItInsert(apply->getArg()->getStartLoc(), ".init");
-      }
-    }
 
     // If we're "constructing" a tuple type, it's simply a conversion.
     if (auto tupleTy = ty->getAs<TupleType>()) {

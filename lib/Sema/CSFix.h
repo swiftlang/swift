@@ -543,7 +543,11 @@ public:
 };
 
 class AllowInvalidInitRef final : public ConstraintFix {
-  enum class RefKind { DynamicOnMetatype, ProtocolMetatype } Kind;
+  enum class RefKind {
+    DynamicOnMetatype,
+    ProtocolMetatype,
+    NonConstMetatype,
+  } Kind;
 
   Type BaseType;
   const ConstructorDecl *Init;
@@ -572,6 +576,11 @@ public:
   onProtocolMetatype(ConstraintSystem &cs, Type baseTy, ConstructorDecl *init,
                      bool isStaticallyDerived, SourceRange baseRange,
                      ConstraintLocator *locator);
+
+  static AllowInvalidInitRef *onNonConstMetatype(ConstraintSystem &cs,
+                                                 Type baseTy,
+                                                 ConstructorDecl *init,
+                                                 ConstraintLocator *locator);
 
 private:
   static AllowInvalidInitRef *create(RefKind kind, ConstraintSystem &cs,
