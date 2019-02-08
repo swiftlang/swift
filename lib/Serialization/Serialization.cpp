@@ -2666,7 +2666,16 @@ void Serializer::writeDecl(const Decl *D) {
   (void)id;
 
   assert((id - 1) == DeclOffsets.size());
+  assert((TypeOffsets.empty() || TypeOffsets.back() != Out.GetCurrentBitNo()) &&
+         "encoding Decl and Type to the same offset");
   DeclOffsets.push_back(Out.GetCurrentBitNo());
+  SWIFT_DEFER {
+    // This is important enough to leave on in Release builds.
+    if (DeclOffsets.back() == Out.GetCurrentBitNo()) {
+      llvm::PrettyStackTraceString message("failed to serialize anything");
+      abort();
+    }
+  };
 
   assert(!D->isInvalid() && "cannot create a module with an invalid decl");
   if (isDeclXRef(D)) {
@@ -3677,14 +3686,23 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
 
 void Serializer::writeType(Type ty) {
   using namespace decls_block;
+  PrettyStackTraceType traceRAII(ty->getASTContext(), "serializing", ty);
 
   auto id = DeclAndTypeIDs[ty];
   assert(id != 0 && "type not referenced properly");
   (void)id;
 
   assert((id - 1) == TypeOffsets.size());
-
+  assert((DeclOffsets.empty() || DeclOffsets.back() != Out.GetCurrentBitNo()) &&
+         "encoding Decl and Type to the same offset");
   TypeOffsets.push_back(Out.GetCurrentBitNo());
+  SWIFT_DEFER {
+    // This is important enough to leave on in Release builds.
+    if (TypeOffsets.back() == Out.GetCurrentBitNo()) {
+      llvm::PrettyStackTraceString message("failed to serialize anything");
+      abort();
+    }
+  };
 
   switch (ty->getKind()) {
   case TypeKind::Error:
