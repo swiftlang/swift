@@ -1587,7 +1587,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   bool hadError = false;
   for (const auto &param : FN->getParams()) {
     params.push_back(param);
-    hadError |= param.getOldType()->hasError();
+    hadError |= param.getPlainType()->hasError();
   }
 
   // Local function to check if the given type is valid e.g. doesn't have

@@ -2108,10 +2108,10 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
     return false;
 
   const auto &param = params.front();
-  if (param.hasLabel() || param.isVariadic())
+  if (param.hasLabel() || param.isVariadic() || param.isInOut())
     return false;
 
-  auto inputTy = param.getOldType()->getAs<BoundGenericStructType>();
+  auto inputTy = param.getPlainType()->getAs<BoundGenericStructType>();
   if (!inputTy)
     return false;
 

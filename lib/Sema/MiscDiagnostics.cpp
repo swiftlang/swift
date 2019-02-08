@@ -4224,8 +4224,7 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
     return None;
 
   // Dig out the type of the variable.
-  Type type = var->getInterfaceType()->getReferenceStorageReferent()
-                ->getWithoutSpecifierType();
+  Type type = var->getValueInterfaceType();
   while (auto optObjectTy = type->getOptionalObjectType())
     type = optObjectTy;
 
