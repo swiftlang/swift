@@ -1615,7 +1615,7 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   auto req = path.back();
 
   ConstraintLocator *reqLoc = nullptr;
-  if (req.getKind() == ConstraintLocator::ConditionalRequirement) {
+  if (req.isConditionalRequirement()) {
     // If underlaying conformance requirement has been fixed as
     // we there is no reason to fix up conditional requirements.
     if (cs.hasFixFor(cs.getConstraintLocator(anchor, req)))
@@ -2777,11 +2777,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     SmallVector<LocatorPathElt, 4> path;
     auto *anchor = locator.getLocatorParts(path);
 
-    if (!path.empty() &&
-        (path.back().getKind() == ConstraintLocator::TypeParameterRequirement ||
-         path.back().getKind() == ConstraintLocator::ConditionalRequirement)) {
+    if (path.empty())
+      return SolutionKind::Error;
+
+    if (path.back().isTypeParameterRequirement() ||
+        path.back().isConditionalRequirement()) {
       ConstraintLocator *reqLoc = nullptr;
-      if (path.back().getKind() == ConstraintLocator::ConditionalRequirement) {
+      if (path.back().isConditionalRequirement()) {
         // Underlying conformance requirement is itself fixed,
         // this wouldn't lead to right solution.
         if (hasFixFor(getConstraintLocator(anchor, path.back())))

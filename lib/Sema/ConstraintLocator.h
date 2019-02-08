@@ -421,6 +421,14 @@ public:
     unsigned getNewSummaryFlags() const {
       return getSummaryFlagsForPathElement(getKind());
     }
+
+    bool isTypeParameterRequirement() const {
+      return getKind() == PathElementKind::TypeParameterRequirement;
+    }
+
+    bool isConditionalRequirement() const {
+      return getKind() == PathElementKind::ConditionalRequirement;
+    }
   };
 
   /// Return the summary flags for an entire path.

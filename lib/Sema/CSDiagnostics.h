@@ -186,11 +186,11 @@ public:
     assert(!path.empty());
 
     auto &last = path.back();
-    assert(last.getKind() == ConstraintLocator::TypeParameterRequirement ||
-           last.getKind() == ConstraintLocator::ConditionalRequirement);
+    assert(last.isTypeParameterRequirement() ||
+           last.isConditionalRequirement());
     assert(static_cast<RequirementKind>(last.getValue2()) == kind);
 
-    IsConditional = last.getKind() == ConstraintLocator::ConditionalRequirement;
+    IsConditional = last.isConditionalRequirement();
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -205,10 +205,8 @@ public:
     assert(!path.empty());
 
     auto &requirementLoc = path.back();
-    assert(requirementLoc.getKind() ==
-               ConstraintLocator::TypeParameterRequirement ||
-           requirementLoc.getKind() ==
-               ConstraintLocator::ConditionalRequirement);
+    assert(requirementLoc.isTypeParameterRequirement() ||
+           requirementLoc.isConditionalRequirement());
     return requirementLoc.getValue();
   }
 
