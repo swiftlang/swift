@@ -65,7 +65,6 @@ _ = pullback(at: Vector.zero, in: side_effect_release_zero)
 
 // CHECK-LABEL: @{{.*}}side_effect_release_zero{{.*}}__adjoint_src_0_wrt_0
 // CHECK: bb0([[X:%.*]] : $Vector, %1 : $_AD__$s11refcounting24side_effect_release_zeroyAA6VectorVADF__Type__src_0_wrt_0):
-// CHECK:  retain_value [[SEED:%.*]] : $Vector
 // CHECK:  [[BUF:%.*]] = alloc_stack $Vector
 // CHECK:  [[BUF_ACCESS:%.*]] = begin_access [init] [static] [no_nested_conflict] [[BUF]] : $*Vector
 // CHECK:  [[ZERO_GETTER:%.*]] = function_ref @$s11refcounting6VectorV4zeroACvgZ
