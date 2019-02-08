@@ -155,3 +155,24 @@ enum T : P {
   a = a + x
   return a
 }
+
+//===----------------------------------------------------------------------===//
+// Crasher TF-8
+//===----------------------------------------------------------------------===//
+
+protocol TF8Proto : Differentiable {
+  associatedtype Scalar
+  @differentiable(wrt: (self, input))
+  func applied(to input: Float) -> Float
+}
+
+struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiable {
+  @noDerivative let bar: Scalar
+
+  @differentiable(wrt: (self, input))
+  // expected-note @+2 {{differentiating functions with parameters or result of unknown size is not supported yet}}
+  // expected-error @+1 {{function is not differentiable}}
+  func applied(to input: Float) -> Float {
+    return input
+  }
+}

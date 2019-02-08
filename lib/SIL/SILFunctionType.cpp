@@ -2373,6 +2373,29 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
     ::getUncachedSILFunctionTypeForConstant(M, constant,
                                             loweredInterfaceType);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // In the case of autodiff associated functions, the above computations
+  // determine `silFnType` by first computing the associated function type at
+  // the AST level and then lowering that. Unfortunately, the actual
+  // SILFunctionType for the function is determined by first lowering the
+  // function's AST type, and then computing the associated function type at the
+  // SIL level. "Lowering" does not commute with "getting the autodiff
+  // associated type", so these two computations produce different results.
+  // Therefore `silFnType` is not the actual type of the function that
+  // `constant` refers to.
+  //
+  // We hackily fix this problem by redoing the computation in the right order.
+  if (auto *autoDiffFuncId = constant.autoDiffAssociatedFunctionIdentifier) {
+    auto origFnConstantInfo =
+        getConstantInfo(constant.asAutoDiffOriginalFunction());
+    auto loweredIndices =
+        autoDiffFuncId->getParameterIndices()->getLowered(formalInterfaceType);
+    silFnType = origFnConstantInfo.SILFnType->getAutoDiffAssociatedFunctionType(
+        loweredIndices, /*resultIndex*/ 0,
+        autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(), M,
+        LookUpConformanceInModule(M.getSwiftModule()));
+  }
+
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
              constant.print(llvm::dbgs());
              llvm::dbgs() << "\n  formal type: ";
