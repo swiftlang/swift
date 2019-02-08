@@ -3183,14 +3183,18 @@ private:
   AdjointValue prepareSeedAdjoint() {
     auto *ret = cast<ReturnInst>(getOriginal().findReturnBB()->getTerminator());
     auto origRetLoc = ret->getOperand().getLoc();
-    if (seed->getType().isReferenceCounted(getModule())) {
-      auto *rvi = builder.createRetainValue(origRetLoc, seed,
-                                            builder.getDefaultAtomicity());
-      assert(rvi->getParent() == getAdjoint().getEntryBlock());
-    }
+    if (seed->getType().isAddress())
+      builder.createRetainValueAddr(origRetLoc, seed,
+                                    builder.getDefaultAtomicity());
+    else
+      builder.createRetainValue(origRetLoc, seed,
+                                builder.getDefaultAtomicity());
     auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
       LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
-      b.createReleaseValue(loc, v, b.getDefaultAtomicity());
+      if (v->getType().isAddress())
+        b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
+      else
+        b.createReleaseValue(loc, v, b.getDefaultAtomicity());
     };
     return makeConcreteAdjointValue(
         ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
@@ -4838,8 +4842,7 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
            "FIXME: We could emit a thunk that converts the VJP to have the "
            "desired indices.");
     auto assocFn = assocFnAndIndices->first;
-    if (assocFn->getType().isReferenceCounted(*getModule()))
-      builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
+    builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
     assocFns.push_back(assocFnAndIndices->first);
   }
 
