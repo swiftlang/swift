@@ -467,11 +467,11 @@ public:
   StructDecl *getPrimalValueStruct() const { return primalValueStruct; }
 
   /// Add a pullback to the primal value struct.
-  VarDecl *addPullbackDecl(SILInstruction *inst, Type pullbackType) {
-    // Decls must have AST types (not `SILFunctionType`), so we convert the
-    // `SILFunctionType` of the pullback to a `FunctionType` with the same
-    // parameters and results.
-    auto *silFnTy = pullbackType->castTo<SILFunctionType>();
+  VarDecl *addPullbackDecl(SILInstruction *inst, SILType pullbackType) {
+    // IRGen requires decls to have AST types (not `SILFunctionType`), so we
+    // convert the `SILFunctionType` of the pullback to a `FunctionType` with
+    // the same parameters and results.
+    auto silFnTy = pullbackType.castTo<SILFunctionType>();
     SmallVector<AnyFunctionType::Param, 8> params;
     for (auto &param : silFnTy->getParameters())
       params.push_back(AnyFunctionType::Param(param.getType()));
@@ -2036,16 +2036,19 @@ static bool isDifferentiationParameter(SILArgument *argument,
   return false;
 }
 
-/// For a nested function call whose result tuple is active on the
-/// differentiation path, compute the set of minimal indices for differentiating
-/// this function as required by the data flow.
+/// For a nested function call that has results active on the differentiation
+/// path, compute the set of minimal indices for differentiating this function
+/// as required by the data flow.
 static void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, const SILAutoDiffIndices &parentIndices,
+    ApplyInst *ai, SmallVectorImpl<SILValue> &results,
+    const SILAutoDiffIndices &parentIndices,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices) {
-  // Make sure the function call result is active.
-  assert(activityInfo.isActive(ai, parentIndices));
+  // Make sure the function call has active results.
+  assert(llvm::any_of(results, [&](SILValue result) {
+    return activityInfo.isActive(result, parentIndices);
+  }));
   auto fnTy = ai->getCallee()->getType().castTo<SILFunctionType>();
   SILFunctionConventions convs(fnTy, ai->getModule());
   auto arguments = ai->getArgumentOperands();
@@ -2166,23 +2169,22 @@ public:
     auto *origExit = &*original->findReturnBB();
     auto *exit = BBMap.lookup(origExit);
     assert(exit->getParent() == getPrimal());
-    // Get the original's return value's corresponsing value in the primal.
+    // Get the original's return value's corresponding value in the primal.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
     auto origRetVal = origRetInst->getOperand();
     auto origResInPrimal = getOpValue(origRetVal);
     // Create a primal value struct containing all static primal values and
     // tapes.
     auto loc = getPrimal()->getLocation();
-    auto structTy =
-        getPrimalInfo().getPrimalValueStruct()->getDeclaredInterfaceType();
-    if (auto primalGenericEnv = getPrimal()->getGenericEnvironment())
-      structTy = primalGenericEnv->mapTypeIntoContext(structTy);
+    auto structTy = getOpASTType(getPrimalInfo()
+                                     .getPrimalValueStruct()
+                                     ->getDeclaredInterfaceType()
+                                     ->getCanonicalType());
     auto &builder = getBuilder();
     builder.setInsertionPoint(exit);
     auto structLoweredTy =
         getContext().getTypeConverter().getLoweredType(structTy);
-    auto primValsVal =
-        builder.createStruct(loc, structLoweredTy, primalValues);
+    auto primValsVal = builder.createStruct(loc, structLoweredTy, primalValues);
     // FIXME: Handle tapes.
     //
     // If the original result was a tuple, return a tuple of all elements in the
@@ -2197,7 +2199,7 @@ public:
       elts.push_back(primValsVal);
       for (unsigned i : range(numElts))
         elts.push_back(builder.emitTupleExtract(loc, origResInPrimal, i));
-      retVal = builder.createTuple(loc, elts);
+      retVal = joinElements(elts, builder, loc);
     }
     // If the original result was a single value, return a tuple of the primal
     // value struct value and the original result.
@@ -2301,7 +2303,7 @@ public:
     mapValue(sei, originalDirectResult);
     // Checkpoint the pullback.
     SILValue pullback = vjpDirectResults.back();
-    getPrimalInfo().addPullbackDecl(sei, pullback->getType().getASTType());
+    getPrimalInfo().addPullbackDecl(sei, pullback->getType());
     primalValues.push_back(pullback);
   }
 
@@ -2382,9 +2384,15 @@ public:
 
   void visitApplyInst(ApplyInst *ai) {
     auto &context = getContext();
-    // Special handling logic only applies when `apply` is active. If not, just
-    // do standard cloning.
-    if (!activityInfo.isActive(ai, synthesis.indices)) {
+    // Special handling logic only applies when `apply` has active results. If
+    // not, just do standard cloning.
+    SmallVector<SILValue, 4> allResults;
+    allResults.push_back(ai);
+    allResults.append(ai->getIndirectSILResults().begin(),
+                      ai->getIndirectSILResults().end());
+    if (llvm::none_of(allResults, [&](SILValue result) {
+      return activityInfo.isActive(result, synthesis.indices);
+    })) {
       LLVM_DEBUG(getADDebugStream() << "Not active:\n" << *ai << '\n');
       SILClonerWithScopes::visitApplyInst(ai);
       return;
@@ -2396,8 +2404,8 @@ public:
     LLVM_DEBUG(getADDebugStream() << "Primal-transforming:\n" << *ai << '\n');
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
-    collectMinimalIndicesForFunctionCall(ai, synthesis.indices, activityInfo,
-                                         activeParamIndices,
+    collectMinimalIndicesForFunctionCall(ai, allResults, synthesis.indices,
+                                         activityInfo, activeParamIndices,
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
     assert(!activeResultIndices.empty() && "Result indices cannot be empty");
@@ -2409,7 +2417,7 @@ public:
                    [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
                s << "}\n";);
 
-    // FIXME: If there are mutiple active results, we don't support it yet.
+    // FIXME: We don't support multiple active results yet.
     if (activeResultIndices.size() > 1) {
       context.emitNondifferentiabilityError(ai, synthesis.task);
       errorOccurred = true;
@@ -2434,6 +2442,7 @@ public:
     auto vjp = vjpAndVJPIndices->first;
 
     // Emit error if callee type has indirect differentiation parameters/result.
+    // TODO(TF-104): Lift this restriction.
     if (diagnoseIndirectParametersOrResult(
             vjp->getType().getAs<SILFunctionType>(), getContext(),
             getDifferentiationTask())) {
@@ -2480,7 +2489,7 @@ public:
     mapValue(ai, originalDirectResult);
 
     // Checkpoint the pullback.
-    getPrimalInfo().addPullbackDecl(ai, pullback->getType().getASTType());
+    getPrimalInfo().addPullbackDecl(ai, pullback->getType());
     primalValues.push_back(pullback);
 
     // Some instructions that produce the callee may have been cloned.
@@ -3173,20 +3182,6 @@ private:
     return false;
   }
 
-  AdjointValue prepareSeedAdjoint() {
-    auto *ret = cast<ReturnInst>(getOriginal().findReturnBB()->getTerminator());
-    auto origRetLoc = ret->getOperand().getLoc();
-    auto *rvi = builder.createRetainValue(origRetLoc, seed,
-                                          builder.getDefaultAtomicity());
-    assert(rvi->getParent() == getAdjoint().getEntryBlock());
-    auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-      LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
-      b.createReleaseValue(loc, v, b.getDefaultAtomicity());
-    };
-    return makeConcreteAdjointValue(
-        ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
-  }
-
 public:
   /// Performs adjoint synthesis on the empty adjoint function. Returns true if
   /// any error occurs.
@@ -3221,8 +3216,26 @@ public:
     collectAllFormalResultsInTypeOrder(original, formalResults);
     auto srcIdx = task->getIndices().source;
 
+    // Prepare seed adjoint.
     builder.setInsertionPoint(adjointEntry);
-    initializeAdjointValue(formalResults[srcIdx], prepareSeedAdjoint());
+    if (seed->getType().isAddress()) {
+      builder.createRetainValueAddr(adjLoc, seed,
+                                    builder.getDefaultAtomicity());
+      auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
+        LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
+        b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
+      };
+      setAdjointBuffer(formalResults[srcIdx],
+                       ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
+    } else {
+      builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
+      auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
+        LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
+        b.createReleaseValue(loc, v, b.getDefaultAtomicity());
+      };
+      initializeAdjointValue(formalResults[srcIdx], makeConcreteAdjointValue(
+          ValueWithCleanup(seed, makeCleanup(seed, cleanupFn))));
+    }
     LLVM_DEBUG(getADDebugStream()
                << "Assigned seed " << *seed << " as the adjoint of "
                << formalResults[srcIdx]);
@@ -3402,7 +3415,7 @@ public:
                                              /*isNonThrowing*/ false);
     builder.createDeallocStack(loc, seedBuf);
 
-    // If `pullbackCall` is a tuple, extract all results.
+    // Extract all results from `pullbackCall`.
     SmallVector<SILValue, 8> dirResults;
     extractAllElements(pullbackCall, builder, dirResults);
     // Get all results in type-defined order.
@@ -3423,7 +3436,7 @@ public:
 
     // Set adjoints for all original parameters.
     auto originalParams = ai->getArgumentsWithoutIndirectResults();
-    auto origNumIndRes = origConvs.getNumIndirectSILResults();
+    auto origNumIndRes = ai->getNumIndirectResults();
     auto allResultsIt = allResults.begin();
 
     auto cleanupFn = [](SILBuilder &b, SILLocation l, SILValue v) {
@@ -4016,8 +4029,6 @@ void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   assert(zeroDecl->isProtocolRequirement());
   auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
   SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
-  auto *nomTypeDecl = type->getAnyNominal();
-  assert(nomTypeDecl);
   auto methodType =
       getContext().getTypeConverter().getConstantType(accessorDeclRef);
   // Lookup conformance to `AdditiveArithmetic`.
@@ -4219,11 +4230,12 @@ void AdjointEmitter::accumulateIndirect(
   assert(cotangentSpace && "No tangent space for this type");
   switch (cotangentSpace->getKind()) {
   case VectorSpace::Kind::Vector: {
-    auto *adjointDecl = cotangentSpace->getNominal();
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *combinerFuncDecl = getContext().getPlusDecl();
     // Call the combiner function and return.
-    auto adjointParentModule = adjointDecl->getModuleContext();
+    auto adjointParentModule = cotangentSpace->getNominal()
+        ? cotangentSpace->getNominal()->getModuleContext()
+        : getModule().getSwiftModule();
     auto confRef = *adjointParentModule->lookupConformance(adjointASTTy, proto);
     SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
     auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
@@ -4826,11 +4838,11 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
   auto origFnOperand = adfi->getOriginalFunction();
   SILBuilder builder(adfi);
   auto loc = parent->getLocation();
+  SILAutoDiffIndices desiredIndices(0, adfi->getParameterIndices());
 
   SmallVector<SILValue, 2> assocFns;
   for (auto assocFnKind : {AutoDiffAssociatedFunctionKind::JVP,
                            AutoDiffAssociatedFunctionKind::VJP}) {
-    SILAutoDiffIndices desiredIndices(0, adfi->getParameterIndices());
     auto getInvoker =
         [&](AutoDiffFunctionInst *inst) -> DifferentiationInvoker {
       if (auto *expr = findDifferentialOperator(inst))
@@ -4853,8 +4865,7 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
            "FIXME: We could emit a thunk that converts the VJP to have the "
            "desired indices.");
     auto assocFn = assocFnAndIndices->first;
-    if (assocFn->getType().isReferenceCounted(*getModule()))
-      builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
+    builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
     assocFns.push_back(assocFnAndIndices->first);
   }
 
