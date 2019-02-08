@@ -243,6 +243,58 @@
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master"
             }
+        },
+        "swift-5.1-old-llvm-branch" : {
+            "aliases": ["swift-5.1-old-llvm-branch"],
+            "repos": {
+                "llvm": "swift-5.0-branch",
+                "clang": "swift-5.0-branch",
+                "compiler-rt": "swift-5.0-branch",
+                "swift": "swift-5.1-old-llvm-branch",
+                "lldb": "stable",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "swift-syntax": "master",
+                "swift-stress-tester": "master",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release",
+                "icu": "release-61-1",
+                "clang-tools-extra": "swift-5.0-branch",
+                "libcxx": "swift-5.0-branch",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
+            }
+        },
+        "swift-5.1-branch" : {
+            "aliases": ["swift-5.1-branch"],
+            "repos": {
+                "llvm": "swift-5.1-branch",
+                "clang": "swift-5.1-branch",
+                "compiler-rt": "swift-5.1-branch",
+                "swift": "swift-5.1-branch",
+                "lldb": "stable",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "swift-syntax": "master",
+                "swift-stress-tester": "master",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release",
+                "icu": "release-61-1",
+                "clang-tools-extra": "swift-5.1-branch",
+                "libcxx": "swift-5.1-branch",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
+            }
         }
     }
 }
