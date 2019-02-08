@@ -15,7 +15,8 @@ import ClangModule
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -c -g -o %t.o -module-cache-path %t -I %S/Inputs
-// RUN: file %t/*/ClangModule-*.pcm | egrep -q '(Mach-O|ELF)'
+// RUN: llvm-readobj -h %t/*/ClangModule-*.pcm | %FileCheck %s
+// CHECK: Format: {{(Mach-O|ELF|COFF)}}
 
 // 3. Test that swift-ide-check will not share swiftc's module cache.
 
