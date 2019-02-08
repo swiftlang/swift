@@ -145,26 +145,26 @@ def dedented_lines(description):
 
 def hash_syntax_node(node):
     # Hash into the syntax name and serialization code
-    result = hash((node.name, str(get_serialization_code(node.syntax_kind))))
+    result = hash((node.name, get_serialization_code(node.syntax_kind)))
     for child in node.children:
         # Hash into the expected child syntax
         result = hash((result, child.syntax_kind))
         # Hash into the child name
         result = hash((result, child.name))
         # Hash into whether the child is optional
-        result = hash((result, str(child.is_optional)))
+        result = hash((result, child.is_optional))
     return result
 
 
 def hash_token_syntax(token):
     # Hash into the token name and serialization code
-    return hash((token.name, str(token.serialization_code)))
+    return hash((token.name, token.serialization_code))
 
 
 def calculate_node_hash():
     result = 0
     for node in SYNTAX_NODES:
-        result = hash((result, hash_syntax_node(node=node)))
+        result = hash((result, hash_syntax_node(node)))
     for token in SYNTAX_TOKENS:
-        result = hash((result, hash_token_syntax(token=token)))
+        result = hash((result, hash_token_syntax(token)))
     return result
