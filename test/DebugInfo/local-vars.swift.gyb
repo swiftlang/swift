@@ -2,13 +2,13 @@
 // test only verifies that the variables show up in the debug info at
 // all. There are other tests testing liveness and representation.
 
-// REQUIRES: rdar45708367
+// REQUIRES: rdar47777473
 // RUN: %gyb %s -o %t.swift
 // RUN: %target-swift-frontend %t.swift -g -emit-ir -o - | %FileCheck %t.swift
 // RUN: %target-swift-frontend %t.swift -g -c -o %t.o
 // RUN: %llvm-dwarfdump %t.o \
 // RUN:   | %FileCheck %t.swift --check-prefix=DWARF
-// DISABLED_RDAR_43340064 %llvm-dwarfdump --verify %t.o
+// RUN: %llvm-dwarfdump --verify %t.o
 // RUN: %target-swift-frontend %t.swift -O -g -emit-ir -o - \
 // RUN:   | %FileCheck %t.swift --check-prefix=OPTZNS
 
