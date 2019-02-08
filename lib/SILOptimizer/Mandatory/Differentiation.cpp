@@ -3180,26 +3180,6 @@ private:
     return false;
   }
 
-  AdjointValue prepareSeedAdjoint() {
-    auto *ret = cast<ReturnInst>(getOriginal().findReturnBB()->getTerminator());
-    auto origRetLoc = ret->getOperand().getLoc();
-    if (seed->getType().isAddress())
-      builder.createRetainValueAddr(origRetLoc, seed,
-                                    builder.getDefaultAtomicity());
-    else
-      builder.createRetainValue(origRetLoc, seed,
-                                builder.getDefaultAtomicity());
-    auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-      LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
-      if (v->getType().isAddress())
-        b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
-      else
-        b.createReleaseValue(loc, v, b.getDefaultAtomicity());
-    };
-    return makeConcreteAdjointValue(
-        ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
-  }
-
 public:
   /// Performs adjoint synthesis on the empty adjoint function. Returns true if
   /// any error occurs.
@@ -3234,8 +3214,26 @@ public:
     collectAllFormalResultsInTypeOrder(original, formalResults);
     auto srcIdx = task->getIndices().source;
 
+    // Prepare seed adjoint.
     builder.setInsertionPoint(adjointEntry);
-    initializeAdjointValue(formalResults[srcIdx], prepareSeedAdjoint());
+    if (seed->getType().isAddress()) {
+      builder.createRetainValueAddr(adjLoc, seed,
+                                    builder.getDefaultAtomicity());
+      auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
+        LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
+        b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
+      };
+      setAdjointBuffer(formalResults[srcIdx],
+                       ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
+    } else {
+      builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
+      auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
+        LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
+        b.createReleaseValue(loc, v, b.getDefaultAtomicity());
+      };
+      initializeAdjointValue(formalResults[srcIdx], makeConcreteAdjointValue(
+          ValueWithCleanup(seed, makeCleanup(seed, cleanupFn))));
+    }
     LLVM_DEBUG(getADDebugStream()
                << "Assigned seed " << *seed << " as the adjoint of "
                << formalResults[srcIdx]);
