@@ -1726,6 +1726,10 @@ ERROR(type_witness_objc_generic_parameter,none,
 NOTE(witness_fix_access,none,
      "mark the %0 as '%select{%error|fileprivate|internal|public|%error}1' to "
      "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
+NOTE(witness_move_to_another_extension,none,
+     "move the %0 to another extension where it can be declared "
+     "'%select{%error|%error|internal|public|%error}1' to "
+     "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
 WARNING(assoc_type_default_conformance_failed,none,
         "default type %0 for associated type %1 does not satisfy constraint "
         "%2: %3", (Type, DeclName, Type, Type))
