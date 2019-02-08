@@ -90,15 +90,6 @@ Type RequirementFailure::getOwnerType() const {
 }
 
 const GenericContext *RequirementFailure::getGenericContext() const {
-  // For conditional requirements, this is easy because all
-  // required information is contained in the conformance
-  // reference.
-  if (isConditional()) {
-    auto *conformance = getConformanceRef().getConcrete();
-    auto *DC = conformance->getDeclContext();
-    return DC->getAsDecl()->getAsGenericContext();
-  }
-
   if (auto *genericCtx = AffectedDecl->getAsGenericContext())
     return genericCtx;
   return AffectedDecl->getDeclContext()->getAsDecl()->getAsGenericContext();
@@ -199,6 +190,16 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
   return AffectedDecl->getAsGenericContext();
 }
 
+bool RequirementFailure::isStaticOrInstanceMember(const ValueDecl *decl) {
+  if (decl->isInstanceMember())
+    return true;
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl))
+    return AFD->isStatic() && !AFD->isOperator();
+
+  return decl->isStatic();
+}
+
 bool RequirementFailure::diagnoseAsError() {
   if (!canDiagnoseFailure())
     return false;
@@ -210,7 +211,8 @@ bool RequirementFailure::diagnoseAsError() {
   auto lhs = resolveType(getLHS());
   auto rhs = resolveType(getRHS());
 
-  if (reqDC != genericCtx) {
+  if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
+                              isStaticOrInstanceMember(AffectedDecl))) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
     emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
                    AffectedDecl->getDescriptiveKind(),

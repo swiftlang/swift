@@ -399,6 +399,6 @@ extension BinaryInteger {
     return self <= 1
             ? 1
             : (2...self).reduce(1, *)
-            // expected-error@-1 {{instance method 'reduce' requires that 'Self.Stride' conform to 'SignedInteger'}}
+            // expected-error@-1 {{referencing instance method 'reduce' on 'ClosedRange' requires that 'Self.Stride' conform to 'SignedInteger'}}
   }
 }

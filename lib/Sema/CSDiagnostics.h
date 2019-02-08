@@ -269,6 +269,10 @@ private:
   ValueDecl *getDeclRef() const;
 
   void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
+
+  /// Determine whether given declaration represents a static
+  /// or instance property/method, excluding operators.
+  static bool isStaticOrInstanceMember(const ValueDecl *decl);
 };
 
 /// Diagnostics for failed conformance checks originating from
