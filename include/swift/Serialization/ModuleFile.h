@@ -48,6 +48,7 @@ class ModuleFile
   : public LazyMemberLoader,
     public LazyConformanceLoader {
   friend class SerializedASTFile;
+  friend class ASTDeserializer;
   friend class SILDeserializer;
   using Status = serialization::Status;
   using TypeID = serialization::TypeID;
@@ -525,10 +526,6 @@ private:
   /// index_block::DeclMembersLayout format.
   std::unique_ptr<SerializedDeclMembersTable>
   readDeclMembersTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  /// Main logic of getDeclChecked.
-  llvm::Expected<Decl *>
-  getDeclCheckedImpl(serialization::DeclID DID);
 
   /// Reads the index block, which contains global tables.
   ///
