@@ -3124,7 +3124,7 @@ private:
     assert(insertion.second); (void)insertion;
   }
 
-  ValueWithCleanup getAdjointBuffer(SILValue originalBuffer) {
+  ValueWithCleanup &getAdjointBuffer(SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
     auto insertion = bufferMap.try_emplace(originalBuffer,
                                            ValueWithCleanup(SILValue()));
@@ -3141,19 +3141,6 @@ private:
     builder.createEndAccess(access->getLoc(), access, /*aborted*/ false);
     localAllocations.push_back(newBuf);
     return (insertion.first->getSecond() = ValueWithCleanup(newBuf, nullptr));
-  }
-
-  void addToAdjointBuffer(SILValue originalBuffer,
-                          SILValue newValueBufferAccess) {
-    assert(originalBuffer->getType().isAddress() &&
-           newValueBufferAccess->getType().isAddress());
-    auto buf = getAdjointBuffer(originalBuffer);
-    auto *access = builder.createBeginAccess(
-        newValueBufferAccess.getLoc(), buf, SILAccessKind::Modify,
-        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
-    accumulateIndirect(access, newValueBufferAccess);
-    builder.createEndAccess(access->getLoc(), access, /*aborted*/ false);
   }
 
   //--------------------------------------------------------------------------//
@@ -3661,6 +3648,8 @@ public:
   //    Adjoint: dealloc_stack adj[y]
   void visitAllocStackInst(AllocStackInst *asi) {
     auto adjBuf = getAdjointBuffer(asi);
+    if (auto *cleanup = adjBuf.getCleanup())
+      cleanup->applyRecursively(builder, asi->getLoc());
     builder.createDeallocStack(asi->getLoc(), adjBuf);
   }
 
@@ -3679,7 +3668,10 @@ public:
     emitZeroIndirect(bufType.getASTType(), access, dsi->getLoc());
     builder.createEndAccess(dsi->getLoc(), access, /*aborted*/ false);
     setAdjointBuffer(dsi->getOperand(),
-                     ValueWithCleanup(adjBuf, /*cleanup*/ nullptr));
+        ValueWithCleanup(adjBuf, makeCleanup(adjBuf,
+            [](SILBuilder &b, SILLocation l, SILValue v) {
+              b.createReleaseValueAddr(l, v, b.getDefaultAtomicity());
+            })));
   }
 
   // Handle `load` instruction.
@@ -3687,32 +3679,68 @@ public:
   //    Adjoint: adj[x] += adj[y]
   void visitLoadInst(LoadInst *li) {
     auto adjVal = materializeAdjointDirect(takeAdjointValue(li), li->getLoc());
-    auto *buf = builder.createAllocStack(li->getLoc(), adjVal.getType());
+    // Allocate a local buffer and store the adjoint value. This buffer will be
+    // used for accumulation into the adjoint buffer.
+    auto *localBuf = builder.createAllocStack(li->getLoc(), adjVal.getType());
     auto *initAccess = builder.createBeginAccess(
-        li->getLoc(), buf, SILAccessKind::Init, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+        li->getLoc(), localBuf, SILAccessKind::Init,
+        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+        /*fromBuiltin*/ false);
     builder.createStore(li->getLoc(), adjVal, initAccess,
-        getBufferSOQ(buf->getType().getASTType(), getAdjoint()));
+        getBufferSOQ(localBuf->getType().getASTType(), getAdjoint()));
     builder.createEndAccess(li->getLoc(), initAccess, /*aborted*/ false);
+    // Get the adjoin buffer.
+    auto &adjBuf = getAdjointBuffer(li->getOperand());
+    // Accumulate the adjoint value in the local buffer into the adjoint buffer.
     auto *readAccess = builder.createBeginAccess(
-        li->getLoc(), buf, SILAccessKind::Read, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    addToAdjointBuffer(li->getOperand(), readAccess);
+        li->getLoc(), localBuf, SILAccessKind::Read,
+        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+        /*fromBuiltin*/ false);
+    accumulateIndirect(adjBuf, readAccess);
+    // Combine the adjoint buffer's original child cleanups with the adjoint
+    // value's cleanup.
+    adjBuf.setCleanup(makeCleanupFromChildren({adjBuf.getCleanup(),
+                                               adjVal.getCleanup()}));
     builder.createEndAccess(li->getLoc(), readAccess, /*aborted*/ false);
-    builder.createDeallocStack(li->getLoc(), buf);
+    builder.createDeallocStack(li->getLoc(), localBuf);
   }
 
   // Handle `store` instruction.
   //   Original: store x to y
   //    Adjoint: adj[x] += load adj[y]; adj[y] = 0
   void visitStoreInst(StoreInst *si) {
-    auto adjBuf = getAdjointBuffer(si->getDest());
+    auto &adjBuf = getAdjointBuffer(si->getDest());
     auto bufType = remapType(adjBuf.getType());
     auto adjVal = builder.createLoad(si->getLoc(), adjBuf,
         getBufferLOQ(bufType.getASTType(), getAdjoint()));
+    // Disable the buffer's top-level cleanup (which is supposed to operate on
+    // the buffer), create a cleanup for the value that carrys all child
+    // cleanups.
+    auto valueCleanup = makeCleanup(adjVal,
+        [](SILBuilder &b, SILLocation l, SILValue v) {
+          b.createReleaseValue(l, v, b.getDefaultAtomicity());
+        }, adjBuf.getCleanup()
+            ? adjBuf.getCleanup()->getChildren() : ArrayRef<Cleanup *>());
     addAdjointValue(si->getSrc(), makeConcreteAdjointValue(
-        ValueWithCleanup(adjVal, adjBuf.getCleanup())));
-    emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
+        ValueWithCleanup(adjVal, valueCleanup)));
+    // Set the buffer to zero, with a cleanup.
+    auto *bai = dyn_cast<BeginAccessInst>(adjBuf.getValue());
+    if (bai && !(bai->getAccessKind() == SILAccessKind::Modify ||
+                 bai->getAccessKind() == SILAccessKind::Init)) {
+      auto *modifyAccess = builder.createBeginAccess(
+          si->getLoc(), bai->getSource(), SILAccessKind::Modify,
+          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+          /*fromBuiltin*/ false);
+      emitZeroIndirect(bufType.getASTType(), modifyAccess, si->getLoc());
+      builder.createEndAccess(si->getLoc(), modifyAccess, /*aborted*/ false);
+    } else {
+      emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
+    }
+    auto cleanup = makeCleanup(adjBuf,
+                               [](SILBuilder &b, SILLocation l, SILValue v) {
+      b.createReleaseValueAddr(l, v, b.getDefaultAtomicity());
+    });
+    adjBuf.setCleanup(cleanup);
   }
 
   // Handle `begin_access` instruction.
