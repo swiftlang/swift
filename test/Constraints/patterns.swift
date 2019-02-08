@@ -254,7 +254,7 @@ enum SR2057 {
 }
 
 let sr2057: SR2057?
-if case .foo = sr2057 { } // expected-error{{enum case 'foo' not found in type 'SR2057?'}}
+if case .foo = sr2057 { } // Ok
 
 
 // Invalid 'is' pattern
@@ -333,10 +333,10 @@ struct S_32241441 {
 func rdar32241441() {
   let s: S_32241441? = S_32241441()
 
-  switch s?.type {
-  case .foo: // expected-error {{enum case 'foo' not found in type 'S_32241441.E_32241441?'}} {{12-12=?}}
+  switch s?.type { // expected-error {{switch must be exhaustive}} expected-note {{add missing case: '.none'}}
+  case .foo: // Ok
     break;
-  case .bar: // expected-error {{enum case 'bar' not found in type 'S_32241441.E_32241441?'}} {{12-12=?}}
+  case .bar: // Ok
     break;
   }
 }
@@ -409,4 +409,15 @@ func test8347() -> String {
   }
 }
 
+enum SR_7799 {
+ case baz
+ case bar
+}
 
+let sr7799: SR_7799? = .bar
+
+switch sr7799 {
+ case .bar?: break // Ok
+ case .baz: break // Ok
+ default: break
+}

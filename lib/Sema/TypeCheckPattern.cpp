@@ -1395,19 +1395,24 @@ recur:
             goto recur;
           }
 
-          auto diag = diagnose(EEP->getLoc(),
-                               diag::enum_element_pattern_member_not_found,
-                               EEP->getName().str(), type);
-
           // If we have an optional type let's try to see if the case
-          // exists in its base type, if so we can suggest a fix-it for that.
+          // exists in its base type and create a new pattern which contains
+          // the enum case.
           if (auto baseType = type->getOptionalObjectType()) {
             if (lookupEnumMemberElement(*this, dc, baseType, EEP->getName(),
-                                        EEP->getLoc()))
-              diag.fixItInsertAfter(EEP->getEndLoc(), "?");
+                                        EEP->getLoc())) {
+              P = new (Context)
+                  OptionalSomePattern(EEP, EEP->getEndLoc(), true);
+              P->setImplicit();
+              return coercePatternToType(P, resolution, type, options);
+            } else {
+              diagnose(EEP->getLoc(),
+                       diag::enum_element_pattern_member_not_found,
+                       EEP->getName().str(), type);
+              return true;
+            }
           }
         }
-        return true;
       }
       enumTy = type;
     } else {
