@@ -1982,6 +1982,9 @@ ERROR(protocol_composition_one_class,none,
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol, non-class type %1",
       (Type, Type))
+NOTE(requires_conformance_nonprotocol_fixit,none,
+     "use '%0 == %1' to require '%0' to be '%1'",
+     (StringRef, StringRef))
 ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
