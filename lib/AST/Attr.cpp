@@ -131,8 +131,8 @@ DeclAttributes::isUnavailableInSwiftVersion(
   return false;
 }
 
-const AvailableAttr *DeclAttributes::getPotentiallyUnavailable(
-                          const ASTContext &ctx) const {
+const AvailableAttr *
+DeclAttributes::getPotentiallyUnavailable(const ASTContext &ctx) const {
   const AvailableAttr *potential = nullptr;
   const AvailableAttr *conditional = nullptr;
 
@@ -151,20 +151,20 @@ const AvailableAttr *DeclAttributes::getPotentiallyUnavailable(
         return AvAttr;
 
       switch (AvAttr->getVersionAvailability(ctx)) {
-        case AvailableVersionComparison::Available:
-          // Doesn't limit the introduced version.
-          break;
+      case AvailableVersionComparison::Available:
+        // Doesn't limit the introduced version.
+        break;
 
-        case AvailableVersionComparison::PotentiallyUnavailable:
-          // We'll return this if we don't see something that proves it's
-          // not available in this version.
-          potential = AvAttr;
-          break;
+      case AvailableVersionComparison::PotentiallyUnavailable:
+        // We'll return this if we don't see something that proves it's
+        // not available in this version.
+        potential = AvAttr;
+        break;
 
-        case AvailableVersionComparison::Unavailable:
-        case AvailableVersionComparison::Obsoleted:
-          conditional = AvAttr;
-          break;
+      case AvailableVersionComparison::Unavailable:
+      case AvailableVersionComparison::Obsoleted:
+        conditional = AvAttr;
+        break;
       }
     }
 

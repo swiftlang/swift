@@ -214,9 +214,8 @@ struct RuntimeVersionCheck {
     auto otherSpec = new (C) OtherPlatformAvailabilitySpec(SourceLoc());
 
     // availableInfo = "#available(\(platformSpec), \(otherSpec))"
-    auto availableInfo = PoundAvailableInfo::create(C, SourceLoc(),
-                                              { platformSpec, otherSpec },
-                                                    SourceLoc());
+    auto availableInfo = PoundAvailableInfo::create(
+        C, SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
 
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
@@ -242,8 +241,8 @@ struct RuntimeVersionCheck {
 /// be available, returns true. If it will sometimes be available, adds
 /// information about the runtime check needed to ensure it is available to
 /// \c versionCheck and returns true.
-static bool checkAvailability(EnumElementDecl* elt, ASTContext &C,
-                              Optional<RuntimeVersionCheck> &versionCheck) {
+static bool checkAvailability(const EnumElementDecl* elt, ASTContext &C,
+    Optional<RuntimeVersionCheck> &versionCheck) {
   auto *attr = elt->getAttrs().getPotentiallyUnavailable(C);
 
   // Is it always available?
@@ -261,7 +260,11 @@ static bool checkAvailability(EnumElementDecl* elt, ASTContext &C,
     return false;
 
   // It's conditionally available; create a version constraint and return true.
+  assert(attr->getPlatformAgnosticAvailability() ==
+             PlatformAgnosticAvailabilityKind::None &&
+         "can only express #available(somePlatform version) checks");
   versionCheck.emplace(attr->Platform, *attr->Introduced);
+
   return true;
 }
 
