@@ -50,49 +50,6 @@ public:
   void completePostfixExpr(Expr *E, bool hasSpace) override;
   // }
 
-  // Ignore other callbacks.
-  // {
-  void completeExpr() override{};
-  void completeExprSuper(SuperRefExpr *SRE) override{};
-  void completeExprSuperDot(SuperRefExpr *SRE) override{};
-  void completeInPrecedenceGroup(SyntaxKind SK) override{};
-  void completePoundAvailablePlatform() override{};
-  void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override {}
-  void completeTypeSimpleBeginning() override {}
-  void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override {}
-  void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override {}
-  void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override {}
-  void completeDeclAttrParam(DeclAttrKind DK, int Index) override {}
-  void completeNominalMemberBeginning(
-      SmallVectorImpl<StringRef> &Keywords) override {}
-  void completeImportDecl(
-      std::vector<std::pair<Identifier, SourceLoc>> &Path) override {}
-  void completeAfterPoundExpr(CodeCompletionExpr *E,
-                              Optional<StmtKind> ParentKind) override {}
-  void completeAfterPoundDirective() override {}
-  void completePlatformCondition() override {}
-  void completeGenericParams(TypeLoc TL) override {}
-  void completeAfterIfStmt(bool hasElse) override {}
-  void completeAccessorBeginning() override{};
-
-  void completeStmtOrExpr() override{};
-  void completePostfixExprBeginning(CodeCompletionExpr *E) override {}
-  void completeForEachSequenceBeginning(CodeCompletionExpr *E) override{};
-  void completeCaseStmtBeginning() override{};
-
-  void completeAssignmentRHS(AssignExpr *E) override{};
-  void completeCallArg(CodeCompletionExpr *E) override{};
-  void completeReturnStmt(CodeCompletionExpr *E) override{};
-  void completeYieldStmt(CodeCompletionExpr *E,
-                         Optional<unsigned> yieldIndex) override{};
-
-  void completeUnresolvedMember(CodeCompletionExpr *E,
-                                SourceLoc DotLoc) override{};
-  void completeCaseStmtDotPrefix() override{};
-
-  void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override{};
-  // }
-
   void doneParsing() override;
 };
 
