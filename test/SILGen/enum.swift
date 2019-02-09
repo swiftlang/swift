@@ -234,3 +234,22 @@ func useTrailingClosureGeneric<T>(t: T) {
   _ = TrailingClosureGeneric<T>.twoElementsLabel(x: t) { t }
   _ = TrailingClosureGeneric<T>.twoElementsNoLabel(t) { t }
 }
+
+enum SR7799 {
+  case one
+  case two
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4enum6sr77993baryAA6SR7799OSg_tF : $@convention(thin) (Optional<SR7799>) -> () {
+// CHECK: bb0(%0 : $Optional<SR7799>):
+// CHECK-NEXT:  debug_value %0 : $Optional<SR7799>, let, name "bar", argno 1
+// CHECK-NEXT:  switch_enum %0 : $Optional<SR7799>, case #Optional.some!enumelt.1: bb1, default bb4
+// CHECK: bb1(%3 : $SR7799):
+// CHECK-NEXT:  switch_enum %3 : $SR7799, case #SR7799.one!enumelt: bb2, case #SR7799.two!enumelt: bb3
+func sr7799(bar: SR7799?) {
+  switch bar {
+  case .one: print("one")
+  case .two?: print("two")
+  default: print("default")
+  }
+}
