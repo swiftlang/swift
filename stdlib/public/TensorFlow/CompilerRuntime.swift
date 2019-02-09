@@ -776,7 +776,7 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
 
   debugLog("Assembling output tensor handles.")
   let outputTensorHandles = 
-    (outputResult != nil)
+    outputResult != nil
       ? (outputState.cTensorHandles + outputResult!.cTensorHandles)
       : outputState.cTensorHandles
 
