@@ -2726,6 +2726,8 @@ ERROR(differentiable_attr_nongeneric_trailing_where,none,
       "trailing 'where' clause in '@differentiable' attribute of non-generic function %0", (DeclName))
 ERROR(differentiable_attr_unsupported_req_kind,none,
       "layout requirement are not supported by '@differentiable' attribute", ())
+ERROR(differentiable_attr_class_unsupported,none,
+      "class members cannot be marked with '@differentiable'", ())
 
 // @differentiang
 ERROR(differentiating_attr_expected_result_tuple,none,

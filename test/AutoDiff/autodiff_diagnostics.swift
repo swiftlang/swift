@@ -44,6 +44,23 @@ extension Tensor where Scalar : BinaryFloatingPoint {
   }
 }
 
+protocol TF8Proto : Differentiable {
+  associatedtype Scalar
+  @differentiable(wrt: (self, input))
+  func applied(to input: Float) -> Float
+}
+
+struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiable {
+  @noDerivative let bar: Scalar
+
+  @differentiable(wrt: (self, input))
+  // expected-note @+2 {{differentiating functions with parameters or result of unknown size is not supported yet}}
+  // expected-error @+1 {{function is not differentiable}}
+  func applied(to input: Float) -> Float {
+    return input
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Non-differentiable stored properties
 //===----------------------------------------------------------------------===//
@@ -157,22 +174,26 @@ enum T : P {
 }
 
 //===----------------------------------------------------------------------===//
-// Crasher TF-8
+// Classes and existentials (unsupported yet)
 //===----------------------------------------------------------------------===//
 
-protocol TF8Proto : Differentiable {
-  associatedtype Scalar
-  @differentiable(wrt: (self, input))
-  func applied(to input: Float) -> Float
-}
-
-struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiable {
-  @noDerivative let bar: Scalar
-
-  @differentiable(wrt: (self, input))
-  // expected-note @+2 {{differentiating functions with parameters or result of unknown size is not supported yet}}
-  // expected-error @+1 {{function is not differentiable}}
-  func applied(to input: Float) -> Float {
-    return input
+class Foo {
+  // @differentiable cannot be put here. It's rejected by Sema already.
+  func class_method(_ x: Float) -> Float {
+    return x
   }
 }
+
+// Nested call case.
+@differentiable // expected-error 2 {{function is not differentiable}}
+// expected-note @+1 2 {{when differentiating this function definition}}
+func triesToDifferentiateClassMethod(x: Float) -> Float {
+  // expected-note @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{differentiating class members is not supported yet}}
+  return Foo().class_method(x)
+}
+
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
+_ = gradient(at: .zero, in: Foo().class_method)
+

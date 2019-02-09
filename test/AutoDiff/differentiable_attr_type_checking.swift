@@ -97,6 +97,16 @@ func jvpAmbiguousVJP(x: Float) -> (Float, (Float) -> Float) {
   return (x, { $0 })
 }
 
+// TF-153: Class methods are not supported yet.
+class Foo {
+  // Direct differentiation case.
+  // expected-error @+1 {{class members cannot be marked with '@differentiable'}}
+  @differentiable
+  func foo(_ x: Float) -> Float {
+    return x
+  }
+}
+
 struct JVPStruct {
   let p: Float
 
