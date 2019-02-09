@@ -129,10 +129,6 @@ IDENTIFIER(recursivelyAllWritableKeyPaths)
 // AdditiveArithmetic, VectorNumeric
 IDENTIFIER(zero)
 IDENTIFIER(Scalar)
-// ParameterGroup, Parameterized
-IDENTIFIER(allParameters)
-IDENTIFIER(Parameter)
-IDENTIFIER(Parameters)
 // Differentiable
 IDENTIFIER(AllDifferentiableVariables)
 IDENTIFIER(CotangentVector)

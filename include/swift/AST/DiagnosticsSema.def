@@ -2430,10 +2430,6 @@ ERROR(broken_decodable_requirement,none,
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(broken_key_path_iterable_requirement,none,
       "KeyPathIterable protocol is broken: unexpected requirement", ())
-ERROR(broken_parameter_group_requirement,none,
-      "ParameterGroup protocol is broken: unexpected requirement", ())
-ERROR(broken_parameterized_requirement,none,
-      "Parameterized protocol is broken: unexpected requirement", ())
 ERROR(parameterized_no_parameters_struct,none,
       "cannot automatically synthesize %0 because 'Parameters' struct does not "
       "exist", (Type))
@@ -2777,14 +2773,6 @@ ERROR(tf_graph_attr_no_generic_functions,none,
 ERROR(tf_graph_attr_no_functions_with_captures,none,
       "@TensorFlowGraph cannot be applied to functions that capture values",
       ())
-
-// @TFParameter attribute
-ERROR(tfparameter_attr_tensorflow_not_imported,none,
-      "@%0 is available only when 'TensorFlow' is imported", (StringRef))
-ERROR(tfparameter_attr_instance_stored_property_only,none,
-      "only instance stored properties can be declared @%0", (StringRef))
-ERROR(tfparameter_attr_not_in_parameterized,none,
-      "@%0 is allowed only in types that conform to 'Parameterized'", (StringRef))
 
 // @noDerivative attribute
 ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,

@@ -1220,7 +1220,6 @@ namespace  {
     UNINTERESTING_ATTR(Differentiating)
     UNINTERESTING_ATTR(CompilerEvaluable)
     UNINTERESTING_ATTR(TensorFlowGraph)
-    UNINTERESTING_ATTR(TFParameter)
     UNINTERESTING_ATTR(FieldwiseDifferentiable)
     UNINTERESTING_ATTR(NoDerivative)
 

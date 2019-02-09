@@ -4063,8 +4063,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Numeric:
   case KnownProtocolKind::KeyPathIterable:
-  case KnownProtocolKind::ParameterGroup:
-  case KnownProtocolKind::Parameterized:
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:
   case KnownProtocolKind::TensorFlowDataTypeCompatible:

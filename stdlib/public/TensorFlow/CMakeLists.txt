@@ -39,7 +39,6 @@ set(SOURCES
   DataTypes.swift
   Gradients.swift
   Ops.swift
-  Parameterized.swift
   Random.swift
   ShapedArray.swift
   StringOps.swift
