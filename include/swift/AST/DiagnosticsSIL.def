@@ -414,6 +414,8 @@ NOTE(autodiff_class_member_not_supported,none,
      "differentiating class members is not supported yet", ())
 NOTE(autodiff_nested_not_supported,none,
      "nested differentiation is not supported yet", ())
+NOTE(autodiff_missing_return,none,
+     "missing return for differentiation", ())
 
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
