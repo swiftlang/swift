@@ -832,18 +832,18 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
 public func _graph<State : _TensorArrayProtocolEnhanced,
                    Data : TensorGroup>(
   with state: State,
-  in fn: @escaping (State, Data) -> (State)
-) -> (State, Data) -> (State) {
+  in fn: @escaping (State, Data) -> State
+) -> (State, Data) -> State {
   let wrappedFn = {
     // The result argument needs to a type that conforms to TensorGroup. 
     // We are arbitrarily picking Tensor<Float> here. 
     (s: State, d: Data) -> (State, Tensor<Float>?) in
-      (fn(s,d), nil)
+      (fn(s, d), nil)
   }
   let graphFunction = _graphInternal(with: state, in: wrappedFn)
   return { (state: State, data: Data) in
     let result = graphFunction(state, data)
-    return (result.0)
+    return result.0
   }
 }
 
