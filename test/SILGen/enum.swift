@@ -253,3 +253,14 @@ func sr7799(bar: SR7799?) {
   default: print("default")
   }
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s4enum8sr7799_13baryAA6SR7799OSgSg_tF : $@convention(thin) (Optional<Optional<SR7799>>) -> () {
+// CHECK: bb0(%0 : $Optional<Optional<SR7799>>):
+// CHECK-NEXT: debug_value %0 : $Optional<Optional<SR7799>>, let, name "bar", argno 1
+// CHECK-NEXT: switch_enum %0 : $Optional<Optional<SR7799>>, case #Optional.none!enumelt: bb1, default bb2
+func sr7799_1(bar: SR7799??) {
+  switch bar {
+  case .none: print("none")
+  default: print("default")
+  }
+}
