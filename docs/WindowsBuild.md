@@ -219,12 +219,11 @@ Running the testsuite on Windows has additional external dependencies.  You must
 
   1. coreutils
   2. diffutils
-  3. file
-  4. grep
-  5. sed
+  3. grep
+  4. sed
   
 ```cmd
-path S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles(x86)%\GnuWin32\bin
+path S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles(x86)%\GnuWin32\bin;S:\thirdparty\icu4c-63_1-Win64-MSVC2017\lib64
 ninja -C S:\b\swift check-swift
 ```
 
