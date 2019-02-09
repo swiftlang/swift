@@ -55,7 +55,7 @@ public struct PythonLibrary {
 
   static func loadSymbol(
     _ libraryHandle: UnsafeMutableRawPointer, _ name: String
-    ) -> UnsafeMutableRawPointer? {
+  ) -> UnsafeMutableRawPointer? {
     #if canImport(Darwin) || canImport(Glibc)
     return dlsym(libraryHandle, name)
     #elseif os(Windows)
@@ -68,7 +68,7 @@ public struct PythonLibrary {
 
   static func loadSymbol<T>(
     name: String, legacyName: String? = nil, type: T.Type = T.self
-    ) -> T {
+  ) -> T {
     var name = name
     if let legacyName = legacyName, PythonLibrary.shared.isLegacyPython {
       name = legacyName
@@ -202,7 +202,7 @@ private extension PythonLibrary {
 
   static func loadPythonLibrary(
     at path: String, version: PythonVersion
-    ) -> UnsafeMutableRawPointer? {
+  ) -> UnsafeMutableRawPointer? {
     let versionString = version.versionString
 
     if let requiredPythonVersion = Environment.version.value {
