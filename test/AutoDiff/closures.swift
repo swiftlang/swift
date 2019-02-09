@@ -30,3 +30,10 @@ public func closureCaptureMutable() {
 // CHECK:   [[ADJOINT:%.*]] = function_ref @AD__{{.*}}closureCaptureMutabley{{.*}}___adjoint_src_0_wrt_0
 // CHECK:   {{.*}} = partial_apply [callee_guaranteed] [[ADJOINT]]({{.*}})
 
+// TF-30: VJP return value should match the return type.
+struct TF30 : Differentiable {
+  var x: Float
+  @noDerivative var y: @differentiable (Float) -> Float
+}
+// Make sure this passes SIL verification.
+let _: @autodiff (TF30) -> Float = { x in x.x }

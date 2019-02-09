@@ -4494,27 +4494,45 @@ void DifferentiationTask::createEmptyAdjoint() {
       module.Types, origTy->getGenericSignature());
 
   // Given a type, returns its formal SIL parameter info.
-  auto getFormalParameterInfo = [&](CanType type) -> SILParameterInfo {
-    auto &typeLowering = module.Types.getTypeLowering(type);
+  auto getParameterInfoForOriginalResult = [&](
+      CanType type, ResultConvention origResConv) -> SILParameterInfo {
     ParameterConvention conv;
-    if (typeLowering.isFormallyPassedIndirectly())
-      conv = ParameterConvention::Indirect_In_Guaranteed;
-    else if (typeLowering.isTrivial())
-      conv = ParameterConvention::Direct_Unowned;
-    else
+    switch (origResConv) {
+    case ResultConvention::Owned:
+    case ResultConvention::Autoreleased:
       conv = ParameterConvention::Direct_Guaranteed;
+      break;
+    case ResultConvention::Unowned:
+    case ResultConvention::UnownedInnerPointer:
+      conv = ParameterConvention::Direct_Unowned;
+      break;
+    case ResultConvention::Indirect:
+      conv = ParameterConvention::Indirect_In_Guaranteed;
+      break;
+    }
     return {type, conv};
   };
+
   // Given a type, returns its formal SIL result info.
-  auto getFormalResultInfo = [&](CanType type) -> SILResultInfo {
-    auto &typeLowering = module.Types.getTypeLowering(type);
+  auto getResultInfoForOriginalParameter = [&](
+      CanType type, ParameterConvention origParamConv) -> SILResultInfo {
     ResultConvention conv;
-    if (typeLowering.isFormallyReturnedIndirectly())
-      conv = ResultConvention::Indirect;
-    else if (typeLowering.isTrivial())
-      conv = ResultConvention::Unowned;
-    else
+    switch (origParamConv) {
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Guaranteed:
       conv = ResultConvention::Owned;
+      break;
+    case ParameterConvention::Direct_Unowned:
+      conv = ResultConvention::Unowned;
+      break;
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_In_Constant:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_InoutAliasable:
+      conv = ResultConvention::Indirect;
+      break;
+    }
     return {type, conv};
   };
 
@@ -4530,12 +4548,12 @@ void DifferentiationTask::createEmptyAdjoint() {
   auto origParams = origTy->getParameters();
 
   // Add adjoint parameter for the seed.
-  adjParams.push_back(getFormalParameterInfo(
-      origTy->getResults()[getIndices().source]
-          .getType()
+  auto origResInfo = origTy->getResults()[getIndices().source];
+  adjParams.push_back(getParameterInfoForOriginalResult(
+      origResInfo.getType()
           ->getAutoDiffAssociatedVectorSpace(
               AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
-          ->getCanonicalType()));
+          ->getCanonicalType(), origResInfo.getConvention()));
 
   // Accept a primal value struct in the adjoint parameter list. This is the
   // pullback's closure context.
@@ -4546,24 +4564,25 @@ void DifferentiationTask::createEmptyAdjoint() {
   // Add adjoint result for the wrt self parameter, if it was requested.
   auto selfParamIndex = origParams.size() - 1;
   if (origTy->hasSelfParam() &&
-      getIndices().isWrtParameter(selfParamIndex))
-    adjResults.push_back(getFormalResultInfo(
-        origParams[selfParamIndex]
-            .getType()
+      getIndices().isWrtParameter(selfParamIndex)) {
+    auto origSelfParam = origParams[selfParamIndex];
+    adjResults.push_back(getResultInfoForOriginalParameter(
+        origSelfParam.getType()
             ->getAutoDiffAssociatedVectorSpace(
                 AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
-            ->getCanonicalType()));
+            ->getCanonicalType(), origSelfParam.getConvention()));
+  }
 
   // Add adjoint results for the requested non-self wrt parameters.
   for (auto i : getIndices().parameters.set_bits()) {
     if (origTy->hasSelfParam() && i == selfParamIndex)
       continue;
-    adjResults.push_back(getFormalResultInfo(
-        origParams[i]
-            .getType()
+    auto origParam = origParams[i];
+    adjResults.push_back(getResultInfoForOriginalParameter(
+        origParam.getType()
             ->getAutoDiffAssociatedVectorSpace(
                 AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
-            ->getCanonicalType()));
+            ->getCanonicalType(), origParam.getConvention()));
   }
 
   auto adjName = original->getASTContext()
