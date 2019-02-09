@@ -28,6 +28,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringSet.h"
@@ -168,6 +169,16 @@ createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
   SubInvocation.setModuleName(ModuleName);
   SubInvocation.setClangModuleCachePath(CacheDir);
   SubInvocation.getFrontendOptions().PrebuiltModuleCachePath = PrebuiltCacheDir;
+
+  // Respect the detailed-record preprocessor setting of the parent context.
+  // This, and the "raw" clang module format it implicitly enables, are required
+  // by sourcekitd.
+  if (auto *ClangLoader = Ctx.getClangModuleLoader()) {
+    auto &Opts = ClangLoader->getClangInstance().getPreprocessorOpts();
+    if (Opts.DetailedRecord) {
+      SubInvocation.getClangImporterOptions().DetailedPreprocessingRecord = true;
+    }
+  }
 
   // Inhibit warnings from the SubInvocation since we are assuming the user
   // is not in a position to fix them.
