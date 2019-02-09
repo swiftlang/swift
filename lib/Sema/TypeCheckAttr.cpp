@@ -2659,6 +2659,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   auto *checkedWrtParamIndices = autoDiffParameterIndicesBuilder.build(ctx);
+  auto insertion =
+      ctx.DifferentiableAttrs.try_emplace({D, checkedWrtParamIndices}, attr);
+  // Differentiable attributes are uniqued by their parameter indices. Reject
+  // duplicates.
+  if (!insertion.second) {
+    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
+    return;
+  }
 
   // This can happen when someone puts the attribute on an instance method with
   // no parameters (other than the self parameter), and does not specify a wrt

@@ -2706,6 +2706,8 @@ ERROR(differentiable_attr_wrt_self_instance_method_only,none,
 ERROR(differentiable_attr_cannot_diff_wrt_objects_or_existentials,none,
       "class objects and protocol existentials (%0) cannot be differentiated "
       "with respect to", (Type))
+ERROR(differentiable_attr_duplicate,none,
+      "duplicate '@differentiable' attribute", ())
 ERROR(differentiable_attr_function_not_same_type_context,none,
       "%0 is not defined in the current type context", (DeclName))
 ERROR(differentiable_attr_specified_not_function,none,
