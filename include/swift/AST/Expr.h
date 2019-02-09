@@ -951,8 +951,11 @@ public:
   BraceStmt * getBody() const { return Body; }
   void setBody(BraceStmt * b) { Body = b; }
 
-  SourceLoc getLoc() const { return SourceLoc(); }
-  SourceRange getSourceRange() const { return SourceRange(); }
+  SourceLoc getLoc() const { return SubExpr ? SubExpr->getLoc() : SourceLoc(); }
+
+  SourceRange getSourceRange() const {
+    return SubExpr ? SubExpr->getSourceRange() : SourceRange();
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Tap;
