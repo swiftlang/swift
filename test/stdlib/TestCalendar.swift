@@ -109,8 +109,27 @@ class TestCalendar : TestCalendarSuper {
         
         current2.locale = Locale(identifier: "MyMadeUpLocale")
         expectNotEqual(current, current2)
+  }
+
+    func test_hash() {
+        let calendars: [Calendar] = [
+            Calendar.autoupdatingCurrent,
+            Calendar(identifier: .buddhist),
+            Calendar(identifier: .gregorian),
+            Calendar(identifier: .islamic),
+            Calendar(identifier: .iso8601),
+        ]
+        checkHashable(calendars, equalityOracle: { $0 == $1 })
+
+        // autoupdating calendar isn't equal to the current, even though it's
+        // likely to be the same.
+        let calendars2: [Calendar] = [
+            Calendar.autoupdatingCurrent,
+            Calendar.current,
+        ]
+        checkHashable(calendars2, equalityOracle: { $0 == $1 })
     }
-    
+
     func test_properties() {
         // Mainly we want to just make sure these go through to the NSCalendar implementation at this point.
         if #available(iOS 8.0, OSX 10.7, *) {
