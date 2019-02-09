@@ -1006,11 +1006,6 @@ public:
     return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
 
-  /// Emit a "not differentiable" error based on the given differentiation task
-  /// and diagnostic.
-  void emitNondifferentiabilityError(const DifferentiationTask *task,
-                                     Diag<> diag);
-
   /// Given an instruction and a differentiation task associated with the
   /// parent function, emits a "not differentiable" error based on the task. If
   /// the task is indirect, emits notes all the way up to the outermost task,
@@ -1026,19 +1021,18 @@ public:
   void emitNondifferentiabilityError(SILValue value,
                                      const DifferentiationTask *task,
                                      Optional<Diag<>> diag = None);
+
+  /// Emit a "not differentiable" error based on the given differentiation task
+  /// and diagnostic.
+  void emitNondifferentiabilityError(SourceLoc loc,
+                                     const DifferentiationTask *task,
+                                     Optional<Diag<>> diag = None);
 };
 } // end anonymous namespace
 
 ADContext::ADContext(SILModuleTransform &transform)
     : transform(transform), module(*transform.getModule()),
       passManager(*transform.getPassManager()) {}
-
-void ADContext::emitNondifferentiabilityError(const DifferentiationTask *task,
-                                              Diag<> diag) {
-  auto invoker = task->getInvoker();
-  diagnose(invoker.getLocation(), diag);
-  diagnose(invoker.getLocation(), diag::autodiff_function_not_differentiable);
-}
 
 void ADContext::emitNondifferentiabilityError(SILValue value,
                                               const DifferentiationTask *task,
@@ -1062,7 +1056,6 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     return;
   }
-  auto invoker = task->getInvoker();
   LLVM_DEBUG({
     auto &s = getADDebugStream()
         << "Diagnosing non-differentiability for inst \n\t" << *inst
@@ -1070,13 +1063,20 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
     task->print(s);
     s << '\n';
   });
+  emitNondifferentiabilityError(opLoc, task, diag);
+}
+
+void ADContext::emitNondifferentiabilityError(SourceLoc loc,
+                                              const DifferentiationTask *task,
+                                              Optional<Diag<>> diag) {
+  auto invoker = task->getInvoker();
   switch (invoker.getKind()) {
   // For a `autodiff_function` instruction or a `[differentiable]` attribute
   // that is not associated with any source location, we emit a diagnostic at
   // the instruction source location.
   case DifferentiationInvoker::Kind::AutoDiffFunctionInst:
     // FIXME: This will not report an error to the user.
-    diagnose(opLoc,
+    diagnose(loc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     break;
   case DifferentiationInvoker::Kind::SILDifferentiableAttribute: {
@@ -1100,7 +1100,7 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
       diagnose(attr.second->getLocation().getSourceLoc(),
                diag::autodiff_function_not_differentiable);
     }
-    diagnose(opLoc,
+    diagnose(loc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     break;
   }
@@ -1110,9 +1110,10 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
   // differentiation, and a "when differentiating this"  note at each indirect
   // invoker.
   case DifferentiationInvoker::Kind::IndirectDifferentiation: {
+    SILInstruction *inst;
     std::tie(inst, task) = task->getInvoker().getIndirectDifferentiation();
     emitNondifferentiabilityError(inst, task, None);
-    diagnose(opLoc, diag.getValueOr(
+    diagnose(loc, diag.getValueOr(
                         diag::autodiff_when_differentiating_function_call));
     break;
   }
@@ -1123,7 +1124,7 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
     auto *expr = invoker.getFunctionConversion();
     diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable)
         .highlight(expr->getSubExpr()->getSourceRange());
-    diagnose(opLoc,
+    diagnose(loc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     break;
   }
@@ -1135,7 +1136,7 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
     diagnose(diffAttr.first->getLocation(),
              diag::autodiff_function_not_differentiable)
         .highlight(diffAttr.second->getNameLoc());
-    diagnose(opLoc,
+    diagnose(loc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     break;
   }
@@ -1546,6 +1547,17 @@ static void dumpActivityInfo(SILFunction &fn,
   }
 }
 
+/// If the original function doesn't have a return, it cannot be differentiated.
+static bool diagnoseNoReturn(ADContext &context,
+                             DifferentiationTask *task) {
+  if (task->getOriginal()->findReturnBB() != task->getOriginal()->end())
+    return false;
+  context.emitNondifferentiabilityError(
+      task->getOriginal()->getLocation().getEndSourceLoc(),
+      task, diag::autodiff_missing_return);
+  return true;
+}
+
 /// If the original function in the differentiation task has more than one basic
 /// blocks, emit a "control flow unsupported" error at appropriate source
 /// locations. Returns true if error is emitted.
@@ -1586,6 +1598,7 @@ static bool diagnoseIndirectParametersOrResult(CanSILFunctionType fnType,
   }
   if (hasIndirectParamOrResult) {
     context.emitNondifferentiabilityError(
+        task->getOriginal()->getLocation().getSourceLoc(),
         task, diag::autodiff_function_indirect_params_or_result_unsupported);
     return true;
   }
@@ -2528,12 +2541,13 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   LLVM_DEBUG(getADDebugStream() << "Performing primal synthesis for original "
              << item.original->getName() << " and its corresponding primal "
              << item.target->getName() << '\n');
-  // FIXME: If the original function has multiple basic blocks, bail out since
-  // AD does not support control flow yet.
-  // FIXME: If the original function has indirect differentiation
-  // parameters/result, bail out since AD does not support function calls with
-  // indirect parameters yet.
-  if (diagnoseUnsupportedControlFlow(context, item.task) ||
+  // If the original function has multiple basic blocks, bail out since AD does
+  // not support control flow yet.
+  // If the original function has indirect differentiation parameters/result,
+  // bail out since AD does not support function calls with indirect parameters
+  // yet.
+  if (diagnoseNoReturn(context, item.task) ||
+      diagnoseUnsupportedControlFlow(context, item.task) ||
       diagnoseIndirectParametersOrResult(
           item.original->getLoweredFunctionType(), context, item.task)) {
     errorOccurred = true;

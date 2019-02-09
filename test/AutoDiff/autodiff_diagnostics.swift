@@ -24,9 +24,10 @@ _ = gradient(at: 0, in: one_to_one_0) // okay!
 // Indirect parameters/results (generics)
 //===----------------------------------------------------------------------===//
 
-// expected-note @+3 {{differentiating functions with parameters or result of unknown size is not supported yet}}
-// expected-error @+2 {{function is not differentiable}}
+// expected-error @+1 {{function is not differentiable}}
 @differentiable()
+// expected-note @+2 {{differentiating functions with parameters or result of unknown size is not supported yet}}
+// expected-note @+1 {{when differentiating this function definition}}
 func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
   return x + 1
 }
@@ -36,11 +37,30 @@ struct Tensor<Scalar> {
 }
 extension Tensor : Differentiable where Scalar : Differentiable & FloatingPoint {}
 extension Tensor where Scalar : BinaryFloatingPoint {
-  // expected-note @+3 {{differentiating functions with parameters or result of unknown size is not supported yet}}
-  // expected-error @+2 {{function is not differentiable}}
+  // expected-error @+1 {{function is not differentiable}}
   @differentiable(wrt: (self) where Scalar : Differentiable)
+  // expected-note @+2 {{differentiating functions with parameters or result of unknown size is not supported yet}}
+  // expected-note @+1 {{when differentiating this function definition}}
   func TF_6(_ x: Float) -> Tensor {
     return self + Scalar(x)
+  }
+}
+
+protocol TF8Proto : Differentiable {
+  associatedtype Scalar
+  @differentiable(wrt: (self, input))
+  func applied(to input: Float) -> Float
+}
+
+struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiable {
+  @noDerivative let bar: Scalar
+
+  // expected-error @+1 {{function is not differentiable}}
+  @differentiable(wrt: (self, input))
+  // expected-note @+2 {{differentiating functions with parameters or result of unknown size is not supported yet}}
+  // expected-note @+1 {{when differentiating this function definition}}
+  func applied(to input: Float) -> Float {
+    return input
   }
 }
 
@@ -143,6 +163,7 @@ _ = gradient(at: 0) { x in if_else(0, true) }
 //===----------------------------------------------------------------------===//
 // @differentiable attributes
 //===----------------------------------------------------------------------===//
+
 var a: Float = 3.0
 protocol P {
   @differentiable
@@ -168,22 +189,12 @@ enum T : P {
 }
 
 //===----------------------------------------------------------------------===//
-// Crasher TF-8
+// Unreachable
 //===----------------------------------------------------------------------===//
 
-protocol TF8Proto : Differentiable {
-  associatedtype Scalar
-  @differentiable(wrt: (self, input))
-  func applied(to input: Float) -> Float
-}
-
-struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiable {
-  @noDerivative let bar: Scalar
-
-  @differentiable(wrt: (self, input))
-  // expected-note @+2 {{differentiating functions with parameters or result of unknown size is not supported yet}}
-  // expected-error @+1 {{function is not differentiable}}
-  func applied(to input: Float) -> Float {
-    return input
-  }
+// expected-error @+1 {{function is not differentiable}}
+let no_return: @differentiable (Float) -> Float = { x in
+  let _ = x + 1
+// expected-note @+2 {{missing return for differentiation}}
+// expected-error @+1 {{missing return in a closure expected to return 'Float'}}
 }
