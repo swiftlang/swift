@@ -83,7 +83,7 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags, SourceLoc DiagLoc,
 }
 
 static std::unique_ptr<llvm::MemoryBuffer>
-getBufferOfDependency(clang::vfs::FileSystem &FS,
+getBufferOfDependency(llvm::vfs::FileSystem &FS,
                       StringRef ModulePath, StringRef DepPath,
                       DiagnosticEngine &Diags, SourceLoc DiagLoc) {
   auto DepBuf = FS.getBufferForFile(DepPath, /*FileSize=*/-1,
@@ -274,7 +274,7 @@ swiftModuleIsUpToDate(llvm::vfs::FileSystem &FS,
 ///      out to avoid having to do recursive scanning when rechecking this
 ///      dependency in the future.
 static bool
-collectDepsForSerialization(clang::vfs::FileSystem &FS,
+collectDepsForSerialization(llvm::vfs::FileSystem &FS,
                             CompilerInstance &SubInstance,
                             StringRef InPath, StringRef ModuleCachePath,
                             SmallVectorImpl<FileDependency> &Deps,
