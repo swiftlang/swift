@@ -2317,17 +2317,22 @@ internal func _checkEquatableImpl<Instance : Equatable>(
       let isEqualXY = x == y
       expectEqual(
         predictedXY, isEqualXY,
-        (predictedXY
-           ? "expected equal, found not equal\n"
-           : "expected not equal, found equal\n") +
-        "lhs (at index \(i)): \(String(reflecting: x))\n" +
-        "rhs (at index \(j)): \(String(reflecting: y))",
+        """
+        \((predictedXY
+           ? "expected equal, found not equal"
+           : "expected not equal, found equal"))
+        lhs (at index \(i)): \(String(reflecting: x))
+        rhs (at index \(j)): \(String(reflecting: y))
+        """,
         stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
       // Not-equal is an inverse of equal.
       expectNotEqual(
         isEqualXY, x != y,
-        "lhs (at index \(i)): \(String(reflecting: x))\nrhs (at index \(j)): \(String(reflecting: y))",
+        """
+        lhs (at index \(i)): \(String(reflecting: x))
+        rhs (at index \(j)): \(String(reflecting: y))
+        """,
         stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
       if !allowBrokenTransitivity {
@@ -2369,6 +2374,10 @@ public func checkEquatable<T : Equatable>(
     showFrame: false)
 }
 
+/// Produce an integer hash value for `value` by feeding it to a dedicated
+/// `Hasher`. This is always done by calling the `hash(into:)` method.
+/// If a non-nil `seed` is given, it is used to perturb the hasher state;
+/// this is useful for resolving accidental hash collisions.
 internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
   var hasher = Hasher()
   if let seed = seed {
@@ -2487,7 +2496,7 @@ public func checkHashable<Instances: Collection>(
         expectEqual(
           x._rawHashValue(seed: 0), y._rawHashValue(seed: 0),
           """
-          _rawHashValue expected to match, found to differ
+          _rawHashValue(seed:) expected to match, found to differ
           lhs (at index \(i)): \(x)
           rhs (at index \(j)): \(y)
           """,
