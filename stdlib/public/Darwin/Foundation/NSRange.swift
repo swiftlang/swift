@@ -13,12 +13,17 @@
 @_exported import Foundation // Clang module
 
 extension NSRange : Hashable {
-    public var hashValue: Int {
+    public var hashValue: Int { // FIXME(hashValue): Remove
 #if arch(i386) || arch(arm)
         return Int(bitPattern: (UInt(bitPattern: location) | (UInt(bitPattern: length) << 16)))
 #elseif arch(x86_64) || arch(arm64)
         return Int(bitPattern: (UInt(bitPattern: location) | (UInt(bitPattern: length) << 32)))
 #endif
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(location)
+        hasher.combine(length)
     }
 
     public static func==(lhs: NSRange, rhs: NSRange) -> Bool {
