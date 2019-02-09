@@ -11,6 +11,16 @@ func no_jvp_or_vjp(_ x: Float) -> Float {
   return x * x
 }
 
+@differentiable // expected-error {{duplicate '@differentiable' attribute}}
+@differentiable
+func dupe_attributes(arg: Float) -> Float { return arg }
+
+@differentiable(wrt: arg1) // expected-error {{duplicate '@differentiable' attribute}}
+@differentiable(wrt: arg1)
+@differentiable(wrt: arg2) // expected-error {{duplicate '@differentiable' attribute}}
+@differentiable(wrt: arg2)
+func dupe_attributes(arg1: Float, arg2: Float) -> Float { return arg1 }
+
 // JVP
 
 @differentiable(jvp: jvpSimpleJVP)

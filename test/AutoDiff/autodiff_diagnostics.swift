@@ -61,6 +61,17 @@ struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiabl
   }
 }
 
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{differentiating functions with parameters or result of unknown size is not supported yet}}
+_ = gradient(at: 1.0, in: { x in x.squareRoot() })
+
+// FIXME(TF-159): Diagnose functions with inout parameters.
+// _ = Float(5).gradient { x -> Float in
+//   var a = x
+//   a += x
+//   return a
+// }
+
 //===----------------------------------------------------------------------===//
 // Non-differentiable stored properties
 //===----------------------------------------------------------------------===//
