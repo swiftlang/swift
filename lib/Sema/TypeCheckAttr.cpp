@@ -2476,11 +2476,18 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         original = nullptr;
     }
   }
-  
+
+  // Global immutable vars, for example, have no getter, and therefore trigger
+  // this.
   if (!original) {
-    // Global immutable vars, for example, have no getter, and therefore trigger
-    // this.
     diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+    return;
+  }
+
+  // Class members are not supported by differentiation yet.
+  if (original->getInnermostTypeContext() &&
+      isa<ClassDecl>(original->getInnermostTypeContext())) {
+    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_class_unsupported);
     return;
   }
 

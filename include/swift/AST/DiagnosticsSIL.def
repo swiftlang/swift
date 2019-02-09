@@ -410,6 +410,8 @@ NOTE(autodiff_nested_function_call_multiple_return_active,none,
      "function call is being differentiated from multiple return values", ())
 NOTE(autodiff_control_flow_not_supported,none,
      "differentiating control flow is not supported yet", ())
+NOTE(autodiff_class_member_not_supported,none,
+     "differentiating class members is not supported yet", ())
 NOTE(autodiff_nested_not_supported,none,
      "nested differentiation is not supported yet", ())
 NOTE(autodiff_missing_return,none,

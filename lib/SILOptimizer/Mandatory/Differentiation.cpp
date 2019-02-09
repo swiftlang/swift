@@ -1930,6 +1930,14 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     return std::make_pair(convertedRef, requirementIndices);
   }
 
+  // Reject class methods.
+  if (auto *classMethod =
+          peerThroughFunctionConversions<ClassMethodInst>(original)) {
+    context.emitNondifferentiabilityError(original, parentTask,
+        diag::autodiff_class_member_not_supported);
+    return None;
+  }
+
   // Emit the general opaque function error.
   context.emitNondifferentiabilityError(original, parentTask,
       diag::autodiff_opaque_function_not_differentiable);

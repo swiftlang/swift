@@ -189,6 +189,30 @@ enum T : P {
 }
 
 //===----------------------------------------------------------------------===//
+// Classes and existentials (unsupported yet)
+//===----------------------------------------------------------------------===//
+
+class Foo {
+  // @differentiable cannot be put here. It's rejected by Sema already.
+  func class_method(_ x: Float) -> Float {
+    return x
+  }
+}
+
+// Nested call case.
+@differentiable // expected-error 2 {{function is not differentiable}}
+// expected-note @+1 2 {{when differentiating this function definition}}
+func triesToDifferentiateClassMethod(x: Float) -> Float {
+  // expected-note @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{differentiating class members is not supported yet}}
+  return Foo().class_method(x)
+}
+
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
+_ = gradient(at: .zero, in: Foo().class_method)
+
+//===----------------------------------------------------------------------===//
 // Unreachable
 //===----------------------------------------------------------------------===//
 
