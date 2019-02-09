@@ -223,7 +223,7 @@ date to give the bundle identifier of the toolchain's ``Info.plist``. For
 instance, if ``$BUNDLE_PREFIX`` was ``com.example``, the toolchain
 produced will have the bundle identifier ``com.example.YYYYMMDD``. It
 will be created in the directory you run the script with a filename
-of the form: ``swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
+ of the form: ``swift-tensorflow-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
 
 Beyond building the toolchain, ``build-toolchain-tensorflow`` also supports the
 following (non-exhaustive) set of useful options::
