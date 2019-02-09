@@ -638,3 +638,42 @@ func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
 {
   _ = Dictionary(uniqueKeysWithValues: Array(c))
 }
+
+// https://bugs.swift.org/browse/SR-7984
+struct SR_7984<Bar> {
+  func doSomething() {}
+}
+
+extension SR_7984 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{28-29= ==}}
+
+protocol SR_7984_Proto {
+  associatedtype Bar
+}
+
+extension SR_7984_Proto where Bar: String {} // expected-error {{type 'Self.Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{34-35= ==}}
+
+protocol SR_7984_HasFoo {
+  associatedtype Foo
+}
+protocol SR_7984_HasAssoc {
+  associatedtype Assoc: SR_7984_HasFoo
+}
+
+struct SR_7984_X<T: SR_7984_HasAssoc> {}
+extension SR_7984_X where T.Assoc.Foo: String {} // expected-error {{type 'T.Assoc.Foo' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Assoc.Foo == String' to require 'T.Assoc.Foo' to be 'String'}} {{38-39= ==}}
+
+struct SR_7984_S<T: Sequence> where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{46-47= ==}}
+func SR_7984_F<T: Sequence>(foo: T) where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{52-53= ==}}
+
+protocol SR_7984_P {
+  func S<T : Sequence>(bar: T) where T.Element: String // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{47-48= ==}}
+}
+
+struct A<T: String> {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
+struct B<T> where T: String {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
+protocol C {
+  associatedtype Foo: String // expected-error {{inheritance from non-protocol, non-class type 'String'}} expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+}
+protocol D {
+  associatedtype Foo where Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+}

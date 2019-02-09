@@ -290,6 +290,12 @@ bool AllowInvalidInitRef::diagnose(Expr *root, bool asNote) const {
                                           getLocator());
     return failure.diagnose(asNote);
   }
+
+  case RefKind::NonConstMetatype: {
+    ImplicitInitOnNonConstMetatypeFailure failure(root, getConstraintSystem(),
+                                                  BaseType, Init, getLocator());
+    return failure.diagnose(asNote);
+  }
   }
 }
 
@@ -306,6 +312,14 @@ AllowInvalidInitRef *AllowInvalidInitRef::onProtocolMetatype(
     ConstraintLocator *locator) {
   return create(RefKind::ProtocolMetatype, cs, baseTy, init,
                 isStaticallyDerived, baseRange, locator);
+}
+
+AllowInvalidInitRef *
+AllowInvalidInitRef::onNonConstMetatype(ConstraintSystem &cs, Type baseTy,
+                                        ConstructorDecl *init,
+                                        ConstraintLocator *locator) {
+  return create(RefKind::NonConstMetatype, cs, baseTy, init,
+                /*isStaticallyDerived=*/false, SourceRange(), locator);
 }
 
 AllowInvalidInitRef *

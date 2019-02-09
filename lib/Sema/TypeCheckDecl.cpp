@@ -2063,6 +2063,9 @@ public:
   explicit DeclChecker(TypeChecker &TC) : TC(TC) {}
 
   void visit(Decl *decl) {
+    if (TC.Context.Stats)
+      TC.Context.Stats->getFrontendCounters().NumDeclsTypechecked++;
+
     FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
@@ -3862,13 +3865,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       auto valueParams = accessor->getParameters();
 
       // Determine the value type.
-      Type valueIfaceTy;
-      if (auto VD = dyn_cast<VarDecl>(storage)) {
-        valueIfaceTy = VD->getInterfaceType()->getReferenceStorageReferent();
-      } else {
-        auto SD = cast<SubscriptDecl>(storage);
-        valueIfaceTy = SD->getElementInterfaceType();
-
+      Type valueIfaceTy = storage->getValueInterfaceType();
+      if (auto SD = dyn_cast<SubscriptDecl>(storage)) {
         // Copy the index types instead of re-validating them.
         auto indices = SD->getIndices();
         for (size_t i = 0, e = indices->size(); i != e; ++i) {
@@ -4413,6 +4411,9 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
 }
 
 void TypeChecker::finalizeDecl(ValueDecl *decl) {
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumDeclsFinalized++;
+
   validateDecl(decl);
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {

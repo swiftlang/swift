@@ -1034,13 +1034,17 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
     return nullptr;
 
   auto intType = getIntDecl()->getDeclaredType();
+  auto isIntParam = [&](AnyFunctionType::Param param) {
+    return (!param.isVariadic() && !param.isInOut() &&
+            param.getPlainType()->isEqual(intType));
+  };
   auto boolType = getBoolDecl()->getDeclaredType();
   auto decl = lookupOperatorFunc(*this, "==",
                                  intType, [=](FunctionType *type) {
     // Check for the signature: (Int, Int) -> Bool
     if (type->getParams().size() != 2) return false;
-    if (!type->getParams()[0].getOldType()->isEqual(intType) ||
-        !type->getParams()[1].getOldType()->isEqual(intType)) return false;
+    if (!isIntParam(type->getParams()[0]) ||
+        !isIntParam(type->getParams()[1])) return false;
     return type->getResult()->isEqual(boolType);
   });
   getImpl().EqualIntDecl = decl;
@@ -1227,8 +1231,9 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
   if (intrinsicsParams.size() != 3)
     return nullptr;
 
-  if (llvm::any_of(intrinsicsParams, [](const AnyFunctionType::Param &p) {
-    return !isBuiltinWordType(p.getOldType());
+  if (llvm::any_of(intrinsicsParams, [](AnyFunctionType::Param param) {
+    return (param.isVariadic() || param.isInOut() ||
+            !isBuiltinWordType(param.getPlainType()));
   })) {
     return nullptr;
   }

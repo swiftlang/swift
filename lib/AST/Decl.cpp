@@ -4127,8 +4127,15 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   // the parameter type.
   if (auto funcTy = type->getAs<AnyFunctionType>()) {
     auto inputKind = SelfReferenceKind::None();
-    for (auto &elt : funcTy->getParams()) {
-      inputKind |= findProtocolSelfReferences(proto, elt.getOldType(),
+    for (auto param : funcTy->getParams()) {
+      // inout parameters are invariant.
+      if (param.isInOut()) {
+        if (findProtocolSelfReferences(proto, param.getPlainType(),
+                                       skipAssocTypes)) {
+          return SelfReferenceKind::Other();
+        }
+      }
+      inputKind |= findProtocolSelfReferences(proto, param.getParameterType(),
                                               skipAssocTypes);
     }
     auto resultKind = findProtocolSelfReferences(proto, funcTy->getResult(),
@@ -4157,14 +4164,6 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   if (auto selfType = type->getAs<DynamicSelfType>()) {
     return findProtocolSelfReferences(proto, selfType->getSelfType(),
                                       skipAssocTypes);
-  }
-
-  // InOut types are invariant.
-  if (auto inOutType = type->getAs<InOutType>()) {
-    if (findProtocolSelfReferences(proto, inOutType->getObjectType(),
-                                   skipAssocTypes)) {
-      return SelfReferenceKind::Other();
-    }
   }
 
   // Bound generic types are invariant.
@@ -4237,8 +4236,15 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     // as a function result type.
     if (!allowCovariantParameters) {
       auto inputKind = SelfReferenceKind::None();
-      for (auto &elt : type->castTo<AnyFunctionType>()->getParams()) {
-        inputKind |= ::findProtocolSelfReferences(this, elt.getOldType(),
+      for (auto param : type->castTo<AnyFunctionType>()->getParams()) {
+        // inout parameters are invariant.
+        if (param.isInOut()) {
+          if (::findProtocolSelfReferences(this, param.getPlainType(),
+                                           skipAssocTypes)) {
+            return SelfReferenceKind::Other();
+          }
+        }
+        inputKind |= ::findProtocolSelfReferences(this, param.getParameterType(),
                                                   skipAssocTypes);
       }
 

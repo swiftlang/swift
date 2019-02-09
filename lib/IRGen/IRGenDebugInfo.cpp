@@ -193,11 +193,11 @@ private:
       return StringRef();
   }
 
-  SILLocation::DebugLoc getDeserializedLoc(Pattern *) { return {}; }
-  SILLocation::DebugLoc getDeserializedLoc(Expr *) { return {}; }
-  SILLocation::DebugLoc getDeserializedLoc(Stmt *) { return {}; }
-  SILLocation::DebugLoc getDeserializedLoc(Decl *D) {
-    SILLocation::DebugLoc L;
+  using DebugLoc = SILLocation::DebugLoc;
+  DebugLoc getDeserializedLoc(Pattern *) { return {}; }
+  DebugLoc getDeserializedLoc(Expr *) { return {}; }
+  DebugLoc getDeserializedLoc(Decl *D) {
+    DebugLoc L;
     const DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
     StringRef Filename = getFilenameFromDC(DC);
     if (!Filename.empty())
@@ -205,31 +205,51 @@ private:
     return L;
   }
 
-  /// Use the SM to figure out the actual line/column of a SourceLoc.
+  /// Use the Swift SM to figure out the actual line/column of a SourceLoc.
   template <typename WithLoc>
-  SILLocation::DebugLoc getDebugLoc(IRGenDebugInfo &DI, WithLoc *S,
-                                    bool End = false) {
-    SILLocation::DebugLoc L;
-    if (S == nullptr)
-      return L;
+  DebugLoc getSwiftDebugLoc(IRGenDebugInfo &DI, WithLoc *ASTNode, bool End) {
+    if (!ASTNode)
+      return {};
 
-    SourceLoc Loc = End ? S->getEndLoc() : S->getStartLoc();
+    SourceLoc Loc = End ? ASTNode->getEndLoc() : ASTNode->getStartLoc();
     if (Loc.isInvalid())
       // This may be a deserialized or clang-imported decl. And modules
       // don't come with SourceLocs right now. Get at least the name of
       // the module.
-      return getDeserializedLoc(S);
+      return getDeserializedLoc(ASTNode);
 
     return DI.decodeSourceLoc(Loc);
   }
 
-  SILLocation::DebugLoc getStartLocation(Optional<SILLocation> OptLoc) {
+  DebugLoc getDebugLoc(IRGenDebugInfo &DI, Pattern *P, bool End = false) {
+    return getSwiftDebugLoc(DI, P, End);
+  }
+  DebugLoc getDebugLoc(IRGenDebugInfo &DI, Expr *E, bool End = false) {
+    return getSwiftDebugLoc(DI, E, End);
+  }
+  DebugLoc getDebugLoc(IRGenDebugInfo &DI, Decl *D, bool End = false) {
+    DebugLoc L;
+    if (!D)
+      return L;
+
+    if (auto *ClangDecl = D->getClangDecl()) {
+      auto ClangSrcLoc = ClangDecl->getBeginLoc();
+      clang::SourceManager &ClangSM =
+          CI.getClangASTContext().getSourceManager();
+      L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
+      L.Filename = ClangSM.getBufferName(ClangSrcLoc);
+      return L;
+    }
+    return getSwiftDebugLoc(DI, D, End);
+  }
+
+  DebugLoc getStartLocation(Optional<SILLocation> OptLoc) {
     if (!OptLoc)
       return {};
     return decodeSourceLoc(OptLoc->getStartSourceLoc());
   }
 
-  SILLocation::DebugLoc sanitizeCodeViewDebugLoc(SILLocation::DebugLoc DLoc) {
+  DebugLoc sanitizeCodeViewDebugLoc(DebugLoc DLoc) {
     if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
       // When WinDbg finds two locations with the same line but different
       // columns, the user must select an address when they break on that
@@ -238,13 +258,13 @@ private:
     return DLoc;
   }
 
-  SILLocation::DebugLoc decodeDebugLoc(SILLocation Loc) {
+  DebugLoc decodeDebugLoc(SILLocation Loc) {
     if (Loc.isDebugInfoLoc())
       return sanitizeCodeViewDebugLoc(Loc.getDebugInfoLoc());
     return decodeSourceLoc(Loc.getDebugSourceLoc());
   }
 
-  SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc) {
+  DebugLoc getDebugLocation(Optional<SILLocation> OptLoc) {
     if (!OptLoc || (Opts.DebugInfoFormat != IRGenDebugInfoFormat::CodeView &&
                     OptLoc->isInPrologue()))
       return {};
@@ -1187,13 +1207,6 @@ private:
       auto *StructTy = BaseTy->castTo<StructType>();
       auto *Decl = StructTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
-      if (auto *ClangDecl = Decl->getClangDecl()) {
-        auto ClangSrcLoc = ClangDecl->getBeginLoc();
-        clang::SourceManager &ClangSM =
-            CI.getClangASTContext().getSourceManager();
-        L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
-        L.Filename = ClangSM.getBufferName(ClangSrcLoc);
-      }
       auto *File = getOrCreateFile(L.Filename);
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         return createStructType(DbgTy, Decl, StructTy, Scope, File, L.Line,
@@ -1212,13 +1225,6 @@ private:
       auto *ClassTy = BaseTy->castTo<ClassType>();
       auto *Decl = ClassTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
-      if (auto *ClangDecl = Decl->getClangDecl()) {
-        auto ClangSrcLoc = ClangDecl->getBeginLoc();
-        clang::SourceManager &ClangSM =
-            CI.getClangASTContext().getSourceManager();
-        L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
-        L.Filename = ClangSM.getBufferName(ClangSrcLoc);
-      }
       assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
       return createPointerSizedStruct(Scope, Decl->getNameStr(),
                                       getOrCreateFile(L.Filename), L.Line,
@@ -1414,13 +1420,13 @@ private:
       auto L = getDebugLoc(*this, Decl);
       auto AliasedTy = TypeAliasTy->getSinglyDesugaredType();
       auto File = getOrCreateFile(L.Filename);
-      // For TypeAlias types, the DeclContext for the aliasED type is
+      // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
          DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), AliasedTy,
          DbgTy.StorageType, DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
-                                    File, L.Line, File);
+                                    File, L.Line, Scope);
     }
 
     case TypeKind::Paren: {
@@ -1529,26 +1535,35 @@ private:
     // FIXME: Builtin and qualified types in LLVM have no parent
     // scope. TODO: This can be fixed by extending DIBuilder.
     llvm::DIScope *Scope = nullptr;
-    DeclContext *Context = DbgTy.getType()->getNominalOrBoundGenericNominal();
-    if (Context) {
-      if (auto *D = Context->getSelfNominalTypeDecl())
-        if (auto *ClangDecl = D->getClangDecl()) {
-          clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
-          auto Idx = ClangDecl->getOwningModuleID();
-          auto SubModuleDesc = Reader.getSourceDescriptor(Idx);
-          auto TopLevelModuleDesc = getClangModule(*D->getModuleContext());
-          if (SubModuleDesc && TopLevelModuleDesc) {
-            // Describe the submodule, but substitute the cached ASTFile from
-            // the toplevel module. The ASTFile pointer in SubModule may be
-            // dangling and cant be trusted.
-            Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
-                                       SubModuleDesc->getPath(),
-                                       TopLevelModuleDesc->getASTFile(),
-                                       TopLevelModuleDesc->getSignature()},
-                                      SubModuleDesc->getModuleOrNull());
-          }
-        }
-      Context = Context->getParent();
+    // Make sure to retrieve the context of the type alias, not the pointee.
+    DeclContext *Context = nullptr;
+    const Decl *TypeDecl = nullptr;
+    const clang::Decl *ClangDecl = nullptr;
+    if (auto Alias = dyn_cast<TypeAliasType>(DbgTy.getType())) {
+      TypeAliasDecl *AliasDecl = Alias->getDecl();
+      TypeDecl = AliasDecl;
+      Context = AliasDecl->getParent();
+      ClangDecl = AliasDecl->getClangDecl();
+    } else if (auto *ND = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
+      TypeDecl = ND;
+      Context = ND->getParent();
+      ClangDecl = ND->getClangDecl();
+    }
+    if (ClangDecl) {
+      clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
+      auto Idx = ClangDecl->getOwningModuleID();
+      auto SubModuleDesc = Reader.getSourceDescriptor(Idx);
+      auto TopLevelModuleDesc = getClangModule(*TypeDecl->getModuleContext());
+      if (SubModuleDesc && TopLevelModuleDesc) {
+        // Describe the submodule, but substitute the cached ASTFile from
+        // the toplevel module. The ASTFile pointer in SubModule may be
+        // dangling and cant be trusted.
+        Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
+                                   SubModuleDesc->getPath(),
+                                   TopLevelModuleDesc->getASTFile(),
+                                   TopLevelModuleDesc->getSignature()},
+                                  SubModuleDesc->getModuleOrNull());
+      }
     }
     if (!Scope)
       Scope = getOrCreateContext(Context);

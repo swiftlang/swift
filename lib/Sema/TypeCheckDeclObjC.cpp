@@ -825,18 +825,22 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (SubscriptType->getParams().size() != 1)
     return false;
 
-  Type IndicesType = SubscriptType->getParams()[0].getOldType();
-  if (IndicesType->hasError())
+  auto IndexParam = SubscriptType->getParams()[0];
+  if (IndexParam.isInOut())
     return false;
 
-  bool IndicesResult =
-    IndicesType->isRepresentableIn(ForeignLanguage::ObjectiveC,
-                                   SD->getDeclContext());
+  Type IndexType = SubscriptType->getParams()[0].getParameterType();
+  if (IndexType->hasError())
+    return false;
+
+  bool IndexResult =
+    IndexType->isRepresentableIn(ForeignLanguage::ObjectiveC,
+                                 SD->getDeclContext());
 
   Type ElementType = SD->getElementInterfaceType();
   bool ElementResult = ElementType->isRepresentableIn(
         ForeignLanguage::ObjectiveC, SD->getDeclContext());
-  bool Result = IndicesResult && ElementResult;
+  bool Result = IndexResult && ElementResult;
 
   if (Result && checkObjCInExtensionContext(SD, Diagnose))
     return false;
@@ -845,7 +849,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     return Result;
 
   SourceRange TypeRange;
-  if (!IndicesResult)
+  if (!IndexResult)
     TypeRange = SD->getIndices()->getSourceRange();
   else
     TypeRange = SD->getElementTypeLoc().getSourceRange();
@@ -854,8 +858,8 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     .highlight(TypeRange);
 
   diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),
-                                     !IndicesResult ? IndicesType
-                                                    : ElementType,
+                                     !IndexResult ? IndexType
+                                                  : ElementType,
                                      TypeRange);
   describeObjCReason(SD, Reason);
 
