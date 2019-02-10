@@ -388,7 +388,7 @@ Every existing runtime function will need to be audited for its desirability and
 
 The runtime is also responsible for lazily creating new type metadata entries at run time, either for generic type instantiations or for resilient constructs. Library evolution in general introduces a whole new category of needs from the runtime by making data and metadata more opaque, requiring interaction to be done through runtime APIs. Additionally, ownership semantics may require new runtime APIs or modifications to existing APIs. These new runtime needs are still under investigation [[SR-4352](https://bugs.swift.org/browse/SR-4352)].
 
-There are many potential future directions to open up the ABI and operate on less-opaque data directly, as well a techniques such as call-site caching. These are ABI-additive, and will be interesting to explore in the future.
+There are many potential future directions to open up the ABI and operate on less-opaque data directly, as well as techniques such as call-site caching. These are ABI-additive, and will be interesting to explore in the future.
 
 For a potentially-out-of-date listing of runtime symbols and some details, see the [Runtime docs](https://github.com/apple/swift/blob/master/docs/Runtime.md).
 

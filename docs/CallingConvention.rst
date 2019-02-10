@@ -1048,7 +1048,7 @@ opaque range in the maximal aligned storage unit with a mapping from
 that aligned storage unit to an integer of the aligned storage unit's
 size.  Remove any other opaque ranges in the maximal aligned storage
 unit.  Note that this can create overlapping ranges in some cases.
-For this purposes of this calculation, the last maximal aligned
+For the purposes of this calculation, the last maximal aligned
 storage unit should be considered "full", as if the type had an
 infinite amount of empty tail-padding.
 

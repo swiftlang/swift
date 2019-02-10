@@ -1,6 +1,6 @@
 # Optimizer Counter Analysis
 
-It is possible possible by means of providing some special command-line
+It is possible by means of providing some special command-line
 options to ask the Swift compiler to produce different statistics about
 the optimizer counters. Optimizer counters are most typically counters
 representing different aspects of a SIL representation for a Swift module

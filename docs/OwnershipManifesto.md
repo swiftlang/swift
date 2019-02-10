@@ -645,7 +645,7 @@ properties.
 
 In some cases, where desired, the compiler may be able to
 preserve source compatibility and avoid an error by implicitly
-inserting a copy instead.  This likely something we would only
+inserting a copy instead.  This is likely something we would only
 do in a source-compatibility mode.
 
 Static enforcement will be used for:
