@@ -462,7 +462,7 @@ static SILValue constantFoldCompare(BuiltinInst *BI, BuiltinValueKind ID) {
   // operation with overflow checks enabled.
   BuiltinInst *BIOp;
   if (match(BI, m_BuiltinInst(BuiltinValueKind::ICMP_SLT,
-                              m_TupleExtractInst(m_BuiltinInst(BIOp), 0),
+                              m_TupleExtractOperation(m_BuiltinInst(BIOp), 0),
                               m_Zero()))) {
     // Check if Other is a result of an unsigned operation with overflow.
     switch (BIOp->getBuiltinInfo().ID) {
@@ -482,7 +482,7 @@ static SILValue constantFoldCompare(BuiltinInst *BI, BuiltinValueKind ID) {
   // Fold x >= 0 into true, if x is known to be a result of an unsigned
   // operation with overflow checks enabled.
   if (match(BI, m_BuiltinInst(BuiltinValueKind::ICMP_SGE,
-                              m_TupleExtractInst(m_BuiltinInst(BIOp), 0),
+                              m_TupleExtractOperation(m_BuiltinInst(BIOp), 0),
                               m_Zero()))) {
     // Check if Other is a result of an unsigned operation with overflow.
     switch (BIOp->getBuiltinInfo().ID) {
@@ -1287,32 +1287,90 @@ case BuiltinValueKind::id:
   return nullptr;
 }
 
-static SILValue constantFoldInstruction(SILInstruction &I,
-                                        Optional<bool> &ResultsInError) {
-  // Constant fold function calls.
-  if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
-    return constantFoldBuiltin(BI, ResultsInError);
+/// On success this places a new value for each result of Op->getUser() into
+/// Results. Results is guaranteed on success to have the same number of entries
+/// as results of User. If we could only simplify /some/ of an instruction's
+/// results, we still return true, but signal that we couldn't simplify by
+/// placing SILValue() in that position instead.
+static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
+                                    SmallVectorImpl<SILValue> &Results) {
+  auto *User = Op->getUser();
+
+  // Constant fold builtin invocations.
+  if (auto *BI = dyn_cast<BuiltinInst>(User)) {
+    Results.push_back(constantFoldBuiltin(BI, ResultsInError));
+    return true;
   }
 
   // Constant fold extraction of a constant element.
-  if (auto *TEI = dyn_cast<TupleExtractInst>(&I)) {
-    if (auto *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
-      return TheTuple->getElement(TEI->getFieldNo());
+  if (auto *TEI = dyn_cast<TupleExtractInst>(User)) {
+    if (auto *TheTuple = dyn_cast<TupleInst>(TEI->getOperand())) {
+      Results.push_back(TheTuple->getElement(TEI->getFieldNo()));
+      return true;
+    }
   }
 
   // Constant fold extraction of a constant struct element.
-  if (auto *SEI = dyn_cast<StructExtractInst>(&I)) {
-    if (auto *Struct = dyn_cast<StructInst>(SEI->getOperand()))
-      return Struct->getOperandForField(SEI->getField())->get();
+  if (auto *SEI = dyn_cast<StructExtractInst>(User)) {
+    if (auto *Struct = dyn_cast<StructInst>(SEI->getOperand())) {
+      Results.push_back(Struct->getOperandForField(SEI->getField())->get());
+      return true;
+    }
+  }
+
+  // Constant fold struct destructuring of a trivial value or a guaranteed
+  // non-trivial value.
+  //
+  // We can not do this for non-trivial owned values without knowing that we
+  // will eliminate the underlying struct since we would be introducing a
+  // "use-after-free" from an ownership model perspective.
+  if (auto *DSI = dyn_cast<DestructureStructInst>(User)) {
+    if (auto *Struct = dyn_cast<StructInst>(DSI->getOperand())) {
+      transform(
+          Struct->getAllOperands(), std::back_inserter(Results),
+          [&](Operand &op) -> SILValue {
+            SILValue operandValue = op.get();
+            auto ownershipKind = operandValue.getOwnershipKind();
+            if (ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
+              return operandValue;
+            return SILValue();
+          });
+      return true;
+    }
+  }
+
+  // Constant fold tuple destructuring of a trivial value or a guaranteed
+  // non-trivial value.
+  //
+  // We can not do this for non-trivial owned values without knowing that we
+  // will eliminate the underlying tuple since we would be introducing a
+  // "use-after-free" from the ownership model perspective.
+  if (auto *DTI = dyn_cast<DestructureTupleInst>(User)) {
+    if (auto *Tuple = dyn_cast<TupleInst>(DTI->getOperand())) {
+      transform(
+          Tuple->getAllOperands(), std::back_inserter(Results),
+          [&](Operand &op) -> SILValue {
+            SILValue operandValue = op.get();
+            auto ownershipKind = operandValue.getOwnershipKind();
+            if (ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
+              return operandValue;
+            return SILValue();
+          });
+      return true;
+    }
   }
 
   // Constant fold indexing insts of a 0 integer literal.
-  if (auto *II = dyn_cast<IndexingInst>(&I))
-    if (auto *IntLiteral = dyn_cast<IntegerLiteralInst>(II->getIndex()))
-      if (!IntLiteral->getValue())
-        return II->getBase();
+  if (auto *II = dyn_cast<IndexingInst>(User)) {
+    if (auto *IntLiteral = dyn_cast<IntegerLiteralInst>(II->getIndex())) {
+      if (!IntLiteral->getValue()) {
+        Results.push_back(II->getBase());
+        return true;
+      }
+    }
+  }
 
-  return SILValue();
+  return false;
 }
 
 static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
@@ -1468,6 +1526,9 @@ ConstantFolder::processWorkList() {
                           I->eraseFromParent();
                         });
 
+  // An out parameter array that we use to return new simplified results from
+  // constantFoldInstruction.
+  SmallVector<SILValue, 8> ConstantFoldedResults;
   while (!WorkList.empty()) {
     SILInstruction *I = WorkList.pop_back_val();
     assert(I->getParent() && "SILInstruction must have parent.");
@@ -1515,6 +1576,7 @@ ConstantFolder::processWorkList() {
       continue;
     }
 
+    // If we have a cast instruction, try to optimize it.
     if (isa<CheckedCastBranchInst>(I) || isa<CheckedCastAddrBranchInst>(I) ||
         isa<UnconditionalCheckedCastInst>(I) ||
         isa<UnconditionalCheckedCastAddrInst>(I)) {
@@ -1551,104 +1613,134 @@ ConstantFolder::processWorkList() {
       continue;
     }
 
-
     // Go through all users of the constant and try to fold them.
-    // TODO: MultiValueInstruction
     FoldedUsers.clear();
-    for (auto Use : cast<SingleValueInstruction>(I)->getUses()) {
-      SILInstruction *User = Use->getUser();
-      LLVM_DEBUG(llvm::dbgs() << "    User: " << *User);
+    for (auto Result : I->getResults()) {
+      for (auto *Use : Result->getUses()) {
+        SILInstruction *User = Use->getUser();
+        LLVM_DEBUG(llvm::dbgs() << "    User: " << *User);
 
-      // It is possible that we had processed this user already. Do not try
-      // to fold it again if we had previously produced an error while folding
-      // it.  It is not always possible to fold an instruction in case of error.
-      if (ErrorSet.count(User))
-        continue;
+        // It is possible that we had processed this user already. Do not try to
+        // fold it again if we had previously produced an error while folding
+        // it.  It is not always possible to fold an instruction in case of
+        // error.
+        if (ErrorSet.count(User))
+          continue;
 
-      // Some constant users may indirectly cause folding of their users.
-      if (isa<StructInst>(User) || isa<TupleInst>(User)) {
-        WorkList.insert(User);
-        continue;
-      }
-
-      // Always consider cond_fail instructions as potential for DCE.  If the
-      // expression feeding them is false, they are dead.  We can't handle this
-      // as part of the constant folding logic, because there is no value
-      // they can produce (other than empty tuple, which is wasteful).
-      if (isa<CondFailInst>(User))
-        FoldedUsers.insert(User);
-
-      // Initialize ResultsInError as a None optional.
-      //
-      // We are essentially using this optional to represent 3 states: true,
-      // false, and n/a.
-      Optional<bool> ResultsInError;
-
-      // If we are asked to emit diagnostics, override ResultsInError with a
-      // Some optional initialized to false.
-      if (EnableDiagnostics)
-        ResultsInError = false;
-
-      // Try to fold the user. If ResultsInError is None, we do not emit any
-      // diagnostics. If ResultsInError is some, we use it as our return value.
-      SILValue C = constantFoldInstruction(*User, ResultsInError);
-
-      // If we did not pass in a None and the optional is set to true, add the
-      // user to our error set.
-      if (ResultsInError.hasValue() && ResultsInError.getValue())
-        ErrorSet.insert(User);
-
-      // We failed to constant propagate... continue...
-      if (!C)
-        continue;
-
-      // We can currently only do this constant-folding of single-value
-      // instructions.
-      auto UserV = cast<SingleValueInstruction>(User);
-
-      // Handle a corner case: if this instruction is an unreachable CFG loop
-      // there is no defined dominance order and we can end up with loops in the
-      // use-def chain. Just bail in this case.
-      if (C == UserV)
-        continue;
-
-      // Ok, we have succeeded. Add user to the FoldedUsers list and perform the
-      // necessary cleanups, RAUWs, etc.
-      FoldedUsers.insert(User);
-      ++NumInstFolded;
-
-      InvalidateInstructions = true;
-
-      // If the constant produced a tuple, be smarter than RAUW: explicitly nuke
-      // any tuple_extract instructions using the apply.  This is a common case
-      // for functions returning multiple values.
-      if (auto *TI = dyn_cast<TupleInst>(C)) {
-        for (auto UI = UserV->use_begin(), E = UserV->use_end(); UI != E;) {
-          Operand *O = *UI++;
-
-          // If the user is a tuple_extract, just substitute the right value in.
-          if (auto *TEI = dyn_cast<TupleExtractInst>(O->getUser())) {
-            SILValue NewVal = TI->getOperand(TEI->getFieldNo());
-            TEI->replaceAllUsesWith(NewVal);
-            TEI->dropAllReferences();
-            FoldedUsers.insert(TEI);
-            if (auto *Inst = NewVal->getDefiningInstruction())
-              WorkList.insert(Inst);
-          }
+        // Some constant users may indirectly cause folding of their users.
+        if (isa<StructInst>(User) || isa<TupleInst>(User)) {
+          WorkList.insert(User);
+          continue;
         }
 
-        if (UserV->use_empty())
-          FoldedUsers.insert(TI);
+        // Always consider cond_fail instructions as potential for DCE.  If the
+        // expression feeding them is false, they are dead.  We can't handle
+        // this as part of the constant folding logic, because there is no value
+        // they can produce (other than empty tuple, which is wasteful).
+        if (isa<CondFailInst>(User))
+          FoldedUsers.insert(User);
+
+        // Initialize ResultsInError as a None optional.
+        //
+        // We are essentially using this optional to represent 3 states: true,
+        // false, and n/a.
+        Optional<bool> ResultsInError;
+
+        // If we are asked to emit diagnostics, override ResultsInError with a
+        // Some optional initialized to false.
+        if (EnableDiagnostics)
+          ResultsInError = false;
+
+        // Try to fold the user. If ResultsInError is None, we do not emit any
+        // diagnostics. If ResultsInError is some, we use it as our return
+        // value.
+        ConstantFoldedResults.clear();
+        bool Success =
+            constantFoldInstruction(Use, ResultsInError, ConstantFoldedResults);
+
+        // If we did not pass in a None and the optional is set to true, add the
+        // user to our error set.
+        if (ResultsInError.hasValue() && ResultsInError.getValue())
+          ErrorSet.insert(User);
+
+        // We failed to constant propagate... continue...
+        if (!Success || llvm::none_of(ConstantFoldedResults,
+                                      [](SILValue v) { return bool(v); }))
+          continue;
+
+        // Now iterate over our new results.
+        for (auto pair : llvm::enumerate(ConstantFoldedResults)) {
+          SILValue C = pair.value();
+          unsigned Index = pair.index();
+
+          // Skip any values that we couldn't simplify.
+          if (!C)
+            continue;
+
+          // Handle a corner case: if this instruction is an unreachable CFG
+          // loop there is no defined dominance order and we can end up with
+          // loops in the use-def chain. Just bail in this case.
+          if (C->getDefiningInstruction() == User)
+            continue;
+
+          // Ok, we have succeeded. Add user to the FoldedUsers list and perform
+          // the necessary cleanups, RAUWs, etc.
+          FoldedUsers.insert(User);
+          ++NumInstFolded;
+
+          InvalidateInstructions = true;
+
+          // If the constant produced a tuple, be smarter than RAUW: explicitly
+          // nuke any tuple_extract instructions using the apply.  This is a
+          // common case for functions returning multiple values.
+          if (auto *TI = dyn_cast<TupleInst>(C)) {
+            for (SILValue Result : User->getResults()) {
+              for (auto UI = Result->use_begin(), UE = Result->use_end();
+                   UI != UE;) {
+                Operand *O = *UI++;
+
+                // If the user is a tuple_extract, just substitute the right
+                // value in.
+                if (auto *TEI = dyn_cast<TupleExtractInst>(O->getUser())) {
+                  SILValue NewVal = TI->getOperand(TEI->getFieldNo());
+                  TEI->replaceAllUsesWith(NewVal);
+                  TEI->dropAllReferences();
+                  FoldedUsers.insert(TEI);
+                  if (auto *Inst = NewVal->getDefiningInstruction())
+                    WorkList.insert(Inst);
+                  continue;
+                }
+
+                if (auto *DTI = dyn_cast<DestructureTupleInst>(O->getUser())) {
+                  SILValue NewVal = TI->getOperand(O->getOperandNumber());
+                  auto OwnershipKind = NewVal.getOwnershipKind();
+                  if (OwnershipKind.isCompatibleWith(
+                          ValueOwnershipKind::Guaranteed)) {
+                    SILValue DTIResult = DTI->getResult(O->getOperandNumber());
+                    DTIResult->replaceAllUsesWith(NewVal);
+                    FoldedUsers.insert(DTI);
+                    if (auto *Inst = NewVal->getDefiningInstruction())
+                      WorkList.insert(Inst);
+                    continue;
+                  }
+                }
+              }
+            }
+
+            if (llvm::all_of(User->getResults(),
+                             [](SILValue v) { return v->use_empty(); }))
+              FoldedUsers.insert(TI);
+          }
+
+          // We were able to fold, so all users should use the new folded value.
+          User->getResult(Index)->replaceAllUsesWith(C);
+
+          // The new constant could be further folded now, add it to the
+          // worklist.
+          if (auto *Inst = C->getDefiningInstruction())
+            WorkList.insert(Inst);
+        }
       }
-
-
-      // We were able to fold, so all users should use the new folded value.
-      UserV->replaceAllUsesWith(C);
-
-      // The new constant could be further folded now, add it to the worklist.
-      if (auto *Inst = C->getDefiningInstruction())
-        if (isa<SingleValueInstruction>(Inst))
-          WorkList.insert(Inst);
     }
 
     // Eagerly DCE. We do this after visiting all users to ensure we don't
@@ -1675,4 +1767,12 @@ ConstantFolder::processWorkList() {
   return InvalidationKind(Inv);
 }
 
-
+void ConstantFolder::dumpWorklist() const {
+#ifndef NDEBUG
+  llvm::dbgs() << "*** Dumping Constant Folder Worklist ***\n";
+  for (auto *i : WorkList) {
+    llvm::dbgs() << *i;
+  }
+  llvm::dbgs() << "\n";
+#endif
+}

@@ -517,6 +517,8 @@ public:
   SILInstructionResultArray getResults() const { return getResultsImpl(); }
   unsigned getNumResults() const { return getResults().size(); }
 
+  SILValue getResult(unsigned index) const { return getResults()[index]; }
+
   /// Return the types of the results produced by this instruction.
   SILInstructionResultArray::type_range getResultTypes() const {
     return getResultsImpl().getTypes();
