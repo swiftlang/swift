@@ -570,7 +570,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                                       {argTypes.begin(), argTypes.end()},
                                       /*isVararg*/ false);
 
-  cache = Module.getOrInsertFunction(name, fnTy);
+  cache =
+      cast<llvm::Function>(Module.getOrInsertFunction(name, fnTy).getCallee());
 
   // Add any function attributes and set the calling convention.
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
@@ -956,8 +957,9 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   if (linkLib.shouldForceLoad()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
-    auto ForceImportThunk =
-        Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false));
+    auto ForceImportThunk = cast<llvm::Function>(
+        Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false))
+            .getCallee());
     ApplyIRLinkage(IRLinkage::ExternalImport)
         .to(cast<llvm::GlobalValue>(ForceImportThunk));
 
