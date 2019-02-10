@@ -502,14 +502,14 @@ public:
         if (!readObjCClassName(MetadataAddress, className))
           return BuiltType();
 
-        auto BuiltObjCClass = Builder.createObjCClassType(std::move(className));
+        BuiltType BuiltObjCClass = Builder.createObjCClassType(std::move(className));
         if (!BuiltObjCClass) {
           // Try the superclass.
           if (!classMeta->Superclass)
             return BuiltType();
 
-          return readTypeFromMetadata(classMeta->Superclass,
-                                      skipArtificialSubclasses);
+          BuiltObjCClass = readTypeFromMetadata(classMeta->Superclass,
+                                                skipArtificialSubclasses);
         }
 
         TypeCache[MetadataAddress] = BuiltObjCClass;
