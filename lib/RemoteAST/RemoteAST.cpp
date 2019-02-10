@@ -509,6 +509,18 @@ public:
         Reader.readTypeFromMetadata(metadataAddress.getAddressData());
     if (!typeResult)
       return getFailure<std::pair<Type, RemoteAddress>>();
+
+    // When the existential wraps a class type, LLDB expects that the
+    // address returned is the class instance itself and not the address
+    // of the reference.
+    if (!isBridged && typeResult->getClassOrBoundGenericClass()) {
+      auto pointerval = Reader.readPointerValue(valueAddress.getAddressData());
+      if (!pointerval)
+        return getFailure<std::pair<Type, RemoteAddress>>();
+
+      valueAddress = RemoteAddress(*pointerval);
+    }
+
     return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
                                                std::move(valueAddress));
   }
@@ -525,6 +537,18 @@ public:
         Reader.readTypeFromMetadata(metadataAddress.getAddressData());
     if (!typeResult)
       return getFailure<std::pair<Type, RemoteAddress>>();
+
+    // When the existential wraps a class type, LLDB expects that the
+    // address returned is the class instance itself and not the address
+    // of the reference.
+    if (typeResult->getClassOrBoundGenericClass()) {
+      auto pointerval = Reader.readPointerValue(valueAddress.getAddressData());
+      if (!pointerval)
+        return getFailure<std::pair<Type, RemoteAddress>>();
+
+      valueAddress = RemoteAddress(*pointerval);
+    }
+
     return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
                                                std::move(valueAddress));
   }
