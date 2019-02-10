@@ -60,3 +60,6 @@ public func use_global() -> Int {
 // aarch64:        str [[REG2]], [sp]
 // aarch64:        bl swift_endAccess
 // aarch64:        ldr x0, [sp]
+
+// s390x-LABEL: $s4main10use_globalSiyF:
+// s390x:        lgrl    %[[REG1:r[0-9]+]], ($s4main6globalSivp)
