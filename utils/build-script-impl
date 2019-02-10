@@ -3229,6 +3229,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
+                set_swiftevolve_build_command
                 call "${swiftevolve_build_command[@]}" test
                 continue
                 ;;
