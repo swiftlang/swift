@@ -2279,8 +2279,7 @@ public:
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
-                          DeclContext *useDC,
-                          const DeclRefExpr *base = nullptr);
+                          DeclContext *useDC);
 
   /// Return the type-of-reference of the given value.
   ///

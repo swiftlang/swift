@@ -874,8 +874,7 @@ std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
-                                     DeclContext *useDC,
-                                     const DeclRefExpr *base) {
+                                     DeclContext *useDC) {
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
@@ -963,7 +962,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Determine the type of the value, opening up that type if necessary.
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
   Type valueType =
-      getUnopenedTypeOfReference(varDecl, Type(), useDC, base, wantInterfaceType);
+      getUnopenedTypeOfReference(varDecl, Type(), useDC, /*base=*/nullptr,
+                                 wantInterfaceType);
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
@@ -1185,7 +1185,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
-    return getTypeOfReference(value, functionRefKind, locator, useDC, base);
+    return getTypeOfReference(value, functionRefKind, locator, useDC);
   }
 
   FunctionType::Param baseObjParam(baseObjTy);
@@ -1752,6 +1752,16 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
   } else if (auto *CE = dyn_cast<CallExpr>(anchor)) {
     baseExpr = CE->getFn();
     baseType = getType(baseExpr);
+    // If this is an initializer call without explicit mention
+    // of `.init` on metatype value.
+    if (auto *MTT = baseType->getAs<MetatypeType>()) {
+      auto instanceType = MTT->getInstanceType();
+      if (!cs.isTypeReference(baseExpr) && !instanceType->isExistentialType()) {
+        (void)cs.recordFix(AllowInvalidInitRef::onNonConstMetatype(
+            cs, baseType, init, locator));
+        return;
+      }
+    }
   // Initializer reference which requires contextual base type e.g. `.init(...)`.
   } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
     // We need to find type variable which represents contextual base.

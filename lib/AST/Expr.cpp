@@ -474,6 +474,11 @@ bool Expr::isTypeReference(
       continue;
     }
 
+    if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+      expr = USE->getSubExpr();
+      continue;
+    }
+
     // Anything else is not statically derived.
     return false;
   } while (true);

@@ -771,6 +771,25 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to construct an instance using non-constant
+/// metatype base without explictly specifying `init`:
+///
+/// ```swift
+/// let foo = Int.self
+/// foo(0) // should be `foo.init(0)`
+/// ```
+class ImplicitInitOnNonConstMetatypeFailure final
+    : public InvalidInitRefFailure {
+public:
+  ImplicitInitOnNonConstMetatypeFailure(Expr *root, ConstraintSystem &cs,
+                                        Type baseTy,
+                                        const ConstructorDecl *init,
+                                        ConstraintLocator *locator)
+      : InvalidInitRefFailure(root, cs, baseTy, init, SourceRange(), locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
