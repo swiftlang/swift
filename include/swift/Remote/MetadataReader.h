@@ -202,6 +202,7 @@ private:
   StoredPointer TaggedPointerExtendedSlotShift;
   StoredPointer TaggedPointerExtendedSlotMask;
   StoredPointer TaggedPointerExtendedClasses;
+  StoredPointer TaggedPointerObfuscator;
 
   Demangle::NodeFactory Factory;
 
@@ -711,7 +712,7 @@ public:
     if (getTaggedPointerEncoding() != TaggedPointerEncodingKind::Extended)
       return false;
   
-    return objectAddress & TaggedPointerMask;
+    return (objectAddress ^ TaggedPointerObfuscator) & TaggedPointerMask;
   }
 
   /// Read the isa pointer of an Object-C tagged pointer value.
@@ -728,8 +729,8 @@ public:
 
     // Extended pointers have a tag of 0b111, using 8 additional bits
     // to specify the class.
-    if (TaggedPointerExtendedMask != 0  &&
-        ((objectAddress & TaggedPointerExtendedMask)
+    if (TaggedPointerExtendedMask != 0 &&
+        (((objectAddress ^ TaggedPointerObfuscator) & TaggedPointerExtendedMask)
            == TaggedPointerExtendedMask)) {
       auto tag = ((objectAddress >> TaggedPointerExtendedSlotShift) &
                   TaggedPointerExtendedSlotMask);
@@ -2435,6 +2436,9 @@ private:
       finish(TaggedPointerEncodingKind::Error);
     TaggedPointerExtendedClasses =
         TaggedPointerExtendedClassesAddr.getAddressData();
+
+    tryFindAndReadSymbol(TaggedPointerObfuscator,
+                         "objc_debug_taggedpointer_obfuscator");
 
 #   undef tryFindSymbol
 #   undef tryReadSymbol
