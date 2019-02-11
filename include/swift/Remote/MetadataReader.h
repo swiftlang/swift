@@ -361,24 +361,21 @@ public:
     bool isObjC = false;
     bool isBridged = false;
 
-    // If we can determine the Objective-C class name, this is probably an
-    // error existential with NSError-compatible layout.
-    std::string ObjCClassName;
-    if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
-      if (ObjCClassName == "__SwiftNativeNSError")
-        isObjC = true;
-      else
+    auto Meta = readMetadata(*MetadataAddress);
+    if (auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta)) {
+      if (ClassMeta->isPureObjC()) {
+        // If we can determine the Objective-C class name, this is probably an
+        // error existential with NSError-compatible layout.
+        std::string ObjCClassName;
+        if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
+          if (ObjCClassName == "__SwiftNativeNSError")
+            isObjC = true;
+          else
+            isBridged = true;
+        }
+      } else {
         isBridged = true;
-    } else {
-      // Otherwise, we can check to see if this is a class metadata with the
-      // kind value's least significant bit set, which indicates a pure
-      // Swift class.
-      auto Meta = readMetadata(*MetadataAddress);
-      auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta);
-      if (!ClassMeta)
-        return None;
-
-      isObjC = ClassMeta->isPureObjC();
+      }
     }
 
     if (isBridged) {
