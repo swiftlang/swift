@@ -374,6 +374,14 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
+  // Determines whether this type variable represents an object
+  // of the optional type extracted by force unwrap.
+  bool isOptionalObject = false;
+  if (auto *locator = typeVar->getImpl().getLocator()) {
+    auto *anchor = locator->getAnchor();
+    isOptionalObject = anchor && isa<ForceValueExpr>(anchor);
+  }
+
   // Gather the constraints associated with this type variable.
   llvm::SetVector<Constraint *> constraints;
   getConstraintGraph().gatherConstraints(
@@ -424,6 +432,18 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       auto type = binding->BindingType;
       if (exactTypes.insert(type->getCanonicalType()).second) {
         result.addPotentialBinding(*binding);
+
+        // Result of force unwrap is always connected to its base
+        // optional type via `OptionalObject` constraint which
+        // preserves l-valueness, so in case where object type got
+        // inferred before optional type (because it got the
+        // type from context e.g. parameter type of a function call),
+        // we need to test type with and without l-value after
+        // delaying bindings for as long as possible.
+        if (isOptionalObject && !type->is<LValueType>()) {
+          result.addPotentialBinding(binding->withType(LValueType::get(type)));
+          result.FullyBound = true;
+        }
 
         if (auto *locator = typeVar->getImpl().getLocator()) {
           auto path = locator->getPath();
