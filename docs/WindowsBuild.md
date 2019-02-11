@@ -174,6 +174,7 @@ cmake -G Ninja^
  -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/include"^
  -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/lib64/icuin.lib"^
  -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr"^
+ -DPYTHON_EXECUTABLE=C:\Python27\python.exe^
  S:\swift
 popd
 cmake --build "S:\b\swift"
