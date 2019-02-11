@@ -1,4 +1,4 @@
-//===--- ArrayAppend.swift ------------------------------------------------===//
+//===--- SequenceAlgos.swift ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,13 +18,34 @@ import TestsUtils
 // To avoid too many little micro benchmarks, it measures them all together
 // for each sequence type.
 
+let t: [BenchmarkCategory] = [.validation, .api]
+
 public let SequenceAlgos = [
-  BenchmarkInfo(name: "SequenceAlgosList", runFunction: run_SequenceAlgosList, tags: [.validation, .api], setUpFunction: { buildWorkload() }, tearDownFunction: nil),
-  BenchmarkInfo(name: "SequenceAlgosArray", runFunction: run_SequenceAlgosArray, tags: [.validation, .api], setUpFunction: { buildWorkload() }, tearDownFunction: nil),
-  BenchmarkInfo(name: "SequenceAlgosContiguousArray", runFunction: run_SequenceAlgosContiguousArray, tags: [.validation, .api], setUpFunction: { buildWorkload() }, tearDownFunction: nil),
-  BenchmarkInfo(name: "SequenceAlgosRange", runFunction: run_SequenceAlgosRange, tags: [.validation, .api], setUpFunction: { buildWorkload() }, tearDownFunction: nil),
-  BenchmarkInfo(name: "SequenceAlgosUnfoldSequence", runFunction: run_SequenceAlgosUnfoldSequence, tags: [.validation, .api], setUpFunction: { buildWorkload() }, tearDownFunction: nil),
-  BenchmarkInfo(name: "SequenceAlgosAnySequence", runFunction: run_SequenceAlgosAnySequence, tags: [.validation, .api], setUpFunction: { buildWorkload() }, tearDownFunction: nil),
+  BenchmarkInfo(name: "SequenceAlgosList", runFunction: { for _ in 0..<$0 {
+      benchmarkSequenceAlgos(s: l, n: n)
+      benchmarkEquatableSequenceAlgos(s: l, n: n)
+    }}, tags: t, setUpFunction: { blackHole(l) }, legacyFactor: 10),
+  BenchmarkInfo(name: "SequenceAlgosArray", runFunction: { for _ in 0..<$0 {
+      benchmarkSequenceAlgos(s: a, n: a.count)
+      benchmarkEquatableSequenceAlgos(s: a, n: a.count)
+    }}, tags: t, setUpFunction: { blackHole(a) }, legacyFactor: 10),
+  BenchmarkInfo(name: "SequenceAlgosContiguousArray",
+    runFunction: { for _ in 0..<$0 {
+        benchmarkSequenceAlgos(s: c, n: c.count)
+        benchmarkEquatableSequenceAlgos(s: c, n: c.count)
+      }}, tags: t, setUpFunction: { blackHole(c) }, legacyFactor: 10),
+  BenchmarkInfo(name: "SequenceAlgosRange", runFunction: { for _ in 0..<$0 {
+      benchmarkSequenceAlgos(s: r, n: r.count)
+      benchmarkEquatableSequenceAlgos(s: r, n: r.count)
+    }}, tags: t, legacyFactor: 10),
+  BenchmarkInfo(name: "SequenceAlgosUnfoldSequence",
+    runFunction: { for _ in 0..<$0 {
+        benchmarkSequenceAlgos(s: s, n: n)
+      }}, tags: t, setUpFunction: { blackHole(s) }, legacyFactor: 10),
+  BenchmarkInfo(name: "SequenceAlgosAnySequence",
+    runFunction: { for _ in 0..<$0 {
+        benchmarkSequenceAlgos(s: y, n: n/10)
+      }}, tags: t, setUpFunction: { blackHole(y) }, legacyFactor: 100),
 ]
 
 extension List: Sequence {
@@ -55,79 +76,25 @@ func benchmarkSequenceAlgos<S: Sequence>(s: S, n: Int) where S.Element == Int {
   CheckResults(s.starts(with: s))
 }
 
-let n = 10_000
+let n = 1_000
 let r = 0..<(n*100)
 let l = List(0..<n)
 let c = ContiguousArray(0..<(n*100))
 let a = Array(0..<(n*100))
-let y = AnySequence(0..<n)
+let y = AnySequence(0..<n/10)
 let s = sequence(first: 0, next: { $0 < n&-1 ? $0&+1 : nil})
 
-func buildWorkload() {
-  blackHole(l.makeIterator())
-  blackHole(c.makeIterator())
-  blackHole(a.makeIterator())
-  blackHole(y.makeIterator())
-  blackHole(s.makeIterator())
-}
-
-func benchmarkEquatableSequenceAlgos<S: Sequence>(s: S, n: Int) where S.Element == Int, S: Equatable {
+func benchmarkEquatableSequenceAlgos<S: Sequence>(s: S, n: Int)
+  where S.Element == Int, S: Equatable {
   CheckResults(repeatElement(s, count: 1).contains(s))
   CheckResults(!repeatElement(s, count: 1).contains { $0 != s })
-}
-
-@inline(never)
-public func run_SequenceAlgosRange(_ N: Int) {
-  for _ in 0..<N {
-    benchmarkSequenceAlgos(s: r, n: r.count)
-    benchmarkEquatableSequenceAlgos(s: r, n: r.count)
-  }
-}
-
-@inline(never)
-public func run_SequenceAlgosArray(_ N: Int) {
-  for _ in 0..<N {
-    benchmarkSequenceAlgos(s: a, n: a.count)
-    benchmarkEquatableSequenceAlgos(s: a, n: a.count)
-  }
-}
-
-@inline(never)
-public func run_SequenceAlgosContiguousArray(_ N: Int) {
-  for _ in 0..<N {
-    benchmarkSequenceAlgos(s: c, n: c.count)
-    benchmarkEquatableSequenceAlgos(s: c, n: c.count)
-  }
-}
-
-@inline(never)
-public func run_SequenceAlgosAnySequence(_ N: Int) {
-  for _ in 0..<N {
-    benchmarkSequenceAlgos(s: y, n: n)
-  }
-}
-
-@inline(never)
-public func run_SequenceAlgosUnfoldSequence(_ N: Int) {
-  for _ in 0..<N {
-    benchmarkSequenceAlgos(s: s, n: n)
-  }
-}
-
-@inline(never)
-public func run_SequenceAlgosList(_ N: Int) {
-  for _ in 0..<N {
-    benchmarkSequenceAlgos(s: l, n: n)
-    benchmarkEquatableSequenceAlgos(s: l, n: n)
-  }
 }
 
 enum List<Element> {
   case end
   indirect case node(Element, List<Element>)
-  
+
   init<S: BidirectionalCollection>(_ elements: S) where S.Element == Element {
     self = elements.reversed().reduce(.end) { .node($1,$0) }
   }
 }
-
