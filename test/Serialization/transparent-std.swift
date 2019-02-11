@@ -16,13 +16,17 @@ func test_foo(x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
 }
 
 // SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$s19def_transparent_std12assign_tuple1x1yyBi64__Bot_BptF : $@convention(thin) (Builtin.Int64, @guaranteed Builtin.NativeObject, Builtin.RawPointer) -> () {
-// SIL: = tuple (%0 : $Builtin.Int64, %1 : $Builtin.NativeObject)
-// SIL: retain_value
-// SIL: = tuple_extract
-// SIL: = tuple_extract
-// SIL: = pointer_to_address
-// SIL: = tuple
-// SIL: = load
+// SIL: bb0([[ARG0:%.*]] : ${{.*}}, [[ARG1:%.*]] : ${{.*}}, [[ARG2:%.*]] :
+// SIL: [[TUP:%.*]] = tuple ([[ARG0]] : $Builtin.Int64, [[ARG1]] : $Builtin.NativeObject)
+// SIL: retain_value [[TUP]]
+// SIL: [[CASTED_PTR:%.*]] = pointer_to_address [[ARG2]]
+// SIL: [[CASTED_PTR_0:%.*]] = tuple_element_addr [[CASTED_PTR]] : $*(Builtin.Int64, Builtin.NativeObject), 0
+// SIL: store [[ARG0]] to [[CASTED_PTR_0]]
+// SIL: [[CASTED_PTR_1:%.*]] = tuple_element_addr [[CASTED_PTR]] : $*(Builtin.Int64, Builtin.NativeObject), 1
+// SIL: [[OLD_VALUE:%.*]] = load [[CASTED_PTR_1]]
+// SIL: store [[ARG1]] to [[CASTED_PTR_1]]
+// SIL: strong_release [[OLD_VALUE]]
+// SIL: } // end sil function '$s19def_transparent_std12assign_tuple1x1yyBi64__Bot_BptF' 
 func test_tuple(x: (Builtin.Int64, Builtin.NativeObject),
                 y: Builtin.RawPointer) {
   assign_tuple(x: x, y: y)
