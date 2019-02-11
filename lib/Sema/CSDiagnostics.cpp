@@ -24,6 +24,8 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
@@ -94,13 +96,39 @@ const GenericContext *RequirementFailure::getGenericContext() const {
 }
 
 const Requirement &RequirementFailure::getRequirement() const {
+  // If this is a conditional requirement failure we need to
+  // fetch conformance from constraint system associated with
+  // type requirement this conditional conformance belongs to.
+  if (isConditional()) {
+    auto conformanceRef = getConformanceRef();
+    return conformanceRef.getConditionalRequirements()[getRequirementIndex()];
+  }
+
   return getGenericContext()->getGenericRequirements()[getRequirementIndex()];
+}
+
+ProtocolConformanceRef RequirementFailure::getConformanceRef() const {
+  assert(isConditional());
+
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+
+  auto *typeReqLoc =
+      cs.getConstraintLocator(getRawAnchor(), locator->getPath().drop_back(),
+                              /*summaryFlags=*/0);
+
+  auto conformance = llvm::find_if(
+      cs.CheckedConformances,
+      [&](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
+              &conformance) { return conformance.first == typeReqLoc; });
+  assert(conformance != cs.CheckedConformances.end());
+  return conformance->second;
 }
 
 ValueDecl *RequirementFailure::getDeclRef() const {
   auto &cs = getConstraintSystem();
 
-  auto *anchor = getAnchor();
+  auto *anchor = getRawAnchor();
   auto *locator = cs.getConstraintLocator(anchor);
   if (auto *AE = dyn_cast<CallExpr>(anchor)) {
     assert(isa<TypeExpr>(AE->getFn()));
@@ -142,6 +170,13 @@ ValueDecl *RequirementFailure::getDeclRef() const {
 }
 
 const DeclContext *RequirementFailure::getRequirementDC() const {
+  // In case of conditional requirement failure, we don't
+  // have to guess where the it comes from.
+  if (isConditional()) {
+    auto *conformance = getConformanceRef().getConcrete();
+    return conformance->getDeclContext();
+  }
+
   const auto &req = getRequirement();
   auto *DC = AffectedDecl->getDeclContext();
 
@@ -155,27 +190,41 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
   return AffectedDecl->getAsGenericContext();
 }
 
+bool RequirementFailure::isStaticOrInstanceMember(const ValueDecl *decl) {
+  if (decl->isInstanceMember())
+    return true;
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl))
+    return AFD->isStatic() && !AFD->isOperator();
+
+  return decl->isStatic();
+}
+
 bool RequirementFailure::diagnoseAsError() {
   if (!canDiagnoseFailure())
     return false;
 
-  auto *anchor = getAnchor();
+  auto *anchor = getRawAnchor();
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
 
-  if (reqDC != genericCtx) {
+  auto lhs = resolveType(getLHS());
+  auto rhs = resolveType(getRHS());
+
+  if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
+                              isStaticOrInstanceMember(AffectedDecl))) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
     emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
                    AffectedDecl->getDescriptiveKind(),
-                   AffectedDecl->getFullName(), NTD->getDeclaredType(),
-                   getLHS(), getRHS());
+                   AffectedDecl->getFullName(), NTD->getDeclaredType(), lhs,
+                   rhs);
   } else {
     emitDiagnostic(anchor->getLoc(), getDiagnosticOnDecl(),
                    AffectedDecl->getDescriptiveKind(),
-                   AffectedDecl->getFullName(), getLHS(), getRHS());
+                   AffectedDecl->getFullName(), lhs, rhs);
   }
 
-  emitRequirementNote(reqDC->getAsDecl());
+  emitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
   return true;
 }
 
@@ -188,23 +237,32 @@ bool RequirementFailure::diagnoseAsNote() {
   return true;
 }
 
-void RequirementFailure::emitRequirementNote(const Decl *anchor) const {
+void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
+                                             Type rhs) const {
   auto &req = getRequirement();
 
-  if (getRHS()->isEqual(req.getSecondType())) {
-    emitDiagnostic(anchor, diag::where_requirement_failure_one_subst,
-                   req.getFirstType(), getLHS());
+  if (isConditional()) {
+    auto *conformance = getConformanceRef().getConcrete();
+    emitDiagnostic(anchor, diag::requirement_implied_by_conditional_conformance,
+                   resolveType(conformance->getType()),
+                   conformance->getProtocol()->getDeclaredInterfaceType());
     return;
   }
 
-  if (getLHS()->isEqual(req.getFirstType())) {
+  if (rhs->isEqual(req.getSecondType())) {
     emitDiagnostic(anchor, diag::where_requirement_failure_one_subst,
-                   req.getSecondType(), getRHS());
+                   req.getFirstType(), lhs);
+    return;
+  }
+
+  if (lhs->isEqual(req.getFirstType())) {
+    emitDiagnostic(anchor, diag::where_requirement_failure_one_subst,
+                   req.getSecondType(), rhs);
     return;
   }
 
   emitDiagnostic(anchor, diag::where_requirement_failure_both_subst,
-                 req.getFirstType(), getLHS(), req.getSecondType(), getRHS());
+                 req.getFirstType(), lhs, req.getSecondType(), rhs);
 }
 
 bool MissingConformanceFailure::diagnoseAsError() {

@@ -1602,7 +1602,7 @@ ConstraintSystem::matchTypesBindTypeVar(
 
 static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
                                             Type type2, Expr *anchor,
-                                            LocatorPathElt &req) {
+                                            ArrayRef<LocatorPathElt> path) {
   // Can't fix not yet properly resolved types.
   if (type1->hasTypeVariable() || type2->hasTypeVariable())
     return nullptr;
@@ -1612,9 +1612,21 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   if (type1->hasDependentMember() || type2->hasDependentMember())
     return nullptr;
 
-  // Build simplified locator which only contains anchor and requirement info.
-  ConstraintLocatorBuilder requirement(cs.getConstraintLocator(anchor));
-  auto *reqLoc = cs.getConstraintLocator(requirement.withPathElement(req));
+  auto req = path.back();
+
+  ConstraintLocator *reqLoc = nullptr;
+  if (req.isConditionalRequirement()) {
+    // If underlaying conformance requirement has been fixed as
+    // we there is no reason to fix up conditional requirements.
+    if (cs.hasFixFor(cs.getConstraintLocator(anchor, req)))
+      return nullptr;
+
+    // For conditional requirements we need a full path.
+    reqLoc = cs.getConstraintLocator(anchor, path, /*summaryFlags=*/0);
+  } else {
+    // Build simplified locator which only contains anchor and requirement info.
+    reqLoc = cs.getConstraintLocator(anchor, req);
+  }
 
   auto reqKind = static_cast<RequirementKind>(req.getValue2());
   switch (reqKind) {
@@ -1644,8 +1656,9 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
 
   auto &elt = path.back();
   switch (elt.getKind()) {
-  case ConstraintLocator::TypeParameterRequirement: {
-    if (auto *fix = fixRequirementFailure(cs, lhs, rhs, anchor, elt))
+  case ConstraintLocator::TypeParameterRequirement:
+  case ConstraintLocator::ConditionalRequirement: {
+    if (auto *fix = fixRequirementFailure(cs, lhs, rhs, anchor, path))
       conversionsOrFixes.push_back(fix);
     break;
   }
@@ -2691,10 +2704,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (conformance.isConcrete()) {
       unsigned index = 0;
       for (const auto &req : conformance.getConditionalRequirements()) {
-        addConstraint(
-          req,
-          locator.withPathElement(
-            LocatorPathElt::getConditionalRequirementComponent(index++)));
+        addConstraint(req,
+                      locator.withPathElement(
+                          LocatorPathElt::getConditionalRequirementComponent(
+                              index++, req.getKind())));
       }
     }
 
@@ -2764,15 +2777,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     SmallVector<LocatorPathElt, 4> path;
     auto *anchor = locator.getLocatorParts(path);
 
-    if (!path.empty() && path.back().getKind() ==
-        ConstraintLocator::PathElementKind::TypeParameterRequirement) {
-      auto typeRequirement = path.back();
-      // Let's strip all of the unnecessary information from locator,
-      // diagnostics only care about anchor - to lookup type,
-      // and what was the requirement# which is not satisfied.
-      ConstraintLocatorBuilder requirement(getConstraintLocator(anchor));
-      auto *reqLoc =
-          getConstraintLocator(requirement.withPathElement(typeRequirement));
+    if (path.empty())
+      return SolutionKind::Error;
+
+    if (path.back().isTypeParameterRequirement() ||
+        path.back().isConditionalRequirement()) {
+      ConstraintLocator *reqLoc = nullptr;
+      if (path.back().isConditionalRequirement()) {
+        // Underlying conformance requirement is itself fixed,
+        // this wouldn't lead to right solution.
+        if (hasFixFor(getConstraintLocator(anchor, path.back())))
+          return SolutionKind::Error;
+
+        // For conditional requirements we need complete path, which includes
+        // type requirement position, to be able to fetch conformance later.
+        reqLoc = getConstraintLocator(locator);
+      } else {
+        // Let's strip all of the unnecessary information from locator,
+        // diagnostics only care about anchor - to lookup type,
+        // and what was the requirement# which is not satisfied.
+        reqLoc = getConstraintLocator(anchor, path.back());
+      }
 
       auto *fix = MissingConformance::create(*this, type, protocol, reqLoc);
       if (!recordFix(fix))
@@ -5417,12 +5442,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
     // Always useful, unless duplicate of exactly the same fix and location.
     // This situation might happen when the same fix kind is applicable to
     // different overload choices.
-    auto *loc = fix->getLocator();
-    auto existingFix = llvm::find_if(Fixes, [&](const ConstraintFix *e) {
-      // If we already have a fix like this recorded, let's not do it again,
-      return e->getKind() == fix->getKind() && e->getLocator() == loc;
-    });
-    if (existingFix == Fixes.end())
+    if (!hasFixFor(fix->getLocator()))
       Fixes.push_back(fix);
   } else {
     // Only useful to record if no pre-existing fix in the subexpr tree.

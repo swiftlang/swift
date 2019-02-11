@@ -944,6 +944,7 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
+  friend class RequirementFailure;
   friend class MissingMemberFailure;
 
   class SolverScope;
@@ -1810,6 +1811,14 @@ public:
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix);
+
+  /// Determine whether constraint system already has a fix recorded
+  /// for a particular location.
+  bool hasFixFor(ConstraintLocator *locator) const {
+    return llvm::any_of(Fixes, [&locator](const ConstraintFix *fix) {
+      return fix->getLocator() == locator;
+    });
+  }
 
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
   /// constraint system, return the decl that it references.
