@@ -329,7 +329,7 @@ function (swift_benchmark_compile_archopts)
     endif()
   endif()
 
-  set(common_swift4_options ${common_options} "-swift-version" "4")
+  set(common_swift4_options ${common_options} "-swift-version" "5")
 
   # Always optimize the driver modules.
   # Note that we compile the driver for Osize also with -Osize
