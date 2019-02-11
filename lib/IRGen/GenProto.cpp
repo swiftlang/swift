@@ -329,8 +329,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
                        MetadataSource::InvalidSourceIndex,
                        selfTy);
 
-  if (fnType->getDefaultWitnessMethodProtocol() ||
-      fnType->getWitnessMethodClass(M)) {
+  if (fnType->getSelfInstanceType()->is<GenericTypeParamType>()) {
     // The Self type is abstract, so we can fulfill its metadata from
     // the Self metadata parameter.
     addSelfMetadataFulfillment(selfTy);
@@ -1114,7 +1113,7 @@ static llvm::Value *emitWitnessTableAccessorCall(
 
   // Emit the source metadata if we haven't yet.
   if (!*srcMetadataCache) {
-    *srcMetadataCache = IGF.emitTypeMetadataRef(
+    *srcMetadataCache = IGF.emitAbstractTypeMetadataRef(
       conformance->getType()->getCanonicalType());
   }
 
@@ -2850,7 +2849,7 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
   }
   if (auto fn = dyn_cast<FunctionType>(type)) {
     for (const auto &elt : fn.getParams())
-      addTypeMetadata(elt.getOldType());
+      addTypeMetadata(elt.getPlainType());
     addTypeMetadata(fn.getResult());
     return;
   }

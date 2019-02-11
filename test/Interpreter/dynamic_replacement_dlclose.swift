@@ -9,13 +9,15 @@ import Module1
 
 import StdlibUnittest
 
-#if os(Linux)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
   import WinSDK
 #else
-  import Darwin
+#error("Unsupported platform")
 #endif
 
 var DynamicallyReplaceable = TestSuite("DynamicallyReplaceable")

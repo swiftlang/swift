@@ -1774,6 +1774,10 @@ public:
   /// The entry point to the transformation.
   void run() override {
     auto *F = getFunction();
+    // Skip functions with ownership for now.
+    if (F->hasOwnership())
+      return;
+
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(getFunction());

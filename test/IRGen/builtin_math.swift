@@ -1,11 +1,13 @@
 // RUN: %target-swift-frontend -emit-ir -O %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-os
 
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-import Darwin
-#elseif os(Android) || os(Cygwin) || os(FreeBSD) || os(Linux)
-import Glibc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
 #elseif os(Windows)
-import MSVCRT
+  import MSVCRT
+#else
+#error("Unsupported platform")
 #endif
 
 // Make sure we use an intrinsic for functions such as exp.

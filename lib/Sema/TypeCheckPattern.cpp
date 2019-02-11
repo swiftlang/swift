@@ -773,13 +773,6 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
     }
   }
 
-  // If this parameter declaration is marked as `@autoclosure`
-  // let's make sure that its parameter type is indeed a function,
-  // this decision couldn't be made based on type representative
-  // alone because it may be later resolved into an invalid type.
-  if (decl->isAutoClosure())
-    hadError |= !(Ty && Ty->is<FunctionType>());
-
   if (hadError)
     TL.setInvalidType(TC.Context);
 
@@ -1594,7 +1587,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   bool hadError = false;
   for (const auto &param : FN->getParams()) {
     params.push_back(param);
-    hadError |= param.getOldType()->hasError();
+    hadError |= param.getPlainType()->hasError();
   }
 
   // Local function to check if the given type is valid e.g. doesn't have

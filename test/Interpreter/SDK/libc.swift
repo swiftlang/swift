@@ -9,12 +9,14 @@
 // TODO: rdar://problem/33388782
 // REQUIRES: CPU=x86_64
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
+#else
+#error("Unsupported platform")
 #endif
 
 let sourcePath = CommandLine.arguments[1]

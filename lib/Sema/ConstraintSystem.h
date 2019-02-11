@@ -1762,6 +1762,12 @@ public:
                                 pathElt.getNewSummaryFlags());
   }
 
+  ConstraintLocator *
+  getConstraintLocator(const Expr *anchor,
+                       ConstraintLocator::PathElement pathElt) {
+    return getConstraintLocator(const_cast<Expr *>(anchor), pathElt);
+  }
+
   /// Extend the given constraint locator with a path element.
   ConstraintLocator *
   getConstraintLocator(ConstraintLocator *locator,
@@ -2273,8 +2279,7 @@ public:
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
-                          DeclContext *useDC,
-                          const DeclRefExpr *base = nullptr);
+                          DeclContext *useDC);
 
   /// Return the type-of-reference of the given value.
   ///

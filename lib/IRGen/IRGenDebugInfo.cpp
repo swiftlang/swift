@@ -28,7 +28,9 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -54,6 +56,10 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
+
+#ifndef NDEBUG
+#include "swift/AST/ASTDemangler.h"
+#endif
 
 using namespace swift;
 using namespace irgen;
@@ -187,11 +193,11 @@ private:
       return StringRef();
   }
 
-  SILLocation::DebugLoc getDeserializedLoc(Pattern *) { return {}; }
-  SILLocation::DebugLoc getDeserializedLoc(Expr *) { return {}; }
-  SILLocation::DebugLoc getDeserializedLoc(Stmt *) { return {}; }
-  SILLocation::DebugLoc getDeserializedLoc(Decl *D) {
-    SILLocation::DebugLoc L;
+  using DebugLoc = SILLocation::DebugLoc;
+  DebugLoc getDeserializedLoc(Pattern *) { return {}; }
+  DebugLoc getDeserializedLoc(Expr *) { return {}; }
+  DebugLoc getDeserializedLoc(Decl *D) {
+    DebugLoc L;
     const DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
     StringRef Filename = getFilenameFromDC(DC);
     if (!Filename.empty())
@@ -199,31 +205,51 @@ private:
     return L;
   }
 
-  /// Use the SM to figure out the actual line/column of a SourceLoc.
+  /// Use the Swift SM to figure out the actual line/column of a SourceLoc.
   template <typename WithLoc>
-  SILLocation::DebugLoc getDebugLoc(IRGenDebugInfo &DI, WithLoc *S,
-                                    bool End = false) {
-    SILLocation::DebugLoc L;
-    if (S == nullptr)
-      return L;
+  DebugLoc getSwiftDebugLoc(IRGenDebugInfo &DI, WithLoc *ASTNode, bool End) {
+    if (!ASTNode)
+      return {};
 
-    SourceLoc Loc = End ? S->getEndLoc() : S->getStartLoc();
+    SourceLoc Loc = End ? ASTNode->getEndLoc() : ASTNode->getStartLoc();
     if (Loc.isInvalid())
       // This may be a deserialized or clang-imported decl. And modules
       // don't come with SourceLocs right now. Get at least the name of
       // the module.
-      return getDeserializedLoc(S);
+      return getDeserializedLoc(ASTNode);
 
     return DI.decodeSourceLoc(Loc);
   }
 
-  SILLocation::DebugLoc getStartLocation(Optional<SILLocation> OptLoc) {
+  DebugLoc getDebugLoc(IRGenDebugInfo &DI, Pattern *P, bool End = false) {
+    return getSwiftDebugLoc(DI, P, End);
+  }
+  DebugLoc getDebugLoc(IRGenDebugInfo &DI, Expr *E, bool End = false) {
+    return getSwiftDebugLoc(DI, E, End);
+  }
+  DebugLoc getDebugLoc(IRGenDebugInfo &DI, Decl *D, bool End = false) {
+    DebugLoc L;
+    if (!D)
+      return L;
+
+    if (auto *ClangDecl = D->getClangDecl()) {
+      auto ClangSrcLoc = ClangDecl->getLocStart();
+      clang::SourceManager &ClangSM =
+          CI.getClangASTContext().getSourceManager();
+      L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
+      L.Filename = ClangSM.getBufferName(ClangSrcLoc);
+      return L;
+    }
+    return getSwiftDebugLoc(DI, D, End);
+  }
+
+  DebugLoc getStartLocation(Optional<SILLocation> OptLoc) {
     if (!OptLoc)
       return {};
     return decodeSourceLoc(OptLoc->getStartSourceLoc());
   }
 
-  SILLocation::DebugLoc sanitizeCodeViewDebugLoc(SILLocation::DebugLoc DLoc) {
+  DebugLoc sanitizeCodeViewDebugLoc(DebugLoc DLoc) {
     if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
       // When WinDbg finds two locations with the same line but different
       // columns, the user must select an address when they break on that
@@ -232,13 +258,13 @@ private:
     return DLoc;
   }
 
-  SILLocation::DebugLoc decodeDebugLoc(SILLocation Loc) {
+  DebugLoc decodeDebugLoc(SILLocation Loc) {
     if (Loc.isDebugInfoLoc())
       return sanitizeCodeViewDebugLoc(Loc.getDebugInfoLoc());
     return decodeSourceLoc(Loc.getDebugSourceLoc());
   }
 
-  SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc) {
+  DebugLoc getDebugLocation(Optional<SILLocation> OptLoc) {
     if (!OptLoc || (Opts.DebugInfoFormat != IRGenDebugInfoFormat::CodeView &&
                     OptLoc->isInPrologue()))
       return {};
@@ -582,14 +608,18 @@ private:
     }
 
     StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
-    auto M =
+    llvm::DIModule *M =
         DBuilder.createModule(Parent, Name, ConfigMacros, IncludePath, Sysroot);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
 
-  llvm::DIModule *
-  getOrCreateModule(clang::ExternalASTSource::ASTSourceDescriptor Desc) {
+  using ASTSourceDescriptor = clang::ExternalASTSource::ASTSourceDescriptor;
+  /// Create a DIModule from a clang module or PCH.
+  /// The clang::Module pointer is passed separately because the recursive case
+  /// needs to fudge the AST descriptor.
+  llvm::DIModule *getOrCreateModule(ASTSourceDescriptor Desc,
+                                    const clang::Module *ClangModule) {
     // PCH files don't have a signature field in the control block,
     // but LLVM detects skeleton CUs by looking for a non-zero DWO id.
     // We use the lower 64 bits for debug info.
@@ -599,10 +629,24 @@ private:
             : ~1ULL;
 
     // Handle Clang modules.
-    if (const clang::Module *ClangModule = Desc.getModuleOrNull()) {
+    if (ClangModule) {
       llvm::DIModule *Parent = nullptr;
-      if (ClangModule->Parent)
-        Parent = getOrCreateModule(*ClangModule->Parent);
+      if (ClangModule->Parent) {
+        // The loading of additional modules by Sema may trigger an out-of-date
+        // PCM rebuild in the Clang module dependencies of the additional
+        // module. A PCM rebuild causes the ModuleManager to unload previously
+        // loaded ASTFiles. For this reason we must use the cached ASTFile
+        // information here instead of the potentially dangling pointer to the
+        // ASTFile that is stored in the clang::Module object.
+        //
+        // Note: The implementation here assumes that all clang submodules
+        //       belong to the same PCM file.
+        ASTSourceDescriptor ParentDescriptor(*ClangModule->Parent);
+        Parent = getOrCreateModule({ParentDescriptor.getModuleName(),
+                                    ParentDescriptor.getPath(),
+                                    Desc.getASTFile(), Desc.getSignature()},
+                                   ClangModule->Parent);
+      }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
                                Desc.getPath(), Signature, Desc.getASTFile());
     }
@@ -612,10 +656,18 @@ private:
                              Desc.getASTFile());
   };
 
+  static Optional<ASTSourceDescriptor> getClangModule(const ModuleDecl &M) {
+    for (auto *FU : M.getFiles())
+      if (auto *CMU = dyn_cast_or_null<ClangModuleUnit>(FU))
+        if (auto Desc = CMU->getASTSourceDescriptor())
+          return Desc;
+    return None;
+  }
+  
   llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
     ModuleDecl *M = IM.second;
-    if (auto *ClangModule = M->findUnderlyingClangModule())
-      return getOrCreateModule(*ClangModule);
+    if (Optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
+      return getOrCreateModule(*ModuleDesc, ModuleDesc->getModuleOrNull());
 
     StringRef Path = getFilenameFromDC(M);
     StringRef Name = M->getName().str();
@@ -660,6 +712,28 @@ private:
     return Size(size);
   }
 
+#ifndef NDEBUG
+  static bool areTypesReallyEqual(Type lhs, Type rhs) {
+    // Due to an oversight, escaping and non-escaping @convention(block)
+    // are mangled identically.
+    auto eraseEscapingBlock = [](Type t) -> Type {
+      return t.transform([](Type t) -> Type {
+        if (auto *fnType = t->getAs<FunctionType>()) {
+          if (fnType->getExtInfo().getRepresentation()
+                == FunctionTypeRepresentation::Block) {
+            return FunctionType::get(fnType->getParams(),
+                                    fnType->getResult(),
+                                    fnType->getExtInfo().withNoEscape(true));
+          }
+        }
+        return t;
+      });
+    };
+
+    return eraseEscapingBlock(lhs)->isEqual(eraseEscapingBlock(rhs));
+  }
+#endif
+
   StringRef getMangledName(DebugTypeInfo DbgTy) {
     if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
       return BumpAllocatedString(DbgTy.getDecl()->getName().str());
@@ -669,9 +743,33 @@ private:
       Ty = Ty->mapTypeOutOfContext();
 
     Mangle::ASTMangler Mangler;
-    std::string Name = Mangler.mangleTypeForDebugger(
+    std::string Result = Mangler.mangleTypeForDebugger(
         Ty, DbgTy.getDeclContext());
-    return BumpAllocatedString(Name);
+
+    if (!Opts.DisableRoundTripDebugTypes) {
+      // Make sure we can reconstruct mangled types for the debugger.
+#ifndef NDEBUG
+      auto &Ctx = Ty->getASTContext();
+      Type Reconstructed = Demangle::getTypeForMangling(Ctx, Result);
+      if (!Reconstructed) {
+        llvm::errs() << "Failed to reconstruct type for " << Result << "\n";
+        llvm::errs() << "Original type:\n";
+        Ty->dump();
+        abort();
+      } else if (!Reconstructed->isEqual(Ty)) {
+        if (!areTypesReallyEqual(Reconstructed, Ty)) {
+          llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
+          llvm::errs() << "Original type:\n";
+          Ty->dump();
+          llvm::errs() << "Reconstructed type:\n";
+          Reconstructed->dump();
+          abort();
+        }
+      }
+#endif
+    }
+
+    return BumpAllocatedString(Result);
   }
 
   llvm::DIDerivedType *createMemberType(DebugTypeInfo DbgTy, StringRef Name,
@@ -1109,13 +1207,6 @@ private:
       auto *StructTy = BaseTy->castTo<StructType>();
       auto *Decl = StructTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
-      if (auto *ClangDecl = Decl->getClangDecl()) {
-        auto ClangSrcLoc = ClangDecl->getLocStart();
-        clang::SourceManager &ClangSM =
-            CI.getClangASTContext().getSourceManager();
-        L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
-        L.Filename = ClangSM.getBufferName(ClangSrcLoc);
-      }
       auto *File = getOrCreateFile(L.Filename);
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         return createStructType(DbgTy, Decl, StructTy, Scope, File, L.Line,
@@ -1134,13 +1225,6 @@ private:
       auto *ClassTy = BaseTy->castTo<ClassType>();
       auto *Decl = ClassTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
-      if (auto *ClangDecl = Decl->getClangDecl()) {
-        auto ClangSrcLoc = ClangDecl->getLocStart();
-        clang::SourceManager &ClangSM =
-            CI.getClangASTContext().getSourceManager();
-        L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
-        L.Filename = ClangSM.getBufferName(ClangSrcLoc);
-      }
       assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
       return createPointerSizedStruct(Scope, Decl->getNameStr(),
                                       getOrCreateFile(L.Filename), L.Line,
@@ -1336,13 +1420,13 @@ private:
       auto L = getDebugLoc(*this, Decl);
       auto AliasedTy = TypeAliasTy->getSinglyDesugaredType();
       auto File = getOrCreateFile(L.Filename);
-      // For TypeAlias types, the DeclContext for the aliasED type is
+      // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
          DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), AliasedTy,
          DbgTy.StorageType, DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
-                                    File, L.Line, File);
+                                    File, L.Line, Scope);
     }
 
     case TypeKind::Paren: {
@@ -1451,16 +1535,35 @@ private:
     // FIXME: Builtin and qualified types in LLVM have no parent
     // scope. TODO: This can be fixed by extending DIBuilder.
     llvm::DIScope *Scope = nullptr;
-    DeclContext *Context = DbgTy.getType()->getNominalOrBoundGenericNominal();
-    if (Context) {
-      if (auto *D = Context->getSelfNominalTypeDecl())
-        if (auto *ClangDecl = D->getClangDecl()) {
-          clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
-          auto Idx = ClangDecl->getOwningModuleID();
-          if (auto Info = Reader.getSourceDescriptor(Idx))
-            Scope = getOrCreateModule(*Info);
-        }
-      Context = Context->getParent();
+    // Make sure to retrieve the context of the type alias, not the pointee.
+    DeclContext *Context = nullptr;
+    const Decl *TypeDecl = nullptr;
+    const clang::Decl *ClangDecl = nullptr;
+    if (auto Alias = dyn_cast<TypeAliasType>(DbgTy.getType())) {
+      TypeAliasDecl *AliasDecl = Alias->getDecl();
+      TypeDecl = AliasDecl;
+      Context = AliasDecl->getParent();
+      ClangDecl = AliasDecl->getClangDecl();
+    } else if (auto *ND = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
+      TypeDecl = ND;
+      Context = ND->getParent();
+      ClangDecl = ND->getClangDecl();
+    }
+    if (ClangDecl) {
+      clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
+      auto Idx = ClangDecl->getOwningModuleID();
+      auto SubModuleDesc = Reader.getSourceDescriptor(Idx);
+      auto TopLevelModuleDesc = getClangModule(*TypeDecl->getModuleContext());
+      if (SubModuleDesc && TopLevelModuleDesc) {
+        // Describe the submodule, but substitute the cached ASTFile from
+        // the toplevel module. The ASTFile pointer in SubModule may be
+        // dangling and cant be trusted.
+        Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
+                                   SubModuleDesc->getPath(),
+                                   TopLevelModuleDesc->getASTFile(),
+                                   TopLevelModuleDesc->getSignature()},
+                                  SubModuleDesc->getModuleOrNull());
+      }
     }
     if (!Scope)
       Scope = getOrCreateContext(Context);
@@ -1532,7 +1635,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly);
-  MainFile = getOrCreateFile(BumpAllocatedString(SourcePath));
+  MainFile = getOrCreateFile(SourcePath);
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading

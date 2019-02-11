@@ -1438,27 +1438,35 @@ ConstantFolder::processWorkList() {
   // instruction from different entry points in the WorkList.
   llvm::DenseSet<SILInstruction *> ErrorSet;
   llvm::SetVector<SILInstruction *> FoldedUsers;
-  CastOptimizer CastOpt(FuncBuilder,
-      [&](SingleValueInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
+  CastOptimizer CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
+                        /* ReplaceValueUsesAction */
+                        [&](SILValue oldValue, SILValue newValue) {
+                          InvalidateInstructions = true;
+                          oldValue->replaceAllUsesWith(newValue);
+                        },
+                        /* ReplaceInstUsesAction */
+                        [&](SingleValueInstruction *I, ValueBase *V) {
+                          InvalidateInstructions = true;
+                          I->replaceAllUsesWith(V);
+                        },
+                        /* EraseAction */
+                        [&](SILInstruction *I) {
+                          auto *TI = dyn_cast<TermInst>(I);
 
-        InvalidateInstructions = true;
-        I->replaceAllUsesWith(V);
-      },
-      [&](SILInstruction *I) { /* EraseAction */
-        auto *TI = dyn_cast<TermInst>(I);
+                          if (TI) {
+                            // Invalidate analysis information related to
+                            // branches. Replacing
+                            // unconditional_check_branch type instructions
+                            // by a trap will also invalidate branches/the
+                            // CFG.
+                            InvalidateBranches = true;
+                          }
 
-        if (TI) {
-          // Invalidate analysis information related to branches. Replacing
-          // unconditional_check_branch type instructions by a trap will also
-          // invalidate branches/the CFG.
-          InvalidateBranches = true;
-        }
+                          InvalidateInstructions = true;
 
-        InvalidateInstructions = true;
-
-        WorkList.remove(I);
-        I->eraseFromParent();
-      });
+                          WorkList.remove(I);
+                          I->eraseFromParent();
+                        });
 
   while (!WorkList.empty()) {
     SILInstruction *I = WorkList.pop_back_val();

@@ -14,6 +14,12 @@ sil @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObjec
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 
+class Klass {}
+enum FakeOptional<T> {
+case some(T)
+case none
+}
+
 ///////////
 // Tests //
 ///////////
@@ -231,3 +237,59 @@ bb0(%0 : $Builtin.NativeObject):
   return %9999 : $()
 }
 
+sil [transparent] [ossa] @term_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $FakeOptional<Klass>):
+  checked_cast_br %0 : $Builtin.NativeObject to $Klass, bb1, bb2
+
+bb1(%1a : @owned $Klass):
+  destroy_value %1a : $Klass
+  br bb3
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some: bb4, default bb5
+
+bb4(%3 : @owned $Klass):
+  destroy_value %3 : $Klass
+  br bb6
+
+bb5(%4 : @owned $FakeOptional<Klass>):
+  destroy_value %4 : $FakeOptional<Klass>
+  br bb6
+
+bb6:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @term_non_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $FakeOptional<Klass>):
+// CHECK:   checked_cast_br [[ARG0]] : $Builtin.NativeObject to $Klass, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+//
+// CHECK: [[YES]]([[SUCC:%.*]] :
+// CHECK:   release_value [[SUCC]]
+// CHECK:   br [[CONT:bb[0-9]+]]
+//
+// CHECK: [[NO]]:
+// CHECK:   release_value [[ARG0]]
+// CHECK:   br [[CONT]]
+//
+// CHECK: [[CONT]]:
+// CHECK:   switch_enum [[ARG1]] : $FakeOptional<Klass>, case #FakeOptional.some!enumelt.1: [[SOME:bb[0-9]+]], default [[DEFAULT:bb[0-9]+]]
+//
+// CHECK: [[SOME]]([[PAYLOAD:%.*]] :
+// CHECK:   release_value [[PAYLOAD]]
+//
+// CHECK: [[DEFAULT]]:
+// CHECK:   release_value [[ARG1]]
+// CHECK: } // end sil function 'term_non_ossa_caller'
+sil @term_non_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $FakeOptional<Klass>):
+  %2 = function_ref @term_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> ()
+  apply %2(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
