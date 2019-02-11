@@ -3468,6 +3468,14 @@ public:
       b.createReleaseValueAddr(l, v, b.getDefaultAtomicity());
     };
 
+    // Emits a release based on the value's type category (address or object).
+    auto emitRelease = [&](SILValue v) {
+      if (v->getType().isAddress())
+        builder.createReleaseValueAddr(loc, v, builder.getDefaultAtomicity());
+      else
+        builder.createReleaseValue(loc, v, builder.getDefaultAtomicity());
+    };
+
     // If the applied adjoint returns the adjoint of the original self
     // parameter, then it returns it first. Set the adjoint of the original
     // self parameter.
@@ -3475,15 +3483,22 @@ public:
     if (ai->hasSelfArgument() &&
         applyInfo.actualIndices.isWrtParameter(selfParamIndex)) {
       auto cotanWrtSelf = *allResultsIt++;
-      auto origArg = ai->getArgument(origNumIndRes + selfParamIndex);
-      if (cotanWrtSelf->getType().isAddress())
-        setAdjointBuffer(origArg, ValueWithCleanup(
-            cotanWrtSelf, makeCleanup(cotanWrtSelf, cleanupFnAddr)));
-      else
-        addAdjointValue(origArg,
-            makeConcreteAdjointValue(ValueWithCleanup(
-                cotanWrtSelf,
-                makeCleanup(cotanWrtSelf, cleanupFn, {seedBuf.getCleanup()}))));
+      // If the self cotangent value corresponds to a non-desired self
+      // parameter, it won't be used, so release it.
+      if (!applyInfo.desiredIndices.isWrtParameter(selfParamIndex))
+        emitRelease(cotanWrtSelf);
+      else {
+        auto origArg = ai->getArgument(origNumIndRes + selfParamIndex);
+        if (cotanWrtSelf->getType().isAddress())
+          setAdjointBuffer(origArg, ValueWithCleanup(
+              cotanWrtSelf, makeCleanup(cotanWrtSelf, cleanupFnAddr)));
+        else
+          addAdjointValue(origArg,
+              makeConcreteAdjointValue(ValueWithCleanup(
+                  cotanWrtSelf,
+                  makeCleanup(cotanWrtSelf, cleanupFn,
+                              {seedBuf.getCleanup()}))));
+      }
     }
     // Set adjoints for the remaining non-self original parameters.
     for (unsigned i : applyInfo.actualIndices.parameters.set_bits()) {
@@ -3497,12 +3512,8 @@ public:
       // be used, so release it.
       if (i >= applyInfo.desiredIndices.parameters.size() ||
           !applyInfo.desiredIndices.parameters[i]) {
-        if (cotan->getType().isAddress())
-          builder.createReleaseValueAddr(loc, cotan,
-                                         builder.getDefaultAtomicity());
-        else
-          builder.createReleaseValue(loc, cotan,
-                                     builder.getDefaultAtomicity());
+        emitRelease(cotan);
+        continue;
       }
       if (cotan->getType().isAddress())
         setAdjointBuffer(origArg, ValueWithCleanup(
@@ -4907,7 +4918,7 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
            "desired indices.");
     auto assocFn = assocFnAndIndices->first;
     builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
-    assocFns.push_back(assocFnAndIndices->first);
+    assocFns.push_back(assocFn);
   }
 
   auto *newADFI = builder.createAutoDiffFunction(
