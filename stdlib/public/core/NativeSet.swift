@@ -51,11 +51,15 @@ internal struct _NativeSet<Element: Hashable> {
 
   @inlinable
   internal init(_ cocoa: __owned __CocoaSet, capacity: Int) {
-    _internalInvariant(cocoa.count <= capacity)
-    self._storage = _SetStorage<Element>.convert(cocoa, capacity: capacity)
-    for element in cocoa {
-      let nativeElement = _forceBridgeFromObjectiveC(element, Element.self)
-      insertNew(nativeElement, isUnique: true)
+    if capacity == 0 {
+      self._storage = __RawSetStorage.empty
+    } else {
+      _internalInvariant(cocoa.count <= capacity)
+      self._storage = _SetStorage<Element>.convert(cocoa, capacity: capacity)
+      for element in cocoa {
+        let nativeElement = _forceBridgeFromObjectiveC(element, Element.self)
+        insertNew(nativeElement, isUnique: true)
+      }
     }
   }
 #endif

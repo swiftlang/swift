@@ -52,13 +52,17 @@ internal struct _NativeDictionary<Key: Hashable, Value> {
 
   @inlinable
   internal init(_ cocoa: __owned __CocoaDictionary, capacity: Int) {
-    _internalInvariant(cocoa.count <= capacity)
-    self._storage =
-      _DictionaryStorage<Key, Value>.convert(cocoa, capacity: capacity)
-    for (key, value) in cocoa {
-      insertNew(
-        key: _forceBridgeFromObjectiveC(key, Key.self),
-        value: _forceBridgeFromObjectiveC(value, Value.self))
+    if capacity == 0 {
+      self._storage = __RawDictionaryStorage.empty
+    } else {
+      _internalInvariant(cocoa.count <= capacity)
+      self._storage =
+        _DictionaryStorage<Key, Value>.convert(cocoa, capacity: capacity)
+      for (key, value) in cocoa {
+        insertNew(
+          key: _forceBridgeFromObjectiveC(key, Key.self),
+          value: _forceBridgeFromObjectiveC(value, Value.self))
+      }
     }
   }
 #endif
