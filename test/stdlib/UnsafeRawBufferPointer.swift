@@ -39,6 +39,38 @@ UnsafeRawBufferPointerTestSuite.test("initFromValue") {
   expectEqual(value2, value1)
 }
 
+UnsafeRawBufferPointerTestSuite.test("initFromNilBuffer") {
+  let urbp1 =
+    UnsafeRawBufferPointer(UnsafeBufferPointer<Int>(start: nil, count: 0))
+  expectEqual(urbp1.baseAddress, nil)
+
+  let urbp2 =
+    UnsafeRawBufferPointer(UnsafeMutableBufferPointer<Int>(start: nil, count: 0))
+  expectEqual(urbp2.baseAddress, nil)
+
+  let umrbp =
+    UnsafeMutableRawBufferPointer(
+      UnsafeMutableBufferPointer<Int>(start: nil, count: 0))
+  expectEqual(umrbp.baseAddress, nil)
+}
+
+UnsafeRawBufferPointerTestSuite.test("initFromNilSlice") {
+  let urbp1 =
+    UnsafeRawBufferPointer(
+      rebasing: UnsafeRawBufferPointer(start: nil, count: 0)[...])
+  expectEqual(urbp1.baseAddress, nil)
+
+  let urbp2 =
+    UnsafeRawBufferPointer(
+      rebasing: UnsafeMutableRawBufferPointer(start: nil, count: 0)[...])
+  expectEqual(urbp2.baseAddress, nil)
+
+  let umrbp =
+    UnsafeMutableRawBufferPointer(
+      rebasing: UnsafeMutableRawBufferPointer(start: nil, count: 0)[...])
+  expectEqual(umrbp.baseAddress, nil)
+}
+
 // Test mutability and subscript getter/setters.
 UnsafeRawBufferPointerTestSuite.test("nonmutating_subscript_setter") {
   var value1: Int32 = -1

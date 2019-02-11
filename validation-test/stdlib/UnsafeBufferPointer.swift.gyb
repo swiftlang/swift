@@ -104,6 +104,19 @@ ${SelfName}TestSuite.test("rebasing") {
       expectEqual(rebased2[0], slice[i + 1])
     }
   }
+
+  let rebased3 = ${SelfType}(rebasing: ${SelfType}(start: nil, count: 0)[...])
+  expectEqual(rebased3.baseAddress, nil)
+
+%   if not IsMutable:
+%   if IsRaw:
+  let rebased4 = ${SelfType}(rebasing: UnsafeMutableRawBufferPointer(start: nil, count: 0)[...])
+  expectEqual(rebased4.baseAddress, nil)
+%   else:
+  let rebased4 = ${SelfType}(rebasing: UnsafeMutableBufferPointer<Float>(start: nil, count: 0)[...])
+  expectEqual(rebased4.baseAddress, nil)
+%   end # !Raw
+%   end # Mutable
 }
 
 // Allocate two buffers. Initialize one and copy it into the other. Pass those
