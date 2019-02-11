@@ -275,10 +275,19 @@ static void splitDestructure(SILBuilder &B, SILInstruction *I, SILValue Op) {
     SingleValueInstruction *ProjInst =
         Proj.createObjectProjection(B, Loc, Op).get();
 
+    // If we can simplify, do so.
+    if (SILValue NewV = simplifyInstruction(ProjInst)) {
+      Result->replaceAllUsesWith(NewV);
+      ProjInst->eraseFromParent();
+      continue;
+    }
+
     Result->replaceAllUsesWith(ProjInst);
   }
 
-  I->eraseFromParent();
+  // We may have exposed trivially dead instructions due to
+  // simplifyInstruction... delete I and any such instructions!
+  recursivelyDeleteTriviallyDeadInstructions(I, true);
 }
 
 bool OwnershipModelEliminatorVisitor::visitDestructureStructInst(
