@@ -120,8 +120,9 @@ cmake --build "S:\b\cmark"
 ### 6. Build LLVM/Clang
 - This must be done from within a developer command prompt. LLVM and Clang are
   large projects, so building might take a few hours. Make sure that the build
-  type (e.g. `Debug`, `Release`, `RelWithDebInfoAssert`) for LLVM/Clang matches the
-  build type for Swift.
+  type for LLVM/Clang is compatbile with the build type for Swift. That is,
+  either build everything `Debug` or some variant of `Release` (e.g. `Release`,
+  `RelWithDebInfo`).
 ```cmd
 mkdir "S:\b\llvm"
 pushd "S:\b\llvm"
