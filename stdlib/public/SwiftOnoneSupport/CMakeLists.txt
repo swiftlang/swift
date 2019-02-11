@@ -17,11 +17,13 @@ if(CMAKE_BUILD_TYPE STREQUAL Debug AND WINDOWS IN_LIST SWIFT_SDKS)
   # programs in Debug mode, and need the import library to be generated even if
   # nothing is exported.  Because we will still generate the DLL, create an
   # empty import library.
-  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/SwiftOnoneSupport.def
-    "LIBRARY SwiftOnoneSupport\n"
-    "EXPORTS")
+  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/swiftSwiftOnoneSupport.def
+    "LIBRARY swiftSwiftOnoneSupport\n"
+    "EXPORTS\n")
   foreach(architecture ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
     target_sources(swiftSwiftOnoneSupport-windows-${architecture} PRIVATE
-      ${CMAKE_CURRENT_BINARY_DIR}/SwiftOnoneSupport.def)
+      ${CMAKE_CURRENT_BINARY_DIR}/swiftSwiftOnoneSupport.def)
+    set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/swiftSwiftOnoneSupport.def
+      PROPERTIES HEADER_FILE_ONLY TRUE)
   endforeach()
 endif()
