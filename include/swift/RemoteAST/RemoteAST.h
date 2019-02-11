@@ -136,6 +136,8 @@ public:
   }
 };
 
+using OpenedExistential = Result<std::pair<Type, remote::RemoteAddress>>;
+
 /// A context for performing an operation relating the remote process with
 /// the AST.  This may be discarded and recreated at any time without danger,
 /// but reusing a context across multiple calls may allow some redundant work
@@ -212,11 +214,17 @@ public:
   Result<remote::RemoteAddress>
   getHeapMetadataForObject(remote::RemoteAddress address);
 
+  /// Resolve the dynamic type and the value address of an error existential
+  /// object, Unlike getDynamicTypeAndAddressForExistential(), this function
+  /// takes the address of the instance and not the address of the reference.
+  OpenedExistential
+  getDynamicTypeAndAddressForError(remote::RemoteAddress object);
+
   /// Given an existential and its static type, resolve its dynamic
   /// type and address. A single step of unwrapping is performed, i.e. if the
   /// value stored inside the existential is itself an existential, the
   /// caller can decide whether to iterate itself.
-  Result<std::pair<Type, remote::RemoteAddress>>
+  OpenedExistential
   getDynamicTypeAndAddressForExistential(remote::RemoteAddress address,
                                          Type staticType);
 };

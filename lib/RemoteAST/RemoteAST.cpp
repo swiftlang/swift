@@ -104,7 +104,9 @@ public:
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) = 0;
   virtual Result<RemoteAddress>
   getHeapMetadataForObject(RemoteAddress object) = 0;
-  virtual Result<std::pair<Type, RemoteAddress>>
+  virtual OpenedExistential
+  getDynamicTypeAndAddressForError(RemoteAddress object) = 0;
+  virtual OpenedExistential
   getDynamicTypeAndAddressForExistential(RemoteAddress object,
                                          Type staticType) = 0;
 
@@ -476,7 +478,7 @@ public:
     return getFailure<RemoteAddress>();
   }
 
-  Result<std::pair<Type, RemoteAddress>>
+  OpenedExistential
   getDynamicTypeAndAddressClassExistential(RemoteAddress object) {
     auto pointerval = Reader.readPointerValue(object.getAddressData());
     if (!pointerval)
@@ -491,13 +493,18 @@ public:
                                                RemoteAddress(*pointerval));
   }
 
-  Result<std::pair<Type, RemoteAddress>>
-  getDynamicTypeAndAddressErrorExistential(RemoteAddress object) {
-    auto pointerval = Reader.readPointerValue(object.getAddressData());
-    if (!pointerval)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+  OpenedExistential
+  getDynamicTypeAndAddressErrorExistential(RemoteAddress object,
+                                           bool dereference=true) {
+    if (dereference) {
+      auto pointerval = Reader.readPointerValue(object.getAddressData());
+      if (!pointerval)
+        return getFailure<std::pair<Type, RemoteAddress>>();
+      object = RemoteAddress(*pointerval);
+    }
+
     auto result =
-        Reader.readMetadataAndValueErrorExistential(RemoteAddress(*pointerval));
+        Reader.readMetadataAndValueErrorExistential(object);
     if (!result)
       return getFailure<std::pair<Type, RemoteAddress>>();
 
@@ -525,7 +532,7 @@ public:
                                                std::move(valueAddress));
   }
 
-  Result<std::pair<Type, RemoteAddress>>
+  OpenedExistential
   getDynamicTypeAndAddressOpaqueExistential(RemoteAddress object) {
     auto result = Reader.readMetadataAndValueOpaqueExistential(object);
     if (!result)
@@ -553,7 +560,7 @@ public:
                                                std::move(valueAddress));
   }
 
-  Result<std::pair<Type, RemoteAddress>>
+  OpenedExistential
   getDynamicTypeAndAddressExistentialMetatype(RemoteAddress object) {
     // The value of the address is just the input address.
     // The type is obtained through the following sequence of steps:
@@ -573,11 +580,20 @@ public:
                                                std::move(object));
   }
 
+  /// Resolve the dynamic type and the value address of an error existential
+  /// object, Unlike getDynamicTypeAndAddressForExistential(), this function
+  /// takes the address of the instance and not the address of the reference.
+  OpenedExistential
+  getDynamicTypeAndAddressForError(RemoteAddress object) override {
+    return getDynamicTypeAndAddressErrorExistential(object,
+                                                    /*dereference=*/false);
+  }
+
   /// Resolve the dynamic type and the value address of an existential,
   /// given its address and its static type. For class and error existentials,
   /// this API takes a pointer to the instance reference rather than the
   /// instance reference itself.
-  Result<std::pair<Type, RemoteAddress>>
+  OpenedExistential
   getDynamicTypeAndAddressForExistential(RemoteAddress object,
                                          Type staticType) override {
     // If this is not an existential, give up.
@@ -658,7 +674,13 @@ RemoteASTContext::getHeapMetadataForObject(remote::RemoteAddress address) {
   return asImpl(Impl)->getHeapMetadataForObject(address);
 }
 
-Result<std::pair<Type, remote::RemoteAddress>>
+OpenedExistential
+RemoteASTContext::getDynamicTypeAndAddressForError(
+    remote::RemoteAddress address) {
+  return asImpl(Impl)->getDynamicTypeAndAddressForError(address);
+}
+
+OpenedExistential
 RemoteASTContext::getDynamicTypeAndAddressForExistential(
     remote::RemoteAddress address, Type staticType) {
   return asImpl(Impl)->getDynamicTypeAndAddressForExistential(address,
