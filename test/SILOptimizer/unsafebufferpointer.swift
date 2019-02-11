@@ -87,10 +87,10 @@ public func testSubscript(_ ubp: UnsafeBufferPointer<Float>) -> Float {
 // CHECK: add i64
 // CHECK: [[CMP:%[0-9]+]] = icmp eq i64 %{{.*}}, %{{.*}}
 // CHECK: br i1 [[CMP]], label %[[RET]], label %[[LOOP]]
-public func testSubscript(_ ubp: UnsafeRawBufferPointer) -> Int {
-  var sum: Int = 0
+public func testSubscript(_ ubp: UnsafeRawBufferPointer) -> Int64 {
+  var sum: Int64 = 0
   for i in 0 ..< ubp.count {
-    sum &+= Int(ubp[i])
+    sum &+= Int64(ubp[i])
   }
   return sum
 }
