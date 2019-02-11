@@ -537,8 +537,9 @@ public:
       if (!OptMetaAndValue)
         return false;
 
-      RemoteAddress InstanceMetadataAddress = OptMetaAndValue->first;
-      RemoteAddress InstanceAddress = OptMetaAndValue->second;
+      RemoteAddress InstanceMetadataAddress = std::get<0>(*OptMetaAndValue);
+      RemoteAddress InstanceAddress = std::get<1>(*OptMetaAndValue);
+      // FIXME: Check third value, 'isBridged'
 
       auto InstanceTR =
           readTypeFromMetadata(InstanceMetadataAddress.getAddressData());

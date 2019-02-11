@@ -500,8 +500,10 @@ public:
         Reader.readMetadataAndValueErrorExistential(RemoteAddress(*pointerval));
     if (!result)
       return getFailure<std::pair<Type, RemoteAddress>>();
-    RemoteAddress metadataAddress = result->first;
-    RemoteAddress valueAddress = result->second;
+
+    RemoteAddress metadataAddress = std::get<0>(*result);
+    RemoteAddress valueAddress = std::get<1>(*result);
+    bool isBridged = std::get<2>(*result);
 
     auto typeResult =
         Reader.readTypeFromMetadata(metadataAddress.getAddressData());
