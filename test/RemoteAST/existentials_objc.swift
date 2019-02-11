@@ -2,6 +2,7 @@
 
 // REQUIRES: swift-remoteast-test
 // REQUIRES: objc_interop
+// REQUIRES: SR9908
 
 import Foundation
 
