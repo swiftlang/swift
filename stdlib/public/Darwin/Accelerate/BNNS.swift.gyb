@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
 @_exported import Accelerate
 @_exported import Accelerate.vecLib.BNNS
 
