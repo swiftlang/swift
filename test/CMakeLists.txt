@@ -299,10 +299,15 @@ foreach(SDK ${SWIFT_SDKS})
           set(test_mode_target_suffix "-${test_mode}")
         endif()
 
+        set(maybe_command_upload_stdlib)
+        if(NOT test_mode STREQUAL "only_non_executable")
+          set(maybe_command_upload_stdlib ${command_upload_stdlib})
+        endif()
+
         set(test_target_name
             "check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}")
         add_custom_target("${test_target_name}"
-            ${command_upload_stdlib}
+            ${maybe_command_upload_stdlib}
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
