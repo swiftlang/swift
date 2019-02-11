@@ -1078,11 +1078,11 @@ public:
   /// created for various dynamic purposes like KVO?
   bool isArtificialSubclass() const {
     assert(isTypeMetadata());
-    return Description == 0;
+    return Description == nullptr;
   }
   void setArtificialSubclass() {
     assert(isTypeMetadata());
-    Description = 0;
+    Description = nullptr;
   }
 
   ClassFlags getFlags() const {
@@ -1321,7 +1321,7 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
-    return sizeof(TargetStructMetadata<Runtime>) / sizeof(void*);
+    return sizeof(TargetStructMetadata<Runtime>) / sizeof(StoredPointer);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1369,7 +1369,7 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
-    return sizeof(TargetEnumMetadata<Runtime>) / sizeof(void*);
+    return sizeof(TargetEnumMetadata<Runtime>) / sizeof(StoredPointer);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1547,10 +1547,10 @@ class TargetProtocolDescriptorRef {
   /// is clear).
   StoredPointer storage;
 
+public:
   constexpr TargetProtocolDescriptorRef(StoredPointer storage)
     : storage(storage) { }
 
-public:
   constexpr TargetProtocolDescriptorRef() : storage() { }
 
   TargetProtocolDescriptorRef(
@@ -2519,7 +2519,6 @@ public:
   /// The type that's constrained, described as a mangled name.
   RelativeDirectPointer<const char, /*nullable*/ false> Param;
 
-private:
   union {
     /// A mangled representation of the same-type or base class the param is
     /// constrained to.
@@ -2544,7 +2543,6 @@ private:
     GenericRequirementLayoutKind Layout;
   };
 
-public:
   constexpr GenericRequirementFlags getFlags() const {
     return Flags;
   }
@@ -2784,6 +2782,7 @@ private:
   using TrailingGenericContextObjects
     = TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>;
 
+public:
   /// A mangling of the `Self` type context that the extension extends.
   /// The mangled name represents the type in the generic context encoded by
   /// this descriptor. For example, a nongeneric nominal type extension will
@@ -2794,7 +2793,6 @@ private:
   /// extension is declared inside.
   RelativeDirectPointer<const char> ExtendedContext;
 
-public:
   using TrailingGenericContextObjects::getGenericContext;
 
   StringRef getMangledExtendedContext() const {
@@ -3538,11 +3536,11 @@ public:
   llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const;
 
   /// Return the offset of the start of generic arguments in the nominal
-  /// type's metadata. The returned value is measured in sizeof(void*).
+  /// type's metadata. The returned value is measured in sizeof(StoredPointer).
   int32_t getGenericArgumentOffset() const;
 
   /// Return the start of the generic arguments array in the nominal
-  /// type's metadata. The returned value is measured in sizeof(void*).
+  /// type's metadata. The returned value is measured in sizeof(StoredPointer).
   const TargetMetadata<Runtime> * const *getGenericArguments(
                                const TargetMetadata<Runtime> *metadata) const {
     auto offset = getGenericArgumentOffset();

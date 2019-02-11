@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5
 
 public protocol PublicProto {
   func publicReq()
@@ -57,6 +57,18 @@ private struct PrivateStruct: PublicProto, InternalProto, FilePrivateProto, Priv
   public var publicVar = 0
 }
 
+public struct PublicStructWithInternalExtension: PublicProto, InternalProto, FilePrivateProto, PrivateProto {}
+// expected-error@-1 {{method 'publicReq()' must be declared public because it matches a requirement in public protocol 'PublicProto'}} {{none}}
+// expected-error@-2 {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{none}}
+// expected-error@-3 {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{none}}
+// expected-error@-4 {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{none}}
+internal extension PublicStructWithInternalExtension {
+  private func publicReq() {} // expected-note {{move the instance method to another extension where it can be declared 'public' to satisfy the requirement}} {{none}}
+  private func internalReq() {} // expected-note {{mark the instance method as 'internal' to satisfy the requirement}} {{3-11=}}
+  private func filePrivateReq() {} // expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+}
+
 extension PublicStruct {
   public init(x: Int) { self.init() }
 }
@@ -79,17 +91,17 @@ public extension PublicStruct {
   private func extImplPublic() {}
 }
 internal extension PublicStruct {
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
+  public func extMemberInternal() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'internal'}} {{none}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension PublicStruct {
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  public func extMemberFilePrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'fileprivate'}} {{none}}
   fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension PublicStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  public func extMemberPrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'private'}} {{none}}
   fileprivate func extFuncPrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a private (equivalent to fileprivate) extension}} {{3-15=}}
   private func extImplPrivate() {}
 }
@@ -99,17 +111,17 @@ public extension InternalStruct { // expected-error {{extension of internal stru
   private func extImplPublic() {}
 }
 internal extension InternalStruct {
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
+  public func extMemberInternal() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'internal'}} {{none}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension InternalStruct {
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  public func extMemberFilePrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'fileprivate'}} {{none}}
   fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension InternalStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  public func extMemberPrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'private'}} {{none}}
   fileprivate func extFuncPrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a private (equivalent to fileprivate) extension}} {{3-15=}}
   private func extImplPrivate() {}
 }
@@ -119,17 +131,17 @@ public extension FilePrivateStruct { // expected-error {{extension of fileprivat
   private func extImplPublic() {}
 }
 internal extension FilePrivateStruct { // expected-error {{extension of fileprivate struct cannot be declared internal}} {{1-10=}}
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
+  public func extMemberInternal() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'internal'}} {{none}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension FilePrivateStruct {
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  public func extMemberFilePrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'fileprivate'}} {{none}}
   fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension FilePrivateStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  public func extMemberPrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'private'}} {{none}}
   fileprivate func extFuncPrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a private (equivalent to fileprivate) extension}} {{3-15=}}
   private func extImplPrivate() {}
 }
@@ -139,17 +151,17 @@ public extension PrivateStruct { // expected-error {{extension of private struct
   private func extImplPublic() {}
 }
 internal extension PrivateStruct { // expected-error {{extension of private struct cannot be declared internal}} {{1-10=}}
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
+  public func extMemberInternal() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'internal'}} {{none}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension PrivateStruct { // expected-error {{extension of private struct cannot be declared fileprivate}} {{1-13=}}
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  public func extMemberFilePrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'fileprivate'}} {{none}}
   fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension PrivateStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  public func extMemberPrivate() {} // expected-warning {{'public' modifier conflicts with extension's default access of 'private'}} {{none}}
   fileprivate func extFuncPrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a private (equivalent to fileprivate) extension}} {{3-15=}}
   private func extImplPrivate() {}
 }
@@ -174,10 +186,10 @@ public class Base {
 
 
 public extension Base {
-  open func extMemberPublic() {} // expected-warning {{declaring open instance method in a public extension}}
+  open func extMemberPublic() {} // expected-warning {{'open' modifier conflicts with extension's default access of 'public'}}
 }
 internal extension Base {
-  open func extMemberInternal() {} // expected-warning {{declaring open instance method in an internal extension}}
+  open func extMemberInternal() {} // expected-warning {{'open' modifier conflicts with extension's default access of 'internal'}}
 }
 
 public class PublicSub: Base {
@@ -677,6 +689,22 @@ internal struct EquatablishOuterProblem3 {
 private func ==(lhs: EquatablishOuterProblem3.Inner, rhs: EquatablishOuterProblem3.Inner) {}
 // expected-note@-1 {{mark the operator function as 'internal' to satisfy the requirement}} {{1-8=internal}}
 
+internal struct EquatablishOuterProblem4 {
+  public struct Inner : Equatablish {} // expected-error {{method '==' must be as accessible as its enclosing type because it matches a requirement in protocol 'Equatablish'}} {{none}}
+}
+internal extension EquatablishOuterProblem4.Inner {
+  fileprivate static func ==(lhs: EquatablishOuterProblem4.Inner, rhs: EquatablishOuterProblem4.Inner) {}
+  // expected-note@-1 {{mark the operator function as 'internal' to satisfy the requirement}} {{3-15=}}
+}
+
+internal struct EquatablishOuterProblem5 {
+  public struct Inner : Equatablish {} // expected-error {{method '==' must be as accessible as its enclosing type because it matches a requirement in protocol 'Equatablish'}} {{none}}
+}
+private extension EquatablishOuterProblem5.Inner {
+  static func ==(lhs: EquatablishOuterProblem5.Inner, rhs: EquatablishOuterProblem5.Inner) {}
+  // expected-note@-1 {{move the operator function to another extension where it can be declared 'internal' to satisfy the requirement}} {{none}}
+}
+
 
 public protocol AssocTypeProto {
   associatedtype Assoc
@@ -698,6 +726,20 @@ internal struct AssocTypeOuterProblem2 {
   public struct Inner : AssocTypeProto {
     fileprivate typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{none}} expected-note {{mark the type alias as 'internal' to satisfy the requirement}} {{5-16=internal}}
   }
+}
+
+internal struct AssocTypeOuterProblem3 {
+  public struct Inner : AssocTypeProto {} // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{none}}
+}
+internal extension AssocTypeOuterProblem3.Inner {
+  fileprivate typealias Assoc = Int // expected-note {{mark the type alias as 'internal' to satisfy the requirement}} {{3-15=}}
+}
+
+internal struct AssocTypeOuterProblem4 {
+  public struct Inner : AssocTypeProto {} // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{none}}
+}
+private extension AssocTypeOuterProblem4.Inner {
+  typealias Assoc = Int // expected-note {{move the type alias to another extension where it can be declared 'internal' to satisfy the requirement}} {{none}}
 }
 
 internal typealias InternalComposition = PublicClass & PublicProto // expected-note {{declared here}}
@@ -811,3 +853,19 @@ private extension ClassWithProperties {
 public var inferredType = PrivateStruct() // expected-error {{variable cannot be declared public because its type 'PrivateStruct' uses a private type}}
 public var inferredGenericParameters: Optional = PrivateStruct() // expected-error {{variable cannot be declared public because its type uses a private type}}
 public var explicitType: Optional<PrivateStruct> = PrivateStruct() // expected-error {{variable cannot be declared public because its type uses a private type}}
+
+// rdar://problem/47557376
+@objc open class ObjCBase {
+  init() {}
+  @objc open dynamic func foo() {}
+  @objc open dynamic var bar: Int = 0
+}
+open class ObjCSub: ObjCBase {}
+public extension ObjCSub {
+  // Don't try to remove the 'open', since it's needed to be a valid 'override'.
+  open override func foo() {} // expected-warning {{'open' modifier conflicts with extension's default access of 'public'}} {{none}}
+  open override var bar: Int { // expected-warning {{'open' modifier conflicts with extension's default access of 'public'}} {{none}}
+    get { return 0 }
+    set {}
+  }
+}

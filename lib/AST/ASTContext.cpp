@@ -1034,13 +1034,17 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
     return nullptr;
 
   auto intType = getIntDecl()->getDeclaredType();
+  auto isIntParam = [&](AnyFunctionType::Param param) {
+    return (!param.isVariadic() && !param.isInOut() &&
+            param.getPlainType()->isEqual(intType));
+  };
   auto boolType = getBoolDecl()->getDeclaredType();
   auto decl = lookupOperatorFunc(*this, "==",
                                  intType, [=](FunctionType *type) {
     // Check for the signature: (Int, Int) -> Bool
     if (type->getParams().size() != 2) return false;
-    if (!type->getParams()[0].getOldType()->isEqual(intType) ||
-        !type->getParams()[1].getOldType()->isEqual(intType)) return false;
+    if (!isIntParam(type->getParams()[0]) ||
+        !isIntParam(type->getParams()[1])) return false;
     return type->getResult()->isEqual(boolType);
   });
   getImpl().EqualIntDecl = decl;
@@ -1227,8 +1231,9 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
   if (intrinsicsParams.size() != 3)
     return nullptr;
 
-  if (llvm::any_of(intrinsicsParams, [](const AnyFunctionType::Param &p) {
-    return !isBuiltinWordType(p.getOldType());
+  if (llvm::any_of(intrinsicsParams, [](AnyFunctionType::Param param) {
+    return (param.isVariadic() || param.isInOut() ||
+            !isBuiltinWordType(param.getPlainType()));
   })) {
     return nullptr;
   }
@@ -1470,23 +1475,6 @@ void ASTContext::verifyAllLoadedModules() const {
 
 ClangModuleLoader *ASTContext::getClangModuleLoader() const {
   return getImpl().TheClangModuleLoader;
-}
-
-static void recordKnownProtocol(ModuleDecl *Stdlib, StringRef Name,
-                                KnownProtocolKind Kind) {
-  Identifier ID = Stdlib->getASTContext().getIdentifier(Name);
-  UnqualifiedLookup Lookup(ID, Stdlib, nullptr, SourceLoc(),
-                           UnqualifiedLookup::Flags::KnownPrivate |
-                               UnqualifiedLookup::Flags::TypeLookup);
-  if (auto Proto
-        = dyn_cast_or_null<ProtocolDecl>(Lookup.getSingleTypeResult()))
-    Proto->setKnownProtocolKind(Kind);
-}
-
-void ASTContext::recordKnownProtocols(ModuleDecl *Stdlib) {
-#define PROTOCOL_WITH_NAME(Id, Name) \
-  recordKnownProtocol(Stdlib, Name, KnownProtocolKind::Id);
-#include "swift/AST/KnownProtocols.def"
 }
 
 ModuleDecl *ASTContext::getLoadedModule(
@@ -1761,10 +1749,6 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
   auto moduleID = ModulePath[0];
   for (auto &importer : getImpl().ModuleLoaders) {
     if (ModuleDecl *M = importer->loadModule(moduleID.second, ModulePath)) {
-      if (ModulePath.size() == 1 &&
-          (ModulePath[0].first == StdlibModuleName ||
-           ModulePath[0].first == Id_Foundation))
-        recordKnownProtocols(M);
       return M;
     }
   }

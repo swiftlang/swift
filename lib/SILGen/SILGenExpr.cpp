@@ -947,7 +947,7 @@ RValue RValueEmitter::visitOtherConstructorDeclRefExpr(
 }
 
 RValue RValueEmitter::visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C) {
-  llvm_unreachable("NilLiteralExpr not lowered?");
+  return SGF.emitLiteral(E, C);
 }
 
 RValue RValueEmitter::visitIntegerLiteralExpr(IntegerLiteralExpr *E,
@@ -963,9 +963,7 @@ RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
 
 RValue RValueEmitter::visitBooleanLiteralExpr(BooleanLiteralExpr *E, 
                                               SGFContext C) {
-  auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
-  SILValue boolValue = SGF.B.createIntegerLiteral(E, i1Ty, E->getValue());
-  return RValue(SGF, E, ManagedValue::forUnmanaged(boolValue));
+  return SGF.emitLiteral(E, C);
 }
 
 RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,

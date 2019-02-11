@@ -3394,7 +3394,7 @@ zero, the contained values will be destroyed. If the ``partial_apply`` has a
 is allocated on the stack and intialized to contain the closed-over values. The
 closed-over values are not retained, lifetime of the closed-over values must be
 managed separately. The lifetime of the stack context of a ``partial_apply
-[stack]`` must be terminated with a ``dealloc_stack``.
+[on_stack]`` must be terminated with a ``dealloc_stack``.
 
 If the callee is generic, all of its generic parameters must be bound by the
 given substitution list. The arguments are given with these generic

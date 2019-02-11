@@ -159,7 +159,7 @@ class TypeRefBuilder {
 
 public:
   using BuiltType = const TypeRef *;
-  using BuiltNominalTypeDecl = Optional<std::string>;
+  using BuiltTypeDecl = Optional<std::string>;
   using BuiltProtocolDecl = Optional<std::pair<std::string, bool /*isObjC*/>>;
 
   TypeRefBuilder();
@@ -205,12 +205,13 @@ public:
   /// Factory methods for all TypeRef kinds
   ///
 
-  const BuiltinTypeRef *createBuiltinType(const std::string &mangledName) {
+  const BuiltinTypeRef *createBuiltinType(const std::string &builtinName,
+                                          const std::string &mangledName) {
     return BuiltinTypeRef::create(*this, mangledName);
   }
 
   Optional<std::string>
-  createNominalTypeDecl(const Demangle::NodePointer &node) {
+  createTypeDecl(const Demangle::NodePointer &node, bool &typeAlias) {
     return Demangle::mangleNode(node);
   }
 
@@ -224,7 +225,8 @@ public:
     return std::make_pair(name, true);
   }
 
-  Optional<std::string> createNominalTypeDecl(std::string &&mangledName) {
+  Optional<std::string> createTypeDecl(std::string &&mangledName,
+                                       bool &typeAlias) {
     return std::move(mangledName);
   }
   
@@ -237,6 +239,13 @@ public:
                                     const Optional<std::string> &mangledName,
                                     const TypeRef *parent) {
     return NominalTypeRef::create(*this, *mangledName, parent);
+  }
+
+  const TypeRef *createTypeAliasType(
+                                    const Optional<std::string> &mangledName,
+                                    const TypeRef *parent) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
   }
 
   const BoundGenericTypeRef *
@@ -266,6 +275,39 @@ public:
     return FunctionTypeRef::create(*this, params, result, flags);
   }
 
+  const FunctionTypeRef *createImplFunctionType(
+    Demangle::ImplParameterConvention calleeConvention,
+    ArrayRef<Demangle::ImplFunctionParam<const TypeRef *>> params,
+    ArrayRef<Demangle::ImplFunctionResult<const TypeRef *>> results,
+    Optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
+    ImplFunctionTypeFlags flags) {
+    // Minimal support for lowered function types. These come up in
+    // reflection as capture types. For the reflection library's
+    // purposes, the only part that matters is the convention.
+    FunctionTypeFlags funcFlags;
+    switch (flags.getRepresentation()) {
+    case Demangle::ImplFunctionRepresentation::Thick:
+    case Demangle::ImplFunctionRepresentation::Closure:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Swift);
+      break;
+    case Demangle::ImplFunctionRepresentation::Thin:
+    case Demangle::ImplFunctionRepresentation::Method:
+    case Demangle::ImplFunctionRepresentation::ObjCMethod:
+    case Demangle::ImplFunctionRepresentation::WitnessMethod:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Thin);
+      break;
+    case Demangle::ImplFunctionRepresentation::CFunctionPointer:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::CFunctionPointer);
+      break;
+    case Demangle::ImplFunctionRepresentation::Block:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Block);
+      break;
+    }
+
+    auto result = createTupleType({}, "", false);
+    return FunctionTypeRef::create(*this, {}, result, funcFlags);
+  }
+
   const ProtocolCompositionTypeRef *
   createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
                                 BuiltType superclass,
@@ -286,18 +328,27 @@ public:
   }
 
   const ExistentialMetatypeTypeRef *
-  createExistentialMetatypeType(const TypeRef *instance) {
+  createExistentialMetatypeType(const TypeRef *instance,
+                    Optional<Demangle::ImplMetatypeRepresentation> repr=None) {
     return ExistentialMetatypeTypeRef::create(*this, instance);
   }
 
   const MetatypeTypeRef *createMetatypeType(const TypeRef *instance,
-                                            bool WasAbstract = false) {
+                    Optional<Demangle::ImplMetatypeRepresentation> repr=None) {
+    bool WasAbstract = (repr && *repr != ImplMetatypeRepresentation::Thin);
     return MetatypeTypeRef::create(*this, instance, WasAbstract);
   }
 
   const GenericTypeParameterTypeRef *
   createGenericTypeParameterType(unsigned depth, unsigned index) {
     return GenericTypeParameterTypeRef::create(*this, depth, index);
+  }
+
+  const DependentMemberTypeRef *
+  createDependentMemberType(const std::string &member,
+                            const TypeRef *base) {
+    // Should not have unresolved dependent member types here.
+    return nullptr;
   }
 
   const DependentMemberTypeRef *
@@ -321,6 +372,11 @@ public:
     return SILBoxTypeRef::create(*this, base);
   }
 
+  const TypeRef *createDynamicSelfType(const TypeRef *selfType) {
+    // TypeRefs should not contain DynamicSelfType.
+    return nullptr;
+  }
+
   const ObjCClassTypeRef *getUnnamedObjCClassType() {
     return createObjCClassType("");
   }
@@ -328,6 +384,14 @@ public:
   const ObjCClassTypeRef *
   createObjCClassType(const std::string &name) {
     return ObjCClassTypeRef::create(*this, name);
+  }
+
+  const ObjCClassTypeRef *
+  createBoundGenericObjCClassType(const std::string &name,
+                                  std::vector<const TypeRef *> &args) {
+    // Remote reflection just ignores generic arguments for Objective-C
+    // lightweight generic types, since they don't affect layout.
+    return createObjCClassType(name);
   }
 
   const ObjCProtocolTypeRef *

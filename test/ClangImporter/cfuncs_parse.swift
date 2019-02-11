@@ -17,7 +17,7 @@ func test_cfunc2(_ i: Int) {
 
 func test_cfunc3_a() {
   let b = cfunc3( { (a : Double, b : Double) -> Double in a + b } )
-  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') must be unwrapped}}
+  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') must be unwrapped to a value of type 'double_bin_op_block' (aka '(Double, Double) -> Double')}}
   // expected-note@-1{{coalesce}}
   // expected-note@-2{{force-unwrap}}
   _ = b!(1.5, 2.5) as Double
@@ -26,7 +26,7 @@ func test_cfunc3_a() {
 
 func test_cfunc3_b() {
   let b = cfunc3( { a, b in a + b } )
-  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') must be unwrapped}}
+  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') must be unwrapped to a value of type 'double_bin_op_block' (aka '(Double, Double) -> Double')}}
   // expected-note@-1{{coalesce}}
   // expected-note@-2{{force-unwrap}}
   _ = b!(1.5, 2.5) as Double
@@ -35,7 +35,7 @@ func test_cfunc3_b() {
 
 func test_cfunc3_c() {
   let b = cfunc3({ $0 + $1 })
-  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') must be unwrapped}}
+  _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') must be unwrapped to a value of type 'double_bin_op_block' (aka '(Double, Double) -> Double')}}
   // expected-note@-1{{coalesce}}
   // expected-note@-2{{force-unwrap}}
   _ = b!(1.5, 2.5) as Double

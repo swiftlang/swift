@@ -315,6 +315,28 @@ class MixedClass: Hashable {
   var hashValue: Int { return -9000 }
 }
 
+// Ensure equatable and hashable works with weak/unowned properties as well
+struct Foo: Equatable, Hashable {
+    weak var foo: Bar?
+    unowned var bar: Bar
+}
+
+class Bar {
+   let bar: String
+
+   init(bar: String) {
+     self.bar = bar
+   }
+}
+
+extension Bar: Equatable, Hashable {
+  static func == (lhs: Bar, rhs: Bar) -> Bool {
+        return lhs.bar == rhs.bar
+  }
+
+  func hash(into hasher: inout Hasher) {}
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'

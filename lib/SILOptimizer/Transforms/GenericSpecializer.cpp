@@ -37,6 +37,11 @@ class GenericSpecializer : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction &F = *getFunction();
+
+    // TODO: We should be able to handle ownership.
+    if (F.hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "***** GenericSpecializer on function:"
                             << F.getName() << " *****\n");
 

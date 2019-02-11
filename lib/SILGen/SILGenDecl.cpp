@@ -1194,24 +1194,37 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   // We handle emitting the variable storage when we see the pattern binding.
 }
 
-/// Emit a check that returns 1 if the running OS version is in
-/// the specified version range and 0 otherwise. The returned SILValue
-/// (which has type Builtin.Int1) represents the result of this check.
-SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
-                                                 const VersionRange &range) {
-  // Emit constants for the checked version range.
-  llvm::VersionTuple Vers = range.getLowerEndpoint();
+/// Emit literals for the major, minor, and subminor components of the version
+/// and return a tuple of SILValues for them.
+static std::tuple<SILValue, SILValue, SILValue>
+emitVersionLiterals(SILLocation loc, SILGenBuilder &B, ASTContext &ctx,
+                    llvm::VersionTuple Vers) {
   unsigned major = Vers.getMajor();
   unsigned minor =
       (Vers.getMinor().hasValue() ? Vers.getMinor().getValue() : 0);
   unsigned subminor =
       (Vers.getSubminor().hasValue() ? Vers.getSubminor().getValue() : 0);
 
-  SILType wordType = SILType::getBuiltinWordType(getASTContext());
+  SILType wordType = SILType::getBuiltinWordType(ctx);
 
   SILValue majorValue = B.createIntegerLiteral(loc, wordType, major);
   SILValue minorValue = B.createIntegerLiteral(loc, wordType, minor);
   SILValue subminorValue = B.createIntegerLiteral(loc, wordType, subminor);
+
+  return std::make_tuple(majorValue, minorValue, subminorValue);
+}
+
+/// Emit a check that returns 1 if the running OS version is in
+/// the specified version range and 0 otherwise. The returned SILValue
+/// (which has type Builtin.Int1) represents the result of this check.
+SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
+                                                 const VersionRange &range) {
+  // Emit constants for the checked version range.
+  SILValue majorValue;
+  SILValue minorValue;
+  SILValue subminorValue;
+  std::tie(majorValue, minorValue, subminorValue) =
+      emitVersionLiterals(loc, B, getASTContext(), range.getLowerEndpoint());
 
   // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
   FuncDecl *versionQueryDecl =

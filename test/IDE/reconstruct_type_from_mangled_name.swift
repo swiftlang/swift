@@ -1,5 +1,4 @@
 // RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
-// XFAIL: *
 
 struct Mystruct1 {
 // CHECK: decl: struct Mystruct1
@@ -66,21 +65,21 @@ class Myclass2 {
     arr1.append(1)
 // FIXME: missing append()
 // CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyyxnF
-// CHECK: type: (inout Array<Int>) -> (Int) -> ()
+// CHECK: type: (inout Array<Int>) -> (__owned Int) -> ()
 
     var arr2 : [Mystruct1]
 // CHECK: decl: var arr2: [Mystruct1]
 // CHECK: type: Array<Mystruct1>
 
     arr2.append(Mystruct1())
-// CHECK: type: (inout Array<Mystruct1>) -> (Mystruct1) -> ()
+// CHECK: type: (inout Array<Mystruct1>) -> (__owned Mystruct1) -> ()
 
     var arr3 : [Myclass1]
 // CHECK: decl: var arr3: [Myclass1]
 // CHECK: type: Array<Myclass1>
 
     arr3.append(Myclass1())
-// CHECK: type: (inout Array<Myclass1>) -> (Myclass1) -> ()
+// CHECK: type: (inout Array<Myclass1>) -> (__owned Myclass1) -> ()
 
     _ = Myclass2.init()
 // CHECK: dref: init()
@@ -256,31 +255,29 @@ func takesGeneric(_ t: GenericOuter<Int>.GenericInner<String>) {
 func hasLocalDecls() {
   func localFunction() {}
 
-  // FIXME
-  // CHECK: decl: FAILURE for 'LocalType'
+  // CHECK: decl: struct LocalType  for 'LocalType' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_V
   struct LocalType {
-    // CHECK: FAILURE for 'localMethod'
+    // CHECK: func localMethod() for 'localMethod' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_V11localMethodyyF
     func localMethod() {}
 
-    // CHECK: FAILURE for 'subscript(_:)'
-    subscript(x: Int) { get {} set {} }
+    // CHECK: subscript(x: Int) -> Int { get set } for 'subscript' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_VyS2icip
+    subscript(x: Int) -> Int { get {} set {} }
 
-    // CHECK: decl: FAILURE for ''
-    // CHECK: decl: FAILURE for ''
-    // CHECK: decl: FAILURE for ''
+    // CHECK: decl: get for '' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_VyS2icig
+    // CHECK: decl: set for '' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_VyS2icis
+    // CHECK: decl: init() for '' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_VADycfc
 
   }
 
-  // FIXME
-  // CHECK: decl: FAILURE for 'LocalClass'
+  // CHECK: decl: class LocalClass for 'LocalClass' usr=s:14swift_ide_test13hasLocalDeclsyyF0E5ClassL_C
   class LocalClass {
-    // CHECK: FAILURE for 'deinit'
+    // CHECK: decl: {{(@objc )?}}deinit for 'deinit' usr=s:14swift_ide_test13hasLocalDeclsyyF0E5ClassL_Cfd
     deinit {}
 
-    // CHECK: decl: FAILURE for ''
+    // CHECK: decl: init() for '' usr=s:14swift_ide_test13hasLocalDeclsyyF0E5ClassL_CADycfc
   }
 
-  // CHECK: decl: FAILURE for 'LocalAlias'
+  // CHECK: decl: typealias LocalAlias = LocalType for 'LocalAlias' usr=s:14swift_ide_test13hasLocalDeclsyyF0E5AliasL_a
   typealias LocalAlias = LocalType
 }
 
@@ -304,7 +301,7 @@ struct HasSubscript {
 // FIXME
 // CHECK: decl: FAILURE	for 'T' usr=s:14swift_ide_test19HasGenericSubscriptV1Txmfp
 struct HasGenericSubscript<T> {
-  // CHECK: subscript<U>(t: T) -> U { get set }	for 'subscript(_:)' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xclui
+  // CHECK: subscript<U>(t: T) -> U { get set } for 'subscript' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluip
   // FIXME
   // CHECK: decl: FAILURE	for 'U'
   // FIXME

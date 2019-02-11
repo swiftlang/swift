@@ -217,6 +217,10 @@ struct AccessEnforcementReleaseSinking : public SILFunctionTransform {
     if (F->empty())
       return;
 
+    // FIXME: Support ownership.
+    if (F->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "Running AccessEnforcementReleaseSinking on "
                             << F->getName() << "\n");
 

@@ -432,6 +432,22 @@ void USRGenerationRequest::noteCycleStep(DiagnosticEngine &diags) const {
 }
 
 //----------------------------------------------------------------------------//
+// Mangled local type name computation.
+//----------------------------------------------------------------------------//
+
+void MangleLocalTypeDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  const auto &storage = getStorage();
+  auto &d = std::get<0>(storage);
+  diags.diagnose(d, diag::circular_reference);
+}
+
+void MangleLocalTypeDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  const auto &storage = getStorage();
+  auto &d = std::get<0>(storage);
+  diags.diagnose(d, diag::circular_reference);
+}
+
+//----------------------------------------------------------------------------//
 // DefaultTypeRequest.
 //----------------------------------------------------------------------------//
 
@@ -472,7 +488,7 @@ const char *
 DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
   switch (knownProtocolKind) {
 
-// clang-format off
+  // clang-format off
     # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
       case KnownProtocolKind::Id: return typeName;
     # include "swift/AST/KnownProtocols.def"

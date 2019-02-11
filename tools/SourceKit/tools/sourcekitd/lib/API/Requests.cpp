@@ -28,6 +28,7 @@
 
 #include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Version.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
@@ -362,6 +363,19 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     auto dict = RB.getDictionary();
     dict.set(KeyVersionMajor, ProtocolMajorVersion);
     dict.set(KeyVersionMinor, static_cast<int64_t>(ProtocolMinorVersion));
+    return Rec(RB.createResponse());
+  }
+
+  if (ReqUID == RequestCompilerVersion) {
+    ResponseBuilder RB;
+    auto dict = RB.getDictionary();
+    auto thisVersion = swift::version::Version::getCurrentLanguageVersion();
+    dict.set(KeyVersionMajor, static_cast<int64_t>(thisVersion[0]));
+    dict.set(KeyVersionMinor, static_cast<int64_t>(thisVersion[1]));
+    if (thisVersion.size() > 2)
+      dict.set(KeyVersionPatch, static_cast<int64_t>(thisVersion[2]));
+    else
+      dict.set(KeyVersionPatch, static_cast<int64_t>(0));
     return Rec(RB.createResponse());
   }
 

@@ -9,8 +9,7 @@ set(swiftReflection_SOURCES
   "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp")
+  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
 
 # When we're building with assertions, include the demangle node dumper to aid
 # in debugging.
@@ -35,6 +34,8 @@ if(SWIFT_INCLUDE_TOOLS)
   endif()
 
   if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    set(CURRENT_CMAKE_C_COMPILER ${CMAKE_C_COMPILER})
+    set(CURRENT_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
     set(CMAKE_C_COMPILER ${HOST_CMAKE_C_COMPILER})
     set(CMAKE_CXX_COMPILER ${HOST_CMAKE_CXX_COMPILER})
   endif()
@@ -45,5 +46,9 @@ if(SWIFT_INCLUDE_TOOLS)
     ${SWIFT_RUNTIME_CXX_FLAGS})
   set_property(TARGET swiftReflection
     APPEND_STRING PROPERTY LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS})
-endif()
 
+  if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    set(CMAKE_C_COMPILER ${CURRENT_CMAKE_C_COMPILER})
+    set(CMAKE_CXX_COMPILER ${CURRENT_CMAKE_CXX_COMPILER})
+  endif()
+endif()

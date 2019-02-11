@@ -440,7 +440,8 @@ void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
 }
 
 bool Expr::isTypeReference(
-    llvm::function_ref<Type(const Expr *)> getType) const {
+    llvm::function_ref<Type(const Expr *)> getType,
+    llvm::function_ref<Decl *(const Expr *)> getDecl) const {
   // If the result isn't a metatype, there's nothing else to do.
   if (!getType(this)->is<AnyMetatypeType>())
     return false;
@@ -461,22 +462,33 @@ bool Expr::isTypeReference(
     if (auto memberRef = dyn_cast<MemberRefExpr>(expr))
       return isa<TypeDecl>(memberRef->getMember().getDecl());
 
+    // Any other expressions which might be referencing
+    // a declaration e.g. not yet type-checked ones like
+    // `UnresolvedDotExpr`.
+    if (auto *decl = getDecl(expr))
+      return isa<TypeDecl>(decl);
+
     // When the base of a "." expression is ignored, look at the member.
     if (auto ignoredDot = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr)) {
       expr = ignoredDot->getRHS();
       continue;
     }
 
+    if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+      expr = USE->getSubExpr();
+      continue;
+    }
+
     // Anything else is not statically derived.
     return false;
   } while (true);
-
 }
 
 bool Expr::isStaticallyDerivedMetatype(
-    llvm::function_ref<Type(const Expr *)> getType) const {
+    llvm::function_ref<Type(const Expr *)> getType,
+    llvm::function_ref<bool(const Expr *)> isTypeReference) const {
   // The expression must first be a type reference.
-  if (!isTypeReference(getType))
+  if (!isTypeReference(this))
     return false;
 
   auto type = getType(this)

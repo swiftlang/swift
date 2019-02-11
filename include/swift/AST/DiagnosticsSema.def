@@ -761,7 +761,7 @@ ERROR(imported_decl_is_wrong_kind_typealias,none,
 ERROR(ambiguous_decl_in_module,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
 
-ERROR(module_not_testable,none,
+ERROR(module_not_testable,Fatal,
       "module %0 was not compiled for testing", (Identifier))
 
 ERROR(module_not_compiled_for_private_import,none,
@@ -1210,9 +1210,10 @@ WARNING(access_control_setter_redundant,none,
       "%1",
       (AccessLevel, DescriptiveDeclKind, AccessLevel))
 WARNING(access_control_ext_member_more,none,
-    "declaring %select{%error|a fileprivate|an internal|a public|open}0 %1 in "
-    "%select{a private|a fileprivate|an internal|a public|%error}2 extension",
-    (AccessLevel, DescriptiveDeclKind, AccessLevel))
+    "'%select{%error|fileprivate|internal|public|open}0' modifier conflicts "
+    "with extension's default access of "
+    "'%select{private|fileprivate|internal|public|%error}1'",
+    (AccessLevel, AccessLevel))
 WARNING(access_control_ext_member_redundant,none,
     "'%select{%error|fileprivate|internal|public|%error}0' modifier is redundant "
     "for %1 declared in %select{a private (equivalent to fileprivate)|a fileprivate"
@@ -1725,6 +1726,10 @@ ERROR(type_witness_objc_generic_parameter,none,
 NOTE(witness_fix_access,none,
      "mark the %0 as '%select{%error|fileprivate|internal|public|%error}1' to "
      "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
+NOTE(witness_move_to_another_extension,none,
+     "move the %0 to another extension where it can be declared "
+     "'%select{%error|%error|internal|public|%error}1' to "
+     "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
 WARNING(assoc_type_default_conformance_failed,none,
         "default type %0 for associated type %1 does not satisfy constraint "
         "%2: %3", (Type, DeclName, Type, Type))
@@ -1981,6 +1986,9 @@ ERROR(protocol_composition_one_class,none,
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol, non-class type %1",
       (Type, Type))
+NOTE(requires_conformance_nonprotocol_fixit,none,
+     "use '%0 == %1' to require '%0' to be '%1'",
+     (StringRef, StringRef))
 ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
@@ -2777,7 +2785,7 @@ ERROR(specific_type_of_expression_is_ambiguous,none,
 
 ERROR(failed_to_produce_diagnostic,Fatal,
       "failed to produce diagnostic for expression; "
-      "please file a bug report with your project", ())
+      "please file a bug report", ())
 
 
 ERROR(missing_protocol,none,
@@ -4245,9 +4253,13 @@ WARNING(non_exhaustive_switch_unknown_only,none,
         "switch covers known cases, but %0 may have additional unknown values"
         "%select{|, possibly added in future versions}1", (Type, bool))
 
-WARNING(override_nsobject_hashvalue,none,
+WARNING(override_nsobject_hashvalue_warning,none,
         "override of 'NSObject.hashValue' is deprecated; "
-        "override 'NSObject.hash' to get consistent hashing behavior", ())
+        "did you mean to override 'NSObject.hash'?", ())
+ERROR(override_nsobject_hashvalue_error,none,
+      "'NSObject.hashValue' is not overridable; "
+      "did you mean to override 'NSObject.hash'?", ())
+
 WARNING(hashvalue_implementation,none,
         "'Hashable.hashValue' is deprecated as a protocol requirement; "
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",

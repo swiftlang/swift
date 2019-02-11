@@ -540,10 +540,18 @@ public:
     void verifyParsed(Stmt *S) {}
     void verifyParsed(Pattern *P) {}
     void verifyParsed(Decl *D) {
+      PrettyStackTraceDecl debugStack("verifying ", D);
       if (!D->getDeclContext()) {
-        Out << "every Decl should have a DeclContext";
-        PrettyStackTraceDecl debugStack("verifying DeclContext", D);
+        Out << "every Decl should have a DeclContext\n";
         abort();
+      }
+      if (auto *DC = dyn_cast<DeclContext>(D)) {
+        if (D->getDeclContext() != DC->getParent()) {
+          Out << "Decl's DeclContext not in sync with DeclContext's parent\n";
+          D->getDeclContext()->dumpContext();
+          DC->getParent()->dumpContext();
+          abort();
+        }
       }
     }
     template<typename T>

@@ -1429,20 +1429,27 @@ namespace {
                           diag::super_with_no_base_class);
     }
 
-    Type resolveTypeReferenceInExpression(TypeRepr *rep) {
+    Type resolveTypeReferenceInExpression(TypeRepr *repr) {
+      TypeLoc loc(repr);
+      return resolveTypeReferenceInExpression(loc);
+    }
+
+    Type resolveTypeReferenceInExpression(TypeLoc &loc) {
       TypeResolutionOptions options(TypeResolverContext::InExpression);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      return TypeResolution::forContextual(CS.DC).resolveType(rep,
-                                                              options);
+      bool hadError = CS.TC.validateType(
+          loc, TypeResolution::forContextual(CS.DC), options);
+      return hadError ? Type() : loc.getType();
     }
 
     Type visitTypeExpr(TypeExpr *E) {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
-      if (E->getTypeLoc().wasValidated()) {
-        type = E->getTypeLoc().getType();
-      } else if (auto *rep = E->getTypeRepr()) {
-        type = resolveTypeReferenceInExpression(rep);
+      auto &typeLoc = E->getTypeLoc();
+      if (typeLoc.wasValidated()) {
+        type = typeLoc.getType();
+      } else if (typeLoc.hasLocation()) {
+        type = resolveTypeReferenceInExpression(typeLoc);
       }
 
       if (!type || type->hasError()) return Type();
@@ -1633,7 +1640,7 @@ namespace {
                                      expr->getFunctionRefKind(),
                                      expr->getOuterAlternatives());
     }
-    
+
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = CS.getType(expr->getSubExpr());
       

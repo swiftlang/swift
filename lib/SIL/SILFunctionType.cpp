@@ -98,25 +98,8 @@ CanType SILFunctionType::getSelfInstanceType() const {
   return selfTy;
 }
 
-ProtocolDecl *
-SILFunctionType::getDefaultWitnessMethodProtocol() const {
-  assert(getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod);
-  auto selfTy = getSelfInstanceType();
-  if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
-    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
-    auto superclass = GenericSig->getSuperclassBound(paramTy);
-    if (superclass)
-      return nullptr;
-    auto protos = GenericSig->getConformsTo(paramTy);
-    assert(protos.size() == 1);
-    return protos[0];
-  }
-
-  return nullptr;
-}
-
 ClassDecl *
-SILFunctionType::getWitnessMethodClass(ModuleDecl &M) const {
+SILFunctionType::getWitnessMethodClass() const {
   auto selfTy = getSelfInstanceType();
   auto genericSig = getGenericSignature();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
@@ -1240,12 +1223,6 @@ getSILFunctionTypeForAbstractCFunction(SILModule &M,
                                        AnyFunctionType::ExtInfo extInfo,
                                        Optional<SILDeclRef> constant);
 
-/// If EnableGuaranteedNormalArguments is set, return a default convention that
-/// uses guaranteed.
-static DefaultConventions getNormalArgumentConvention(SILModule &M) {
-  return DefaultConventions(NormalParameterConvention::Guaranteed);
-}
-
 static CanSILFunctionType getNativeSILFunctionType(
     SILModule &M, AbstractionPattern origType,
     CanAnyFunctionType substInterfaceType, AnyFunctionType::ExtInfo extInfo,
@@ -1294,11 +1271,12 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::IVarInitializer:
-    case SILDeclRef::Kind::IVarDestroyer:
-      return getSILFunctionType(M, origType, substInterfaceType, extInfo,
-                                getNormalArgumentConvention(M), ForeignInfo(),
-                                origConstant, constant, reqtSubs,
+    case SILDeclRef::Kind::IVarDestroyer: {
+      auto conv = DefaultConventions(NormalParameterConvention::Guaranteed);
+      return getSILFunctionType(M, origType, substInterfaceType, extInfo, conv,
+                                ForeignInfo(), origConstant, constant, reqtSubs,
                                 witnessMethodConformance);
+    }
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
                                 DeallocatorConventions(), ForeignInfo(),

@@ -7,4 +7,4 @@ import TestModule
 
 _ = TestStruct()
 
-// CHECK: -lcoreTestModuleKitUtilsTool
+// CHECK: {{-lcoreTestModuleKitUtilsTool|/DEFAULTLIB:coreTestModuleKitUtilsTool.lib}}

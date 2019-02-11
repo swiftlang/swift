@@ -597,6 +597,14 @@ void swift_initClassMetadata(ClassMetadata *self,
                              const TypeLayout * const *fieldTypes,
                              size_t *fieldOffsets);
 
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataDependency
+swift_initClassMetadata2(ClassMetadata *self,
+                         ClassLayoutFlags flags,
+                         size_t numFields,
+                         const TypeLayout * const *fieldTypes,
+                         size_t *fieldOffsets);
+
 #if SWIFT_OBJC_INTEROP
 /// Initialize various fields of the class metadata.
 ///
@@ -612,6 +620,14 @@ void swift_updateClassMetadata(ClassMetadata *self,
                                size_t numFields,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets);
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataDependency
+swift_updateClassMetadata2(ClassMetadata *self,
+                           ClassLayoutFlags flags,
+                           size_t numFields,
+                           const TypeLayout * const *fieldTypes,
+                           size_t *fieldOffsets);
 #endif
 
 /// Given class metadata, a class descriptor and a method descriptor, look up

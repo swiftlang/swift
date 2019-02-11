@@ -1163,6 +1163,10 @@ class SILCSE : public SILFunctionTransform {
   bool RunsOnHighLevelSil;
   
   void run() override {
+    // FIXME: We should be able to support ownership.
+    if (getFunction()->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "***** CSE on function: "
                             << getFunction()->getName() << " *****\n");
 

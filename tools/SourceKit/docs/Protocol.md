@@ -28,6 +28,7 @@ The protocol is documented in the following format:
 | [Module interface generation](#module-interface-generation) | source.request.editor.open.interface |
 | [Indexing](#indexing) | source.request.indexsource  |
 | [Protocol Version](#protocol-version) | source.request.protocol_version |
+| [Compiler Version](#compiler-version) | source.request.compiler_version |
 
 
 # Requests
@@ -614,6 +615,45 @@ Welcome to SourceKit.  Type ':help' for assistance.
     key.request: source.request.protocol_version
 }
 ```
+
+## Compiler Version
+
+SourceKit can provide information about the version of the compiler version that is being used.
+
+### Request
+
+```
+{
+    <key.request>: (UID) <source.request.compiler_version>
+}
+```
+
+### Response
+
+```
+{
+    <key.version_major>: (int64) // The major version number in a version string
+    <key.version_minor>: (int64) // The minor version number in a version string
+    <key.version_patch>: (int64) // The patch version number in a version string
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=compiler-version
+```
+
+or
+
+```
+$ sourcekitd-repl
+Welcome to SourceKit.  Type ':help' for assistance.
+(SourceKit) {
+    key.request: source.request.compiler_version
+}
+```
+
 
 ## Cursor Info
 

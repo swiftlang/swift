@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -27,45 +27,18 @@ import SwiftShims
 /// - Returns: The string of characters read from standard input. If EOF has
 ///   already been reached when `readLine()` is called, the result is `nil`.
 public func readLine(strippingNewline: Bool = true) -> String? {
-  var linePtrVar: UnsafeMutablePointer<UInt8>?
-  var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)
-  if readBytes == -1 {
+  var utf8Start: UnsafeMutablePointer<UInt8>?
+  let utf8Count = swift_stdlib_readLine_stdin(&utf8Start)
+  defer {
+    _swift_stdlib_free(utf8Start)
+  }
+  guard utf8Count > 0 else {
     return nil
   }
-  _internalInvariant(readBytes >= 0,
-    "unexpected return value from swift_stdlib_readLine_stdin")
-  if readBytes == 0 {
-    return ""
+  let utf8Buffer = UnsafeBufferPointer(start: utf8Start, count: utf8Count)
+  var result = String._fromUTF8Repairing(utf8Buffer).result
+  if strippingNewline, result.last == "\n" || result.last == "\r\n" {
+    _ = result.removeLast()
   }
-
-  let linePtr = linePtrVar!
-  if strippingNewline {
-    // FIXME: Unicode conformance.  To fix this, we need to reimplement the
-    // code we call above to get a line, since it will only stop on LF.
-    //
-    // <rdar://problem/20013999> Recognize Unicode newlines in readLine()
-    //
-    // Recognize only LF and CR+LF combinations for now.
-    let cr = UInt8(ascii: "\r")
-    let lf = UInt8(ascii: "\n")
-    if readBytes == 1 && linePtr[0] == lf {
-      return ""
-    }
-    if readBytes >= 2 {
-      switch (linePtr[readBytes - 2], linePtr[readBytes - 1]) {
-      case (cr, lf):
-        readBytes -= 2
-        break
-      case (_, lf):
-        readBytes -= 1
-        break
-      default:
-        ()
-      }
-    }
-  }
-  let result = String._fromUTF8Repairing(
-    UnsafeBufferPointer(start: linePtr, count: readBytes)).0
-  _swift_stdlib_free(linePtr)
   return result
 }

@@ -205,25 +205,6 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
                           threshold * 1.4, output_file, *results)
 
 
-def get_results(bench_dir, opt_level, num_samples, to_test):
-    try:
-        exe = os.path.join(bench_dir, 'bin', 'Benchmark_' + opt_level)
-        args = [exe, '--num-samples=' + str(num_samples),
-                '--sample-time=0.0025']
-        if to_test:
-            args += to_test
-        env = {'DYLD_LIBRARY_PATH': os.path.join(bench_dir, 'lib', 'swift',
-               'macos'),
-               'SWIFT_DETERMINISTIC_HASHING': '1'}
-        output = subprocess.check_output(args, env=env)
-    except subprocess.CalledProcessError as e:
-        sys.stderr.write(e.output)
-        sys.stderr.flush()
-        return sys.exit(e.returncode)
-    else:
-        return output
-
-
 def report_code_size(opt_level, old_dir, new_dir, platform, output_file):
     if opt_level == 'swiftlibs':
         files = glob.glob(os.path.join(old_dir, 'lib', 'swift', platform,

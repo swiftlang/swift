@@ -1566,6 +1566,12 @@ SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
   return D;
 }
 
+NullablePtr<SILBasicBlock> SwitchEnumInstBase::getDefaultBBOrNull() const {
+  if (!hasDefault())
+    return nullptr;
+  return getDefaultBB();
+}
+
 SwitchEnumInst *SwitchEnumInst::create(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,

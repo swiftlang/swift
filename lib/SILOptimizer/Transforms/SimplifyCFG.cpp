@@ -1934,20 +1934,26 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
   auto ThisBB = CCBI->getParent();
 
   bool MadeChange = false;
-  CastOptimizer CastOpt(FuncBuilder,
-      [&MadeChange](SILInstruction *I,
-                    ValueBase *V) {  /* ReplaceInstUsesAction */
+  CastOptimizer CastOpt(
+      FuncBuilder, nullptr /*SILBuilderContext*/,
+      /* ReplaceValueUsesAction */
+      [&MadeChange](SILValue oldValue, SILValue newValue) {
         MadeChange = true;
       },
-      [&MadeChange](SILInstruction *I) { /* EraseInstAction */
+      /* ReplaceInstUsesAction */
+      [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
+      /* EraseInstAction */
+      [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      [&]() { /* WillSucceedAction */
+      /* WillSucceedAction */
+      [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      [&]() { /* WillFailAction */
+      /* WillFailAction */
+      [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
       });
@@ -1964,22 +1970,27 @@ bool SimplifyCFG::simplifyCheckedCastValueBranchBlock(
 
   bool MadeChange = false;
   CastOptimizer CastOpt(
-      FuncBuilder,
-      [&MadeChange](SILInstruction *I,
-                    ValueBase *V) { /* ReplaceInstUsesAction */
-                                    MadeChange = true;
+      FuncBuilder, nullptr /*SILBuilderContext*/,
+      /* ReplaceValueUsesAction */
+      [&MadeChange](SILValue oldValue, SILValue newValue) {
+        MadeChange = true;
       },
-      [&MadeChange](SILInstruction *I) { /* EraseInstAction */
-                                         MadeChange = true;
-                                         I->eraseFromParent();
+      /* ReplaceInstUsesAction */
+      [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
+      /* EraseInstAction */
+      [&MadeChange](SILInstruction *I) {
+        MadeChange = true;
+        I->eraseFromParent();
       },
-      [&]() { /* WillSucceedAction */
-              MadeChange |= removeIfDead(FailureBB);
-              addToWorklist(ThisBB);
+      /* WillSucceedAction */
+      [&]() {
+        MadeChange |= removeIfDead(FailureBB);
+        addToWorklist(ThisBB);
       },
-      [&]() { /* WillFailAction */
-              MadeChange |= removeIfDead(SuccessBB);
-              addToWorklist(ThisBB);
+      /* WillFailAction */
+      [&]() {
+        MadeChange |= removeIfDead(SuccessBB);
+        addToWorklist(ThisBB);
       });
 
   MadeChange |= bool(CastOpt.simplifyCheckedCastValueBranchInst(CCBI));
@@ -1994,19 +2005,24 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
   auto ThisBB = CCABI->getParent();
 
   bool MadeChange = false;
-  CastOptimizer CastOpt(FuncBuilder,
-      [&MadeChange](SILInstruction *I, ValueBase *V) {
-        MadeChange = true;
-      }, /* ReplaceInstUsesAction */
-      [&MadeChange](SILInstruction *I) { /* EraseInstAction */
+  CastOptimizer CastOpt(
+      FuncBuilder, nullptr /*SILBuilderContext*/,
+      /* ReplaceValueUsesAction */
+      [&MadeChange](SILValue, SILValue) { MadeChange = true; },
+      /* ReplaceInstUsesAction */
+      [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
+      /* EraseInstAction */
+      [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      [&]() { /* WillSucceedAction */
+      /* WillSucceedAction */
+      [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      [&]() { /* WillFailAction */
+      /* WillFailAction */
+      [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
       });
@@ -3591,6 +3607,10 @@ namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
+    // FIXME: We should be able to handle ownership.
+    if (getFunction()->hasOwnership())
+      return;
+
     if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
                     /*EnableJumpThread=*/false)
             .run())
@@ -3608,6 +3628,9 @@ namespace {
 class JumpThreadSimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
+    // FIXME: Handle ownership.
+    if (getFunction()->hasOwnership())
+      return;
     if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
                     /*EnableJumpThread=*/true)
             .run())

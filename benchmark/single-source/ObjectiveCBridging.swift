@@ -13,25 +13,66 @@
 import TestsUtils
 import Foundation
 
+let t: [BenchmarkCategory] = [.validation, .bridging]
+let ts: [BenchmarkCategory] = [.validation, .bridging, .String]
+
 public let ObjectiveCBridging = [
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSString", runFunction: run_ObjectiveCBridgeFromNSString, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSStringForced", runFunction: run_ObjectiveCBridgeFromNSStringForced, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeToNSString", runFunction: run_ObjectiveCBridgeToNSString, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSArrayAnyObject", runFunction: run_ObjectiveCBridgeFromNSArrayAnyObject, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSArrayAnyObjectForced", runFunction: run_ObjectiveCBridgeFromNSArrayAnyObjectForced, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeToNSArray", runFunction: run_ObjectiveCBridgeToNSArray, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSArrayAnyObjectToString", runFunction: run_ObjectiveCBridgeFromNSArrayAnyObjectToString, tags: [.validation, .bridging, .String]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSArrayAnyObjectToStringForced", runFunction: run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced, tags: [.validation, .bridging, .String]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObject", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObject, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectForced", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced, tags: [.validation, .bridging, .unstable]),
-  BenchmarkInfo(name: "ObjectiveCBridgeToNSDictionary", runFunction: run_ObjectiveCBridgeToNSDictionary, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectToString", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString, tags: [.validation, .bridging, .String, .unstable]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced, tags: [.validation, .bridging, .String, .unstable]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObject", runFunction: run_ObjectiveCBridgeFromNSSetAnyObject, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectForced", runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectForced, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeToNSSet", runFunction: run_ObjectiveCBridgeToNSSet, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectToString", runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectToString, tags: [.validation, .bridging, .String]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectToStringForced", runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced, tags: [.validation, .bridging, .String, .unstable]),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSString",
+    runFunction: run_ObjectiveCBridgeFromNSString, tags: t,
+    legacyFactor: 5),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSStringForced",
+    runFunction: run_ObjectiveCBridgeFromNSStringForced, tags: t,
+    legacyFactor: 5),
+  BenchmarkInfo(name: "ObjectiveCBridgeToNSString",
+    runFunction: run_ObjectiveCBridgeToNSString, tags: t),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSArrayAnyObject",
+    runFunction: run_ObjectiveCBridgeFromNSArrayAnyObject, tags: t,
+    legacyFactor: 100),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSArrayAnyObjectForced",
+    runFunction: run_ObjectiveCBridgeFromNSArrayAnyObjectForced, tags: t,
+    legacyFactor: 20),
+  BenchmarkInfo(name: "ObjectiveCBridgeToNSArray",
+    runFunction: run_ObjectiveCBridgeToNSArray, tags: t,
+    legacyFactor: 50),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSArrayAnyObjectToString",
+    runFunction: run_ObjectiveCBridgeFromNSArrayAnyObjectToString, tags: ts,
+    legacyFactor: 100),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSArrayAnyObjectToStringForced",
+    runFunction: run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced,
+    tags: ts, legacyFactor: 200),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObject",
+    runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObject, tags: t,
+    legacyFactor: 100),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectForced",
+    runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced, tags: t,
+    legacyFactor: 50),
+  BenchmarkInfo(name: "ObjectiveCBridgeToNSDictionary",
+    runFunction: run_ObjectiveCBridgeToNSDictionary, tags: t,
+    legacyFactor: 50),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectToString",
+    runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString,
+    tags: ts, legacyFactor: 500),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced",
+    runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced,
+    tags: ts, legacyFactor: 500),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObject",
+    runFunction: run_ObjectiveCBridgeFromNSSetAnyObject, tags: t,
+    legacyFactor: 200),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectForced",
+    runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectForced, tags: t,
+    legacyFactor: 20),
+  BenchmarkInfo(name: "ObjectiveCBridgeToNSSet",
+    runFunction: run_ObjectiveCBridgeToNSSet, tags: t,
+    legacyFactor: 50),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectToString",
+    runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectToString, tags: ts,
+    legacyFactor: 500),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectToStringForced",
+    runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced, tags: ts,
+    legacyFactor: 500),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDateComponents",
+    runFunction: run_ObjectiveCBridgeFromNSDateComponents, tags: t,
+    setUpFunction: setup_dateComponents),
 ]
 
 #if _runtime(_ObjC)
@@ -59,7 +100,7 @@ func testObjectiveCBridgeFromNSString() {
   let nsString = createNSString()
 
   var s: String?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 2_000 {
     // Call _conditionallyBridgeFromObjectiveC.
     let n : String? = conditionalCast(nsString)
     if n != nil {
@@ -87,7 +128,7 @@ func testObjectiveCBridgeFromNSStringForced() {
   let nsString = createNSString()
 
   var s: String?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 2_000 {
     // Call _forceBridgeFromObjectiveC
     s = forcedCast(nsString)
   }
@@ -156,7 +197,7 @@ func testObjectiveCBridgeFromNSArrayAnyObject() {
   let nsArray = createNSArray()
 
   var nativeString : String?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 100 {
     if let nativeArray : [NSString] = conditionalCast(nsArray) {
        nativeString = forcedCast(nativeArray[0])
     }
@@ -182,7 +223,7 @@ func testObjectiveCBridgeFromNSArrayAnyObjectForced() {
   let nsArray = createNSArray()
 
   var nativeString : String?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 500 {
     let nativeArray : [NSString] = forcedCast(nsArray)
     nativeString = forcedCast(nativeArray[0])
   }
@@ -208,7 +249,7 @@ func testObjectiveCBridgeToNSArray() {
     "abcde", "abcde", "abcde", "abcde", "abcde"]
 
   var nsString : Any?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 200 {
     let nsArray = nativeArray as NSArray
     nsString = nsArray.object(at: 0)
   }
@@ -233,7 +274,7 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToString() {
   let nsArray = createNSArray()
 
   var nativeString : String?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 100 {
     if let nativeArray : [String] = conditionalCast(nsArray) {
       nativeString = nativeArray[0]
     }
@@ -259,7 +300,7 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToStringForced() {
   let nsArray = createNSArray()
 
   var nativeString : String?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 50 {
     let nativeArray : [String] = forcedCast(nsArray)
     nativeString = nativeArray[0]
   }
@@ -313,7 +354,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObject() {
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 
   var nativeInt : Int?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 100 {
     if let nativeDictionary : [NSString : NSNumber] = conditionalCast(nsDictionary) {
        nativeInt = forcedCast(nativeDictionary[nsString])
     }
@@ -340,7 +381,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectForced() {
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 
   var nativeInt : Int?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 200 {
     if let nativeDictionary : [NSString : NSNumber] = forcedCast(nsDictionary) {
        nativeInt = forcedCast(nativeDictionary[nsString])
     }
@@ -369,7 +410,7 @@ func testObjectiveCBridgeToNSDictionary() {
   let key = "abcde1" as NSString
 
   var nsNumber : Any?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 200 {
     let nsDict = nativeDictionary as NSDictionary
     nsNumber = nsDict.object(forKey: key)
   }
@@ -396,7 +437,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToString() {
   let nativeString = nsString as String
 
   var nativeInt : Int?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 20 {
     if let nativeDictionary : [String : Int] = conditionalCast(nsDictionary) {
        nativeInt = nativeDictionary[nativeString]
     }
@@ -424,7 +465,7 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced() {
   let nativeString = nsString as String
 
   var nativeInt : Int?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 20 {
     if let nativeDictionary : [String : Int] = forcedCast(nsDictionary) {
        nativeInt = nativeDictionary[nativeString]
     }
@@ -480,7 +521,7 @@ func testObjectiveCBridgeFromNSSetAnyObject() {
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 
   var result : Bool?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 50 {
     if let nativeSet : Set<NSString> = conditionalCast(nsSet) {
        result = nativeSet.contains(nsString)
     }
@@ -507,7 +548,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectForced() {
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 
   var result : Bool?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 500 {
     if let nativeSet : Set<NSString> = forcedCast(nsSet) {
        result = nativeSet.contains(nsString)
     }
@@ -535,7 +576,7 @@ func testObjectiveCBridgeToNSSet() {
   let key = "abcde1" as NSString
 
   var nsString : Any?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 200 {
     let nsDict = nativeSet as NSSet
     nsString = nsDict.member(key)
   }
@@ -562,7 +603,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectToString() {
   let nsSet = createNSSet()
 
   var result : Bool?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 20 {
     if let nativeSet : Set<String> = conditionalCast(nsSet) {
        result = nativeSet.contains(nativeString)
     }
@@ -590,7 +631,7 @@ func testObjectiveCBridgeFromNSSetAnyObjectToStringForced() {
   let nativeString = nsString as String
 
   var result : Bool?
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 20 {
     if let nativeSet : Set<String> = forcedCast(nsSet) {
        result = nativeSet.contains(nativeString)
     }
@@ -608,4 +649,63 @@ public func run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced(_ N: Int) {
     }
   }
 #endif
+}
+
+#if _runtime(_ObjC)
+
+//translated directly from an objc part of the original testcase
+@objc class DictionaryContainer : NSObject {
+  @objc var _dictionary:NSDictionary
+
+  //simulate an objc property being imported via bridging
+  @objc var dictionary:Dictionary<DateComponents, String> {
+    @inline(never)
+    get {
+      return _dictionary as! Dictionary<DateComponents, String>
+    }
+  }
+
+  override init() {
+    _dictionary = NSDictionary()
+    super.init()
+    let dict = NSMutableDictionary()
+    let calendar = NSCalendar(calendarIdentifier: .gregorian)!
+    let now = Date()
+    for day in 0..<36 {
+      let date = calendar.date(byAdding: .day, value: -day, to: now, options: NSCalendar.Options())
+      let components = calendar.components([.year, .month, .day], from: date!)
+      dict[components as NSDateComponents] = "TESTING"
+    }
+    _dictionary = NSDictionary(dictionary: dict)
+  }
+}
+
+var componentsContainer: DictionaryContainer? = nil
+var componentsArray:[DateComponents]? = nil
+#endif
+
+public func setup_dateComponents() {
+  #if _runtime(_ObjC)
+  componentsContainer = DictionaryContainer()
+  let now = Date()
+  let calendar = Calendar(identifier: .gregorian)
+  componentsArray = (0..<10).compactMap { (day) -> DateComponents? in
+    guard let date = calendar.date(byAdding: .day, value: -day, to: now) else {
+      return nil
+    }
+
+    return calendar.dateComponents([.year, .month, .day], from: date)
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeFromNSDateComponents(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    for components in componentsArray! {
+      let _ = componentsContainer!.dictionary[components]
+    }
+  }
+  #endif
 }

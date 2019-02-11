@@ -453,6 +453,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::ProtocolVersion:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestProtocolVersion);
     break;
+  
+  case SourceKitRequest::CompilerVersion:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCompilerVersion);
+    break;
 
   case SourceKitRequest::DemangleNames:
     prepareDemangleRequest(Req, Opts);
@@ -999,6 +1003,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       break;
 
     case SourceKitRequest::ProtocolVersion:
+    case SourceKitRequest::CompilerVersion:
     case SourceKitRequest::Close:
     case SourceKitRequest::Index:
     case SourceKitRequest::CodeComplete:

@@ -11,14 +11,18 @@
 //===----------------------------------------------------------------------===//
 import TestsUtils
 
+let t: [BenchmarkCategory] = [.validation, .api, .algorithm, .String]
 // Sort an array of strings using an explicit sort predicate.
 public let SortStrings = [
-  BenchmarkInfo(name: "SortSortedStrings", runFunction: run_SortSortedStrings, tags: [.validation, .api, .algorithm, .String],
+  BenchmarkInfo(name: "SortSortedStrings",
+    runFunction: run_SortSortedStrings, tags: t,
     setUpFunction: { blackHole(sortedWords) }),
-  BenchmarkInfo(name: "SortStrings", runFunction: run_SortStrings, tags: [.validation, .api, .algorithm, .String],
+  BenchmarkInfo(name: "SortStrings",
+    runFunction: run_SortStrings, tags: t,
     setUpFunction: { blackHole(words) }),
-  BenchmarkInfo(name: "SortStringsUnicode", runFunction: run_SortStringsUnicode, tags: [.validation, .api, .algorithm, .String],
-    setUpFunction: { blackHole(unicodeWords) }),
+  BenchmarkInfo(name: "SortStringsUnicode",
+    runFunction: run_SortStringsUnicode, tags: t,
+    setUpFunction: { blackHole(unicodeWords) }, legacyFactor: 5),
 ]
 
 let sortedWords = words.sorted()
@@ -2050,7 +2054,7 @@ var unicodeWords: [String] = [
   ]
 
 public func run_SortStringsUnicode(_ N: Int) {
-  for _ in 1...5*N {
+  for _ in 1...N {
     benchSortStrings(unicodeWords)
   }
 }

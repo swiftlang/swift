@@ -876,6 +876,7 @@ private:
       // non-whole-module generation.
       sil = performSILGeneration(*M->getFiles().front(), CI.getSILOptions());
       runSILDiagnosticPasses(*sil);
+      runSILOwnershipEliminatorPass(*sil);
       runSILLoweringPasses(*sil);
     }
 

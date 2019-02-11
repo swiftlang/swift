@@ -946,7 +946,6 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   switch (I->getKind()) {
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::StrongReleaseInst:
-  case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::ReleaseValueInst:
@@ -960,7 +959,12 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
 static bool useHasTransitiveOwnership(const SILInstruction *I) {
   // convert_escape_to_noescape is used to convert to a @noescape function type.
   // It does not change ownership of the function value.
-  return isa<ConvertEscapeToNoEscapeInst>(I);
+  if (isa<ConvertEscapeToNoEscapeInst>(I))
+    return true;
+
+  // Look through copy_value. It is inert for our purposes, but we need to look
+  // through it.
+  return isa<CopyValueInst>(I);
 }
 
 static SILValue createLifetimeExtendedAllocStack(

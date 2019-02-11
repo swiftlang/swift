@@ -365,17 +365,13 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
                                         "mangling type for debugger", Ty);
 
   DWARFMangling = true;
+  OptimizeProtocolNames = false;
   beginMangling();
   
   if (DC)
     bindGenericParameters(DC);
 
-  if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
-    appendFunction(fnType, false);
-  } else {
-    appendType(Ty);
-  }
-
+  appendType(Ty);
   appendOperator("D");
   return finalize();
 }
@@ -468,6 +464,20 @@ std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
   return finalize();
 }
 
+std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
+  DWARFMangling = true;
+  beginMangling();
+  
+  if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
+    appendFunction(fnType, false);
+  } else {
+    appendType(Ty);
+  }
+
+  appendOperator("D");
+  return finalize();
+}
+
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
   beginManglingWithoutPrefix();
@@ -506,6 +516,22 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   return finalize();
 }
 
+std::string ASTMangler::mangleLocalTypeDecl(const TypeDecl *type) {
+  beginManglingWithoutPrefix();
+  AllowNamelessEntities = true;
+  OptimizeProtocolNames = false;
+
+  if (auto GTD = dyn_cast<GenericTypeDecl>(type)) {
+    appendAnyGenericType(GTD);
+  } else {
+    assert(isa<AssociatedTypeDecl>(type));
+    appendContextOf(type);
+    appendDeclName(type);
+    appendOperator("Qa");
+  }
+
+  return finalize();
+}
 
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
@@ -737,7 +763,7 @@ void ASTMangler::appendType(Type type) {
 
       if (aliasTy->getSubstitutionMap().hasAnySubstitutableParams()) {
         // Try to mangle the entire name as a substitution.
-        if (tryMangleSubstitution(tybase))
+        if (tryMangleTypeSubstitution(tybase))
           return;
 
         appendAnyGenericType(decl);
@@ -745,7 +771,7 @@ void ASTMangler::appendType(Type type) {
         appendBoundGenericArgs(type, isFirstArgList);
         appendRetroactiveConformances(type);
         appendOperator("G");
-        addSubstitution(type.getPointer());
+        addTypeSubstitution(type);
         return;
       }
 
@@ -840,7 +866,7 @@ void ASTMangler::appendType(Type type) {
         Decl = type->getAnyGeneric();
       if (shouldMangleAsGeneric(type)) {
         // Try to mangle the entire name as a substitution.
-        if (tryMangleSubstitution(tybase))
+        if (tryMangleTypeSubstitution(tybase))
           return;
 
         if (isStdlibType(Decl) && Decl->getName().str() == "Optional") {
@@ -855,7 +881,7 @@ void ASTMangler::appendType(Type type) {
           appendRetroactiveConformances(type);
           appendOperator("G");
         }
-        addSubstitution(type.getPointer());
+        addTypeSubstitution(type);
         return;
       }
       appendAnyGenericType(type->getAnyGeneric());
@@ -901,7 +927,7 @@ void ASTMangler::appendType(Type type) {
 
     case TypeKind::DependentMember: {
       auto *DepTy = cast<DependentMemberType>(tybase);
-      if (tryMangleSubstitution(DepTy))
+      if (tryMangleTypeSubstitution(DepTy))
         return;
 
       bool isAssocTypeAtDepth = false;
@@ -920,7 +946,7 @@ void ASTMangler::appendType(Type type) {
         appendAssociatedTypeName(DepTy);
         appendOperator("qa");
       }
-      addSubstitution(DepTy);
+      addTypeSubstitution(DepTy);
       return;
     }
       
@@ -1633,7 +1659,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   }
 
   // Try to mangle the entire name as a substitution.
-  if (tryMangleSubstitution(key.getPointer()))
+  if (tryMangleTypeSubstitution(key))
     return;
   
   // Try to mangle a symbolic reference for a nominal type.
@@ -1642,7 +1668,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     if (nominal && (!CanSymbolicReference || CanSymbolicReference(nominal))) {
       appendSymbolicReference(nominal);
       // Substitutions can refer back to the symbolic reference.
-      addSubstitution(key.getPointer());
+      addTypeSubstitution(key);
       return;
     }
   }
@@ -1705,7 +1731,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     }
   }
 
-  addSubstitution(key.getPointer());
+  addTypeSubstitution(key);
 }
 
 void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
@@ -1941,7 +1967,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
 
   if (auto *DT = FirstTy->getAs<DependentMemberType>()) {
     bool isAssocTypeAtDepth = false;
-    if (tryMangleSubstitution(DT)) {
+    if (tryMangleTypeSubstitution(DT)) {
       switch (reqt.getKind()) {
         case RequirementKind::Conformance:
           return appendOperator("RQ");
@@ -1957,7 +1983,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
       llvm_unreachable("bad requirement type");
     }
     GenericTypeParamType *gpBase = appendAssocType(DT, isAssocTypeAtDepth);
-    addSubstitution(DT);
+    addTypeSubstitution(DT);
     assert(gpBase);
     switch (reqt.getKind()) {
       case RequirementKind::Conformance:
@@ -2043,24 +2069,54 @@ void ASTMangler::appendGenericSignatureParts(
   appendOperator("r", StringRef(OpStorage.data(), OpStorage.size()));
 }
 
+// If the base type is known to have a single protocol conformance
+// in the current generic context, then we don't need to disambiguate the
+// associated type name by protocol.
+DependentMemberType *
+ASTMangler::dropProtocolFromAssociatedType(DependentMemberType *dmt) {
+  auto baseTy = dmt->getBase();
+  bool unambiguous = (!dmt->getAssocType() ||
+                      CurGenericSignature->getConformsTo(baseTy).size() <= 1);
+
+  if (auto *baseDMT = baseTy->getAs<DependentMemberType>())
+    baseTy = dropProtocolFromAssociatedType(baseDMT);
+
+  if (unambiguous)
+    return DependentMemberType::get(baseTy, dmt->getName());
+
+  return DependentMemberType::get(baseTy, dmt->getAssocType());
+}
+
+Type
+ASTMangler::dropProtocolsFromAssociatedTypes(Type type) {
+  if (!OptimizeProtocolNames || !CurGenericSignature)
+    return type;
+
+  if (!type->hasDependentMember())
+    return type;
+
+  return type.transform([&](Type t) -> Type {
+    if (auto *dmt = dyn_cast<DependentMemberType>(t.getPointer()))
+      return dropProtocolFromAssociatedType(dmt);
+    return t;
+  });
+}
+
 void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
-  auto assocTy = dmt->getAssocType();
+  if (auto assocTy = dmt->getAssocType()) {
+    appendIdentifier(assocTy->getName().str());
 
-  // If the base type is known to have a single protocol conformance
-  // in the current generic context, then we don't need to disambiguate the
-  // associated type name by protocol.
-  // This can result in getting the same mangled string for different
-  // DependentMemberTypes. This is not a problem but re-mangling might do more
-  // aggressive substitutions, which means that the re-mangled name may differ
-  // from the original mangled name.
-  // FIXME: We ought to be able to get to the generic signature from a
-  // dependent type, but can't yet. Shouldn't need this side channel.
-
-  appendIdentifier(assocTy->getName().str());
-  if (!OptimizeProtocolNames || !CurGenericSignature
-      || CurGenericSignature->getConformsTo(dmt->getBase()).size() > 1) {
-    appendAnyGenericType(assocTy->getProtocol());
+    // If the base type is known to have a single protocol conformance
+    // in the current generic context, then we don't need to disambiguate the
+    // associated type name by protocol.
+    if (!OptimizeProtocolNames || !CurGenericSignature
+        || CurGenericSignature->getConformsTo(dmt->getBase()).size() > 1) {
+      appendAnyGenericType(assocTy->getProtocol());
+    }
+    return;
   }
+
+  appendIdentifier(dmt->getName().str());
 }
 
 void ASTMangler::appendClosureEntity(
@@ -2174,11 +2230,13 @@ bool ASTMangler::tryAppendStandardSubstitution(const GenericTypeDecl *decl) {
   if (!isStdlibType(decl))
     return false;
 
-  if (char Subst = getStandardTypeSubst(decl->getName().str())) {
-    if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
-      appendOperator("S", StringRef(&Subst, 1));
+  if (isa<NominalTypeDecl>(decl)) {
+    if (char Subst = getStandardTypeSubst(decl->getName().str())) {
+      if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
+        appendOperator("S", StringRef(&Subst, 1));
+      }
+      return true;
     }
-    return true;
   }
   return false;
 }

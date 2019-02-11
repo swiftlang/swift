@@ -1,11 +1,13 @@
 // RUN: %target-typecheck-verify-swift
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
-import Glibc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
 #elseif os(Windows)
-import MSVCRT
+  import MSVCRT
+#else
+#error("Unsupported platform")
 #endif
 
 _ = M_PI // expected-warning {{is deprecated}}

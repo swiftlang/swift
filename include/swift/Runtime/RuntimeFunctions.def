@@ -780,7 +780,6 @@ FUNCTION(RelocateClassMetadata,
          ARGS(TypeContextDescriptorPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
-// struct FieldInfo { size_t Size; size_t AlignMask; };
 // void swift_initClassMetadata(Metadata *self,
 //                              ClassLayoutFlags flags,
 //                              size_t numFields,
@@ -794,7 +793,6 @@ FUNCTION(InitClassMetadata,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
-// struct FieldInfo { size_t Size; size_t AlignMask; };
 // void swift_updateClassMetadata(Metadata *self,
 //                                ClassLayoutFlags flags,
 //                                size_t numFields,
@@ -803,6 +801,32 @@ FUNCTION(InitClassMetadata,
 FUNCTION(UpdateClassMetadata,
          swift_updateClassMetadata, C_CC,
          RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
+              Int8PtrPtrTy->getPointerTo(),
+              SizeTy->getPointerTo()),
+         ATTRS(NoUnwind))
+
+// MetadataDependency swift_initClassMetadata2(Metadata *self,
+//                                             ClassLayoutFlags flags,
+//                                             size_t numFields,
+//                                             TypeLayout * const *fieldTypes,
+//                                             size_t *fieldOffsets);
+FUNCTION(InitClassMetadata2,
+         swift_initClassMetadata2, SwiftCC,
+         RETURNS(TypeMetadataDependencyTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
+              Int8PtrPtrTy->getPointerTo(),
+              SizeTy->getPointerTo()),
+         ATTRS(NoUnwind))
+
+// MetadataDependency swift_updateClassMetadata2(Metadata *self,
+//                                               ClassLayoutFlags flags,
+//                                               size_t numFields,
+//                                               TypeLayout * const *fieldTypes,
+//                                               size_t *fieldOffsets);
+FUNCTION(UpdateClassMetadata2,
+         swift_updateClassMetadata2, SwiftCC,
+         RETURNS(TypeMetadataDependencyTy),
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),

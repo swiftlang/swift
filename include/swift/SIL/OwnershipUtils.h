@@ -67,6 +67,63 @@ struct ErrorBehaviorKind {
 
 } // end namespace ownership
 
+class LinearLifetimeError {
+  ownership::ErrorBehaviorKind errorBehavior;
+  bool foundUseAfterFree = false;
+  bool foundLeak = false;
+  bool foundOverConsume = false;
+
+public:
+  LinearLifetimeError(ownership::ErrorBehaviorKind errorBehavior)
+      : errorBehavior(errorBehavior) {}
+
+  bool getFoundError() const {
+    return foundUseAfterFree || foundLeak || foundOverConsume;
+  }
+
+  bool getFoundLeak() const { return foundLeak; }
+
+  bool getFoundUseAfterFree() const { return foundUseAfterFree; }
+
+  bool getFoundOverConsume() const { return foundOverConsume; }
+
+  void handleLeak(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundLeak = true;
+
+    if (errorBehavior.shouldPrintMessage())
+      messagePrinterFunc();
+
+    if (errorBehavior.shouldReturnFalseOnLeak())
+      return;
+
+    // We already printed out our error if we needed to, so don't pass it along.
+    handleError([]() {});
+  }
+
+  void handleOverConsume(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundOverConsume = true;
+    handleError(std::move(messagePrinterFunc));
+  }
+
+  void handleUseAfterFree(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundUseAfterFree = true;
+    handleError(std::move(messagePrinterFunc));
+  }
+
+private:
+  void handleError(llvm::function_ref<void()> &&messagePrinterFunc) {
+    if (errorBehavior.shouldPrintMessage())
+      messagePrinterFunc();
+
+    if (errorBehavior.shouldReturnFalse()) {
+      return;
+    }
+
+    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
+    llvm_unreachable("triggering standard assertion failure routine");
+  }
+};
+
 /// Returns true if:
 ///
 /// 1. No consuming uses are reachable from any other consuming use, from any
@@ -82,7 +139,7 @@ struct ErrorBehaviorKind {
 /// error.
 /// \p leakingBlocks If non-null a list of blocks where the value was detected
 /// to leak. Can be used to insert missing destroys.
-bool valueHasLinearLifetime(
+LinearLifetimeError valueHasLinearLifetime(
     SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
     ArrayRef<BranchPropagatedUser> nonConsumingUses,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
@@ -105,6 +162,8 @@ bool isOwnershipForwardingInst(SILInstruction *i);
 
 bool isGuaranteedForwardingInst(SILInstruction *i);
 
+/// Look up through the def-use chain of \p inputValue, recording any "borrow"
+/// introducers that we find into \p out.
 bool getUnderlyingBorrowIntroducers(SILValue inputValue,
                                     SmallVectorImpl<SILValue> &out);
 
