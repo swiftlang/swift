@@ -86,6 +86,26 @@ struct delete_with_free {
   }
 };
 
+/// A structure representing an opened existential type.
+struct RemoteExistential {
+  /// The payload's concrete type metadata.
+  RemoteAddress MetadataAddress;
+
+  /// The address of the payload value.
+  RemoteAddress PayloadAddress;
+
+  /// True if this is an NSError instance transparently bridged to an Error
+  /// existential.
+  bool IsBridgedError;
+
+  RemoteExistential(RemoteAddress MetadataAddress,
+                    RemoteAddress PayloadAddress,
+                    bool IsBridgedError=false)
+    : MetadataAddress(MetadataAddress),
+      PayloadAddress(PayloadAddress),
+      IsBridgedError(IsBridgedError) {}
+};
+
 /// A generic reader of metadata.
 ///
 /// BuilderType must implement a particular interface which is currently
@@ -330,7 +350,7 @@ public:
   /// pointer to its metadata address, its value address, and whether this
   /// is a toll-free-bridged NSError or an actual Error existential wrapper
   /// around a native Swift value.
-  Optional<std::tuple<RemoteAddress, RemoteAddress, bool>>
+  Optional<RemoteExistential>
   readMetadataAndValueErrorExistential(RemoteAddress ExistentialAddress) {
     // An pointer to an error existential is always an heap object.
     auto MetadataAddress =
@@ -363,10 +383,9 @@ public:
 
     if (isBridged) {
       // NSError instances don't need to be unwrapped.
-      return Optional<std::tuple<RemoteAddress, RemoteAddress, bool>>(
-          {RemoteAddress(*MetadataAddress),
-          ExistentialAddress,
-          isBridged});
+      return RemoteExistential(RemoteAddress(*MetadataAddress),
+                               ExistentialAddress,
+                               isBridged);
     }
 
     // In addition to the isa pointer and two 32-bit reference counts, if the
@@ -400,15 +419,15 @@ public:
     auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
     InstanceAddress += Offset;
 
-    return Optional<std::tuple<RemoteAddress, RemoteAddress, bool>>(
-        {RemoteAddress(*InstanceMetadataAddress),
-         RemoteAddress(InstanceAddress),
-         isBridged});
+    return RemoteExistential(
+        RemoteAddress(*InstanceMetadataAddress),
+        RemoteAddress(InstanceAddress),
+        isBridged);
   }
 
   /// Given a known-opaque existential, attemp to discover the pointer to its
   /// metadata address and its value.
-  Optional<std::pair<RemoteAddress, RemoteAddress>>
+  Optional<RemoteExistential>
   readMetadataAndValueOpaqueExistential(RemoteAddress ExistentialAddress) {
     // OpaqueExistentialContainer is the layout of an opaque existential.
     // `Type` is the pointer to the metadata.
@@ -428,8 +447,8 @@ public:
     // Inline representation (the value fits in the existential container).
     // So, the value starts at the first word of the container.
     if (VWT->isValueInline())
-      return Optional<std::pair<RemoteAddress, RemoteAddress>>(
-          {RemoteAddress(MetadataAddress), ExistentialAddress});
+      return RemoteExistential(RemoteAddress(MetadataAddress),
+                               ExistentialAddress);
 
     // Non-inline (box'ed) representation.
     // The first word of the container stores the address to the box.
@@ -440,8 +459,8 @@ public:
     auto AlignmentMask = VWT->getAlignmentMask();
     auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
     auto StartOfValue = BoxAddress + Offset;
-    return Optional<std::pair<RemoteAddress, RemoteAddress>>(
-        {RemoteAddress(MetadataAddress), RemoteAddress(StartOfValue)});
+    return RemoteExistential(RemoteAddress(MetadataAddress),
+                             RemoteAddress(StartOfValue));
   }
 
   /// Read a protocol from a reference to said protocol.
