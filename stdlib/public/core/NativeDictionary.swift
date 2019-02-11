@@ -37,7 +37,11 @@ internal struct _NativeDictionary<Key: Hashable, Value> {
 
   @inlinable
   internal init(capacity: Int) {
-    self._storage = _DictionaryStorage<Key, Value>.allocate(capacity: capacity)
+    if capacity == 0 {
+      self._storage = __RawDictionaryStorage.empty
+    } else {
+      self._storage = _DictionaryStorage<Key, Value>.allocate(capacity: capacity)
+    }
   }
 
 #if _runtime(_ObjC)
