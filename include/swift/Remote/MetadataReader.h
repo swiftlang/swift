@@ -327,8 +327,10 @@ public:
   }
 
   /// Given a pointer to a known-error existential, attempt to discover the
-  /// pointer to its metadata address and its value address.
-  Optional<std::pair<RemoteAddress, RemoteAddress>>
+  /// pointer to its metadata address, its value address, and whether this
+  /// is a toll-free-bridged NSError or an actual Error existential wrapper
+  /// around a native Swift value.
+  Optional<std::tuple<RemoteAddress, RemoteAddress, bool>>
   readMetadataAndValueErrorExistential(RemoteAddress ExistentialAddress) {
     // An pointer to an error existential is always an heap object.
     auto MetadataAddress =
@@ -337,6 +339,7 @@ public:
       return None;
 
     bool isObjC = false;
+    bool isBridged = false;
 
     // If we can determine the Objective-C class name, this is probably an
     // error existential with NSError-compatible layout.
@@ -344,6 +347,8 @@ public:
     if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
       if (ObjCClassName == "__SwiftNativeNSError")
         isObjC = true;
+      else
+        isBridged = true;
     } else {
       // Otherwise, we can check to see if this is a class metadata with the
       // kind value's least significant bit set, which indicates a pure
@@ -354,6 +359,14 @@ public:
         return None;
 
       isObjC = ClassMeta->isPureObjC();
+    }
+
+    if (isBridged) {
+      // NSError instances don't need to be unwrapped.
+      return Optional<std::tuple<RemoteAddress, RemoteAddress, bool>>(
+          {RemoteAddress(*MetadataAddress),
+          ExistentialAddress,
+          isBridged});
     }
 
     // In addition to the isa pointer and two 32-bit reference counts, if the
@@ -387,9 +400,10 @@ public:
     auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
     InstanceAddress += Offset;
 
-    return Optional<std::pair<RemoteAddress, RemoteAddress>>(
+    return Optional<std::tuple<RemoteAddress, RemoteAddress, bool>>(
         {RemoteAddress(*InstanceMetadataAddress),
-         RemoteAddress(InstanceAddress)});
+         RemoteAddress(InstanceAddress),
+         isBridged});
   }
 
   /// Given a known-opaque existential, attemp to discover the pointer to its
