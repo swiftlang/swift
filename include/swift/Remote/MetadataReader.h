@@ -496,28 +496,8 @@ public:
     if (!Meta) return BuiltType();
 
     switch (Meta->getKind()) {
-    case MetadataKind::Class: {
-      auto classMeta = cast<TargetClassMetadata<Runtime>>(Meta);
-      if (!classMeta->isTypeMetadata()) {
-        std::string className;
-        if (!readObjCClassName(MetadataAddress, className))
-          return BuiltType();
-
-        BuiltType BuiltObjCClass = Builder.createObjCClassType(std::move(className));
-        if (!BuiltObjCClass) {
-          // Try the superclass.
-          if (!classMeta->Superclass)
-            return BuiltType();
-
-          BuiltObjCClass = readTypeFromMetadata(classMeta->Superclass,
-                                                skipArtificialSubclasses);
-        }
-
-        TypeCache[MetadataAddress] = BuiltObjCClass;
-        return BuiltObjCClass;
-      }
-      return readNominalTypeFromMetadata(Meta, skipArtificialSubclasses);
-    }
+    case MetadataKind::Class:
+      return readNominalTypeFromClassMetadata(Meta, skipArtificialSubclasses);
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
@@ -2281,6 +2261,30 @@ private:
     }
 
     return nominal;
+  }
+
+  BuiltType readNominalTypeFromClassMetadata(MetadataRef origMetadata,
+                                       bool skipArtificialSubclasses = false) {
+    auto classMeta = cast<TargetClassMetadata<Runtime>>(origMetadata);
+    if (classMeta->isTypeMetadata())
+      return readNominalTypeFromMetadata(origMetadata, skipArtificialSubclasses);
+
+    std::string className;
+    if (!readObjCClassName(origMetadata.getAddress(), className))
+      return BuiltType();
+
+    BuiltType BuiltObjCClass = Builder.createObjCClassType(std::move(className));
+    if (!BuiltObjCClass) {
+      // Try the superclass.
+      if (!classMeta->Superclass)
+        return BuiltType();
+
+      BuiltObjCClass = readTypeFromMetadata(classMeta->Superclass,
+                                            skipArtificialSubclasses);
+    }
+
+    TypeCache[origMetadata.getAddress()] = BuiltObjCClass;
+    return BuiltObjCClass;
   }
 
   /// Given that the remote process is running the non-fragile Apple runtime,
