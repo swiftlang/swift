@@ -42,7 +42,7 @@ extension NonConditional {
 
 struct Conditional<T> {}
 extension Conditional: ContainsMinMax where T: ContainsMinMax {}
-extension Conditional: ContainsFoo where T: ContainsFoo {}
+extension Conditional: ContainsFoo where T: ContainsFoo {} // expected-note {{requirement from conditional conformance of 'Conditional<T>' to 'ContainsFoo'}}
 
 extension Conditional {
     func f() {
@@ -53,6 +53,6 @@ extension Conditional {
         // expected-warning@-1{{use of 'min' as reference to global function in module 'Swift' will change in future versions of Swift to reference instance method in generic struct 'Conditional' which comes via a conditional conformance}}
         // expected-note@-2{{use 'Swift.' to continue to reference the global function}}
         _ = foo(5, 6)
-        // expected-error@-1{{type 'T' does not conform to protocol 'ContainsFoo'}}
+        // expected-error@-1{{referencing instance method 'foo()' on 'Conditional' requires that 'T' conform to 'ContainsFoo'}}
     }
 }

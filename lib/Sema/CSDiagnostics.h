@@ -172,6 +172,9 @@ protected:
   /// to diagnose failures related to arguments.
   const ApplyExpr *Apply = nullptr;
 
+  /// If this failure associated with one of the conditional requirements.
+  bool IsConditional = false;
+
 public:
   RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
                      ConstraintLocator *locator)
@@ -183,8 +186,11 @@ public:
     assert(!path.empty());
 
     auto &last = path.back();
-    assert(last.getKind() == ConstraintLocator::TypeParameterRequirement);
+    assert(last.isTypeParameterRequirement() ||
+           last.isConditionalRequirement());
     assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+
+    IsConditional = last.isConditionalRequirement();
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -199,7 +205,8 @@ public:
     assert(!path.empty());
 
     auto &requirementLoc = path.back();
-    assert(requirementLoc.getKind() == PathEltKind::TypeParameterRequirement);
+    assert(requirementLoc.isTypeParameterRequirement() ||
+           requirementLoc.isConditionalRequirement());
     return requirementLoc.getValue();
   }
 
@@ -219,6 +226,13 @@ public:
   bool diagnoseAsNote() override;
 
 protected:
+  /// Determine whether this is a conditional requirement failure.
+  bool isConditional() const { return IsConditional; }
+
+  /// If this is a failure in condition requirement, retrieve
+  /// conformance information.
+  ProtocolConformanceRef getConformanceRef() const;
+
   /// Retrieve declaration contextual where current
   /// requirement has been introduced.
   const DeclContext *getRequirementDC() const;
@@ -230,6 +244,13 @@ protected:
   /// Determine whether it would be possible to diagnose
   /// current requirement failure.
   bool canDiagnoseFailure() const {
+    // If this is a conditional requirement failure,
+    // we have a lot more information compared to
+    // type requirement case, because we know that
+    // underlying conformance requirement matched.
+    if (isConditional())
+      return true;
+
     // For static/initializer calls there is going to be
     // a separate fix, attached to the argument, which is
     // much easier to diagnose.
@@ -247,7 +268,11 @@ private:
   /// Retrieve declaration associated with failing generic requirement.
   ValueDecl *getDeclRef() const;
 
-  void emitRequirementNote(const Decl *anchor) const;
+  void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
+
+  /// Determine whether given declaration represents a static
+  /// or instance property/method, excluding operators.
+  static bool isStaticOrInstanceMember(const ValueDecl *decl);
 };
 
 /// Diagnostics for failed conformance checks originating from

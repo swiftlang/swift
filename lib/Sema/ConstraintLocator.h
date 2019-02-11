@@ -162,10 +162,10 @@ public:
     case NamedTupleElement:
     case TupleElement:
     case KeyPathComponent:
-    case ConditionalRequirement:
       return 1;
 
     case TypeParameterRequirement:
+    case ConditionalRequirement:
     case ApplyArgToParam:
       return 2;
     }
@@ -340,8 +340,10 @@ public:
     }
 
     /// Get a path element for a conditional requirement.
-    static PathElement getConditionalRequirementComponent(unsigned index) {
-      return PathElement(ConditionalRequirement, index);
+    static PathElement
+    getConditionalRequirementComponent(unsigned index, RequirementKind kind) {
+      return PathElement(ConditionalRequirement, index,
+                         static_cast<unsigned>(kind));
     }
 
     static PathElement getTypeRequirementComponent(unsigned index,
@@ -418,6 +420,14 @@ public:
     /// Return the summary flags for this particular element.
     unsigned getNewSummaryFlags() const {
       return getSummaryFlagsForPathElement(getKind());
+    }
+
+    bool isTypeParameterRequirement() const {
+      return getKind() == PathElementKind::TypeParameterRequirement;
+    }
+
+    bool isConditionalRequirement() const {
+      return getKind() == PathElementKind::ConditionalRequirement;
     }
   };
 
