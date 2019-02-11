@@ -3381,20 +3381,17 @@ public:
                 CBI->getCastType(),
             "success dest block argument of checked_cast_br must match type of "
             "cast");
-    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
-            "failure dest of checked_cast_br in unqualified ownership sil must "
-            "take no arguments");
-#if 0
-    require(F.hasUnqualifiedOwnership() ||
-                CBI->getFailureBB()->args_size() == 1,
+    require(!F.hasOwnership() || CBI->getFailureBB()->args_size() == 1,
             "failure dest of checked_cast_br must take one argument in "
             "ownership qualified sil");
-    require(F.hasUnqualifiedOwnership() ||
+    require(!F.hasOwnership() ||
                 CBI->getFailureBB()->args_begin()[0]->getType() ==
                     CBI->getOperand()->getType(),
             "failure dest block argument must match type of original type in "
             "ownership qualified sil");
-#endif
+    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
+            "Failure dest of checked_cast_br must not take any argument in "
+            "non-ownership qualified sil");
   }
 
   void checkCheckedCastValueBranchInst(CheckedCastValueBranchInst *CBI) {
