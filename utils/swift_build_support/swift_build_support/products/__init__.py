@@ -21,9 +21,9 @@ from .lldb import LLDB
 from .llvm import LLVM
 from .ninja import Ninja
 from .skstresstester import SKStressTester
-from .swiftevolve import SwiftEvolve
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
+from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .xctest import XCTest
