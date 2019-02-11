@@ -36,7 +36,11 @@ internal struct _NativeSet<Element: Hashable> {
 
   @inlinable
   internal init(capacity: Int) {
-    self._storage = _SetStorage<Element>.allocate(capacity: capacity)
+    if capacity == 0 {
+      self._storage = __RawSetStorage.empty
+    } else {
+      self._storage = _SetStorage<Element>.allocate(capacity: capacity)
+    }
   }
 
 #if _runtime(_ObjC)
