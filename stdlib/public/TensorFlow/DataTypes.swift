@@ -74,7 +74,7 @@ public typealias TensorFlowNumeric = TensorFlowScalar & Numeric
 public typealias TensorFlowSignedNumeric = TensorFlowScalar & SignedNumeric
 public typealias TensorFlowInteger = TensorFlowScalar & BinaryInteger
 public typealias TensorFlowFloatingPoint
-  = TensorFlowScalar & FloatingPoint & Differentiable
+  = TensorFlowScalar & BinaryFloatingPoint & Differentiable
 
 // This is the implementation of the _getScalarOrDie requirement for each
 // concrete type below.  We use this round-about approach to implement the
