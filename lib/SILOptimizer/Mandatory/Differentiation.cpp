@@ -68,12 +68,6 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
-/// Returns true if the module we are compiling is in an LLDB REPL.
-static bool isInLLDBREPL(SILModule &module) {
-  // TODO(SR-9704): Use a more prinicpled way to do this check.
-  return module.getSwiftModule()->getNameStr().startswith("__lldb_expr_");
-}
-
 /// Creates arguments in the entry block based on the function type.
 static void createEntryArguments(SILFunction *f) {
   auto *entry = f->getEntryBlock();
@@ -1796,15 +1790,10 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
         context.lookUpMinimalDifferentiationTask(originalFn, desiredIndices);
     if (!task) {
       if (originalFn->isExternalDeclaration()) {
-        // For LLDB REPL, we should attempt to load the function as
-        // this may be defined in a different cell.
-        if (isInLLDBREPL(*original->getModule()))
-          original->getModule()->loadFunction(originalFn);
-        // If we still don't have the definition, generate an error message.
-        if (originalFn->isExternalDeclaration()) {
+        if (!originalFn->isDefinition()) {
           context.emitNondifferentiabilityError(
-              original, parentTask,
-              diag::autodiff_external_nondifferentiable_function);
+            original, parentTask,
+            diag::autodiff_external_nondifferentiable_function);
           return None;
         }
       }
@@ -1855,14 +1844,11 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
       auto *task =
           context.lookUpMinimalDifferentiationTask(initialFn, desiredIndices);
       if (!task) {
-        if (initialFn->isExternalDeclaration()) {
-          if (isInLLDBREPL(*original->getModule()))
-            original->getModule()->loadFunction(initialFn);
-          if (initialFn->isExternalDeclaration()) {
-            context.emitNondifferentiabilityError(original, parentTask,
-                diag::autodiff_global_let_closure_not_differentiable);
-            return None;
-          }
+        if (!initialFn->isDefinition()) {
+          context.emitNondifferentiabilityError(
+              original, parentTask,
+              diag::autodiff_global_let_closure_not_differentiable);
+          return None;
         }
         task = context.registerDifferentiationTask(
             initialFn, desiredIndices, invoker);
