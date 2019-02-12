@@ -117,35 +117,35 @@ public:
 
   /// Complete the whole expression.  This is a fallback that should
   /// produce results when more specific completion methods failed.
-  virtual void completeExpr() = 0;
+  virtual void completeExpr() {};
 
   /// Complete expr-dot after we have consumed the dot.
-  virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) = 0;
+  virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) {};
 
   /// Complete the beginning of a statement or expression.
-  virtual void completeStmtOrExpr() = 0;
+  virtual void completeStmtOrExpr() {};
 
   /// Complete the beginning of expr-postfix -- no tokens provided
   /// by user.
-  virtual void completePostfixExprBeginning(CodeCompletionExpr *E) = 0;
+  virtual void completePostfixExprBeginning(CodeCompletionExpr *E) {};
 
   /// Complete the beginning of expr-postfix in a for-each loop sequqence
   /// -- no tokens provided by user.
-  virtual void completeForEachSequenceBeginning(CodeCompletionExpr *E) = 0;
+  virtual void completeForEachSequenceBeginning(CodeCompletionExpr *E) {};
 
   /// Complete a given expr-postfix.
-  virtual void completePostfixExpr(Expr *E, bool hasSpace) = 0;
+  virtual void completePostfixExpr(Expr *E, bool hasSpace) {};
 
   /// Complete a given expr-postfix, given that there is a following
   /// left parenthesis.
-  virtual void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) = 0;
+  virtual void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) {};
 
   /// Complete expr-super after we have consumed the 'super' keyword.
-  virtual void completeExprSuper(SuperRefExpr *SRE) = 0;
+  virtual void completeExprSuper(SuperRefExpr *SRE) {};
 
   /// Complete expr-super after we have consumed the 'super' keyword and
   /// a dot.
-  virtual void completeExprSuperDot(SuperRefExpr *SRE) = 0;
+  virtual void completeExprSuperDot(SuperRefExpr *SRE) {};
 
   /// Complete the argument to an Objective-C #keyPath
   /// expression.
@@ -153,59 +153,59 @@ public:
   /// \param KPE A partial #keyPath expression that can be used to
   /// provide context. This will be \c NULL if no components of the
   /// #keyPath argument have been parsed yet.
-  virtual void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) = 0;
+  virtual void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) {};
 
   /// Complete the beginning of type-simple -- no tokens provided
   /// by user.
-  virtual void completeTypeSimpleBeginning() = 0;
+  virtual void completeTypeSimpleBeginning() {};
 
   /// Complete a given type-identifier after we have consumed the dot.
-  virtual void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) = 0;
+  virtual void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) {};
 
   /// Complete a given type-identifier when there is no trailing dot.
-  virtual void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) = 0;
+  virtual void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) {};
 
   /// Complete at the beginning of a case stmt pattern.
-  virtual void completeCaseStmtBeginning() = 0;
+  virtual void completeCaseStmtBeginning() {};
 
   /// Complete a case stmt pattern that starts with a dot.
-  virtual void completeCaseStmtDotPrefix() = 0;
+  virtual void completeCaseStmtDotPrefix() {};
 
   /// Complete at the beginning of member of a nominal decl member -- no tokens
   /// provided by user.
   virtual void completeNominalMemberBeginning(
-      SmallVectorImpl<StringRef> &Keywords) = 0;
+      SmallVectorImpl<StringRef> &Keywords) {};
 
   /// Complete at the beginning of accessor in a accessor block.
-  virtual void completeAccessorBeginning() = 0;
+  virtual void completeAccessorBeginning() {};
 
   /// Complete the keyword in attribute, for instance, @available.
-  virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) = 0;
+  virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) {};
 
   /// Complete the parameters in attribute, for instance, version specifier for
   /// @available.
-  virtual void completeDeclAttrParam(DeclAttrKind DK, int Index) = 0;
+  virtual void completeDeclAttrParam(DeclAttrKind DK, int Index) {};
 
   /// Complete within a precedence group decl or after a colon in an
   /// operator decl.
-  virtual void completeInPrecedenceGroup(SyntaxKind SK) = 0;
+  virtual void completeInPrecedenceGroup(SyntaxKind SK) {};
 
   /// Complete the platform names inside #available statements.
-  virtual void completePoundAvailablePlatform() = 0;
+  virtual void completePoundAvailablePlatform() {};
 
   /// Complete the import decl with importable modules.
   virtual void
-  completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) = 0;
+  completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) {};
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
-                                        SourceLoc DotLoc) = 0;
+                                        SourceLoc DotLoc) {};
 
-  virtual void completeAssignmentRHS(AssignExpr *E) = 0;
+  virtual void completeAssignmentRHS(AssignExpr *E) {};
 
-  virtual void completeCallArg(CodeCompletionExpr *E) = 0;
+  virtual void completeCallArg(CodeCompletionExpr *E) {};
 
-  virtual void completeReturnStmt(CodeCompletionExpr *E) = 0;
+  virtual void completeReturnStmt(CodeCompletionExpr *E) {};
 
   /// Complete a yield statement.  A missing yield index means that the
   /// completion immediately follows the 'yield' keyword; it may be either
@@ -213,18 +213,18 @@ public:
   /// index means that the completion is within the parentheses and is
   /// for a specific yield value.
   virtual void completeYieldStmt(CodeCompletionExpr *E,
-                                 Optional<unsigned> yieldIndex) = 0;
+                                 Optional<unsigned> yieldIndex) {};
 
   virtual void completeAfterPoundExpr(CodeCompletionExpr *E,
-                                      Optional<StmtKind> ParentKind) = 0;
+                                      Optional<StmtKind> ParentKind) {};
 
-  virtual void completeAfterPoundDirective() = 0;
+  virtual void completeAfterPoundDirective() {};
 
-  virtual void completePlatformCondition() = 0;
+  virtual void completePlatformCondition() {};
 
-  virtual void completeAfterIfStmt(bool hasElse) = 0;
+  virtual void completeAfterIfStmt(bool hasElse) {};
 
-  virtual void completeGenericParams(TypeLoc TL) = 0;
+  virtual void completeGenericParams(TypeLoc TL) {};
 
   /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

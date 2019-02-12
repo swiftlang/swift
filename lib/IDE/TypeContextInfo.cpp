@@ -35,45 +35,10 @@ public:
   ContextInfoCallbacks(Parser &P, TypeContextInfoConsumer &Consumer)
       : CodeCompletionCallbacks(P), Consumer(Consumer) {}
 
-  void completeExpr() override{};
-
-  // Ignore callbacks for suffix completions
-  // {
-  void completeDotExpr(Expr *E, SourceLoc DotLoc) override {};
-  void completePostfixExpr(Expr *E, bool hasSpace) override {};
-  void completeExprSuper(SuperRefExpr *SRE) override {};
-  void completeExprSuperDot(SuperRefExpr *SRE) override {};
-  // }
-
-  // Ignore non-expression callbacks.
-  // {
-  void completeInPrecedenceGroup(SyntaxKind SK) override {};
-  void completePoundAvailablePlatform() override {};
-  void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override {}
-  void completeTypeSimpleBeginning() override {}
-  void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override {}
-  void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override {}
-  void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override {}
-  void completeDeclAttrParam(DeclAttrKind DK, int Index) override {}
-  void completeNominalMemberBeginning(
-      SmallVectorImpl<StringRef> &Keywords) override {}
-  void completeImportDecl(
-      std::vector<std::pair<Identifier, SourceLoc>> &Path) override {}
-  void completeAfterPoundExpr(CodeCompletionExpr *E,
-                              Optional<StmtKind> ParentKind) override {}
-  void completeAfterPoundDirective() override {}
-  void completePlatformCondition() override {}
-  void completeGenericParams(TypeLoc TL) override {}
-  void completeAfterIfStmt(bool hasElse) override {}
-  void completeAccessorBeginning() override {};
-  // }
-
-  void completeStmtOrExpr() override {};
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
   void completeCaseStmtBeginning() override;
 
-  void completeAssignmentRHS(AssignExpr *E) override {};
   void completeCallArg(CodeCompletionExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
@@ -82,8 +47,6 @@ public:
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
   void completeCaseStmtDotPrefix() override;
-
-  void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override{};
 
   void doneParsing() override;
 };
