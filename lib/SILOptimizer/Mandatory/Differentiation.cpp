@@ -4133,7 +4133,7 @@ AdjointEmitter::accumulateAdjointsDirect(AdjointValue &&lhs,
       if (auto *tupTy = lhsTy->getAs<TupleType>()) {
         for (auto idx : range(rhs.getNumAggregateElements())) {
           auto lhsElt = builder.createTupleExtract(
-            lhsVal.getLoc(), lhsVal, idx);
+              lhsVal.getLoc(), lhsVal, idx);
           auto rhsElt = rhs.takeAggregateElement(idx);
           newElements.push_back(accumulateAdjointsDirect(
               makeConcreteAdjointValue(
@@ -4145,7 +4145,7 @@ AdjointEmitter::accumulateAdjointsDirect(AdjointValue &&lhs,
         for (unsigned i = 0; fieldIt != structDecl->getStoredProperties().end();
              ++fieldIt, ++i) {
           auto lhsElt = builder.createStructExtract(
-            lhsVal.getLoc(), lhsVal, *fieldIt);
+              lhsVal.getLoc(), lhsVal, *fieldIt);
           auto rhsElt = rhs.takeAggregateElement(i);
           newElements.push_back(accumulateAdjointsDirect(
               makeConcreteAdjointValue(
