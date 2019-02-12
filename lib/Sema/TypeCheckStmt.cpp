@@ -1261,8 +1261,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     }
     return;
   }
-  
-  // Skip checking if there is no type, which presumably means there was a 
+
+  // Skip checking if there is no type, which presumably means there was a
   // type error.
   if (!E->getType()) {
     return;
@@ -1308,7 +1308,25 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   // dead?
   if (E->getType()->is<AnyFunctionType>()) {
     bool isDiscardable = false;
-    if (auto *Fn = dyn_cast<ApplyExpr>(E)) {
+
+    // The called function could be wrapped inside a `dot_syntax_call_expr`
+    // node, for example:
+    //
+    // class Bar {
+    //   @discardableResult
+    //   func foo() -> Int { return 0 }
+    //
+    //   func baz() {
+    //     self.foo
+    //     foo
+    //   }
+    // }
+    //
+    // So look through the DSCE and get the function being called.
+    auto expr =
+        isa<DotSyntaxCallExpr>(E) ? cast<DotSyntaxCallExpr>(E)->getFn() : E;
+
+    if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
       if (auto *declRef = dyn_cast<DeclRefExpr>(Fn->getFn())) {
         if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(declRef->getDecl())) {
           if (funcDecl->getAttrs().hasAttribute<DiscardableResultAttr>()) {

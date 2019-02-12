@@ -211,3 +211,14 @@ class Foo {
     myOptionalFooProtocol?.returnSomething() // okay
   }
 }
+
+class Discard {
+  @discardableResult func bar() -> Int {
+    return 0
+  }
+
+  func baz() {
+    self.bar // expected-error {{expression resolves to an unused function}}
+    bar // expected-error {{expression resolves to an unused function}}
+  }
+}
