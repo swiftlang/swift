@@ -142,14 +142,13 @@ cmake --build "S:\b\llvm"
 - Update your path to include the LLVM tools.
 
 ```cmd
-PATH S:\b\llvm\bin;%PATH%
+path S:\b\llvm\bin;%PATH%
 ```
 
 ### 7. Build Swift
-- This must be done from within a developer command prompt and could take hours 
-  depending on your system.
-- You may need to adjust the `SWIFT_WINDOWS_LIB_DIRECTORY` parameter depending on
-  your target platform or Windows SDK version.
+- This must be done from within a developer command prompt
+- Note that Visual Studio vends a 32-bit python 2.7 installation in `C:\Python27` and a 64-bit python in `C:\Python27amd64`.  You may use either one based on your installation.
+
 ```cmd
 mkdir "S:\b\swift"
 pushd "S:\b\swift"
@@ -268,6 +267,7 @@ cmake -G Ninja^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
    S:\swift-corelibs-foundation
+ popd
  cmake --build S:\b\foundation
 
 ```
