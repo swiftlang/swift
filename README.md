@@ -149,6 +149,8 @@ Below is more information about TensorFlow-related build arguments.
     * Default value: None.
 * `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so` and `libtensorflow_framework.so`).
     * Default value: None.
+* `tensorflow-swift-apis`: A path to the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) deep learning library repository.
+    * Default value: `tensorflow-swift-apis` if the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) repository is cloned. Otherwise, none.
 * `tensorflow-swift-bindings`: A generated TensorFlow Swift bindings file (`RawOpsGenerated.swift`) obtained from [tensorflow/swift-bindings](https://github.com/tensorflow/swift-bindings).
     * Default value: `tensorflow-swift-bindings/RawOpsGenerated.swift` if the [tensorflow/swift-bindings](https://github.com/tensorflow/swift-bindings) repository is cloned. Otherwise, none.
 
@@ -226,10 +228,12 @@ will be created in the directory you run the script with a filename
  of the form: ``swift-tensorflow-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
 
 Beyond building the toolchain, ``build-toolchain-tensorflow`` also supports the
-following (non-exhaustive) set of useful options::
+following (non-exhaustive) set of useful options:
 
 - ``--dry-run``: Perform a dry run build. This is off by default.
 - ``--test``: Test the toolchain after it has been compiled. This is off by default.
+- ``--gpu`` (Linux only): Build with GPU support. This is off by default.
+- ``--pkg`` (macOS only): Build a toolchain installer package (`.pkg`). This is off by default.
 
 More options may be added over time. Please pass ``--help`` to
 ``build-toolchain-tensorflow`` to see the full set of options.
