@@ -254,6 +254,14 @@ internal struct _SliceBuffer<Element>
     return target + c
   }
 
+  public __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
+    // This customization point is not implemented for internal types.
+    // Accidentally calling it would be a catastrophic performance bug.
+    fatalError("unsupported")
+  }
+
   /// True, if the array is native and does not need a deferred type check.
   @inlinable
   internal var arrayPropertyIsNativeTypeChecked: Bool {

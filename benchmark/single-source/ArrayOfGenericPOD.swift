@@ -20,12 +20,21 @@
 
 import TestsUtils
 
-public let ArrayOfGenericPOD = BenchmarkInfo(
-  // Renamed benchmark to "2" when IUO test was removed, which
-  // effectively changed what we're benchmarking here.
-  name: "ArrayOfGenericPOD2",
-  runFunction: run_ArrayOfGenericPOD,
-  tags: [.validation, .api, .Array])
+public let ArrayOfGenericPOD = [
+  BenchmarkInfo(
+    // Renamed benchmark to "2" when IUO test was removed, which
+    // effectively changed what we're benchmarking here.
+    name: "ArrayOfGenericPOD2",
+    runFunction: run_ArrayOfGenericPOD,
+    tags: [.validation, .api, .Array]),
+
+  // Initialize an array of generic POD from a slice.
+  // This takes a unique path through stdlib customization points.
+  BenchmarkInfo(
+    name: "ArrayInitFromSlice",
+    runFunction: run_initFromSlice,
+    tags: [.validation, .api, .Array], setUpFunction: createArrayOfPOD)
+]
 
 class RefArray<T> {
   var array: [T]
@@ -62,5 +71,31 @@ public func run_ArrayOfGenericPOD(_ N: Int) {
   for _ in 0..<N {
     genEnumArray()
     genStructArray()
+  }
+}
+
+// --- ArrayInitFromSlice
+
+var globalArray = Array<UInt8>(repeating: 0, count: 4096)
+
+func createArrayOfPOD() {
+  blackHole(globalArray)
+}
+
+@inline(never)
+@_optimize(none)
+func copyElements<S: Sequence>(_ contents: S) -> [UInt8]
+  where S.Iterator.Element == UInt8
+{
+  return [UInt8](contents)
+}
+
+@inline(never)
+public func run_initFromSlice(_ N: Int) {
+  for _ in 0..<N {
+    for _ in 0..<1000 {
+      // Slice off at least one element so the array buffer can't be reused.
+      blackHole(copyElements(globalArray[0..<4095]))
+    }
   }
 }
