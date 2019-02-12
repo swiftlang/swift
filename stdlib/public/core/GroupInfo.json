@@ -167,7 +167,8 @@
     "Floating": [
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",
-      "FloatingPointTypes.swift"],
+      "FloatingPointTypes.swift",
+      "Mathsable.swift"],
     "Vector": [
       "SIMDVector.swift",
       "SIMDVectorTypes.swift"]}

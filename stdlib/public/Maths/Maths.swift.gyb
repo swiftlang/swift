@@ -1,0 +1,64 @@
+//===--- Maths.swift ------------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// MARK: - Free functions defined on FloatingPoint
+@_transparent
+public func ceil<T>(_ x: T) -> T where T: FloatingPoint {
+  return x.rounded(.up)
+}
+
+@_transparent
+public func floor<T>(_ x: T) -> T where T: FloatingPoint {
+  return x.rounded(.down)
+}
+
+@_transparent
+public func round<T: FloatingPoint>(_ x: T) -> T {
+  return x.rounded()
+}
+
+@_transparent
+public func trunc<T>(_ x: T) -> T where T: FloatingPoint {
+  return x.rounded(.towardZero)
+}
+
+@_transparent
+public func sqrt<T>(_ x: T) -> T where T: FloatingPoint {
+  return x.squareRoot()
+}
+
+@_transparent
+public func fma<T>(_ x: T, _ y: T, _ z: T) -> T where T: FloatingPoint {
+  return z.addingProduct(x, y)
+}
+
+@_transparent
+public func remainder<T>(_ x: T, _ y: T) -> T where T: FloatingPoint {
+  return x.remainder(dividingBy: y)
+}
+
+@_transparent
+public func fmod<T>(_ x: T, _ y: T) -> T where T: FloatingPoint {
+  return x.truncatingRemainder(dividingBy: y)
+}
+
+// MARK: - Free functions defined on Mathsable
+
+%from SwiftMathsFunctions import *
+%for func in MathFunctions:
+
+@_transparent
+public func ${func.free_decl()} {
+//  return T.Maths.${func.name}(${func.params()})
+  return T.${func.name}(${func.params()})
+}
+%end

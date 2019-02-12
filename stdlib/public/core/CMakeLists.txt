@@ -87,6 +87,7 @@ set(SWIFTLIB_ESSENTIAL
   LifetimeManager.swift
   ManagedBuffer.swift
   Map.swift
+  Mathsable.swift.gyb
   MemoryLayout.swift
   UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
   Misc.swift

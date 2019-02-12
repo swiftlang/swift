@@ -1,0 +1,117 @@
+//===--- Mathsable.swift --------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+//  We are omitting the following for now, which could also be defined on
+//  FloatingPoint, as it's not obvious that we want free function
+//  implementations:
+//
+//    fabs - use Swift.abs instead.
+//
+//    scalbn, frexp, ldexp, ilogb - we should provide a better technique
+//    for safely rescaling floating-point computations instead of these
+//    poorly named and easy to misuse functions.
+
+%{
+from SwiftMathsFunctions import *
+}%
+
+/* NAMESPACED
+public protocol Mathsable {
+  associatedtype Maths: MathsImplementations where Maths.Value == Self
+}
+
+public protocol MathsImplementations {
+  associatedtype Value
+%for func in MathFunctions:
+  static func ${func.decl("Value")}
+%end
+}
+
+%for type in all_floating_point_types():
+extension ${type.stdlib_name}: Mathsable {
+  public enum Maths: MathsImplementations {
+    public typealias Value = ${type.stdlib_name}
+% for func in MathFunctions:
+
+    @_transparent
+    public static func ${func.decl("Value")} {
+      return ${func.impl(type)}
+    }
+%end
+  }
+}
+
+%end
+
+public struct _SIMDMaths<V>: MathsImplementations
+where V: SIMD, V.Scalar: Mathsable {
+  
+  public typealias Value = V
+%for func in MathFunctions:
+
+  @_transparent
+  public static func ${func.decl("V")} {
+    var r = V()
+    for i in x.indices {
+      r[i] = V.Scalar.Maths.${func.name}(${func.params("", "[i]")})
+    }
+    return r
+  }
+%end
+}
+
+extension SIMD where Scalar: Mathsable {
+  public typealias Maths = _SIMDMaths<Self>
+}
+
+%for n in [2,3,4,8,16,32,64]:
+extension SIMD${n}: Mathsable where Scalar: Mathsable { }
+%end
+*/
+
+/* NO NAMESPACE */
+public protocol Mathsable {
+%for func in MathFunctions:
+  static func ${func.decl("Self")}
+%end
+}
+
+%for type in all_floating_point_types():
+extension ${type.stdlib_name}: Mathsable {
+% for func in MathFunctions:
+
+  @_transparent
+  public static func ${func.decl(type.stdlib_name)} {
+    return ${func.impl(type)}
+  }
+%end
+}
+
+%end
+
+extension SIMD where Scalar: Mathsable {
+%for func in MathFunctions:
+
+  @_transparent
+  public static func ${func.decl("Self")} {
+    var r = Self()
+    for i in x.indices {
+      r[i] = Scalar.${func.name}(${func.params("", "[i]")})
+    }
+    return r
+  }
+%end
+}
+
+%for n in [2,3,4,8,16,32,64]:
+extension SIMD${n}: Mathsable where Scalar: Mathsable { }
+%end

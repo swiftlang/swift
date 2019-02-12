@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
+@_exported import Maths
 
 // Generic functions implementable directly on FloatingPoint.
 @_transparent
@@ -163,9 +164,6 @@ UnaryFunctions = [
 # We call this intrinsic via the Builtin method so keep this list in
 # sync with core/BuiltinMath.swift.gyb
 UnaryIntrinsicFunctions = [
-    'cos', 'sin',
-    'exp', 'exp2',
-    'log', 'log10', 'log2',
     'nearbyint', 'rint',
 ]
 
