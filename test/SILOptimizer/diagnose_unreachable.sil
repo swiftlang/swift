@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnose-unreachable -sil-print-debuginfo | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -diagnose-unreachable -sil-print-debuginfo | %FileCheck %s
 
 import Builtin
 import Swift
@@ -281,6 +281,7 @@ bb3:
 enum Singleton {
   case x(Int, UnicodeScalar)
 };
+
 sil @constant_fold_switch_enum_with_payload : $@convention(thin) (Int, UnicodeScalar) -> (Int, UnicodeScalar) {
 bb0(%6 : $Int, %10 : $UnicodeScalar):
   %11 = tuple (%6 : $Int, %10 : $UnicodeScalar)
@@ -447,4 +448,57 @@ bb2(%3 : $Never):
 
 bb3(%4 : $Error):
   throw %4 : $Error
+}
+
+enum Either<L, R> {
+case left(L)
+case right(R)
+}
+
+class Klass1 {}
+class Klass2 {}
+
+// CHECK-LABEL: sil [ossa] @constant_fold_diagnose_unreachable_succ_match : $@convention(thin) (@owned Klass1) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   destroy_value [[ARG]]
+// CHECK: } // end sil function 'constant_fold_diagnose_unreachable_succ_match'
+sil [ossa] @constant_fold_diagnose_unreachable_succ_match : $@convention(thin) (@owned Klass1) -> () {
+bb0(%0 : @owned $Klass1):
+  %1 = enum $Either<Klass1, Klass2>, #Either.left!enumelt.1, %0 : $Klass1
+  switch_enum %1 : $Either<Klass1, Klass2>, case #Either.left!enumelt.1: bb1, default bb2
+
+bb1(%2 : @owned $Klass1):
+  destroy_value %2 : $Klass1
+  br bb3
+
+bb2(%3 : @owned $Either<Klass1, Klass2>):
+  destroy_value %3 : $Either<Klass1, Klass2>
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @constant_fold_diagnose_unreachable_default : $@convention(thin) (@owned Klass2) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ENUM:%.*]] = enum $Either<Klass1, Klass2>, #Either.right!enumelt.1, [[ARG]]
+// CHECK:   destroy_value [[ENUM]]
+// CHECK: } // end sil function 'constant_fold_diagnose_unreachable_default'
+sil [ossa] @constant_fold_diagnose_unreachable_default : $@convention(thin) (@owned Klass2) -> () {
+bb0(%0 : @owned $Klass2):
+  %1 = enum $Either<Klass1, Klass2>, #Either.right!enumelt.1, %0 : $Klass2
+  switch_enum %1 : $Either<Klass1, Klass2>, case #Either.left!enumelt.1: bb1, default bb2
+
+bb1(%2 : @owned $Klass1):
+  destroy_value %2 : $Klass1
+  br bb3
+
+bb2(%3 : @owned $Either<Klass1, Klass2>):
+  destroy_value %3 : $Either<Klass1, Klass2>
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
 }
