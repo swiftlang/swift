@@ -17,7 +17,6 @@ import platform
 import re
 import sys
 import traceback
-
 from functools import reduce
 from multiprocessing import freeze_support
 
