@@ -27,8 +27,8 @@ import TestsUtils
 // copy-on-write buffer (outline case) that holds the struct vs copying the
 // individual fields of the struct in the inline case of `Ref3`.
 
-let t: [BenchmarkCategory] = [.existential]
-let ta: [BenchmarkCategory] = [.api, .Array, .existential]
+let t: [BenchmarkCategory] = [.skip]
+let ta: [BenchmarkCategory] = [.api, .Array, .skip]
 
 public let ExistentialPerformance: [BenchmarkInfo] = [
   BenchmarkInfo(name: "Existential.method.1x.Ref1",
