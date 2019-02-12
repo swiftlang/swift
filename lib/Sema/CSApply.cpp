@@ -8013,6 +8013,12 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   // Match the optional value against its `Some` case.
   auto &ctx = tc.Context;
   auto isSomeExpr = new (ctx) EnumIsCaseExpr(expr, ctx.getOptionalSomeDecl());
-  cs.setType(isSomeExpr, tc.lookupBoolType(cs.DC));
+  auto boolDecl = ctx.getBoolDecl();
+
+  if (!boolDecl) {
+    tc.diagnose(SourceLoc(), diag::broken_bool);
+  }
+
+  cs.setType(isSomeExpr, boolDecl ? boolDecl->getDeclaredType() : Type());
   return isSomeExpr;
 }
