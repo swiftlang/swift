@@ -1790,12 +1790,10 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
         context.lookUpMinimalDifferentiationTask(originalFn, desiredIndices);
     if (!task) {
       if (originalFn->isExternalDeclaration()) {
-        if (!originalFn->isDefinition()) {
-          context.emitNondifferentiabilityError(
+        context.emitNondifferentiabilityError(
             original, parentTask,
             diag::autodiff_external_nondifferentiable_function);
-          return None;
-        }
+        return None;
       }
       task = context.registerDifferentiationTask(originalFn, desiredIndices,
                                                  invoker);
@@ -1844,7 +1842,7 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
       auto *task =
           context.lookUpMinimalDifferentiationTask(initialFn, desiredIndices);
       if (!task) {
-        if (!initialFn->isDefinition()) {
+        if (initialFn->isExternalDeclaration()) {
           context.emitNondifferentiabilityError(
               original, parentTask,
               diag::autodiff_global_let_closure_not_differentiable);
