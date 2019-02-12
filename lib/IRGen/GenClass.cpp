@@ -2237,21 +2237,47 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
 
   auto &resilientLayout = selfTI.getClassLayout(*this, selfType,
                                               /*forBackwardDeployment=*/false);
-  auto &fragileLayout = selfTI.getClassLayout(*this, selfType,
-                                              /*forBackwardDeployment=*/true);
 
   if (resilientLayout.doesMetadataRequireRelocation())
     return ClassMetadataStrategy::Resilient;
 
-  if (fragileLayout.doesMetadataRequireInitialization())
+  // On Windows, we want to force singleton metadata initialization, since
+  // fixed class metadata emission requires an absolute global reference to the
+  // Builtin.NativeObject value witness table in the runtime, which is something
+  // the PE executable format does not support.
+  if (IRGen.Opts.LazyInitializeClassMetadata)
     return ClassMetadataStrategy::Singleton;
 
-  // If the legacy type info was sufficient to produce a fixed fragile layout,
-  // but our resilient layout requires initialization, we can use the fixed
-  // layout on older Objective-C runtimes, and emit an update callback for
-  // newer Objective-C runtimes.
+  // If we have generic ancestry, we have to use the singleton pattern.
   if (resilientLayout.doesMetadataRequireInitialization())
+    return ClassMetadataStrategy::Singleton;
+
+  // If we have resiliently-sized fields, we might be able to use the
+  // update pattern.
+  if (resilientLayout.doesMetadataRequireUpdate()) {
+    // The update pattern only benefits us on platforms with an Objective-C
+    // runtime, otherwise just use the singleton pattern.
+    if (!Context.LangOpts.EnableObjCInterop)
+      return ClassMetadataStrategy::Singleton;
+
+    // If the Objective-C runtime is new enough, we can just use the update
+    // pattern unconditionally.
+    if (Types.doesPlatformSupportObjCMetadataUpdateCallback())
+      return ClassMetadataStrategy::Update;
+
+    // Otherwise, check if we have legacy type info for backward deployment.
+    auto &fragileLayout = selfTI.getClassLayout(*this, selfType,
+                                               /*forBackwardDeployment=*/true);
+
+    // If we still have resiliently-sized fields even when using the legacy
+    // type info, fall back to the singleton pattern.
+    if (fragileLayout.doesMetadataRequireUpdate())
+      return ClassMetadataStrategy::Singleton;
+
+    // We're going to use the legacy type info on older Objective-C runtimes,
+    // and the update callback on newer runtimes.
     return ClassMetadataStrategy::FixedOrUpdate;
+  }
 
   return ClassMetadataStrategy::Fixed;
 }

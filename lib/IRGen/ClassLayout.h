@@ -157,13 +157,31 @@ public:
              Options.contains(ClassMetadataFlags::ClassHasObjCAncestry));
   }
 
-  bool doesMetadataRequireInitialization() const {
-    return (Options.contains(ClassMetadataFlags::ClassHasResilientAncestry) ||
-            Options.contains(ClassMetadataFlags::ClassHasGenericAncestry) ||
-            Options.contains(ClassMetadataFlags::ClassHasResilientMembers) ||
+  /// Returns true iff everything about the class metadata layout is statically
+  /// known except field offsets and the instance size and alignment.
+  ///
+  /// Will assert if the class metadata is "more" dynamic; you must check
+  /// doesMetadataRequireRelocation() and doesMetadataRequireInitialization()
+  /// first.
+  bool doesMetadataRequireUpdate() const {
+    assert(!doesMetadataRequireInitialization());
+    return (Options.contains(ClassMetadataFlags::ClassHasResilientMembers) ||
             Options.contains(ClassMetadataFlags::ClassHasMissingMembers));
   }
 
+  /// Returns true iff everything about the class metadata layout is statically
+  /// known except the superclass field must be instantiated at runtime because
+  /// it is a generic class type.
+  ///
+  /// Will assert if the class metadata is "more" dynamic; you must check
+  /// doesMetadataRequireRelocation() first.
+  bool doesMetadataRequireInitialization() const {
+    assert(!doesMetadataRequireRelocation());
+    return Options.contains(ClassMetadataFlags::ClassHasGenericAncestry);
+  }
+
+  /// Returns true if the class metadata must be built at runtime because its
+  /// size is not known at compile time. This is the most general case.
   bool doesMetadataRequireRelocation() const {
     return (Options.contains(ClassMetadataFlags::ClassHasResilientAncestry) ||
             Options.contains(ClassMetadataFlags::ClassIsGeneric));
