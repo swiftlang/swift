@@ -3730,11 +3730,15 @@ public:
     Kind = LookupKind::Type;
     this->BaseType = BaseType;
     NeedLeadingDot = !HaveDot;
-    Type MetaBase = MetatypeType::get(BaseType);
-    lookupVisibleMemberDecls(*this, MetaBase,
+    lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType),
                              CurrDeclContext, TypeResolver,
                              IncludeInstanceMembers);
-    addKeyword("Type", MetaBase);
+    if (BaseType->isAnyExistentialType()) {
+      addKeyword("Protocol", MetatypeType::get(BaseType));
+      addKeyword("Type", ExistentialMetatypeType::get(BaseType));
+    } else {
+      addKeyword("Type", MetatypeType::get(BaseType));
+    }
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
