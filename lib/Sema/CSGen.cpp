@@ -2800,7 +2800,14 @@ namespace {
                        CS.getConstraintLocator(expr));
 
       // The result is Bool.
-      return CS.getTypeChecker().lookupBoolType(CS.DC);
+      auto boolDecl = tc.Context.getBoolDecl();
+
+      if (!boolDecl) {
+        tc.diagnose(SourceLoc(), diag::broken_bool);
+        return Type();
+      }
+
+      return boolDecl->getDeclaredType();
     }
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
