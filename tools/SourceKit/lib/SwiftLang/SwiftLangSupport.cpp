@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
@@ -188,6 +189,26 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+SwiftLangSupport::makeCodeCompletionMemoryBuffer(
+    const llvm::MemoryBuffer *origBuf, unsigned &Offset,
+    const std::string bufferIdentifier) {
+
+  auto origBuffSize = origBuf->getBufferSize();
+  if (Offset > origBuffSize)
+    Offset = origBuffSize;
+
+  auto newBuffer = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
+      origBuffSize + 1, bufferIdentifier);
+  auto *pos = origBuf->getBufferStart() + Offset;
+  auto *newPos =
+      std::copy(origBuf->getBufferStart(), pos, newBuffer->getBufferStart());
+  *newPos = '\0';
+  std::copy(pos, origBuf->getBufferEnd(), newPos + 1);
+
+  return std::unique_ptr<llvm::MemoryBuffer>(newBuffer.release());
 }
 
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
@@ -748,6 +769,71 @@ bool SwiftLangSupport::printAccessorUSR(const AbstractStorageDecl *D,
                                         AccessorKind AccKind,
                                         llvm::raw_ostream &OS) {
   return ide::printAccessorUSR(D, AccKind, OS);
+}
+
+void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
+                                                  swift::Type baseTy,
+                                                  bool usePlaceholder,
+                                                  llvm::raw_ostream &OS) {
+  // Base name.
+  OS << VD->getBaseName().userFacingName();
+
+  // Parameters.
+  auto *M = VD->getModuleContext();
+  auto substMap = baseTy->getMemberSubstitutionMap(M, VD);
+  auto printSingleParam = [&](ParamDecl *param) {
+    auto paramTy = param->getInterfaceType();
+
+    // Label.
+    if (!param->getArgumentName().empty())
+      OS << param->getArgumentName() << ": ";
+
+    // InOut.
+    if (param->isInOut()) {
+      OS << "&";
+      paramTy = paramTy->getInOutObjectType();
+    }
+
+    // Type.
+    if (usePlaceholder)
+      OS << "<#T##";
+
+    if (auto substitutedTy = paramTy.subst(substMap))
+      paramTy = substitutedTy;
+
+    if (paramTy->hasError() && param->getTypeLoc().hasLocation()) {
+      // Fallback to 'TypeRepr' printing.
+      param->getTypeLoc().getTypeRepr()->print(OS);
+    } else {
+      paramTy.print(OS);
+    }
+
+    if (usePlaceholder)
+      OS << "#>";
+  };
+  auto printParams = [&](const ParameterList *params) {
+    OS << '(';
+    bool isFirst = true;
+    for (auto param : params->getArray()) {
+      if (isFirst)
+        isFirst = false;
+      else
+        OS << ", ";
+      printSingleParam(param);
+    }
+    OS << ')';
+  };
+  if (auto EED = dyn_cast<EnumElementDecl>(VD)) {
+    if (auto params = EED->getParameterList())
+      printParams(params);
+  } else if (auto *FD = dyn_cast<FuncDecl>(VD)) {
+    if (auto params = FD->getParameters())
+      printParams(params);
+  } else if (isa<VarDecl>(VD)) {
+    // Var decl doesn't have parameters.
+  } else {
+    llvm_unreachable("Unsupported Decl kind for printMemberDeclDescription()");
+  }
 }
 
 std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
