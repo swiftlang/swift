@@ -4129,13 +4129,31 @@ AdjointEmitter::accumulateAdjointsDirect(AdjointValue &&lhs,
     // x + (y, z) => (x.0 + y, x.1 + z)
     case AdjointValueKind::Aggregate:
       SmallVector<AdjointValue, 8> newElements;
-      for (auto i : range(rhs.getNumAggregateElements())) {
-        auto lhsElt = builder.createTupleExtract(lhsVal.getLoc(), lhsVal, i);
-        auto rhsElt = rhs.takeAggregateElement(i);
-        newElements.push_back(accumulateAdjointsDirect(
-            makeConcreteAdjointValue(
-                ValueWithCleanup(lhsElt, lhsVal.getCleanup())),
-            std::move(rhsElt)));
+      auto lhsTy = lhsVal.getValue()->getType().getASTType();
+      if (auto *tupTy = lhsTy->getAs<TupleType>()) {
+        for (auto idx : range(rhs.getNumAggregateElements())) {
+          auto lhsElt = builder.createTupleExtract(
+            lhsVal.getLoc(), lhsVal, idx);
+          auto rhsElt = rhs.takeAggregateElement(idx);
+          newElements.push_back(accumulateAdjointsDirect(
+              makeConcreteAdjointValue(
+                  ValueWithCleanup(lhsElt, lhsVal.getCleanup())),
+              std::move(rhsElt)));
+        }
+      } else if (auto *structDecl = lhsTy->getStructOrBoundGenericStruct()) {
+        auto fieldIt = structDecl->getStoredProperties().begin();
+        for (unsigned i = 0; fieldIt != structDecl->getStoredProperties().end();
+             ++fieldIt, ++i) {
+          auto lhsElt = builder.createStructExtract(
+            lhsVal.getLoc(), lhsVal, *fieldIt);
+          auto rhsElt = rhs.takeAggregateElement(i);
+          newElements.push_back(accumulateAdjointsDirect(
+              makeConcreteAdjointValue(
+                  ValueWithCleanup(lhsElt, lhsVal.getCleanup())),
+              std::move(rhsElt)));
+        }
+      } else {
+        llvm_unreachable("Not an aggregate type");
       }
       return makeAggregateAdjointValue(lhsVal.getType(), newElements);
     }
