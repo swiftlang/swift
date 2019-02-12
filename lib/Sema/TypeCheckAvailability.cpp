@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeRefinementContext.h"
@@ -856,15 +857,31 @@ static Optional<ASTNode> findInnermostAncestor(
 static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
                                              const DeclContext *ReferenceDC,
                                              const SourceManager &SM) {
-  if (const Decl *D = ReferenceDC->getInnermostDeclarationDeclContext())
-    return D;
+  auto ContainsReferenceRange = [&](const Decl *D) -> bool {
+    if (ReferenceRange.isInvalid())
+      return false;
+    return SM.rangeContains(D->getSourceRange(), ReferenceRange);
+  };
 
-  // We couldn't find a suitable node by climbing the DeclContext
-  // hierarchy, so fall back to looking for a top-level declaration
-  // that contains the reference range. We will hit this case for
-  // top-level elements that do not themselves introduce DeclContexts,
-  // such as extensions and global variables. If we don't have a reference
-  // range, there is nothing we can do, so return null.
+  if (const Decl *D = ReferenceDC->getInnermostDeclarationDeclContext()) {
+    // If we have an inner declaration context, see if we can narrow the search
+    // down to one of its members. This is important for properties, which don't
+    // count as DeclContexts of their own but which can still introduce
+    // availability.
+    if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+      auto BestMember = llvm::find_if(IDC->getMembers(),
+                                      ContainsReferenceRange);
+      if (BestMember != IDC->getMembers().end())
+        return *BestMember;
+    }
+    return D;
+  }
+
+  // We couldn't find a suitable node by climbing the DeclContext hierarchy, so
+  // fall back to looking for a top-level declaration that contains the
+  // reference range. We will hit this case for top-level elements that do not
+  // themselves introduce DeclContexts, such as global variables. If we don't
+  // have a reference range, there is nothing we can do, so return null.
   if (ReferenceRange.isInvalid())
     return nullptr;
 
@@ -872,11 +889,9 @@ static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
   if (!SF)
     return nullptr;
 
-  for (Decl *D : SF->Decls) {
-    if (SM.rangeContains(D->getSourceRange(), ReferenceRange)) {
-      return D;
-    }
-  }
+  auto BestTopLevelDecl = llvm::find_if(SF->Decls, ContainsReferenceRange);
+  if (BestTopLevelDecl != SF->Decls.end())
+    return *BestTopLevelDecl;
 
   return nullptr;
 }
@@ -929,9 +944,13 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
     // binding.
     ArrayRef<PatternBindingEntry> Entries = PBD->getPatternList();
     if (!Entries.empty()) {
-      VarDecl *VD = Entries.front().getPattern()->getSingleVar();
-      if (VD)
-        return VD;
+      const VarDecl *AnyVD = nullptr;
+      // FIXME: This is wasteful; we only need the first variable.
+      Entries.front().getPattern()->forEachVariable([&](const VarDecl *VD) {
+        AnyVD = VD;
+      });
+      if (AnyVD)
+        return AnyVD;
     }
   } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
     // Similar to the PatternBindingDecl case above, we return the
@@ -1408,7 +1427,7 @@ someEnclosingDeclMatches(SourceRange ReferenceRange,
   // Climb the DeclContext hierarchy to see if any of the containing
   // declarations matches the predicate.
   const DeclContext *DC = ReferenceDC;
-  do {
+  while (true) {
     auto *D = DC->getInnermostDeclarationDeclContext();
     if (!D)
       break;
@@ -1424,20 +1443,15 @@ someEnclosingDeclMatches(SourceRange ReferenceRange,
         return true;
     }
 
-    DC = DC->getParent();
-  } while (DC);
+    DC = D->getDeclContext();
+  }
 
   // Search the AST starting from our innermost declaration context to see if
   // if the reference is inside a property declaration but not inside an
   // accessor (this can happen for the TypeRepr for the declared type of a
   // property, for example).
   // We can't rely on the DeclContext hierarchy climb above because properties
-  // do not introduce a new DeclContext. This search is potentially slow, so we
-  // do it last and only if the reference declaration context is a
-  // type or global context.
-
-  if (!ReferenceDC->isTypeContext() && !ReferenceDC->isModuleScopeContext())
-    return false;
+  // do not introduce a new DeclContext.
 
   // Don't search for a containing declaration if we don't have a source range.
   if (ReferenceRange.isInvalid())
@@ -1448,28 +1462,11 @@ someEnclosingDeclMatches(SourceRange ReferenceRange,
       findContainingDeclaration(ReferenceRange, ReferenceDC, Ctx.SourceMgr);
 
   // We may not be able to find a declaration to search if the ReferenceRange
-  // is invalid (i.e., we are in synthesized code).
+  // isn't useful (i.e., we are in synthesized code).
   if (!DeclToSearch)
     return false;
 
-  InnermostAncestorFinder::MatchPredicate IsDeclaration =
-      [](ASTNode Node, ASTWalker::ParentTy Parent) {
-        return Node.is<Decl *>();
-  };
-
-  Optional<ASTNode> FoundDeclarationNode =
-      findInnermostAncestor(ReferenceRange, Ctx.SourceMgr,
-                            const_cast<Decl *>(DeclToSearch), IsDeclaration);
-
-  if (FoundDeclarationNode.hasValue()) {
-    const Decl *D = FoundDeclarationNode.getValue().get<Decl *>();
-    D = abstractSyntaxDeclForAvailableAttribute(D);
-    if (Pred(D)) {
-      return true;
-    }
-  }
-
-  return false;
+  return Pred(abstractSyntaxDeclForAvailableAttribute(DeclToSearch));
 }
 
 /// Returns true if the reference or any of its parents is an
