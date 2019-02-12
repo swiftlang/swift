@@ -495,8 +495,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameter slice: The buffer slice to rebase.
   @inlinable // unsafe-performance
   public init(rebasing slice: Slice<UnsafeBufferPointer<Element>>) {
-    self.init(start: slice.base.baseAddress! + slice.startIndex,
-      count: slice.count)
+    let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
+    self.init(start: base, count: slice.count)
   }
 
 %  end
@@ -522,9 +522,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameter slice: The buffer slice to rebase.
   @inlinable // unsafe-performance
   public init(rebasing slice: Slice<UnsafeMutableBufferPointer<Element>>) {
-    self.init(
-      start: slice.base.baseAddress! + slice.startIndex,
-      count: slice.count)
+    let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
+    self.init(start: base, count: slice.count)
   }
 
   /// Deallocates the memory block previously allocated at this buffer pointer’s 
