@@ -119,8 +119,10 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   internal var unflaggedNativeInstance: Native {
     @inline(__always) get {
       _internalInvariant(isNative)
-      _internalInvariant(_nonPointerBits(rawValue) == 0)
-      return Builtin.reinterpretCast(rawValue)
+      let mask = UInt(
+        truncatingIfNeeded: _StringObject.Nibbles.largeAddressMask)
+      let strippedBits = _bitPattern(rawValue) & mask
+      return Builtin.reinterpretCast(strippedBits)
     }
   }
 
