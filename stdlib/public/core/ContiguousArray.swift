@@ -520,10 +520,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// - Parameter s: The sequence of elements to turn into an array.
   @inlinable
   public init<S: Sequence>(_ s: S) where S.Element == Element {
-    self = ContiguousArray(
-      _buffer: _Buffer(
-        _buffer: s._copyToContiguousArray()._buffer,
-        shiftedToStartIndex: 0))
+    self.init(_buffer: s._copyToContiguousArray()._buffer)
   }
 
   /// Creates a new array containing the specified number of a single, repeated
@@ -948,7 +945,7 @@ extension ContiguousArray: RangeReplaceableCollection {
     if let n = _buffer.requestNativeBuffer() {
       return ContiguousArray(_buffer: n)
     }
-    return _copyCollectionToContiguousArray(_buffer)
+    return _copyCollectionToContiguousArray(self)
   }
 }
 
