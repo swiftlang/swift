@@ -121,6 +121,9 @@ private class TraceContext {
   // pruned away in the inputs to the trace graph function.
   var symbolicInputs: [TF_Output] = []
 
+  /// The outputs obtained by executing the `tracee` for computing the trace.
+  var tracedOutputs: [CTensorHandle] = []
+
   /// The trace context object used in TF C API calls that convert eager ops to
   /// (trace) graph nodes.
   let cTraceContext: CTFETraceContext
@@ -162,8 +165,7 @@ private class TraceContext {
   }
 
   /// Finalize the trace graph function.
-  func finalize(traceeBasicName: String,
-                outputs: [CTensorHandle]) {
+  func finalize(traceeBasicName: String) {
     internalConsistencyCheck(traceGraphFn == nil)
     var symbolicOutputs: [TF_Output] = []
     // Only add symbolic output tensors as the outputs of the trace graph function.
@@ -177,10 +179,10 @@ private class TraceContext {
     // x) is symbolic. The second one for y is concrete, and is computed at
     // trace creation time, not trace execution time.
     // Also see the comment block above finalizeAndExecuteTraceFn().
-    for (i, output) in outputs.enumerated()
-        where TFE_TensorHandleIsConcrete(output) == 0 {
-      debugLog("Adding symbolic output \(i) as a trace graph func output.")
-      symbolicOutputs.append(TFE_GetTFOutputFromTensorHandle(output ,status))
+    for (i, tracedOutput) in tracedOutputs.enumerated()
+        where TFE_TensorHandleIsConcrete(tracedOutput) == 0 {
+      debugLog("Adding symbolic tracedOutput \(i) as a trace graph func output.")
+      symbolicOutputs.append(TFE_GetTFOutputFromTensorHandle(tracedOutput ,status))
       checkOk(status)
     }
 
@@ -201,7 +203,7 @@ private class TraceContext {
                Finalizing trace graph func \(tracedFunctionName), with \
                \(traceeInputCount) tracee inputs and \
                \(additionalInputTensorCount) additional inputs, and up to \
-               \(outputs.count) return values.
+               \(tracedOutputs.count) return values.
                """)
     traceGraphFn =
       TF_GraphToFunction(graph, tracedFunctionName,
@@ -232,8 +234,7 @@ private class TraceContext {
 
   /// Execute the trace graph function, and return the list of output tensors
   /// from the trace execution. These output tensors are owned by the caller.
-  func execute(traceeInputs: [_AnyTensorHandle],
-               outputs: [CTensorHandle]) -> [CTensorHandle] {
+  func execute(traceeInputs: [_AnyTensorHandle]) -> [CTensorHandle] {
     // We must be in the `notTracing` enum mode.
     internalConsistencyCheck(_RuntimeConfig.traceState.context == nil)
     internalConsistencyCheck(traceGraphFn != nil)
@@ -275,7 +276,7 @@ private class TraceContext {
 
     // Tell TensorFlow to execute the graph function we built, containing
     // the trace.
-    let maxReturnValueCount = outputs.count
+    let maxReturnValueCount = tracedOutputs.count
     debugLog("""
                Executing trace func \(tracedFunctionName!) with up to \
                \(maxReturnValueCount) return values.
@@ -298,11 +299,11 @@ private class TraceContext {
     var returnValueIdx = 0
     // See the comment block within finalize() below on why we handle concrete
     // and symbolic output tensors differently.
-    for output in outputs {
-      if TFE_TensorHandleIsConcrete(output) != 0 {
+    for tracedOutput in tracedOutputs {
+      if TFE_TensorHandleIsConcrete(tracedOutput) != 0 {
         // These concrete tensors are owned by some other objects, so we make a
         // copy here.
-        let newOutput = TFE_TensorHandleCopySharingTensor(output, status)
+        let newOutput = TFE_TensorHandleCopySharingTensor(tracedOutput, status)
         checkOk(status)
         internalConsistencyCheck(newOutput != nil)
         traceGraphOutputs.append(newOutput!)
@@ -647,14 +648,12 @@ public final class _ExecutionContext {
 // Elements in `outputs` can come from two sources:
 // a) Symbolic tensors produced by tensor ops, and added as trace graph nodes.
 // b) Concrete tensors produced by host code (e.g. Tensor(1.0)).
-fileprivate func finalizeTraceFunction(_ name: String,
-                                       outputs: [CTensorHandle]
-) -> TraceContext {
+fileprivate func finalizeTraceFunction(_ name: String) -> TraceContext {
   guard let traceContext = _RuntimeConfig.traceState.context else {
     fatalError("Not in tracing mode!.")
   }
   _RuntimeConfig.traceState = .notTracing
-  traceContext.finalize(traceeBasicName: name, outputs: outputs)
+  traceContext.finalize(traceeBasicName: name)
   return traceContext
 }
 
@@ -738,12 +737,13 @@ extension _TensorArrayProtocolEnhanced {
 }
 
 // TODO: rename this to `graph` when it's ready for end users.
-private func _graphInternal<State : _TensorArrayProtocolEnhanced,
-                            Data : TensorGroup,
-                            Result : TensorGroup>(
+/// Trace `fn` with the given state and return the generated trace context.
+private func _trace<State : _TensorArrayProtocolEnhanced,
+                    Data : TensorGroup,
+                    Result : TensorGroup>(
   with state: State,
   in fn: (State, Data) -> (State, Result?)
-) -> (State, Data) -> (State, Result?) {
+) -> TraceContext {
   debugLog("""
              Tracing over a function with \(state._tensorHandleCount) input \
              state tensors and \(Data._typeList.count) input data tensors.
@@ -755,11 +755,11 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
 
   // Switch to tracing mode.
   let dtypes = state._dtypes + Data._typeList.map { $0.cDataType }
-  _RuntimeConfig.traceState = .tracing(TraceContext(dtypes: dtypes))
+  let traceCtx = TraceContext(dtypes: dtypes)
+  _RuntimeConfig.traceState = .tracing(traceCtx)
 
   // Handle inputs.
-  let traceFn = _RuntimeConfig.traceState.context!
-  let inputSymbolicTensors = traceFn.symbolicInputs.map {
+  let inputSymbolicTensors = traceCtx.symbolicInputs.map {
     TFE_NewTensorHandleFromTFOutput($0, TF_OperationOutputType($0))!
   }
   internalConsistencyCheck(inputSymbolicTensors.count == dtypes.count)
@@ -775,7 +775,7 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
   let (outputState, outputResult) = fn(symbolicState, symbolicData)
 
   debugLog("Assembling output tensor handles.")
-  let outputTensorHandles = 
+  traceCtx.tracedOutputs =
     outputResult != nil
       ? (outputState.cTensorHandles + outputResult!.cTensorHandles)
       : outputState.cTensorHandles
@@ -784,9 +784,16 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
   debugLog("Finalizing trace graph function.")
   // TAP means tensor array protocol.
   let opType = "MyTraceFn_TAP"
-  let traceContext = finalizeTraceFunction(opType,
-                                           outputs: outputTensorHandles)
-
+  return finalizeTraceFunction(opType)
+}
+  
+private func _graphInternal<State : _TensorArrayProtocolEnhanced,
+                           Data : TensorGroup,
+                           Result : TensorGroup>(
+  with state: State,
+  in fn: (State, Data) -> (State, Result?)
+) -> (State, Data) -> (State, Result?) {
+  let traceContext = _trace(with: state, in : fn) 
   // The result is a closure that captures and executes the trace graph
   // function in the trace context.
   return { (oldState: State, data: Data) -> (State, Result?) in
@@ -804,8 +811,7 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
     })
 
     debugLog("Executing trace graph function.")
-    let returnValues = traceContext.execute(traceeInputs: inputTensors,
-                                            outputs: outputTensorHandles)
+    let returnValues = traceContext.execute(traceeInputs: inputTensors)
 
     debugLog("Creating output model instance.")
     let newState = state._makeInstance(owning: returnValues.prefix(
@@ -816,6 +822,7 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
   }
 }
 
+// TODO: rename this to `graph` when it's ready for end users.
 public func _graph<State : _TensorArrayProtocolEnhanced,
                    Data : TensorGroup,
                    Result : TensorGroup>(
@@ -830,6 +837,7 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
   }
 }
 
+// TODO: rename this to `graph` when it's ready for end users.
 public func _graph<State : _TensorArrayProtocolEnhanced,
                    Data : TensorGroup>(
   with state: State,
