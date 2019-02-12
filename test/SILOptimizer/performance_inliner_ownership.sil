@@ -1,0 +1,41 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// Make sure that we do not try to inline non-ossa functions into ossa
+// functions. This can only occur with transparent functions today.
+
+// We do not need a filecheck here since if we inline, the strong_release will
+// hit assertions since strong_release is a non-ossa instruction that can never
+// be in an ossa function.
+sil [transparent] [ossa] @ossa_transparent_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @non_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We put in this filecheck test to make sure that without the [ossa] bit, we
+// /would/ inline.
+//
+// CHECK-LABEL: sil [transparent]  @non_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: strong_release
+// CHECK: } // end sil function 'non_ossa_caller'
+sil [transparent] @non_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @non_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @non_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
