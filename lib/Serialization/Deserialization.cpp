@@ -2231,82 +2231,6 @@ class swift::ASTDeserializer {
   using Serialized = ModuleFile::Serialized<T>;
   using TypeID = serialization::TypeID;
 
-  ModuleFile &MF;
-public:
-  ASTDeserializer(ModuleFile &MF) : MF(MF) {}
-
-  Expected<Decl *> getDeclCheckedImpl(DeclID DID);
-};
-
-Expected<Decl *>
-ModuleFile::getDeclChecked(DeclID DID) {
-  // Tag every deserialized ValueDecl coming out of getDeclChecked with its ID.
-  Expected<Decl *> deserialized =
-      ASTDeserializer(*this).getDeclCheckedImpl(DID);
-  if (deserialized && deserialized.get()) {
-    if (auto *IDC = dyn_cast<IterableDeclContext>(deserialized.get())) {
-      // Only set the DeclID on the returned Decl if it's one that was loaded
-      // and _wasn't_ one that had its DeclID set elsewhere (a followed XREF).
-      if (IDC->wasDeserialized() &&
-          static_cast<uint32_t>(IDC->getDeclID()) == 0) {
-        IDC->setDeclID(DID);
-      }
-    }
-  }
-  return deserialized;
-}
-
-template <typename DERIVED>
-static bool attributeChainContains(DeclAttribute *attr) {
-  DeclAttributes tempAttrs;
-  tempAttrs.setRawAttributeChain(attr);
-  static_assert(std::is_trivially_destructible<DeclAttributes>::value,
-                "must not try to destroy the attribute chain");
-  return tempAttrs.hasAttribute<DERIVED>();
-}
-
-Expected<Decl *>
-ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
-  if (DID == 0)
-    return nullptr;
-
-  assert(DID <= MF.Decls.size() && "invalid decl ID");
-  auto &declOrOffset = MF.Decls[DID-1];
-
-  if (declOrOffset.isComplete())
-    return declOrOffset;
-
-  ++NumDeclsLoaded;
-  BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
-  MF.DeclTypeCursor.JumpToBit(declOrOffset);
-  auto entry = MF.DeclTypeCursor.advance();
-
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    // We don't know how to serialize decls represented by sub-blocks.
-    MF.error();
-    return nullptr;
-  }
-
-  ASTContext &ctx = MF.getContext();
-  SmallVector<uint64_t, 64> scratch;
-  StringRef blobData;
-
-  if (auto s = ctx.Stats)
-    s->getFrontendCounters().NumDeclsDeserialized++;
-
-  // Read the attributes (if any).
-  // This isn't just using DeclAttributes because that would result in the
-  // attributes getting reversed.
-  // FIXME: If we reverse them at serialization time we could get rid of this.
-  DeclAttribute *DAttrs = nullptr;
-  DeclAttribute **AttrsNext = &DAttrs;
-  auto AddAttribute = [&](DeclAttribute *Attr) {
-    // Advance the linked list.
-    *AttrsNext = Attr;
-    AttrsNext = Attr->getMutableNext();
-  };
-  unsigned recordID;
-
   class PrivateDiscriminatorRAII {
     ModuleFile &moduleFile;
     Serialized<Decl *> &declOrOffset;
@@ -2364,30 +2288,71 @@ ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
     }
   };
 
-  PrivateDiscriminatorRAII privateDiscriminatorRAII{MF, declOrOffset};
-  LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
-  ModuleFile::DeserializingEntityRAII deserializingEntity(MF);
-  FilenameForPrivateRAII filenameForPrivate(declOrOffset);
+  ModuleFile &MF;
+public:
+  ASTDeserializer(ModuleFile &MF) : MF(MF) {}
 
-  // Local function that handles the "inherited" list for a type.
-  auto handleInherited
-    = [&](TypeDecl *nominal, ArrayRef<uint64_t> rawInheritedIDs) {
-      auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
-      for_each(inheritedTypes, rawInheritedIDs,
-               [this](TypeLoc &tl, uint64_t rawID) {
-         tl = TypeLoc::withoutLoc(MF.getType(rawID));
-      });
-      nominal->setInherited(inheritedTypes);
-  };
+  /// Deserializes decl attribute and attribute-like records from
+  /// \c MF.DeclTypesCursor until a non-attribute record is found,
+  /// passing each one to \p AddAttribute.
+  llvm::Error deserializeDeclAttributes(
+      ASTContext &ctx,
+      llvm::function_ref<void (DeclAttribute *)> AddAttribute,
+      FilenameForPrivateRAII &filenameForPrivate,
+      LocalDiscriminatorRAII &localDiscriminatorRAII,
+      PrivateDiscriminatorRAII &privateDiscriminatorRAII);
 
+  Expected<Decl *> getDeclCheckedImpl(DeclID DID);
+};
+
+Expected<Decl *>
+ModuleFile::getDeclChecked(DeclID DID) {
+  // Tag every deserialized ValueDecl coming out of getDeclChecked with its ID.
+  Expected<Decl *> deserialized =
+      ASTDeserializer(*this).getDeclCheckedImpl(DID);
+  if (deserialized && deserialized.get()) {
+    if (auto *IDC = dyn_cast<IterableDeclContext>(deserialized.get())) {
+      // Only set the DeclID on the returned Decl if it's one that was loaded
+      // and _wasn't_ one that had its DeclID set elsewhere (a followed XREF).
+      if (IDC->wasDeserialized() &&
+          static_cast<uint32_t>(IDC->getDeclID()) == 0) {
+        IDC->setDeclID(DID);
+      }
+    }
+  }
+  return deserialized;
+}
+
+template <typename DERIVED>
+static bool attributeChainContains(DeclAttribute *attr) {
+  DeclAttributes tempAttrs;
+  tempAttrs.setRawAttributeChain(attr);
+  static_assert(std::is_trivially_destructible<DeclAttributes>::value,
+                "must not try to destroy the attribute chain");
+  return tempAttrs.hasAttribute<DERIVED>();
+}
+
+llvm::Error ASTDeserializer::deserializeDeclAttributes(
+    ASTContext &ctx,
+    llvm::function_ref<void (DeclAttribute *)> AddAttribute,
+    FilenameForPrivateRAII &filenameForPrivate,
+    LocalDiscriminatorRAII &localDiscriminatorRAII,
+    PrivateDiscriminatorRAII &privateDiscriminatorRAII) {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
   while (true) {
+    BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
+    auto entry = MF.DeclTypeCursor.advance();
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       // We don't know how to serialize decls represented by sub-blocks.
       MF.error();
-      return nullptr;
+      return llvm::Error::success();
     }
 
-    recordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+    unsigned recordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                     &blobData);
 
     if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
@@ -2417,13 +2382,13 @@ ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
                                        isImplicit);
         break;
       }
-      
+
       case decls_block::SwiftNativeObjCRuntimeBase_DECL_ATTR: {
         bool isImplicit;
         IdentifierID nameID;
         serialization::decls_block::SwiftNativeObjCRuntimeBaseDeclAttrLayout
           ::readRecord(scratch, isImplicit, nameID);
-        
+
         auto name = MF.getIdentifier(nameID);
         Attr = new (ctx) SwiftNativeObjCRuntimeBaseAttr(name, SourceLoc(),
                                                         SourceRange(),
@@ -2612,11 +2577,11 @@ ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
       default:
         // We don't know how to deserialize this kind of attribute.
         MF.error();
-        return nullptr;
+        return llvm::Error::success();
       }
 
       if (!Attr)
-        return nullptr;
+        return llvm::Error::success();
 
       AddAttribute(Attr);
 
@@ -2635,15 +2600,81 @@ ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
       decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
       filenameForPrivate.filename = MF.getIdentifier(filenameID);
     } else {
-      break;
+      return llvm::Error::success();
     }
 
-    // Advance bitstream cursor to the next record.
-    entry = MF.DeclTypeCursor.advance();
-
     // Prepare to read the next record.
+    restoreOffset.cancel();
     scratch.clear();
   }
+}
+
+Expected<Decl *>
+ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
+  if (DID == 0)
+    return nullptr;
+
+  assert(DID <= MF.Decls.size() && "invalid decl ID");
+  auto &declOrOffset = MF.Decls[DID-1];
+
+  if (declOrOffset.isComplete())
+    return declOrOffset;
+
+  ++NumDeclsLoaded;
+  BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
+  MF.DeclTypeCursor.JumpToBit(declOrOffset);
+
+  ASTContext &ctx = MF.getContext();
+
+  if (auto s = ctx.Stats)
+    s->getFrontendCounters().NumDeclsDeserialized++;
+
+  // Read the attributes (if any).
+  // This isn't just using DeclAttributes because that would result in the
+  // attributes getting reversed.
+  // FIXME: If we reverse them at serialization time we could get rid of this.
+  DeclAttribute *DAttrs = nullptr;
+  DeclAttribute **AttrsNext = &DAttrs;
+  auto AddAttribute = [&](DeclAttribute *Attr) {
+    // Advance the linked list.
+    *AttrsNext = Attr;
+    AttrsNext = Attr->getMutableNext();
+  };
+
+  PrivateDiscriminatorRAII privateDiscriminatorRAII{MF, declOrOffset};
+  LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
+  ModuleFile::DeserializingEntityRAII deserializingEntity(MF);
+  FilenameForPrivateRAII filenameForPrivate(declOrOffset);
+
+  // Local function that handles the "inherited" list for a type.
+  auto handleInherited
+    = [&](TypeDecl *nominal, ArrayRef<uint64_t> rawInheritedIDs) {
+      auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
+      for_each(inheritedTypes, rawInheritedIDs,
+               [this](TypeLoc &tl, uint64_t rawID) {
+         tl = TypeLoc::withoutLoc(MF.getType(rawID));
+      });
+      nominal->setInherited(inheritedTypes);
+  };
+
+  auto attrError = deserializeDeclAttributes(ctx, AddAttribute,
+                                             filenameForPrivate,
+                                             localDiscriminatorRAII,
+                                             privateDiscriminatorRAII);
+  if (attrError)
+    return std::move(attrError);
+
+  auto entry = MF.DeclTypeCursor.advance();
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    // We don't know how to serialize decls represented by sub-blocks.
+    MF.error();
+    return nullptr;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  unsigned recordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                   &blobData);
 
   PrettyDeclDeserialization stackTraceEntry(
      &MF, declOrOffset, DID, static_cast<decls_block::RecordKind>(recordID));
