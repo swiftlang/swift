@@ -21,11 +21,13 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Platform.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Path.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "EnumPayload.h"
@@ -1114,6 +1116,30 @@ TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
   return found->second;
 }
 
+static llvm::StringLiteral platformsWithLegacyLayouts[][2] = {
+  {"appletvos", "arm64"},
+  {"appletvsimulator", "x86_64"},
+  {"iphoneos", "armv7"},
+  {"iphoneos", "armv7s"},
+  {"iphoneos", "arm64"},
+  {"iphonesimulator", "i386"},
+  {"iphonesimulator", "x86_64"},
+  {"macosx", "x86_64"},
+  {"watchos", "armv7k"},
+  {"watchsimulator", "i386"}
+};
+
+static bool doesPlatformUseLegacyLayouts(StringRef platformName,
+                                         StringRef archName) {
+  for (auto platformArchPair : platformsWithLegacyLayouts) {
+    if (platformName == platformArchPair[0] &&
+        archName == platformArchPair[1]) {
+      return true;
+    }
+  }
+
+  return false;
+}
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
@@ -1125,13 +1151,34 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   if (IGM.IRGen.Opts.EnableResilienceBypass)
     LoweringMode = Mode::CompletelyFragile;
 
-  StringRef path = IGM.IRGen.Opts.ReadTypeInfoPath;
-  if (!path.empty()) {
-    bool error = readLegacyTypeInfo(path);
-    if (error) {
-      llvm::report_fatal_error("Cannot read '" + path + "'");
-    }
+  // We have a bunch of -parse-stdlib tests that pass a -target in the test
+  // suite. To prevent these from failing when the user hasn't build the
+  // standard library for that target, we pass -disable-legacy-type-info to
+  // disable trying to load the legacy type info.
+  if (IGM.IRGen.Opts.DisableLegacyTypeInfo)
+    return;
+
+  auto platformName = getPlatformNameForTriple(IGM.Triple);
+  auto archName = getMajorArchitectureName(IGM.Triple);
+
+  if (!doesPlatformUseLegacyLayouts(platformName, archName))
+    return;
+
+  llvm::SmallString<128> defaultPath;
+
+  StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
+  if (path.empty()) {
+    defaultPath.append(IGM.Context.SearchPathOpts.RuntimeLibraryPath);
+    llvm::sys::path::append(defaultPath, "layouts-");
+    defaultPath.append(archName);
+    defaultPath.append(".yaml");
+
+    path = defaultPath;
   }
+
+  bool error = readLegacyTypeInfo(path);
+  if (error)
+    llvm::report_fatal_error("Cannot read '" + path + "'");
 }
 
 TypeConverter::~TypeConverter() {

@@ -376,12 +376,7 @@ namespace {
         // Lower the field type.
         auto *eltType = &IGM.getTypeInfo(type);
         if (CompletelyFragileLayout && !eltType->isFixedSize()) {
-          // For staging purposes, only do the new thing if the path flag
-          // is provided.
-          auto mode = (IGM.IRGen.Opts.ReadTypeInfoPath.empty()
-                       ? TypeConverter::Mode::CompletelyFragile
-                       : TypeConverter::Mode::Legacy);
-          LoweringModeScope scope(IGM, mode);
+          LoweringModeScope scope(IGM, TypeConverter::Mode::Legacy);
           eltType = &IGM.getTypeInfo(type);
         }
 
@@ -533,12 +528,8 @@ const ClassLayout &
 ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType,
                               bool forBackwardDeployment) const {
   // Perform fragile layout only if Objective-C interop is enabled.
-  //
-  // FIXME: EnableClassResilience staging flag will go away once we can do
-  // in-place re-initialization of class metadata.
   bool completelyFragileLayout = (forBackwardDeployment &&
-                                  IGM.Context.LangOpts.EnableObjCInterop &&
-                                  !IGM.IRGen.Opts.EnableClassResilience);
+                                  IGM.Context.LangOpts.EnableObjCInterop);
 
   // Return the cached layout if available.
   auto &Layout = completelyFragileLayout ? FragileLayout : ResilientLayout;
