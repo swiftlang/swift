@@ -90,7 +90,7 @@ public let DataBenchmarks = [
     legacyFactor: 20),
 
   BenchmarkInfo(name: "DataAppendArray",
-    runFunction: { append($0*100, arraySize: 809, to: medium) }, tags: d,
+    runFunction: { append($0*100, array: array809, to: medium) }, tags: d,
     legacyFactor: 100),
 
   BenchmarkInfo(name: "DataReset",
@@ -194,6 +194,8 @@ let small = sampleData(.small)
 let medium = sampleData(.medium)
 let large = sampleData(.large)
 
+let array809 = byteArray(size: 809)
+
 let repeatElementSeq = { count in
   return sequence(state: count) { (i: inout Int) -> UInt8? in
     defer { i = i &- 1 }; return i > 0 ? UInt8(0xA0) : nil
@@ -208,10 +210,14 @@ enum SampleKind {
   case immutableBacking
 }
 
-func fillBuffer(_ buffer: UnsafeMutableBufferPointer<UInt8>) {
-  for i in buffer.indices {
-    buffer[i] = UInt8(truncatingIfNeeded: i)
+func byteArray(size: Int) -> [UInt8] {
+  var bytes = [UInt8](repeating: 0, count: size)
+  bytes.withUnsafeMutableBufferPointer { buffer in
+    for i in buffer.indices {
+      buffer[i] = UInt8(truncatingIfNeeded: i)
+    }
   }
+  return bytes
 }
 
 func sampleData(size: Int) -> Data {
@@ -226,11 +232,7 @@ func sampleData(size: Int) -> Data {
 
 func sampleBridgedNSData() -> Data {
   let count = 1033
-  var bytes = [UInt8](repeating: 0, count: count)
-  bytes.withUnsafeMutableBufferPointer {
-    fillBuffer($0)
-  }
-  let data = NSData(bytes: bytes, length: count)
+  let data = NSData(bytes: byteArray(size: count), length: count)
   return Data(referencing: data)
 }
 
@@ -286,11 +288,7 @@ func append(_ N: Int, bytes count: Int, to data: Data) {
 }
 
 @inline(never)
-func append(_ N: Int, arraySize: Int, to data: Data) {
-  var bytes = [UInt8](repeating: 0, count: arraySize)
-  bytes.withUnsafeMutableBufferPointer {
-    fillBuffer($0)
-  }
+func append(_ N: Int, array bytes: [UInt8], to data: Data) {
   for _ in 1...N {
     var copy = data
     copy.append(contentsOf: bytes)
