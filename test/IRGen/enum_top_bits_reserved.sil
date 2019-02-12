@@ -1,5 +1,5 @@
-// RUN: %swift -module-name test -emit-ir -target arm64-apple-ios10.0 %s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-arm64
-// RUN: %swift -module-name test -emit-ir -target x86_64-apple-macosx10.12 %s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-x86_64
+// RUN: %swift -module-name test -emit-ir -disable-legacy-type-info -target arm64-apple-ios10.0 %s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-arm64
+// RUN: %swift -module-name test -emit-ir -disable-legacy-type-info -target x86_64-apple-macosx10.12 %s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-x86_64
 
 class NativeClass {}
 sil_vtable NativeClass {}

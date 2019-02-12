@@ -100,6 +100,10 @@ static llvm::cl::opt<IRGenOutputKind>
                                            "object", "Emit an object file")),
                llvm::cl::init(IRGenOutputKind::ObjectFile));
 
+static llvm::cl::opt<bool>
+    DisableLegacyTypeInfo("disable-legacy-type-info",
+        llvm::cl::desc("Don't try to load backward deployment layouts"));
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -155,6 +159,7 @@ int main(int argc, char **argv) {
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();
   Opts.OutputKind = OutputKind;
+  Opts.DisableLegacyTypeInfo = DisableLegacyTypeInfo;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

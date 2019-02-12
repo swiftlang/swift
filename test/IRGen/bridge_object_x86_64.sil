@@ -1,4 +1,4 @@
-// RUN: %swift -module-name bridge_object -emit-ir -target x86_64-apple-macosx10.9 %s | %FileCheck %s
+// RUN: %swift -module-name bridge_object -emit-ir -disable-legacy-type-info -target x86_64-apple-macosx10.9 %s | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=X86
 

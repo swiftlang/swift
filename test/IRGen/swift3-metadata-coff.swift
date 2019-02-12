@@ -1,4 +1,4 @@
-// RUN: %swift -target thumbv7--windows-itanium -parse-stdlib -parse-as-library -module-name Swift -O -emit-ir %s -o - | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target thumbv7--windows-itanium -parse-stdlib -parse-as-library -module-name Swift -O -emit-ir %s -o - | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=ARM
 
