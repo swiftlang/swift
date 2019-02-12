@@ -825,6 +825,7 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
   let graphFunction = _graphInternal(with: state, in: fn)
   return { (state: State, data: Data) in
     let result = graphFunction(state, data)
+    internalConsistencyCheck(result.1 != nil)
     return (result.0, result.1!)
   }
 }
