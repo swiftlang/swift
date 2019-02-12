@@ -91,6 +91,7 @@ static ParserStatus parseDefaultArgument(
   case Parser::ParameterContextKind::Function:
   case Parser::ParameterContextKind::Operator:
   case Parser::ParameterContextKind::Initializer:
+  case Parser::ParameterContextKind::EnumElement:
     break;
   case Parser::ParameterContextKind::Closure:
     diagID = diag::no_default_arg_closure;
@@ -100,9 +101,6 @@ static ParserStatus parseDefaultArgument(
     break;
   case Parser::ParameterContextKind::Curried:
     diagID = diag::no_default_arg_curried;
-    break;
-  case Parser::ParameterContextKind::EnumElement:
-    diagID = diag::no_default_arg_enum_elt;
     break;
   }
   

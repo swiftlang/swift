@@ -411,10 +411,9 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   // Emit the exploded constructor argument.
   ArgumentSource payload;
   if (element->hasAssociatedValues()) {
-    RValue arg = emitImplicitValueConstructorArg
-      (*this, Loc, element->getArgumentInterfaceType()->getCanonicalType(),
-       element->getDeclContext());
-   payload = ArgumentSource(Loc, std::move(arg));
+    auto eltArgTy = element->getArgumentInterfaceType()->getCanonicalType();
+    RValue arg = emitImplicitValueConstructorArg(*this, Loc, eltArgTy, element);
+    payload = ArgumentSource(Loc, std::move(arg));
   }
 
   // Emit the metatype argument.
