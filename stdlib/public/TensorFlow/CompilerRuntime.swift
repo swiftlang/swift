@@ -738,12 +738,12 @@ extension _TensorArrayProtocolEnhanced {
 }
 
 // TODO: rename this to `graph` when it's ready for end users.
-public func _graph<State : _TensorArrayProtocolEnhanced,
-                   Data : TensorGroup,
-                   Result : TensorGroup>(
+private func _graphInternal<State : _TensorArrayProtocolEnhanced,
+                            Data : TensorGroup,
+                            Result : TensorGroup>(
   with state: State,
-  in fn: (State, Data) -> (State, Result)
-) -> (State, Data) -> (State, Result) {
+  in fn: (State, Data) -> (State, Result?)
+) -> (State, Data) -> (State, Result?) {
   debugLog("""
              Tracing over a function with \(state._tensorHandleCount) input \
              state tensors and \(Data._typeList.count) input data tensors.
@@ -775,8 +775,11 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
   let (outputState, outputResult) = fn(symbolicState, symbolicData)
 
   debugLog("Assembling output tensor handles.")
-  let outputTensorHandles = outputState.cTensorHandles
-    + outputResult.cTensorHandles
+  let outputTensorHandles = 
+    outputResult != nil
+      ? (outputState.cTensorHandles + outputResult!.cTensorHandles)
+      : outputState.cTensorHandles
+
 
   debugLog("Finalizing trace graph function.")
   // TAP means tensor array protocol.
@@ -786,7 +789,7 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
 
   // The result is a closure that captures and executes the trace graph
   // function in the trace context.
-  return { (oldState: State, data: Data) -> (State, Result) in
+  return { (oldState: State, data: Data) -> (State, Result?) in
     debugLog("Running trace function over state \(oldState) and data \(data).")
 
     debugLog("Getting input state tensor handles.")
@@ -805,11 +808,43 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
                                             outputs: outputTensorHandles)
 
     debugLog("Creating output model instance.")
-    let newState = state._makeInstance(owning: returnValues.dropLast(
-                                         Data._typeList.count))
-    let result = Result(
-      _copying: returnValues.dropFirst(Int(state._tensorHandleCount)))
+    let newState = state._makeInstance(owning: returnValues.prefix(
+                                         Int(state._tensorHandleCount)))
+    let resultValues = returnValues.dropFirst(Int(state._tensorHandleCount))
+    let result = resultValues.isEmpty ? nil : Result(_copying: resultValues)
     return (newState, result)
+  }
+}
+
+public func _graph<State : _TensorArrayProtocolEnhanced,
+                   Data : TensorGroup,
+                   Result : TensorGroup>(
+  with state: State,
+  in fn: @escaping (State, Data) -> (State, Result)
+) -> (State, Data) -> (State, Result) {
+  let graphFunction = _graphInternal(with: state, in: fn)
+  return { (state: State, data: Data) in
+    let result = graphFunction(state, data)
+    internalConsistencyCheck(result.1 != nil)
+    return (result.0, result.1!)
+  }
+}
+
+public func _graph<State : _TensorArrayProtocolEnhanced,
+                   Data : TensorGroup>(
+  with state: State,
+  in fn: @escaping (State, Data) -> State
+) -> (State, Data) -> State {
+  let wrappedFn = {
+    // The result argument needs to a type that conforms to TensorGroup. 
+    // We are arbitrarily picking Tensor<Float> here. 
+    (s: State, d: Data) -> (State, Tensor<Float>?) in
+      (fn(s, d), nil)
+  }
+  let graphFunction = _graphInternal(with: state, in: wrappedFn)
+  return { (state: State, data: Data) in
+    let result = graphFunction(state, data)
+    return result.0
   }
 }
 
