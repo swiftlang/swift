@@ -312,7 +312,7 @@ getFieldAt(const Metadata *base, unsigned index) {
       (int)typeName.length, typeName.data);
     return {"unknown",
             FieldType()
-              .withType(TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {}))
+              .withType(&METADATA_SYM(EMPTY_TUPLE_MANGLING))
               .withIndirect(false)
               .withWeak(false)};
   };
@@ -336,20 +336,15 @@ getFieldAt(const Metadata *base, unsigned index) {
   auto typeName = field.getMangledTypeName(0);
 
   SubstGenericParametersFromMetadata substitutions(base);
-  auto typeInfo = swift_getTypeByMangledName(typeName, substitutions,
+  auto typeInfo = swift_getTypeByMangledName(MetadataState::Complete,
+                                             typeName, substitutions,
                                              substitutions);
-
-  // Complete the type metadata before returning it to the caller.
-  if (typeInfo) {
-    typeInfo = TypeInfo(swift_checkMetadataState(MetadataState::Complete,
-                                                 typeInfo).Value,
-                        typeInfo.getReferenceOwnership());
-  }
 
   // If demangling the type failed, pretend it's an empty type instead with
   // a log message.
-  if (typeInfo == nullptr) {
-    typeInfo = TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {});
+  if (!typeInfo.getMetadata()) {
+    typeInfo = TypeInfo({&METADATA_SYM(EMPTY_TUPLE_MANGLING),
+                         MetadataState::Complete}, {});
     missing_reflection_metadata_warning(
       "warning: the Swift runtime was unable to demangle the type "
       "of field '%*s'. the mangled type name is '%*s'. this field will "
@@ -359,7 +354,7 @@ getFieldAt(const Metadata *base, unsigned index) {
   }
 
   return {name, FieldType()
-                 .withType(typeInfo)
+                 .withType(typeInfo.getMetadata())
                  .withIndirect(field.isIndirectCase())
                  .withWeak(typeInfo.isWeak())};
 }

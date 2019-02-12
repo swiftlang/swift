@@ -13,6 +13,7 @@
 #ifndef SWIFT_DRIVER_DEPENDENCYGRAPH_H
 #define SWIFT_DRIVER_DEPENDENCYGRAPH_H
 
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -121,7 +122,6 @@ private:
   llvm::StringMap<std::pair<std::vector<DependencyEntryTy>, DependencyMaskTy>> Dependencies;
 
   /// The set of marked nodes.
-
   llvm::SmallPtrSet<const void *, 16> Marked;
 
   /// A list of all external dependencies that cannot be resolved from just this
@@ -231,7 +231,10 @@ public:
   /// ("depends") are not cleared; new dependencies are considered additive.
   ///
   /// If \p node has already been marked, only its outgoing edges are updated.
-  LoadResult loadFromPath(T node, StringRef path) {
+  /// The third argument is ignored here, but must be present so that the same
+  /// call site can polymorphically call \ref
+  /// experimental_dependencies::ModuleDepGraph::loadFromPath
+  LoadResult loadFromPath(T node, StringRef path, DiagnosticEngine &) {
     return DependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
                                              path);
   }

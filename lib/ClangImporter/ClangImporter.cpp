@@ -3075,6 +3075,18 @@ ClangModuleUnit::ClangModuleUnit(ModuleDecl &M,
                                  const clang::Module *clangModule)
   : LoadedFile(FileUnitKind::ClangModule, M), owner(owner),
     clangModule(clangModule) {
+  // Capture the file metadata before it goes away.
+  if (clangModule)
+    ASTSourceDescriptor = {*clangModule};
+}
+
+Optional<clang::ExternalASTSource::ASTSourceDescriptor>
+ClangModuleUnit::getASTSourceDescriptor() const {
+  if (clangModule) {
+    assert(ASTSourceDescriptor.getModuleOrNull() == clangModule);
+    return ASTSourceDescriptor;
+  }
+  return None;
 }
 
 bool ClangModuleUnit::hasClangModule(ModuleDecl *M) {

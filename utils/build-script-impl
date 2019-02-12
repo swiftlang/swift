@@ -107,6 +107,7 @@ KNOWN_SETTINGS=(
     test-installable-package    ""               "whether to run post-packaging tests on the produced package"
     reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
     build-libparser-only        ""               "only build libSwiftSyntaxParser"
+    libparser-ver               ""               "current version of libSwiftSyntaxParser"
     skip-reconfigure            ""               "set to skip reconfigure"
     swift-primary-variant-sdk   ""               "default SDK for target binaries"
     swift-primary-variant-arch  ""               "default arch for target binaries"
@@ -128,6 +129,7 @@ KNOWN_SETTINGS=(
     skip-build-android          ""               "set to skip building Swift stdlibs for Android"
     skip-build-lldb             ""               "set to skip building LLDB"
     skip-build-llbuild          ""               "set to skip building llbuild"
+    skip-build-libcxx           ""               "set to skip building libcxx"
     skip-build-swiftpm          ""               "set to skip building swiftpm"
     skip-build-swiftsyntax      ""               "set to skip building swiftSyntax"
     skip-build-skstresstester   ""               "set to skip building the SourceKit stress tester"
@@ -207,6 +209,7 @@ KNOWN_SETTINGS=(
     install-swiftevolve         ""               "whether to install the swift-evolve tool"
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
+    install-libcxx              ""               "whether to install libc++"
     install-libdispatch         ""               "whether to install libdispatch"
     install-libicu              ""               "whether to install libicu"
     install-playgroundsupport   ""               "whether to install PlaygroundSupport"
@@ -1201,6 +1204,7 @@ FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
+LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
@@ -1233,12 +1237,6 @@ if [ -e "${WORKSPACE}/compiler-rt" ] ; then
     if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
         make_relative_symlink "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
     fi
-fi
-
-# Build libcxx, unless it doesn't exist.
-LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
-if [[ ! -e "${LIBCXX_SOURCE_DIR}" ]] ; then
-  SKIP_BUILD_LIBCXX=1
 fi
 
 PRODUCTS=(cmark llvm)
@@ -1549,21 +1547,6 @@ COMMON_C_FLAGS=" -Wno-unknown-warning-option -Werror=unguarded-availability-new"
 eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 eval BUILD_ARGS=(${BUILD_ARGS})
-
-if [[ -n "${DISTCC}" ]]; then
-    if [[ "$(uname -s)" == "Darwin" ]] ; then
-        # These are normally deduced by CMake, but when the compiler is set to
-        # distcc which is installed elsewhere, we need to set them explicitly.
-        COMMON_CMAKE_OPTIONS=(
-            "${COMMON_CMAKE_OPTIONS[@]}" "-DCMAKE_AR=$(xcrun_find_tool ar)"
-            "-DCMAKE_LINKER=$(xcrun_find_tool ld)"
-            "-DCMAKE_NM=$(xcrun_find_tool nm)"
-            "-DCMAKE_OBJDUMP=$(xcrun_find_tool objdump)"
-            "-DCMAKE_RANLIB=$(xcrun_find_tool ranlib)"
-            "-DCMAKE_STRIP=$(xcrun_find_tool strip)"
-        )
-    fi
-fi
 
 eval CMAKE_BUILD=("${DISTCC_PUMP}" "${CMAKE}" "--build")
 
@@ -2462,6 +2445,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 if [ "${BUILD_LIBPARSER_ONLY}" ]; then
                     build_targets=(libSwiftSyntaxParser)
+                    if [ "${LIBPARSER_VER}" ] ; then
+                      cmake_options=(
+                          "${cmake_options[@]}"
+                          -DSWIFT_LIBPARSER_VER:STRING="${LIBPARSER_VER}"
+                      )
+                    fi
                 fi
                 skip_build=${SKIP_BUILD_SWIFT}
                 ;;
@@ -2534,12 +2523,12 @@ for host in "${ALL_HOSTS[@]}"; do
                       -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
                   )
 
-                  if [[ ${LLDB_BUILD_ON_MACOS} ]] ; then
+                  if [[ "$(uname -s)" == "Darwin" ]] ; then
                     cmake_options+=(
                       -DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
                       -DLLDB_CODESIGN_IDENTITY=""
                     )
-                    if "${ENABLE_ASAN}" ]] ; then
+                    if [[ "${ENABLE_ASAN}" ]] ; then
                       # Limit the number of parallel tests
                       LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --threads=$(sysctl hw.physicalcpu | awk '{ print $2 }')"
                     fi
@@ -3504,6 +3493,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/;/ install-/g')
                 ;;
             libcxx)
+                if [[ -z "${INSTALL_LIBCXX}" ]] ; then
+                    continue
+                fi
                 INSTALL_TARGETS=install-cxx-headers
                 ;;
             swift)
@@ -3815,29 +3807,39 @@ for host in "${ALL_HOSTS[@]}"; do
             call darwin_install_extract_symbols
         else
             set -x
+            if [ "${BUILD_LIBPARSER_ONLY}" ]; then
+                # We don't have a toolchain so we should install to the specified dir
+                CURRENT_INSTALL_DIR="${INSTALL_DESTDIR}"
+                CURRENT_PREFIX="/."
+            else
+                # If we have a toolchain, use the toolchain install dir.
+                CURRENT_INSTALL_DIR=${host_install_destdir}
+                CURRENT_PREFIX="${TOOLCHAIN_PREFIX}"
+            fi
+
             # Copy executables and shared libraries from the `host_install_destdir` to
             # INSTALL_SYMROOT and run dsymutil on them.
-            (cd "${host_install_destdir}" &&
-             find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | cpio --insecure -pdm "${INSTALL_SYMROOT}")
+            (cd "${CURRENT_INSTALL_DIR}" &&
+             find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | cpio --insecure -pdm "${INSTALL_SYMROOT}")
 
             # Run dsymutil on executables and shared libraries.
             #
             # Exclude shell scripts.
             (cd "${INSTALL_SYMROOT}" &&
-             find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | \
+             find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
                grep -v crashlog.py | \
                grep -v symbolication.py | \
                xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
 
             # Strip executables, shared libraries and static libraries in
             # `host_install_destdir`.
-            find "${host_install_destdir}${TOOLCHAIN_PREFIX}/" \
+            find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
               '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
               xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
 
             # Codesign dylibs after strip tool
             # rdar://45388785
-            find "${host_install_destdir}${TOOLCHAIN_PREFIX}/" \
+            find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
               '(' -name "*.dylib" ')' -type f -print | \
               xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool codesign) -f -s -
 

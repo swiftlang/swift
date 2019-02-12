@@ -174,11 +174,11 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Compile the module to export resilient interfaces for all "
             "public declarations by default">;
 
-def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
-   HelpText<"Enable resilient layout for classes containing resilient value types">;
+def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
+  HelpText<"Completely disable legacy type layout">;
 
-def read_type_info_path_EQ : Joined<["-"], "read-type-info-path=">,
-  HelpText<"Read legacy type layout from the given path">;
+def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
+  HelpText<"Read legacy type layout from the given path instead of default path">;
 }
 
 

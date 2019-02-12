@@ -660,7 +660,7 @@ static Optional<KnownProtocolKind>
 getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
   TypeChecker &tc = TypeChecker::createForContext(protocol->getASTContext());
 
-// clang-format off
+  // clang-format off
   #define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)            \
     if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))        \
       return KnownProtocolKind::Id;

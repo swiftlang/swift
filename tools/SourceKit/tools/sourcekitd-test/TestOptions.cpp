@@ -105,6 +105,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     case OPT_req:
       Request = llvm::StringSwitch<SourceKitRequest>(InputArg->getValue())
         .Case("version", SourceKitRequest::ProtocolVersion)
+        .Case("compiler-version", SourceKitRequest::CompilerVersion)
         .Case("demangle", SourceKitRequest::DemangleNames)
         .Case("mangle", SourceKitRequest::MangleSimpleClasses)
         .Case("index", SourceKitRequest::Index)
@@ -115,6 +116,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("complete.cache.ondisk", SourceKitRequest::CodeCompleteCacheOnDisk)
         .Case("complete.setpopularapi", SourceKitRequest::CodeCompleteSetPopularAPI)
         .Case("typecontextinfo", SourceKitRequest::TypeContextInfo)
+        .Case("conformingmethods", SourceKitRequest::ConformingMethodList)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
         .Case("syntax-map", SourceKitRequest::SyntaxMap)

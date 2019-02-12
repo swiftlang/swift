@@ -406,10 +406,9 @@ extension String {
        contigBytes._providesContiguousBytesNoCopy
     {
       self = contigBytes.withUnsafeBytes { rawBufPtr in
-        let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
         return String._fromUTF8Repairing(
           UnsafeBufferPointer(
-            start: ptr.assumingMemoryBound(to: UInt8.self),
+            start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
             count: rawBufPtr.count)).0
       }
       return
@@ -837,7 +836,7 @@ extension String {
     }
     return codeUnits
   }
-  
+
   public // @testable
   func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
     try _gutsSlice._withNFCCodeUnits(f)

@@ -16,6 +16,7 @@
 // CHECK-EXPLICIT-SAME:           -resource-dir 
 
 // Check that we don't write temporary file names in the debug info
-// RUN: env TMPDIR=abc/def %target-swift-frontend %s -I abc/def/xyz -g -emit-ir -debug-info-store-invocation -o - | %FileCheck --check-prefix CHECK-TEMP %s
+// RUN: env TMP=abc/def TMPDIR=abc/def %target-swift-frontend %s -I abc/def/xyz -g -emit-ir -debug-info-store-invocation -o - | %FileCheck --check-prefix CHECK-TEMP %s
+// RUN: env TMP=%t TMPDIR=%t %target-swift-frontend %s -I %t/xyz -g -emit-ir -debug-info-store-invocation -o - | %FileCheck --check-prefix CHECK-TEMP %s
 // CHECK-TEMP: !DICompileUnit({{.*}} flags: "{{.*}} -I <temporary-file>
 

@@ -106,6 +106,9 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.CollapseSingleGetterProperty = false;
   result.VarInitializers = true;
 
+  // We should print __consuming, __owned, etc for the module interface file.
+  result.SkipUnderscoredKeywords = false;
+
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
     if (!AFD || !AFD->hasInlinableBodyText()) return;
@@ -270,6 +273,22 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   printText(Text);
 }
 
+void ASTPrinter::printEscapedStringLiteral(StringRef str) {
+  SmallString<128> encodeBuf;
+  StringRef escaped =
+    Lexer::getEncodedStringSegment(str, encodeBuf,
+                                   /*isFirstSegment*/true,
+                                   /*isLastSegment*/true,
+                                   /*indentToStrip*/~0U /* sentinel */);
+
+  // FIXME: This is wasteful, but ASTPrinter is an abstract class that doesn't
+  //        have a directly-accessible ostream.
+  SmallString<128> escapeBuf;
+  llvm::raw_svector_ostream os(escapeBuf);
+  os << QuotedString(escaped);
+  printTextImpl(escapeBuf.str());
+}
+
 void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name) {
   PrintNameContext Context = PrintNameContext::Normal;
   if (isa<GenericTypeParamDecl>(RefTo)) {
@@ -350,7 +369,7 @@ ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   SmallString<16> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
   OS << keyword;
-  printer.printKeyword(Buffer.str());
+  printer.printKeyword(Buffer.str(), PrintOptions());
   return printer;
 }
 
@@ -575,7 +594,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       Printer << tok::kw_public;
       break;
     case AccessLevel::Open:
-      Printer.printKeyword("open");
+      Printer.printKeyword("open", Options);
       break;
     }
     Printer << suffix << " ";
@@ -1614,11 +1633,9 @@ static StringRef getAccessorLabel(AccessorDecl *accessor) {
 
 void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
   if (accessor->isAssumedNonMutating() && accessor->isMutating()) {
-    Printer.printKeyword("mutating");
-    Printer << " ";
+    Printer.printKeyword("mutating", Options, " ");
   } else if (accessor->isExplicitNonMutating()) {
-    Printer.printKeyword("nonmutating");
-    Printer << " ";
+    Printer.printKeyword("nonmutating", Options, " ");
   }
 }
 
@@ -1675,17 +1692,17 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     Printer << " {";
     if (mutatingGetter) {
       Printer << " ";
-      Printer.printKeyword("mutating");
+      Printer.printKeyword("mutating", Options);
     }
     Printer << " ";
-    Printer.printKeyword("get");
+    Printer.printKeyword("get", Options);
     if (settable) {
       if (nonmutatingSetter) {
         Printer << " ";
-        Printer.printKeyword("nonmutating");
+        Printer.printKeyword("nonmutating", Options);
       }
       Printer << " ";
-      Printer.printKeyword("set");
+      Printer.printKeyword("set", Options);
     }
     Printer << " }";
     return;
@@ -1728,7 +1745,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     if (!PrintAccessorBody) {
       Printer << " ";
       printMutatingModifiersIfNeeded(Accessor);
-      Printer.printKeyword(getAccessorLabel(Accessor));
+      Printer.printKeyword(getAccessorLabel(Accessor), Options);
     } else {
       {
         IndentRAII IndentMore(*this);
@@ -2364,13 +2381,13 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     /* nothing */
     break;
   case ValueOwnership::InOut:
-    printer << "inout ";
+    printer.printKeyword("inout", options, " ");
     break;
   case ValueOwnership::Shared:
-    printer << "__shared ";
+    printer.printKeyword("__shared", options, " ");
     break;
   case ValueOwnership::Owned:
-    printer << "__owned ";
+    printer.printKeyword("__owned", options, " ");
     break;
   }
 }
@@ -2530,7 +2547,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     case DefaultArgumentKind::Function:
     case DefaultArgumentKind::DSOHandle:
     case DefaultArgumentKind::NilLiteral:
-      Printer.printKeyword(defaultArgStr);
+      Printer.printKeyword(defaultArgStr, Options);
       break;
     default:
       Printer << defaultArgStr;
@@ -2665,11 +2682,9 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (decl->isStatic())
         printStaticKeyword(decl->getCorrectStaticSpelling());
       if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
-        Printer.printKeyword("mutating");
-        Printer << " ";
+        Printer.printKeyword("mutating", Options, " ");
       } else if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
-        Printer.printKeyword("__consuming");
-        Printer << " ";
+        Printer.printKeyword("__consuming", Options, " ");
       }
       Printer << tok::kw_func << " ";
     }
@@ -2846,8 +2861,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       isClassContext = dc->getSelfClassDecl() != nullptr;
     }
     if (isClassContext) {
-      Printer.printKeyword("convenience");
-      Printer << " ";
+      Printer.printKeyword("convenience", Options, " ");
     } else {
       assert(decl->getDeclContext()->getExtendedProtocolDecl() &&
              "unexpected convenience initializer");
@@ -2896,8 +2910,8 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
 }
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
-  Printer.printKeyword("infix");
-  Printer << " " << tok::kw_operator << " ";
+  Printer.printKeyword("infix", Options, " ");
+  Printer << tok::kw_operator << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2928,17 +2942,16 @@ void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
     if (!decl->isAssociativityImplicit() ||
         !decl->isNonAssociative()) {
       indent();
-      Printer.printKeyword("associativity");
-      Printer << ": ";
+      Printer.printKeyword("associativity", Options, ": ");
       switch (decl->getAssociativity()) {
       case Associativity::None:
-        Printer.printKeyword("none");
+        Printer.printKeyword("none", Options);
         break;
       case Associativity::Left:
-        Printer.printKeyword("left");
+        Printer.printKeyword("left", Options);
         break;
       case Associativity::Right:
-        Printer.printKeyword("right");
+        Printer.printKeyword("right", Options);
         break;
       }
       Printer.printNewline();
@@ -2946,15 +2959,13 @@ void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
     if (!decl->isAssignmentImplicit() ||
         decl->isAssignment()) {
       indent();
-      Printer.printKeyword("assignment");
-      Printer << ": ";
-      Printer.printKeyword(decl->isAssignment() ? "true" : "false");
+      Printer.printKeyword("assignment", Options, ": ");
+      Printer.printKeyword(decl->isAssignment() ? "true" : "false", Options);
       Printer.printNewline();
     }
     if (!decl->getHigherThan().empty()) {
       indent();
-      Printer.printKeyword("higherThan");
-      Printer << ": ";
+      Printer.printKeyword("higherThan", Options, ": ");
       if (!decl->getHigherThan().empty()) {
         Printer << decl->getHigherThan()[0].Name;
         for (auto &rel : decl->getHigherThan().slice(1))
@@ -2964,8 +2975,7 @@ void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
     }
     if (!decl->getLowerThan().empty()) {
       indent();
-      Printer.printKeyword("lowerThan");
-      Printer << ": ";
+      Printer.printKeyword("lowerThan", Options, ": ");
       if (!decl->getLowerThan().empty()) {
         Printer << decl->getLowerThan()[0].Name;
         for (auto &rel : decl->getLowerThan().slice(1))
@@ -2979,8 +2989,8 @@ void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
 }
 
 void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
-  Printer.printKeyword("prefix");
-  Printer << " " << tok::kw_operator << " ";
+  Printer.printKeyword("prefix", Options, " ");
+  Printer << tok::kw_operator << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2997,8 +3007,8 @@ void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
-  Printer.printKeyword("postfix");
-  Printer << " " << tok::kw_operator << " ";
+  Printer.printKeyword("postfix", Options, " ");
+  Printer << tok::kw_operator << " ";
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -3035,8 +3045,7 @@ void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
 }
 
 void PrintAST::visitYieldStmt(YieldStmt *stmt) {
-  Printer.printKeyword("yield");
-  Printer << " ";
+  Printer.printKeyword("yield", Options, " ");
   bool parens = (stmt->getYields().size() != 1
                  || stmt->getLParenLoc().isValid());
   if (parens) Printer << "(";

@@ -1078,11 +1078,11 @@ public:
   /// created for various dynamic purposes like KVO?
   bool isArtificialSubclass() const {
     assert(isTypeMetadata());
-    return Description == 0;
+    return Description == nullptr;
   }
   void setArtificialSubclass() {
     assert(isTypeMetadata());
-    Description = 0;
+    Description = nullptr;
   }
 
   ClassFlags getFlags() const {
@@ -1321,7 +1321,7 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
-    return sizeof(TargetStructMetadata<Runtime>) / sizeof(void*);
+    return sizeof(TargetStructMetadata<Runtime>) / sizeof(StoredPointer);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -1369,7 +1369,7 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
-    return sizeof(TargetEnumMetadata<Runtime>) / sizeof(void*);
+    return sizeof(TargetEnumMetadata<Runtime>) / sizeof(StoredPointer);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
@@ -3536,11 +3536,11 @@ public:
   llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const;
 
   /// Return the offset of the start of generic arguments in the nominal
-  /// type's metadata. The returned value is measured in sizeof(void*).
+  /// type's metadata. The returned value is measured in sizeof(StoredPointer).
   int32_t getGenericArgumentOffset() const;
 
   /// Return the start of the generic arguments array in the nominal
-  /// type's metadata. The returned value is measured in sizeof(void*).
+  /// type's metadata. The returned value is measured in sizeof(StoredPointer).
   const TargetMetadata<Runtime> * const *getGenericArguments(
                                const TargetMetadata<Runtime> *metadata) const {
     auto offset = getGenericArgumentOffset();

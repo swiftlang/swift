@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -57,7 +57,7 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
 
 // General utilities <stdlib.h>
 // Memory management functions
-static inline void _swift_stdlib_free(void *ptr) {
+static inline void _swift_stdlib_free(void *_Nullable ptr) {
   extern void free(void *);
   free(ptr);
 }

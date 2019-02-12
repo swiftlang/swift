@@ -17,6 +17,7 @@
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Path.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -1332,7 +1333,12 @@ llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
   auto loc = SILLocation::decode(sourceLoc, IGM.Context.SourceMgr);
   auto line = llvm::ConstantInt::get(IGM.Int32Ty, loc.Line);
   auto col = llvm::ConstantInt::get(IGM.Int32Ty, loc.Column);
-  auto filename = IGM.getAddrOfGlobalString(loc.Filename);
+
+  // Only output the filepath in debug mode. It is going to leak into the
+  // executable. This is the same behavior as asserts.
+  auto filename = IGM.IRGen.Opts.shouldOptimize()
+                      ? IGM.getAddrOfGlobalString("")
+                      : IGM.getAddrOfGlobalString(loc.Filename);
   auto filenameLength =
       llvm::ConstantInt::get(IGM.Int32Ty, loc.Filename.size());
   auto type = llvm::ConstantInt::get(IGM.Int32Ty, verificationType);

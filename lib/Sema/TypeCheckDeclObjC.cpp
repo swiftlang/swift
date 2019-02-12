@@ -825,18 +825,22 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (SubscriptType->getParams().size() != 1)
     return false;
 
-  Type IndicesType = SubscriptType->getParams()[0].getOldType();
-  if (IndicesType->hasError())
+  auto IndexParam = SubscriptType->getParams()[0];
+  if (IndexParam.isInOut())
     return false;
 
-  bool IndicesResult =
-    IndicesType->isRepresentableIn(ForeignLanguage::ObjectiveC,
-                                   SD->getDeclContext());
+  Type IndexType = SubscriptType->getParams()[0].getParameterType();
+  if (IndexType->hasError())
+    return false;
+
+  bool IndexResult =
+    IndexType->isRepresentableIn(ForeignLanguage::ObjectiveC,
+                                 SD->getDeclContext());
 
   Type ElementType = SD->getElementInterfaceType();
   bool ElementResult = ElementType->isRepresentableIn(
         ForeignLanguage::ObjectiveC, SD->getDeclContext());
-  bool Result = IndicesResult && ElementResult;
+  bool Result = IndexResult && ElementResult;
 
   if (Result && checkObjCInExtensionContext(SD, Diagnose))
     return false;
@@ -845,7 +849,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     return Result;
 
   SourceRange TypeRange;
-  if (!IndicesResult)
+  if (!IndexResult)
     TypeRange = SD->getIndices()->getSourceRange();
   else
     TypeRange = SD->getElementTypeLoc().getSourceRange();
@@ -854,8 +858,8 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     .highlight(TypeRange);
 
   diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),
-                                     !IndicesResult ? IndicesType
-                                                    : ElementType,
+                                     !IndexResult ? IndexType
+                                                  : ElementType,
                                      TypeRange);
   describeObjCReason(SD, Reason);
 
@@ -1054,7 +1058,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
       protocolContext && protocolContext->isObjC();
 
   // Local function to determine whether we can implicitly infer @objc.
-  auto canInferImplicitObjC = [&] {
+  auto canInferImplicitObjC = [&](bool allowAnyAccess) {
     if (VD->isInvalid())
       return false;
     if (VD->isOperator())
@@ -1064,7 +1068,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     if (!allowImplicit && VD->isImplicit())
       return false;
 
-    if (VD->getFormalAccess() <= AccessLevel::FilePrivate)
+    if (!allowAnyAccess && VD->getFormalAccess() <= AccessLevel::FilePrivate)
       return false;
 
     if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
@@ -1115,6 +1119,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   // A member of an @objc protocol is implicitly @objc.
   if (isMemberOfObjCProtocol)
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
+
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
@@ -1122,10 +1127,14 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
        cast<ExtensionDecl>(VD->getDeclContext())->getAttrs()
         .hasAttribute<NonObjCAttr>()))
     return None;
-  if (isMemberOfObjCClassExtension(VD) && canInferImplicitObjC())
+
+  if (isMemberOfObjCClassExtension(VD) && 
+      canInferImplicitObjC(/*allowAnyAccess*/true))
     return ObjCReason(ObjCReason::MemberOfObjCExtension);
-  if (isMemberOfObjCMembersClass(VD) && canInferImplicitObjC())
+  if (isMemberOfObjCMembersClass(VD) && 
+      canInferImplicitObjC(/*allowAnyAccess*/false))
     return ObjCReason(ObjCReason::MemberOfObjCMembersClass);
+
   // An override of an @objc declaration is implicitly @objc.
   if (VD->getOverriddenDecl() && VD->getOverriddenDecl()->isObjC())
     return ObjCReason(ObjCReason::OverridesObjC);
@@ -1177,7 +1186,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   // (and extensions thereof) whose class hierarchies originate in Objective-C,
   // e.g., which derive from NSObject, so long as the members have internal
   // access or greater.
-  if (!canInferImplicitObjC())
+  if (!canInferImplicitObjC(/*allowAnyAccess*/false))
     return None;
 
   // If this declaration is part of a class with implicitly @objc members,

@@ -245,6 +245,12 @@ protocol FooProtocol {
   // CHECK:  <associatedtype>associatedtype <name>Baz</name>: Equatable</associatedtype>
   associatedtype Qux where Qux: Equatable
   // CHECK:  <associatedtype>associatedtype <name>Qux</name> where Qux: Equatable</associatedtype>
+  associatedtype Bar2 = Int
+  // CHECK:  <associatedtype>associatedtype <name>Bar2</name> = Int</associatedtype>
+  associatedtype Baz2: Equatable = Int
+  // CHECK:  <associatedtype>associatedtype <name>Baz2</name>: Equatable = Int</associatedtype>
+  associatedtype Qux2 = Int where Qux2: Equatable
+  // CHECK:  <associatedtype>associatedtype <name>Qux2</name> = Int where Qux2: Equatable</associatedtype>
 }
 
 // CHECK: <struct>struct <name>Generic</name><<generic-param><name>T</name>: <inherited><elem-typeref>Comparable</elem-typeref></inherited></generic-param>, <generic-param><name>X</name></generic-param>> {

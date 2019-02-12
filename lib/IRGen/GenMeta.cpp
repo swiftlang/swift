@@ -1815,12 +1815,14 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
     if (!doesClassMetadataRequireRelocation(IGM, classDecl))
       flags |= ClassLayoutFlags::HasStaticVTable;
 
+    llvm::Value *dependency;
     if (doesClassMetadataRequireInitialization(IGM, classDecl)) {
       // Call swift_initClassMetadata().
-      IGF.Builder.CreateCall(IGM.getInitClassMetadataFn(),
-                             {metadata,
-                              IGM.getSize(Size(uintptr_t(flags))),
-                              numFields, fields.getAddress(), fieldVector});
+      dependency =
+        IGF.Builder.CreateCall(IGM.getInitClassMetadata2Fn(),
+                               {metadata,
+                                IGM.getSize(Size(uintptr_t(flags))),
+                                numFields, fields.getAddress(), fieldVector});
     } else {
       assert(doesClassMetadataRequireUpdate(IGM, classDecl));
       assert(IGM.Context.LangOpts.EnableObjCInterop);
@@ -1828,11 +1830,18 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
       // Call swift_updateClassMetadata(). Note that the static metadata
       // already references the superclass in this case, but we still want
       // to ensure the superclass metadata is initialized first.
-      IGF.Builder.CreateCall(IGM.getUpdateClassMetadataFn(),
-                             {metadata,
-                              IGM.getSize(Size(uintptr_t(flags))),
-                              numFields, fields.getAddress(), fieldVector});
+      dependency =
+        IGF.Builder.CreateCall(IGM.getUpdateClassMetadata2Fn(),
+                               {metadata,
+                                IGM.getSize(Size(uintptr_t(flags))),
+                                numFields, fields.getAddress(), fieldVector});
     }
+
+    // Collect any possible dependency from initializing the class; generally
+    // this involves the superclass.
+    assert(collector);
+    collector->collect(IGF, dependency);
+
   } else {
     assert(isa<StructDecl>(target));
 

@@ -247,3 +247,7 @@ def verify_syntax_node_serialization_codes(nodes, serialization_codes):
         if serialization_code in used_codes:
             error("Serialization code %d used twice" % serialization_code)
         used_codes.add(serialization_code)
+
+
+def get_serialization_code(syntax_kind):
+    return SYNTAX_NODE_SERIALIZATION_CODES[syntax_kind]

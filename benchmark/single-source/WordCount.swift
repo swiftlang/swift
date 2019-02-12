@@ -27,37 +27,43 @@ public let WordCount = [
     name: "WordSplitASCII",
     runFunction: run_WordSplitASCII,
     tags: [.validation, .api, .String, .algorithm, .unstable],
-    setUpFunction: { buildWorkload() }
+    setUpFunction: { buildWorkload() },
+    legacyFactor: 10
   ),
   BenchmarkInfo(
     name: "WordSplitUTF16",
     runFunction: run_WordSplitUTF16,
     tags: [.validation, .api, .String, .algorithm, .unstable],
-    setUpFunction: { buildWorkload() }
+    setUpFunction: { buildWorkload() },
+    legacyFactor: 10
   ),
   BenchmarkInfo(
     name: "WordCountUniqueASCII",
     runFunction: run_WordCountUniqueASCII,
     tags: [.validation, .api, .String, .Dictionary, .algorithm],
-    setUpFunction: { buildWorkload() }
+    setUpFunction: { buildWorkload() },
+    legacyFactor: 10
   ),
   BenchmarkInfo(
     name: "WordCountUniqueUTF16",
     runFunction: run_WordCountUniqueUTF16,
     tags: [.validation, .api, .String, .Dictionary, .algorithm],
-    setUpFunction: { buildWorkload() }
+    setUpFunction: { buildWorkload() },
+    legacyFactor: 10
   ),
   BenchmarkInfo(
     name: "WordCountHistogramASCII",
     runFunction: run_WordCountHistogramASCII,
     tags: [.validation, .api, .String, .Dictionary, .algorithm],
-    setUpFunction: { buildWorkload() }
+    setUpFunction: { buildWorkload() },
+    legacyFactor: 100
   ),
   BenchmarkInfo(
     name: "WordCountHistogramUTF16",
     runFunction: run_WordCountHistogramUTF16,
     tags: [.validation, .api, .String, .Dictionary, .algorithm],
-    setUpFunction: { buildWorkload() }
+    setUpFunction: { buildWorkload() },
+    legacyFactor: 100
   ),
 ]
 
@@ -201,7 +207,7 @@ struct Words: IteratorProtocol, Sequence {
 
 @inline(never)
 public func run_WordSplitASCII(_ N: Int) {
-  for _ in 1...10*N {
+  for _ in 1...N {
     let words = Array(Words(identity(asciiText)))
     CheckResults(words.count == 280)
     blackHole(words)
@@ -210,7 +216,7 @@ public func run_WordSplitASCII(_ N: Int) {
 
 @inline(never)
 public func run_WordSplitUTF16(_ N: Int) {
-  for _ in 1...10*N {
+  for _ in 1...N {
     let words = Array(Words(identity(utf16Text)))
     CheckResults(words.count == 280)
     blackHole(words)
@@ -222,7 +228,7 @@ let utf16Words = Array(Words(utf16Text))
 
 @inline(never)
 public func run_WordCountUniqueASCII(_ N: Int) {
-  for _ in 1...100*N {
+  for _ in 1...10*N {
     let words = Set(identity(asciiWords))
     CheckResults(words.count == 168)
     blackHole(words)
@@ -231,7 +237,7 @@ public func run_WordCountUniqueASCII(_ N: Int) {
 
 @inline(never)
 public func run_WordCountUniqueUTF16(_ N: Int) {
-  for _ in 1...100*N {
+  for _ in 1...10*N {
     let words = Set(identity(utf16Words))
     CheckResults(words.count == 168)
     blackHole(words)
@@ -252,7 +258,7 @@ where S.Element == String {
 
 @inline(never)
 public func run_WordCountHistogramASCII(_ N: Int) {
-  for _ in 1...100*N {
+  for _ in 1...N {
     let words = histogram(for: identity(asciiWords))
     CheckResults(words.count == 168)
     CheckResults(words[0] == ("and", 15))
@@ -262,7 +268,7 @@ public func run_WordCountHistogramASCII(_ N: Int) {
 
 @inline(never)
 public func run_WordCountHistogramUTF16(_ N: Int) {
-  for _ in 1...100*N {
+  for _ in 1...N {
     let words = histogram(for: identity(utf16Words))
     CheckResults(words.count == 168)
     CheckResults(words[0] == ("and", 15))

@@ -227,13 +227,35 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   return member->getAccessSemanticsFromContext(DC, isAccessOnSelf);
 }
 
+/// This extends functionality of `Expr::isTypeReference` with
+/// support for `UnresolvedDotExpr` and `UnresolvedMemberExpr`.
+/// This method could be used on not yet fully type-checked AST.
 bool ConstraintSystem::isTypeReference(const Expr *E) {
-  return E->isTypeReference([&](const Expr *E) -> Type { return getType(E); });
+  return E->isTypeReference(
+      [&](const Expr *E) -> Type { return simplifyType(getType(E)); },
+      [&](const Expr *E) -> Decl * {
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+          return findResolvedMemberRef(
+              getConstraintLocator(UDE, ConstraintLocator::Member));
+        }
+
+        if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
+          return findResolvedMemberRef(
+              getConstraintLocator(UME, ConstraintLocator::UnresolvedMember));
+        }
+
+        if (isa<OverloadSetRefExpr>(E))
+          return findResolvedMemberRef(
+              getConstraintLocator(const_cast<Expr *>(E)));
+
+        return nullptr;
+      });
 }
 
 bool ConstraintSystem::isStaticallyDerivedMetatype(const Expr *E) {
   return E->isStaticallyDerivedMetatype(
-      [&](const Expr *E) -> Type { return getType(E); });
+      [&](const Expr *E) -> Type { return simplifyType(getType(E)); },
+      [&](const Expr *E) -> bool { return isTypeReference(E); });
 }
 
 Type ConstraintSystem::getInstanceType(const TypeExpr *E) {
@@ -295,78 +317,6 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
     buf.append(self.begin(), self.end());
   }
   
-  return true;
-}
-
-/// Determine whether the given type refers to a non-final class (or
-/// dynamic self of one).
-static bool isNonFinalClass(Type type) {
-  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
-    type = dynamicSelf->getSelfType();
-
-  if (auto classDecl = type->getClassOrBoundGenericClass())
-    return !classDecl->isFinal();
-
-  if (auto archetype = type->getAs<ArchetypeType>())
-    if (auto super = archetype->getSuperclass())
-      return isNonFinalClass(super);
-
-  if (type->isExistentialType())
-    return true;
-
-  return false;
-}
-
-// Non-required constructors may not be not inherited. Therefore when
-// constructing a class object, either the metatype must be statically
-// derived (rather than an arbitrary value of metatype type) or the referenced
-// constructor must be required.
-static bool
-diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
-                                            Expr *base,
-                                            DeclNameLoc memberRefLoc,
-                                            ConstructorDecl *ctorDecl,
-                                            bool SuppressDiagnostics) {
-  auto &tc = cs.getTypeChecker();
-  auto baseTy = cs.getType(base)->getRValueType();
-  auto instanceTy = baseTy->getMetatypeInstanceType();
-
-  bool isStaticallyDerived =
-    base->isStaticallyDerivedMetatype(
-      [&](const Expr *expr) -> Type {
-        return cs.getType(expr);
-      });
-
-  // FIXME: The "hasClangNode" check here is a complete hack.
-  if (isNonFinalClass(instanceTy) &&
-      !isStaticallyDerived &&
-      !ctorDecl->hasClangNode() &&
-      !(ctorDecl->isRequired() ||
-        ctorDecl->getDeclContext()->getSelfProtocolDecl())) {
-    if (SuppressDiagnostics)
-      return false;
-
-    tc.diagnose(memberRefLoc, diag::dynamic_construct_class, instanceTy)
-      .highlight(base->getSourceRange());
-    auto ctor = cast<ConstructorDecl>(ctorDecl);
-    tc.diagnose(ctorDecl, diag::note_nonrequired_initializer,
-                ctor->isImplicit(), ctor->getFullName());
-  // Constructors cannot be called on a protocol metatype, because there is no
-  // metatype to witness it.
-  } else if (isa<ConstructorDecl>(ctorDecl) &&
-             baseTy->is<MetatypeType>() &&
-             instanceTy->isExistentialType()) {
-    if (SuppressDiagnostics)
-      return false;
-
-    if (isStaticallyDerived) {
-      tc.diagnose(memberRefLoc, diag::construct_protocol_by_name, instanceTy)
-        .highlight(base->getSourceRange());
-    } else {
-      tc.diagnose(memberRefLoc, diag::construct_protocol_value, baseTy)
-        .highlight(base->getSourceRange());
-    }
-  }
   return true;
 }
 
@@ -877,14 +827,6 @@ namespace {
       if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
         baseIsInstance = false;
         baseTy = baseMeta->getInstanceType();
-
-        // If the member is a constructor, verify that it can be legally
-        // referenced from this base.
-        if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-          if (!diagnoseInvalidDynamicConstructorReferences(cs, base, memberLoc,
-                                           ctor, SuppressDiagnostics))
-            return nullptr;
-        }
       }
 
       // Build a member reference.
@@ -1999,18 +1941,14 @@ namespace {
                         { tc.Context.Id_booleanLiteral });
       DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinBooleanLiteral });
-      return convertLiteral(
+      return convertLiteralInPlace(
                expr,
                type,
-               cs.getType(expr),
                protocol,
                tc.Context.Id_BooleanLiteralType,
                initName,
                builtinProtocol,
-               Type(BuiltinIntegerType::get(BuiltinIntegerWidth::fixed(1), 
-                                            tc.Context)),
                builtinInitName,
-               nullptr,
                diag::boolean_literal_broken_proto,
                diag::builtin_boolean_literal_broken_proto);
     }
@@ -2638,18 +2576,6 @@ namespace {
           if (dre->getDecl()->getFullName() == cs.getASTContext().Id_self) {
             // We have a reference to 'self'.
             diagnoseBadInitRef = false;
-
-            // Special case -- in a protocol extension initializer with a class
-            // constrainted Self type, 'self' has archetype type, and only
-            // required initializers can be called.
-            if (cs.getType(dre)->getRValueType()->is<ArchetypeType>()) {
-              if (!diagnoseInvalidDynamicConstructorReferences(cs, base,
-                                                               nameLoc,
-                                                               ctor,
-                                                               SuppressDiagnostics))
-                return nullptr;
-            }
-
             // Make sure the reference to 'self' occurs within an initializer.
             if (!dyn_cast_or_null<ConstructorDecl>(
                    cs.DC->getInnermostMethodContext())) {
@@ -7053,6 +6979,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     // Set the builtin initializer.
     if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
       stringLiteral->setBuiltinInitializer(witness);
+    else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
+      booleanLiteral->setBuiltinInitializer(witness);
     else {
       cast<MagicIdentifierLiteralExpr>(literal)
         ->setBuiltinInitializer(witness);
@@ -7100,6 +7028,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     nilLiteral->setInitializer(witness);
   else if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
     stringLiteral->setInitializer(witness);
+  else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
+    booleanLiteral->setInitializer(witness);
   else
     cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(witness);
 
@@ -7468,24 +7398,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // We have a type constructor.
   if (auto metaTy = cs.getType(fn)->getAs<AnyMetatypeType>()) {
     auto ty = metaTy->getInstanceType();
-
-    if (!cs.isTypeReference(fn)) {
-      bool isExistentialType = false;
-      // If this is an attempt to initialize existential type.
-      if (auto metaType = cs.getType(fn)->getAs<MetatypeType>()) {
-        auto instanceType = metaType->getInstanceType();
-        isExistentialType = instanceType->isExistentialType();
-      }
-
-      if (!isExistentialType) {
-        // If the metatype value isn't a type expression,
-        // the user should reference '.init' explicitly, for clarity.
-        cs.TC
-            .diagnose(apply->getArg()->getStartLoc(),
-                      diag::missing_init_on_metatype_initialization)
-            .fixItInsert(apply->getArg()->getStartLoc(), ".init");
-      }
-    }
 
     // If we're "constructing" a tuple type, it's simply a conversion.
     if (auto tupleTy = ty->getAs<TupleType>()) {

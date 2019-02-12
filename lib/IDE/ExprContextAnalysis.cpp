@@ -31,6 +31,53 @@ using namespace swift;
 using namespace ide;
 
 //===----------------------------------------------------------------------===//
+// prepareForRetypechecking(Expr *)
+//===----------------------------------------------------------------------===//
+
+/// Prepare the given expression for type-checking again, prinicipally by
+/// erasing any ErrorType types on the given expression, allowing later
+/// type-checking to make progress.
+///
+/// FIXME: this is fundamentally a workaround for the fact that we may end up
+/// typechecking parts of an expression more than once - first for checking
+/// the context, and later for checking more-specific things like unresolved
+/// members.  We should restructure code-completion type-checking so that we
+/// never typecheck more than once (or find a more principled way to do it).
+void swift::ide::prepareForRetypechecking(Expr *E) {
+  assert(E);
+  struct Eraser : public ASTWalker {
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (expr && expr->getType() && (expr->getType()->hasError() ||
+                                      expr->getType()->hasUnresolvedType()))
+        expr->setType(Type());
+      if (auto *ACE = dyn_cast_or_null<AutoClosureExpr>(expr)) {
+        return { true, ACE->getSingleExpressionBody() };
+      }
+      return { true, expr };
+    }
+    bool walkToTypeLocPre(TypeLoc &TL) override {
+      if (TL.getType() && (TL.getType()->hasError() ||
+                           TL.getType()->hasUnresolvedType()))
+        TL.setType(Type());
+      return true;
+    }
+
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      if (P && P->hasType() && (P->getType()->hasError() ||
+                                P->getType()->hasUnresolvedType())) {
+        P->setType(Type());
+      }
+      return { true, P };
+    }
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+  };
+
+  E->walk(Eraser());
+}
+
+//===----------------------------------------------------------------------===//
 // typeCheckContextUntil(DeclContext, SourceLoc)
 //===----------------------------------------------------------------------===//
 

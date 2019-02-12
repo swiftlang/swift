@@ -944,6 +944,7 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
+  friend class RequirementFailure;
   friend class MissingMemberFailure;
 
   class SolverScope;
@@ -1762,6 +1763,12 @@ public:
                                 pathElt.getNewSummaryFlags());
   }
 
+  ConstraintLocator *
+  getConstraintLocator(const Expr *anchor,
+                       ConstraintLocator::PathElement pathElt) {
+    return getConstraintLocator(const_cast<Expr *>(anchor), pathElt);
+  }
+
   /// Extend the given constraint locator with a path element.
   ConstraintLocator *
   getConstraintLocator(ConstraintLocator *locator,
@@ -1804,6 +1811,14 @@ public:
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix);
+
+  /// Determine whether constraint system already has a fix recorded
+  /// for a particular location.
+  bool hasFixFor(ConstraintLocator *locator) const {
+    return llvm::any_of(Fixes, [&locator](const ConstraintFix *fix) {
+      return fix->getLocator() == locator;
+    });
+  }
 
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
   /// constraint system, return the decl that it references.
@@ -2273,8 +2288,7 @@ public:
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
-                          DeclContext *useDC,
-                          const DeclRefExpr *base = nullptr);
+                          DeclContext *useDC);
 
   /// Return the type-of-reference of the given value.
   ///

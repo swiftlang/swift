@@ -126,11 +126,21 @@ generateOptimizationRemarkRegex(DiagnosticEngine &Diags, ArgList &Args,
 static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   const bool Escape = std::strpbrk(Arg, "\"\\$ ");
 
-  if (!TempDir.empty() && StringRef(Arg).startswith(TempDir)) {
-    // Don't write temporary file names in the debug info. This would prevent
-    // incremental llvm compilation because we would generate different IR on
-    // every compiler invocation.
-    Arg = "<temporary-file>";
+  if (!TempDir.empty()) {
+    llvm::SmallString<256> ArgPath{Arg};
+    llvm::sys::fs::make_absolute(ArgPath);
+    llvm::sys::path::native(ArgPath);
+
+    llvm::SmallString<256> TempPath{TempDir};
+    llvm::sys::fs::make_absolute(TempPath);
+    llvm::sys::path::native(TempPath);
+
+    if (StringRef(ArgPath).startswith(TempPath)) {
+      // Don't write temporary file names in the debug info. This would prevent
+      // incremental llvm compilation because we would generate different IR on
+      // every compiler invocation.
+      Arg = "<temporary-file>";
+    }
   }
 
   if (!Escape) {
@@ -281,6 +291,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   if (Args.hasArg(OPT_enable_experimental_dependencies))
     Opts.EnableExperimentalDependencies = true;
+
+  if (Args.hasArg(OPT_experimental_dependency_include_intrafile))
+    Opts.ExperimentalDependenciesIncludeIntrafileOnes = true;
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
@@ -1054,10 +1067,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = false;
   }
 
-  if (Args.hasArg(OPT_enable_class_resilience)) {
-    Opts.EnableClassResilience = true;
-  }
-
   if (Args.hasArg(OPT_enable_resilience_bypass)) {
     Opts.EnableResilienceBypass = true;
   }
@@ -1066,8 +1075,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // (e.g. NativeObject).  Force the lazy initialization of the VWT always.
   Opts.LazyInitializeClassMetadata = Triple.isOSBinFormatCOFF();
 
-  if (const Arg *A = Args.getLastArg(OPT_read_type_info_path_EQ)) {
-    Opts.ReadTypeInfoPath = A->getValue();
+  if (Args.hasArg(OPT_disable_legacy_type_info)) {
+    Opts.DisableLegacyTypeInfo = true;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {
+    Opts.ReadLegacyTypeInfoPath = A->getValue();
   }
 
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))

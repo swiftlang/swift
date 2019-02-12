@@ -1,11 +1,13 @@
 // RUN: not %target-swift-frontend -typecheck %s 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-runtime %s
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
-#elseif os(Android) || os(Cygwin) || os(FreeBSD) || os(Linux)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
+#else
+#error("Unsupported platform")
 #endif
 
 func test() {

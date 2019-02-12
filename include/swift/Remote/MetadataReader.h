@@ -171,6 +171,39 @@ private:
   StoredPointer IndexedClassesCountPointer;
   StoredPointer LastIndexedClassesCount = 0;
 
+  enum class TaggedPointerEncodingKind {
+    /// We haven't checked yet.
+    Unknown,
+
+    /// There was an error trying to find out the tagged pointer encoding.
+    Error,
+
+    /// The "extended" encoding.
+    ///
+    /// 1 bit:   is-tagged
+    /// 3 bits:  class index (for objc_debug_taggedpointer_classes[])
+    /// 60 bits: payload
+    ///
+    /// Class index 0b111 represents 256 additional classes:
+    ///
+    /// 1 bit:   is-tagged
+    /// 3 bits:  0b111
+    /// 8 bits:  extended class index (for objc_debug_taggedpointer_ext_classes[])
+    /// 54 bits: payload
+    Extended
+  };
+  TaggedPointerEncodingKind TaggedPointerEncoding =
+      TaggedPointerEncodingKind::Unknown;
+  StoredPointer TaggedPointerMask;
+  StoredPointer TaggedPointerSlotShift;
+  StoredPointer TaggedPointerSlotMask;
+  StoredPointer TaggedPointerClasses;
+  StoredPointer TaggedPointerExtendedMask;
+  StoredPointer TaggedPointerExtendedSlotShift;
+  StoredPointer TaggedPointerExtendedSlotMask;
+  StoredPointer TaggedPointerExtendedClasses;
+  StoredPointer TaggedPointerObfuscator;
+
   Demangle::NodeFactory Factory;
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
@@ -463,10 +496,28 @@ public:
     if (!Meta) return BuiltType();
 
     switch (Meta->getKind()) {
-    case MetadataKind::Class:
-      if (!cast<TargetClassMetadata<Runtime>>(Meta)->isTypeMetadata())
-        return BuiltType();
+    case MetadataKind::Class: {
+      auto classMeta = cast<TargetClassMetadata<Runtime>>(Meta);
+      if (!classMeta->isTypeMetadata()) {
+        std::string className;
+        if (!readObjCClassName(MetadataAddress, className))
+          return BuiltType();
+
+        BuiltType BuiltObjCClass = Builder.createObjCClassType(std::move(className));
+        if (!BuiltObjCClass) {
+          // Try the superclass.
+          if (!classMeta->Superclass)
+            return BuiltType();
+
+          BuiltObjCClass = readTypeFromMetadata(classMeta->Superclass,
+                                                skipArtificialSubclasses);
+        }
+
+        TypeCache[MetadataAddress] = BuiltObjCClass;
+        return BuiltObjCClass;
+      }
       return readNominalTypeFromMetadata(Meta, skipArtificialSubclasses);
+    }
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
@@ -657,10 +708,48 @@ public:
     return buildContextMangling(context, Dem);
   }
 
+  bool isTaggedPointer(StoredPointer objectAddress) {
+    if (getTaggedPointerEncoding() != TaggedPointerEncodingKind::Extended)
+      return false;
+  
+    return (objectAddress ^ TaggedPointerObfuscator) & TaggedPointerMask;
+  }
+
+  /// Read the isa pointer of an Object-C tagged pointer value.
+  Optional<StoredPointer>
+  readMetadataFromTaggedPointer(StoredPointer objectAddress) {
+    auto readArrayElement = [&](StoredPointer base, StoredPointer tag)
+        -> Optional<StoredPointer> {
+      StoredPointer addr = base + tag * sizeof(StoredPointer);
+      StoredPointer isa;
+      if (!Reader->readInteger(RemoteAddress(addr), &isa))
+        return None;
+      return isa;
+    };
+
+    // Extended pointers have a tag of 0b111, using 8 additional bits
+    // to specify the class.
+    if (TaggedPointerExtendedMask != 0 &&
+        (((objectAddress ^ TaggedPointerObfuscator) & TaggedPointerExtendedMask)
+           == TaggedPointerExtendedMask)) {
+      auto tag = ((objectAddress >> TaggedPointerExtendedSlotShift) &
+                  TaggedPointerExtendedSlotMask);
+      return readArrayElement(TaggedPointerExtendedClasses, tag);
+    }
+
+    // Basic tagged pointers use a 3 bit tag to specify the class.
+    auto tag = ((objectAddress >> TaggedPointerSlotShift) &
+                TaggedPointerSlotMask);
+    return readArrayElement(TaggedPointerClasses, tag);
+  }
+
   /// Read the isa pointer of a class or closure context instance and apply
   /// the isa mask.
   Optional<StoredPointer>
   readMetadataFromInstance(StoredPointer objectAddress) {
+    if (isTaggedPointer(objectAddress))
+      return readMetadataFromTaggedPointer(objectAddress);
+
     StoredPointer isa;
     if (!Reader->readInteger(RemoteAddress(objectAddress), &isa))
       return None;
@@ -2290,7 +2379,72 @@ private:
       }
     }
 
+#   undef tryFindSymbol
+#   undef tryReadSymbol
+#   undef tryFindAndReadSymbol
+
     return finish(IsaEncodingKind::None);
+  }
+
+  TaggedPointerEncodingKind getTaggedPointerEncoding() {
+    if (TaggedPointerEncoding != TaggedPointerEncodingKind::Unknown)
+      return TaggedPointerEncoding;
+
+    auto finish = [&](TaggedPointerEncodingKind result)
+        -> TaggedPointerEncodingKind {
+      TaggedPointerEncoding = result;
+      return result;
+    };
+
+    /// Look up the given global symbol and bind 'varname' to its
+    /// address if its exists.
+#   define tryFindSymbol(varname, symbolName)                \
+      auto varname = Reader->getSymbolAddress(symbolName);   \
+      if (!varname)                                          \
+        return finish(TaggedPointerEncodingKind::Error)
+    /// Read from the given pointer into 'dest'.
+#   define tryReadSymbol(varname, dest) do {                 \
+      if (!Reader->readInteger(varname, &dest))              \
+        return finish(TaggedPointerEncodingKind::Error);     \
+    } while (0)
+    /// Read from the given global symbol into 'dest'.
+#   define tryFindAndReadSymbol(dest, symbolName) do {       \
+      tryFindSymbol(_address, symbolName);                   \
+      tryReadSymbol(_address, dest);                         \
+    } while (0)
+
+    tryFindAndReadSymbol(TaggedPointerMask,
+                         "objc_debug_taggedpointer_mask");
+    tryFindAndReadSymbol(TaggedPointerSlotShift,
+                         "objc_debug_taggedpointer_slot_shift");
+    tryFindAndReadSymbol(TaggedPointerSlotMask,
+                         "objc_debug_taggedpointer_slot_mask");
+    tryFindSymbol(TaggedPointerClassesAddr,
+                  "objc_debug_taggedpointer_classes");
+    if (!TaggedPointerClassesAddr)
+      finish(TaggedPointerEncodingKind::Error);
+    TaggedPointerClasses = TaggedPointerClassesAddr.getAddressData();
+    tryFindAndReadSymbol(TaggedPointerExtendedMask,
+                         "objc_debug_taggedpointer_ext_mask");
+    tryFindAndReadSymbol(TaggedPointerExtendedSlotShift,
+                         "objc_debug_taggedpointer_ext_slot_shift");
+    tryFindAndReadSymbol(TaggedPointerExtendedSlotMask,
+                         "objc_debug_taggedpointer_ext_slot_mask");
+    tryFindSymbol(TaggedPointerExtendedClassesAddr,
+                  "objc_debug_taggedpointer_ext_classes");
+    if (!TaggedPointerExtendedClassesAddr)
+      finish(TaggedPointerEncodingKind::Error);
+    TaggedPointerExtendedClasses =
+        TaggedPointerExtendedClassesAddr.getAddressData();
+
+    tryFindAndReadSymbol(TaggedPointerObfuscator,
+                         "objc_debug_taggedpointer_obfuscator");
+
+#   undef tryFindSymbol
+#   undef tryReadSymbol
+#   undef tryFindAndReadSymbol
+
+    return finish(TaggedPointerEncodingKind::Extended);
   }
 
   template <class T>

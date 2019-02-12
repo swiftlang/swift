@@ -162,6 +162,8 @@ bool isOwnershipForwardingInst(SILInstruction *i);
 
 bool isGuaranteedForwardingInst(SILInstruction *i);
 
+/// Look up through the def-use chain of \p inputValue, recording any "borrow"
+/// introducers that we find into \p out.
 bool getUnderlyingBorrowIntroducers(SILValue inputValue,
                                     SmallVectorImpl<SILValue> &out);
 

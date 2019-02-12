@@ -434,6 +434,16 @@ function(_compile_swift_files
   string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
   file(WRITE "${file_path}" "'${source_files_quoted}'")
   
+  # If this platform/architecture combo supports backward deployment to old
+  # Objective-C runtimes, we need to copy a YAML file with legacy type layout
+  # information to the build directory so that the compiler can find it.
+  #
+  # See stdlib/CMakeLists.txt and TypeConverter::TypeConverter() in
+  # lib/IRGen/GenType.cpp.
+  set(SWIFTFILE_PLATFORM "${SWIFT_SDK_${SWIFTFILE_SDK}_LIB_SUBDIR}")
+  set(copy_legacy_layouts_dep
+      "copy-legacy-layouts-${SWIFTFILE_PLATFORM}-${SWIFTFILE_ARCHITECTURE}")
+
   add_custom_command_target(
       dependency_target
       COMMAND
@@ -447,6 +457,7 @@ function(_compile_swift_files
         ${file_path} ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
         ${obj_dirs_dependency_target}
+        ${copy_legacy_layouts_dep}
       COMMENT "Compiling ${first_output}")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
 

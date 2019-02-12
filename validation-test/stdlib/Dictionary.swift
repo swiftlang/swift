@@ -3010,7 +3010,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(d.count == 0)
 
     let empty = Dictionary<Int, Int>()
-    expectNotEqual(empty._rawIdentifier(), d._rawIdentifier())
+    expectEqual(empty._rawIdentifier(), d._rawIdentifier())
 
     d.removeAll()
     assert(empty._rawIdentifier() == d._rawIdentifier())
@@ -3305,7 +3305,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   var d2 = getBridgedNonverbatimEquatableDictionary([:])
   let identity2 = d2._rawIdentifier()
   assert(isNativeDictionary(d2))
-  assert(identity1 != identity2)
+  assert(identity1 == identity2)
 
   assert(d1 == d2)
   assert(identity1 == d1._rawIdentifier())
@@ -3313,11 +3313,11 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
 
   d2[TestBridgedKeyTy(10)] = TestBridgedEquatableValueTy(2010)
   assert(isNativeDictionary(d2))
-  assert(identity2 == d2._rawIdentifier())
+  assert(identity2 != d2._rawIdentifier())
 
   assert(d1 != d2)
   assert(identity1 == d1._rawIdentifier())
-  assert(identity2 == d2._rawIdentifier())
+  assert(identity2 != d2._rawIdentifier())
 }
 
 

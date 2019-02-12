@@ -13,6 +13,7 @@
 #include "XMLValidator.h"
 #include "ModuleAPIDiff.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
@@ -32,6 +33,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/ConformingMethodList.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -100,6 +102,7 @@ enum class ActionType {
   ReconstructType,
   Range,
   TypeContextInfo,
+  ConformingMethodList,
 };
 
 class NullDebuggerClient : public DebuggerClient {
@@ -224,7 +227,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "Print indexed symbol information"),
            clEnumValN(ActionType::TypeContextInfo,
 	                    "type-context-info",
-                      "Perform expression context info analysis")));
+                      "Perform expression context info analysis"),
+           clEnumValN(ActionType::ConformingMethodList,
+	                    "conforming-methods",
+                      "Perform conforming method analysis for expression")));
 
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"),
@@ -411,6 +417,13 @@ static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
   llvm::cl::desc("A discriminator to prefer in lookups"),
   llvm::cl::cat(Category));
+
+// '-conforming-methods' options.
+
+static llvm::cl::list<std::string>
+ConformingMethodListExpectedTypes("conforming-methods-expected-types",
+    llvm::cl::desc("Set expected types for comforming method list"),
+    llvm::cl::cat(Category));
 
 // '-syntax-coloring' options.
 
@@ -722,6 +735,70 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
   // Consumer.
   std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
       ide::makeTypeContextInfoCallbacksFactory(*Consumer));
+
+  Invocation.setCodeCompletionFactory(callbacksFactory.get());
+  if (!SecondSourceFileName.empty()) {
+    Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
+        SecondSourceFileName);
+  }
+  CompilerInstance CI;
+
+  PrintingDiagnosticConsumer PrintDiags;
+  if (CodeCompletionDiagnostics) {
+    // Display diagnostics to stderr.
+    CI.addDiagnosticConsumer(&PrintDiags);
+  }
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  return 0;
+}
+
+static int
+doConformingMethodList(const CompilerInvocation &InitInvok,
+                       StringRef SourceFilename, StringRef SecondSourceFileName,
+                       StringRef CodeCompletionToken,
+                       bool CodeCompletionDiagnostics,
+                       const std::vector<std::string> expectedTypeNames) {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+      llvm::MemoryBuffer::getFile(SourceFilename);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening input file: "
+                 << FileBufOrErr.getError().message() << '\n';
+    return 1;
+  }
+
+  unsigned Offset;
+
+  std::unique_ptr<llvm::MemoryBuffer> CleanFile(removeCodeCompletionTokens(
+      FileBufOrErr.get().get(), CodeCompletionToken, &Offset));
+
+  if (Offset == ~0U) {
+    llvm::errs() << "could not find code completion token \""
+                 << CodeCompletionToken << "\"\n";
+    return 1;
+  }
+  llvm::outs() << "found code completion token " << CodeCompletionToken
+               << " at offset " << Offset << "\n";
+  llvm::errs() << "found code completion token " << CodeCompletionToken
+               << " at offset " << Offset << "\n";
+
+  CompilerInvocation Invocation(InitInvok);
+
+  Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
+
+  SmallVector<const char *, 4> typeNames;
+  for (auto &name : expectedTypeNames)
+    typeNames.push_back(name.c_str());
+
+  // Create a CodeCompletionConsumer.
+  std::unique_ptr<ide::ConformingMethodListConsumer> Consumer(
+      new ide::PrintingConformingMethodListConsumer(llvm::outs()));
+
+  // Create a factory for code completion callbacks that will feed the
+  // Consumer.
+  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+      ide::makeConformingMethodListCallbacksFactory(typeNames, *Consumer));
 
   Invocation.setCodeCompletionFactory(callbacksFactory.get());
   if (!SecondSourceFileName.empty()) {
@@ -2682,7 +2759,7 @@ public:
 
     if (T) {
       T = T->getRValueType();
-      tryDemangleType(T,
+      tryDemangleType(T->mapTypeOutOfContext(),
                       (NestedDCs.empty()
                        ? D->getDeclContext()
                        : NestedDCs.back()),
@@ -2694,19 +2771,16 @@ public:
 private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
     Mangle::ASTMangler Mangler;
-    std::string mangledName(Mangler.mangleTypeForDebugger(
-                              T->mapTypeOutOfContext(), DC));
-    std::string Error;
+    std::string mangledName(Mangler.mangleTypeForDebugger(T, DC));
     Type ReconstructedType = DC->mapTypeIntoContext(
-        getTypeFromMangledSymbolname(Ctx, mangledName, Error));
+        Demangle::getTypeForMangling(Ctx, mangledName));
     Stream << "type: ";
     if (ReconstructedType) {
       ReconstructedType->print(Stream);
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << " "
-           << Error << "\n";
+    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << "\n";
   }
 
   void tryDemangleDecl(ValueDecl *VD, CharSourceRange range, bool isRef) {
@@ -3269,6 +3343,19 @@ int main(int argc, char *argv[]) {
                                   options::SecondSourceFilename,
                                   options::CodeCompletionToken,
                                   options::CodeCompletionDiagnostics);
+    break;
+
+  case ActionType::ConformingMethodList:
+    if (options::CodeCompletionToken.empty()) {
+      llvm::errs() << "token name required\n";
+      return 1;
+    }
+    ExitCode = doConformingMethodList(InitInvok,
+                                      options::SourceFilename,
+                                      options::SecondSourceFilename,
+                                      options::CodeCompletionToken,
+                                      options::CodeCompletionDiagnostics,
+                                      options::ConformingMethodListExpectedTypes);
     break;
 
   case ActionType::SyntaxColoring:

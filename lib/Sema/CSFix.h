@@ -37,6 +37,7 @@ class SourceManager;
 
 namespace constraints {
 
+class OverloadChoice;
 class ConstraintSystem;
 class ConstraintLocator;
 class Solution;
@@ -115,6 +116,12 @@ enum class FixKind : uint8_t {
   /// Allow expressions where initializer call (either `self.init` or
   /// `super.init`) is only partially applied.
   AllowInvalidPartialApplication,
+
+  /// Non-required constructors may not be not inherited. Therefore when
+  /// constructing a class object, either the metatype must be statically
+  /// derived (rather than an arbitrary value of metatype type) or the
+  /// referenced constructor must be required.
+  AllowInvalidInitRef,
 };
 
 class ConstraintFix {
@@ -557,6 +564,54 @@ public:
   static AllowInvalidPartialApplication *create(bool isWarning,
                                                 ConstraintSystem &cs,
                                                 ConstraintLocator *locator);
+};
+
+class AllowInvalidInitRef final : public ConstraintFix {
+  enum class RefKind {
+    DynamicOnMetatype,
+    ProtocolMetatype,
+    NonConstMetatype,
+  } Kind;
+
+  Type BaseType;
+  const ConstructorDecl *Init;
+  bool IsStaticallyDerived;
+  SourceRange BaseRange;
+
+  AllowInvalidInitRef(ConstraintSystem &cs, RefKind kind, Type baseTy,
+                      ConstructorDecl *init, bool isStaticallyDerived,
+                      SourceRange baseRange, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidInitRef, locator), Kind(kind),
+        BaseType(baseTy), Init(init), IsStaticallyDerived(isStaticallyDerived),
+        BaseRange(baseRange) {}
+
+public:
+  std::string getName() const override {
+    return "allow invalid initializer reference";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInvalidInitRef *
+  dynamicOnMetatype(ConstraintSystem &cs, Type baseTy, ConstructorDecl *init,
+                    SourceRange baseRange, ConstraintLocator *locator);
+
+  static AllowInvalidInitRef *
+  onProtocolMetatype(ConstraintSystem &cs, Type baseTy, ConstructorDecl *init,
+                     bool isStaticallyDerived, SourceRange baseRange,
+                     ConstraintLocator *locator);
+
+  static AllowInvalidInitRef *onNonConstMetatype(ConstraintSystem &cs,
+                                                 Type baseTy,
+                                                 ConstructorDecl *init,
+                                                 ConstraintLocator *locator);
+
+private:
+  static AllowInvalidInitRef *create(RefKind kind, ConstraintSystem &cs,
+                                     Type baseTy, ConstructorDecl *init,
+                                     bool isStaticallyDerived,
+                                     SourceRange baseRange,
+                                     ConstraintLocator *locator);
 };
 
 } // end namespace constraints

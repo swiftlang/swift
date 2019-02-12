@@ -30,8 +30,8 @@ else()
     set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
   endif()
 
-  set(CMAKE_CXX_COMPILER_ARG1 "")
-  set(CMAKE_C_COMPILER_ARG1 "")
+  set(CMAKE_C_COMPILER_LAUNCHER "")
+  set(CMAKE_CXX_COMPILER_LAUNCHER "")
   # The sanitizers require using the same version of the compiler for
   # everything and there are various places where we link runtime code with
   # code built by the host compiler. Disable sanitizers for the runtime for
@@ -106,6 +106,48 @@ swift_create_stdlib_targets("swift-stdlib" "sib" TRUE)
 swift_create_stdlib_targets("swift-stdlib" "sibopt" TRUE)
 swift_create_stdlib_targets("swift-stdlib" "sibgen" TRUE)
 swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
+
+foreach(sdk ${SWIFT_SDKS})
+  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+    set(platform "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+    set(input "${SWIFT_SOURCE_DIR}/stdlib/public/legacy_layouts/${platform}/layouts-${arch}.yaml")
+    set(output "${SWIFTLIB_DIR}/${platform}/layouts-${arch}.yaml")
+
+    if(EXISTS "${input}")
+      # Copy the input file to the build directory.
+      add_custom_command(
+        OUTPUT "${output}"
+        DEPENDS "${input}"
+        COMMAND
+          "${CMAKE_COMMAND}" -E copy
+          "${input}"
+          "${output}")
+
+      # Define a target for this so that we can depend on it when
+      # building Swift sources.
+      add_custom_target(
+        "copy-legacy-layouts-${platform}-${arch}"
+        DEPENDS "${output}"
+        SOURCES "${input}")
+
+      # Make sure we ultimately always do this as part of building the
+      # standard library. In practice we'll do this earlier if at least
+      # one Swift source file has changed.
+      add_dependencies(
+        "swift-stdlib-${platform}-${arch}"
+        "copy-legacy-layouts-${platform}-${arch}")
+
+      swift_install_in_component(stdlib
+          FILES ${input}
+          DESTINATION "lib/swift/${platform}/")
+    else()
+      # Add a dummy target that does nothing so we can still depend on it
+      # later without checking if the input files exist.
+      add_custom_target(
+        "copy-legacy-layouts-${platform}-${arch}")
+    endif()
+  endforeach()
+endforeach()
 
 add_subdirectory(public)
 add_subdirectory(private)

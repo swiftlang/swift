@@ -22,6 +22,7 @@
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -39,8 +40,8 @@ llvm::cl::opt<bool> EnableSILInliningOfGenerics(
   llvm::cl::desc("Enable inlining of generics"));
 
 llvm::cl::opt<bool>
-    EnableSILAgressiveInlining("sil-agressive-inline", llvm::cl::init(false),
-                               llvm::cl::desc("Enable agressive inlining"));
+    EnableSILAggressiveInlining("sil-aggressive-inline", llvm::cl::init(false),
+                               llvm::cl::desc("Enable aggressive inlining"));
 
 //===----------------------------------------------------------------------===//
 //                           Performance Inliner
@@ -326,7 +327,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   // if AllAccessesBeneficialToInline is true
   int ExclusivityBenefitWeight = 0;
   int ExclusivityBenefitBase = ExclusivityBenefit;
-  if (EnableSILAgressiveInlining) {
+  if (EnableSILAggressiveInlining) {
     ExclusivityBenefitBase += 500;
   }
 
@@ -877,6 +878,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // remains valid.
   SmallVector<FullApplySite, 8> AppliesToInline;
   collectAppliesToInline(Caller, AppliesToInline);
+  bool needUpdateStackNesting = false;
 
   if (AppliesToInline.empty())
     return false;
@@ -889,7 +891,16 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     if (!Callee->shouldOptimize()) {
       continue;
     }
-    
+
+    // If we have a callee that doesn't have ownership, but the caller does have
+    // ownership... do not inline. The two modes are incompatible. Today this
+    // should only happen with transparent functions.
+    if (!Callee->hasOwnership() && Caller->hasOwnership()) {
+      assert(Caller->isTransparent() &&
+             "Should only happen with transparent functions");
+      continue;
+    }
+
     SmallVector<SILValue, 8> Args;
     for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);
@@ -909,6 +920,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::PerformanceInline,
                        AI.getSubstitutionMap(), OpenedArchetypesTracker);
 
+    needUpdateStackNesting |= Inliner.needsUpdateStackNesting(AI);
+
     // We've already determined we should be able to inline this, so
     // unconditionally inline the function.
     //
@@ -920,6 +933,11 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // The inliner splits blocks at call sites. Re-merge trivial branches to
   // reestablish a canonical CFG.
   mergeBasicBlocks(Caller);
+
+  if (needUpdateStackNesting) {
+    StackNesting().correctStackNesting(Caller);
+  }
+
   return true;
 }
 
