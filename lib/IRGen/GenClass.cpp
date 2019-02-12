@@ -163,54 +163,7 @@ namespace {
     // ancestry, or has a superclass that is itself resilient.
     bool CompletelyFragileLayout;
 
-    // The below flags indicate various things about the metadata of the
-    // class that might require dynamic initialization or resilient
-    // access patterns:
-
-    // Does the class or any of its superclasses have stored properties that
-    // where dropped due to the Swift language version availability of
-    // their types?
-    bool ClassHasMissingMembers = false;
-
-    // Does the class or any of its fragile superclasses have stored
-    // properties of unknown size, which do *not* depend on generic
-    // parameters?
-    //
-    // This is different from the class itself being resilient or
-    // having resilient ancestry, because we still have a fixed layout
-    // for the class metadata in this case.
-    //
-    // In fact, for a class with resilient ancestry, this can still be
-    // false if all of the fields known to us are fixed size.
-    bool ClassHasResilientMembers = false;
-
-    // Is this class or any of its superclasses generic?
-    bool ClassHasGenericAncestry = false;
-
-    // Is this class itself generic via the Swift generic system, ie. not a
-    // lightweight Objective-C generic class?
-    bool ClassIsGeneric = false;
-
-    // Does the class layout depend on the size or alignment of its
-    // generic parameters?
-    //
-    // This can be the case if the class has generic resilient ancestry
-    // that depends on the class's generic parameters, of it it has
-    // fields of generic type that are not fixed size.
-    bool ClassHasGenericLayout = false;
-
-    // Is this class or any of its superclasses resilient from the viewpoint
-    // of the current module? This means that their metadata can change size,
-    // hence field offsets, generic arguments and virtual methods must be
-    // accessed relative to a metadata base global variable.
-    bool ClassHasResilientAncestry = false;
-
-    // Are any of this class's superclasses defined in Objective-C?
-    // This means that field offsets must be loaded from field offset globals
-    // or the field offset vector in the metadata, and the Objective-C runtime
-    // will slide offsets based on the actual superclass size, which is not
-    // known at compile time.
-    bool ClassHasObjCAncestry = false;
+    ClassMetadataOptions Options;
 
   public:
     ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
@@ -243,7 +196,7 @@ namespace {
       assert(theClass);
 
       if (theClass->isGenericContext() && !theClass->hasClangNode())
-        ClassIsGeneric = true;
+        Options |= ClassMetadataFlags::ClassIsGeneric;
 
       addFieldsForClass(theClass, classType, /*superclass=*/false);
 
@@ -261,27 +214,6 @@ namespace {
       return Elements;
     }
 
-    /// Do instances of the class have a completely known, static layout?
-    bool isFixedSize() const {
-      return !(ClassHasMissingMembers ||
-               ClassHasResilientMembers ||
-               ClassHasGenericLayout ||
-               ClassHasObjCAncestry);
-    }
-
-    bool doesMetadataRequireInitialization() const {
-      return (ClassHasMissingMembers ||
-              ClassHasResilientMembers ||
-              ClassHasResilientAncestry ||
-              ClassHasGenericAncestry ||
-              IGM.getOptions().LazyInitializeClassMetadata);
-    }
-
-    bool doesMetadataRequireRelocation() const {
-      return (ClassHasResilientAncestry ||
-              ClassIsGeneric);
-    }
-
     ClassLayout getClassLayout(llvm::Type *classTy) const {
       assert(!TailTypes);
 
@@ -289,14 +221,8 @@ namespace {
       auto allFieldAccesses = IGM.Context.AllocateCopy(AllFieldAccesses);
       auto allElements = IGM.Context.AllocateCopy(Elements);
 
-      return ClassLayout(*this,
-                         isFixedSize(),
-                         doesMetadataRequireInitialization(),
-                         doesMetadataRequireRelocation(),
-                         classTy,
-                         allStoredProps,
-                         allFieldAccesses,
-                         allElements);
+      return ClassLayout(*this, Options, classTy,
+                         allStoredProps, allFieldAccesses, allElements);
     }
 
   private:
@@ -320,7 +246,7 @@ namespace {
     void addFieldsForClass(ClassDecl *theClass, SILType classType,
                            bool superclass) {
       if (theClass->hasClangNode()) {
-        ClassHasObjCAncestry = true;
+        Options |= ClassMetadataFlags::ClassHasObjCAncestry;
         return;
       }
 
@@ -330,18 +256,18 @@ namespace {
         assert(superclassType && superclassDecl);
 
         if (IGM.hasResilientMetadata(superclassDecl, ResilienceExpansion::Maximal))
-          ClassHasResilientAncestry = true;
+          Options |= ClassMetadataFlags::ClassHasResilientAncestry;
 
         // If the superclass has resilient storage, don't walk its fields.
         if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
-          ClassHasResilientMembers = true;
+          Options |= ClassMetadataFlags::ClassHasResilientMembers;
 
           // If the superclass is generic, we have to assume that its layout
           // depends on its generic parameters. But this only propagates down to
           // subclasses whose superclass type depends on the subclass's generic
           // context.
           if (superclassType.hasArchetype())
-            ClassHasGenericLayout = true;
+            Options |= ClassMetadataFlags::ClassHasGenericLayout;
         } else {
           // Otherwise, we are allowed to have total knowledge of the superclass
           // fields, so walk them to compute the layout.
@@ -350,16 +276,16 @@ namespace {
       }
 
       if (theClass->isGenericContext())
-        ClassHasGenericAncestry = true;
+        Options |= ClassMetadataFlags::ClassHasGenericAncestry;
 
       if (classHasIncompleteLayout(IGM, theClass))
-        ClassHasMissingMembers = true;
+        Options |= ClassMetadataFlags::ClassHasMissingMembers;
 
       if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal))
-        ClassHasResilientAncestry = true;
+        Options |= ClassMetadataFlags::ClassHasResilientAncestry;
 
       if (IGM.isResilient(theClass, ResilienceExpansion::Maximal)) {
-        ClassHasResilientMembers = true;
+        Options |= ClassMetadataFlags::ClassHasResilientMembers;
         return;
       }
 
@@ -382,9 +308,9 @@ namespace {
 
         if (!eltType->isFixedSize()) {
           if (type.hasArchetype())
-            ClassHasGenericLayout = true;
+            Options |= ClassMetadataFlags::ClassHasGenericLayout;
           else
-            ClassHasResilientMembers = true;
+            Options |= ClassMetadataFlags::ClassHasResilientMembers;
         }
 
         auto element = ElementLayout::getIncomplete(*eltType);
@@ -445,7 +371,8 @@ namespace {
         //   var y : AKlass = AKlass()
         //   var t : T?
         // }
-        if (ClassHasGenericLayout && ClassHasObjCAncestry) {
+        if (Options.contains(ClassMetadataFlags::ClassHasGenericLayout) &&
+            Options.contains(ClassMetadataFlags::ClassHasObjCAncestry)) {
           for (auto &access : AllFieldAccesses) {
             if (access == FieldAccess::NonConstantDirect)
               access = FieldAccess::ConstantIndirect;
@@ -455,23 +382,26 @@ namespace {
     }
 
     FieldAccess getFieldAccess() {
-      // If the layout so far has a fixed size, the field offset is known
-      // statically.
-      if (isFixedSize())
-        return FieldAccess::ConstantDirect;
-
       // If layout so far depends on generic parameters, we have to load the
       // offset from the field offset vector in class metadata.
-      if (ClassHasGenericLayout)
+      if (Options.contains(ClassMetadataFlags::ClassHasGenericLayout))
         return FieldAccess::ConstantIndirect;
 
       // If layout so far doesn't depend on any generic parameters, but it's
-      // nonetheless not statically known (because either a superclass
-      // or a member type was resilient), then we can rely on the existence
+      // nonetheless not statically known (because either the stored property
+      // layout of a superclass is resilient, or one of our own members is a
+      // resilient value type), then we can rely on the existence
       // of a global field offset variable which will be initialized by
       // either the Objective-C or Swift runtime, depending on the
       // class's heritage.
-      return FieldAccess::NonConstantDirect;
+      if (Options.contains(ClassMetadataFlags::ClassHasMissingMembers) ||
+          Options.contains(ClassMetadataFlags::ClassHasResilientMembers) ||
+          Options.contains(ClassMetadataFlags::ClassHasObjCAncestry))
+        return FieldAccess::NonConstantDirect;
+
+      // If the layout so far has a fixed size, the field offset is known
+      // statically.
+      return FieldAccess::ConstantDirect;
     }
   };
 } // end anonymous namespace
@@ -2316,6 +2246,10 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
   if (fragileLayout.doesMetadataRequireInitialization())
     return ClassMetadataStrategy::Singleton;
 
+  // If the legacy type info was sufficient to produce a fixed fragile layout,
+  // but our resilient layout requires initialization, we can use the fixed
+  // layout on older Objective-C runtimes, and emit an update callback for
+  // newer Objective-C runtimes.
   if (resilientLayout.doesMetadataRequireInitialization())
     return ClassMetadataStrategy::FixedOrUpdate;
 
