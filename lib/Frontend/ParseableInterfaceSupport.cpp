@@ -452,7 +452,7 @@ bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
       return;
     }
 
-    SubError = SubInstance.getDiags().hadAnyError();
+    SubError = Diags.hadAnyError();
   });
   return !RunSuccess || SubError;
 }
