@@ -108,6 +108,8 @@ public:
   ///
   /// If the current DeclContext is nested in a function body, the SourceLoc
   /// is used to determine which declarations in that body are visible.
+  UnqualifiedLookup(const char* dummy, DeclName Name, DeclContext *DC, LazyResolver *TypeResolver,
+                    SourceLoc Loc = SourceLoc(), Options options = Options());
   UnqualifiedLookup(DeclName Name, DeclContext *DC, LazyResolver *TypeResolver,
                     SourceLoc Loc = SourceLoc(), Options options = Options());
 
@@ -131,6 +133,56 @@ inline UnqualifiedLookup::Options operator|(UnqualifiedLookup::Flags flag1,
                                             UnqualifiedLookup::Flags flag2) {
   return UnqualifiedLookup::Options(flag1) | flag2;
 }
+  
+  
+  /// This class implements and represents the result of performing
+  /// unqualified lookup (i.e. lookup for a plain identifier).
+  class ExpUnqualifiedLookup {
+  public:
+    using Flags = UnqualifiedLookup::Flags;
+  
+    using Options = UnqualifiedLookup::Options;
+    
+    /// Lookup an unqualified identifier \p Name in the context.
+    ///
+    /// If the current DeclContext is nested in a function body, the SourceLoc
+    /// is used to determine which declarations in that body are visible.
+    ExpUnqualifiedLookup(DeclName Name, DeclContext *DC, LazyResolver *TypeResolver,
+                      SourceLoc Loc = SourceLoc(), Options options = Options());
+    
+    SmallVector<LookupResultEntry, 4> Results;
+    /// The index of the first result that isn't from the innermost scope
+    /// with results.
+    ///
+    /// That is, \c makeArrayRef(Results).take_front(IndexOfFirstOuterResults)
+    /// will be Results from the innermost scope that had results, and the
+    /// remaining elements of Results will be from parent scopes of this one.
+    size_t IndexOfFirstOuterResult;
+    
+    /// Return true if anything was found by the name lookup.
+    bool isSuccess() const { return !Results.empty(); }
+    
+    /// Get the result as a single type, or a null type if that fails.
+    TypeDecl *getSingleTypeResult();
+    
+    bool operator==(const UnqualifiedLookup &other) const {
+      if (Results.size() != other.Results.size())
+        return false;
+      for (size_t i: indices(Results)) {
+        const auto &e = Results[i];
+        const auto &oe = other.Results[i];
+        if (e.getValueDecl() != oe.getValueDecl())
+          return false;
+        if (e.getDeclContext() != oe.getDeclContext())
+          return false;
+        if (e.getBaseDecl() != oe.getBaseDecl())
+          return false;
+      }
+      return IndexOfFirstOuterResult == other.IndexOfFirstOuterResult;
+    }
+    
+    bool verifyEqual(const UnqualifiedLookup &) const;
+  };
 
 /// Describes the reason why a certain declaration is visible.
 enum class DeclVisibilityKind {
