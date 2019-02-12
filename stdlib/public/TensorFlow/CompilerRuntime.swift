@@ -960,8 +960,8 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
 }
 
 
-public func _TFFuncSpecializer<State : _TensorArrayProtocolEnhanced,
-                               Data : TensorGroup>(
+public func _tffunc<State : _TensorArrayProtocolEnhanced,
+                    Data : TensorGroup>(
   with state: State,
   in fn: @escaping (State, Data) -> (State)
 ) -> (Data) -> (String) {

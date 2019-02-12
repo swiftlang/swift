@@ -32,18 +32,17 @@ TracerTests.testAllBackends("SimpleTFFunction") {
     return i + 1
   }
 
-  let specializer = _TFFuncSpecializer(with: Tensor<Int32>(0), in: cond)
+  let tffunc = _tffunc(with: Tensor<Int32>(0), in: cond)
 
   func runWhile(_ n: Int32) -> Tensor<Int32> {
     return  #tfop(
       "StatelessWhile",
       Tensor<Int32>(0),
       T$dtype: [Int32.tensorFlowDataType],
-      cond$func: specializer(Tensor<Int32>(n)),
+      cond$func: tffunc(Tensor<Int32>(n)),
       body: body)
   }
 
-  let result = runWhile(130)
   expectEqualWithScalarTensor(10, runWhile(10))
   expectEqualWithScalarTensor(300, runWhile(300))
 }
