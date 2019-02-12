@@ -298,6 +298,12 @@ final internal class __StringStorage
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
+  
+  @objc(isEqual:)
+  @_effects(readonly)
+  final internal func isEqual(object other:AnyObject?) -> Int8 {
+    return _isEqual(other)
+  }
 
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
@@ -775,6 +781,12 @@ final internal class __SharedStringStorage
   @objc(isEqualToString:)
   @_effects(readonly)
   final internal func isEqual(to other:AnyObject?) -> Int8 {
+    return _isEqual(other)
+  }
+  
+  @objc(isEqual:)
+  @_effects(readonly)
+  final internal func isEqual(object other:AnyObject?) -> Int8 {
     return _isEqual(other)
   }
 
