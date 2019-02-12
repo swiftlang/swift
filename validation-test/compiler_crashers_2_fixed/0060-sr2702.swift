@@ -46,7 +46,7 @@ public func XUAllSubclassesOfClass<T: AnyObject>(_ aClass: T.Type) -> [T.Type] {
 			free(memory)
 		}
 		
-		let classesPtr = memory.assumingMemoryBound(to: Optional<AnyClass>.self)
+		let classesPtr = memory.assumingMemoryBound(to: AnyClass.self)
 		let classes = AutoreleasingUnsafeMutablePointer<AnyClass>(classesPtr)
 		numClasses = objc_getClassList(classes, numClasses)
 
