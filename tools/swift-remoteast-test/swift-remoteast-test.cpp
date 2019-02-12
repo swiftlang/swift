@@ -15,6 +15,7 @@
 
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/InProcessMemoryReader.h"
+#include "swift/Remote/MetadataReader.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/FrontendTool/FrontendTool.h"
@@ -38,7 +39,7 @@ using namespace swift::remote;
 using namespace swift::remoteAST;
 
 /// The context for the code we're running.  Set by the observer.
-static ASTContext *Context = nullptr;
+static ASTContext *context = nullptr;
 
 /// The RemoteAST for the code we're running.
 std::shared_ptr<MemoryReader> reader;
@@ -49,7 +50,7 @@ static RemoteASTContext &getRemoteASTContext() {
     return *remoteContext;
 
   std::shared_ptr<MemoryReader> reader(new InProcessMemoryReader());
-  remoteContext.reset(new RemoteASTContext(*Context, std::move(reader)));
+  remoteContext.reset(new RemoteASTContext(*context, std::move(reader)));
   return *remoteContext;
 }
 
@@ -166,7 +167,7 @@ printDynamicTypeAndAddressForExistential(void *object,
       RemoteAddress(object), staticTypeResult.getValue());
   if (result) {
     out << "found type: ";
-    result.getValue().first.print(out);
+    result.getValue().InstanceType.print(out);
     out << "\n";
   } else {
     out << result.getFailure().render() << '\n';
@@ -177,7 +178,7 @@ namespace {
 
 struct Observer : public FrontendObserver {
   void configuredCompiler(CompilerInstance &instance) override {
-    Context = &instance.getASTContext();
+    context = &instance.getASTContext();
   }
 };
 
