@@ -1006,7 +1006,13 @@ public:
   }
 
   void visitEnumCaseDecl(EnumCaseDecl *ecd) {}
-  void visitEnumElementDecl(EnumElementDecl *ued) {}
+  void visitEnumElementDecl(EnumElementDecl *EED) {
+    if (!EED->hasAssociatedValues())
+      return;
+
+    // Emit any default argument generators.
+    SGM.emitDefaultArgGenerators(EED, EED->getParameterList());
+  }
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers.
