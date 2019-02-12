@@ -222,6 +222,7 @@ SYNTAX_TOKENS = [
     Punctuator('PrefixPeriod', 'period_prefix', text='.',
                serialization_code=87),
     Punctuator('Comma', 'comma', text=',', serialization_code=84),
+    Punctuator('Ellipsis', 'ellipsis', text='...', serialization_code=118),
     Punctuator('Colon', 'colon', text=':', serialization_code=82),
     Punctuator('Semicolon', 'semi', text=';', serialization_code=83),
     Punctuator('Equal', 'equal', text='=', serialization_code=86),
