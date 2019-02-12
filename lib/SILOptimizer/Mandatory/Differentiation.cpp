@@ -4980,10 +4980,6 @@ void Differentiation::run() {
         DifferentiationInvoker(fnAndAttr.second, fnAndAttr.first));
   }
 
-  bool errorProcessingAutoDiffInsts = false;
-  for (auto *adfi : autodiffInsts)
-    errorProcessingAutoDiffInsts |= processAutoDiffFunctionInst(adfi, context);
-
   auto cleanUp = [&]() {
     for (auto &task : context.getDifferentiationTasks())
       context.clearTask(task.get());
@@ -5001,6 +4997,10 @@ void Differentiation::run() {
     cleanUp();
     return;
   }
+
+  bool errorProcessingAutoDiffInsts = false;
+  for (auto *adfi : autodiffInsts)
+    errorProcessingAutoDiffInsts |= processAutoDiffFunctionInst(adfi, context);
 
   // If there was any error that occurred during `autodiff_function` instruction
   // processing, back out.
