@@ -791,8 +791,8 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
                            Data : TensorGroup,
                            Result : TensorGroup>(
   with state: State,
-  in fn: (State, Data) -> (State, Result)
-) -> (State, Data) -> (State, Result) {
+  in fn: (State, Data) -> (State, Result?)
+) -> (State, Data) -> (State, Result?) {
   let traceContext = _trace(with: state, in : fn) 
   // The result is a closure that captures and executes the trace graph
   // function in the trace context.
