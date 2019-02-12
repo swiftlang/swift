@@ -3502,6 +3502,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_SWIFT}" ]] ; then
                     continue
                 fi
+                # Swift syntax parser is currently a sub-product of Swift;
+                # We need to specify the install target separately here.
+                if [ "${BUILD_LIBPARSER_ONLY}" ]; then
+                    INSTALL_TARGETS=tools/libSwiftSyntaxParser/install
+                fi
                 ;;
             llbuild)
                 if [[ -z "${INSTALL_LLBUILD}" ]] ; then
@@ -3807,15 +3812,9 @@ for host in "${ALL_HOSTS[@]}"; do
             call darwin_install_extract_symbols
         else
             set -x
-            if [ "${BUILD_LIBPARSER_ONLY}" ]; then
-                # We don't have a toolchain so we should install to the specified dir
-                CURRENT_INSTALL_DIR="${INSTALL_DESTDIR}"
-                CURRENT_PREFIX="/."
-            else
-                # If we have a toolchain, use the toolchain install dir.
-                CURRENT_INSTALL_DIR=${host_install_destdir}
-                CURRENT_PREFIX="${TOOLCHAIN_PREFIX}"
-            fi
+
+            CURRENT_INSTALL_DIR=${host_install_destdir}
+            CURRENT_PREFIX="${TOOLCHAIN_PREFIX}"
 
             # Copy executables and shared libraries from the `host_install_destdir` to
             # INSTALL_SYMROOT and run dsymutil on them.
