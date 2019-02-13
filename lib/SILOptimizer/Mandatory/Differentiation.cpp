@@ -1811,11 +1811,11 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     taskCallback(task);
     auto *assocFn = task->getAssociatedFunction(kind);
     auto *ref = builder.createFunctionRef(loc, assocFn);
-    // FIXME(201): Handle direct differentiation of reabstraction thunks.
+    // FIXME(TF-201): Handle direct differentiation of reabstraction thunks.
     // Tentative solution: clone a new reabstraction thunk where function
     // argument has a `@differentiable` function type.
     if (originalFn->isThunk() == IsReabstractionThunk) {
-      // Handle here!
+      // Handle here.
     }
     auto convertedRef = reapplyFunctionConversion(
         ref, originalFRI, original, builder, loc,
@@ -3713,14 +3713,6 @@ public:
       } else {
         auto adjBuf = getAdjointBuffer(origParam);
         indParamAdjoints.push_back(adjBuf);
-        if (auto *cleanup = adjBuf.getCleanup()) {
-          LLVM_DEBUG(getADDebugStream() << "Disabling cleanup for "
-                     << adjBuf.getValue() << "for return\n");
-          cleanup->disable();
-          LLVM_DEBUG(getADDebugStream() << "Applying "
-                     << cleanup->getNumChildren() << " child cleanups\n");
-          cleanup->applyRecursively(builder, adjLoc);
-        }
       }
     };
     // The original's self parameter, if present, is the last parameter. But we
@@ -3815,7 +3807,7 @@ public:
     auto *field = getPrimalInfo().lookUpPullbackDecl(ai);
     assert(field);
     auto loc = ai->getLoc();
-    SILValue pullback =
+    auto pullback =
         builder.createStructExtract(loc, primalValueAggregateInAdj, field);
 
     // Get the original result of the `apply` instruction.
@@ -3852,11 +3844,10 @@ public:
     } else {
       auto adjointBuf = getAdjointBuffer(origResult);
       adjointValue = adjointBuf.getValue();
-      adjointType = adjointBuf.getValue()->getType();
+      adjointType = adjointBuf.getType();
     }
 
     // Register indirect results as arguments.
-    // FIXME: This logic is crucial and needs to be fixed.
     SILFunctionConventions calleeConvs(
         ai->getCallee()->getType().castTo<SILFunctionType>(), ai->getModule());
     SmallVector<SILValue, 4> tempAllocations;
@@ -3877,18 +3868,14 @@ public:
     }
 
     // Initialize seed buffer.
-    ValueWithCleanup seedBuf(builder.createAllocStack(loc, adjointType),
-                             /*cleanup*/ nullptr);
+    auto seedBuf = builder.createAllocStack(loc, adjointType);
     if (adjointType.isObject()) {
-      ValueWithCleanup access(
-          builder.createBeginAccess(
-              loc, seedBuf, SILAccessKind::Init,
-              SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-              /*fromBuiltin*/ false),
-              /*cleanup*/ nullptr);
+      auto access = builder.createBeginAccess(
+          loc, seedBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
       auto soq = getBufferSOQ(adjointType.getASTType(), builder.getFunction());
       builder.createStore(loc, adjointValue, access, soq);
-      builder.createEndAccess(access.getLoc(), access, /*aborted*/ false);
+      builder.createEndAccess(loc, access, /*aborted*/ false);
     } else {
       builder.createCopyAddr(loc, adjointValue, seedBuf, IsNotTake,
                              IsInitialization);
@@ -3916,8 +3903,7 @@ public:
     auto *pullbackCall = builder.createApply(ai->getLoc(), pullback,
                                              SubstitutionMap(), args,
                                              /*isNonThrowing*/ false);
-    tempAllocations.push_back(seedBuf.getValue());
-    // builder.createDeallocStack(loc, seedBuf);
+    tempAllocations.push_back(seedBuf);
 
     // Extract all results from `pullbackCall`.
     SmallVector<SILValue, 8> dirResults;
@@ -3994,9 +3980,7 @@ public:
           }
           else {
             addAdjointValue(origArg, makeConcreteAdjointValue(ValueWithCleanup(
-                cotanWrtSelf,
-                makeCleanup(cotanWrtSelf, cleanupFn,
-                            {seedBuf.getCleanup()}))));
+                cotanWrtSelf, makeCleanup(cotanWrtSelf, cleanupFn))));
           }
         }
       }
@@ -4034,7 +4018,7 @@ public:
         }
         else
           addAdjointValue(origArg, makeConcreteAdjointValue(ValueWithCleanup(
-              cotan, makeCleanup(cotan, cleanupFn, {seedBuf.getCleanup()}))));
+              cotan, makeCleanup(cotan, cleanupFn))));
       }
     }
     // Deallocate temporary allocations.
@@ -4264,7 +4248,6 @@ public:
               else
                 b.createDestroyAddr(l, v);
             })));
-    // localAllocations.push_back(adjBuf);
   }
 
   // Handle `load` instruction.
