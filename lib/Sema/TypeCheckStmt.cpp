@@ -508,7 +508,8 @@ public:
       Type contextType = yieldType;
       if (yieldResults[i].isInOut()) {
         contextTypePurpose = CTP_YieldByReference;
-        contextType = LValueType::get(contextType);
+        if (!contextType->hasError())
+          return nullptr;
 
         // Check that the yielded expression is a &.
         if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
