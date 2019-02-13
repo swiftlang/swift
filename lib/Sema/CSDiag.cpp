@@ -4971,6 +4971,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       }
     }
 
+    if (fnType->is<ExistentialMetatypeType>()) {
+      auto diag = diagnose(arg->getStartLoc(),
+                           diag::missing_init_on_metatype_initialization);
+      diag.highlight(fnExpr->getSourceRange());
+    }
+
     if (!fnType->is<ExistentialMetatypeType>()) {
       auto diag = diagnose(arg->getStartLoc(),
                            diag::cannot_call_non_function_value, fnType);

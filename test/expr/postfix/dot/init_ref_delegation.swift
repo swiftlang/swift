@@ -101,7 +101,7 @@ enum Z2 {
 // Ill-formed initialization: wrong context.
 class Z3 {
   func f() {
-    self.init() // expected-error{{static member 'init' cannot be used on instance of type 'Z3'}} {{10-10=type(of: }} {{14-14=)}} 
+    self.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{10-10=type(of: }} {{14-14=)}}
   }
 
   init() { }
@@ -112,7 +112,7 @@ class Z4 {
   init() {} // expected-note{{selected non-required initializer}}
 
   convenience init(other: Z4) {
-    other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}} 
+    other.init() // expected-error{{'member 'init' cannot be used on value of type 'Z4'}} {{11-11=type(of: }} {{15-15=)}}
     type(of: other).init() // expected-error{{must use a 'required' initializer}}
   }
 }
@@ -121,7 +121,7 @@ class Z5 : Z4 {
   override init() { }
 
   convenience init(other: Z5) {
-    other.init() // expected-error{{member 'init' cannot be used on value of type 'Z5'}} {{11-11=type(of: }} {{15-15=)}} 
+    other.init() // expected-error{{member 'init' cannot be used on value of type 'Z5'}} {{11-11=type(of: }}
   }
 }
 
@@ -150,7 +150,7 @@ struct RDar16603812 {
    var i = 42
    init() {}
    func foo() {
-      self.init() // expected-error {{static member 'init' cannot be used on instance of type 'RDar16603812'}} {{12-12=type(of: }} {{16-16=)}} 
+      self.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{12-12=type(of: }} {{16-16=)}}
       type(of: self).init() // expected-warning{{result of 'RDar16603812' initializer is unused}}
    }
 }
@@ -199,7 +199,7 @@ class D: C {
   }
 
   func foo() {
-    self.init(x: 0) // expected-error{{cannot invoke 'D.init' with an argument list of type '(x: Int)'}} {{10-10=type(of: }} {{14-14=)}} 
+    self.init(x: 0) // expected-error{{cannot invoke 'D.init' with an argument list of type '(x: Int)'}} {{10-10=type(of: }}
   }
   func bar() {
     super.init(x: 0) // expected-error{{cannot invoke 'C.init' with an argument list of type '(x: Int)'}}
@@ -270,10 +270,10 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
   var c3a = type(of: x).init() // expected-error{{'required' initializer}}
   var c4a = type(of: x).init(proto: "")
 
-  var ci1 = x.init(required: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(required: Int)'}} {{15-15=type(of: }} {{19-19=)}} 
-  var ci2 = x.init(x: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(x: Int)'}} {{15-15=type(of: }} {{19-19=)}} 
-  var ci3 = x.init() // expected-error{{member 'init' cannot be used on value of type 'T'}} {{15-15=type(of: }} {{19-19=)}} 
-  var ci4 = x.init(proto: "") // expected-error{{cannot invoke 'T.init' with an argument list of type '(proto: String)'}} {{15-15=type(of: }} {{19-19=)}} 
+  var ci1 = x.init(required: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(required: Int)'}} {{15-15=type(of: }}
+  var ci2 = x.init(x: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(x: Int)'}} {{15-15=type(of: }}
+  var ci3 = x.init() // expected-error{{member 'init' cannot be used on value of type 'T'}} {{15-15=type(of: }}
+  var ci4 = x.init(proto: "") // expected-error{{cannot invoke 'T.init' with an argument list of type '(proto: String)'}} {{15-15=type(of: }}
 
   var ci1a = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
   var ci2a = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}

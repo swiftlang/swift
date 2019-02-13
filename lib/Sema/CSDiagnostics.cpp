@@ -1592,8 +1592,19 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   //
   // Produce a tailored diagnostic for these cases since this
   // comes up and is otherwise non-obvious what is going on.
-  
-  if (BaseType->is<MetatypeType>() && !member->isStatic()) {
+
+  if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
+      !BaseType->getRValueType()->is<AnyMetatypeType>()) {
+    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(getRawAnchor())) {
+      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+      emitDiagnostic(loc, diag::init_not_instance_member)
+          .fixItInsert(fixItRng.Start, "type(of: ")
+          .fixItInsertAfter(fixItRng.End, ")");
+      return true;
+    }
+  }
+
+  if (BaseType->is<AnyMetatypeType>() && !member->isStatic()) {
     auto instanceTy = BaseType->getRValueType();
     
     if (auto *AMT = instanceTy->getAs<AnyMetatypeType>()) {
@@ -1661,7 +1672,13 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
           .highlight(member->getSourceRange());
       return true;
     }
-    
+
+    if (isa<TypeExpr>(getRawAnchor())) {
+      emitDiagnostic(loc, diag::instance_member_use_on_type, instanceTy, Name)
+          .highlight(getRawAnchor()->getSourceRange());
+      return true;
+    }
+
     // Just emit a generic "instance member cannot be used" error
     emitDiagnostic(loc, diag::could_not_use_instance_member_on_type, instanceTy,
                    Name, instanceTy, false)
@@ -1730,7 +1747,17 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
     
     Diag->highlight(getAnchor()->getSourceRange());
-    
+
+    if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
+        !baseObjTy->is<AnyMetatypeType>()) {
+      if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(getRawAnchor())) {
+        SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+        Diag->fixItInsert(fixItRng.Start, "type(of: ");
+        Diag->fixItInsertAfter(fixItRng.End, ")");
+        return true;
+      }
+    }
+
     // Determine the contextual type of the expression
     Type contextualType;
     for (auto iterateCS = &cs; contextualType.isNull() && iterateCS;
