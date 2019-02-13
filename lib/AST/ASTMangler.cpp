@@ -961,8 +961,8 @@ void ASTMangler::appendType(Type type) {
         // Dependent members of non-generic-param types are not canonical, but
         // we may still want to mangle them for debugging or indexing purposes.
         appendType(DepTy->getBase());
-        appendAssociatedTypeName(DepTy);
-        appendOperator("qa");
+        appendIdentifier(DepTy->getName().str());
+        appendOperator("Qa");
       }
       addTypeSubstitution(DepTy);
       return;
