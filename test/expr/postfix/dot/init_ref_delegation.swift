@@ -199,7 +199,7 @@ class D: C {
   }
 
   func foo() {
-    self.init(x: 0) // expected-error{{cannot invoke 'D.init' with an argument list of type '(x: Int)'}} {{10-10=type(of: }}
+    self.init(x: 0) // expected-error{{cannot invoke 'D.init' with an argument list of type '(x: Int)'}}
   }
   func bar() {
     super.init(x: 0) // expected-error{{cannot invoke 'C.init' with an argument list of type '(x: Int)'}}
@@ -270,10 +270,10 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
   var c3a = type(of: x).init() // expected-error{{'required' initializer}}
   var c4a = type(of: x).init(proto: "")
 
-  var ci1 = x.init(required: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(required: Int)'}} {{15-15=type(of: }}
-  var ci2 = x.init(x: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(x: Int)'}} {{15-15=type(of: }}
-  var ci3 = x.init() // expected-error{{member 'init' cannot be used on value of type 'T'}} {{15-15=type(of: }}
-  var ci4 = x.init(proto: "") // expected-error{{cannot invoke 'T.init' with an argument list of type '(proto: String)'}} {{15-15=type(of: }}
+  var ci1 = x.init(required: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(required: Int)'}}
+  var ci2 = x.init(x: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(x: Int)'}}
+  var ci3 = x.init() // expected-error{{member 'init' cannot be used on value of type 'T'}}
+  var ci4 = x.init(proto: "") // expected-error{{cannot invoke 'T.init' with an argument list of type '(proto: String)'}}
 
   var ci1a = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
   var ci2a = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
