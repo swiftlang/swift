@@ -742,6 +742,22 @@ private:
     if (!Ty->hasTypeParameter())
       Ty = Ty->mapTypeOutOfContext();
 
+    // Strip off top level of type sugar (except for type aliases).
+    // We don't want Optional<T> and T? to get different debug types.
+    while (true) {
+      if (auto *ParenTy = dyn_cast<ParenType>(Ty.getPointer())) {
+        Ty = ParenTy->getUnderlyingType();
+        continue;
+      }
+
+      if (auto *SugarTy = dyn_cast<SyntaxSugarType>(Ty.getPointer())) {
+        Ty = SugarTy->getSinglyDesugaredType();
+        continue;
+      }
+
+      break;
+    }
+
     Mangle::ASTMangler Mangler;
     std::string Result = Mangler.mangleTypeForDebugger(
         Ty, DbgTy.getDeclContext());

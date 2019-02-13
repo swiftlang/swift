@@ -779,11 +779,29 @@ void ASTMangler::appendType(Type type) {
     }
 
     case TypeKind::Paren:
-      return appendSugaredType<ParenType>(type);
-    case TypeKind::ArraySlice: /* fallthrough */
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      appendType(cast<ParenType>(tybase)->getUnderlyingType());
+      appendOperator("XSp");
+      return;
+
+    case TypeKind::ArraySlice:
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      appendType(cast<ArraySliceType>(tybase)->getBaseType());
+      appendOperator("XSa");
+      return;
+
     case TypeKind::Optional:
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      appendType(cast<OptionalType>(tybase)->getBaseType());
+      appendOperator("XSq");
+      return;
+
     case TypeKind::Dictionary:
-      return appendSugaredType<SyntaxSugarType>(type);
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      appendType(cast<DictionaryType>(tybase)->getKeyType());
+      appendType(cast<DictionaryType>(tybase)->getValueType());
+      appendOperator("XSD");
+      return;
 
     case TypeKind::ExistentialMetatype: {
       ExistentialMetatypeType *EMT = cast<ExistentialMetatypeType>(tybase);
@@ -1647,28 +1665,24 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   if (tryAppendStandardSubstitution(decl))
     return;
 
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+
   // For generic types, this uses the unbound type.
-  Type key;
-  if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
-    if (alias->isGeneric())
-      key = alias->getUnboundGenericType();
-    else
-      key = alias->getDeclaredInterfaceType();
+  if (nominal) {
+    if (tryMangleTypeSubstitution(nominal->getDeclaredType()))
+      return;
   } else {
-    key = cast<NominalTypeDecl>(decl)->getDeclaredType();
+    if (tryMangleSubstitution(cast<TypeAliasDecl>(decl)))
+      return;
   }
 
-  // Try to mangle the entire name as a substitution.
-  if (tryMangleTypeSubstitution(key))
-    return;
   
   // Try to mangle a symbolic reference for a nominal type.
   if (AllowSymbolicReferences) {
-    auto nominal = key->getAnyNominal();
     if (nominal && (!CanSymbolicReference || CanSymbolicReference(nominal))) {
       appendSymbolicReference(nominal);
       // Substitutions can refer back to the symbolic reference.
-      addTypeSubstitution(key);
+      addTypeSubstitution(nominal->getDeclaredType());
       return;
     }
   }
@@ -1731,7 +1745,10 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     }
   }
 
-  addTypeSubstitution(key);
+  if (nominal)
+    addTypeSubstitution(nominal->getDeclaredType());
+  else
+    addSubstitution(cast<TypeAliasDecl>(decl));
 }
 
 void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {

@@ -2655,6 +2655,27 @@ NodePointer Demangler::demangleSpecialType() {
     }
     case 'e':
       return createType(createNode(Node::Kind::ErrorType));
+    case 'S':
+      // Sugared type for debugger.
+      switch (nextChar()) {
+      case 'q':
+        return createType(createWithChild(Node::Kind::SugaredOptional,
+                                          popNode(Node::Kind::Type)));
+      case 'a':
+        return createType(createWithChild(Node::Kind::SugaredArray,
+                                          popNode(Node::Kind::Type)));
+      case 'D': {
+        NodePointer value = popNode(Node::Kind::Type);
+        NodePointer key = popNode(Node::Kind::Type);
+        return createType(createWithChildren(Node::Kind::SugaredDictionary,
+                                             key, value));
+      }
+      case 'p':
+        return createType(createWithChild(Node::Kind::SugaredParen,
+                                          popNode(Node::Kind::Type)));
+      default:
+        return nullptr;
+      }
     default:
       return nullptr;
   }

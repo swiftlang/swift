@@ -303,6 +303,10 @@ private:
     case Node::Kind::TypeList:
     case Node::Kind::LabelList:
     case Node::Kind::TypeSymbolicReference:
+    case Node::Kind::SugaredOptional:
+    case Node::Kind::SugaredArray:
+    case Node::Kind::SugaredDictionary:
+    case Node::Kind::SugaredParen:
       return true;
 
     case Node::Kind::ProtocolList:
@@ -508,6 +512,15 @@ private:
     printer_unreachable("bad node kind");
   }
 
+  void printWithParens(NodePointer type) {
+    bool needs_parens = !isSimpleType(type);
+    if (needs_parens)
+      Printer << "(";
+    print(type);
+    if (needs_parens)
+      Printer << ")";
+  }
+
   SugarType findSugar(NodePointer Node) {
     if (Node->getNumChildren() == 1 &&
         Node->getKind() == Node::Kind::Type)
@@ -595,12 +608,7 @@ private:
       case SugarType::Optional:
       case SugarType::ImplicitlyUnwrappedOptional: {
         NodePointer type = Node->getChild(1)->getChild(0);
-        bool needs_parens = !isSimpleType(type);
-        if (needs_parens)
-          Printer << "(";
-        print(type);
-        if (needs_parens)
-          Printer << ")";
+        printWithParens(type);
         Printer << (sugarType == SugarType::Optional ? "?" : "!");
         break;
       }
@@ -1731,12 +1739,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Idx++;
     }
     NodePointer type = Node->getChild(Idx)->getChild(0);
-    bool needs_parens = !isSimpleType(type);
-    if (needs_parens)
-      Printer << "(";
-    print(type);
-    if (needs_parens)
-      Printer << ")";
+    printWithParens(type);
     if (isExistentialType(type)) {
       Printer << ".Protocol";
     } else {
@@ -2188,6 +2191,27 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::ProtocolConformanceRefInOtherModule:
     Printer << "protocol conformance ref (retroactive) ";
     printChildren(Node);
+    return nullptr;
+  case Node::Kind::SugaredOptional:
+    printWithParens(Node->getChild(0));
+    Printer << "?";
+    return nullptr;
+  case Node::Kind::SugaredArray:
+    Printer << "[";
+    print(Node->getChild(0));
+    Printer << "]";
+    return nullptr;
+  case Node::Kind::SugaredDictionary:
+    Printer << "[";
+    print(Node->getChild(0));
+    Printer << " : ";
+    print(Node->getChild(1));
+    Printer << "]";
+    return nullptr;
+  case Node::Kind::SugaredParen:
+    Printer << "(";
+    print(Node->getChild(0));
+    Printer << ")";
     return nullptr;
   }
   printer_unreachable("bad node kind!");

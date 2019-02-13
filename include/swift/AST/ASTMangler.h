@@ -210,14 +210,6 @@ protected:
 
   void bindGenericParameters(CanGenericSignature sig);
 
-  /// Mangles a sugared type iff we are mangling for the debugger.
-  template <class T> void appendSugaredType(Type type) {
-    assert(DWARFMangling &&
-           "sugared types are only legal when mangling for the debugger");
-    auto *BlandTy = cast<T>(type.getPointer())->getSinglyDesugaredType();
-    appendType(BlandTy);
-  }
-
   void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
   /// Append the bound generics arguments for the given declaration context

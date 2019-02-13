@@ -1242,6 +1242,26 @@ public:
   TypeReferenceOwnership getReferenceOwnership() const {
     return ReferenceOwnership;
   }
+
+  BuiltType createOptionalType(BuiltType base) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
+  BuiltType createArrayType(BuiltType base) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
+  BuiltType createDictionaryType(BuiltType key, BuiltType value) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
+  BuiltType createParenType(BuiltType base) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
 };
 
 }
