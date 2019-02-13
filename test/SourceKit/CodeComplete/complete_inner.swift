@@ -63,6 +63,7 @@ func test001() {
 // TOP_LEVEL_0-NEXT:   Foo(
 // TOP_LEVEL_0-NEXT:   FooBar
 // TOP_LEVEL_0-NEXT:   Foo.self
+// TOP_LEVEL_0-NEXT:   Foo.Type
 // TOP_LEVEL_0-NEXT:   Foo()
 // TOP_LEVEL_0-NEXT: ]
 
@@ -75,6 +76,7 @@ func test001() {
 // TOP_LEVEL_0-NEXT:   FooBar.
 // TOP_LEVEL_0-NEXT:   FooBar(
 // TOP_LEVEL_0-NEXT:   FooBar.self
+// TOP_LEVEL_0-NEXT:   FooBar.Type
 // TOP_LEVEL_0-NEXT:   FooBar()
 // TOP_LEVEL_0-NEXT:   FooBar(x: Foo)
 // TOP_LEVEL_0-NEXT:   FooBar.fooBar()

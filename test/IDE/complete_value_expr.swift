@@ -186,6 +186,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_2 | %FileCheck %s -check-prefix=KEYWORD_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_3 | %FileCheck %s -check-prefix=KEYWORD_3
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_1 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_2 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_3 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_3
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -389,6 +393,7 @@ var fooObject: FooStruct
 
 // FOO_STRUCT_DOT: Begin completions
 // FOO_STRUCT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct.Type#]; name=self
+// FOO_STRUCT_DOT-NEXT: Keyword/CurrNominal: Type[#FooStruct.Type#]; name=Type
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0({#self: &FooStruct#})[#() -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#self: &FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc2({#self: &FooStruct#})[#(Int, b: inout Double) -> Void#]{{; name=.+$}}
@@ -481,6 +486,7 @@ var fooObject: FooStruct
 // FOO_STRUCT_NO_DOT-NEXT: Decl[Enum]/CurrNominal:           .ExtNestedEnum[#FooStruct.ExtNestedEnum#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      .ExtNestedTypealias[#Int#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Keyword[self]/CurrNominal:        .self[#FooStruct.Type#]; name=self
+// FOO_STRUCT_NO_DOT-NEXT: Keyword/CurrNominal:              .Type[#FooStruct.Type#]; name=Type
 // FOO_STRUCT_NO_DOT-NEXT: End completions
 
 func testObjectExpr() {
@@ -886,6 +892,7 @@ func testLookInBaseStatic() {
   MembersDerived.#^BASE_MEMBERS_STATIC^#
 // BASE_MEMBERS_STATIC: Begin completions
 // BASE_MEMBERS_STATIC-NEXT: Keyword[self]/CurrNominal: self[#MembersDerived.Type#]; name=self
+// BASE_MEMBERS_STATIC-NEXT: Keyword/CurrNominal: Type[#MembersDerived.Type#]; name=Type
 // BASE_MEMBERS_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: derivedInstanceFunc({#self: MembersDerived#})[#() -> Void#]{{; name=.+$}}
 // BASE_MEMBERS_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   derivedStaticFunc()[#Void#]{{; name=.+$}}
 // BASE_MEMBERS_STATIC-NEXT: Decl[Constructor]/CurrNominal:    init()[#MembersDerived#]; name=init(){{$}}
@@ -1121,6 +1128,7 @@ func testFuncParenPattern2(_ fpp: FuncParenPattern) {
 // FUNC_PAREN_PATTERN_2-NEXT: Decl[Constructor]/CurrNominal: ({#(Int, Int)#})[#FuncParenPattern#]{{; name=.+$}}
 // FUNC_PAREN_PATTERN_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#self: &FuncParenPattern#})[#(Int) -> Void#]{{; name=.+$}}
 // FUNC_PAREN_PATTERN_2-NEXT: Keyword[self]/CurrNominal: .self[#FuncParenPattern.Type#]; name=self
+// FUNC_PAREN_PATTERN_2-NEXT: Keyword/CurrNominal: .Type[#FuncParenPattern.Type#]; name=Type
 // FUNC_PAREN_PATTERN_2-NEXT: End completions
 }
 
@@ -1198,6 +1206,7 @@ func testResolveGenericParams1() {
 // RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<FooStruct>.Type#]; name=Type
 // RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: End completions
 }
 
@@ -1225,6 +1234,8 @@ func testResolveGenericParams2<Foo : FooProtocol>(_ foo: Foo) {
 // RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooProtocol#})[#FooProtocol#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<Foo>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<Foo>.Type#]; name=Type
+
 // RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: End completions
 }
 
@@ -1241,7 +1252,7 @@ struct TestResolveGenericParams3_4<T> {
 // RESOLVE_GENERIC_PARAMS_3-NEXT: End completions
 
     FooGenericStruct<FooStruct>#^RESOLVE_GENERIC_PARAMS_3_STATIC^#
-// RESOLVE_GENERIC_PARAMS_3_STATIC: Begin completions, 11 items
+// RESOLVE_GENERIC_PARAMS_3_STATIC: Begin completions, 12 items
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[Constructor]/CurrNominal:    ()[#FooGenericStruct<FooStruct>#]; name=()
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[Constructor]/CurrNominal:    ({#t: FooStruct#})[#FooGenericStruct<FooStruct>#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#self: &FooGenericStruct<FooStruct>#})[#(FooStruct) -> Void#]{{; name=.+$}}
@@ -1253,6 +1264,7 @@ struct TestResolveGenericParams3_4<T> {
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<FooStruct>.Type#]; name=Type
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: End completions
   }
 
@@ -1280,6 +1292,7 @@ struct TestResolveGenericParams3_4<T> {
 // RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): T#})[#T#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<T>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<T>.Type#]; name=Type
 // RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: End completions
   }
 
@@ -1307,6 +1320,7 @@ struct TestResolveGenericParams3_4<T> {
 // RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<U>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<U>.Type#]; name=Type
 // RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: End completions
   }
 }
@@ -1647,21 +1661,21 @@ func checkOverrideInclusion2(_ arg: Override3) {
 // CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
 // CHECK_NODUP_RESTATED_REQ_NODOT: End completions
 
-// CHECK_NODUP_RESTATED_REQ_TYPE1: Begin completions, 5 items
+// CHECK_NODUP_RESTATED_REQ_TYPE1: Begin completions, 6 items
 // CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/Super: foo({#self: NoDupReq6#})[#() -> Void#]; name=foo(NoDupReq6)
 // CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/Super: roo({#self: NoDupReq6#})[#(arg1: Int) -> Void#]; name=roo(NoDupReq6
 // CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[AssociatedType]/Super: E; name=E
 // CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/CurrNominal: roo({#self: NoDupReq6#})[#(arg2: Int) -> Void#]; name=roo(NoDupReq6)
 // CHECK_NODUP_RESTATED_REQ_TYPE1: End completions
 
-// CHECK_NODUP_RESTATED_REQ_TYPE2: Begin completions, 5 items
+// CHECK_NODUP_RESTATED_REQ_TYPE2: Begin completions, 6 items
 // CHECK_NODUP_RESTATED_REQ_TYPE2: Decl[InstanceMethod]/CurrNominal: foo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#() -> Void#]; name=foo(NoDupReq1 & NoDupReq2 & NoDupReq3)
 // CHECK_NODUP_RESTATED_REQ_TYPE2: Decl[InstanceMethod]/CurrNominal: roo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#(arg1: Int) -> Void#]; name=roo(NoDupReq1 & NoDupReq2 & NoDupReq3)
 // CHECK_NODUP_RESTATED_REQ_TYPE2: Decl[AssociatedType]/CurrNominal: E; name=E
 // CHECK_NODUP_RESTATED_REQ_TYPE2: Decl[InstanceMethod]/CurrNominal: roo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#(arg2: Int) -> Void#]; name=roo(NoDupReq1 & NoDupReq2 & NoDupReq3)
 // CHECK_NODUP_RESTATED_REQ_TYPE2: End completions
 
-// CHECK_NODUP_RESTATED_REQ_TYPE3: Begin completions, 5 items
+// CHECK_NODUP_RESTATED_REQ_TYPE3: Begin completions, 6 items
 // CHECK_NODUP_RESTATED_REQ_TYPE3: Decl[InstanceMethod]/CurrNominal: foo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#() -> Void#]; name=foo(NoDupReq1 & NoDupReq2 & NoDupReq3)
 // CHECK_NODUP_RESTATED_REQ_TYPE3: Decl[InstanceMethod]/CurrNominal: roo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#(arg1: Int) -> Void#]; name=roo(NoDupReq1 & NoDupReq2 & NoDupReq3)
 // CHECK_NODUP_RESTATED_REQ_TYPE3: Decl[AssociatedType]/CurrNominal: E; name=E
@@ -2038,4 +2052,35 @@ func testKeyword(cat: Cat) {
 // KEYWORD_3-DAG: Decl[InstanceVar]/CurrNominal:      prop1[#String#]; name=prop1
 // KEYWORD_3-DAG: Decl[InstanceVar]/CurrNominal:      prop2[#String#]; name=prop2
 // KEYWORD_3: End completions
+}
+
+protocol ExistentialProto {
+  static func staticMethod()
+  func instanceMethod()
+}
+
+func testExistential() {
+  let _ = ExistentialProto.#^PROTOCOLTYPE_DOT_1^#
+// PROTOCOLTYPE_DOT_1: Begin completions, 5 items
+// PROTOCOLTYPE_DOT_1-DAG: Keyword[self]/CurrNominal:          self[#ExistentialProto.Protocol#]; name=self
+// PROTOCOLTYPE_DOT_1-DAG: Keyword/CurrNominal:                Protocol[#ExistentialProto.Protocol#]; name=Protocol
+// PROTOCOLTYPE_DOT_1-DAG: Keyword/CurrNominal:                Type[#ExistentialProto.Type#]; name=Type
+// FIXME(SR-75, rdar://problem/21289579): These 2 are invalid: {
+// PROTOCOLTYPE_DOT_1-DAG: Decl[StaticMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: staticMethod()[#Void#]; name=staticMethod()
+// PROTOCOLTYPE_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceMethod({#self: ExistentialProto#})[#() -> Void#]; name=instanceMethod(ExistentialProto)
+// }
+// PROTOCOLTYPE_DOT_1: End completions
+
+  let _ = ExistentialProto.Type.#^PROTOCOLTYPE_DOT_2^#
+// PROTOCOLTYPE_DOT_2: Begin completions, 3 items
+// PROTOCOLTYPE_DOT_2-DAG: Keyword[self]/CurrNominal:          self[#ExistentialProto.Type.Protocol#]; name=self
+// PROTOCOLTYPE_DOT_2-DAG: Keyword/CurrNominal:                Protocol[#ExistentialProto.Type.Protocol#]; name=Protocol
+// PROTOCOLTYPE_DOT_2-DAG: Keyword/CurrNominal:                Type[#ExistentialProto.Type.Type#]; name=Type
+// PROTOCOLTYPE_DOT_2: End completions
+
+  let _ = ExistentialProto.Protocol.#^PROTOCOLTYPE_DOT_3^#
+// PROTOCOLTYPE_DOT_3: Begin completions, 2 items
+// PROTOCOLTYPE_DOT_3-DAG: Keyword[self]/CurrNominal:          self[#ExistentialProto.Protocol.Type#]; name=self
+// PROTOCOLTYPE_DOT_3-DAG: Keyword/CurrNominal:                Type[#ExistentialProto.Protocol.Type#]; name=Type
+// PROTOCOLTYPE_DOT_3: End completions
 }
