@@ -21,9 +21,10 @@ if len(args) == 0:
 
 absoluteArgs = [os.path.abspath(arg) for arg in args]
 swiftcs = [os.path.join(arg, 'bin', 'swiftc') for arg in absoluteArgs]
-mirrorlibs = [os.path.join(arg, 'lib', 'swift', 'macosx',
-                           'libswiftRemoteMirror.dylib')
-              for arg in absoluteArgs]
+swiftlibs = [os.path.join(arg, 'lib', 'swift', 'macosx')
+             for arg in absoluteArgs]
+mirrorlibs = [os.path.join(lib, 'libswiftRemoteMirror.dylib')
+              for lib in swiftlibs]
 
 os.chdir(os.path.dirname(sys.argv[0]))
 
@@ -37,10 +38,11 @@ subprocess.check_call(['clang',
                        '-g', 'test.m'])
 
 # Build a test library with each Swift compiler passed in.
-for i, swiftc in enumerate(swiftcs):
+for i, (swiftc, swiftlib) in enumerate(zip(swiftcs, swiftlibs)):
     subprocess.check_call(
         ['xcrun', swiftc, '-emit-library', 'test.swift',
-         '-o', os.path.join('/tmp', 'libtest' + str(i) + '.dylib')])
+         '-o', os.path.join('/tmp', 'libtest' + str(i) + '.dylib'),
+         '-Xlinker', '-rpath', '-Xlinker', swiftlib])
 
 # Run the test harness with all combinations of the remote mirror libraries.
 for i in range(len(swiftcs) + 1):

@@ -96,6 +96,19 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Failed to add library at %s\n", argv[i]);
       exit(1);
     }
+    
+    unsigned long long *isSwiftMaskPtr = dlsym(
+      Handle, "swift_reflection_classIsSwiftMask");
+    if (isSwiftMaskPtr) {
+      printf("%s has isSwiftMask. Original value is %lld\n",
+             argv[i], *isSwiftMaskPtr);
+      swift_reflection_interop_setClassIsSwiftMask(Context, 1);
+      printf("Set mask to 1, value is now %lld\n", *isSwiftMaskPtr);
+      swift_reflection_interop_setClassIsSwiftMask(Context, 2);
+      printf("Set mask to 2, value is now %lld\n", *isSwiftMaskPtr);
+    } else {
+      printf("%s does not have isSwiftMask\n", argv[i]);
+    }
   }
   
   int hasLegacy = 0;

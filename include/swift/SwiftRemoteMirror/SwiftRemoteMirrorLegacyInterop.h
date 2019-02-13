@@ -55,6 +55,13 @@ static inline void
 swift_reflection_interop_destroyReflectionContext(
   SwiftReflectionInteropContextRef ContextRef);
 
+/// Set the is-Swift mask for the stable ABI on the current system.
+/// NOTE: must be called after interop_addLibrary is used to add the
+/// stable ABI remote mirror library in order to take effect.
+static inline void
+swift_reflection_interop_setClassIsSwiftMask(
+  SwiftReflectionInteropContextRef ContextRef, uint64_t mask);
+
 static inline int
 swift_reflection_interop_addImage(SwiftReflectionInteropContextRef ContextRef,
                                   swift_addr_t imageStart);
@@ -175,6 +182,8 @@ typedef int (*ReadBytesFunctionLegacy)(void *reader_context, swift_addr_t addres
                                        void *dest, uint64_t size);
 
 struct SwiftReflectionFunctions {
+  unsigned long long *classIsSwiftMaskPtr;
+
   uint16_t (*getSupportedMetadataVersion)(void);
 
   SwiftReflectionContextRef (*createReflectionContext)(
@@ -406,6 +415,8 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
   } while (0)
 #define LOAD(name) LOAD_NAMED(name, "swift_reflection_" #name)
   
+  Functions->classIsSwiftMaskPtr =
+    (unsigned long long *)dlsym(Handle, "swift_reflection_classIsSwiftMask");
   LOAD(getSupportedMetadataVersion);
   uint16_t version = Functions->getSupportedMetadataVersion();
   if (version < SWIFT_LEGACY_METADATA_MIN_VERSION)
@@ -573,6 +584,15 @@ swift_reflection_interop_destroyReflectionContext(
   CFRelease(ContextRef->AddressToLibraryCache);
   
   free(ContextRef);
+}
+
+static inline void
+swift_reflection_interop_setClassIsSwiftMask(
+  SwiftReflectionInteropContextRef ContextRef, uint64_t mask) {
+  FOREACH_LIBRARY {
+    if (Library->Functions.classIsSwiftMaskPtr)
+      *Library->Functions.classIsSwiftMaskPtr = mask;
+  }
 }
 
 #ifndef __LP64__
