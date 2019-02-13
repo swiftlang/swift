@@ -41,7 +41,7 @@ ModelADTests.testAllBackends("XORTraining") {
           let ŷ = classifier.applied(to: x)
           return meanSquaredError(predicted: ŷ, expected: y)
       }
-      optimizer.update(&classifier.allDifferentiableVariables, along: 𝛁model)
+      optimizer.update(&classifier, along: 𝛁model)
   }
   print(classifier.applied(to: [[0, 0], [0, 1], [1, 0], [1, 1]]))
 }
