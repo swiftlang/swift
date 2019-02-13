@@ -286,6 +286,10 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
 /// When we see an expression in a TopLevelCodeDecl in the REPL, process it,
 /// adding the proper decls back to the top level of the file.
 void REPLChecker::processREPLTopLevelExpr(Expr *E) {
+  // Don't try to print expressions without types.
+  if (!E->getType())
+    return;
+
   CanType T = E->getType()->getCanonicalType();
 
   // Don't try to print invalid expressions, module exprs, or void expressions.
