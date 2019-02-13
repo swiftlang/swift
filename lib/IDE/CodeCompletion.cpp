@@ -1250,6 +1250,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   Optional<StmtKind> ParentStmtKind;
 
   SmallVector<StringRef, 3> ParsedKeywords;
+  SourceLoc introducerLoc;
 
   std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
 
@@ -1348,7 +1349,7 @@ public:
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
-      SmallVectorImpl<StringRef> &Keywords) override;
+      SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
   void completeAccessorBeginning() override;
 
   void completePoundAvailablePlatform() override;
@@ -3856,9 +3857,11 @@ public:
 
 class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
+  ASTContext &Ctx;
   const DeclContext *CurrDeclContext;
   LazyResolver *TypeResolver;
   SmallVectorImpl<StringRef> &ParsedKeywords;
+  SourceLoc introducerLoc;
 
   bool hasFuncIntroducer = false;
   bool hasVarIntroducer = false;
@@ -3872,9 +3875,10 @@ class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
 public:
   CompletionOverrideLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
                            const DeclContext *CurrDeclContext,
-                           SmallVectorImpl<StringRef> &ParsedKeywords)
-      : Sink(Sink),
-        CurrDeclContext(CurrDeclContext), ParsedKeywords(ParsedKeywords) {
+                           SmallVectorImpl<StringRef> &ParsedKeywords,
+                           SourceLoc introducerLoc)
+      : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
+        ParsedKeywords(ParsedKeywords), introducerLoc(introducerLoc) {
     (void)createTypeChecker(Ctx);
     TypeResolver = Ctx.getLazyResolver();
 
@@ -3953,10 +3957,17 @@ public:
     if (!hasDeclIntroducer && !hasAccessModifier)
       addAccessControl(VD, Builder);
 
-    // FIXME: if we're missing 'override', but have the decl introducer we
-    // should delete it and re-add both in the correct order.
-    if (!hasDeclIntroducer && !hasStaticOrClass && missingOverride(Reason))
-      Builder.addOverrideKeyword();
+    if (missingOverride(Reason)) {
+      if (!hasDeclIntroducer)
+        Builder.addOverrideKeyword();
+      else {
+        auto dist = Ctx.SourceMgr.getByteDistance(
+                      introducerLoc, Ctx.SourceMgr.getCodeCompletionLoc());
+        Builder.setNumBytesToErase(dist);
+        Builder.addOverrideKeyword();
+        Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
+      }
+    }
 
     if (!hasDeclIntroducer)
       Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
@@ -4487,8 +4498,9 @@ void CodeCompletionCallbacksImpl::completeGenericParams(TypeLoc TL) {
 }
 
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
-    SmallVectorImpl<StringRef> &Keywords) {
+    SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) {
   assert(!InEnumElementRawValue);
+  this->introducerLoc = introducerLoc;
   ParsedKeywords.clear();
   ParsedKeywords.append(Keywords.begin(), Keywords.end());
   Kind = CompletionKind::NominalMemberBeginning;
@@ -5043,7 +5055,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::NominalMemberBeginning: {
     CompletionOverrideLookup OverrideLookup(CompletionContext.getResultSink(),
                                             P.Context, CurDeclContext,
-                                            ParsedKeywords);
+                                            ParsedKeywords, introducerLoc);
     OverrideLookup.getOverrideCompletions(SourceLoc());
     break;
   }

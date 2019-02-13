@@ -174,7 +174,7 @@ public:
   /// Complete at the beginning of member of a nominal decl member -- no tokens
   /// provided by user.
   virtual void completeNominalMemberBeginning(
-      SmallVectorImpl<StringRef> &Keywords) {};
+      SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) {};
 
   /// Complete at the beginning of accessor in a accessor block.
   virtual void completeAccessorBeginning() {};
