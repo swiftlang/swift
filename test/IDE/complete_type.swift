@@ -396,6 +396,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_ARGS_LOCAL_PARAM | %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_ARGS_LOCAL_RETURN | %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_DOT_1 | %FileCheck %s -check-prefix=PROTOCOL_DOT_1
+
 //===--- Helper types that are used in this test
 
 struct FooStruct {
@@ -1081,4 +1083,13 @@ func _testForGenericArg_() {
   let a : GenStruct<#^GENERIC_ARGS_LOCAL_VAR^#
   func foo1(x: GenStruct<#^GENERIC_ARGS_LOCAL_PARAM^#
   func foo2() -> GenStruct<#^GENERIC_ARGS_LOCAL_RETURN^#
+}
+
+func testProtocol() {
+  let _: FooProtocol.#^PROTOCOL_DOT_1^#
+// PROTOCOL_DOT_1: Begin completions, 3 items
+// PROTOCOL_DOT_1-DAG: Decl[AssociatedType]/CurrNominal:   FooTypeAlias1; name=FooTypeAlias1
+// PROTOCOL_DOT_1-DAG: Keyword/None:                       Protocol[#FooProtocol.Protocol#]; name=Protocol
+// PROTOCOL_DOT_1-DAG: Keyword/None:                       Type[#FooProtocol.Type#]; name=Type
+// PROTOCOL_DOT_1: End completions
 }

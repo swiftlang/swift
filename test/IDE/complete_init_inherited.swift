@@ -18,6 +18,7 @@ class A {
 // TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#double: Double#})[#A#]{{; name=.+$}}
 // TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#A#]{{; name=.+$}}
 // TEST_A-NEXT: Keyword[self]/CurrNominal:          .self[#A.Type#]; name=self
+// TEST_A-NEXT: Keyword/CurrNominal:                .Type[#A.Type#]; name=Type
 // TEST_A-NEXT: End completions
 
 class B : A {
@@ -31,6 +32,7 @@ class B : A {
 // TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#double: Double#})[#B#]{{; name=.+$}}
 // TEST_B-NEXT: Decl[Constructor]/Super:            ({#float: Float#})[#A#]{{; name=.+$}}
 // TEST_B-NEXT: Keyword[self]/CurrNominal:          .self[#B.Type#]; name=self
+// TEST_B-NEXT: Keyword/CurrNominal: .Type[#B.Type#]; name=Type
 // TEST_B-NEXT: End completions
 
 class C : B {
@@ -47,6 +49,7 @@ class C : B {
 // TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#C#]{{; name=.+$}}
 // TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#c: C#})[#C#]{{; name=.+$}}
 // TEST_C-NEXT: Keyword[self]/CurrNominal:          .self[#C.Type#]; name=self
+// TEST_C-NEXT: Keyword/CurrNominal:                .Type[#C.Type#]; name=Type
 // TEST_C-NEXT: End completions
 
 class D : C {
@@ -65,6 +68,7 @@ class D : C {
 // TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#D#]{{; name=.+$}}
 // TEST_D-NEXT: Decl[Constructor]/Super:            ({#c: C#})[#C#]{{; name=.+$}}
 // TEST_D-NEXT: Keyword[self]/CurrNominal:          .self[#D.Type#]; name=self
+// TEST_D-NEXT: Keyword/CurrNominal:                .Type[#D.Type#]; name=Type
 // TEST_D-NEXT: End completions
 
 // TEST_D_DOT: Decl[Constructor]/CurrNominal:       init({#d: D#})[#D#]; name=init(d: D)
