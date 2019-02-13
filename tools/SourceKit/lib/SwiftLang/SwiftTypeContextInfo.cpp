@@ -105,51 +105,69 @@ void SwiftLangSupport::getExpressionContextInfo(
       SwiftLangSupport::printTypeUSR(Item.ExpectedTy, OS);
       unsigned TypeUSRLength = SS.size() - TypeUSRBegin;
 
-      SmallVector<SourceKit::TypeContextInfoItem::Member, 8> ImplicitMembers;
+      struct MemberInfo {
+        size_t DeclNameBegin = 0;
+        size_t DeclNameLength = 0;
+        size_t DescriptionBegin = 0;
+        size_t DescriptionLength = 0;
+        size_t SourceTextBegin = 0;
+        size_t SourceTextLength = 0;
+        StringRef BriefComment;
+
+        MemberInfo() {}
+      };
+      SmallVector<MemberInfo, 8> ImplicitMembers;
       for (auto member : Item.ImplicitMembers) {
+        ImplicitMembers.emplace_back();
+        auto &memberElem = ImplicitMembers.back();
 
         // Name.
-        unsigned DeclNameBegin = SS.size();
+        memberElem.DeclNameBegin = SS.size();
         member->getFullName().print(OS);
-        unsigned DeclNameLength = SS.size() - DeclNameBegin;
-        StringRef DeclNameStr(SS.begin() + DeclNameBegin, DeclNameLength);
+        memberElem.DeclNameLength = SS.size() - memberElem.DeclNameBegin;
 
         // Description.
-        unsigned DescriptionBegin = SS.size();
+        memberElem.DescriptionBegin = SS.size();
         SwiftLangSupport::printMemberDeclDescription(
             member, Item.ExpectedTy, /*usePlaceholder=*/false, OS);
-        unsigned DescriptionLength = SS.size() - DescriptionBegin;
-        StringRef Description(SS.begin() + DescriptionBegin, DescriptionLength);
+        memberElem.DescriptionLength = SS.size() - memberElem.DescriptionBegin;
 
         // Sourcetext.
-        unsigned SourceTextBegin = SS.size();
+        memberElem.SourceTextBegin = SS.size();
         SwiftLangSupport::printMemberDeclDescription(
             member, Item.ExpectedTy, /*usePlaceholder=*/true, OS);
-        unsigned SourceTextLength = SS.size() - SourceTextBegin;
-        StringRef SourceText(SS.begin() + SourceTextBegin, SourceTextLength);
+        memberElem.SourceTextLength = SS.size() - memberElem.SourceTextBegin;
 
         // DocBrief.
-        StringRef BriefComment;
         auto MaybeClangNode = member->getClangNode();
         if (MaybeClangNode) {
           if (auto *D = MaybeClangNode.getAsDecl()) {
             const auto &ClangContext = D->getASTContext();
             if (const clang::RawComment *RC =
                     ClangContext.getRawCommentForAnyRedecl(D))
-              BriefComment = RC->getBriefText(ClangContext);
+              memberElem.BriefComment = RC->getBriefText(ClangContext);
           }
         } else {
-          BriefComment = member->getBriefComment();
+          memberElem.BriefComment = member->getBriefComment();
         }
-
-        ImplicitMembers.push_back(
-            {DeclNameStr, Description, SourceText, BriefComment});
       }
 
       SourceKit::TypeContextInfoItem Info;
+      SmallVector<SourceKit::TypeContextInfoItem::Member, 8> SKImplicitMembers;
+
+      for (auto &info : ImplicitMembers) {
+        StringRef Name(SS.begin() + info.DeclNameBegin, info.DeclNameLength);
+        StringRef Description(SS.begin() + info.DescriptionBegin,
+                              info.DescriptionLength);
+        StringRef SourceText(SS.begin() + info.SourceTextBegin,
+                             info.SourceTextLength);
+        SKImplicitMembers.push_back(
+            {Name, Description, SourceText, info.BriefComment});
+      }
+
       Info.TypeName = StringRef(SS.begin() + TypeNameBegin, TypeNameLength);
       Info.TypeUSR = StringRef(SS.begin() + TypeUSRBegin, TypeUSRLength);
-      Info.ImplicitMembers = ImplicitMembers;
+      Info.ImplicitMembers = SKImplicitMembers;
 
       SKConsumer.handleResult(Info);
     }
