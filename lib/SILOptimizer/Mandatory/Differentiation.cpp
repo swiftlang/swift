@@ -2336,7 +2336,7 @@ public:
       ApplyInst *ai, CanSILFunctionType assocFnTy) {
     auto &context = getContext();
     auto *swiftModule = context.getModule().getSwiftModule();
-    auto origSubstMap = ai->getSubstitutionMap();
+    auto origSubstMap = getOpSubstitutionMap(ai->getSubstitutionMap());
     auto assocGenSig = assocFnTy->getGenericSignature();
     // If associated derivative has no generic signature, then short-circuit and
     // return original substitution map.
