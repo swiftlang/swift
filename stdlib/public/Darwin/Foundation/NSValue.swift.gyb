@@ -23,3 +23,31 @@ ${ ObjectiveCBridgeableImplementationForNSValue("CGVector") }
 ${ ObjectiveCBridgeableImplementationForNSValue("CGSize") }
 ${ ObjectiveCBridgeableImplementationForNSValue("CGAffineTransform") }
 
+extension NSValue {
+    public func value<StoredType>(of type: StoredType.Type) -> StoredType? {
+        if StoredType.self is AnyObject.Type {
+            let encoding = String(cString: objCType)
+            // some subclasses of NSValue can return @ and the default initialized variant returns ^v for encoding
+            guard encoding == "^v" || encoding == "@" else {
+                return nil
+            }
+            return nonretainedObjectValue as? StoredType
+        } else if _isPOD(StoredType.self) {
+            var storedSize = 0
+            var storedAlignment = 0
+            NSGetSizeAndAlignment(objCType, &storedSize, &storedAlignment)
+            guard MemoryLayout<StoredType>.size == storedSize && MemoryLayout<StoredType>.alignment == storedAlignment else {
+                return nil
+            }
+            let allocated = UnsafeMutablePointer<StoredType>.allocate(capacity: 1)
+            defer { allocated.deallocate() }
+            if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
+            	getValue(allocated, size: storedSize)
+        	} else {
+        		getValue(allocated)
+        	}
+            return allocated.pointee
+        }
+        return nil
+    }
+}
