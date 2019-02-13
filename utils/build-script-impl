@@ -2512,8 +2512,6 @@ for host in "${ALL_HOSTS[@]}"; do
                       -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                       -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                       -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                      -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                      -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
                       -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
                       -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
                       -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
