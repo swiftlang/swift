@@ -1875,6 +1875,7 @@ function set_swiftsyntax_build_command() {
 function set_stresstester_build_script_helper_command() {
     local package_name="$1"
     local package_build_type="$2"
+    local package_build_dir="$3"
 
     if [ "${SKIP_BUILD_SWIFTSYNTAX}" ]; then
         echo "Error: Cannot build $package_name without SwiftSyntax."
@@ -1897,7 +1898,7 @@ function set_stresstester_build_script_helper_command() {
 
     stresstester_build_script_helper_command+=(
         --package-dir="${package_name}"
-        --build-dir="$(build_directory ${host} skstresstester)"
+        --build-dir="${package_build_dir}"
         --swiftc-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
         --swift-build-exec="$(swiftpm_find_tool swift-build)"
         --swift-test-exec="$(swiftpm_find_tool swift-test)"
@@ -1909,12 +1910,12 @@ function set_stresstester_build_script_helper_command() {
 }
 
 function set_skstresstester_build_command() {
-    set_stresstester_build_script_helper_command SourceKitStressTester "${SKSTRESSTESTER_BUILD_TYPE}"
+    set_stresstester_build_script_helper_command SourceKitStressTester "${SKSTRESSTESTER_BUILD_TYPE}" "$(build_directory ${host} skstresstester)"
     skstresstester_build_command=("${stresstester_build_script_helper_command[@]}")
 }
 
 function set_swiftevolve_build_command() {
-    set_stresstester_build_script_helper_command SwiftEvolve "${SWIFTEVOLVE_BUILD_TYPE}"
+    set_stresstester_build_script_helper_command SwiftEvolve "${SWIFTEVOLVE_BUILD_TYPE}" "$(build_directory ${host} swiftevolve)"
     swiftevolve_build_command=("${stresstester_build_script_helper_command[@]}")
 }
 
@@ -3229,6 +3230,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
+                set_swiftevolve_build_command
                 call "${swiftevolve_build_command[@]}" test
                 continue
                 ;;
@@ -3620,6 +3622,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 echo "--- Installing ${product} ---"
+                set_swiftevolve_build_command
                 call "${swiftevolve_build_command[@]}" --prefix="${host_install_destdir}${host_install_prefix}" install
                 continue
                 ;;
