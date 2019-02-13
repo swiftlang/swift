@@ -178,23 +178,23 @@ func existential(_ p: P) {
 }
 
 func staticExistential(_ p: P.Type, pp: P.Protocol) {
-  let _ = p() // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
-  let _ = p().bar // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
-  let _ = p().bar(1) // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  let _ = p() // expected-error{{protocol type 'P' cannot be instantiated}}
+  let _ = p().bar // expected-error{{protocol type 'P' cannot be instantiated}}
+  let _ = p().bar(1) // expected-error{{protocol type 'P' cannot be instantiated}}
 
   let ppp: P = p.init()
 
-  _ = pp() // expected-error{{instance member 'init' cannot be used on type 'P'}}
-  _ = pp().bar // expected-error{{instance member 'init' cannot be used on type 'P'}}
-  _ = pp().bar(2) // expected-error{{instance member 'init' cannot be used on type 'P'}}
+  _ = pp() // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = pp().bar // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = pp().bar(2) // expected-error{{protocol type 'P' cannot be instantiated}}
 
-  _ = pp.init() // expected-error{{instance member 'init' cannot be used on type 'P'}}
-  _ = pp.init().bar // expected-error{{instance member 'init' cannot be used on type 'P'}}
-  _ = pp.init().bar(3) // expected-error{{instance member 'init' cannot be used on type 'P'}}
+  _ = pp.init() // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = pp.init().bar // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = pp.init().bar(3) // expected-error{{protocol type 'P' cannot be instantiated}}
 
-  _ = P() // expected-error{{instance member 'init' cannot be used on type 'P'}}
-  _ = P().bar // expected-error{{instance member 'init' cannot be used on type 'P'}}
-  _ = P().bar(4) // expected-error{{instance member 'init' cannot be used on type 'P'}}
+  _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = P().bar // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = P().bar(4) // expected-error{{protocol type 'P' cannot be instantiated}}
 
   // Instance member of metatype
   let _: (P) -> (Int) -> () = P.bar
@@ -211,7 +211,7 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
 
   // Instance member of existential metatype -- not allowed
   _ = p.bar // expected-error{{instance member 'bar' cannot be used on type 'P'}}
-  _ = p.mut // expected-error {{instance member 'mut' cannot be used on type 'P'}}
+  _ = p.mut // expected-error{{instance member 'mut' cannot be used on type 'P'}}
 
   // Static member of metatype -- not allowed
   _ = pp.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}

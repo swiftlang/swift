@@ -3762,20 +3762,41 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                        e.second == MemberLookupResult::UR_TypeMemberOnInstance;
               })) {
 
+        SmallVector<OverloadChoice, 4> choices;
+
+        for (auto &pair : result.UnviableCandidates) {
+          choices.push_back(std::move(pair.first));
+        }
+
+        if (baseTy->is<MetatypeType>() &&
+            baseTy->getMetatypeInstanceType()->isAnyExistentialType()) {
+          if (llvm::all_of(choices, [&](const OverloadChoice &c) {
+                return c.isDecl() && isa<ConstructorDecl>(c.getDecl());
+              })) {
+
+            for (auto choice : choices) {
+              bool isStaticallyDerived =
+                  !(baseTy->getMetatypeInstanceType()->is<DynamicSelfType>() ||
+                    baseTy->getMetatypeInstanceType()->is<ArchetypeType>());
+              auto *protoFix = AllowInvalidInitRef::onProtocolMetatype(
+                  *this, baseTy, dyn_cast<ConstructorDecl>(choice.getDecl()),
+                  isStaticallyDerived, choice.getDecl()->getSourceRange(),
+                  locator);
+              if (recordFix(protoFix))
+                return SolutionKind::Error;
+            }
+
+            addOverloadSet(memberTy, choices, useDC, locator);
+            return SolutionKind::Solved;
+          }
+        }
+
         auto *fix =
             AllowTypeOrInstanceMember::create(*this, baseTy, member, locator);
 
         if (recordFix(fix))
           // The fix wasn't successful, so return an error
           return SolutionKind::Error;
-
-        // The fix was successful, so let's add the choices to the overload set
-        // and return the solution as solved
-        SmallVector<OverloadChoice, 4> choices;
-
-        for (auto &pair : result.UnviableCandidates) {
-          choices.push_back(std::move(pair.first));
-        }
 
         addOverloadSet(memberTy, choices, useDC, locator);
         return SolutionKind::Solved;

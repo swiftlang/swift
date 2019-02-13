@@ -113,7 +113,7 @@ protocol P2 {
 
 func constructExistentialValue(_ pm: P.Type) {
   _ = pm.init()
-  _ = P() // expected-error{{instance member 'init' cannot be used on type 'P'}}
+  _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
 }
 
 typealias P1_and_P2 = P & P2
