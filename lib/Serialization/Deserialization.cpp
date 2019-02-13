@@ -55,26 +55,27 @@ StringRef swift::getNameOfModule(const ModuleFile *MF) {
 }
 
 namespace {
-  struct IDAndKind {
+  struct OffsetAndKind {
     const Decl *D;
-    DeclID ID;
+    uint64_t offset;
   };
 
-  static raw_ostream &operator<<(raw_ostream &os, IDAndKind &&pair) {
+  static raw_ostream &operator<<(raw_ostream &os, OffsetAndKind &&pair) {
     return os << Decl::getKindName(pair.D->getKind())
-              << "Decl #" << pair.ID;
+              << "Decl @ " << pair.offset;
   }
 
   class PrettyDeclDeserialization : public llvm::PrettyStackTraceEntry {
     const ModuleFile *MF;
     const ModuleFile::Serialized<Decl*> &DeclOrOffset;
-    DeclID ID;
+    uint64_t offset;
     decls_block::RecordKind Kind;
   public:
     PrettyDeclDeserialization(ModuleFile *module,
                               const ModuleFile::Serialized<Decl*> &declOrOffset,
-                              DeclID DID, decls_block::RecordKind kind)
-      : MF(module), DeclOrOffset(declOrOffset), ID(DID), Kind(kind) {
+                              decls_block::RecordKind kind)
+      : MF(module), DeclOrOffset(declOrOffset), offset(declOrOffset),
+        Kind(kind) {
     }
 
     static const char *getRecordKindString(decls_block::RecordKind Kind) {
@@ -88,18 +89,19 @@ namespace {
 
     void print(raw_ostream &os) const override {
       if (!DeclOrOffset.isComplete()) {
-        os << "While deserializing decl #" << ID << " ("
+        os << "While deserializing decl @ " << offset << " ("
            << getRecordKindString(Kind) << ")";
       } else {
         os << "While deserializing ";
 
         if (auto VD = dyn_cast<ValueDecl>(DeclOrOffset.get())) {
-          os << "'" << VD->getBaseName() << "' (" << IDAndKind{VD, ID} << ")";
+          os << "'" << VD->getBaseName() << "' (" << OffsetAndKind{VD, offset}
+             << ")";
         } else if (auto ED = dyn_cast<ExtensionDecl>(DeclOrOffset.get())) {
           os << "extension of '" << ED->getExtendedType() << "' ("
-             << IDAndKind{ED, ID} << ")";
+             << OffsetAndKind{ED, offset} << ")";
         } else {
-          os << IDAndKind{DeclOrOffset.get(), ID};
+          os << OffsetAndKind{DeclOrOffset.get(), offset};
         }
       }
       os << " in '" << getNameOfModule(MF) << "'\n";
@@ -2226,7 +2228,7 @@ Decl *ModuleFile::getDecl(DeclID DID) {
 }
 
 /// Used to split up methods that would otherwise live in ModuleFile.
-class swift::ASTDeserializer {
+class swift::DeclDeserializer {
   template <typename T>
   using Serialized = ModuleFile::Serialized<T>;
   using TypeID = serialization::TypeID;
@@ -2289,20 +2291,35 @@ class swift::ASTDeserializer {
   };
 
   ModuleFile &MF;
+  Serialized<Decl *> &declOrOffset;
+
+  DeclAttribute *DAttrs = nullptr;
+  DeclAttribute **AttrsNext = &DAttrs;
+
+  void AddAttribute(DeclAttribute *Attr) {
+    // Advance the linked list.
+    // This isn't just using DeclAttributes because that would result in the
+    // attributes getting reversed.
+    // FIXME: If we reverse them at serialization time we could get rid of this.
+    *AttrsNext = Attr;
+    AttrsNext = Attr->getMutableNext();
+  };
+
 public:
-  ASTDeserializer(ModuleFile &MF) : MF(MF) {}
+  DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
+      : MF(MF), declOrOffset(declOrOffset) {}
 
   /// Deserializes decl attribute and attribute-like records from
   /// \c MF.DeclTypesCursor until a non-attribute record is found,
   /// passing each one to \p AddAttribute.
   llvm::Error deserializeDeclAttributes(
       ASTContext &ctx,
-      llvm::function_ref<void (DeclAttribute *)> AddAttribute,
       FilenameForPrivateRAII &filenameForPrivate,
       LocalDiscriminatorRAII &localDiscriminatorRAII,
       PrivateDiscriminatorRAII &privateDiscriminatorRAII);
 
-  Expected<Decl *> getDeclCheckedImpl(DeclID DID);
+  static Expected<Decl *> getDeclCheckedImpl(ModuleFile &MF, DeclID DID);
+  Expected<Decl *> getDeclCheckedImpl();
 
   Expected<Decl *> deserializeTypeAlias(Serialized<Decl *> &declOrOffset,
                                         ArrayRef<uint64_t> scratch,
@@ -2362,7 +2379,7 @@ Expected<Decl *>
 ModuleFile::getDeclChecked(DeclID DID) {
   // Tag every deserialized ValueDecl coming out of getDeclChecked with its ID.
   Expected<Decl *> deserialized =
-      ASTDeserializer(*this).getDeclCheckedImpl(DID);
+      DeclDeserializer::getDeclCheckedImpl(*this, DID);
   if (deserialized && deserialized.get()) {
     if (auto *IDC = dyn_cast<IterableDeclContext>(deserialized.get())) {
       // Only set the DeclID on the returned Decl if it's one that was loaded
@@ -2385,9 +2402,8 @@ static bool attributeChainContains(DeclAttribute *attr) {
   return tempAttrs.hasAttribute<DERIVED>();
 }
 
-llvm::Error ASTDeserializer::deserializeDeclAttributes(
+llvm::Error DeclDeserializer::deserializeDeclAttributes(
     ASTContext &ctx,
-    llvm::function_ref<void (DeclAttribute *)> AddAttribute,
     FilenameForPrivateRAII &filenameForPrivate,
     LocalDiscriminatorRAII &localDiscriminatorRAII,
     PrivateDiscriminatorRAII &privateDiscriminatorRAII) {
@@ -2663,7 +2679,7 @@ llvm::Error ASTDeserializer::deserializeDeclAttributes(
 }
 
 Expected<Decl *>
-ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
+DeclDeserializer::getDeclCheckedImpl(ModuleFile &MF, DeclID DID) {
   if (DID == 0)
     return nullptr;
 
@@ -2677,22 +2693,15 @@ ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
   BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
   MF.DeclTypeCursor.JumpToBit(declOrOffset);
 
+  return DeclDeserializer(MF, declOrOffset).getDeclCheckedImpl();
+}
+
+Expected<Decl *>
+DeclDeserializer::getDeclCheckedImpl() {
   ASTContext &ctx = MF.getContext();
 
   if (auto s = ctx.Stats)
     s->getFrontendCounters().NumDeclsDeserialized++;
-
-  // Read the attributes (if any).
-  // This isn't just using DeclAttributes because that would result in the
-  // attributes getting reversed.
-  // FIXME: If we reverse them at serialization time we could get rid of this.
-  DeclAttribute *DAttrs = nullptr;
-  DeclAttribute **AttrsNext = &DAttrs;
-  auto AddAttribute = [&](DeclAttribute *Attr) {
-    // Advance the linked list.
-    *AttrsNext = Attr;
-    AttrsNext = Attr->getMutableNext();
-  };
 
   PrivateDiscriminatorRAII privateDiscriminatorRAII{MF, declOrOffset};
   LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
@@ -2710,7 +2719,7 @@ ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
       nominal->setInherited(inheritedTypes);
   };
 
-  auto attrError = deserializeDeclAttributes(ctx, AddAttribute,
+  auto attrError = deserializeDeclAttributes(ctx,
                                              filenameForPrivate,
                                              localDiscriminatorRAII,
                                              privateDiscriminatorRAII);
@@ -2740,7 +2749,7 @@ ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
                                                    &blobData);
 
   PrettyDeclDeserialization stackTraceEntry(
-     &MF, declOrOffset, DID, static_cast<decls_block::RecordKind>(recordID));
+     &MF, declOrOffset, static_cast<decls_block::RecordKind>(recordID));
 
   switch (recordID) {
   case decls_block::TypeAliasLayout::Code:
