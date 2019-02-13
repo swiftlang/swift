@@ -5,6 +5,8 @@
 // RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 // RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 
+// REQUIRES: executable_test
+
 import Module1
 
 import StdlibUnittest
