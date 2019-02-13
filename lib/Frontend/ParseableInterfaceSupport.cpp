@@ -97,8 +97,8 @@ getBufferOfDependency(llvm::vfs::FileSystem &FS,
   return std::move(DepBuf.get());
 }
 
-static Optional<clang::vfs::Status>
-getStatusOfDependency(clang::vfs::FileSystem &FS,
+static Optional<llvm::vfs::Status>
+getStatusOfDependency(llvm::vfs::FileSystem &FS,
                       StringRef ModulePath, StringRef DepPath,
                       DiagnosticEngine &Diags, SourceLoc DiagLoc) {
   auto Status = FS.status(DepPath);
@@ -215,7 +215,7 @@ void ParseableInterfaceModuleLoader::configureSubInvocationInputsAndOutputs(
 
 // Checks that a dependency read from the cached module is up to date compared
 // to the interface file it represents.
-static bool dependencyIsUpToDate(clang::vfs::FileSystem &FS, FileDependency In,
+static bool dependencyIsUpToDate(llvm::vfs::FileSystem &FS, FileDependency In,
                                  StringRef ModulePath, DiagnosticEngine &Diags,
                                  SourceLoc DiagLoc) {
   auto Status = getStatusOfDependency(FS, ModulePath, In.Path, Diags, DiagLoc);
