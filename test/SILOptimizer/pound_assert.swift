@@ -458,19 +458,14 @@ func testStructPassedAsProtocols() {
 
 //===----------------------------------------------------------------------===//
 // Strings
-//
-// TODO: The constant evaluator does not implement string accesses/comparisons
-// so theses tests cannot test that the implemented string operations produce
-// correct values in the arrays. These tests only test that the implemented
-// string operations do not crash or produce unknown values. As soon as we have
-// string accesses/comparisons, modify these tests to check the values in the
-// strings.
 //===----------------------------------------------------------------------===//
 
 struct ContainsString {
   let x: Int
   let str: String
 }
+
+// Test string initialization
 
 func stringInitEmptyTopLevel() {
   let c = ContainsString(x: 1, str: "")
@@ -482,20 +477,113 @@ func stringInitNonEmptyTopLevel() {
   #assert(c.x == 1)
 }
 
-func stringInitEmptyFlowSensitive() -> ContainsString {
-  return ContainsString(x: 1, str: "")
+// Test string equality (==)
+
+func emptyString() -> String {
+  return ""
 }
 
-func invokeStringInitEmptyFlowSensitive() {
-  #assert(stringInitEmptyFlowSensitive().x == 1)
+func asciiString() -> String {
+  return "test string"
 }
 
-func stringInitNonEmptyFlowSensitive() -> ContainsString {
-  return ContainsString(x: 1, str: "hello world")
+func dollarSign() -> String {
+  return "dollar sign: \u{24}"
 }
 
-func invokeStringInitNonEmptyFlowSensitive() {
-  #assert(stringInitNonEmptyFlowSensitive().x == 1)
+func flag() -> String {
+  return "flag: \u{1F1FA}\u{1F1F8}"
+}
+
+func compareWithIdenticalStrings() {
+  #assert(emptyString() == "")
+  #assert(asciiString() == "test string")
+  #assert(dollarSign() == "dollar sign: $")
+  #assert(flag() == "flag: 🇺🇸")
+}
+
+func compareWithUnequalStrings() {
+  #assert(emptyString() == "Nonempty") // expected-error {{assertion failed}}
+  #assert(asciiString() == "")         // expected-error {{assertion failed}}
+  #assert(dollarSign() == flag())      // expected-error {{assertion failed}}
+  #assert(flag() == "flag: \u{1F496}") // expected-error {{assertion failed}}
+}
+
+// Test string appends (+=)
+
+// String.+= when used at the top-level of #assert cannot be folded as the
+// interpreter cannot extract the relevant instructions to interpret.
+// (This is because append is a mutating function and there will be more than
+// one writer to the string.) Nonetheless, flow-sensitive uses of String.+=
+// will be interpretable.
+func testStringAppendTopLevel() {
+  var a = "a"
+  a += "b"
+  #assert(a == "ab")  // expected-error {{#assert condition not constant}}
+                      // expected-note@-1 {{could not fold operation}}
+}
+
+func appendedAsciiString() -> String {
+  var str = "test "
+  str += "string"
+  return str
+}
+
+func appendedDollarSign() -> String {
+  var d = "dollar sign: "
+  d += "\u{24}"
+  return d
+}
+
+func appendedFlag() -> String {
+  var flag = "\u{1F1FA}"
+  flag += "\u{1F1F8}"
+  return flag
+}
+
+func testStringAppend() {
+  #assert(appendedAsciiString() == asciiString())
+  #assert(appendedDollarSign() == dollarSign())
+  #assert(appendedFlag() == "🇺🇸")
+
+  #assert(appendedAsciiString() == "") // expected-error {{assertion failed}}
+  #assert(appendedDollarSign() == "")  // expected-error {{assertion failed}}
+  #assert(appendedFlag() == "")        // expected-error {{assertion failed}}
+}
+
+func conditionalAppend(_ b: Bool, _ str1: String, _ str2: String) -> String {
+  let suffix = "One"
+  var result = ""
+  if b {
+    result = str1
+    result += suffix
+  } else {
+    result = str2
+    result += suffix
+  }
+  return result
+}
+
+func testConditionalAppend() {
+  let first = "first"
+  let second = "second"
+  #assert(conditionalAppend(true, first, second) == "firstOne")
+  #assert(conditionalAppend(false, first, second) == "secondOne")
+}
+
+struct ContainsMutableString {
+  let x: Int
+  var str: String
+}
+
+func appendOfStructProperty() -> ContainsMutableString {
+  var c = ContainsMutableString(x: 0, str: "broken")
+  c.str += " arrow"
+  return c
+}
+
+func testAppendOfStructProperty() {
+  #assert(appendOfStructProperty().str == "broken arrow")
 }
 
 //===----------------------------------------------------------------------===//
