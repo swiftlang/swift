@@ -35,7 +35,7 @@ TracerTests.testAllBackends("SimpleTFFunction") {
   let tffunc = _tffunc(with: Tensor<Int32>(0), in: cond)
 
   func runWhile(_ n: Int32) -> Tensor<Int32> {
-    return  #tfop(
+    return #tfop(
       "StatelessWhile",
       Tensor<Int32>(0),
       T$dtype: [Int32.tensorFlowDataType],

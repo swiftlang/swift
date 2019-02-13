@@ -320,7 +320,7 @@ private class TraceContext {
   }
 
   /// Bind data to the inputs of the graph and return the specialized graph.
-  func specializedTFFunc(data: TensorGroup) -> String {
+  func specializeTFFunction<Data: TensorGroup>(with data: Data) -> String {
     // TODO(bgogul): When we have additional inputs, we will have do a bit more.
     // We will simply cause such cases to fail temporarily.
     internalConsistencyCheck(additionalInputTensorCount == 0)
@@ -334,12 +334,12 @@ private class TraceContext {
     let tracedFunctionName = TF_FunctionName(traceGraphFn)
     internalConsistencyCheck(tracedFunctionName != nil)
     let tracedOpDesc = TF_NewOperation(
-                         specializedGraph, tracedFunctionName, "tracedFn")
+      specializedGraph, tracedFunctionName, "tracedFn")
 
     // Create and append the inputs to the graph function.
     let traceeInputs = symbolicInputs.dropLast(
       Int(data._tensorHandleCount + additionalInputTensorCount))
-    var inputs:[TF_Output] = []
+    var inputs: [TF_Output] = []
     for (i, traceeInput) in traceeInputs.enumerated() {
       let desc = TF_NewOperation(specializedGraph, "Placeholder", "input_\(i)")
       TF_SetAttrType(desc, "dtype", TF_OperationOutputType(traceeInput))
@@ -392,7 +392,7 @@ private class TraceContext {
       outputs.append(TF_Output(oper: result, index: outputIndex))
       outputIndex += 1
     }
-    let specializedTFFuncName : String =
+    let specializedTFFuncName =
       "specialized_tffunc_\(_RuntimeConfig.traceGraphFunctionCounter)"
     _RuntimeConfig.traceGraphFunctionCounter += 1
 
@@ -924,7 +924,6 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
   }
 }
 
-
 // TODO: rename this to `graph` when it's ready for end users.
 public func _graph<State : _TensorArrayProtocolEnhanced,
                    Data : TensorGroup,
@@ -959,11 +958,12 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
   }
 }
 
-
+/// Trace the given function `fn` and return a closure that can be used to
+/// create a `TF_Function(State)` specialized for `data`.
 public func _tffunc<State : _TensorArrayProtocolEnhanced,
                     Data : TensorGroup>(
   with state: State,
-  in fn: @escaping (State, Data) -> (State)
+  in fn: @escaping (State, Data) -> State
 ) -> (Data) -> (String) {
   let wrappedFn = {
     // The result argument needs to be a type that conforms to TensorGroup.
@@ -971,9 +971,9 @@ public func _tffunc<State : _TensorArrayProtocolEnhanced,
     (s: State, d: Data) -> (State, Tensor<Float>?) in
       (fn(s, d), nil)
   }
-  let traceContext = _trace(with: state, in : wrappedFn)
-  return { (data: Data) -> String in
-    traceContext.specializedTFFunc(data: data)
+  let traceContext = _trace(with: state, in: wrappedFn)
+  return {
+    data in traceContext.specializeTFFunction(with: data)
   }
 }
 
@@ -1892,15 +1892,15 @@ func _TFCOpSetAttrString(_ op: CTFEOp,
   }
 }
 
-/// Wrapper around TFE_OpSetAttrString that handles converting the Swift Stdlib
-/// String into a buffer that TFE_OpSetAttrString can read.
+/// Wrapper around TFE_OpSetAttrFunctionName that handles converting the Swift
+/// Stdlib String into a buffer that TFE_OpSetAttrFunctionName can read.
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrFunctionName")
 func _TFCOpSetAttrFunctionName(_ op: CTFEOp,
                                _ attrName: UnsafePointer<Int8>,
                                _ value: String) {
   value.utf8CString.withUnsafeBufferPointer { buffer in
-    // utf8CString is null-terminated; TFE_OpSetAttrString wants
+    // utf8CString is null-terminated; TFE_OpSetAttrFunctionName wants
     // non-null-terminated.
     TFE_OpSetAttrFunctionName(op, attrName, buffer.baseAddress, buffer.count - 1)
   }
