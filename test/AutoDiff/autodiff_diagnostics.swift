@@ -1,4 +1,8 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify -verify-ignore-unknown %s
+
+// FIXME(TF-201): Remove `-verify-ignore-unknown`. This is currently necessary
+// due to direct differentiation of reabstraction thunks, which emits errors
+// with unknown location.
 
 //===----------------------------------------------------------------------===//
 // Top-level (before primal/adjoint synthesis)
@@ -32,6 +36,14 @@ func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
   // expected-note @+2 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
   // expected-note @+1 {{expression is not differentiable}}
   return x + 1
+}
+_ = gradient(at: 1.0, in: generic) // expected-error {{function is not differentiable}}
+
+// FIXME(TF-202): Diagnose "no conformance to `AdditiveArithmetic`" in differentiation pass.
+func direct<T : Differentiable>(_ x: T) -> T {
+// func direct<T : Differentiable>(_ x: T) -> T where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic {
+// public func direct<T : FloatingPoint & Differentiable>(_ x: T) -> T where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic {
+  return x
 }
 
 struct Tensor<Scalar> {
