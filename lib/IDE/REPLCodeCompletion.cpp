@@ -16,6 +16,7 @@
 
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
@@ -193,7 +194,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
                  CodeCompletionCallbacksFactory *CompletionCallbacksFactory) {
   // Temporarily disable printing the diagnostics.
   ASTContext &Ctx = SF.getASTContext();
-  DiagnosticTransaction DelayedDiags(Ctx.Diags);
+  DiagnosticSuppression SuppressedDiags(Ctx.Diags);
 
   std::string AugmentedCode = EnteredCode.str();
   AugmentedCode += '\0';
@@ -222,7 +223,10 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Now we are done with code completion.  Remove the declarations we
   // temporarily inserted.
   SF.Decls.resize(OriginalDeclCount);
-  DelayedDiags.abort();
+
+  // Reset the error state because it's only relevant to the code that we just
+  // processed, which now gets thrown away.
+  Ctx.Diags.resetHadAnyError();
 }
 
 void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
