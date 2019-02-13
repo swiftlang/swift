@@ -110,12 +110,10 @@ class ClassWithInheritance9 : FooClass, BarClass, FooProtocol, BarProtocol, FooN
 //===---
 
 enum EnumWithInheritance1 : FooNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
-// expected-error@-1{{type 'EnumWithInheritance1' does not conform to protocol 'RawRepresentable'}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance1 : <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance1 : FooNonExistentProtocol {{{$}}
 
 enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
-// expected-error@-1{{type 'EnumWithInheritance2' does not conform to protocol 'RawRepresentable'}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {{{$}}
 
