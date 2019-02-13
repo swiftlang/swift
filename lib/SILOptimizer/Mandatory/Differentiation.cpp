@@ -3847,28 +3847,19 @@ public:
       adjointType = adjointBuf.getType();
     }
 
-    // Register indirect results as arguments.
-    SILFunctionConventions calleeConvs(
-        ai->getCallee()->getType().castTo<SILFunctionType>(), ai->getModule());
-    SmallVector<SILValue, 4> tempAllocations;
-    unsigned count = pullbackType->getNumIndirectFormalResults();
-    for (auto paramIdx : range(calleeConvs.getNumParameters())) {
-      if (count == 0)
-        break;
-      auto paramInfo = calleeConvs.getParameters()[paramIdx];
-      if (paramInfo.isFormalIndirect()) {
-        auto param = ai->getArgument(
-            calleeConvs.getNumIndirectSILResults() + paramIdx);
-        auto *buf = builder.createAllocStack(loc,
-            remapType(getCotangentType(param->getType(), getModule())));
-        tempAllocations.push_back(buf);
-        args.push_back(buf);
-        ++count;
-      }
+    // Store temporary stack allocations.
+    SmallVector<AllocStackInst *, 4> tempAllocations;
+    // Create allocations for pullback indirect results.
+    for (auto indRes : pullbackType->getIndirectFormalResults()) {
+      auto *buf = builder.createAllocStack(loc,
+          remapType(indRes.getSILStorageType()));
+      tempAllocations.push_back(buf);
+      args.push_back(buf);
     }
 
     // Initialize seed buffer.
     auto seedBuf = builder.createAllocStack(loc, adjointType);
+    tempAllocations.push_back(seedBuf);
     if (adjointType.isObject()) {
       auto access = builder.createBeginAccess(
           loc, seedBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
@@ -3903,7 +3894,6 @@ public:
     auto *pullbackCall = builder.createApply(ai->getLoc(), pullback,
                                              SubstitutionMap(), args,
                                              /*isNonThrowing*/ false);
-    tempAllocations.push_back(seedBuf);
 
     // Extract all results from `pullbackCall`.
     SmallVector<SILValue, 8> dirResults;
