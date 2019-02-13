@@ -281,7 +281,7 @@ KNOWN_SETTINGS=(
     tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
     tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
     tensorflow-swift-bindings          ""        "Path to TensorFlow Swift bindings file"
-    tensorflow-swift-apis              ""        "Path to TensorFlow high-level APIs repository"
+    tensorflow-swift-apis              ""        "Path to TensorFlow deep learning library repository"
 )
 
 # Centralized access point for traced command invocation.
