@@ -112,7 +112,7 @@ class Z4 {
   init() {} // expected-note{{selected non-required initializer}}
 
   convenience init(other: Z4) {
-    other.init() // expected-error{{'member 'init' cannot be used on value of type 'Z4'}}
+    other.init() // expected-error{{member 'init' cannot be used on value of type 'Z4'}}
     type(of: other).init() // expected-error{{must use a 'required' initializer}}
   }
 }
