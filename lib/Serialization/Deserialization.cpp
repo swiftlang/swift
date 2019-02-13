@@ -2303,6 +2303,59 @@ public:
       PrivateDiscriminatorRAII &privateDiscriminatorRAII);
 
   Expected<Decl *> getDeclCheckedImpl(DeclID DID);
+
+  Expected<Decl *> deserializeTypeAlias(Serialized<Decl *> &declOrOffset,
+                                        ArrayRef<uint64_t> scratch,
+                                        StringRef blobData) {
+    IdentifierID nameID;
+    DeclContextID contextID;
+    TypeID underlyingTypeID, interfaceTypeID;
+    bool isImplicit;
+    GenericEnvironmentID genericEnvID;
+    uint8_t rawAccessLevel;
+    ArrayRef<uint64_t> dependencyIDs;
+
+    decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
+                                             underlyingTypeID, interfaceTypeID,
+                                             isImplicit, genericEnvID,
+                                             rawAccessLevel, dependencyIDs);
+
+    Identifier name = MF.getIdentifier(nameID);
+
+    for (TypeID dependencyID : dependencyIDs) {
+      auto dependency = MF.getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()));
+      }
+    }
+
+    auto DC = MF.getDeclContext(contextID);
+
+    auto genericParams = MF.maybeReadGenericParams(DC);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto alias = MF.createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(), name,
+                                              SourceLoc(), genericParams, DC);
+    declOrOffset = alias;
+
+    MF.configureGenericEnvironment(alias, genericEnvID);
+
+    alias->setUnderlyingType(MF.getType(underlyingTypeID));
+
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      alias->setAccess(*accessLevel);
+    } else {
+      MF.error();
+      return nullptr;
+    }
+
+    if (isImplicit)
+      alias->setImplicit();
+
+    return alias;
+  }
 };
 
 Expected<Decl *>
@@ -2663,6 +2716,16 @@ ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
                                              privateDiscriminatorRAII);
   if (attrError)
     return std::move(attrError);
+  SWIFT_DEFER {
+    // Record the attributes.
+    auto decl = declOrOffset.get();
+    if (decl && !decl->hasValidationStarted()) {
+      if (DAttrs)
+        declOrOffset.get()->getAttrs().setRawAttributeChain(DAttrs);
+
+      decl->setValidationToChecked();
+    }
+  };
 
   auto entry = MF.DeclTypeCursor.advance();
   if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -2680,56 +2743,8 @@ ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
      &MF, declOrOffset, DID, static_cast<decls_block::RecordKind>(recordID));
 
   switch (recordID) {
-  case decls_block::TYPE_ALIAS_DECL: {
-    IdentifierID nameID;
-    DeclContextID contextID;
-    TypeID underlyingTypeID, interfaceTypeID;
-    bool isImplicit;
-    GenericEnvironmentID genericEnvID;
-    uint8_t rawAccessLevel;
-    ArrayRef<uint64_t> dependencyIDs;
-
-    decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
-                                             underlyingTypeID, interfaceTypeID,
-                                             isImplicit, genericEnvID,
-                                             rawAccessLevel, dependencyIDs);
-
-    Identifier name = MF.getIdentifier(nameID);
-
-    for (TypeID dependencyID : dependencyIDs) {
-      auto dependency = MF.getTypeChecked(dependencyID);
-      if (!dependency) {
-        return llvm::make_error<TypeError>(
-            name, takeErrorInfo(dependency.takeError()));
-      }
-    }
-
-    auto DC = MF.getDeclContext(contextID);
-
-    auto genericParams = MF.maybeReadGenericParams(DC);
-    if (declOrOffset.isComplete())
-      return declOrOffset;
-
-    auto alias = MF.createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(), name,
-                                              SourceLoc(), genericParams, DC);
-    declOrOffset = alias;
-
-    MF.configureGenericEnvironment(alias, genericEnvID);
-
-    alias->setUnderlyingType(MF.getType(underlyingTypeID));
-
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
-      alias->setAccess(*accessLevel);
-    } else {
-      MF.error();
-      return nullptr;
-    }
-
-    if (isImplicit)
-      alias->setImplicit();
-
-    break;
-  }
+  case decls_block::TypeAliasLayout::Code:
+    return deserializeTypeAlias(declOrOffset, scratch, blobData);
 
   case decls_block::GENERIC_TYPE_PARAM_DECL: {
     IdentifierID nameID;
@@ -4120,13 +4135,7 @@ ASTDeserializer::getDeclCheckedImpl(DeclID DID) {
     return nullptr;
   }
 
-  // Record the attributes.
-  if (DAttrs)
-    declOrOffset.get()->getAttrs().setRawAttributeChain(DAttrs);
-
-  auto decl = declOrOffset.get();
-  decl->setValidationToChecked();
-  return decl;
+  return declOrOffset.get();
 }
 
 /// Translate from the Serialization function type repr enum values to the AST
