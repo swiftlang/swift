@@ -112,7 +112,7 @@ class Z4 {
   init() {} // expected-note{{selected non-required initializer}}
 
   convenience init(other: Z4) {
-    other.init() // expected-error{{'member 'init' cannot be used on value of type 'Z4'}} {{11-11=type(of: }} {{15-15=)}}
+    other.init() // expected-error{{'member 'init' cannot be used on value of type 'Z4'}}
     type(of: other).init() // expected-error{{must use a 'required' initializer}}
   }
 }
@@ -121,7 +121,7 @@ class Z5 : Z4 {
   override init() { }
 
   convenience init(other: Z5) {
-    other.init() // expected-error{{member 'init' cannot be used on value of type 'Z5'}} {{11-11=type(of: }}
+    other.init() // expected-error{{member 'init' cannot be used on value of type 'Z5'}}
   }
 }
 
