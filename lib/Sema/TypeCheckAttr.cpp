@@ -2796,8 +2796,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return false;
     for (auto paramPair : llvm::zip(candidateFnTy.getParams(),
                                     required.getParams()))
-      if (std::get<0>(paramPair).getParameterType() !=
-          std::get<1>(paramPair).getParameterType())
+      if (!std::get<0>(paramPair).getPlainType()->isEqual(
+          std::get<1>(paramPair).getPlainType()))
         return false;
 
     // If required result type is non-function, check that result types match
