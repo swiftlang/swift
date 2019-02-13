@@ -467,6 +467,34 @@ tupleextract_ty<LTy> m_TupleExtractInst(const LTy &Left, unsigned Index) {
   return tupleextract_ty<LTy>(Left, Index);
 }
 
+/// Match either a tuple_extract that the index field from a tuple or the
+/// indexth destructure_tuple result.
+template <typename LTy> struct tupleextractoperation_ty {
+  LTy L;
+  unsigned index;
+  tupleextractoperation_ty(const LTy &Left, unsigned i) : L(Left), index(i) {}
+
+  template <typename ITy> bool match(ITy *V) {
+    if (auto *TEI = dyn_cast<TupleExtractInst>(V)) {
+      return TEI->getFieldNo() == index &&
+             L.match((ValueBase *)TEI->getOperand());
+    }
+
+    if (auto *DTR = dyn_cast<DestructureTupleResult>(V)) {
+      return DTR->getIndex() == index &&
+             L.match((ValueBase *)DTR->getParent()->getOperand());
+    }
+
+    return false;
+  }
+};
+
+template <typename LTy>
+tupleextractoperation_ty<LTy> m_TupleExtractOperation(const LTy &Left,
+                                                      unsigned Index) {
+  return tupleextractoperation_ty<LTy>(Left, Index);
+}
+
 //===----------------------------------------------------------------------===//
 //              Function/Builtin/Intrinsic Application Matchers
 //===----------------------------------------------------------------------===//
