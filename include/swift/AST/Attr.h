@@ -1503,6 +1503,8 @@ public:
   void setVJPFunction(FuncDecl *decl) { VJPFunction = decl; }
 
   bool parametersMatch(const DifferentiableAttr &other) const {
+    assert(ParameterIndices);
+    assert(other.ParameterIndices);
     return ParameterIndices->parameters == other.ParameterIndices->parameters;
   }
 
