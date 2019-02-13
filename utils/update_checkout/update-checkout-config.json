@@ -277,7 +277,7 @@
                 "clang": "swift-5.1-branch",
                 "compiler-rt": "swift-5.1-branch",
                 "swift": "swift-5.1-branch",
-                "lldb": "stable",
+                "lldb": "swift-5.1-branch",
                 "cmark": "master",
                 "llbuild": "master",
                 "swiftpm": "master",
