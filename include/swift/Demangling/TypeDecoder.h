@@ -733,6 +733,50 @@ class TypeDecoder {
       // NativeObject type ref.
       return Builder.createBuiltinType("Builtin.NativeObject", "Bo");
     }
+    case NodeKind::SugaredOptional: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+
+      return Builder.createOptionalType(base);
+    }
+    case NodeKind::SugaredArray: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+
+      return Builder.createArrayType(base);
+    }
+    case NodeKind::SugaredDictionary: {
+      if (Node->getNumChildren() < 2)
+        return BuiltType();
+
+      auto key = decodeMangledType(Node->getChild(0));
+      if (!key)
+        return BuiltType();
+
+      auto value = decodeMangledType(Node->getChild(1));
+      if (!key)
+        return BuiltType();
+
+      return Builder.createDictionaryType(key, value);
+    }
+    case NodeKind::SugaredParen: {
+      if (Node->getNumChildren() < 1)
+        return BuiltType();
+
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+
+      return Builder.createParenType(base);
+    }
     default:
       return BuiltType();
     }

@@ -2307,6 +2307,27 @@ void Remangler::mangleProtocolSymbolicReference(Node *node) {
                          (const void *)node->getIndex()));
 }
 
+void Remangler::mangleSugaredOptional(Node *node) {
+  mangleType(node->getChild(0));
+  Buffer << "XSq";
+}
+
+void Remangler::mangleSugaredArray(Node *node) {
+  mangleType(node->getChild(0));
+  Buffer << "XSa";
+}
+
+void Remangler::mangleSugaredDictionary(Node *node) {
+  mangleType(node->getChild(0));
+  mangleType(node->getChild(1));
+  Buffer << "XSD";
+}
+
+void Remangler::mangleSugaredParen(Node *node) {
+  mangleType(node->getChild(0));
+  Buffer << "XSp";
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.

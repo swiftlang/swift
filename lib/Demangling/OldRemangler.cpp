@@ -2260,6 +2260,22 @@ void Remangler::mangleProtocolSymbolicReference(Node *node, EntityContext&) {
   unreachable("unsupported");
 }
 
+void Remangler::mangleSugaredOptional(Node *node) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleSugaredArray(Node *node) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleSugaredDictionary(Node *node) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleSugaredParen(Node *node) {
+  unreachable("unsupported");
+}
+
 /// The top-level interface to the remangler.
 std::string Demangle::mangleNodeOld(const NodePointer &node) {
   if (!node) return "";
