@@ -2095,11 +2095,12 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
 
 /// Get or create a reabstraction thunk from `fromType` to `toType`, to be
 /// called in `caller`.
-SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder fb,
-                                           SILModule &module, SILLocation loc,
-                                           SILFunction *caller,
-                                           CanSILFunctionType fromType,
-                                           CanSILFunctionType toType) {
+static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
+                                                  SILModule &module,
+                                                  SILLocation loc,
+                                                  SILFunction *caller,
+                                                  CanSILFunctionType fromType,
+                                                  CanSILFunctionType toType) {
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
   auto thunkType =
@@ -3930,8 +3931,8 @@ public:
     };
 
     // Emits a release based on the value's type category (address or object).
-    // TODO: Make this a top-level function and call it everywhere consistently.
-    // This reduces code dupe and may fix some memory leaks.
+    // TODO(TF-210): Make this a top-level function and call it everywhere
+    // consistently. This reduces code dupe and may fix some memory leaks.
     auto emitRelease = [&](SILValue v) {
       if (v->getType().isAddress()) {
         if (v->getType().isLoadable(getModule()))
