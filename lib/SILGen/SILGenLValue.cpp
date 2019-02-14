@@ -2831,6 +2831,8 @@ static bool isCurrentFunctionReadAccess(SILGenFunction &SGF) {
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
                                         SGFAccessKind accessKind,
                                         LValueOptions options) {
+  MarkBindOptionalShortCut shortCut(SGF, e);
+
   // MemberRefExpr can refer to type and function members, but the only case
   // that can be an lvalue is a VarDecl.
   VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
@@ -3280,12 +3282,25 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
 
   // Bind the value, branching to the destination address if there's no
   // value there.
-  SGF.emitBindOptionalAddress(e, optAddr, e->getDepth());
+  bool mayShortCut = SGF.MayShortCutBindOptionals.count(e);
+  SGF.emitBindOptionalAddress(e, optAddr, e->getDepth(), mayShortCut);
 
   // Project out the payload on the success branch.  We can just use a
   // naked ValueComponent here; this is effectively a separate l-value.
-  ManagedValue valueAddr =
-    getAddressOfOptionalValue(SGF, e, optAddr, valueTypeData);
+  ManagedValue valueAddr;
+  if (mayShortCut) {
+    bool hadCleanup = optAddr.hasCleanup();
+    SILValue addr = optAddr.forward(SGF);
+    auto eltTy = addr->getType()
+                     .getObjectType()
+                     .getOptionalObjectType()
+                     .getAddressType();
+    auto castedAddr = SGF.B.createUncheckedAddrCast(e, addr, eltTy);
+    valueAddr = hadCleanup ? SGF.emitManagedBufferWithCleanup(castedAddr)
+                           : ManagedValue::forLValue(castedAddr);
+  } else {
+    valueAddr = getAddressOfOptionalValue(SGF, e, optAddr, valueTypeData);
+  }
   LValue valueLV;
   valueLV.add<ValueComponent>(valueAddr, None, valueTypeData);
   return valueLV;

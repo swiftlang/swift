@@ -330,6 +330,8 @@ public:
   /// BindOptionalExpr is a missing value.
   SmallVector<JumpDest, 2> BindOptionalFailureDests;
 
+  llvm::DenseSet<BindOptionalExpr*> MayShortCutBindOptionals;
+
   /// The cleanup depth and epilog BB for "return" statements.
   JumpDest ReturnDest = JumpDest::invalid();
   /// The cleanup depth and epilog BB for "fail" statements.
@@ -1627,7 +1629,8 @@ public:
   /// NOTE: This operation does consume the managed value.
   ManagedValue emitBindOptional(SILLocation loc,
                                 ManagedValue optionalAddrOrValue,
-                                unsigned depth);
+                                unsigned depth,
+                                bool mayShortCut = false);
 
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr
@@ -1635,7 +1638,7 @@ public:
   ///
   /// NOTE: This operation does not consume the managed address.
   void emitBindOptionalAddress(SILLocation loc, ManagedValue optionalAddr,
-                               unsigned depth);
+                               unsigned depth, bool mayShortCut = false);
 
   void emitOptionalEvaluation(SILLocation loc, Type optionalType,
                               SmallVectorImpl<ManagedValue> &results,
@@ -1945,6 +1948,9 @@ public:
 
   /// Get the _Pointer protocol used for pointer argument operations.
   ProtocolDecl *getPointerProtocol();
+
+
+  BindOptionalExpr *maySkipSwitchInBindOptionalSubExpr(Expr *E);
 };
 
 
@@ -1979,6 +1985,30 @@ public:
       SGF.B.clearInsertionPoint();
     }
     SGF.CurFunctionSection = SavedSection;
+  }
+};
+
+/// A utility class for marking bind_optional_expr as always forwardable as
+/// casted class type.
+///
+/// objc?.method() // Does not care that objc is null. We can just call.
+///
+class MarkBindOptionalShortCut {
+  SILGenFunction &SGF;
+  BindOptionalExpr *bindOptional;
+
+public:
+  MarkBindOptionalShortCut(SILGenFunction &SGF, Expr *e)
+      : SGF(SGF), bindOptional(SGF.maySkipSwitchInBindOptionalSubExpr(e)) {
+    if (bindOptional)
+      SGF.MayShortCutBindOptionals.insert(bindOptional);
+  }
+
+  ~MarkBindOptionalShortCut() {
+    if (bindOptional) {
+      assert(SGF.MayShortCutBindOptionals.count(bindOptional));
+      SGF.MayShortCutBindOptionals.erase(bindOptional);
+    }
   }
 };
 

@@ -661,6 +661,7 @@ tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
 }
 
 RValue RValueEmitter::visitApplyExpr(ApplyExpr *E, SGFContext C) {
+  MarkBindOptionalShortCut shortCut(SGF, E);
   return SGF.emitApplyExpr(E, C);
 }
 
@@ -2149,11 +2150,109 @@ private:
 
 } // end anonymous namespace
 
+// We may simply forward the Optional<SomeClass> value as SomeClass if the
+// receiver of the value is the self argument of objc_msgSend.
+BindOptionalExpr *SILGenFunction::maySkipSwitchInBindOptionalSubExpr(Expr *E) {
+
+  // Acceptable output types are class types and void (since it does not have
+  // uses), and optional thereof. Those types can be satisfied by the return
+  // value of the objc_msgSend without change in representation.
+  auto hasAcceptableOuputType = [](Expr *expr) -> bool {
+    auto ty = expr->getType()->getWithoutSpecifierType();
+    if (ty->isAnyClassReferenceType() || ty->isVoid())
+      return true;
+    if (!ty->getOptionalObjectType())
+      return false;
+    return ty->getOptionalObjectType()->isAnyClassReferenceType() ||
+           ty->getOptionalObjectType()->isVoid();
+  };
+
+  // Objective-C property.
+  if (auto *memberRefExpr = dyn_cast<MemberRefExpr>(E)) {
+    if (!hasAcceptableOuputType(memberRefExpr))
+      return nullptr;
+    auto *decl = memberRefExpr->getMember().getDecl();
+    auto *var = dyn_cast<VarDecl>(decl);
+    if (!var)
+      return nullptr;
+    if (!var->hasClangNode())
+      return nullptr;
+    auto *self = memberRefExpr->getBase();
+    if (!self->getType()->isAnyClassReferenceType())
+      return nullptr;
+    if (auto *load = dyn_cast<LoadExpr>(self))
+      self = load->getSubExpr();
+    auto *bindOptional = dyn_cast<BindOptionalExpr>(self);
+    if (!bindOptional)
+      return nullptr;
+    return bindOptional;
+  }
+
+  // Objective-C method call.
+  if (auto *call = dyn_cast<CallExpr>(E)) {
+    if (!hasAcceptableOuputType(call))
+      return nullptr;
+    auto *dotCall = dyn_cast<DotSyntaxCallExpr>(call->getDirectCallee());
+    if (!dotCall)
+      return nullptr;
+
+    auto *self = dotCall->getBase();
+    if (!self->getType()->isAnyClassReferenceType())
+      return nullptr;
+    if (auto *load = dyn_cast<LoadExpr>(self))
+      self = load->getSubExpr();
+    self = dyn_cast<BindOptionalExpr>(self);
+    if (!self)
+      return nullptr;
+
+    auto *func = dyn_cast<DeclRefExpr>(dotCall->getFn());
+    if (!func)
+      return nullptr;
+    if (!func->getDecl()->isObjC())
+      return nullptr;
+
+    return cast<BindOptionalExpr>(self);
+  }
+
+  // Objective-C protocol call.
+  if (auto *openExistential = dyn_cast<OpenExistentialExpr>(E)) {
+    auto *existential = openExistential->getExistentialValue();
+    if (auto *load = dyn_cast<LoadExpr>(existential))
+      existential = load->getSubExpr();
+    existential = dyn_cast<BindOptionalExpr>(existential);
+    if (!existential)
+      return nullptr;
+    auto *call = dyn_cast<CallExpr>(openExistential->getSubExpr());
+    if (!call)
+      return nullptr;
+    if (!hasAcceptableOuputType(call))
+      return nullptr;
+    auto *dotCall = dyn_cast<DotSyntaxCallExpr>(call->getDirectCallee());
+    if (!dotCall)
+      return nullptr;
+
+    // Self must be the opened existential.
+    auto *self = dotCall->getBase();
+    if (self != openExistential->getOpaqueValue())
+      return nullptr;
+
+    auto *func = dyn_cast<DeclRefExpr>(dotCall->getFn());
+    if (!func)
+      return nullptr;
+    if (!func->getDecl()->isObjC())
+      return nullptr;
+    return cast<BindOptionalExpr>(existential);
+  }
+  return nullptr;
+}
+
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
 
+
   if (isa<TypeDecl>(E->getMember().getDecl())) {
+    MarkBindOptionalShortCut shortCut(SGF, E);
     // Emit the metatype for the associated type.
     visit(E->getBase());
     SILValue MT =
@@ -2164,9 +2263,11 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   // If we have a nominal type decl as our base, try to emit the base rvalue's
   // member using special logic that will let us avoid extra retains
   // and releases.
-  if (auto *N = E->getBase()->getType()->getNominalOrBoundGenericNominal())
+  if (auto *N = E->getBase()->getType()->getNominalOrBoundGenericNominal()) {
+    MarkBindOptionalShortCut shortCut(SGF, E);
     if (auto RV = NominalTypeMemberRefRValueEmitter(E, C, N).emit(SGF))
       return RValue(std::move(RV.getValue()));
+  }
 
   // Everything else should use the l-value logic.
 
@@ -4428,7 +4529,8 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
 
 void SILGenFunction::emitBindOptionalAddress(SILLocation loc,
                                              ManagedValue optAddress,
-                                             unsigned depth) {
+                                             unsigned depth,
+                                             bool mayShortCut) {
   assert(optAddress.getType().isAddress() && "Expected an address here");
   assert(depth < BindOptionalFailureDests.size());
   auto failureDest =
@@ -4438,10 +4540,14 @@ void SILGenFunction::emitBindOptionalAddress(SILLocation loc,
   // Since we know that we have an address, we do not need to worry about
   // ownership invariants. Instead just use a select_enum_addr.
   SILBasicBlock *someBB = createBasicBlock();
+  if (mayShortCut) {
+    B.createBranch(loc, someBB);
+  } else {
   SILValue hasValue = emitDoesOptionalHaveValue(loc, optAddress.getValue());
 
   auto noneBB = Cleanups.emitBlockForCleanups(failureDest, loc);
   B.createCondBranch(loc, hasValue, someBB, noneBB);
+  }
 
   // Reset the insertion point at the end of hasValueBB so we can
   // continue to emit code there.
@@ -4450,33 +4556,48 @@ void SILGenFunction::emitBindOptionalAddress(SILLocation loc,
 
 ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
                                               ManagedValue optValue,
-                                              unsigned depth) {
+                                              unsigned depth,
+                                              bool mayShortCut) {
   assert(optValue.isPlusOne(*this) && "Can only bind plus one values");
   assert(depth < BindOptionalFailureDests.size());
   auto failureDest = BindOptionalFailureDests[BindOptionalFailureDests.size()
                                                 - depth - 1];
 
   SILBasicBlock *hasValueBB = createBasicBlock();
-  SILBasicBlock *hasNoValueBB = createBasicBlock();
 
   SILType optValueTy = optValue.getType();
-  SwitchEnumBuilder SEB(B, loc, optValue);
-  SEB.addOptionalSomeCase(hasValueBB, nullptr,
-                          [&](ManagedValue mv, SwitchCaseFullExpr &&expr) {
-                            // If mv is not an address, forward it. We will
-                            // recreate the cleanup outside when we return the
-                            // argument.
-                            if (mv.getType().isObject()) {
-                              mv.forward(*this);
-                            }
-                            expr.exit();
-                          });
-  // If not, thread out through a bunch of cleanups.
-  SEB.addOptionalNoneCase(hasNoValueBB, failureDest,
-                          [&](ManagedValue mv, SwitchCaseFullExpr &&expr) {
-                            expr.exitAndBranch(loc);
-                          });
-  std::move(SEB).emit();
+
+  if (mayShortCut) {
+    if (optValue.getType().isLoadable(F.getModule())) {
+      auto optValue2 = B.createUncheckedRefCast(
+          loc, optValue, optValueTy.getObjectType().getOptionalObjectType());
+      B.createBranch(loc, hasValueBB, {optValue2});
+      B.emitBlock(hasValueBB);
+      auto mv = B.createOwnedPhiArgument(optValue2.getType());
+      mv.forward(*this); // The value will be handled below.
+    } else {
+      B.createBranch(loc, hasValueBB);
+    }
+  } else {
+    SILBasicBlock *hasNoValueBB = createBasicBlock();
+    SwitchEnumBuilder SEB(B, loc, optValue);
+    SEB.addOptionalSomeCase(hasValueBB, nullptr,
+                            [&](ManagedValue mv, SwitchCaseFullExpr &&expr) {
+                              // If mv is not an address, forward it. We will
+                              // recreate the cleanup outside when we return the
+                              // argument.
+                              if (mv.getType().isObject()) {
+                                mv.forward(*this);
+                              }
+                              expr.exit();
+                            });
+    // If not, thread out through a bunch of cleanups.
+    SEB.addOptionalNoneCase(hasNoValueBB, failureDest,
+                            [&](ManagedValue mv, SwitchCaseFullExpr &&expr) {
+                              expr.exitAndBranch(loc);
+                            });
+    std::move(SEB).emit();
+  }
 
   // Reset the insertion point at the end of hasValueBB so we can
   // continue to emit code there.
@@ -4496,6 +4617,10 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
       optValueTy.getObjectType().getOptionalObjectType().getAddressType();
   assert(eltTy);
   SILValue address = optValue.forward(*this);
+  if (mayShortCut) {
+    SILValue castedAddress = B.createUncheckedAddrCast(loc, address, eltTy);
+    return emitManagedBufferWithCleanup(castedAddress);
+  }
   return emitManagedBufferWithCleanup(
       B.createUncheckedTakeEnumDataAddr(loc, address, someDecl, eltTy));
 }
@@ -4521,7 +4646,8 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
   // Check to see whether the optional is present, if not, jump to the current
   // nil handler block. Otherwise, return the value as the result of the
   // expression.
-  optValue = SGF.emitBindOptional(E, optValue, E->getDepth());
+  optValue = SGF.emitBindOptional(E, optValue, E->getDepth(),
+                                  SGF.MayShortCutBindOptionals.count(E));
   return RValue(SGF, E, optValue);
 }
 
@@ -4956,6 +5082,7 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
     return RValue(SGF, E, *result);
   }
 
+  MarkBindOptionalShortCut shortCut(SGF, E);
   FormalEvaluationScope writebackScope(SGF);
   return SGF.emitOpenExistentialExpr<RValue>(E,
                                              [&](Expr *subExpr) -> RValue {
