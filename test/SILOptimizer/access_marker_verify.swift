@@ -385,6 +385,31 @@ enum IntEnum {
 // CHECK:   load [trivial] [[PROJ]] : $*Int
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify7IntEnumO8getValueSivg'
 
+// Also test SILGenPattern for address-only enums with indirect loadable payloads.
+enum IntTEnum<T> {
+  indirect case int(Int)
+  case other(T)
+
+  var getValue: Int {
+    switch self {
+    case .int(let x): return x
+    case .other: return 0
+    }
+  }
+}
+// IntTEnum.getValue.getter
+// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify8IntTEnumO8getValueSivg : $@convention(method) <T> (@in_guaranteed IntTEnum<T>) -> Int {
+// CHECK: bb0(%0 : $*IntTEnum<T>):
+// CHECK:   switch_enum_addr %{{.*}} : $*IntTEnum<T>, case #IntTEnum.int!enumelt.1: bb1, case #IntTEnum.other!enumelt.1: bb2
+// CHECK: bb1:
+// CHECK:   [[UTEDA:%.*]] = unchecked_take_enum_data_addr %{{.*}} : $*IntTEnum<T>, #IntTEnum.int!enumelt.1
+// CHECK-NOT: begin_access
+// CHECK:   [[BOX:%.*]] = load [take] [[UTEDA]] : $*<τ_0_0> { var Int } <T>
+// CHECK:   [[PROJ:%.*]] = project_box [[BOX]] : $<τ_0_0> { var Int } <T>, 0
+// CHECK-NOT: begin_access
+// CHECK:   load [trivial] [[PROJ]] : $*Int
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify8IntTEnumO8getValueSivg'
+
 // -- indirect enum reference.
 enum RefEnum {
   indirect case ref(BaseClass)
