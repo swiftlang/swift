@@ -761,7 +761,7 @@ void ASTMangler::appendType(Type type) {
         return appendType(aliasTy->getSinglyDesugaredType());
       }
 
-      if (aliasTy->getSubstitutionMap().hasAnySubstitutableParams()) {
+      if (aliasTy->getSubstitutionMap()) {
         // Try to mangle the entire name as a substitution.
         if (tryMangleTypeSubstitution(tybase))
           return;
