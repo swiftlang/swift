@@ -225,14 +225,40 @@ void ParseableInterfaceModuleLoader::configureSubInvocationInputsAndOutputs(
 }
 
 // Checks that a dependency read from the cached module is up to date compared
-// to the interface file it represents.
-static bool dependencyIsUpToDate(llvm::vfs::FileSystem &FS, FileDependency In,
-                                 StringRef ModulePath, DiagnosticEngine &Diags,
-                                 SourceLoc DiagLoc) {
-  auto Status = getStatusOfDependency(FS, ModulePath, In.Path, Diags, DiagLoc);
-  if (!Status) return false;
-  uint64_t mtime = Status->getLastModificationTime().time_since_epoch().count();
-  return Status->getSize() == In.Size && mtime == In.ModificationTime;
+// to the interface file it represents. If it's up-to-date, return its status,
+// so we can switch hash-based dependencies to mtimes after we've validated
+// the hashes.
+static Optional<llvm::vfs::Status>
+dependencyIsUpToDate(llvm::vfs::FileSystem &FS, FileDependency In,
+                     StringRef ModulePath, DiagnosticEngine &Diags,
+                     SourceLoc DiagLoc) {
+  auto Status = getStatusOfDependency(FS, ModulePath, In.getPath(),
+                                      Diags, DiagLoc);
+  if (!Status) return None;
+
+  // If the sizes differ, then we know the file has changed.
+  if (Status->getSize() != In.getSize()) return None;
+
+  // Otherwise, if this dependency is verified by modification time, check
+  // it vs. the modification time of the file.
+  uint64_t mtime =
+    Status->getLastModificationTime().time_since_epoch().count();
+
+  if (In.isModificationTimeBased())
+    return mtime == In.getModificationTime() ? Status : None;
+
+  // Slow path: if the dependency is verified by content hash, check it vs. the
+  // hash of the file.
+  auto buf = getBufferOfDependency(FS, ModulePath, In.getPath(),
+                                   Diags, DiagLoc);
+  if (!buf) return None;
+
+  if (xxHash64(buf->getBuffer()) == In.getContentHash())
+    return Status;
+
+  return None;
+}
+
 }
 
 // Check that the output .swiftmodule file is at least as new as all the
@@ -289,6 +315,7 @@ collectDepsForSerialization(llvm::vfs::FileSystem &FS,
                             CompilerInstance &SubInstance,
                             StringRef InPath, StringRef ModuleCachePath,
                             SmallVectorImpl<FileDependency> &Deps,
+                            bool IsHashBased,
                             DiagnosticEngine &Diags, SourceLoc DiagLoc,
                             DependencyTracker *OuterTracker) {
   auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
@@ -297,17 +324,25 @@ collectDepsForSerialization(llvm::vfs::FileSystem &FS,
   llvm::StringSet<> AllDepNames;
   for (auto const &DepName : InitialDepNames) {
     if (AllDepNames.insert(DepName).second && OuterTracker) {
-        OuterTracker->addDependency(DepName, /*IsSystem=*/false);
+      OuterTracker->addDependency(DepName, /*IsSystem=*/false);
     }
-    auto Status = getStatusOfDependency(FS, InPath, DepName, Diags, DiagLoc);
-    if (!Status)
-      return true;
     auto DepBuf = getBufferOfDependency(FS, InPath, DepName, Diags, DiagLoc);
     if (!DepBuf)
       return true;
-    uint64_t mtime =
-      Status->getLastModificationTime().time_since_epoch().count();
-    Deps.push_back(FileDependency{Status->getSize(), mtime, DepName});
+    auto Status = getStatusOfDependency(FS, InPath, DepName, Diags, DiagLoc);
+    if (!Status)
+      return true;
+
+    if (IsHashBased) {
+      uint64_t hash = xxHash64(DepBuf->getBuffer());
+      Deps.push_back(
+        FileDependency::hashBased(DepName, Status->getSize(), hash));
+    } else {
+      uint64_t mtime =
+        Status->getLastModificationTime().time_since_epoch().count();
+      Deps.push_back(
+        FileDependency::modTimeBased(DepName, Status->getSize(), mtime));
+    }
 
     if (ModuleCachePath.empty())
       continue;
@@ -331,10 +366,10 @@ collectDepsForSerialization(llvm::vfs::FileSystem &FS,
         return true;
       }
       for (auto const &SubDep : SubDeps) {
-        if (AllDepNames.insert(SubDep.Path).second) {
+        if (AllDepNames.insert(SubDep.getPath()).second) {
           Deps.push_back(SubDep);
           if (OuterTracker)
-            OuterTracker->addDependency(SubDep.Path, /*IsSystem=*/false);
+            OuterTracker->addDependency(SubDep.getPath(), /*IsSystem=*/false);
         }
       }
     }
