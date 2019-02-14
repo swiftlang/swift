@@ -2233,68 +2233,15 @@ class swift::DeclDeserializer {
   using Serialized = ModuleFile::Serialized<T>;
   using TypeID = serialization::TypeID;
 
-  class PrivateDiscriminatorRAII {
-    ModuleFile &moduleFile;
-    Serialized<Decl *> &declOrOffset;
-
-  public:
-    Identifier discriminator;
-
-    PrivateDiscriminatorRAII(ModuleFile &moduleFile,
-                      Serialized<Decl *> &declOrOffset)
-      : moduleFile(moduleFile), declOrOffset(declOrOffset) {}
-
-    ~PrivateDiscriminatorRAII() {
-      if (!discriminator.empty() && declOrOffset.isComplete())
-        if (auto value = dyn_cast_or_null<ValueDecl>(declOrOffset.get()))
-          moduleFile.PrivateDiscriminatorsByValue[value] = discriminator;
-    }
-  };
-
-  class LocalDiscriminatorRAII {
-    Serialized<Decl *> &declOrOffset;
-
-  public:
-    unsigned discriminator;
-
-    LocalDiscriminatorRAII(Serialized<Decl *> &declOrOffset)
-      : declOrOffset(declOrOffset), discriminator(0) {}
-
-    ~LocalDiscriminatorRAII() {
-      if (discriminator != 0 && declOrOffset.isComplete())
-        if (auto value = dyn_cast<ValueDecl>(declOrOffset.get()))
-          value->setLocalDiscriminator(discriminator);
-    }
-  };
-
-  class FilenameForPrivateRAII {
-    Serialized<Decl *> &declOrOffset;
-
-  public:
-    Identifier filename;
-
-    FilenameForPrivateRAII(Serialized<Decl *> &decl) : declOrOffset(decl) {}
-    ~FilenameForPrivateRAII() {
-      if (filename.empty())
-        return;
-      if (!declOrOffset.isComplete())
-        return;
-      auto *valueDecl = dyn_cast<ValueDecl>(declOrOffset.get());
-      if (!valueDecl)
-        return;
-      auto *loadedFile = dyn_cast<LoadedFile>(
-          valueDecl->getDeclContext()->getModuleScopeContext());
-      if (!loadedFile)
-        return;
-      loadedFile->addFilenameForPrivateDecl(valueDecl, filename);
-    }
-  };
-
   ModuleFile &MF;
   Serialized<Decl *> &declOrOffset;
 
   DeclAttribute *DAttrs = nullptr;
   DeclAttribute **AttrsNext = &DAttrs;
+
+  Identifier privateDiscriminator;
+  unsigned localDiscriminator = 0;
+  Identifier filenameForPrivate;
 
   void AddAttribute(DeclAttribute *Attr) {
     // Advance the linked list.
@@ -2309,14 +2256,39 @@ public:
   DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
       : MF(MF), declOrOffset(declOrOffset) {}
 
+  ~DeclDeserializer() {
+    if (!declOrOffset.isComplete()) {
+      // We failed to deserialize this declaration.
+      return;
+    }
+
+    Decl *decl = declOrOffset.get();
+    if (!decl)
+      return;
+
+    if (DAttrs)
+      decl->getAttrs().setRawAttributeChain(DAttrs);
+
+    if (auto value = dyn_cast<ValueDecl>(decl)) {
+      if (!privateDiscriminator.empty())
+        MF.PrivateDiscriminatorsByValue[value] = privateDiscriminator;
+
+      if (localDiscriminator != 0)
+        value->setLocalDiscriminator(localDiscriminator);
+
+      if (!filenameForPrivate.empty()) {
+        auto *loadedFile = cast<LoadedFile>(MF.getFile());
+        loadedFile->addFilenameForPrivateDecl(value, filenameForPrivate);
+      }
+    }
+
+    decl->setValidationToChecked();
+  }
+
   /// Deserializes decl attribute and attribute-like records from
   /// \c MF.DeclTypesCursor until a non-attribute record is found,
-  /// passing each one to \p AddAttribute.
-  llvm::Error deserializeDeclAttributes(
-      ASTContext &ctx,
-      FilenameForPrivateRAII &filenameForPrivate,
-      LocalDiscriminatorRAII &localDiscriminatorRAII,
-      PrivateDiscriminatorRAII &privateDiscriminatorRAII);
+  /// passing each one to AddAttribute.
+  llvm::Error deserializeDeclAttributes();
 
   static Expected<Decl *> getDeclCheckedImpl(ModuleFile &MF, DeclID DID);
   Expected<Decl *> getDeclCheckedImpl();
@@ -2402,13 +2374,10 @@ static bool attributeChainContains(DeclAttribute *attr) {
   return tempAttrs.hasAttribute<DERIVED>();
 }
 
-llvm::Error DeclDeserializer::deserializeDeclAttributes(
-    ASTContext &ctx,
-    FilenameForPrivateRAII &filenameForPrivate,
-    LocalDiscriminatorRAII &localDiscriminatorRAII,
-    PrivateDiscriminatorRAII &privateDiscriminatorRAII) {
+llvm::Error DeclDeserializer::deserializeDeclAttributes() {
   using namespace decls_block;
 
+  ASTContext &ctx = MF.getContext();
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
   while (true) {
@@ -2658,16 +2627,16 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes(
       IdentifierID discriminatorID;
       decls_block::PrivateDiscriminatorLayout::readRecord(scratch,
                                                           discriminatorID);
-      privateDiscriminatorRAII.discriminator = MF.getIdentifier(discriminatorID);
+      privateDiscriminator = MF.getIdentifier(discriminatorID);
 
     } else if (recordID == decls_block::LOCAL_DISCRIMINATOR) {
       unsigned discriminator;
       decls_block::LocalDiscriminatorLayout::readRecord(scratch, discriminator);
-      localDiscriminatorRAII.discriminator = discriminator;
+      localDiscriminator = discriminator;
     } else if (recordID == decls_block::FILENAME_FOR_PRIVATE) {
       IdentifierID filenameID;
       decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
-      filenameForPrivate.filename = MF.getIdentifier(filenameID);
+      filenameForPrivate = MF.getIdentifier(filenameID);
     } else {
       return llvm::Error::success();
     }
@@ -2693,6 +2662,7 @@ DeclDeserializer::getDeclCheckedImpl(ModuleFile &MF, DeclID DID) {
   BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
   MF.DeclTypeCursor.JumpToBit(declOrOffset);
 
+  ModuleFile::DeserializingEntityRAII deserializingEntity(MF);
   return DeclDeserializer(MF, declOrOffset).getDeclCheckedImpl();
 }
 
@@ -2702,11 +2672,6 @@ DeclDeserializer::getDeclCheckedImpl() {
 
   if (auto s = ctx.Stats)
     s->getFrontendCounters().NumDeclsDeserialized++;
-
-  PrivateDiscriminatorRAII privateDiscriminatorRAII{MF, declOrOffset};
-  LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
-  ModuleFile::DeserializingEntityRAII deserializingEntity(MF);
-  FilenameForPrivateRAII filenameForPrivate(declOrOffset);
 
   // Local function that handles the "inherited" list for a type.
   auto handleInherited
@@ -2719,22 +2684,15 @@ DeclDeserializer::getDeclCheckedImpl() {
       nominal->setInherited(inheritedTypes);
   };
 
-  auto attrError = deserializeDeclAttributes(ctx,
-                                             filenameForPrivate,
-                                             localDiscriminatorRAII,
-                                             privateDiscriminatorRAII);
+  auto attrError = deserializeDeclAttributes();
   if (attrError)
     return std::move(attrError);
-  SWIFT_DEFER {
-    // Record the attributes.
-    auto decl = declOrOffset.get();
-    if (decl && !decl->hasValidationStarted()) {
-      if (DAttrs)
-        declOrOffset.get()->getAttrs().setRawAttributeChain(DAttrs);
 
-      decl->setValidationToChecked();
-    }
-  };
+  // FIXME: @_dynamicReplacement(for:) includes a reference to another decl,
+  // usually in the same type, and that can result in this decl being
+  // re-entrantly deserialized. If that happens, don't fail here.
+  if (declOrOffset.isComplete())
+    return declOrOffset;
 
   auto entry = MF.DeclTypeCursor.advance();
   if (entry.Kind != llvm::BitstreamEntry::Record) {
