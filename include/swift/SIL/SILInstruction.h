@@ -3605,6 +3605,25 @@ public:
   }
 };
 
+// *NOTE* When serializing, we can only represent up to 4 values here. If more
+// qualifiers are added, SIL serialization must be updated.
+enum class AssignOwnershipQualifier {
+  /// Unknown initialization method
+  Unknown,
+
+  /// The box contains a fully-initialized value.
+  Reassign,
+
+  /// The box contains a class instance that we own, but the instance has
+  /// not been initialized and should be freed with a special SIL
+  /// instruction made for this purpose.
+  Reinit,
+
+  /// The box contains an undefined value that should be ignored.
+  Init,
+};
+static_assert(2 == SILNode::NumAssignOwnershipQualifierBits, "Size mismatch");
+
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in
 /// Raw SIL.
@@ -3615,7 +3634,9 @@ class AssignInst
 
   FixedOperandList<2> Operands;
 
-  AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+  AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+             AssignOwnershipQualifier Qualifier =
+                AssignOwnershipQualifier::Unknown);
 
 public:
   enum {
@@ -3630,6 +3651,14 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  AssignOwnershipQualifier getOwnershipQualifier() const {
+    return AssignOwnershipQualifier(
+      SILInstruction::Bits.AssignInst.OwnershipQualifier);
+  }
+  void setOwnershipQualifier(AssignOwnershipQualifier qualifier) {
+    SILInstruction::Bits.AssignInst.OwnershipQualifier = unsigned(qualifier);
+  }
 };
 
 /// Indicates that a memory location is uninitialized at this point and needs to

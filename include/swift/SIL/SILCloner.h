@@ -1200,7 +1200,8 @@ void SILCloner<ImplClass>::visitAssignInst(AssignInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createAssign(getOpLocation(Inst->getLoc()),
                                       getOpValue(Inst->getSrc()),
-                                      getOpValue(Inst->getDest())));
+                                      getOpValue(Inst->getDest()),
+                                      Inst->getOwnershipQualifier()));
 }
 
 template<typename ImplClass>

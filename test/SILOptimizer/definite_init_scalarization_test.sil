@@ -199,16 +199,10 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : 
 // CHECK:   store [[TUP_D_11]] to [init] [[PROJ_BOX_11]] : $*Builtin.NativeObject
 
 // CHECK:   ([[TUP_D_0:%.*]], [[TUP_D_1:%.*]]) = destructure_tuple [[TUP_COPY]] : $(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
-// CHECK:   [[OLD_VALUE:%.*]] = load [take] [[PROJ_BOX_0]]
-// CHECK:   store [[TUP_D_0]] to [init] [[PROJ_BOX_0]] : $*Builtin.NativeObject
-// CHECK:   destroy_value [[OLD_VALUE]]
+// CHECK:   store [[TUP_D_0]] to [assign] [[PROJ_BOX_0]] : $*Builtin.NativeObject
 // CHECK:   ([[TUP_D_10:%.*]], [[TUP_D_11:%.*]]) = destructure_tuple [[TUP_D_1]] : $(Builtin.NativeObject, Builtin.NativeObject)
-// CHECK:   [[OLD_VALUE:%.*]] = load [take] [[PROJ_BOX_10]]
-// CHECK:   store [[TUP_D_10]] to [init] [[PROJ_BOX_10]] : $*Builtin.NativeObject
-// CHECK:   destroy_value [[OLD_VALUE]]
-// CHECK:   [[OLD_VALUE:%.*]] = load [take] [[PROJ_BOX_11]]
-// CHECK:   store [[TUP_D_11]] to [init] [[PROJ_BOX_11]] : $*Builtin.NativeObject
-// CHECK:   destroy_value [[OLD_VALUE]]
+// CHECK:   store [[TUP_D_10]] to [assign] [[PROJ_BOX_10]] : $*Builtin.NativeObject
+// CHECK:   store [[TUP_D_11]] to [assign] [[PROJ_BOX_11]] : $*Builtin.NativeObject
 
 // CHECK:   destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
 // CHECK: } // end sil function 'test_assigned_owned_2'
