@@ -248,6 +248,26 @@ public:
     return nullptr;
   }
 
+  const TypeRef *createOptionalType(const TypeRef *base) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
+  }
+
+  const TypeRef *createArrayType(const TypeRef *base) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
+  }
+
+  const TypeRef *createDictionaryType(const TypeRef *key, const TypeRef *value) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
+  }
+
+  const TypeRef *createParenType(const TypeRef *base) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
+  }
+
   const BoundGenericTypeRef *
   createBoundGenericType(const Optional<std::string> &mangledName,
                          const std::vector<const TypeRef *> &args) {

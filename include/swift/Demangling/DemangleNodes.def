@@ -252,5 +252,9 @@ NODE(ModuleDescriptor)
 NODE(ExtensionDescriptor)
 NODE(AnonymousDescriptor)
 NODE(AssociatedTypeGenericParamRef)
+NODE(SugaredOptional)
+NODE(SugaredArray)
+NODE(SugaredDictionary)
+NODE(SugaredParen)
 #undef CONTEXT_NODE
 #undef NODE

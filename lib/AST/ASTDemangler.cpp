@@ -577,6 +577,22 @@ Type ASTBuilder::getOpaqueType() {
   return Type();
 }
 
+Type ASTBuilder::createOptionalType(Type base) {
+  return OptionalType::get(base);
+}
+
+Type ASTBuilder::createArrayType(Type base) {
+  return ArraySliceType::get(base);
+}
+
+Type ASTBuilder::createDictionaryType(Type key, Type value) {
+  return DictionaryType::get(key, value);
+}
+
+Type ASTBuilder::createParenType(Type base) {
+  return ParenType::get(Ctx, base);
+}
+
 bool ASTBuilder::validateParentType(TypeDecl *decl, Type parent) {
   auto parentDecl = decl->getDeclContext()->getSelfNominalTypeDecl();
 
