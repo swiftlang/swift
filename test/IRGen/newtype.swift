@@ -6,7 +6,6 @@ import CoreFoundation
 import Foundation
 import Newtype
 
-// REQUIRES: rdar48056043
 // REQUIRES: objc_interop
 
 // Conformance descriptor for synthesized ClosedEnums : _ObjectiveCBridgeable.
@@ -144,13 +143,12 @@ class ObjCTest {
   // CHECK: {{^}$}}
 
   // OPT-LABEL: define hidden %0* @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
-  // OPT: [[CAST_VALUE:%.*]] = bitcast %0* %2 to %objc_object*
-  // OPT: [[RECAST_VALUE:%.*]] = bitcast %objc_object* [[CAST_VALUE]] to i8*
-  // OPT: [[RESULT:%.*]] = {{(tail )?}}call i8* @llvm.objc.retainAutoreleaseReturnValue(i8* [[RECAST_VALUE]])
-  // OPT: [[RESULT_CAST:%.*]] = bitcast i8* [[RESULT]] to %0*
-  // OPT: [[RESULT_RECAST:%.*]] = bitcast %0* [[RESULT_CAST]] to i8*
-  // OPT: [[RESULT_RERECAST:%.*]] = bitcast i8* [[RESULT_RECAST]] to %0*
-  // OPT: ret %0* [[RESULT_RERECAST]]
+  // OPT: [[ARG_CASTED:%.*]] = bitcast %0* %2 to %objc_object*
+  // OPT: [[ARG_RECASTED:%.*]] = bitcast %objc_object* [[ARG_CASTED]] to i8*
+  // OPT: [[ARG_CASTED2:%.*]] = bitcast %0* %2 to i8*
+  // OPT: tail call i8* @llvm.objc.retainAutoreleaseReturnValue(i8* [[ARG_RECASTED]])
+  // OPT: [[CAST_FOR_RETURN:%.*]] = bitcast i8* [[ARG_CASTED2]] to %0*
+  // OPT: ret %0* [[CAST_FOR_RETURN]]
   // OPT: {{^}$}}
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed
