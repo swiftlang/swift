@@ -20,5 +20,16 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6CitiesAAC4nameSSvp",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Cities"
   }
 ]
