@@ -2799,8 +2799,12 @@ public:
 
     // Record desired/actual VJP indices.
     // Temporarily set original pullback type to `None`.
-    getDifferentiationTask()->getNestedApplyInfo().insert(
-        {ai, {indices, vjpAndVJPIndices->second, None}});
+    NestedApplyInfo info{indices, vjpAndVJPIndices->second,
+                         /*originalPullbackType*/ None};
+    auto insertion = getDifferentiationTask()->getNestedApplyInfo().try_emplace(
+        ai, std::move(info));
+    assert(insertion.second && "Nested apply info already exists");
+    auto &nestedApplyInfo = insertion.first->getSecond();
 
     // Call the VJP using the original parameters.
     SmallVector<SILValue, 8> newArgs;
@@ -2853,13 +2857,8 @@ public:
                       pullbackDecl->getInterfaceType()->getCanonicalType()))
             .castTo<SILFunctionType>();
     if (!loweredPullbackType->isEqual(actualPullbackType)) {
-      // Set original pullback type before reabstraction.
-      // NOTE: Is there a better `DenseMap` API?
-      getDifferentiationTask()
-          ->getNestedApplyInfo()
-          .find(ai)
-          ->getSecond()
-          .originalPullbackType = actualPullbackType;
+      // Set non-reabstracted original pullback type in nested apply info.
+      nestedApplyInfo.originalPullbackType = actualPullbackType;
       SILOptFunctionBuilder fb(getContext().getTransform());
       auto *thunk = getOrCreateReabstractionThunk(
           fb, getContext().getModule(), ai->getLoc(), getPrimal(),
@@ -3616,7 +3615,10 @@ public:
                                       builder.getDefaultAtomicity());
         cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
           LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
-          b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
+          if (v->getType().isLoadable(b.getModule()))
+            b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
+          else
+            b.createDestroyAddr(loc, v);
         };
         setAdjointBuffer(formalResults[srcIdx],
                          ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
@@ -3644,7 +3646,7 @@ public:
                << "Assigned seed " << *seed << " as the adjoint of "
                << formalResults[srcIdx]);
 
-    // Pre-emptively register adjoint buffers for original indirect parameters.
+    // Preemptively set adjoint buffers for original indirect parameters.
     auto origParams = original.getArgumentsWithoutIndirectResults();
     auto selfParamIndex = origParams.size() - 1;
     SmallVector<ValueWithCleanup, 4> origIndirectParamAdjointBuffers;
@@ -3928,6 +3930,8 @@ public:
     };
 
     // Emits a release based on the value's type category (address or object).
+    // TODO: Make this a top-level function and call it everywhere consistently.
+    // This reduces code dupe and may fix some memory leaks.
     auto emitRelease = [&](SILValue v) {
       if (v->getType().isAddress()) {
         if (v->getType().isLoadable(getModule()))
@@ -4014,8 +4018,10 @@ public:
       }
     }
     // Deallocate pullback indirect results.
-    for (auto *alloc : reversed(pullbackIndirectResults))
+    for (auto *alloc : reversed(pullbackIndirectResults)) {
+      emitRelease(alloc);
       builder.createDeallocStack(loc, alloc);
+    }
   }
 
   /// Handle `struct` instruction.
@@ -4318,7 +4324,8 @@ public:
   //   Original: copy_addr x to y
   //    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitCopyAddrInst(CopyAddrInst *cai) {
-    auto adjDest = getAdjointBuffer(cai->getDest());
+    auto &adjDest = getAdjointBuffer(cai->getDest());
+    auto destType = remapType(adjDest.getType());
     // Disable the buffer's top-level cleanup (which is supposed to operate on
     // the buffer), create a cleanup for the value that carrys all child
     // cleanups.
@@ -4334,8 +4341,27 @@ public:
         /*fromBuiltin*/ false);
     addToAdjointBuffer(cai->getSrc(), readAccess);
     builder.createEndAccess(cai->getLoc(), readAccess, /*aborted*/ false);
-    auto destType = remapType(adjDest.getType());
-    emitZeroIndirect(destType.getASTType(), adjDest, cai->getLoc());
+    // Set the buffer to zero, with a cleanup.
+    auto *bai = dyn_cast<BeginAccessInst>(adjDest.getValue());
+    if (bai && !(bai->getAccessKind() == SILAccessKind::Modify ||
+                 bai->getAccessKind() == SILAccessKind::Init)) {
+      auto *modifyAccess = builder.createBeginAccess(
+          cai->getLoc(), bai->getSource(), SILAccessKind::Modify,
+          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+          /*fromBuiltin*/ false);
+      emitZeroIndirect(destType.getASTType(), modifyAccess, cai->getLoc());
+      builder.createEndAccess(cai->getLoc(), modifyAccess, /*aborted*/ false);
+    } else {
+      emitZeroIndirect(destType.getASTType(), adjDest, cai->getLoc());
+    }
+    auto cleanup = makeCleanup(adjDest,
+                               [](SILBuilder &b, SILLocation l, SILValue v) {
+      if (v->getType().isLoadable(b.getModule()))
+        b.createReleaseValueAddr(l, v, b.getDefaultAtomicity());
+      else
+        b.createDestroyAddr(l, v);
+    });
+    adjDest.setCleanup(cleanup);
   }
 
   // Handle `begin_access` instruction.
