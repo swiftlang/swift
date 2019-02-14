@@ -164,6 +164,9 @@ public let DataBenchmarks = [
   BenchmarkInfo(name: "DataToStringMedium",
     runFunction: { string($0*200, from: mediumData) }, tags: d,
     legacyFactor: 50),
+  BenchmarkInfo(name: "DataToStringLargeUnicode",
+    runFunction: { string($0*200, from: largeUnicodeData) }, tags: d,
+    legacyFactor: 50),
 
   BenchmarkInfo(name: "StringToDataEmpty",
     runFunction: { data($0*200, from: emptyString) }, tags: d,
@@ -173,6 +176,9 @@ public let DataBenchmarks = [
     legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataMedium",
     runFunction: { data($0*200, from: mediumString) }, tags: d,
+    legacyFactor: 50),
+  BenchmarkInfo(name: "StringToDataLargeUnicode",
+    runFunction: { data($0*200, from: largeUnicodeString) }, tags: d,
     legacyFactor: 50),
 
   BenchmarkInfo(name: "Data.hash.Empty",
@@ -186,9 +192,12 @@ public let DataBenchmarks = [
 let emptyString = ""
 let smallString = "\r\n"
 let mediumString = "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n"
+let largeUnicodeString = 
+  "Swiftに大幅な改良が施され、𓀀𓀁𓀂𓀃, 🇺🇸🇨🇦🇲🇽" + mediumString
 let emptyData = Data()
 let smallData = Data(smallString.utf8)
 let mediumData = Data(mediumString.utf8)
+let largeUnicodeData = Data(largeUnicodeString.utf8)
 
 let small = sampleData(.small)
 let medium = sampleData(.medium)
