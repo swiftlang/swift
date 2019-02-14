@@ -2093,13 +2093,13 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
       interfaceResults, interfaceErrorResult, module.getASTContext());
 }
 
-/// Create a reabstraction thunk from `fromType` to `toType`, to be called in
-/// `caller`.
-SILFunction *createReabstractionThunk(SILOptFunctionBuilder fb,
-                                      SILModule &module, SILLocation loc,
-                                      SILFunction *caller,
-                                      CanSILFunctionType fromType,
-                                      CanSILFunctionType toType) {
+/// Get or create a reabstraction thunk from `fromType` to `toType`, to be
+/// called in `caller`.
+SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder fb,
+                                           SILModule &module, SILLocation loc,
+                                           SILFunction *caller,
+                                           CanSILFunctionType fromType,
+                                           CanSILFunctionType toType) {
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
   auto thunkType =
@@ -2861,7 +2861,7 @@ public:
           ->getSecond()
           .originalPullbackType = actualPullbackType;
       SILOptFunctionBuilder fb(getContext().getTransform());
-      auto *thunk = createReabstractionThunk(
+      auto *thunk = getOrCreateReabstractionThunk(
           fb, getContext().getModule(), ai->getLoc(), getPrimal(),
           actualPullbackType, loweredPullbackType);
       auto *thunkRef = getBuilder().createFunctionRef(ai->getLoc(), thunk);
@@ -3876,7 +3876,7 @@ public:
     // If pullback was reabstracted in primal, reabstract pullback in adjoint.
     if (applyInfo.originalPullbackType) {
       SILOptFunctionBuilder fb(getContext().getTransform());
-      auto *thunk = createReabstractionThunk(
+      auto *thunk = getOrCreateReabstractionThunk(
           fb, getContext().getModule(), ai->getLoc(), &getAdjoint(),
           pullbackType, *applyInfo.originalPullbackType);
       auto *thunkRef = builder.createFunctionRef(ai->getLoc(), thunk);
@@ -3933,9 +3933,6 @@ public:
       }
     };
 
-    // Store temporary stack allocations.
-    SmallVector<AllocStackInst *, 4> tempAllocations;
-
     // If the applied adjoint returns the adjoint of the original self
     // parameter, then it returns it first. Accumulate adjoint for the original
     // self parameter.
@@ -3956,7 +3953,7 @@ public:
         } else {
           if (origArg->getType().isAddress()) {
             auto adjBuf = getAdjointBuffer(origArg);
-            auto tmpBuf =
+            auto *tmpBuf =
                 builder.createAllocStack(loc, cotanWrtSelf->getType());
             builder.createStore(loc, cotanWrtSelf, tmpBuf,
                 getBufferSOQ(tmpBuf->getType().getASTType(), getAdjoint()));
@@ -3965,7 +3962,7 @@ public:
                 /*noNestedConflict*/ true, /*fromBuiltin*/ false);
             accumulateIndirect(adjBuf, readAccess);
             builder.createEndAccess(loc, readAccess, /*aborted*/ false);
-            tempAllocations.push_back(tmpBuf);
+            builder.createDeallocStack(loc, tmpBuf);
           }
           else {
             addAdjointValue(origArg, makeConcreteAdjointValue(ValueWithCleanup(
@@ -3995,7 +3992,7 @@ public:
       } else {
         if (origArg->getType().isAddress()) {
           auto adjBuf = getAdjointBuffer(origArg);
-          auto tmpBuf = builder.createAllocStack(loc, cotan->getType());
+          auto *tmpBuf = builder.createAllocStack(loc, cotan->getType());
           builder.createStore(loc, cotan, tmpBuf,
               getBufferSOQ(tmpBuf->getType().getASTType(), getAdjoint()));
           auto *readAccess = builder.createBeginAccess(
@@ -4003,16 +4000,13 @@ public:
               /*noNestedConflict*/ true, /*fromBuiltin*/ false);
           accumulateIndirect(adjBuf, readAccess);
           builder.createEndAccess(loc, readAccess, /*aborted*/ false);
-          tempAllocations.push_back(tmpBuf);
+          builder.createDeallocStack(loc, tmpBuf);
         }
         else
           addAdjointValue(origArg, makeConcreteAdjointValue(ValueWithCleanup(
               cotan, makeCleanup(cotan, cleanupFn))));
       }
     }
-    // Deallocate temporary allocations.
-    for (auto *alloc : reversed(tempAllocations))
-      builder.createDeallocStack(loc, alloc);
     // Deallocate pullback indirect results.
     for (auto *alloc : reversed(pullbackIndirectResults))
       builder.createDeallocStack(loc, alloc);
