@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: long_test
 // REQUIRES: executable_test
+// UNSUPPORTED: OS=watchos
 
 import SwiftPrivate
 import StdlibUnittest
