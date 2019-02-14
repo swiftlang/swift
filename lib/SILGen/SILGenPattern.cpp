@@ -1920,12 +1920,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
         ManagedValue boxedValue =
             SGF.B.createProjectBox(loc, origCMV.getFinalManagedValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue.getType());
-
-        // TODO: If we have something that is not loadable
         if (eltTL->isLoadable()) {
-          // The boxed value may be shared, so we need to load the value at +0
-          // to make sure that we copy if we try to use it outside of the switch
-          // statement itself.
           boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
           eltCMV = {boxedValue, CastConsumptionKind::BorrowAlways};
         } else {
@@ -2151,37 +2146,20 @@ void PatternMatchEmission::emitEnumElementDispatch(
 
       // If the payload is boxed, project it.
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
-        SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
-        eltTL = &SGF.getTypeLowering(boxedValue->getType());
+        ManagedValue boxedValue =
+          SGF.B.createProjectBox(loc, origCMV.getFinalManagedValue(), 0);
+        eltTL = &SGF.getTypeLowering(boxedValue.getType());
         if (eltTL->isLoadable()) {
-          UnenforcedAccess access;
-          SILValue accessAddress =
-            access.beginAccess(SGF, loc, boxedValue, SILAccessKind::Read);
-
-          // If we needed to do another begin_access, we need to perform a
-          // load_copy. This is because we are going to immediately close the
-          // access here. If we are already in a different access, we can
-          // perform a load_borrow instead here.
-          auto accessMV = ManagedValue::forUnmanaged(accessAddress);
-          ManagedValue newLoadedBoxValue;
-          if (accessAddress == boxedValue) {
-            eltCMV = {SGF.B.createLoadBorrow(loc, accessMV),
-                      CastConsumptionKind::BorrowAlways};
-          } else {
-            // Since we made a copy, send down TakeAlways.
-            eltCMV = {SGF.B.createLoadCopy(loc, accessMV),
-                      CastConsumptionKind::TakeAlways};
-          }
-          access.endAccess(SGF);
+          boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
+          eltCMV = {boxedValue, CastConsumptionKind::BorrowAlways};
         } else {
           // The boxed value may be shared, so we always have to copy it.
-          eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
+          eltCMV = getManagedSubobject(SGF, boxedValue.getValue(), *eltTL,
                                        CastConsumptionKind::CopyOnSuccess);
         }
       }
 
       // Reabstract to the substituted type, if needed.
-
       CanType substEltTy =
         sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), elt,
                                     elt->getArgumentInterfaceType())
