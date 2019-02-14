@@ -410,7 +410,7 @@ Protocol Descriptor
 ~~~~~~~~~~~~~~~~~~~
 
 Protocol descriptors describe the requirements of a protocol, and act as a
-handle for the protocol itself. The are referenced by `Protocol metadata`_, as
+handle for the protocol itself. They are referenced by `Protocol metadata`_, as
 well as `Protocol Conformance Records`_ and generic requirements. Protocol
 descriptors are only created for non-`@objc` Swift protocols: `@objc` protocols
 are emitted as Objective-C metadata. The layout of Swift protocol descriptors is
@@ -433,7 +433,7 @@ as follows:
   the protocol. The generic requirements themselves follow the fixed part
   of the protocol descriptor.
 - The number of **protocol requirements** in the protocol. The protocol
-  requirements follow the generic reuqirements that form the **requirement
+  requirements follow the generic requirements that form the **requirement
   signature**.
 - A string containing the **associated type names**, a C string comprising the
   names of all of the associated types in this protocol, separated by spaces,

@@ -100,7 +100,7 @@ mklink "%VCToolsInstallDir%\include\module.modulemap" S:\swift\stdlib\public\Pla
 mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Platform\visualc.apinotes
 ```
 
-Warning: Creating the above links usually requires adminstrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
+Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
 ### 5. Build CMark
 - This must be done from within a developer command prompt. CMark is a fairly

@@ -2709,7 +2709,7 @@ strong reference type have ownership semantics for the referenced heap
 object. Retain and release operations, however,
 are never implicit in SIL and always must be explicitly performed where needed.
 Retains and releases on the value may be freely moved, and balancing
-retains and releases may deleted, so long as an owning retain count is
+retains and releases may be deleted, so long as an owning retain count is
 maintained for the uses of the value.
 
 All reference-counting operations are defined to work correctly on
@@ -2991,7 +2991,7 @@ Asserts that there exists another reference of the value ``%0`` for the scope
 delineated by the call of this builtin up to the first call of a ``builtin
 "unsafeGuaranteedEnd"`` instruction that uses the second element ``%1.1`` of the
 returned value. If no such instruction can be found nothing can be assumed. This
-assertions holds for uses of the first tuple element of the returned value
+assertion holds for uses of the first tuple element of the returned value
 ``%1.0`` within this scope. The returned reference value equals the input
 ``%0``.
 
@@ -3391,7 +3391,7 @@ separately before the ``partial_apply``. The closure does however take ownership
 of the partially applied arguments; when the closure reference count reaches
 zero, the contained values will be destroyed. If the ``partial_apply`` has a
 ``@noescape`` function type (``partial_apply [on_stack]``) the closure context
-is allocated on the stack and intialized to contain the closed-over values. The
+is allocated on the stack and initialized to contain the closed-over values. The
 closed-over values are not retained, lifetime of the closed-over values must be
 managed separately. The lifetime of the stack context of a ``partial_apply
 [on_stack]`` must be terminated with a ``dealloc_stack``.
