@@ -497,7 +497,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   func _vjpTransposed(
     withPermutations permutations: Tensor<Int32>
   ) -> (Tensor, (Tensor) -> Tensor) {
-    let value = transposed()
+    let value = transposed(withPermutations: permutations)
     return (value, { $0.transposed(withPermutations: permutations) })
   }
 
@@ -505,7 +505,15 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   func _vjpTransposed(
     withPermutations permutations: [Int32]
   ) -> (Tensor, (Tensor) -> Tensor) {
-    let value = transposed()
+    let value = transposed(withPermutations: permutations)
+    return (value, { $0.transposed(withPermutations: permutations) })
+  }
+
+  @inlinable
+  func _vjpTransposed(
+    withPermutations permutations: Int32...
+  ) -> (Tensor, (Tensor) -> Tensor) {
+    let value = transposed(withPermutations: permutations)
     return (value, { $0.transposed(withPermutations: permutations) })
   }
 

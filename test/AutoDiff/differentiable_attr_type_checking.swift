@@ -448,6 +448,15 @@ extension MethodDiffReq where Self : Differentiable {
   }
 }
 
+// expected-error @+1 {{'vjpNonvariadic' does not have expected type '(Float, Int32...) -> (Float, (Float.CotangentVector) -> Float.CotangentVector)' (aka '(Float, Int32...) -> (Float, (Float) -> Float)')}}
+@differentiable(wrt: x, vjp: vjpNonvariadic)
+func variadic(_ x: Float, indices: Int32...) -> Float {
+  return x
+}
+func vjpNonvariadic(_ x: Float, indices: [Int32]) -> (Float, (Float) -> Float) {
+  return (x, { $0 })
+}
+
 // expected-error @+2 {{type 'Scalar' constrained to non-protocol, non-class type 'Float'}}
 // expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Scalar' does not conform to 'Differentiable'}}
 @differentiable(where Scalar : Float)

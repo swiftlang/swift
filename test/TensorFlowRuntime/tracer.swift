@@ -118,6 +118,17 @@ TracerTests.testAllBackends("AllDtypeSupport") {
   expectFalse(bd.scalarized())
 }
 
+TracerTests.testAllBackends("TraceWithNoResult") {
+  func add(state: Tensor<Float>, data: Data) -> (Tensor<Float>) {
+    return state + data
+  }
+  let tracedAdd = _graph(with: Tensor<Float>(2.0), in: add)
+  let three = Tensor<Float>(3.0)
+  expectNearlyEqualWithScalarTensor(5.0, tracedAdd(Tensor<Float>(2.0), three))
+  expectNearlyEqualWithScalarTensor(6.0, tracedAdd(Tensor<Float>(3.0), three))
+  expectNearlyEqualWithScalarTensor(8.0, tracedAdd(Tensor<Float>(5.0), three))
+}
+
 TracerTests.testAllBackends("Basic_IntermediateTensors") {
   func tracee(state: Tensor<Float>, data: Data) -> (Tensor<Float>, Result) {
     // Create an intermediate tensor value, which the tracing infra needs to

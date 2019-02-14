@@ -68,12 +68,6 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
-/// Returns true if the module we are compiling is in an LLDB REPL.
-static bool isInLLDBREPL(SILModule &module) {
-  // TODO(SR-9704): Use a more principled way to do this check.
-  return module.getSwiftModule()->getNameStr().startswith("__lldb_expr_");
-}
-
 /// Creates arguments in the entry block based on the function type.
 static void createEntryArguments(SILFunction *f) {
   auto *entry = f->getEntryBlock();
@@ -1794,17 +1788,10 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
         context.lookUpMinimalDifferentiationTask(originalFn, desiredIndices);
     if (!task) {
       if (originalFn->isExternalDeclaration()) {
-        // For LLDB REPL, we should attempt to load the function as
-        // this may be defined in a different cell.
-        if (isInLLDBREPL(*original->getModule()))
-          original->getModule()->loadFunction(originalFn);
-        // If we still don't have the definition, generate an error message.
-        if (originalFn->isExternalDeclaration()) {
-          context.emitNondifferentiabilityError(
-              original, parentTask,
-              diag::autodiff_external_nondifferentiable_function);
-          return None;
-        }
+        context.emitNondifferentiabilityError(
+            original, parentTask,
+            diag::autodiff_external_nondifferentiable_function);
+        return None;
       }
       task = context.registerDifferentiationTask(originalFn, desiredIndices,
                                                  invoker);
@@ -1860,13 +1847,10 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
           context.lookUpMinimalDifferentiationTask(initialFn, desiredIndices);
       if (!task) {
         if (initialFn->isExternalDeclaration()) {
-          if (isInLLDBREPL(*original->getModule()))
-            original->getModule()->loadFunction(initialFn);
-          if (initialFn->isExternalDeclaration()) {
-            context.emitNondifferentiabilityError(original, parentTask,
-                diag::autodiff_global_let_closure_not_differentiable);
-            return None;
-          }
+          context.emitNondifferentiabilityError(
+              original, parentTask,
+              diag::autodiff_global_let_closure_not_differentiable);
+          return None;
         }
         task = context.registerDifferentiationTask(
             initialFn, desiredIndices, invoker);
@@ -2652,7 +2636,7 @@ public:
       ApplyInst *ai, CanSILFunctionType assocFnTy) {
     auto &context = getContext();
     auto *swiftModule = context.getModule().getSwiftModule();
-    auto origSubstMap = ai->getSubstitutionMap();
+    auto origSubstMap = getOpSubstitutionMap(ai->getSubstitutionMap());
     auto assocGenSig = assocFnTy->getGenericSignature();
     // If associated derivative has no generic signature, then short-circuit and
     // return original substitution map.
@@ -4669,13 +4653,31 @@ AdjointEmitter::accumulateAdjointsDirect(AdjointValue &&lhs,
     // x + (y, z) => (x.0 + y, x.1 + z)
     case AdjointValueKind::Aggregate:
       SmallVector<AdjointValue, 8> newElements;
-      for (auto i : range(rhs.getNumAggregateElements())) {
-        auto lhsElt = builder.createTupleExtract(lhsVal.getLoc(), lhsVal, i);
-        auto rhsElt = rhs.takeAggregateElement(i);
-        newElements.push_back(accumulateAdjointsDirect(
-            makeConcreteAdjointValue(
-                ValueWithCleanup(lhsElt, lhsVal.getCleanup())),
-            std::move(rhsElt)));
+      auto lhsTy = lhsVal.getValue()->getType().getASTType();
+      if (auto *tupTy = lhsTy->getAs<TupleType>()) {
+        for (auto idx : range(rhs.getNumAggregateElements())) {
+          auto lhsElt = builder.createTupleExtract(
+              lhsVal.getLoc(), lhsVal, idx);
+          auto rhsElt = rhs.takeAggregateElement(idx);
+          newElements.push_back(accumulateAdjointsDirect(
+              makeConcreteAdjointValue(
+                  ValueWithCleanup(lhsElt, lhsVal.getCleanup())),
+              std::move(rhsElt)));
+        }
+      } else if (auto *structDecl = lhsTy->getStructOrBoundGenericStruct()) {
+        auto fieldIt = structDecl->getStoredProperties().begin();
+        for (unsigned i = 0; fieldIt != structDecl->getStoredProperties().end();
+             ++fieldIt, ++i) {
+          auto lhsElt = builder.createStructExtract(
+              lhsVal.getLoc(), lhsVal, *fieldIt);
+          auto rhsElt = rhs.takeAggregateElement(i);
+          newElements.push_back(accumulateAdjointsDirect(
+              makeConcreteAdjointValue(
+                  ValueWithCleanup(lhsElt, lhsVal.getCleanup())),
+              std::move(rhsElt)));
+        }
+      } else {
+        llvm_unreachable("Not an aggregate type");
       }
       return makeAggregateAdjointValue(lhsVal.getType(), newElements);
     }

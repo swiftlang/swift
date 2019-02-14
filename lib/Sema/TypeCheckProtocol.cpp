@@ -491,7 +491,9 @@ swift::matchWitness(
           witnessAttrs.getAttribute<DifferentiableAttr>(
               /*AllowInvalid*/ true);
       if (reqDifferentiationAttr &&
-          (!witnessDifferentiationAttr ||
+          (!reqDifferentiationAttr->getParameterIndices() ||
+           !witnessDifferentiationAttr ||
+           !witnessDifferentiationAttr->getParameterIndices() ||
            !witnessDifferentiationAttr->parametersMatch(
                *reqDifferentiationAttr)))
         return RequirementMatch(witness, MatchKind::DifferentiableConflict);
