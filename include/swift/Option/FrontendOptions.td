@@ -64,6 +64,10 @@ def emit_interface_path
   : Separate<["-"], "emit-interface-path">,
     Alias<emit_parseable_module_interface_path>;
 
+def serialize_parseable_module_interface_dependency_hashes
+  : Flag<["-"], "serialize-parseable-module-interface-dependency-hashes">,
+    Flags<[HelpHidden]>;
+
 def tbd_install_name
   : Separate<["-"], "tbd-install_name">, MetaVarName<"<path>">,
     HelpText<"The install_name to use in an emitted TBD file">;

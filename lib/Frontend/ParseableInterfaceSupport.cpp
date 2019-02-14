@@ -480,8 +480,10 @@ bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
     SerializationOpts.OutputPath = OutPathStr.c_str();
     SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
     SmallVector<FileDependency, 16> Deps;
-    if (collectDepsForSerialization(FS, SubInstance, InPath, ModuleCachePath,
-                                    Deps, Diags, DiagLoc, OuterTracker)) {
+    if (collectDepsForSerialization(
+          FS, SubInstance, InPath, ModuleCachePath, Deps,
+          FEOpts.SerializeParseableModuleInterfaceDependencyHashes,
+          Diags, DiagLoc, OuterTracker)) {
       SubError = true;
       return;
     }
