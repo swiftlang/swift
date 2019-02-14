@@ -3947,6 +3947,7 @@ public:
         Options.setBaseType(transformType);
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
+      Options.ExclusiveAttrList.push_back(TAK_autoclosure);
       Options.PrintOverrideKeyword = false;
       Options.PrintPropertyAccessors = false;
       Options.PrintStaticKeyword = !hasStaticOrClass;

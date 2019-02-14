@@ -566,12 +566,13 @@ class Deprecated2 : Deprecated1 {
 
 class EscapingBase {
   func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> (@escaping (@escaping ()->() )->()) { }
+  func autoclosure(arg: @autoclosure () -> Bool) {}
 }
 class Escaping : EscapingBase {
   override func #^ESCAPING_1^#
 }
 // ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (() -> ())) -> ((@escaping () -> ()) -> ()) {|};
-
+// ESCAPING_1: Decl[InstanceMethod]/Super:         autoclosure(arg: @autoclosure () -> Bool) {|};
 class OverrideBase {
   static let staticLet = 0
   static var staticVar = 0
