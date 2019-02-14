@@ -77,7 +77,7 @@ GenericTypeDecl *ASTBuilder::createTypeDecl(StringRef mangledName,
 }
 
 ProtocolDecl *
-ASTBuilder::createProtocolDecl(const Demangle::NodePointer &node) {
+ASTBuilder::createProtocolDecl(NodePointer node) {
   bool typeAlias;
   return dyn_cast_or_null<ProtocolDecl>(
     createTypeDecl(node, typeAlias));
@@ -645,7 +645,7 @@ DeclContext *ASTBuilder::getNotionalDC() {
 }
 
 GenericTypeDecl *
-ASTBuilder::createTypeDecl(const Demangle::NodePointer &node,
+ASTBuilder::createTypeDecl(NodePointer node,
                            bool &typeAlias) {
   auto DC = findDeclContext(node);
   if (!DC)
@@ -656,14 +656,14 @@ ASTBuilder::createTypeDecl(const Demangle::NodePointer &node,
 }
 
 ModuleDecl *
-ASTBuilder::findModule(const Demangle::NodePointer &node) {
+ASTBuilder::findModule(NodePointer node) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
   const auto &moduleName = node->getText();
   return Ctx.getModuleByName(moduleName);
 }
 
 Demangle::NodePointer
-ASTBuilder::findModuleNode(const Demangle::NodePointer &node) {
+ASTBuilder::findModuleNode(NodePointer node) {
   auto child = node;
   while (child->hasChildren() &&
          child->getKind() != Demangle::Node::Kind::Module) {
@@ -677,7 +677,7 @@ ASTBuilder::findModuleNode(const Demangle::NodePointer &node) {
 }
 
 Optional<ASTBuilder::ForeignModuleKind>
-ASTBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
+ASTBuilder::getForeignModuleKind(NodePointer node) {
   if (node->getKind() == Demangle::Node::Kind::DeclContext)
     return getForeignModuleKind(node->getFirstChild());
 
@@ -693,7 +693,7 @@ ASTBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
 
 CanGenericSignature ASTBuilder::demangleGenericSignature(
     NominalTypeDecl *nominalDecl,
-    const Demangle::NodePointer &node) {
+    NodePointer node) {
   GenericSignatureBuilder builder(Ctx);
   builder.addGenericSignature(nominalDecl->getGenericSignature());
 
@@ -768,7 +768,7 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
 }
 
 DeclContext *
-ASTBuilder::findDeclContext(const Demangle::NodePointer &node) {
+ASTBuilder::findDeclContext(NodePointer node) {
   switch (node->getKind()) {
   case Demangle::Node::Kind::DeclContext:
   case Demangle::Node::Kind::Type:

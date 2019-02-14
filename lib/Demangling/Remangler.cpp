@@ -2331,7 +2331,7 @@ void Remangler::mangleSugaredParen(Node *node) {
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNode(const NodePointer &node) {
+std::string Demangle::mangleNode(NodePointer node) {
   return mangleNode(node, [](SymbolicReferenceKind, const void *) -> NodePointer {
     unreachable("should not try to mangle a symbolic reference; "
                 "resolve it to a non-symbolic demangling tree instead");
@@ -2339,7 +2339,7 @@ std::string Demangle::mangleNode(const NodePointer &node) {
 }
 
 std::string
-Demangle::mangleNode(const NodePointer &node, SymbolicResolver resolver) {
+Demangle::mangleNode(NodePointer node, SymbolicResolver resolver) {
   if (!node) return "";
 
   DemanglerPrinter printer;

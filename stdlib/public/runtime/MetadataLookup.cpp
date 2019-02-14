@@ -693,7 +693,7 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 
 static const ProtocolDescriptor *
 _searchProtocolRecords(ProtocolMetadataPrivateState &C,
-                       const Demangle::NodePointer &node) {
+                       NodePointer node) {
   for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto protocol = record.Protocol.getPointer()) {
@@ -707,7 +707,7 @@ _searchProtocolRecords(ProtocolMetadataPrivateState &C,
 }
 
 static const ProtocolDescriptor *
-_findProtocolDescriptor(const Demangle::NodePointer &node,
+_findProtocolDescriptor(NodePointer node,
                         Demangle::Demangler &Dem,
                         std::string &mangledName) {
   const ProtocolDescriptor *foundProtocol = nullptr;
@@ -944,14 +944,14 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
-  BuiltTypeDecl createTypeDecl(const Demangle::NodePointer &node,
+  BuiltTypeDecl createTypeDecl(NodePointer node,
                                bool &typeAlias) const {
     // Look for a nominal type descriptor based on its mangled name.
     return _findNominalTypeDescriptor(node, demangler);
   }
 
   BuiltProtocolDecl createProtocolDecl(
-                                    const Demangle::NodePointer &node) const {
+                                    NodePointer node) const {
     // Look for a protocol descriptor based on its mangled name.
     std::string mangledName;
     if (auto protocol = _findProtocolDescriptor(node, demangler, mangledName))

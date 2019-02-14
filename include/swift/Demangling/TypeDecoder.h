@@ -223,7 +223,7 @@ public:
 /// For a mangled node that refers to an Objective-C class or protocol,
 /// return the class or protocol name.
 static inline Optional<StringRef> getObjCClassOrProtocolName(
-    const Demangle::NodePointer &node) {
+    NodePointer node) {
   if (node->getKind() != Demangle::Node::Kind::Class &&
       node->getKind() != Demangle::Node::Kind::Protocol)
     return None;
@@ -262,7 +262,7 @@ class TypeDecoder {
     : Builder(Builder) {}
 
   /// Given a demangle tree, attempt to turn it into a type.
-  BuiltType decodeMangledType(const Demangle::NodePointer &Node) {
+  BuiltType decodeMangledType(NodePointer Node) {
     if (!Node) return BuiltType();
 
     using NodeKind = Demangle::Node::Kind;
@@ -922,7 +922,7 @@ private:
       return true;
     };
 
-    auto decodeParam = [&](const Demangle::NodePointer &paramNode)
+    auto decodeParam = [&](NodePointer paramNode)
         -> Optional<FunctionParam<BuiltType>> {
       if (paramNode->getKind() != NodeKind::TupleElement)
         return None;
@@ -979,7 +979,7 @@ private:
 template<typename BuilderType>
 inline typename BuilderType::BuiltType
 decodeMangledType(BuilderType &Builder,
-                  const Demangle::NodePointer &Node) {
+                  NodePointer Node) {
   return TypeDecoder<BuilderType>(Builder).decodeMangledType(Node);
 }
 

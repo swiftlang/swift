@@ -212,7 +212,7 @@ private:
   NodePointer getFirstChildOfKind(NodePointer Node, Node::Kind kind) {
     if (!Node)
       return nullptr;
-    for (NodePointer &child : *Node) {
+    for (NodePointer child : *Node) {
       if (child && child->getKind() == kind)
         return child;
     }

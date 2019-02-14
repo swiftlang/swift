@@ -2277,7 +2277,7 @@ void Remangler::mangleSugaredParen(Node *node) {
 }
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNodeOld(const NodePointer &node) {
+std::string Demangle::mangleNodeOld(NodePointer node) {
   if (!node) return "";
 
   DemanglerPrinter printer;
