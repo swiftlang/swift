@@ -101,3 +101,10 @@ public func usesGeneric(y: (GenericAlias<Int>, GenericClass<Int>, GenericAlias<I
   let x = y
   markUsed(x)
 }
+
+public struct Ox<T> {}
+extension Ox where T == Int {
+  public typealias Plow = Int
+}
+
+var v: Ox<Int>.Plow = 0
