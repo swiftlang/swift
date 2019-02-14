@@ -43,7 +43,6 @@
 #else
 #include <sys/mman.h>
 #include <unistd.h>
-#include <dlfcn.h>
 #endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
@@ -2721,13 +2720,6 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets,
                                bool allowDependency) {
-#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
-  // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
-  static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, void* _Nullable))
-    dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
-#endif
-
   bool requiresUpdate = (_objc_realizeClassFromSwift != nullptr);
 
   // If we're on a newer runtime, we're going to be initializing the
