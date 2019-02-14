@@ -126,6 +126,14 @@ public:
 
   Type getOpaqueType();
 
+  Type createOptionalType(Type base);
+
+  Type createArrayType(Type base);
+
+  Type createDictionaryType(Type key, Type value);
+
+  Type createParenType(Type base);
+
 private:
   bool validateParentType(TypeDecl *decl, Type parent);
   CanGenericSignature demangleGenericSignature(
