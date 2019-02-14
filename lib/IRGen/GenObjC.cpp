@@ -1381,7 +1381,7 @@ bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
   if (isa<AccessorDecl>(method))
     return false;
 
-  return method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>();
+  return method->isObjC();
 }
 
 bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
