@@ -99,30 +99,35 @@ const Requirement &RequirementFailure::getRequirement() const {
   // If this is a conditional requirement failure we need to
   // fetch conformance from constraint system associated with
   // type requirement this conditional conformance belongs to.
-  if (isConditional()) {
-    auto conformanceRef = getConformanceRef();
-    return conformanceRef.getConditionalRequirements()[getRequirementIndex()];
-  }
-
-  return getGenericContext()->getGenericRequirements()[getRequirementIndex()];
+  auto requirements = isConditional()
+                          ? Conformance->getConditionalRequirements()
+                          : Signature->getRequirements();
+  return requirements[getRequirementIndex()];
 }
 
-ProtocolConformanceRef RequirementFailure::getConformanceRef() const {
-  assert(isConditional());
-
+ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
+    ConstraintLocator *locator) {
   auto &cs = getConstraintSystem();
-  auto *locator = getLocator();
+  auto path = locator->getPath();
+  assert(!path.empty());
 
-  auto *typeReqLoc =
-      cs.getConstraintLocator(getRawAnchor(), locator->getPath().drop_back(),
-                              /*summaryFlags=*/0);
+  if (!path.back().isConditionalRequirement()) {
+    assert(path.back().isTypeParameterRequirement());
+    return nullptr;
+  }
 
-  auto conformance = llvm::find_if(
+  auto *typeReqLoc = cs.getConstraintLocator(getRawAnchor(), path.drop_back(),
+                                             /*summaryFlags=*/0);
+
+  auto result = llvm::find_if(
       cs.CheckedConformances,
       [&](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
               &conformance) { return conformance.first == typeReqLoc; });
-  assert(conformance != cs.CheckedConformances.end());
-  return conformance->second;
+  assert(result != cs.CheckedConformances.end());
+
+  auto conformance = result->second;
+  assert(conformance.isConcrete());
+  return conformance.getConcrete();
 }
 
 ValueDecl *RequirementFailure::getDeclRef() const {
@@ -169,13 +174,25 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   return ownerType->getAnyGeneric();
 }
 
+GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
+  if (isConditional())
+    return Conformance->getGenericSignature();
+
+  auto path = locator->getPath();
+  for (auto iter = path.rbegin(); iter != path.rend(); ++iter) {
+    const auto &elt = *iter;
+    if (elt.getKind() == ConstraintLocator::OpenedGeneric)
+      return elt.getGenericSignature();
+  }
+
+  llvm_unreachable("Type requirement failure should always have signature");
+}
+
 const DeclContext *RequirementFailure::getRequirementDC() const {
   // In case of conditional requirement failure, we don't
   // have to guess where the it comes from.
-  if (isConditional()) {
-    auto *conformance = getConformanceRef().getConcrete();
-    return conformance->getDeclContext();
-  }
+  if (isConditional())
+    return Conformance->getDeclContext();
 
   const auto &req = getRequirement();
   auto *DC = AffectedDecl->getDeclContext();
@@ -242,10 +259,9 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
   auto &req = getRequirement();
 
   if (isConditional()) {
-    auto *conformance = getConformanceRef().getConcrete();
     emitDiagnostic(anchor, diag::requirement_implied_by_conditional_conformance,
-                   resolveType(conformance->getType()),
-                   conformance->getProtocol()->getDeclaredInterfaceType());
+                   resolveType(Conformance->getType()),
+                   Conformance->getProtocol()->getDeclaredInterfaceType());
     return;
   }
 
