@@ -5537,6 +5537,16 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     builtinLiteralArgs = RValue(*this, {boolManaged}, ty);
     builtinInit = booleanLiteral->getBuiltinInitializer();
     init = booleanLiteral->getInitializer();
+  } else if (auto integerLiteral = dyn_cast<IntegerLiteralExpr>(literal)) {
+    ManagedValue integerManaged =
+        ManagedValue::forUnmanaged(B.createIntegerLiteral(
+            integerLiteral,
+            SILType::getBuiltinIntegerLiteralType(getASTContext()),
+            integerLiteral->getRawValue()));
+    CanType ty = integerManaged.getType().getASTType()->getCanonicalType();
+    builtinLiteralArgs = RValue(*this, {integerManaged}, ty);
+    builtinInit = integerLiteral->getBuiltinInitializer();
+    init = integerLiteral->getInitializer();
   } else {
     ASTContext &ctx = getASTContext();
     SourceLoc loc = literal->getStartLoc();
@@ -5566,7 +5576,23 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     }
 
     case MagicIdentifierLiteralExpr::Line:
-    case MagicIdentifierLiteralExpr::Column:
+    case MagicIdentifierLiteralExpr::Column: {
+      SourceLoc Loc = literal->getStartLoc();
+      unsigned Value = 0;
+      if (Loc.isValid()) {
+        Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
+                    ? ctx.SourceMgr.getLineAndColumn(Loc).first
+                    : ctx.SourceMgr.getLineAndColumn(Loc).second;
+      }
+
+      auto Ty = SILType::getBuiltinIntegerLiteralType(ctx);
+      SILValue V = B.createIntegerLiteral(literal, Ty, Value);
+      builtinLiteralArgs = RValue(*this, {ManagedValue::forUnmanaged(V)},
+                                  Ty.getASTType()->getCanonicalType());
+      builtinInit = magicLiteral->getBuiltinInitializer();
+      init = magicLiteral->getInitializer();
+      break;
+    }
     case MagicIdentifierLiteralExpr::DSOHandle:
       llvm_unreachable("handled elsewhere");
     }
