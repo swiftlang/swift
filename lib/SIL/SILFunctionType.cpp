@@ -255,14 +255,29 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
                             ArrayRef<SILResultInfo> newResults,
                             GenericSignature *genericSignature)
       -> CanSILFunctionType {
-    return SILFunctionType::get(genericSignature
-                                  ? genericSignature
-                                  : base->getGenericSignature(),
+    if (!genericSignature)
+      genericSignature = base->getGenericSignature();
+    // If generic signature is specified, use it to canonical result types.
+    // This is important for consistent typing for types like:
+    //     <T : Differentiable, T == T.CotangentVector> (...) ->
+    //         (@out T.CotangentVector)
+    // Which should be canonicalized to:
+    //     <T : Differentiable, T == T.CotangentVector> (...) ->
+    //         (@out T)
+    ArrayRef<SILResultInfo> results =
+        genericSignature
+            ? map<SmallVector<SILResultInfo, 4>>(
+                  newResults, [&](SILResultInfo resInfo) {
+                    return resInfo.getWithType(
+                        resInfo.getType()->getCanonicalType(genericSignature));
+                  })
+            : newResults;
+    return SILFunctionType::get(genericSignature,
                                 base->getExtInfo(),
                                 base->getCoroutineKind(),
                                 base->getCalleeConvention(),
                                 base->getParameters(), base->getYields(),
-                                newResults, base->getOptionalErrorResult(), ctx,
+                                results, base->getOptionalErrorResult(), ctx,
                                 base->getWitnessMethodConformanceOrNone());
   };
 
@@ -328,17 +343,14 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   results.push_back({closureType, ResultConvention::Owned});
   CanSILFunctionType associatedFunction =
       withNewResults(curryLevels.back(), results,
-                     curryLevels.size() == 1 ? whereClauseGenSig : nullptr);
+                     whereClauseGenSig);
 
   auto curryLevelsWithoutLast =
       ArrayRef<SILFunctionType *>(curryLevels).drop_back(1);
-  for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
-    unsigned i = pair.index();
-    auto *curryLevel = pair.value();
+  for (auto *curryLevel : reversed(curryLevelsWithoutLast))
     associatedFunction = withNewResults(
         curryLevel, {{associatedFunction, ResultConvention::Owned}},
-        i == curryLevelsWithoutLast.size() - 1 ? whereClauseGenSig : nullptr);
-  }
+        whereClauseGenSig);
   return associatedFunction;
 }
 

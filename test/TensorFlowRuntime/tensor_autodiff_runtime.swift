@@ -4,7 +4,6 @@
 // VJP-based AD. See SR-9638.
 //
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 //
 // Tensor AD runtime tests.
 
@@ -170,14 +169,13 @@ TensorADTests.testAllBackends("Side effects") {
   }
   expectEqual(Tensor([8, 8]), pullback(at: Tensor(4), in: foo)([1, 1]))
 
-  // FIXME: This requires support for indirect passing.
-  // func foo(x: Tensor<Float>) -> Tensor<Float> {
-  //   var a = x
-  //   a = a * x
-  //   a = a * x
-  //   a = a * x
-  // }
-  // expectEqual(Tensor([8, 8]), pullback(at: Tensor(4), in: foo)([1, 1]))
+  func bar(x: Tensor<Float>) -> Tensor<Float> {
+    var a = x
+    a = a * x
+    a = a * x
+    return a
+  }
+  expectEqual(Tensor(48), gradient(at: Tensor(4), in: bar))
 }
 
 runAllTests()
