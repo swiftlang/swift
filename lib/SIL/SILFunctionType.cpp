@@ -220,7 +220,7 @@ enum class ConventionsKind : uint8_t {
   ObjCMethod = 2,
   CFunctionType = 3,
   CFunction = 4,
-  SelectorFamily = 5,
+  ObjCSelectorFamily = 5,
   Deallocator = 6,
   Capture = 7,
 };
@@ -1714,7 +1714,7 @@ static const clang::Decl *findClangMethod(ValueDecl *method) {
 /// Note that this will never derive the Init family, which is too dangerous
 /// to leave to chance. Swift functions starting with "init" are always
 /// emitted as if they are part of the "none" family.
-static ObjCSelectorFamily getSelectorFamily(ObjCSelector name) {
+static ObjCSelectorFamily getObjCSelectorFamily(ObjCSelector name) {
   auto result = name.getSelectorFamily();
 
   if (result == ObjCSelectorFamily::Init)
@@ -1724,7 +1724,7 @@ static ObjCSelectorFamily getSelectorFamily(ObjCSelector name) {
 }
 
 /// Get the ObjC selector family a foreign SILDeclRef belongs to.
-static ObjCSelectorFamily getSelectorFamily(SILDeclRef c) {
+static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   assert(c.isForeign);
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
@@ -1745,7 +1745,7 @@ static ObjCSelectorFamily getSelectorFamily(SILDeclRef c) {
       }
     }
 
-    return getSelectorFamily(FD->getObjCSelector());
+    return getObjCSelectorFamily(FD->getObjCSelector());
   }
   case SILDeclRef::Kind::Initializer:
   case SILDeclRef::Kind::IVarInitializer:
@@ -1772,12 +1772,12 @@ static ObjCSelectorFamily getSelectorFamily(SILDeclRef c) {
 
 namespace {
 
-class SelectorFamilyConventions : public Conventions {
+class ObjCSelectorFamilyConventions : public Conventions {
   ObjCSelectorFamily Family;
 
 public:
-  SelectorFamilyConventions(ObjCSelectorFamily family)
-    : Conventions(ConventionsKind::SelectorFamily), Family(family) {}
+  ObjCSelectorFamilyConventions(ObjCSelectorFamily family)
+    : Conventions(ConventionsKind::ObjCSelectorFamily), Family(family) {}
 
   ParameterConvention getIndirectParameter(unsigned index,
                                            const AbstractionPattern &type,
@@ -1834,21 +1834,21 @@ public:
   }
 
   static bool classof(const Conventions *C) {
-    return C->getKind() == ConventionsKind::SelectorFamily;
+    return C->getKind() == ConventionsKind::ObjCSelectorFamily;
   }
 };
 
 } // end anonymous namespace
 
 static CanSILFunctionType
-getSILFunctionTypeForSelectorFamily(SILModule &M, ObjCSelectorFamily family,
-                                    CanAnyFunctionType origType,
-                                    CanAnyFunctionType substInterfaceType,
-                                    AnyFunctionType::ExtInfo extInfo,
-                                    const ForeignInfo &foreignInfo,
-                                    Optional<SILDeclRef> constant) {
+getSILFunctionTypeForObjCSelectorFamily(SILModule &M, ObjCSelectorFamily family,
+                                        CanAnyFunctionType origType,
+                                        CanAnyFunctionType substInterfaceType,
+                                        AnyFunctionType::ExtInfo extInfo,
+                                        const ForeignInfo &foreignInfo,
+                                        Optional<SILDeclRef> constant) {
   return getSILFunctionType(M, AbstractionPattern(origType), substInterfaceType,
-                            extInfo, SelectorFamilyConventions(family),
+                            extInfo, ObjCSelectorFamilyConventions(family),
                             foreignInfo, constant, constant,
                             /*requirement subs*/None,
                             /*witnessMethodConformance=*/None);
@@ -1929,10 +1929,10 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
 
   // If the decl belongs to an ObjC method family, use that family's
   // ownership conventions.
-  return getSILFunctionTypeForSelectorFamily(M, getSelectorFamily(constant),
-                                             origLoweredInterfaceType,
-                                             origLoweredInterfaceType,
-                                             extInfo, foreignInfo, constant);
+  return getSILFunctionTypeForObjCSelectorFamily(
+      M, getObjCSelectorFamily(constant),
+      origLoweredInterfaceType, origLoweredInterfaceType,
+      extInfo, foreignInfo, constant);
 }
 
 CanSILFunctionType TypeConverter::
