@@ -218,10 +218,9 @@ ObjCSelectorFamily ObjCSelector::getSelectorFamily() const {
   };
 
   if (false) /*for #define purposes*/;
-#define CHECK_PREFIX(LABEL, PREFIX) \
-else if (hasPrefix(text, PREFIX)) return ObjCSelectorFamily::LABEL;
-  FOREACH_OBJC_SELECTOR_FAMILY(CHECK_PREFIX)
-#undef CHECK_PREFIX
+#define OBJC_SELECTOR_FAMILY(LABEL, PREFIX) \
+  else if (hasPrefix(text, PREFIX)) return ObjCSelectorFamily::LABEL;
+#include "swift/AST/ObjCSelectorFamily.def"
   else return ObjCSelectorFamily::None;
 }
 

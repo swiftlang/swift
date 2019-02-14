@@ -592,19 +592,10 @@ public:
                             "only for use within the debugger");
 };
 
-/// Apply a macro FAMILY(Name, Prefix) to all ObjC selector families.
-#define FOREACH_OBJC_SELECTOR_FAMILY(FAMILY)       \
-  FAMILY(Alloc, "alloc")                           \
-  FAMILY(Copy, "copy")                             \
-  FAMILY(Init, "init")                             \
-  FAMILY(MutableCopy, "mutableCopy")               \
-  FAMILY(New, "new")
-
 enum class ObjCSelectorFamily : unsigned {
   None,
-#define GET_LABEL(LABEL, PREFIX) LABEL,
-FOREACH_OBJC_SELECTOR_FAMILY(GET_LABEL)
-#undef GET_LABEL
+#define OBJC_SELECTOR_FAMILY(LABEL, PREFIX) LABEL,
+#include "swift/AST/ObjCSelectorFamily.def"
 };
 
 /// Represents an Objective-C selector.
