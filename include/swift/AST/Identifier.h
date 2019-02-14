@@ -592,6 +592,21 @@ public:
                             "only for use within the debugger");
 };
 
+/// Apply a macro FAMILY(Name, Prefix) to all ObjC selector families.
+#define FOREACH_OBJC_SELECTOR_FAMILY(FAMILY)       \
+  FAMILY(Alloc, "alloc")                           \
+  FAMILY(Copy, "copy")                             \
+  FAMILY(Init, "init")                             \
+  FAMILY(MutableCopy, "mutableCopy")               \
+  FAMILY(New, "new")
+
+enum class ObjCSelectorFamily : unsigned {
+  None,
+#define GET_LABEL(LABEL, PREFIX) LABEL,
+FOREACH_OBJC_SELECTOR_FAMILY(GET_LABEL)
+#undef GET_LABEL
+};
+
 /// Represents an Objective-C selector.
 class ObjCSelector {
   /// The storage for an Objective-C selector.
@@ -655,6 +670,8 @@ public:
   ///
   /// \param scratch Scratch space to use.
   StringRef getString(llvm::SmallVectorImpl<char> &scratch) const;
+
+  ObjCSelectorFamily getSelectorFamily() const;
 
   void *getOpaqueValue() const { return Storage.getOpaqueValue(); }
   static ObjCSelector getFromOpaqueValue(void *p) {

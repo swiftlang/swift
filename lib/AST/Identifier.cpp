@@ -18,6 +18,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ConvertUTF.h"
+#include "clang/Basic/CharInfo.h"
 using namespace swift;
 
 void *DeclBaseName::SubscriptIdentifierData =
@@ -197,6 +198,31 @@ ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,
 
   assert(numArgs == pieces.size() && "Wrong number of selector pieces");
   Storage = DeclName(ctx, Identifier(), pieces);
+}
+
+ObjCSelectorFamily ObjCSelector::getSelectorFamily() const {
+  StringRef text = getSelectorPieces().front().get();
+  while (!text.empty() && text[0] == '_') text = text.substr(1);
+
+  // Does the given selector start with the given string as a prefix, in the
+  // sense of the selector naming conventions?
+  // This implementation matches the one used by
+  // clang::Selector::getMethodFamily, to make sure we behave the same as
+  // Clang ARC. We're not just calling that method here because it means
+  // allocating a clang::IdentifierInfo, which requires a Clang ASTContext.
+  auto hasPrefix = [](StringRef text, StringRef prefix) {
+    if (!text.startswith(prefix)) return false;
+    if (text.size() == prefix.size()) return true;
+    assert(text.size() > prefix.size());
+    return !clang::isLowercase(text[prefix.size()]);
+  };
+
+  if (false) /*for #define purposes*/;
+#define CHECK_PREFIX(LABEL, PREFIX) \
+else if (hasPrefix(text, PREFIX)) return ObjCSelectorFamily::LABEL;
+  FOREACH_OBJC_SELECTOR_FAMILY(CHECK_PREFIX)
+#undef CHECK_PREFIX
+  else return ObjCSelectorFamily::None;
 }
 
 StringRef ObjCSelector::getString(llvm::SmallVectorImpl<char> &scratch) const {
