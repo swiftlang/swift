@@ -2234,6 +2234,7 @@ class swift::DeclDeserializer {
   using TypeID = serialization::TypeID;
 
   ModuleFile &MF;
+  ASTContext &ctx;
   Serialized<Decl *> &declOrOffset;
 
   DeclAttribute *DAttrs = nullptr;
@@ -2252,9 +2253,18 @@ class swift::DeclDeserializer {
     AttrsNext = Attr->getMutableNext();
   };
 
+  void handleInherited(TypeDecl *nominal, ArrayRef<uint64_t> rawInheritedIDs) {
+    auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
+    for_each(inheritedTypes, rawInheritedIDs,
+             [this](TypeLoc &tl, uint64_t rawID) {
+       tl = TypeLoc::withoutLoc(MF.getType(rawID));
+    });
+    nominal->setInherited(inheritedTypes);
+  }
+
 public:
   DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
-      : MF(MF), declOrOffset(declOrOffset) {}
+      : MF(MF), ctx(MF.getContext()), declOrOffset(declOrOffset) {}
 
   ~DeclDeserializer() {
     if (!declOrOffset.isComplete()) {
@@ -2377,7 +2387,6 @@ static bool attributeChainContains(DeclAttribute *attr) {
 llvm::Error DeclDeserializer::deserializeDeclAttributes() {
   using namespace decls_block;
 
-  ASTContext &ctx = MF.getContext();
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
   while (true) {
@@ -2668,21 +2677,8 @@ DeclDeserializer::getDeclCheckedImpl(ModuleFile &MF, DeclID DID) {
 
 Expected<Decl *>
 DeclDeserializer::getDeclCheckedImpl() {
-  ASTContext &ctx = MF.getContext();
-
   if (auto s = ctx.Stats)
     s->getFrontendCounters().NumDeclsDeserialized++;
-
-  // Local function that handles the "inherited" list for a type.
-  auto handleInherited
-    = [&](TypeDecl *nominal, ArrayRef<uint64_t> rawInheritedIDs) {
-      auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
-      for_each(inheritedTypes, rawInheritedIDs,
-               [this](TypeLoc &tl, uint64_t rawID) {
-         tl = TypeLoc::withoutLoc(MF.getType(rawID));
-      });
-      nominal->setInherited(inheritedTypes);
-  };
 
   auto attrError = deserializeDeclAttributes();
   if (attrError)
