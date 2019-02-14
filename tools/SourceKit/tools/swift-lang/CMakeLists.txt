@@ -4,7 +4,16 @@ if(NOT SWIFT_SOURCEKIT_USE_INPROC_LIBRARY AND SWIFT_BUILD_STDLIB)
   set(INSTALLED_COMP sourcekit-xpc-service)
   set(DEPENDS_LIST "sourcekitd-test")
 
-  add_swift_target_library(swiftSwiftLang SHARED
+  # The build type of swiftlang should agree with stdlib
+  set(SWIFT_LANG_LIBRARY_BUILD_TYPES)
+  if(SWIFT_BUILD_DYNAMIC_STDLIB)
+    list(APPEND SWIFT_LANG_LIBRARY_BUILD_TYPES SHARED)
+  endif()
+  if(SWIFT_BUILD_STATIC_STDLIB)
+    list(APPEND SWIFT_LANG_LIBRARY_BUILD_TYPES STATIC)
+  endif()
+
+  add_swift_target_library(swiftSwiftLang ${SWIFT_LANG_LIBRARY_BUILD_TYPES}
     SwiftLang.swift
     SourceKitdClient.swift
     SourceKitdRequest.swift
