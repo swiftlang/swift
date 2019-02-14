@@ -358,6 +358,18 @@ private:
 
 #endif
 
+  StringRef getCurrentDirname() {
+    if (!IGM.getOptions().DebugCompilationDir.empty())
+      return IGM.getOptions().DebugCompilationDir;
+
+    if (!CWDName.empty())
+      return CWDName;
+
+    SmallString<256> CWD;
+    llvm::sys::fs::current_path(CWD);
+    return CWDName = BumpAllocatedString(CWD);
+  }
+
   llvm::DIFile *getOrCreateFile(StringRef Filename) {
     if (Filename.empty())
       Filename = SILLocation::getCompilerGeneratedDebugLoc().Filename;
@@ -388,6 +400,8 @@ private:
     llvm::SmallString<512> Path(Filename);
     llvm::sys::path::remove_filename(Path);
     llvm::sys::path::remove_dots(Path);
+    if (Path.size() == 0)
+      Path = getCurrentDirname();
     llvm::DIFile *F = DBuilder.createFile(DebugPrefixMap.remapPath(File),
                                           DebugPrefixMap.remapPath(Path));
 
