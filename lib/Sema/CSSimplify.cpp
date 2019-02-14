@@ -3768,31 +3768,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           choices.push_back(std::move(pair.first));
         }
 
-        if (baseTy->is<MetatypeType>() &&
-            baseTy->getMetatypeInstanceType()->isAnyExistentialType()) {
-          if (llvm::all_of(choices, [&](const OverloadChoice &c) {
-                return c.isDecl() && isa<ConstructorDecl>(c.getDecl());
-              })) {
+        auto meetsProtocolBaseMetatypeCriteria =
+            baseTy->is<MetatypeType>() &&
+            baseTy->getMetatypeInstanceType()->isAnyExistentialType();
 
-            for (auto choice : choices) {
-              bool isStaticallyDerived =
-                  !(baseTy->getMetatypeInstanceType()->is<DynamicSelfType>() ||
-                    baseTy->getMetatypeInstanceType()->is<ArchetypeType>());
-              auto *protoFix = AllowInvalidInitRef::onProtocolMetatype(
-                  *this, baseTy, dyn_cast<ConstructorDecl>(choice.getDecl()),
-                  isStaticallyDerived, choice.getDecl()->getSourceRange(),
-                  locator);
-              if (recordFix(protoFix))
-                return SolutionKind::Error;
-            }
+        auto requiresProtocolMetatypeFix =
+            llvm::any_of(choices, [&](const OverloadChoice &c) {
+              return c.isDecl() && isa<ConstructorDecl>(c.getDecl());
+            });
 
-            addOverloadSet(memberTy, choices, useDC, locator);
-            return SolutionKind::Solved;
-          }
+        ConstraintFix *fix;
+
+        if (meetsProtocolBaseMetatypeCriteria && requiresProtocolMetatypeFix &&
+            !choices.empty()) {
+          auto choice = choices.front();
+          bool isStaticallyDerived =
+              !(baseTy->getMetatypeInstanceType()->is<DynamicSelfType>() ||
+                baseTy->getMetatypeInstanceType()->is<ArchetypeType>());
+          fix = AllowInvalidInitRef::onProtocolMetatype(
+              *this, baseTy, dyn_cast<ConstructorDecl>(choice.getDecl()),
+              isStaticallyDerived, choice.getDecl()->getSourceRange(), locator);
+        } else {
+          fix =
+              AllowTypeOrInstanceMember::create(*this, baseTy, member, locator);
         }
-
-        auto *fix =
-            AllowTypeOrInstanceMember::create(*this, baseTy, member, locator);
 
         if (recordFix(fix))
           // The fix wasn't successful, so return an error
