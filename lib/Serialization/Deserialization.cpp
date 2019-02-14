@@ -2309,7 +2309,6 @@ public:
   /// passing each one to AddAttribute.
   llvm::Error deserializeDeclAttributes();
 
-  static Expected<Decl *> getDeclCheckedImpl(ModuleFile &MF, DeclID DID);
   Expected<Decl *> getDeclCheckedImpl();
 
   Expected<Decl *> deserializeTypeAlias(ArrayRef<uint64_t> scratch,
@@ -3767,10 +3766,23 @@ public:
 Expected<Decl *>
 ModuleFile::getDeclChecked(DeclID DID) {
   // Tag every deserialized ValueDecl coming out of getDeclChecked with its ID.
-  Expected<Decl *> deserialized =
-      DeclDeserializer::getDeclCheckedImpl(*this, DID);
-  if (deserialized && deserialized.get()) {
-    if (auto *IDC = dyn_cast<IterableDeclContext>(deserialized.get())) {
+  if (DID == 0)
+    return nullptr;
+
+  assert(DID <= Decls.size() && "invalid decl ID");
+  auto &declOrOffset = Decls[DID-1];
+
+  if (declOrOffset.isComplete())
+    return declOrOffset;
+
+  ++NumDeclsLoaded;
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(declOrOffset);
+
+  SWIFT_DEFER {
+    if (!declOrOffset.isComplete())
+      return;
+    if (auto *IDC = dyn_cast_or_null<IterableDeclContext>(declOrOffset.get())) {
       // Only set the DeclID on the returned Decl if it's one that was loaded
       // and _wasn't_ one that had its DeclID set elsewhere (a followed XREF).
       if (IDC->wasDeserialized() &&
@@ -3778,8 +3790,10 @@ ModuleFile::getDeclChecked(DeclID DID) {
         IDC->setDeclID(DID);
       }
     }
-  }
-  return deserialized;
+  };
+
+  ModuleFile::DeserializingEntityRAII deserializingEntity(*this);
+  return DeclDeserializer(*this, declOrOffset).getDeclCheckedImpl();
 }
 
 llvm::Error DeclDeserializer::deserializeDeclAttributes() {
@@ -4052,25 +4066,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
     restoreOffset.cancel();
     scratch.clear();
   }
-}
-
-Expected<Decl *>
-DeclDeserializer::getDeclCheckedImpl(ModuleFile &MF, DeclID DID) {
-  if (DID == 0)
-    return nullptr;
-
-  assert(DID <= MF.Decls.size() && "invalid decl ID");
-  auto &declOrOffset = MF.Decls[DID-1];
-
-  if (declOrOffset.isComplete())
-    return declOrOffset;
-
-  ++NumDeclsLoaded;
-  BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
-  MF.DeclTypeCursor.JumpToBit(declOrOffset);
-
-  ModuleFile::DeserializingEntityRAII deserializingEntity(MF);
-  return DeclDeserializer(MF, declOrOffset).getDeclCheckedImpl();
 }
 
 Expected<Decl *>
