@@ -3136,13 +3136,15 @@ for host in "${ALL_HOSTS[@]}"; do
                 # from this file as possible and just have a single call to lldb-dotest.
                 if [[ "$using_xcodebuild" == "FALSE" ]] ; then
                     with_pushd ${lldb_build_dir} \
-                     call ${NINJA_BIN} unittests/LLDBUnitTests
+                        call ${NINJA_BIN} unittests/LLDBUnitTests
+                    with_pushd ${lldb_build_dir} \
+                        call ${NINJA_BIN} lldb-test-deps
                     with_pushd ${results_dir} \
-                          call "${llvm_build_dir}/bin/llvm-lit" \
-                               "${lldb_build_dir}/lit" \
-                               ${LLVM_LIT_ARGS} \
-                               --xunit-xml-output=${results_dir}/results.xml \
-                               --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -t -E \"${DOTEST_EXTRA}\""
+                        call "${llvm_build_dir}/bin/llvm-lit" \
+                             "${lldb_build_dir}/lit" \
+                             ${LLVM_LIT_ARGS} \
+                             --xunit-xml-output=${results_dir}/results.xml \
+                             --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -t -E \"${DOTEST_EXTRA}\""
                     if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                         echo "Running LLDB swift compatibility tests against" \
                              "${LLDB_TEST_SWIFT_COMPATIBILITY}"
