@@ -2673,7 +2673,7 @@ public:
           secondType = origSecondType;
         // If the second type is a dependent member type, try to resolve it
         // using the first type as the base type.
-        // TODO: Add more checks verifying that first type can be the base type?
+        // TODO: Add checks verifying that first type can be the base type.
         if (auto depMemType = secondType->getAs<DependentMemberType>()) {
           if (!firstType->hasTypeParameter()) {
             if (auto substType = depMemType->substBaseType(
@@ -2868,6 +2868,9 @@ public:
       pullback = getBuilder().createPartialApply(
           ai->getLoc(), thunkRef, thunk->getForwardingSubstitutionMap(),
           {pullback}, actualPullbackType->getCalleeConvention());
+      LLVM_DEBUG(getADDebugStream() << "Reabstract pullback from type "
+                 << actualPullbackType << " to type " << loweredPullbackType
+                 << '\n');
     }
     primalValues.push_back(pullback);
 
@@ -3883,6 +3886,9 @@ public:
       pullback = builder.createPartialApply(
           ai->getLoc(), thunkRef, thunk->getForwardingSubstitutionMap(),
           {pullback}, pullbackType->getCalleeConvention());
+      LLVM_DEBUG(getADDebugStream() << "Reabstract pullback from type "
+                 << pullbackType << " to type "
+                 << *applyInfo.originalPullbackType << '\n');
     }
     args.push_back(seed);
 
@@ -4492,11 +4498,11 @@ ValueWithCleanup AdjointEmitter::materializeAdjoint(AdjointValue &&val,
                                                     SILLocation loc) {
   if (val.isConcrete()) {
     LLVM_DEBUG(getADDebugStream()
-        << "Materialzing adjoint: Value is concrete.\n");
+        << "Materializing adjoint: Value is concrete.\n");
     return val.getConcreteValue();
   }
-  LLVM_DEBUG(getADDebugStream() <<
-      "Materialzing adjoint: Value is non-concrete. Materializing directly.\n");
+  LLVM_DEBUG(getADDebugStream() << "Materializing adjoint: Value is "
+                                   "non-concrete. Materializing directly.\n");
   return materializeAdjointDirect(std::move(val), loc);
 }
 
