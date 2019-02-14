@@ -3645,7 +3645,7 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
                              Var->Name, Var->ArgNo, false);
   if (!IGM.DebugInfo)
     return;
-  DebugTypeInfo DTI(nullptr, nullptr, ErrorInfo.getType(),
+  DebugTypeInfo DTI(ErrorInfo.getType(),
                     ErrorResultSlot->getType(), IGM.getPointerSize(),
                     IGM.getPointerAlignment(), true);
   IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI, getDebugScope(),
@@ -3677,14 +3677,11 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   auto RealTy = SILVal->getType().getASTType();
   if (VarDecl *Decl = i->getDecl()) {
     DbgTy = DebugTypeInfo::getLocalVariable(
-        CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-        RealTy, getTypeInfo(SILVal->getType()));
+        Decl, RealTy, getTypeInfo(SILVal->getType()));
   } else if (i->getFunction()->isBare() &&
              !SILTy.hasArchetype() && !Name.empty()) {
     // Preliminary support for .sil debug information.
-    DbgTy = DebugTypeInfo::getFromTypeInfo(CurSILFn->getDeclContext(),
-                                           CurSILFn->getGenericEnvironment(),
-                                           RealTy, getTypeInfo(SILTy));
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy));
   } else
     return;
 
@@ -3722,8 +3719,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto RealType = SILTy.getASTType();
 
   auto DbgTy = DebugTypeInfo::getLocalVariable(
-      CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-      RealType, getTypeInfo(SILVal->getType()));
+      Decl, RealType, getTypeInfo(SILVal->getType()));
   bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
     return;
@@ -3998,9 +3994,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 
   SILType SILTy = i->getType();
   auto RealType = SILTy.getASTType();
-  auto DbgTy = DebugTypeInfo::getLocalVariable(
-      CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-      RealType, type);
+  auto DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type);
 
   bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo)
@@ -4198,9 +4192,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
          "box for a local variable should only have one field");
   auto SILTy = i->getBoxType()->getFieldType(IGM.getSILModule(), 0);
   auto RealType = SILTy.getASTType();
-  auto DbgTy = DebugTypeInfo::getLocalVariable(
-      CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-      RealType, type);
+  auto DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type);
 
   auto Storage = emitShadowCopyIfNeeded(
       boxWithAddr.getAddress(), i->getDebugScope(), Name, 0, IsAnonymous);
