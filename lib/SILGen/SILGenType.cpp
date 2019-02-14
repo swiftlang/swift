@@ -159,7 +159,7 @@ bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   if (method->getAttrs().hasAttribute<NSManagedAttr>())
     return false;
 
-  return method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>();
+  return method->isObjC();
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
