@@ -368,8 +368,8 @@ private class TraceContext {
     let tracedOp = TF_FinishOperation(tracedOpDesc, status)
     checkOk(status)
 
-    // Set up outputs
-    var outputIndex:Int32 = 0
+    // Set up outputs.
+    var outputIndex: Int32 = 0
     var outputs: [TF_Output] = []
     // Get the symbolic outputs from the output.
     for output in tracedOutputs
