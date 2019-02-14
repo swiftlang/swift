@@ -29,8 +29,6 @@
 #include <vector>
 #include <unordered_map>
 
-class NodePointer;
-
 namespace swift {
 namespace reflection {
 
@@ -211,12 +209,12 @@ public:
   }
 
   Optional<std::string>
-  createTypeDecl(const Demangle::NodePointer &node, bool &typeAlias) {
+  createTypeDecl(Node *node, bool &typeAlias) {
     return Demangle::mangleNode(node);
   }
 
   BuiltProtocolDecl
-  createProtocolDecl(const Demangle::NodePointer &node) {
+  createProtocolDecl(Node *node) {
     return std::make_pair(Demangle::mangleNode(node), false);
   }
 
@@ -460,7 +458,7 @@ public:
     Dem.setSymbolicReferenceResolver(
     [this, &reader](SymbolicReferenceKind kind,
                     Directness directness,
-                    int32_t offset, const void *base) -> Demangle::NodePointer {
+                    int32_t offset, const void *base) -> Demangle::Node * {
       // Resolve the reference to a remote address.
       auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
       if (remoteAddress == 0)
