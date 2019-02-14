@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-testing -verify %s | %FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Normal types
@@ -155,4 +155,12 @@ extension DiffComputedProp : Differentiable {
 }
 
 // CHECK-LABEL: DiffComputedProp.computedProp.getter
-// CHECK-NEXT: sil {{.*}} [differentiable source 0 wrt 0 jvp @computedPropJVP vjp @computedPropVJP]
+// CHECK-NEXT: [differentiable source 0 wrt 0 jvp @computedPropJVP vjp @computedPropVJP]
+
+public struct MyLayer: Differentiable {
+  @differentiable
+  var x: Float = 10
+}
+
+// CHECK-LABEL: initialization expression of MyLayer.x
+// CHECK-NEXT: sil [transparent] @$s26differentiable_attr_silgen7MyLayerV1xSfvpfi : $@convention(thin) () -> Float
