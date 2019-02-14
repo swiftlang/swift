@@ -6,6 +6,7 @@ import CoreFoundation
 import Foundation
 import Newtype
 
+// REQUIRES: rdar48056043
 // REQUIRES: objc_interop
 
 // Conformance descriptor for synthesized ClosedEnums : _ObjectiveCBridgeable.
