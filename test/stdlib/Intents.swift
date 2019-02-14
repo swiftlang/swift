@@ -17,7 +17,8 @@ let swiftVersion = "4.2"
 let swiftVersion = "4"
 #endif
 
-if #available(OSX 10.12, iOS 10.0, watchOS 3.2, *) {
+#if !os(macOS)
+if #available(iOS 10.0, watchOS 3.2, *) {
 
   IntentsTestSuite.test("ErrorDomain/\(swiftVersion)") {
     expectEqual("IntentsErrorDomain", INIntentErrorDomain)
@@ -27,6 +28,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.2, *) {
     expectEqual("IntentsErrorDomain", INIntentError.errorDomain)
   }
 }
+#endif
 
 #if os(iOS)
 if #available(iOS 11.0, *) {
