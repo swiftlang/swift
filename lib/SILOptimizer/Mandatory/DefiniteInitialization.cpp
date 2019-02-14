@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "definite-init"
 #include "DIMemoryUseCollector.h"
-#include "MandatoryOptUtils.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -1884,20 +1883,16 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     Use.Inst = nullptr;
     NonLoadUses.erase(Inst);
 
-    PartialInitializationKind PartialInitKind;
-
     if (TheMemory.isClassInitSelf() &&
         Use.Kind == DIUseKind::SelfInit) {
       assert(InitKind == IsInitialization);
-      PartialInitKind = PartialInitializationKind::IsReinitialization;
+      AI->setOwnershipQualifier(AssignOwnershipQualifier::Reinit);
     } else {
-      PartialInitKind = (InitKind == IsInitialization
-                         ? PartialInitializationKind::IsInitialization
-                         : PartialInitializationKind::IsNotInitialization);
+      AI->setOwnershipQualifier((InitKind == IsInitialization
+                                ? AssignOwnershipQualifier::Init
+                                : AssignOwnershipQualifier::Reassign));
     }
 
-    SILBuilderWithScope B(Inst);
-    lowerAssignInstruction(B, AI, PartialInitKind);
     return;
   }
 

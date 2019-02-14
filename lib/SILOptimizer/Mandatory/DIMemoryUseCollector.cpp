@@ -1029,7 +1029,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         getScalarizedElements(AI->getOperand(0), ElementTmps, AI->getLoc(), B);
 
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createAssign(AI->getLoc(), ElementTmps[i], ElementAddrs[i]);
+          B.createAssign(AI->getLoc(), ElementTmps[i], ElementAddrs[i],
+                         AssignOwnershipQualifier::Unknown);
         AI->eraseFromParent();
         continue;
       }
