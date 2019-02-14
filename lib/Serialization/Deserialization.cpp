@@ -3165,14 +3165,15 @@ public:
     return proto;
   }
 
-  Expected<Decl *> deserializePrefixOperator(ArrayRef<uint64_t> scratch,
-                                             StringRef blobData) {
+  template <typename OperatorLayout, typename OperatorDecl>
+  Expected<Decl *> deserializeUnaryOperator(ArrayRef<uint64_t> scratch,
+                                            StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
     ArrayRef<uint64_t> designatedNominalTypeDeclIDs;
 
-    decls_block::PrefixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                  designatedNominalTypeDeclIDs);
+    OperatorLayout::readRecord(scratch, nameID, contextID,
+                               designatedNominalTypeDeclIDs);
     auto DC = MF.getDeclContext(contextID);
 
     SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
@@ -3183,7 +3184,7 @@ public:
       designatedNominalTypes.push_back(cast<NominalTypeDecl>(nominal.get()));
     }
 
-    auto result = MF.createDecl<PrefixOperatorDecl>(
+    auto result = MF.createDecl<OperatorDecl>(
         DC, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(),
         ctx.AllocateCopy(designatedNominalTypes));
 
@@ -3191,31 +3192,16 @@ public:
     return result;
   }
 
+  Expected<Decl *> deserializePrefixOperator(ArrayRef<uint64_t> scratch,
+                                             StringRef blobData) {
+    return deserializeUnaryOperator<decls_block::PrefixOperatorLayout,
+                                    PrefixOperatorDecl>(scratch, blobData);
+  }
+
   Expected<Decl *> deserializePostfixOperator(ArrayRef<uint64_t> scratch,
                                               StringRef blobData) {
-    IdentifierID nameID;
-    DeclContextID contextID;
-    ArrayRef<uint64_t> designatedNominalTypeDeclIDs;
-
-    decls_block::PostfixOperatorLayout::readRecord(
-        scratch, nameID, contextID, designatedNominalTypeDeclIDs);
-
-    auto DC = MF.getDeclContext(contextID);
-
-    SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
-    for (auto id : designatedNominalTypeDeclIDs) {
-      Expected<Decl *> nominal = MF.getDeclChecked(id);
-      if (!nominal)
-        return nominal.takeError();
-      designatedNominalTypes.push_back(cast<NominalTypeDecl>(nominal.get()));
-    }
-
-    auto result = MF.createDecl<PostfixOperatorDecl>(
-        DC, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(),
-        ctx.AllocateCopy(designatedNominalTypes));
-
-    declOrOffset = result;
-    return result;
+    return deserializeUnaryOperator<decls_block::PostfixOperatorLayout,
+                                    PostfixOperatorDecl>(scratch, blobData);
   }
 
   Expected<Decl *> deserializeInfixOperator(ArrayRef<uint64_t> scratch,
