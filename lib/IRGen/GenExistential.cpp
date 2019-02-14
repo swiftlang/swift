@@ -903,7 +903,10 @@ public:
     // Use copy-on-write existentials?
     auto fn = getDestroyBoxedOpaqueExistentialBufferFunction(
         IGF.IGM, getLayout(), addr.getAddress()->getType());
-    auto call = IGF.Builder.CreateCall(fn, {addr.getAddress()});
+    auto call = IGF.Builder.CreateCall(
+        fn, {IGF.Builder.CreateBitCast(
+                addr.getAddress(),
+                cast<llvm::Function>(fn)->arg_begin()->getType())});
     call->setCallingConv(IGF.IGM.DefaultCC);
     call->setDoesNotThrow();
     return;
@@ -2045,8 +2048,11 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
   /// Call a function to handle the non-fixed case.
   auto *allocateFun = getAllocateBoxedOpaqueExistentialBufferFunction(
       IGF.IGM, existLayout, existentialContainer.getAddress()->getType());
-  auto *call =
-      IGF.Builder.CreateCall(allocateFun, {existentialContainer.getAddress()});
+  auto *call = IGF.Builder.CreateCall(
+      allocateFun,
+      {IGF.Builder.CreateBitCast(
+          existentialContainer.getAddress(),
+          cast<llvm::Function>(allocateFun)->arg_begin()->getType())});
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   auto addressOfValue = IGF.Builder.CreateBitCast(call, valuePointerType);
