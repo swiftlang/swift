@@ -1761,8 +1761,17 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
             cs, baseType, init, locator));
         return;
       }
+    } else if (baseType->is<AnyMetatypeType>() &&
+               baseType->getMetatypeInstanceType()
+                   ->getWithoutParens()
+                   ->isAnyExistentialType()) {
+      (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
+          cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
+          baseExpr->getSourceRange(), locator));
+      return;
     }
-  // Initializer reference which requires contextual base type e.g. `.init(...)`.
+    // Initializer reference which requires contextual base type e.g.
+    // `.init(...)`.
   } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
     // We need to find type variable which represents contextual base.
     auto *baseLocator = cs.getConstraintLocator(

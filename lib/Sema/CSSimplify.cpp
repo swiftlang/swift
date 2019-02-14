@@ -3769,33 +3769,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         }
 
         auto meetsProtocolBaseMetatypeCriteria =
-            baseTy->is<MetatypeType>() &&
-            baseTy->getMetatypeInstanceType()->isAnyExistentialType();
+            baseTy->is<AnyMetatypeType>() && baseTy->getMetatypeInstanceType()
+                                                 ->getWithoutParens()
+                                                 ->isAnyExistentialType();
 
         auto requiresProtocolMetatypeFix =
             llvm::any_of(choices, [&](const OverloadChoice &c) {
               return c.isDecl() && isa<ConstructorDecl>(c.getDecl());
             });
 
-        ConstraintFix *fix;
-
-        if (meetsProtocolBaseMetatypeCriteria && requiresProtocolMetatypeFix &&
-            !choices.empty()) {
-          auto choice = choices.front();
-          bool isStaticallyDerived =
-              !(baseTy->getMetatypeInstanceType()->is<DynamicSelfType>() ||
-                baseTy->getMetatypeInstanceType()->is<ArchetypeType>());
-          fix = AllowInvalidInitRef::onProtocolMetatype(
-              *this, baseTy, dyn_cast<ConstructorDecl>(choice.getDecl()),
-              isStaticallyDerived, choice.getDecl()->getSourceRange(), locator);
-        } else {
-          fix =
+        if (!meetsProtocolBaseMetatypeCriteria ||
+            !requiresProtocolMetatypeFix) {
+          auto fix =
               AllowTypeOrInstanceMember::create(*this, baseTy, member, locator);
+          if (recordFix(fix))
+            // The fix wasn't successful, so return an error
+            return SolutionKind::Error;
         }
-
-        if (recordFix(fix))
-          // The fix wasn't successful, so return an error
-          return SolutionKind::Error;
 
         addOverloadSet(memberTy, choices, useDC, locator);
         return SolutionKind::Solved;
