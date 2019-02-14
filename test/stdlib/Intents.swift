@@ -11,7 +11,11 @@ import StdlibUnittest
 
 let IntentsTestSuite = TestSuite("Intents")
 
+#if swift(>=4.2)
+let swiftVersion = "4.2"
+#else
 let swiftVersion = "4"
+#endif
 
 if #available(OSX 10.12, iOS 10.0, watchOS 3.2, *) {
 
