@@ -186,6 +186,7 @@ struct TF_25: Differentiable {
     self.bar = bar
   }
 }
+// Test user-defined memberwise initializer.
 // TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
 struct TF_25_Generic<T : Differentiable>: Differentiable
   where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic
@@ -194,6 +195,14 @@ struct TF_25_Generic<T : Differentiable>: Differentiable
   public init(bar: T) {
     self.bar = bar
   }
+}
+
+// Test initializer that is not a memberwise initializer because of stored property name vs parameter label mismatch.
+struct HasCustomNonMemberwiseInitializer<T : Differentiable>: Differentiable
+  where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic
+{
+  var value: T
+  init(randomLabel value: T) { self.value = value }
 }
 
 // Test type with generic environment.

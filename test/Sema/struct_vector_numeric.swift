@@ -87,3 +87,9 @@ struct InvalidMixedScalar: VectorNumeric { // expected-error {{type 'InvalidMixe
   var float: Float
   var double: Double
 }
+
+// Test initializer that is not a memberwise initializer because of stored property name vs parameter label mismatch.
+struct HasCustomNonMemberwiseInitializer<T : VectorNumeric>: VectorNumeric {
+  var value: T
+  init(randomLabel value: T) { self.value = value }
+}

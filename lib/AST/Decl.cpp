@@ -3095,13 +3095,15 @@ ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
     // Return false if parameter count/stored property count do not match.
     if (numStoredProperties != ctorType->getNumParams())
       return false;
-    // Return true if stored property types match parameter types.
+    // Return true if stored property types/names match parameter types/labels.
     return llvm::all_of(
         llvm::zip(getStoredProperties(), ctorType->getParams()),
         [&](std::tuple<VarDecl *, AnyFunctionType::Param> pair) {
           auto *storedProp = std::get<0>(pair);
           auto param = std::get<1>(pair);
-          return storedProp->getInterfaceType()->isEqual(param.getPlainType());
+          return storedProp->getInterfaceType()->isEqual(
+                     param.getPlainType()) &&
+                 storedProp->getName() == param.getLabel();
         });
   };
 
