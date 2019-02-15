@@ -8,8 +8,8 @@ enum NonTrivialDefaults<T: DefaultInitializable> {
   case empty
 
   // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi_SdSSxtcAEmAA20DefaultInitializableRzlFfA_{{.*}}
-  // CHECK:   [[META:%[0-9]+]] = metatype $@thin Int.Type
   // CHECK:   [[INT_VAL:%[0-9]+]]  = integer_literal $Builtin.IntLiteral, 17
+  // CHECK:   [[META:%[0-9]+]] = metatype $@thin Int.Type
   // CHECK:   [[LIT_FN:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
   // CHECK:   [[LIT_VAL:%[0-9]+]] = apply [[LIT_FN]]([[INT_VAL]], [[META]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
   // CHECK:   return [[LIT_VAL]] : $Int
@@ -50,7 +50,7 @@ enum NonTrivialDefaults<T: DefaultInitializable> {
   // CHECK: } // end sil function '$s17default_arguments15testDefaultArg2AA18NonTrivialDefaultsOyxGyAA0D13InitializableRzlFSSycfu_'
 
   // CHECK-LABEL: sil private [transparent] [ossa] @$s17default_arguments15testDefaultArg2AA18NonTrivialDefaultsOyxGyAA0D13InitializableRzlFSiycfu0_{{.*}}
-  // CHECK:   %1 = integer_literal $Builtin.IntLiteral, [[@LINE+12]]
+  // CHECK:   %0 = integer_literal $Builtin.IntLiteral, [[@LINE+12]]
   // CHECK: } // end sil function '$s17default_arguments15testDefaultArg2AA18NonTrivialDefaultsOyxGyAA0D13InitializableRzlFSiycfu0_'
 
   case defarg2(x: @autoclosure () -> String = #file, t: @autoclosure () -> Int = #line)

@@ -755,6 +755,8 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
         UserSrcTy = CE->getArg()->getType();
         UserDstTy = CE->getType();
       }
+    } else if (auto *ILE = Loc.getAsASTNode<IntegerLiteralExpr>()) {
+      UserDstTy = ILE->getType();
     }
 
     // Assume that we're converting from a literal if the source type is
@@ -1057,6 +1059,9 @@ bool isHexLiteralInSource(FloatLiteralInst *flitInst) {
 bool maybeExplicitFPCons(BuiltinInst *BI, const BuiltinInfo &Builtin) {
   assert(Builtin.ID == BuiltinValueKind::FPTrunc ||
          Builtin.ID == BuiltinValueKind::IntToFPWithOverflow);
+  if (auto *literal = BI->getLoc().getAsASTNode<NumberLiteralExpr>()) {
+    return literal->isExplicitConversion();
+  }
 
   auto *callExpr = BI->getLoc().getAsASTNode<CallExpr>();
   if (!callExpr || !dyn_cast<ConstructorRefCallExpr>(callExpr->getFn()))
@@ -1218,7 +1223,9 @@ case BuiltinValueKind::id:
         SrcVal, /*IsSigned=*/true, APFloat::rmNearestTiesToEven);
 
     SILLocation Loc = BI->getLoc();
-    const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
+    const Expr *CE = Loc.getAsASTNode<ApplyExpr>();
+    if (!CE)
+      CE = Loc.getAsASTNode<LiteralExpr>();
 
     bool overflow = ConversionStatus & APFloat::opOverflow;
     bool inexact = ConversionStatus & APFloat::opInexact;

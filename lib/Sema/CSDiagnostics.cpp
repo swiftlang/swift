@@ -937,6 +937,12 @@ bool AssignmentFailure::diagnoseAsError() {
     return true;
   }
 
+  if (auto LE = dyn_cast<LiteralExpr>(immInfo.first)) {
+    emitDiagnostic(Loc, DeclDiagnostic, "literals are not mutable")
+        .highlight(LE->getSourceRange());
+    return true;
+  }
+
   // If the expression is the result of a call, it is an rvalue, not a mutable
   // lvalue.
   if (auto *AE = dyn_cast<ApplyExpr>(immInfo.first)) {
