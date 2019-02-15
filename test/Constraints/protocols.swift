@@ -178,9 +178,9 @@ func existential(_ p: P) {
 }
 
 func staticExistential(_ p: P.Type, pp: P.Protocol) {
-  let _ = p() // expected-error{{value of type 'P.Type' is a protocol; it cannot be instantiated}}
-  let _ = p().bar // expected-error{{value of type 'P.Type' is a protocol; it cannot be instantiated}}
-  let _ = p().bar(1) // expected-error{{value of type 'P.Type' is a protocol; it cannot be instantiated}}
+  let _ = p() // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  let _ = p().bar // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  let _ = p().bar(1) // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
 
   let ppp: P = p.init()
 
@@ -188,9 +188,9 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   _ = pp().bar // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
   _ = pp().bar(2) // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
 
-  _ = pp.init() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
-  _ = pp.init().bar // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
-  _ = pp.init().bar(3) // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+  _ = pp.init() // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = pp.init().bar // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = pp.init().bar(3) // expected-error{{protocol type 'P' cannot be instantiated}}
 
   _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
   _ = P().bar // expected-error{{protocol type 'P' cannot be instantiated}}

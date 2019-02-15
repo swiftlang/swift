@@ -1748,14 +1748,26 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
     baseExpr = UDE->getBase();
     baseType = getType(baseExpr);
-  // Initializer call e.g. `T(...)`
+
+    if (baseType->is<MetatypeType>()) {
+      auto instanceType = baseType->getAs<MetatypeType>()
+                              ->getInstanceType()
+                              ->getWithoutParens();
+      if (!cs.isTypeReference(baseExpr) && instanceType->isExistentialType()) {
+        (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
+            cs, baseType, init, true, baseExpr->getSourceRange(), locator));
+        return;
+      }
+    }
+
+    // Initializer call e.g. `T(...)`
   } else if (auto *CE = dyn_cast<CallExpr>(anchor)) {
     baseExpr = CE->getFn();
     baseType = getType(baseExpr);
     // If this is an initializer call without explicit mention
     // of `.init` on metatype value.
-    if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
-      auto instanceType = AMT->getInstanceType()->getWithoutParens();
+    if (auto *MTT = baseType->getAs<MetatypeType>()) {
+      auto instanceType = MTT->getInstanceType()->getWithoutParens();
       if (!cs.isTypeReference(baseExpr) && !instanceType->isExistentialType()) {
         (void)cs.recordFix(AllowInvalidInitRef::onNonConstMetatype(
             cs, baseType, init, locator));
@@ -1766,6 +1778,14 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
         (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
             cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
             baseExpr->getSourceRange(), locator));
+      }
+    } else if (auto *AMT = baseType->getAs<ExistentialMetatypeType>()) {
+      auto instanceType = AMT->getInstanceType()->getWithoutParens();
+      if (!cs.isTypeReference(baseExpr) &&
+          instanceType->isAnyExistentialType()) {
+        (void)cs.recordFix(AllowInvalidInitRef::onNonConstMetatype(
+            cs, baseType, init, locator));
+        return;
       }
     }
     // Initializer reference which requires contextual base type e.g.
