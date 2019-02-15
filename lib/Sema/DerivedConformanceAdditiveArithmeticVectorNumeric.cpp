@@ -182,7 +182,8 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
   auto &C = nominal->getASTContext();
 
   // Create memberwise initializer: `Nominal.init(...)`.
-  auto *memberwiseInitDecl = nominal->getMemberwiseInitializer();
+  auto *memberwiseInitDecl = nominal->getEffectiveMemberwiseInitializer();
+  assert(memberwiseInitDecl && "Memberwise initializer must exist");
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
@@ -359,7 +360,8 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
-  auto *memberwiseInitDecl = nominal->getMemberwiseInitializer();
+  auto *memberwiseInitDecl = nominal->getEffectiveMemberwiseInitializer();
+  assert(memberwiseInitDecl && "Memberwise initializer must exist");
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
@@ -417,10 +419,10 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   // The implicit memberwise constructor must be explicitly created so that it
   // can called when synthesizing the `zero` property getter. Normally, the
   // memberwise constructor is synthesized during SILGen, which is too late.
-  if (!nominal->getMemberwiseInitializer()) {
+  if (!nominal->getEffectiveMemberwiseInitializer()) {
     auto *initDecl = createImplicitConstructor(
         TC, nominal, ImplicitConstructorKind::Memberwise);
-    nominal->addMember(initDecl);
+    derived.addMembersToConformanceContext(initDecl);
     C.addSynthesizedDecl(initDecl);
   }
 

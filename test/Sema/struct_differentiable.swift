@@ -1,5 +1,5 @@
 // SWIFT_ENABLE_TENSORFLOW
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 // Verify that a `Differentiable` type upholds `AllDifferentiableVariables == CotangentVector`.
 func assertAllDifferentiableVariablesEqualsCotangentVector<T>(_: T.Type)
@@ -179,6 +179,32 @@ func testKeyPathIterable(x: TestKeyPathIterable) {
   _ = x.allDifferentiableVariables.allKeyPaths
 }
 
+// Test type with user-defined memberwise initializer.
+struct TF_25: Differentiable {
+  public let bar: Float
+  public init(bar: Float) {
+    self.bar = bar
+  }
+}
+// Test user-defined memberwise initializer.
+// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
+struct TF_25_Generic<T : Differentiable>: Differentiable
+  where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic
+{
+  public let bar: T
+  public init(bar: T) {
+    self.bar = bar
+  }
+}
+
+// Test initializer that is not a memberwise initializer because of stored property name vs parameter label mismatch.
+struct HasCustomNonMemberwiseInitializer<T : Differentiable>: Differentiable
+  where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic
+{
+  var value: T
+  init(randomLabel value: T) { self.value = value }
+}
+
 // Test type with generic environment.
 struct HasGenericEnvironment<Scalar : FloatingPoint & Differentiable> : Differentiable {
   var x: Float
@@ -247,6 +273,10 @@ extension GenericConstrained : Differentiable
         T.TangentVector : AdditiveArithmetic,
         T.CotangentVector : AdditiveArithmetic {}
 
+// TF-161: Test conditional conformance of `Array`.
+// expected-warning @+1 {{stored property '_buffer' has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
+extension Array : Differentiable where Element : Differentiable {}
+
 // Test errors.
 
 // Test manually customizing vector space types.
@@ -279,10 +309,10 @@ struct StaticMembersShouldNotAffectAnything : AdditiveArithmetic, Differentiable
 
 struct ImplicitNoDerivative : Differentiable {
   var a: Float
-  var b: Bool // expected-warning {{stored property has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
+  var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
 }
 
 struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
   var x: DifferentiableSubset
-  var b: Bool // expected-warning {{stored property has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
+  var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
 }

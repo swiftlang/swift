@@ -75,3 +75,9 @@ struct GenericExtended<T> {
   var x: T
 }
 extension GenericExtended : Equatable, AdditiveArithmetic where T : AdditiveArithmetic {}
+
+// Test initializer that is not a memberwise initializer because of stored property name vs parameter label mismatch.
+struct HasCustomNonMemberwiseInitializer<T : AdditiveArithmetic>: AdditiveArithmetic {
+  var value: T
+  init(randomLabel value: T) { self.value = value }
+}
