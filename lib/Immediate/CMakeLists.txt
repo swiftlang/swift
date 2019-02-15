@@ -8,5 +8,8 @@ add_swift_host_library(swiftImmediate STATIC
     swiftSILOptimizer
     swiftIRGen
   LLVM_COMPONENT_DEPENDS
-    linker mcjit)
+    executionengine
+    linker
+    mcjit
+    transformutils)
 
