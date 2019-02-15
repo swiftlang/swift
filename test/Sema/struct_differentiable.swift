@@ -185,8 +185,7 @@ struct HasGenericEnvironment<Scalar : FloatingPoint & Differentiable> : Differen
 }
 
 // Test type with generic members that conform to `Differentiable`.
-// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
-// due to `Differentiable` protocol generic signature minimization bug.
+// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
 // expected-error @+1 {{type 'GenericSynthesizeAllStructs<T>' does not conform to protocol 'Differentiable'}}
 struct GenericSynthesizeAllStructs<T> : Differentiable
   where T : Differentiable
@@ -197,8 +196,7 @@ struct GenericSynthesizeAllStructs<T> : Differentiable
 }
 
 // Test generic type with vector space types to `Self`.
-// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
-// due to `Differentiable` protocol generic signature minimization bug.
+// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
 // expected-error @+1 {{type 'GenericNotAdditiveArithmetic<T>' does not conform to protocol 'Differentiable'}}
 struct GenericNotAdditiveArithmetic<T> : Differentiable
   where T : Differentiable, T == T.TangentVector, T == T.CotangentVector
@@ -209,8 +207,7 @@ struct GenericNotAdditiveArithmetic<T> : Differentiable
 }
 
 // Test type in generic context.
-// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
-// due to `Differentiable` protocol generic signature minimization bug.
+// TODO(TF-213): Update after generic signature minimization bug fix.
 struct A<T : Differentiable> {
   struct B<U : Differentiable, V> : Differentiable {
     // expected-error @+1 {{type 'A<T>.B<U, V>.InGenericContext' does not conform to protocol 'Differentiable'}}
@@ -232,8 +229,7 @@ struct Extended {
 extension Extended : Differentiable {}
 
 // Test extension of generic type.
-// FIXME: Blocked by SR-9595: type checker cannot infer `T.TangentVector : AdditiveArithmetic`
-// due to `Differentiable` protocol generic signature minimization bug.
+// TODO(TF-213): Update after generic signature minimization bug fix.
 struct GenericExtended<T> {
   // expected-error @+1 {{synthesizing a conformance to 'Differentiable' requires an explicit 'T.TangentVector : AdditiveArithmetic' conformance constraint}}
   var x: T
@@ -241,7 +237,8 @@ struct GenericExtended<T> {
 // expected-error @+1 {{type 'GenericExtended<T>' does not conform to protocol 'Differentiable'}}
 extension GenericExtended : Differentiable where T : Differentiable {}
 
-// Test constrained extension of generic type (workaround for SR-9595).
+// Test constrained extension of generic type.
+// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
 struct GenericConstrained<T> {
   var x: T
 }

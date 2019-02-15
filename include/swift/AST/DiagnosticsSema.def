@@ -2442,6 +2442,7 @@ ERROR(broken_vector_numeric_requirement,none,
       "VectorNumeric protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
+// TODO(TF-213): Remove after generic signature minimization bug fix.
 ERROR(differentiable_need_explicit_addarith_conformance,none,
       "synthesizing a conformance to 'Differentiable' requires an explicit "
       "'%0' conformance constraint", (StringRef))
