@@ -3092,10 +3092,11 @@ ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
                       getStoredProperties().end());
     auto ctorType =
         ctorDecl->getMethodInterfaceType()->castTo<AnyFunctionType>();
-    // Return false if parameter count/stored property count do not match.
+    // Return false if stored property/initializer parameter count do not match.
     if (numStoredProperties != ctorType->getNumParams())
       return false;
-    // Return true if stored property types/names match parameter types/labels.
+    // Return true if all stored property types/names match initializer
+    // parameter types/labels.
     return llvm::all_of(
         llvm::zip(getStoredProperties(), ctorType->getParams()),
         [&](std::tuple<VarDecl *, AnyFunctionType::Param> pair) {
