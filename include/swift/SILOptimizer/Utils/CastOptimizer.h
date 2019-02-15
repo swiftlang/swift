@@ -62,24 +62,6 @@ class CastOptimizer {
   /// that a cast will fail.
   std::function<void()> WillFailAction;
 
-  /// Optimize a cast from a bridged ObjC type into
-  /// a corresponding Swift type implementing _ObjectiveCBridgeable.
-  SILInstruction *optimizeBridgedObjCToSwiftCast(
-      SILInstruction *Inst, bool isConditional, SILValue Src, SILValue Dest,
-      CanType Source, CanType Target, Type BridgedSourceTy,
-      Type BridgedTargetTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
-
-  /// Optimize a cast from a Swift type implementing _ObjectiveCBridgeable
-  /// into a bridged ObjC type.
-  SILInstruction *optimizeBridgedSwiftToObjCCast(
-      SILInstruction *Inst, CastConsumptionKind ConsumptionKind,
-      bool isConditional, SILValue Src, SILValue Dest, CanType Source,
-      CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
-      SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
-
-  void deleteInstructionsAfterUnreachable(SILInstruction *UnreachableInst,
-                                          SILInstruction *TrapInst);
-
 public:
   CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
                 SILBuilderContext *BuilderContext,
@@ -154,6 +136,43 @@ public:
 
   SILValue optimizeMetatypeConversion(ConversionInst *mci,
                                       MetatypeRepresentation representation);
+
+private:
+  /// Optimize a cast from a bridged ObjC type into a corresponding Swift type
+  /// implementing _ObjectiveCBridgeable. Handles the unconditional case itself
+  /// and the conditional case by delegating to
+  /// optimizeConditionalBridgedObjCToSwiftCast.
+  SILInstruction *optimizeBridgedObjCToSwiftCast(
+      SILInstruction *Inst, bool isConditional, SILValue Src, SILValue Dest,
+      CanType Source, CanType Target, Type BridgedSourceTy,
+      Type BridgedTargetTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
+
+  /// Helper function that optimizes bridged objc objects that are only
+  /// conditionally castable to swift. Called by optimizeBridgedObjCToSwiftCast.
+  SILInstruction *optimizeConditionalBridgedObjCToSwiftCast(
+      SILInstruction *Inst, SILValue Src, SILValue Dest, CanType Source,
+      CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
+      SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
+
+  /// Optimize a cast from a Swift type implementing _ObjectiveCBridgeable into
+  /// a bridged ObjC type. Handles the unconditional case itself and the
+  /// conditional case by delegating to
+  /// optimizeConditionalBridgedSwiftToObjCCast.
+  SILInstruction *optimizeBridgedSwiftToObjCCast(
+      SILInstruction *Inst, CastConsumptionKind ConsumptionKind,
+      bool isConditional, SILValue Src, SILValue Dest, CanType Source,
+      CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
+      SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
+
+  /// Helper function that optimizes bridged swift objects that are only
+  /// conditionally castable to objc. Called by optimizeBridgedSwiftToObjCCast.
+  SILInstruction *optimizeConditionalBridgedSwiftToObjCCast(
+      SILInstruction *Inst, CastConsumptionKind ConsumptionKind, SILValue Src,
+      SILValue Dest, CanType Source, CanType Target, Type BridgedSourceTy,
+      Type BridgedTargetTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
+
+  void deleteInstructionsAfterUnreachable(SILInstruction *UnreachableInst,
+                                          SILInstruction *TrapInst);
 };
 
 } // namespace swift
