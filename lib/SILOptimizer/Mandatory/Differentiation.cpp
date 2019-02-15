@@ -3309,7 +3309,7 @@ private:
   DenseMap<SILBasicBlock *, SILBasicBlock *> adjointBBMap;
 
   /// Local stack allocations.
-  SmallVector<AllocStackInst *, 8> localAllocations;
+  SmallVector<ValueWithCleanup, 8> localAllocations;
 
   /// The primal value aggregate passed to the adjoint function.
   SILArgument *primalValueAggregateInAdj = nullptr;
@@ -3530,7 +3530,8 @@ private:
       localAllocBuilder.setInsertionPoint(
           getAdjoint().getEntryBlock()->begin());
     else
-      localAllocBuilder.setInsertionPoint(localAllocations.back());
+      localAllocBuilder.setInsertionPoint(
+          localAllocations.back().getValue()->getDefiningInstruction());
     // Allocate local buffer and initialize to zero.
     auto *newBuf = localAllocBuilder.createAllocStack(originalBuffer.getLoc(),
         remapType(getCotangentType(originalBuffer->getType(), getModule())));
@@ -3541,8 +3542,19 @@ private:
     emitZeroIndirect(access->getType().getASTType(), access, access->getLoc());
     localAllocBuilder.createEndAccess(
         access->getLoc(), access, /*aborted*/ false);
-    localAllocations.push_back(newBuf);
-    return (insertion.first->getSecond() = ValueWithCleanup(newBuf, nullptr));
+    // Create cleanup for local buffer.
+    auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Cleaning up local buffer " << v << '\n');
+      if (v->getType().isLoadable(b.getModule()))
+        b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
+      else
+        b.createDestroyAddr(loc, v);
+    };
+    auto bufWithCleanup =
+        ValueWithCleanup(newBuf, makeCleanup(newBuf, cleanupFn));
+    localAllocations.push_back(bufWithCleanup);
+    return (insertion.first->getSecond() = bufWithCleanup);
   }
 
   void addToAdjointBuffer(SILValue originalBuffer,
@@ -3730,10 +3742,12 @@ public:
     }
 
     // Deallocate local allocations.
-    for (auto *alloc : localAllocations) {
+    for (auto alloc : localAllocations) {
       // Assert that local allocations have at least one use.
       // Buffers should not be allocated needlessly.
-      assert(!alloc->use_empty());
+      assert(!alloc.getValue()->use_empty());
+      if (auto *cleanup = alloc.getCleanup())
+        cleanup->applyRecursively(builder, adjLoc);
       builder.createDeallocStack(adjLoc, alloc);
     }
 
