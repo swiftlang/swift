@@ -1026,8 +1026,8 @@ static void VisitNodeDependentMember(ASTContext *ast,
     if (dep->getKind() == Demangle::Node::Kind::Type &&
         assoc->getKind() == Demangle::Node::Kind::DependentAssociatedTypeRef) {
       VisitNode(ast, dep, dependency);
-      if (dependency._types.size() == 1 && assoc->hasText()) {
-        Identifier name = ast->getIdentifier(assoc->getText());
+      if (dependency._types.size() == 1 && assoc->getFirstChild()->hasText()) {
+        Identifier name = ast->getIdentifier(assoc->getFirstChild()->getText());
         result._types.push_back(
             DependentMemberType::get(dependency._types[0], name));
         return;
@@ -1810,14 +1810,14 @@ static void VisitNodeRelatedEntityDeclName(
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
   DeclKind decl_kind = GetKindAsDeclKind(parent_node->getKind());
 
-  if (cur_node->getNumChildren() != 1 || !cur_node->hasText()) {
+  if (cur_node->getNumChildren() != 2 || !cur_node->getFirstChild()->hasText()) {
     if (result._error.empty())
       result._error = stringWithFormat(
           "unable to retrieve content for Node::Kind::RelatedEntityDeclName");
     return;
   }
 
-  Demangle::NodePointer id_node(cur_node->getChild(0));
+  Demangle::NodePointer id_node(cur_node->getChild(1));
 
   if (!id_node->hasText()) {
     if (result._error.empty())
@@ -1828,7 +1828,8 @@ static void VisitNodeRelatedEntityDeclName(
 
   SmallVector<ValueDecl *, 4> decls;
   if (result._module) {
-    result._module.lookupRelatedEntity(id_node->getText(), cur_node->getText(),
+    result._module.lookupRelatedEntity(id_node->getText(),
+                                       cur_node->getFirstChild()->getText(),
                                        decl_kind, decls);
   }
 
@@ -1836,7 +1837,7 @@ static void VisitNodeRelatedEntityDeclName(
     if (result._error.empty())
       result._error = stringWithFormat(
           "unable to find Node::Kind::RelatedEntityDeclName '%s' for '%s'",
-          cur_node->getText().str().c_str(),
+          cur_node->getFirstChild()->getText().str().c_str(),
           id_node->getText().str().c_str());
     return;
   }

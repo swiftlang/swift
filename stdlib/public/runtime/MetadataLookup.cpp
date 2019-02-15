@@ -521,10 +521,11 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         // Declarations synthesized by the Clang importer get a small tag
         // string in addition to their name.
         if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){          
-          if (!getIdentity().isRelatedEntity(nameNode->getText()))
+          if (!getIdentity().isRelatedEntity(
+                                        nameNode->getFirstChild()->getText()))
             return false;
           
-          nameNode = nameNode->getChild(0);
+          nameNode = nameNode->getChild(1);
         } else if (getIdentity().isAnyRelatedEntity()) {
           return false;
         }
