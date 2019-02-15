@@ -1158,16 +1158,19 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   if (IGM.IRGen.Opts.DisableLegacyTypeInfo)
     return;
 
-  auto platformName = getPlatformNameForTriple(IGM.Triple);
-  auto archName = getMajorArchitectureName(IGM.Triple);
-
-  if (!doesPlatformUseLegacyLayouts(platformName, archName))
-    return;
-
   llvm::SmallString<128> defaultPath;
 
   StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
   if (path.empty()) {
+    // If the flag was not explicitly specified, look for a file in a
+    // platform-specific location, if this platform is known to require
+    // one.
+    auto platformName = getPlatformNameForTriple(IGM.Triple);
+    auto archName = getMajorArchitectureName(IGM.Triple);
+
+    if (!doesPlatformUseLegacyLayouts(platformName, archName))
+      return;
+
     defaultPath.append(IGM.Context.SearchPathOpts.RuntimeLibraryPath);
     llvm::sys::path::append(defaultPath, "layouts-");
     defaultPath.append(archName);
