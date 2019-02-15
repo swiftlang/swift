@@ -69,18 +69,14 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedObjCToSwiftCast(
     SILInstruction *Inst, SILValue Src, SILValue Dest, CanType Source,
     CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
     SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
-  bool isConditional = true;
-
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
-  // The conformance to _BridgedToObjectiveC is statically known.
-  // Retrieve the bridging operation to be used if a static conformance
-  // to _BridgedToObjectiveC can be proven.
+  // The conformance to _BridgedToObjectiveC is statically known.  Retrieve the
+  // bridging operation to be used if a static conformance to
+  // _BridgedToObjectiveC can be proven.
   FuncDecl *BridgeFuncDecl =
-      isConditional
-          ? M.getASTContext().getConditionallyBridgeFromObjectiveCBridgeable()
-          : M.getASTContext().getForceBridgeFromObjectiveCBridgeable();
+      M.getASTContext().getConditionallyBridgeFromObjectiveCBridgeable();
 
   assert(BridgeFuncDecl && "_forceBridgeFromObjectiveC should exist");
 
@@ -111,15 +107,12 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedObjCToSwiftCast(
     }
   }
 
-  // If this is a conditional cast:
-  // We need a new fail BB in order to add a dealloc_stack to it
-  SILBasicBlock *ConvFailBB = nullptr;
-  if (isConditional) {
-    auto CurrInsPoint = Builder.getInsertionPoint();
-    ConvFailBB = splitBasicBlockAndBranch(Builder, &(*FailureBB->begin()),
-                                          nullptr, nullptr);
-    Builder.setInsertionPoint(CurrInsPoint);
-  }
+  // If this is a conditional cast, we need a new fail BB to place a
+  // dealloc_stack in case the conversion fails.
+  auto CurrInsPoint = Builder.getInsertionPoint();
+  auto *ConvFailBB = splitBasicBlockAndBranch(Builder, &(*FailureBB->begin()),
+                                              nullptr, nullptr);
+  Builder.setInsertionPoint(CurrInsPoint);
 
   if (SILBridgedTy != Src->getType()) {
     // Check if we can simplify a cast into:
@@ -143,17 +136,12 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedObjCToSwiftCast(
       // If type of the source and the expected ObjC type are
       // equal, there is no need to generate the conversion
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
-      if (isConditional) {
-        SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createPhiArgument(SILBridgedTy,
-                                         ValueOwnershipKind::Owned);
-        Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
-        Builder.setInsertionPoint(CastSuccessBB);
-        SrcOp = CastSuccessBB->getArgument(0);
-      } else {
-        SrcOp = Load;
-      }
-    } else if (isConditional) {
+      SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
+      CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
+      Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
+      Builder.setInsertionPoint(CastSuccessBB);
+      SrcOp = CastSuccessBB->getArgument(0);
+    } else {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
       CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
       auto *CCBI = Builder.createCheckedCastBranch(
@@ -162,11 +150,6 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedObjCToSwiftCast(
       splitEdge(CCBI, /* EdgeIdx to ConvFailBB */ 1);
       Builder.setInsertionPoint(CastSuccessBB);
       SrcOp = CastSuccessBB->getArgument(0);
-    } else {
-      auto cast =
-          Builder.createUnconditionalCheckedCast(Loc, Load, SILBridgedTy);
-      NewI = cast;
-      SrcOp = cast;
     }
   } else {
     SrcOp = Src;
@@ -199,21 +182,13 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedObjCToSwiftCast(
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, SubMap);
   SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
 
-  // Temporary to hold the intermediate result.
-  AllocStackInst *Tmp = nullptr;
-  CanType OptionalTy;
-  SILValue InOutOptionalParam;
-  if (isConditional) {
-    // Create a temporary
-    OptionalTy = OptionalType::get(Dest->getType().getASTType())
-                     ->getImplementationType()
-                     ->getCanonicalType();
-    Tmp = Builder.createAllocStack(Loc,
-                                   SILType::getPrimitiveObjectType(OptionalTy));
-    InOutOptionalParam = Tmp;
-  } else {
-    InOutOptionalParam = Dest;
-  }
+  // Create a temporary to hold the intermediate result.
+  CanType OptionalTy = OptionalType::get(Dest->getType().getASTType())
+                           ->getImplementationType()
+                           ->getCanonicalType();
+  auto *Tmp = Builder.createAllocStack(
+      Loc, SILType::getPrimitiveObjectType(OptionalTy));
+  SILValue InOutOptionalParam = Tmp;
 
   (void)ParamTypes;
   assert(ParamTypes[0].getConvention() ==
@@ -256,33 +231,34 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedObjCToSwiftCast(
     }
   }
 
-  // Results should be checked in case we process a conditional
-  // case. E.g. casts from NSArray into [SwiftType] may fail, i.e. return .None.
-  if (isConditional) {
-    // Copy the temporary into Dest.
-    // Load from the optional.
-    auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl();
+  // Check the Results since we may fail.
+  //
+  // As an example, consider a cast from NSArray to [SwiftType]. That cast can
+  // fail. In such a case, we need to return .None.  Results should be checked
+  // in case we process a conditional case. E.g. casts from NSArray into
+  // [SwiftType] may fail, i.e. return .None.
+  // Copy the temporary into Dest.
+  // Load from the optional.
+  auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl();
 
-    SILBasicBlock *ConvSuccessBB = Inst->getFunction()->createBasicBlock();
-    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
-    CaseBBs.push_back(
-        std::make_pair(M.getASTContext().getOptionalNoneDecl(), FailureBB));
-    Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, ConvSuccessBB,
-                                 CaseBBs);
+  SILBasicBlock *ConvSuccessBB = Inst->getFunction()->createBasicBlock();
+  SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
+  CaseBBs.push_back(
+      std::make_pair(M.getASTContext().getOptionalNoneDecl(), FailureBB));
+  Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, ConvSuccessBB, CaseBBs);
 
-    Builder.setInsertionPoint(FailureBB->begin());
-    Builder.createDeallocStack(Loc, Tmp);
+  Builder.setInsertionPoint(FailureBB->begin());
+  Builder.createDeallocStack(Loc, Tmp);
 
-    Builder.setInsertionPoint(ConvSuccessBB);
-    auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
-                                                        SomeDecl);
+  Builder.setInsertionPoint(ConvSuccessBB);
+  auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
+                                                      SomeDecl);
 
-    Builder.createCopyAddr(Loc, Addr, Dest, IsTake, IsInitialization);
+  Builder.createCopyAddr(Loc, Addr, Dest, IsTake, IsInitialization);
 
-    Builder.createDeallocStack(Loc, Tmp);
-    SmallVector<SILValue, 1> SuccessBBArgs;
-    Builder.createBranch(Loc, SuccessBB, SuccessBBArgs);
-  }
+  Builder.createDeallocStack(Loc, Tmp);
+  SmallVector<SILValue, 1> SuccessBBArgs;
+  Builder.createBranch(Loc, SuccessBB, SuccessBBArgs);
 
   EraseInstAction(Inst);
   return (NewI) ? NewI : AI;
@@ -305,13 +281,11 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
-  // The conformance to _BridgedToObjectiveC is statically known.
-  // Retrieve the bridging operation to be used if a static conformance
-  // to _BridgedToObjectiveC can be proven.
+  // The conformance to _BridgedToObjectiveC is statically known.  Retrieve the
+  // bridging operation to be used if a static conformance to
+  // _BridgedToObjectiveC can be proven.
   FuncDecl *BridgeFuncDecl =
-      isConditional
-          ? M.getASTContext().getConditionallyBridgeFromObjectiveCBridgeable()
-          : M.getASTContext().getForceBridgeFromObjectiveCBridgeable();
+      M.getASTContext().getForceBridgeFromObjectiveCBridgeable();
 
   assert(BridgeFuncDecl && "_forceBridgeFromObjectiveC should exist");
 
@@ -342,16 +316,6 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     }
   }
 
-  // If this is a conditional cast:
-  // We need a new fail BB in order to add a dealloc_stack to it
-  SILBasicBlock *ConvFailBB = nullptr;
-  if (isConditional) {
-    auto CurrInsPoint = Builder.getInsertionPoint();
-    ConvFailBB = splitBasicBlockAndBranch(Builder, &(*FailureBB->begin()),
-                                          nullptr, nullptr);
-    Builder.setInsertionPoint(CurrInsPoint);
-  }
-
   if (SILBridgedTy != Src->getType()) {
     // Check if we can simplify a cast into:
     // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
@@ -371,28 +335,10 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     // Try to convert the source into the expected ObjC type first.
 
     if (Load->getType() == SILBridgedTy) {
-      // If type of the source and the expected ObjC type are
-      // equal, there is no need to generate the conversion
-      // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
-      if (isConditional) {
-        SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createPhiArgument(SILBridgedTy,
-                                         ValueOwnershipKind::Owned);
-        Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
-        Builder.setInsertionPoint(CastSuccessBB);
-        SrcOp = CastSuccessBB->getArgument(0);
-      } else {
-        SrcOp = Load;
-      }
-    } else if (isConditional) {
-      SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-      CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
-      auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load,
-                                      SILBridgedTy, CastSuccessBB, ConvFailBB);
-      NewI = CCBI;
-      splitEdge(CCBI, /* EdgeIdx to ConvFailBB */ 1);
-      Builder.setInsertionPoint(CastSuccessBB);
-      SrcOp = CastSuccessBB->getArgument(0);
+      // If type of the source and the expected ObjC type are equal, there is no
+      // need to generate the conversion from ObjCTy to
+      // _ObjectiveCBridgeable._ObjectiveCType.
+      SrcOp = Load;
     } else {
       auto cast =
           Builder.createUnconditionalCheckedCast(Loc, Load, SILBridgedTy);
@@ -431,20 +377,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
 
   // Temporary to hold the intermediate result.
-  AllocStackInst *Tmp = nullptr;
-  CanType OptionalTy;
-  SILValue InOutOptionalParam;
-  if (isConditional) {
-    // Create a temporary
-    OptionalTy = OptionalType::get(Dest->getType().getASTType())
-                     ->getImplementationType()
-                     ->getCanonicalType();
-    Tmp = Builder.createAllocStack(Loc,
-                                   SILType::getPrimitiveObjectType(OptionalTy));
-    InOutOptionalParam = Tmp;
-  } else {
-    InOutOptionalParam = Dest;
-  }
+  SILValue InOutOptionalParam = Dest;
 
   (void)ParamTypes;
   assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed &&
@@ -484,34 +417,6 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     case CastConsumptionKind::CopyOnSuccess:
       break;
     }
-  }
-
-  // Results should be checked in case we process a conditional
-  // case. E.g. casts from NSArray into [SwiftType] may fail, i.e. return .None.
-  if (isConditional) {
-    // Copy the temporary into Dest.
-    // Load from the optional.
-    auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl();
-
-    SILBasicBlock *ConvSuccessBB = Inst->getFunction()->createBasicBlock();
-    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
-    CaseBBs.push_back(
-        std::make_pair(M.getASTContext().getOptionalNoneDecl(), FailureBB));
-    Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, ConvSuccessBB,
-                                 CaseBBs);
-
-    Builder.setInsertionPoint(FailureBB->begin());
-    Builder.createDeallocStack(Loc, Tmp);
-
-    Builder.setInsertionPoint(ConvSuccessBB);
-    auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
-                                                        SomeDecl);
-
-    Builder.createCopyAddr(Loc, Addr, Dest, IsTake, IsInitialization);
-
-    Builder.createDeallocStack(Loc, Tmp);
-    SmallVector<SILValue, 1> SuccessBBArgs;
-    Builder.createBranch(Loc, SuccessBB, SuccessBBArgs);
   }
 
   EraseInstAction(Inst);
@@ -558,7 +463,6 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedSwiftToObjCCast(
     SILInstruction *Inst, CastConsumptionKind ConsumptionKind, SILValue Src,
     SILValue Dest, CanType Source, CanType Target, Type BridgedSourceTy,
     Type BridgedTargetTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
-  bool isConditional = true;
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
@@ -791,21 +695,16 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedSwiftToObjCCast(
     } else if (DestTy.isExactSuperclassOf(ConvTy)) {
       CastedValue = Builder.createUpcast(Loc, NewAI, DestTy);
     } else if (ConvTy.isExactSuperclassOf(DestTy)) {
-      // The downcast from a base class to derived class may fail.
-      if (isConditional) {
-        // In case of a conditional cast, we should handle it gracefully.
-        auto CondBrSuccessBB =
-            NewAI->getFunction()->createBasicBlockAfter(NewAI->getParent());
-        CondBrSuccessBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned,
-                                           nullptr);
-        Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
-                                        CondBrSuccessBB, FailureBB);
-        Builder.setInsertionPoint(CondBrSuccessBB, CondBrSuccessBB->begin());
-        CastedValue = CondBrSuccessBB->getArgument(0);
-      } else {
-        CastedValue = SILValue(
-            Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
-      }
+      // The downcast from a base class to derived class may fail. In case of a
+      // conditional cast, we should handle it gracefully.
+      auto CondBrSuccessBB =
+          NewAI->getFunction()->createBasicBlockAfter(NewAI->getParent());
+      CondBrSuccessBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned,
+                                         nullptr);
+      Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
+                                      CondBrSuccessBB, FailureBB);
+      Builder.setInsertionPoint(CondBrSuccessBB, CondBrSuccessBB->begin());
+      CastedValue = CondBrSuccessBB->getArgument(0);
     } else if (ConvTy.getASTType() ==
                    getNSBridgedClassOfCFClass(M.getSwiftModule(),
                                               DestTy.getASTType()) ||
@@ -824,7 +723,7 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedSwiftToObjCCast(
     }
     NewI = Builder.createStore(Loc, CastedValue, Dest,
                                StoreOwnershipQualifier::Unqualified);
-    if (isConditional && NewI->getParent() != NewAI->getParent()) {
+    if (NewI->getParent() != NewAI->getParent()) {
       Builder.createBranch(Loc, SuccessBB);
     }
   }
@@ -1081,21 +980,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
     } else if (DestTy.isExactSuperclassOf(ConvTy)) {
       CastedValue = Builder.createUpcast(Loc, NewAI, DestTy);
     } else if (ConvTy.isExactSuperclassOf(DestTy)) {
-      // The downcast from a base class to derived class may fail.
-      if (isConditional) {
-        // In case of a conditional cast, we should handle it gracefully.
-        auto CondBrSuccessBB =
-            NewAI->getFunction()->createBasicBlockAfter(NewAI->getParent());
-        CondBrSuccessBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned,
-                                           nullptr);
-        Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
-                                        CondBrSuccessBB, FailureBB);
-        Builder.setInsertionPoint(CondBrSuccessBB, CondBrSuccessBB->begin());
-        CastedValue = CondBrSuccessBB->getArgument(0);
-      } else {
-        CastedValue = SILValue(
-            Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
-      }
+      CastedValue =
+          SILValue(Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
     } else if (ConvTy.getASTType() ==
                    getNSBridgedClassOfCFClass(M.getSwiftModule(),
                                               DestTy.getASTType()) ||
@@ -1114,9 +1000,6 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
     }
     NewI = Builder.createStore(Loc, CastedValue, Dest,
                                StoreOwnershipQualifier::Unqualified);
-    if (isConditional && NewI->getParent() != NewAI->getParent()) {
-      Builder.createBranch(Loc, SuccessBB);
-    }
   }
 
   if (Dest) {
