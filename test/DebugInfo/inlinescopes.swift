@@ -7,7 +7,7 @@
 
 // CHECK: define{{( dllexport)?}}{{( protected)?( signext)?}} i32 @main
 // CHECK: call {{.*}}noinline{{.*}}, !dbg ![[CALL:.*]]
-// CHECK-DAG: ![[TOPLEVEL:.*]] = !DIFile(filename: "inlinescopes.swift"
+// CHECK-DAG: ![[TOPLEVEL:.*]] = !DIFile(filename: "{{.*}}inlinescopes.swift"
 
 import FooBar
 
