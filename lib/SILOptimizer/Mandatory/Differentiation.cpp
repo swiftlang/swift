@@ -3551,8 +3551,7 @@ private:
       else
         b.createDestroyAddr(loc, v);
     };
-    auto bufWithCleanup =
-        ValueWithCleanup(newBuf, makeCleanup(newBuf, cleanupFn));
+    ValueWithCleanup bufWithCleanup(newBuf, makeCleanup(newBuf, cleanupFn));
     localAllocations.push_back(bufWithCleanup);
     return (insertion.first->getSecond() = bufWithCleanup);
   }
