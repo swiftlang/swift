@@ -1748,7 +1748,6 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
     baseExpr = UDE->getBase();
     baseType = getType(baseExpr);
-
     if (baseType->is<MetatypeType>()) {
       auto instanceType = baseType->getAs<MetatypeType>()
                               ->getInstanceType()
@@ -1759,7 +1758,6 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
         return;
       }
     }
-
     // Initializer call e.g. `T(...)`
   } else if (auto *CE = dyn_cast<CallExpr>(anchor)) {
     baseExpr = CE->getFn();
@@ -1779,8 +1777,8 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
             cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
             baseExpr->getSourceRange(), locator));
       }
-    } else if (auto *AMT = baseType->getAs<ExistentialMetatypeType>()) {
-      auto instanceType = AMT->getInstanceType()->getWithoutParens();
+    } else if (auto *EMT = baseType->getAs<ExistentialMetatypeType>()) {
+      auto instanceType = EMT->getInstanceType()->getWithoutParens();
       if (!cs.isTypeReference(baseExpr) &&
           instanceType->isAnyExistentialType()) {
         (void)cs.recordFix(AllowInvalidInitRef::onNonConstMetatype(
