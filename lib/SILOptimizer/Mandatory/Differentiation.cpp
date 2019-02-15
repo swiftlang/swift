@@ -3089,8 +3089,7 @@ public:
   void apply(SILBuilder &builder, SILLocation loc) {
     if (!func) return;
     assert(value);
-    LLVM_DEBUG(getADDebugStream() << "Running `Cleanup::apply` for "
-               << value << '\n');
+    LLVM_DEBUG(getADDebugStream() << "Running `Cleanup::apply` for " << value);
     func(builder, loc, value);
     func = nullptr;
   }
@@ -3544,8 +3543,7 @@ private:
         access->getLoc(), access, /*aborted*/ false);
     // Create cleanup for local buffer.
     auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-      LLVM_DEBUG(getADDebugStream()
-                 << "Cleaning up local buffer " << v << '\n');
+      LLVM_DEBUG(getADDebugStream() << "Cleaning up local buffer " << v);
       if (v->getType().isLoadable(b.getModule()))
         b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
       else
@@ -3752,7 +3750,7 @@ public:
 
     builder.createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
 
-    LLVM_DEBUG(getADDebugStream() << "Generated adjoint\n" << adjoint);
+    LLVM_DEBUG(getADDebugStream() << "Generated adjoint:\n" << adjoint);
     return errorOccurred;
   }
 
@@ -3996,9 +3994,9 @@ public:
 
   /// Handle `struct` instruction.
   ///   y = struct (x0, x1, x2, ...)
-  ///   adj[x0] = struct_extract #0, adj[y]
-  ///   adj[x1] = struct_extract #1, adj[y]
-  ///   adj[x2] = struct_extract #2, adj[y]
+  ///   adj[x0] += struct_extract #0, adj[y]
+  ///   adj[x1] += struct_extract #1, adj[y]
+  ///   adj[x2] += struct_extract #2, adj[y]
   ///   ...
   void visitStructInst(StructInst *si) {
     auto *decl = si->getStructDecl();
@@ -4044,7 +4042,7 @@ public:
     case StructExtractDifferentiationStrategy::Fieldwise: {
       // Compute adjoint as follows:
       //   y = struct_extract <key>, x
-      //   adj[x] = struct (0, ..., key': adj[y], ..., 0)
+      //   adj[x] += struct (0, ..., key': adj[y], ..., 0)
       // where `key'` is the field in the cotangent space corresponding to
       // `key`.
       auto structTy = remapType(sei->getOperand()->getType()).getASTType();
@@ -4061,10 +4059,10 @@ public:
       assert(cotangentVectorDecl);
       // Find the corresponding field in the cotangent space.
       VarDecl *correspondingField = nullptr;
-      // If the cotangent space is the original sapce, then it's the same field.
+      // If the cotangent space is the original struct, then field is the same.
       if (cotangentVectorDecl == sei->getStructDecl())
         correspondingField = sei->getField();
-      // Otherwise we just look it up by name.
+      // Otherwise, look up the field by name.
       else {
         auto correspondingFieldLookup =
             cotangentVectorDecl->lookupDirect(sei->getField()->getName());
@@ -4126,7 +4124,7 @@ public:
 
   /// Handle `tuple` instruction.
   ///   y = tuple (x0, x1, x2, ...)
-  ///   adj[x0] = tuple_extract 0, adj[y]
+  ///   adj[x0] += tuple_extract 0, adj[y]
   ///   ...
   void visitTupleInst(TupleInst *ti) {
     auto av = takeAdjointValue(ti);
@@ -4155,7 +4153,7 @@ public:
   /// Handle `tuple_extract` instruction.
   ///   y = tuple_extract <n>, x
   ///                      |--- n-th element
-  ///   adj[x] = tuple (0, 0, ..., adj[y], ..., 0, 0)
+  ///   adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
   void visitTupleExtractInst(TupleExtractInst *tei) {
     auto *tupleTy = tei->getTupleType();
     auto tupleCotanTy = getCotangentType(tupleTy->getCanonicalType(),
@@ -4233,7 +4231,7 @@ public:
     builder.createStore(li->getLoc(), adjVal, initAccess,
         getBufferSOQ(localBuf->getType().getASTType(), getAdjoint()));
     builder.createEndAccess(li->getLoc(), initAccess, /*aborted*/ false);
-    // Get the adjoin buffer.
+    // Get the adjoint buffer.
     auto &adjBuf = getAdjointBuffer(li->getOperand());
     // Accumulate the adjoint value in the local buffer into the adjoint buffer.
     auto *readAccess = builder.createBeginAccess(
