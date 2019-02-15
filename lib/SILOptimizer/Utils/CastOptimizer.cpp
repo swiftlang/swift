@@ -99,14 +99,6 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedObjCToSwiftCast(
   assert(Src->getType().isAddress() && "Source should have an address type");
   assert(Dest->getType().isAddress() && "Source should have an address type");
 
-  // AnyHashable is a special case - it does not conform to NSObject -
-  // If AnyHashable - Bail out of the optimization
-  if (auto DT = Target.getNominalOrBoundGenericNominal()) {
-    if (DT == M.getASTContext().getAnyHashableDecl()) {
-      return nullptr;
-    }
-  }
-
   // If this is a conditional cast, we need a new fail BB to place a
   // dealloc_stack in case the conversion fails.
   auto CurrInsPoint = Builder.getInsertionPoint();
@@ -298,14 +290,6 @@ SILInstruction *CastOptimizer::optimizeUnconditionalBridgedObjCToSwiftCast(
   assert(Src->getType().isAddress() && "Source should have an address type");
   assert(Dest->getType().isAddress() && "Source should have an address type");
 
-  // AnyHashable is a special case - it does not conform to NSObject -
-  // If AnyHashable - Bail out of the optimization
-  if (auto DT = Target.getNominalOrBoundGenericNominal()) {
-    if (DT == M.getASTContext().getAnyHashableDecl()) {
-      return nullptr;
-    }
-  }
-
   if (SILBridgedTy != Src->getType()) {
     // Check if we can simplify a cast into:
     // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
@@ -420,6 +404,14 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     SILInstruction *Inst, bool isConditional, SILValue Src, SILValue Dest,
     CanType Source, CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
     SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
+  // AnyHashable is a special case - it does not conform to NSObject - If
+  // AnyHashable - Bail out of the optimization early.
+  if (auto DT = Target.getNominalOrBoundGenericNominal()) {
+    if (DT == Inst->getModule().getASTContext().getAnyHashableDecl()) {
+      return nullptr;
+    }
+  }
+
   if (isConditional) {
     return optimizeConditionalBridgedObjCToSwiftCast(
         Inst, Src, Dest, Source, Target, BridgedSourceTy, BridgedTargetTy,
