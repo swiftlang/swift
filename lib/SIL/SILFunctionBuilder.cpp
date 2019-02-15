@@ -73,25 +73,25 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
   // - Non-getter accessors (setters, modifiers, etc).
   // - Default argument generator functions.
   // - Thunks. Those are currently handled in SILGenThunk.cpp.
-  if ((!isa<AccessorDecl>(decl) || dyn_cast<AccessorDecl>(decl)->isGetter()) &&
+  if ((!isa<AccessorDecl>(decl) || cast<AccessorDecl>(decl)->isGetter()) &&
       constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
       !constant.autoDiffAssociatedFunctionIdentifier &&
+      !constant.isStoredPropertyInitializer() &&
       !constant.isThunk()) {
     for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
-      auto *DA = cast<DifferentiableAttr>(A);
       std::string jvpName, vjpName;
       // Get JVP/VJP names.
-      if (auto *jvpFn = DA->getJVPFunction())
+      if (auto *jvpFn = A->getJVPFunction())
         jvpName = SILDeclRef(jvpFn).mangle();
-      if (auto *vjpFn = DA->getVJPFunction())
+      if (auto *vjpFn = A->getVJPFunction())
         vjpName = SILDeclRef(vjpFn).mangle();
       // Get lowered argument indices.
-      auto paramIndices = DA->getParameterIndices();
-      auto loweredIndices = paramIndices->getLowered(
+      auto paramIndices = A->getParameterIndices();
+      auto loweredParamIndices = paramIndices->getLowered(
           decl->getInterfaceType()->castTo<AnyFunctionType>());
-      SILAutoDiffIndices indices(/*source*/ 0, loweredIndices);
+      SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
       auto silDiffAttr = SILDifferentiableAttr::create(
-          M, indices, DA->getRequirements(), M.allocateCopy(jvpName),
+          M, indices, A->getRequirements(), M.allocateCopy(jvpName),
           M.allocateCopy(vjpName));
       F->addDifferentiableAttr(silDiffAttr);
     }
