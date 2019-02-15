@@ -1102,6 +1102,25 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
+  // If a property has changed from nonnull to nullable, we should add ! to the
+  // reference of the property.
+  bool handlePropertyTypeChange(Expr *E) {
+    if (auto MRE = dyn_cast<MemberRefExpr>(E)) {
+      if (auto *VD = MRE->getReferencedDecl().getDecl()) {
+        for (auto *I: getRelatedDiffItems(VD)) {
+          if (auto *Item = dyn_cast<CommonDiffItem>(I)) {
+            if (Item->DiffKind == NodeAnnotation::WrapOptional &&
+                Item->NodeKind == SDKNodeKind::DeclVar) {
+              Editor.insertAfterToken(E->getEndLoc(), "!");
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (E->getSourceRange().isInvalid())
       return false;
@@ -1114,6 +1133,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (handleAssignDestMigration(E))
       return false;
     if (handleAttributeReference(E))
+      return false;
+    if (handlePropertyTypeChange(E))
       return false;
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       auto Fn = CE->getFn();
