@@ -189,6 +189,85 @@ public func resilientAny(s : ResilientWeakRef) {
 // CHECK:  call void @__swift_destroy_boxed_opaque_existential_0(%Any* [[ANY]])
 // CHECK:  ret void
 
+// Make sure that MemoryLayout properties access resilient types' metadata
+// instead of hardcoding sizes based on compile-time layouts.
+
+// CHECK-LABEL: define{{.*}} swiftcc {{i32|i64}} @"$s17struct_resilience38memoryLayoutDotSizeWithResilientStructSiyF"()
+public func memoryLayoutDotSizeWithResilientStruct() -> Int {
+  // CHECK: entry:
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
+  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+
+  // CHECK-NEXT: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 8
+  // CHECK: [[WITNESS_FOR_SIZE:%.*]] = load [[INT]], [[INT]]* [[WITNESS_ADDR]]
+
+  // CHECK: ret [[INT]] [[WITNESS_FOR_SIZE]]
+  return MemoryLayout<Size>.size
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc {{i32|i64}} @"$s17struct_resilience40memoryLayoutDotStrideWithResilientStructSiyF"()
+public func memoryLayoutDotStrideWithResilientStruct() -> Int {
+  // CHECK: entry:
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
+  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+
+  // CHECK-NEXT: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 9
+  // CHECK: [[WITNESS_FOR_STRIDE:%.*]] = load [[INT]], [[INT]]* [[WITNESS_ADDR]]
+
+  // CHECK: ret [[INT]] [[WITNESS_FOR_STRIDE]]
+  return MemoryLayout<Size>.stride
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc {{i32|i64}} @"$s17struct_resilience43memoryLayoutDotAlignmentWithResilientStructSiyF"()
+public func memoryLayoutDotAlignmentWithResilientStruct() -> Int {
+  // CHECK: entry:
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
+  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+
+  // CHECK-NEXT: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 10
+  // CHECK: [[WITNESS_FOR_FLAGS:%.*]] = load i32, i32* [[WITNESS_ADDR]]
+  // CHECK: [[EXTENDED_FLAGS:%.*]] = zext i32 [[WITNESS_FOR_FLAGS]] to [[INT]]
+  // CHECK: [[ALIGNMENT_MASK:%.*]] = and [[INT]] [[EXTENDED_FLAGS]], 255
+  // CHECK: [[ALIGNMENT:%.*]] = add [[INT]] [[ALIGNMENT_MASK]], 1
+
+  // CHECK: ret [[INT]] [[ALIGNMENT]]
+  return MemoryLayout<Size>.alignment
+}
+
+
+// Make sure that MemoryLayout.offset(of:) on a resilient type uses the accessor
+// in the key path instead of hardcoding offsets based on compile-time layouts.
+
+// CHECK-LABEL: define{{.*}} swiftcc { {{i32|i64}}, i8 } @"$s17struct_resilience42memoryLayoutDotOffsetOfWithResilientStructSiSgyF"()
+public func memoryLayoutDotOffsetOfWithResilientStruct() -> Int? {
+  // CHECK-NEXT: entry:
+  // CHECK: [[RAW_KEY_PATH:%.*]] = call %swift.refcounted* @swift_getKeyPath
+  // CHECK: [[WRITABLE_KEY_PATH:%.*]] = bitcast %swift.refcounted* [[RAW_KEY_PATH]] to %Ts15WritableKeyPathCy16resilient_struct4SizeVSiG*
+  // CHECK: [[PARTIAL_KEY_PATH:%.*]] = bitcast %Ts15WritableKeyPathCy16resilient_struct4SizeVSiG* [[WRITABLE_KEY_PATH]] to %Ts14PartialKeyPathCy16resilient_struct4SizeVG*
+  // CHECK: [[ANY_KEY_PATH:%.*]] = bitcast %Ts14PartialKeyPathCy16resilient_struct4SizeVG* [[PARTIAL_KEY_PATH]] to %Ts10AnyKeyPathC*
+
+  // CHECK: [[STORED_INLINE_OFFSET:%.*]] = call swiftcc { [[INT]], i8 } @"$ss10AnyKeyPathC19_storedInlineOffsetSiSgvgTj"(%Ts10AnyKeyPathC* swiftself [[ANY_KEY_PATH]])
+  // CHECK: [[VALUE:%.*]] = extractvalue { [[INT]], i8 } [[STORED_INLINE_OFFSET]], 0
+
+  // CHECK: [[RET_PARTIAL:%.*]] = insertvalue { [[INT]], i8 } undef, [[INT]] [[VALUE]], 0
+  // CHECK: [[RET:%.*]] = insertvalue { [[INT]], i8 } [[RET_PARTIAL]]
+  // CHECK: ret { [[INT]], i8 } [[RET]]
+  return MemoryLayout<Size>.offset(of: \Size.w)
+}
+
+
 // Public metadata accessor for our resilient struct
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s17struct_resilience6MySizeVMa"
