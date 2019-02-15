@@ -395,13 +395,16 @@ diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
 }
 
 /// Form a type checked expression for the index of a @dynamicMemberLookup
-/// subscript index parameter.
+/// subscript index parameter, using the specified name, type, and source loc.
 /// The index expression will have a tuple type of `(dynamicMember: T)`.
+///
+/// Note: propagating source location is necessary to prevent diagnostics with
+/// unknown location.
 static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, Type ty,
                                                SourceLoc loc, DeclContext *dc,
                                                ConstraintSystem &cs) {
   auto &ctx = cs.TC.Context;
-  
+
   // Build and type check the string literal index value to the specific
   // string type expected by the subscript.
   Expr *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
@@ -7317,55 +7320,49 @@ static Expr *finishApplyDynamicCallable(ExprRewriter &rewriter,
   Expr *memberExpr = rewriter.buildMemberRef(
       member->getBase(), selected.openedFullType, member->getDotLoc(),
       selected.choice, member->getNameLoc(), selected.openedType,
-      cs.getConstraintLocator(member), loc, true,
+      cs.getConstraintLocator(member), loc, /*Implicit*/ true,
       selected.choice.getFunctionRefKind(), member->getAccessSemantics(),
       isDynamic);
 
   // Construct argument to the method (either an array or dictionary
   // expression).
   Expr *argument = nullptr;
+  auto expectedParamType = methodType->getParams().front().getParameterType();
   if (!useKwargsMethod) {
-    auto paramArrayType = methodType->getParams()[0].getParameterType();
     auto arrayLitProto = cs.TC.getProtocol(
         fn->getLoc(), KnownProtocolKind::ExpressibleByArrayLiteral);
     auto conformance =
-        cs.TC.conformsToProtocol(paramArrayType, arrayLitProto, cs.DC,
+        cs.TC.conformsToProtocol(expectedParamType, arrayLitProto, cs.DC,
                                  ConformanceCheckFlags::InExpression);
     auto paramType = ProtocolConformanceRef::getTypeWitnessByName(
-                         paramArrayType, *conformance,
+                         expectedParamType, *conformance,
                          cs.getASTContext().Id_ArrayLiteralElement, &cs.TC)
                          ->getDesugaredType();
 
-    std::vector<Expr *> convertedElements;
-    for (Expr *dynamicArg : arg->getElements()) {
-      convertedElements.push_back(rewriter.coerceToType(
-          dynamicArg, paramType,
-          loc.withPathElement(LocatorPathElt::getApplyArgToParam(0, 0))));
-    }
-    auto *argumentTmp =
-        ArrayExpr::create(ctx, SourceLoc(), convertedElements, {}, SourceLoc());
-    argument = argumentTmp;
-
-    cs.setType(argument, paramArrayType);
-    rewriter.finishArrayExpr(argumentTmp);
+    auto arrayElements =
+        map<std::vector<Expr *>>(arg->getElements(), [&](Expr *origArgElt) {
+          return rewriter.coerceToType(origArgElt, paramType, loc);
+        });
+    auto *arrayExpr = ArrayExpr::create(
+        ctx, arg->getStartLoc(), arrayElements, {}, arg->getEndLoc());
+    cs.setType(arrayExpr, expectedParamType);
+    rewriter.finishArrayExpr(arrayExpr);
+    argument = arrayExpr;
   } else {
-    // Get Key and Value associated types.
-    auto paramDictType = methodType->getParams()[0].getParameterType();
     auto dictLitProto = cs.TC.getProtocol(
         fn->getLoc(), KnownProtocolKind::ExpressibleByDictionaryLiteral);
     auto conformance =
-        cs.TC.conformsToProtocol(paramDictType, dictLitProto, cs.DC,
+        cs.TC.conformsToProtocol(expectedParamType, dictLitProto, cs.DC,
                                  ConformanceCheckFlags::InExpression);
     auto keyAssocType =
         ProtocolConformanceRef::getTypeWitnessByName(
-            paramDictType, *conformance, cs.getASTContext().Id_Key, &cs.TC)
+            expectedParamType, *conformance, ctx.Id_Key, &cs.TC)
             ->getDesugaredType();
     auto valueAssocType =
         ProtocolConformanceRef::getTypeWitnessByName(
-            paramDictType, *conformance, cs.getASTContext().Id_Value, &cs.TC)
+            expectedParamType, *conformance, ctx.Id_Value, &cs.TC)
             ->getDesugaredType();
 
-    SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
     for (unsigned i = 0, n = arg->getNumElements(); i < n; i++) {
       auto *labelExpr = new (ctx) StringLiteralExpr(
@@ -7373,45 +7370,32 @@ static Expr *finishApplyDynamicCallable(ExprRewriter &rewriter,
           /*Implicit*/ true);
       cs.setType(labelExpr, keyAssocType);
 
-      Expr *pair = TupleExpr::createImplicit(
+      Expr *dictElt = TupleExpr::createImplicit(
           ctx,
           {rewriter.visitStringLiteralExpr(labelExpr),
-           rewriter.coerceToType(
-               arg->getElement(i), valueAssocType,
-               loc.withPathElement(LocatorPathElt::getApplyArgToParam(0, 0)))},
+           rewriter.coerceToType(arg->getElement(i), valueAssocType, loc)},
           {});
-
-      cs.setType(pair, TupleType::get({TupleTypeElt{keyAssocType},
-                                       TupleTypeElt{valueAssocType}},
-                                      ctx));
-      dictElements.push_back(pair);
+      cs.setType(dictElt, TupleType::get({TupleTypeElt{keyAssocType},
+                                          TupleTypeElt{valueAssocType}},
+                                         ctx));
+      dictElements.push_back(dictElt);
     }
-    auto *argumentTmp =
-        DictionaryExpr::create(ctx, SourceLoc(), dictElements, {}, SourceLoc());
-
-    cs.setType(argumentTmp, paramDictType);
-    rewriter.finishDictionaryExpr(argumentTmp);
-    argument = argumentTmp;
+    auto *dictExpr = DictionaryExpr::create(
+        ctx, arg->getStartLoc(), dictElements, {}, arg->getEndLoc());
+    cs.setType(dictExpr, expectedParamType);
+    rewriter.finishDictionaryExpr(dictExpr);
+    argument = dictExpr;
   }
   argument->setImplicit();
 
-  auto getType = [&](const Expr *E) -> Type { return cs.getType(E); };
-
   // Construct call to the `dynamicallyCall` method.
+  auto getType = [&](const Expr *E) -> Type { return cs.getType(E); };
   CallExpr *result = CallExpr::createImplicit(ctx, memberExpr, argument,
                                               {argumentLabel}, getType);
-
   cs.setType(result, methodType->getResult());
-
-  {
-    // The implicitly constructed tuple_expr may have a type, but this type
-    // is not known in the constraint system.
-    Expr *arg = result->getArg();
-    if (arg->getType()) {
-      cs.setType(arg, arg->getType());
-    }
-  }
-
+  // Set the type of the newly constructed argument in the constraint system.
+  if (result->getArg()->getType())
+    cs.setType(result->getArg(), result->getArg()->getType());
   return result;
 }
 
