@@ -686,8 +686,8 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   // If the associated type is `TangentVector` or `CotangentVector`, make it
   // also conform to `AdditiveArithmetic`.
   if (id == C.Id_TangentVector || id == C.Id_CotangentVector) {
-    // FIXME: conforming to `AdditiveArithmetic` should always be possible.
-    // Otherwise, SR-9595 is triggered; diagnose and return `nullptr`.
+    // Diagnose missing `AdditiveArithmetic` conformance and return `nullptr`.
+    // TODO(TF-213): Remove logic after generic signature minimization bug fix.
     if (canDeriveAdditiveArithmetic) {
       inherited.push_back(addArithType);
     } else {

@@ -17,6 +17,7 @@ import TensorFlowUnittest
 var TensorADTests = TestSuite("TensorIndirectAD")
 
 TensorADTests.testAllBackends("Generic") {
+  // TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
   func indirect<Scalar : Differentiable & FloatingPoint>(_ x: Tensor<Scalar>) -> Tensor<Scalar>
     where Scalar.TangentVector : AdditiveArithmetic, Scalar.CotangentVector : AdditiveArithmetic,
           Scalar == Scalar.CotangentVector
@@ -36,6 +37,7 @@ TensorADTests.testAllBackends("Concrete") {
   expectEqual(Tensor(18), pullback(at: Tensor<Float>(3), in: indirect)(Tensor(3)))
 }
 
+// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
 extension Tensor where Scalar : Differentiable & FloatingPoint,
                        Scalar.TangentVector : AdditiveArithmetic,
                        Scalar.CotangentVector : AdditiveArithmetic {
@@ -65,6 +67,7 @@ extension Double : Addable {
   }
 }
 TensorADTests.testAllBackends("ResultSelection") {
+  // TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
   func indirect<T : Addable>(_ x: T, _ y: T) -> (T, T) where T.TangentVector : AdditiveArithmetic,
                                                              T.CotangentVector : AdditiveArithmetic {
     let first = T.add(x, x)
