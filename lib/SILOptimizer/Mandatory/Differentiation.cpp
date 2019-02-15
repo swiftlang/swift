@@ -3607,60 +3607,39 @@ public:
     seed = adjParamArgs[0];
     primalValueAggregateInAdj = adjParamArgs[1];
 
-    // Assign adjoint to the return value.
-    //   y = tuple (y0, ..., yn)
-    //   return y
-    //   adj[y] =
-    //     if the source result is direct
-    //     then tuple (0, ..., seed, ..., 0) where seed is at the direct
-    //          result index corresponding to the source index
-    //     else zeros
-    SmallVector<SILValue, 8> formalResults;
-    collectAllFormalResultsInTypeOrder(original, formalResults);
-    auto srcIdx = task->getIndices().source;
+    // Assign adjoint for original result.
+    SmallVector<SILValue, 8> origFormalResults;
+    collectAllFormalResultsInTypeOrder(original, origFormalResults);
+    auto origResult = origFormalResults[task->getIndices().source];
 
-    // Prepare seed adjoint.
     builder.setInsertionPoint(adjointEntry);
     if (seed->getType().isAddress()) {
       Cleanup::Func cleanupFn = nullptr;
       if (seed->getType().isLoadable(getModule())) {
         builder.createRetainValueAddr(adjLoc, seed,
                                       builder.getDefaultAtomicity());
-        cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-          LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
-          if (v->getType().isLoadable(b.getModule()))
-            b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
-          else
-            b.createDestroyAddr(loc, v);
-        };
-        setAdjointBuffer(formalResults[srcIdx],
-                         ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
-      } else {
-        auto adjBuf = builder.createAllocStack(adjLoc, seed->getType());
-        localAllocations.push_back(adjBuf);
-        builder.createCopyAddr(adjLoc, seed, adjBuf, IsNotTake, IsInitialization);
-        cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-          LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
-          if (v->getType().isLoadable(b.getModule()))
-            b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
-          else
-            b.createDestroyAddr(loc, v);
-        };
-        setAdjointBuffer(formalResults[srcIdx],
-                         ValueWithCleanup(adjBuf, makeCleanup(adjBuf, cleanupFn)));
       }
+      cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
+        LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
+        if (v->getType().isLoadable(b.getModule()))
+          b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
+        else
+          b.createDestroyAddr(loc, v);
+      };
+      setAdjointBuffer(origResult,
+                       ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
     } else {
       builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
       auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
         LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
         b.createReleaseValue(loc, v, b.getDefaultAtomicity());
       };
-      initializeAdjointValue(formalResults[srcIdx], makeConcreteAdjointValue(
+      initializeAdjointValue(origResult, makeConcreteAdjointValue(
           ValueWithCleanup(seed, makeCleanup(seed, cleanupFn))));
     }
     LLVM_DEBUG(getADDebugStream()
-               << "Assigned seed " << *seed << " as the adjoint of "
-               << formalResults[srcIdx]);
+               << "Assigned seed " << *seed
+               << " as the adjoint of original result " << origResult);
 
     // From the original exit, emit a reverse control flow graph and perform
     // differentiation in each block.
