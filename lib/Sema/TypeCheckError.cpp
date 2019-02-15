@@ -1603,7 +1603,9 @@ private:
     ContextScope scope(*this, None);
     scope.enterTry();
 
-    E->getSubExpr()->walk(*this);
+    if (!isThrowingAccessor(E)) {
+      E->getSubExpr()->walk(*this);
+    }
 
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
@@ -1625,7 +1627,9 @@ private:
     ContextScope scope(*this, Context::getHandled());
     scope.enterTry();
 
-    E->getSubExpr()->walk(*this);
+    if (!isThrowingAccessor(E)) {
+      E->getSubExpr()->walk(*this);
+    }
 
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
@@ -1639,13 +1643,32 @@ private:
     ContextScope scope(*this, Context::getHandled());
     scope.enterTry();
 
-    E->getSubExpr()->walk(*this);
+    if (!isThrowingAccessor(E)) {
+      E->getSubExpr()->walk(*this);
+    }
 
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
       TC.diagnose(E->getLoc(), diag::no_throw_in_try);
     }
     return ShouldNotRecurse;
+  }
+
+  bool isThrowingAccessor(Expr *E) {
+    auto throwingAccessor = false;
+    auto setter = dyn_cast<AssignExpr>(E->getValueProvidingExpr());
+    auto expr = setter ? setter->getDest() : E->getValueProvidingExpr();
+    if (auto MRE = dyn_cast<MemberRefExpr>(expr)) {
+      if (auto VD = dyn_cast_or_null<VarDecl>(MRE->getDecl().getDecl())) {
+        if (VD->getAccessor(setter ? AccessorKind::Set : AccessorKind::Get)
+                ->hasThrows()) {
+          throwingAccessor = true;
+          Flags.set(ContextFlags::HasTryThrowSite);
+        }
+      }
+    }
+
+    return throwingAccessor;
   }
 };
 
