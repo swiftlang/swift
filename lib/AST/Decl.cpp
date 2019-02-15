@@ -3078,21 +3078,38 @@ bool NominalTypeDecl::isOptionalDecl() const {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() {
+ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
+  auto isEffectiveMemberwiseInitializer = [&](ConstructorDecl *ctorDecl) {
+    // Check for `nullptr`.
+    if (!ctorDecl)
+      return false;
+    // Return true if `ctorDecl` is marked as a memberwise initializer.
+    if (ctorDecl->isMemberwiseInitializer())
+      return true;
+    // Get stored property count and initializer type.
+    unsigned numStoredProperties =
+        std::distance(getStoredProperties().begin(),
+                      getStoredProperties().end());
+    auto ctorType =
+        ctorDecl->getMethodInterfaceType()->castTo<AnyFunctionType>();
+    // Return false if parameter count/stored property count do not match.
+    if (numStoredProperties != ctorType->getNumParams())
+      return false;
+    // Return true if stored property types match parameter types.
+    return llvm::all_of(
+        llvm::zip(getStoredProperties(), ctorType->getParams()),
+        [&](std::tuple<VarDecl *, AnyFunctionType::Param> pair) {
+          auto *storedProp = std::get<0>(pair);
+          auto param = std::get<1>(pair);
+          return storedProp->getInterfaceType()->isEqual(param.getPlainType());
+        });
+  };
+
   ConstructorDecl *memberwiseInitDecl = nullptr;
   auto ctorDecls = lookupDirect(DeclBaseName::createConstructor());
   for (auto decl : ctorDecls) {
     auto ctorDecl = dyn_cast<ConstructorDecl>(decl);
-    if (!ctorDecl)
-      continue;
-    // Continue if:
-    // - Constructor is not a memberwise initializer.
-    // - Constructor is implicit and takes no arguments, and nominal has no
-    //   stored properties. This is ad-hoc and accepts empty struct
-    //   constructors generated via `TypeChecker::defineDefaultConstructor`.
-    if (!ctorDecl->isMemberwiseInitializer() &&
-        !(getStoredProperties().empty() && ctorDecl->isImplicit() &&
-          ctorDecl->getParameters()->size() == 0))
+    if (!isEffectiveMemberwiseInitializer(ctorDecl))
       continue;
     assert(!memberwiseInitDecl && "Memberwise initializer already found");
     memberwiseInitDecl = ctorDecl;

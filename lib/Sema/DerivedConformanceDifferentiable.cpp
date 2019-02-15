@@ -230,7 +230,7 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   auto *retNominal = retNominalInterfaceType->getAnyNominal();
   auto retNominalType = funcDecl->mapTypeIntoContext(retNominalInterfaceType);
   auto *retNominalTypeExpr = TypeExpr::createImplicit(retNominalType, C);
-  auto *memberwiseInitDecl = retNominal->getMemberwiseInitializer();
+  auto *memberwiseInitDecl = retNominal->getEffectiveMemberwiseInitializer();
   assert(memberwiseInitDecl && "Memberwise initializer must exist");
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
@@ -403,13 +403,16 @@ static ValueDecl *deriveDifferentiable_method(
   // Add memberwise initializer if necessary.
   auto returnNominal = returnType->getAnyNominal();
   assert(returnNominal && "Return type must be a nominal type");
-  if (!returnNominal->getMemberwiseInitializer()) {
+  if (!returnNominal->getEffectiveMemberwiseInitializer()) {
     // The implicit memberwise constructor must be explicitly created so that
     // it can called in `Differentiable` methods. Normally, the memberwise
     // constructor is synthesized during SILGen, which is too late.
     auto *initDecl = createImplicitConstructor(
         TC, returnNominal, ImplicitConstructorKind::Memberwise);
-    returnNominal->addMember(initDecl);
+    if (nominal == returnNominal)
+      derived.addMembersToConformanceContext(initDecl);
+    else
+      returnNominal->addMember(initDecl);
     C.addSynthesizedDecl(initDecl);
   }
 
@@ -484,7 +487,7 @@ derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl) {
   auto *allDiffableVarsStruct =
       getAssociatedStructDecl(parentDC, C.Id_AllDifferentiableVariables);
   auto *allDiffableVarsInitDecl =
-      allDiffableVarsStruct->getMemberwiseInitializer();
+      allDiffableVarsStruct->getEffectiveMemberwiseInitializer();
   assert(allDiffableVarsInitDecl &&
          "'AllDifferentiableVariables' memberwise initializer not found");
 
@@ -873,7 +876,11 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
       continue;
     nominal->getAttrs().add(
         new (TC.Context) NoDerivativeAttr(/*Implicit*/ true));
-    TC.diagnose(vd, diag::differentiable_implicit_noderivative_fixit)
+    auto loc =
+        vd->getLoc().isValid() ? vd->getLoc() : DC->getAsDecl()->getLoc();
+    assert(loc.isValid() && "Expected valid source location");
+    TC.diagnose(loc, diag::differentiable_implicit_noderivative_fixit,
+                vd->getName())
         .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
                      "@noDerivative ");
   }
