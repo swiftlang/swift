@@ -5,6 +5,8 @@ if(NOT SWIFT_SOURCEKIT_USE_INPROC_LIBRARY AND SWIFT_BUILD_STDLIB)
   set(DEPENDS_LIST "sourcekitd-test")
 
   # The build type of swiftlang should agree with stdlib
+  # This setting could avoid us adding additional search paths when building
+  # executables using SwiftLang.
   set(SWIFT_LANG_LIBRARY_BUILD_TYPES)
   if(SWIFT_BUILD_DYNAMIC_STDLIB)
     list(APPEND SWIFT_LANG_LIBRARY_BUILD_TYPES SHARED)
