@@ -1754,21 +1754,19 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
     baseType = getType(baseExpr);
     // If this is an initializer call without explicit mention
     // of `.init` on metatype value.
-    if (auto *MTT = baseType->getAs<MetatypeType>()) {
-      auto instanceType = MTT->getInstanceType();
+    if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
+      auto instanceType = AMT->getInstanceType()->getWithoutParens();
       if (!cs.isTypeReference(baseExpr) && !instanceType->isExistentialType()) {
         (void)cs.recordFix(AllowInvalidInitRef::onNonConstMetatype(
             cs, baseType, init, locator));
         return;
       }
-    } else if (baseType->is<AnyMetatypeType>() &&
-               baseType->getMetatypeInstanceType()
-                   ->getWithoutParens()
-                   ->isAnyExistentialType()) {
-      (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
-          cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
-          baseExpr->getSourceRange(), locator));
-      return;
+
+      if (instanceType->isAnyExistentialType()) {
+        (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
+            cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
+            baseExpr->getSourceRange(), locator));
+      }
     }
     // Initializer reference which requires contextual base type e.g.
     // `.init(...)`.
