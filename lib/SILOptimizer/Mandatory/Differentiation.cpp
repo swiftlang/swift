@@ -3524,11 +3524,11 @@ private:
     if (!insertion.second) // not inserted
       return insertion.first->getSecond();
     // Set insertion point for local allocation builder: before the last local
-    // allocation, or at the end of the adjoint entry BB if no local allocations
-    // exist.
+    // allocation, or at the start of the adjoint entry BB if no local
+    // allocations exist yet.
     if (localAllocations.empty())
       localAllocBuilder.setInsertionPoint(
-          getAdjoint().getEntryBlock()->begin());
+          getAdjoint().getEntryBlock(), getAdjoint().getEntryBlock()->begin());
     else
       localAllocBuilder.setInsertionPoint(
           localAllocations.back().getValue()->getDefiningInstruction());
