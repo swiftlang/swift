@@ -4,22 +4,14 @@ import StdlibUnittest
 
 var ProtocolRequirementAutodiffTests = TestSuite("ProtocolRequirementAutodiff")
 
-func _pullback<T, U, R>(
-  at x: (T, U), in f: @differentiable (T) -> (U) -> R
-) -> (R.CotangentVector) -> (T.CotangentVector, U.CotangentVector)
-  where T : Differentiable, U : Differentiable, R : Differentiable {
-  // Builtin.autodiffApply_vjp_method(f, x.0, x.1).1
-  return _valueWithPullback(at: x.0, x.1, in: f).1
-}
-
 protocol DiffReq : Differentiable {
   @differentiable(wrt: (self, x))
   func f(_ x: Float) -> Float
 }
 
-extension DiffReq {
+extension DiffReq where TangentVector : AdditiveArithmetic, CotangentVector : AdditiveArithmetic {
   func gradF(at x: Float) -> (Self.CotangentVector, Float) {
-    return _pullback(at: (self, x), in: Self.f)(1)
+    return (valueWithPullback(at: x) { s, x in s.f(x) }).1(1)
   }
 }
 
