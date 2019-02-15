@@ -10,13 +10,13 @@ final class Final<T> {
 // CHECK:   deinit
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x
+// CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Final<T>.CodingKeys, _ b: Final<T>.CodingKeys) -> Bool
+// CHECK:     var hashValue: Int { get }
+// CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:     var stringValue: String { get }
 // CHECK:     init?(stringValue: String)
 // CHECK:     var intValue: Int? { get }
 // CHECK:     init?(intValue: Int)
-// CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Final<T>.CodingKeys, _ b: Final<T>.CodingKeys) -> Bool
-// CHECK:     var hashValue: Int { get }
-// CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:   }
 // CHECK: }
 
@@ -30,13 +30,13 @@ class Nonfinal<T> {
 // CHECK:   deinit
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x
+// CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Nonfinal<T>.CodingKeys, _ b: Nonfinal<T>.CodingKeys) -> Bool
+// CHECK:     var hashValue: Int { get }
+// CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:     var stringValue: String { get }
 // CHECK:     init?(stringValue: String)
 // CHECK:     var intValue: Int? { get }
 // CHECK:     init?(intValue: Int)
-// CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Nonfinal<T>.CodingKeys, _ b: Nonfinal<T>.CodingKeys) -> Bool
-// CHECK:     var hashValue: Int { get }
-// CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:   }
 // CHECK: }
 
