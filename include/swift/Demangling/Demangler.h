@@ -70,18 +70,27 @@ class NodeFactory {
 
   static void freeSlabs(Slab *slab);
   
+#ifdef NODE_FACTORY_DEBUGGING
+  size_t allocatedMemory = 0;
+  static int nestingLevel;
+  std::string indent() { return std::string(nestingLevel * 2, ' '); }
+#endif
+
 public:
 
   NodeFactory() {
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "## New NodeFactory " << this << "\n";
+    std::cerr << indent() << "## New NodeFactory\n";
+    nestingLevel++;
 #endif
   }
   
   virtual ~NodeFactory() {
     freeSlabs(CurrentSlab);
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "Delete NodeFactory " << this << "\n";
+    nestingLevel--;
+    std::cerr << indent() << "## Delete NodeFactory: allocated memory = "
+                          << allocatedMemory  << '\n';
 #endif
   }
   
@@ -92,8 +101,9 @@ public:
     size_t ObjectSize = NumObjects * sizeof(T);
     CurPtr = align(CurPtr, alignof(T));
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "  alloc " << ObjectSize << ", CurPtr = "
+    std::cerr << indent() << "alloc " << ObjectSize << ", CurPtr = "
               << (void *)CurPtr << "\n";
+    allocatedMemory += ObjectSize;
 #endif
 
     // Do we have enough space in the current slab?
@@ -113,7 +123,7 @@ public:
       End = (char *)newSlab + AllocSize;
       assert(CurPtr + ObjectSize <= End);
 #ifdef NODE_FACTORY_DEBUGGING
-      std::cerr << "    ** new slab " << newSlab << ", allocsize = "
+      std::cerr << indent() << "** new slab " << newSlab << ", allocsize = "
                 << AllocSize << ", CurPtr = " << (void *)CurPtr
                 << ", End = " << (void *)End << "\n";
 #endif
@@ -138,8 +148,8 @@ public:
     size_t AdditionalAlloc = MinGrowth * sizeof(T);
 
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "  realloc " << Objects << ", num = " << NumObjects
-              << " (size = " << OldAllocSize << "), Growth = " << Growth
+    std::cerr << indent() << "realloc: capacity = " << Capacity
+              << " (size = " << OldAllocSize << "), growth = " << MinGrowth
               << " (size = " << AdditionalAlloc << ")\n";
 #endif
     if ((char *)Objects + OldAllocSize == CurPtr
@@ -149,7 +159,8 @@ public:
       CurPtr += AdditionalAlloc;
       Capacity += MinGrowth;
 #ifdef NODE_FACTORY_DEBUGGING
-      std::cerr << "    ** can grow: CurPtr = " << (void *)CurPtr << "\n";
+      std::cerr << indent() << "** can grow: " << (void *)CurPtr << '\n';
+      allocatedMemory += AdditionalAlloc;
 #endif
       return;
     }

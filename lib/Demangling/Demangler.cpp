@@ -402,9 +402,6 @@ void Node::reverseChildren(size_t StartingAt) {
 void NodeFactory::freeSlabs(Slab *slab) {
   while (slab) {
     Slab *prev = slab->Previous;
-#ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << "  free slab = " << slab << "\n";
-#endif
     free(slab);
     slab = prev;
   }
@@ -412,6 +409,10 @@ void NodeFactory::freeSlabs(Slab *slab) {
   
 void NodeFactory::clear() {
   if (CurrentSlab) {
+#ifdef NODE_FACTORY_DEBUGGING
+    std::cerr << indent() << "## clear: allocated memory = " << allocatedMemory  << "\n";
+#endif
+
     freeSlabs(CurrentSlab->Previous);
     
     // Recycle the last allocated slab.
@@ -423,6 +424,9 @@ void NodeFactory::clear() {
     CurrentSlab->Previous = nullptr;
     CurPtr = (char *)(CurrentSlab + 1);
     assert(End == CurPtr + SlabSize);
+#ifdef NODE_FACTORY_DEBUGGING
+    allocatedMemory = 0;
+#endif
   }
 }
 
@@ -442,6 +446,10 @@ NodePointer NodeFactory::createNode(Node::Kind K, const CharVector &Text) {
 NodePointer NodeFactory::createNode(Node::Kind K, const char *Text) {
   return new (Allocate<Node>()) Node(K, llvm::StringRef(Text));
 }
+
+#ifdef NODE_FACTORY_DEBUGGING
+int NodeFactory::nestingLevel = 0;
+#endif
 
 //////////////////////////////////
 // CharVector member functions  //
