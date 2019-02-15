@@ -1,0 +1,157 @@
+// This is defined as one big module because there are cyclic dependencies
+// between the submodules all over the place. Breaking this up may actually
+// speed up compilation.
+
+module Swift {
+  // FIXME: Define submodules for all the other directories.
+
+  module Strings {
+    requires cplusplus
+    header "Strings.h"
+    export *
+  }
+
+  module ABI {
+    requires cplusplus
+    // No submodules, there are missing includes.
+    umbrella "ABI"
+   
+    // These headers introduce a cyclic dependency with Swift_Shims.
+    textual header "ABI/HeapObject.h"
+    textual header "ABI/KeyPath.h"
+    textual header "ABI/Metadata.h"
+    textual header "ABI/MetadataValues.h"
+    textual header "ABI/System.h"
+   
+    textual header "ABI/MetadataKind.def"
+    textual header "ABI/ValueWitness.def"
+  }
+
+  module AST {
+    requires cplusplus
+    umbrella "AST" //module * { export * }
+    textual header "AST/ReferenceStorage.def"
+    textual header "AST/StmtNodes.def"
+    textual header "AST/AccessTypeIDZone.def"
+    textual header "AST/TypeCheckerTypeIDZone.def"
+    textual header "AST/AccessorKinds.def"
+    textual header "AST/TypeNodes.def"
+    textual header "AST/Attr.def"
+    textual header "AST/TypeReprNodes.def"
+    textual header "AST/Builtins.def"
+    textual header "AST/DeclNodes.def"
+    textual header "AST/DiagnosticsAll.def"
+    textual header "AST/DiagnosticsClangImporter.def"
+    textual header "AST/DiagnosticsCommon.def"
+    textual header "AST/DiagnosticsDriver.def"
+    textual header "AST/DiagnosticsFrontend.def"
+    textual header "AST/DiagnosticsIRGen.def"
+    textual header "AST/DiagnosticsModuleDiffer.def"
+    textual header "AST/DiagnosticsParse.def"
+    textual header "AST/DiagnosticsRefactoring.def"
+    textual header "AST/DiagnosticsSIL.def"
+    textual header "AST/DiagnosticsSema.def"
+    textual header "AST/ExprNodes.def"
+    textual header "AST/KnownDecls.def"
+    textual header "AST/KnownFoundationEntities.def"
+    textual header "AST/KnownIdentifiers.def"
+    textual header "AST/KnownProtocols.def"
+    textual header "AST/KnownStdlibTypes.def"
+    textual header "AST/NameLookupTypeIDZone.def"
+    textual header "AST/PatternNodes.def"
+    textual header "AST/PlatformKinds.def"
+
+    // Missing include.
+    textual header "AST/DiagnosticsCommon.h"
+    textual header "AST/FileSystem.h"
+
+    // Included inside a namespace.
+    textual header "Basic/DefineTypeIDZone.h"
+    textual header "Basic/ImplementTypeIDZone.h"
+  }
+
+  module Basic {
+    requires cplusplus
+    umbrella "Basic" module * { export * }
+    textual header "Basic/CTypeIDZone.def"
+    textual header "Basic/FileTypes.def"
+    textual header "Basic/Statistics.def"
+
+    // This is included by Swift_Shims.
+    textual header "Basic/type_traits.h"
+    textual header "Basic/Compiler.h"
+  }
+
+  module Demangling {
+    requires cplusplus
+    umbrella "Demangling" module * { export * }
+    textual header "Demangling/DemangleNodes.def"
+    textual header "Demangling/StandardTypesMangling.def"
+    textual header "Demangling/ValueWitnessMangling.def"
+  }
+
+  module Frontend {
+    requires cplusplus
+    umbrella "Frontend" module * { export * }
+  }
+
+  module Parse {
+    requires cplusplus
+    umbrella "Parse" module * { export * }
+  }
+
+  module IDE {
+    requires cplusplus
+    umbrella "IDE" module * { export * }
+    textual header "IDE/DigesterEnums.def"
+    textual header "IDE/RefactoringKinds.def"
+  }    
+
+  module Reflection {
+    requires cplusplus
+    umbrella "Reflection" module * { export * }
+    textual header "Reflection/MetadataSources.def"
+    textual header "Reflection/TypeRefs.def"    
+  }
+
+  module Remote {
+    requires cplusplus
+    umbrella "Remote" module * { export * }
+    textual header "Remote/FailureKinds.def"
+  }
+
+  module RemoteAST {
+    requires cplusplus
+    umbrella "RemoteAST" module * { export * }
+  }
+
+  module Runtime {
+    requires cplusplus
+    umbrella "Runtime" module * { export * }
+   
+    // These two headers introduce a cyclic dependency with Swift_Shims.
+    textual header "Runtime/Config.h"
+    textual header "Runtime/HeapObject.h"
+   
+    textual header "Runtime/BuiltinTypes.def"
+
+    textual header "Runtime/Atomic.h"
+    textual header "Runtime/Debug.h"
+    textual header "Runtime/Unreachable.h"
+   
+    module MutexWin32 {
+      header "Runtime/MutexWin32.h"
+      requires windows
+    }
+  }
+
+  module SIL {
+    requires cplusplus
+    umbrella "SIL" module * { export * }
+    textual header "SIL/AccessedStorage.def"
+    textual header "SIL/BridgedTypes.def"
+    textual header "SIL/SILNodes.def"
+  }
+
+  extern module SwiftShims "../../stdlib/public/SwiftShims/module.modulemap"
+}

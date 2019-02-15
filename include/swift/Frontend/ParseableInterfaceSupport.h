@@ -20,6 +20,7 @@
 namespace swift {
 
 class ModuleDecl;
+class CompilerInvocation;
 
 /// Options for controlling the generation of the .swiftinterface output.
 struct ParseableInterfaceOptions {

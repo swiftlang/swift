@@ -3,11 +3,11 @@ module SwiftShims {
   header "CoreFoundationShims.h"
   header "FoundationShims.h"
   header "GlobalObjects.h"
-  header "HeapObject.h"
+  textual header "HeapObject.h"
   header "KeyPath.h"
   header "LibcShims.h"
   header "Random.h"
-  header "RefCount.h"
+  textual header "RefCount.h"
   header "RuntimeShims.h"
   header "RuntimeStubs.h"
   header "SwiftStdbool.h"
@@ -16,7 +16,7 @@ module SwiftShims {
   header "System.h"
   header "ThreadLocalStorage.h"
   header "UnicodeShims.h"
-  header "Visibility.h"
+  textual header "Visibility.h"
   export *
 }
 

@@ -15,6 +15,7 @@
 
 #include "swift/Basic/FileSystem.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsCommon.h"
 
 namespace swift {
 
