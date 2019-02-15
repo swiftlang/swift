@@ -1744,6 +1744,17 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
   Expr *baseExpr = nullptr;
   Type baseType;
 
+  auto recordOnConstMetatypeFix = [&]() {
+    (void)cs.recordFix(
+        AllowInvalidInitRef::onNonConstMetatype(cs, baseType, init, locator));
+  };
+
+  auto recordOnProtocolMetatypeFix = [&](bool isStaticallyDerived) {
+    (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
+        cs, baseType, init, isStaticallyDerived, baseExpr->getSourceRange(),
+        locator));
+  };
+
   // Explicit initializer reference e.g. `T.init(...)` or `T.init`.
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
     baseExpr = UDE->getBase();
@@ -1753,8 +1764,7 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
                               ->getInstanceType()
                               ->getWithoutParens();
       if (!cs.isTypeReference(baseExpr) && instanceType->isExistentialType()) {
-        (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
-            cs, baseType, init, true, baseExpr->getSourceRange(), locator));
+        recordOnProtocolMetatypeFix(/*isStaticallyDerived*/ true);
         return;
       }
     }
@@ -1764,26 +1774,20 @@ static void validateInitializerRef(ConstraintSystem &cs, ConstructorDecl *init,
     baseType = getType(baseExpr);
     // If this is an initializer call without explicit mention
     // of `.init` on metatype value.
-    if (auto *MTT = baseType->getAs<MetatypeType>()) {
-      auto instanceType = MTT->getInstanceType()->getWithoutParens();
-      if (!cs.isTypeReference(baseExpr) && !instanceType->isExistentialType()) {
-        (void)cs.recordFix(AllowInvalidInitRef::onNonConstMetatype(
-            cs, baseType, init, locator));
-        return;
-      }
+    if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
+      auto instanceType = AMT->getInstanceType()->getWithoutParens();
+      if (!cs.isTypeReference(baseExpr)) {
+        if (baseType->is<MetatypeType>() &&
+            instanceType->isAnyExistentialType()) {
+          recordOnProtocolMetatypeFix(cs.isStaticallyDerivedMetatype(baseExpr));
+          return;
+        }
 
-      if (instanceType->isAnyExistentialType()) {
-        (void)cs.recordFix(AllowInvalidInitRef::onProtocolMetatype(
-            cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
-            baseExpr->getSourceRange(), locator));
-      }
-    } else if (auto *EMT = baseType->getAs<ExistentialMetatypeType>()) {
-      auto instanceType = EMT->getInstanceType()->getWithoutParens();
-      if (!cs.isTypeReference(baseExpr) &&
-          instanceType->isAnyExistentialType()) {
-        (void)cs.recordFix(AllowInvalidInitRef::onNonConstMetatype(
-            cs, baseType, init, locator));
-        return;
+        if (!instanceType->isExistentialType() ||
+            instanceType->isAnyExistentialType()) {
+          recordOnConstMetatypeFix();
+          return;
+        }
       }
     }
     // Initializer reference which requires contextual base type e.g.
