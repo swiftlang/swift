@@ -3309,7 +3309,7 @@ private:
   DenseMap<SILBasicBlock *, SILBasicBlock *> adjointBBMap;
 
   /// Local stack allocations.
-  SmallVector<AllocStackInst *, 8> localAllocations;
+  SmallVector<ValueWithCleanup, 8> localAllocations;
 
   /// The primal value aggregate passed to the adjoint function.
   SILArgument *primalValueAggregateInAdj = nullptr;
@@ -3319,6 +3319,9 @@ private:
 
   /// The main builder.
   SILBuilder builder;
+
+  /// An auxiliary local allocation builder.
+  SILBuilder localAllocBuilder;
 
   llvm::BumpPtrAllocator allocator;
 
@@ -3347,7 +3350,8 @@ public:
                           PostDominanceInfo &postDomInfo,
                           AdjointGen &adjointGen)
       : synthesis(item), activityInfo(activityInfo), postDomInfo(postDomInfo),
-        adjointGen(adjointGen), builder(getAdjoint()) {}
+        adjointGen(adjointGen), builder(getAdjoint()),
+        localAllocBuilder(getAdjoint()) {}
 
 private:
   //--------------------------------------------------------------------------//
@@ -3519,17 +3523,37 @@ private:
                                            ValueWithCleanup(SILValue()));
     if (!insertion.second) // not inserted
       return insertion.first->getSecond();
-    auto *newBuf = builder.createAllocStack(originalBuffer.getLoc(),
+    // Set insertion point for local allocation builder: before the last local
+    // allocation, or at the start of the adjoint entry BB if no local
+    // allocations exist yet.
+    if (localAllocations.empty())
+      localAllocBuilder.setInsertionPoint(
+          getAdjoint().getEntryBlock(), getAdjoint().getEntryBlock()->begin());
+    else
+      localAllocBuilder.setInsertionPoint(
+          localAllocations.back().getValue()->getDefiningInstruction());
+    // Allocate local buffer and initialize to zero.
+    auto *newBuf = localAllocBuilder.createAllocStack(originalBuffer.getLoc(),
         remapType(getCotangentType(originalBuffer->getType(), getModule())));
-    auto *access = builder.createBeginAccess(newBuf->getLoc(), newBuf,
-                                             SILAccessKind::Init,
-                                             SILAccessEnforcement::Static,
-                                             /*noNestedConflict*/ true,
-                                             /*fromBuiltin*/ false);
+    auto *access = localAllocBuilder.createBeginAccess(
+        newBuf->getLoc(), newBuf, SILAccessKind::Init,
+        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+        /*fromBuiltin*/ false);
     emitZeroIndirect(access->getType().getASTType(), access, access->getLoc());
-    builder.createEndAccess(access->getLoc(), access, /*aborted*/ false);
-    localAllocations.push_back(newBuf);
-    return (insertion.first->getSecond() = ValueWithCleanup(newBuf, nullptr));
+    localAllocBuilder.createEndAccess(
+        access->getLoc(), access, /*aborted*/ false);
+    // Create cleanup for local buffer.
+    auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Cleaning up local buffer " << v << '\n');
+      if (v->getType().isLoadable(b.getModule()))
+        b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
+      else
+        b.createDestroyAddr(loc, v);
+    };
+    ValueWithCleanup bufWithCleanup(newBuf, makeCleanup(newBuf, cleanupFn));
+    localAllocations.push_back(bufWithCleanup);
+    return (insertion.first->getSecond() = bufWithCleanup);
   }
 
   void addToAdjointBuffer(SILValue originalBuffer,
@@ -3589,92 +3613,44 @@ public:
     auto *origRet = getSingleReturn(&original);
     auto *origRetBB = origRet->getParent();
     adjointBBMap.insert({origRetBB, adjointEntry});
-    SILFunctionConventions origConv(origTy, getModule());
     // The adjoint function has type (seed, pv) -> ([arg0], ..., [argn]).
     auto adjParamArgs = adjoint.getArgumentsWithoutIndirectResults();
     seed = adjParamArgs[0];
     primalValueAggregateInAdj = adjParamArgs[1];
 
-    // Assign adjoint to the return value.
-    //   y = tuple (y0, ..., yn)
-    //   return y
-    //   adj[y] =
-    //     if the source result is direct
-    //     then tuple (0, ..., seed, ..., 0) where seed is at the direct
-    //          result index corresponding to the source index
-    //     else zeros
-    SmallVector<SILValue, 8> formalResults;
-    collectAllFormalResultsInTypeOrder(original, formalResults);
-    auto srcIdx = task->getIndices().source;
+    // Assign adjoint for original result.
+    SmallVector<SILValue, 8> origFormalResults;
+    collectAllFormalResultsInTypeOrder(original, origFormalResults);
+    auto origResult = origFormalResults[task->getIndices().source];
 
-    // Prepare seed adjoint.
     builder.setInsertionPoint(adjointEntry);
     if (seed->getType().isAddress()) {
       Cleanup::Func cleanupFn = nullptr;
       if (seed->getType().isLoadable(getModule())) {
         builder.createRetainValueAddr(adjLoc, seed,
                                       builder.getDefaultAtomicity());
-        cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-          LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
-          if (v->getType().isLoadable(b.getModule()))
-            b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
-          else
-            b.createDestroyAddr(loc, v);
-        };
-        setAdjointBuffer(formalResults[srcIdx],
-                         ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
-      } else {
-        auto adjBuf = builder.createAllocStack(adjLoc, seed->getType());
-        localAllocations.push_back(adjBuf);
-        builder.createCopyAddr(adjLoc, seed, adjBuf, IsNotTake, IsInitialization);
-        cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-          LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
-          b.createDestroyAddr(loc, v);
-        };
-        setAdjointBuffer(formalResults[srcIdx],
-                         ValueWithCleanup(adjBuf, makeCleanup(adjBuf, cleanupFn)));
       }
+      cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
+        LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
+        if (v->getType().isLoadable(b.getModule()))
+          b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
+        else
+          b.createDestroyAddr(loc, v);
+      };
+      setAdjointBuffer(origResult,
+                       ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
     } else {
       builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
       auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
         LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
         b.createReleaseValue(loc, v, b.getDefaultAtomicity());
       };
-      initializeAdjointValue(formalResults[srcIdx], makeConcreteAdjointValue(
+      initializeAdjointValue(origResult, makeConcreteAdjointValue(
           ValueWithCleanup(seed, makeCleanup(seed, cleanupFn))));
     }
     LLVM_DEBUG(getADDebugStream()
-               << "Assigned seed " << *seed << " as the adjoint of "
-               << formalResults[srcIdx]);
-
-    // Preemptively set adjoint buffers for original indirect parameters.
-    auto origParams = original.getArgumentsWithoutIndirectResults();
-    auto selfParamIndex = origParams.size() - 1;
-    SmallVector<ValueWithCleanup, 4> origIndirectParamAdjointBuffers;
-    for (auto i : task->getIndices().parameters.set_bits()) {
-      auto origParam = origParams[i];
-      if (!origParam->getType().isAddress())
-        continue;
-      auto *adjBuf = builder.createAllocStack(adjLoc,
-          getCotangentType(remapType(origParam->getType()), getModule()));
-      auto *access = builder.createBeginAccess(adjBuf->getLoc(), adjBuf,
-                                               SILAccessKind::Init,
-                                               SILAccessEnforcement::Static,
-                                               /*noNestedConflict*/ true,
-                                               /*fromBuiltin*/ false);
-      emitZeroIndirect(access->getType().getASTType(), access, access->getLoc());
-      builder.createEndAccess(access->getLoc(), access, /*aborted*/ false);
-      auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-        LLVM_DEBUG(getADDebugStream()
-                   << "Cleaning up original indirect parameter adjoint buffer "
-                   << v << '\n');
-        b.createDestroyAddr(loc, v);
-      };
-      auto adjBufWithCleanup =
-          ValueWithCleanup(adjBuf, makeCleanup(adjBuf, cleanupFn));
-      setAdjointBuffer(origParam, adjBufWithCleanup);
-      origIndirectParamAdjointBuffers.push_back(adjBufWithCleanup);
-    }
+               << "Assigned seed " << *seed
+               << " as the adjoint of original result " << origResult);
 
     // From the original exit, emit a reverse control flow graph and perform
     // differentiation in each block.
@@ -3719,6 +3695,9 @@ public:
     // This vector will contain all indirect parameter adjoint buffers.
     SmallVector<ValueWithCleanup, 4> indParamAdjoints;
 
+    auto origParams = original.getArgumentsWithoutIndirectResults();
+    auto selfParamIndex = origParams.size() - 1;
+
     // Materializes the return element corresponding to the parameter
     // `parameterIndex` into the `retElts` vector.
     auto addRetElt = [&](unsigned parameterIndex) -> void {
@@ -3761,27 +3740,17 @@ public:
       builder.createCopyAddr(adjLoc, source, dest, IsTake, IsInitialization);
     }
 
-    // Deallocate adjoint buffers for original indirect parameters.
-    for (auto adjBuf : reversed(origIndirectParamAdjointBuffers)) {
-      if (auto *cleanup = adjBuf.getCleanup())
+    // Deallocate local allocations.
+    for (auto alloc : localAllocations) {
+      // Assert that local allocations have at least one use.
+      // Buffers should not be allocated needlessly.
+      assert(!alloc.getValue()->use_empty());
+      if (auto *cleanup = alloc.getCleanup())
         cleanup->applyRecursively(builder, adjLoc);
-      builder.createDeallocStack(adjLoc, adjBuf);
+      builder.createDeallocStack(adjLoc, alloc);
     }
 
     builder.createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
-
-    // For any temporary allocations, emit a deallocation in the right place.
-    for (auto *alloc : reversed(localAllocations)) {
-      auto useIt = alloc->use_begin();
-      assert(useIt != alloc->use_end());
-      SILBasicBlock *deallocationPoint = (useIt++)->getUser()->getParent();
-      while (useIt != alloc->use_end()) {
-        postDomInfo.findNearestCommonDominator(
-            deallocationPoint, (useIt++)->getUser()->getParent());
-      }
-      builder.setInsertionPoint(deallocationPoint->getTerminator());
-      builder.createDeallocStack(adjLoc, alloc);
-    }
 
     LLVM_DEBUG(getADDebugStream() << "Generated adjoint\n" << adjoint);
     return errorOccurred;
