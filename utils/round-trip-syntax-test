@@ -76,9 +76,12 @@ class RoundTripTask(object):
 
         contents = ''.join(map(lambda l: l.decode('utf-8', errors='replace'),
                                open(self.input_filename).readlines()))
-        lines = difflib.unified_diff(contents,
-                                     self.stdout.decode('utf-8',
-                                                        errors='replace'),
+        stdout_contents = self.stdout.decode('utf-8', errors='replace')
+
+        if contents == stdout_contents:
+          return None
+
+        lines = difflib.unified_diff(contents, stdout_contents,
                                      fromfile=self.input_filename,
                                      tofile='-')
         diff = '\n'.join(line for line in lines)
