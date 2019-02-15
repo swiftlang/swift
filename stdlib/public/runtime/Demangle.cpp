@@ -284,7 +284,7 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   // Gather the complete set of generic arguments that must be written to
   // form this type.
   std::vector<const Metadata *> allGenericArgs;
-  gatherWrittenGenericArgs(type, description, allGenericArgs);
+  gatherWrittenGenericArgs(type, description, allGenericArgs, Dem);
 
   // Demangle the generic arguments.
   std::vector<NodePointer> demangledGenerics;
