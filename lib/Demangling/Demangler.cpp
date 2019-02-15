@@ -408,6 +408,7 @@ void NodeFactory::freeSlabs(Slab *slab) {
 }
   
 void NodeFactory::clear() {
+  assert(!isBorrowed);
   if (CurrentSlab) {
 #ifdef NODE_FACTORY_DEBUGGING
     std::cerr << indent() << "## clear: allocated memory = " << allocatedMemory  << "\n";

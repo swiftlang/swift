@@ -311,8 +311,12 @@ class Remangler {
 #include "swift/Demangling/DemangleNodes.def"
 
 public:
-  Remangler(DemanglerPrinter &Buffer,
-            SymbolicResolver Resolver) : Buffer(Buffer), Resolver(Resolver) {}
+  Remangler(DemanglerPrinter &Buffer, SymbolicResolver Resolver,
+            NodeFactory *BorrowFrom)
+       : Buffer(Buffer), Resolver(Resolver) {
+    if (BorrowFrom)
+      Factory.providePreallocatedMemory(*BorrowFrom);
+  }
 
   void mangle(Node *node) {
     switch (node->getKind()) {
@@ -2334,19 +2338,20 @@ void Remangler::mangleSugaredParen(Node *node) {
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNode(NodePointer node) {
+std::string Demangle::mangleNode(NodePointer node, NodeFactory *BorrowFrom) {
   return mangleNode(node, [](SymbolicReferenceKind, const void *) -> NodePointer {
     unreachable("should not try to mangle a symbolic reference; "
                 "resolve it to a non-symbolic demangling tree instead");
-  });
+  }, BorrowFrom);
 }
 
 std::string
-Demangle::mangleNode(NodePointer node, SymbolicResolver resolver) {
+Demangle::mangleNode(NodePointer node, SymbolicResolver resolver,
+                     NodeFactory *BorrowFrom) {
   if (!node) return "";
 
   DemanglerPrinter printer;
-  Remangler(printer, resolver).mangle(node);
+  Remangler(printer, resolver, BorrowFrom).mangle(node);
 
   return std::move(printer).str();
 }

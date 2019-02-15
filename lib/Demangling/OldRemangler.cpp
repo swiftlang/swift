@@ -214,7 +214,11 @@ namespace {
     std::unordered_map<SubstitutionEntry, unsigned,
                        SubstitutionEntry::Hasher> Substitutions;
   public:
-    Remangler(DemanglerPrinter &out) : Out(out) {}
+    Remangler(DemanglerPrinter &out,
+              NodeFactory *BorrowFrom) : Out(out) {
+      if (BorrowFrom)
+        Factory.providePreallocatedMemory(*BorrowFrom);
+    }
 
     class EntityContext {
       bool AsContext = false;
@@ -2282,10 +2286,10 @@ void Remangler::mangleSugaredParen(Node *node) {
 }
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNodeOld(NodePointer node) {
+std::string Demangle::mangleNodeOld(NodePointer node, NodeFactory *BorrowFrom) {
   if (!node) return "";
 
   DemanglerPrinter printer;
-  Remangler(printer).mangle(node);
+  Remangler(printer, BorrowFrom).mangle(node);
   return std::move(printer).str();
 }

@@ -474,8 +474,10 @@ void mangleIdentifier(const char *data, size_t length,
 
 /// Remangle a demangled parse tree.
 ///
-/// This should always round-trip perfectly with demangleSymbolAsNode.
-std::string mangleNode(NodePointer root);
+/// If \p BorrowFrom is specified, the initial bump pointer memory is
+/// borrowed from the free memory of BorrowFrom.
+std::string mangleNode(NodePointer root,
+                       NodeFactory *BorrowFrom = nullptr);
 
 using SymbolicResolver =
   llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
@@ -484,14 +486,17 @@ using SymbolicResolver =
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
 ///
-/// This should always round-trip perfectly with demangleSymbolAsNode.
-std::string mangleNode(NodePointer root, SymbolicResolver resolver);
+/// If \p BorrowFrom is specified, the initial bump pointer memory is
+/// borrowed from the free memory of BorrowFrom.
+std::string mangleNode(NodePointer root, SymbolicResolver resolver,
+                       NodeFactory *BorrowFrom = nullptr);
 
 /// Remangle in the old mangling scheme.
 ///
-/// This is only used for objc-runtime names and should be removed as soon as
-/// we switch to the new mangling for those names as well.
-std::string mangleNodeOld(NodePointer root);
+/// This is only used for objc-runtime names.
+/// If \p BorrowFrom is specified, the initial bump pointer memory is
+/// borrowed from the free memory of BorrowFrom.
+std::string mangleNodeOld(NodePointer root, NodeFactory *BorrowFrom = nullptr);
 
 /// Transform the node structure to a string.
 ///
