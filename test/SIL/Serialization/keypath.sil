@@ -56,6 +56,12 @@ struct T {
   let w: (Int, C)
 }
 
+struct GenT<A, B> {
+  var x: (A, B)
+  let y: (a: A, b: B)
+  let z: (e0: External<A>, e1: External<B>)
+}
+
 // CHECK-LABEL: sil shared [serialized] [ossa] @stored_properties
 sil shared [serialized] [ossa] @stored_properties : $@convention(thin) () -> () {
 entry:
@@ -97,13 +103,28 @@ entry:
   return undef : $()
 }
 
-// CHECK-LABEL: sil shared [serialized] @tuple_generic
-sil shared [serialized] @tuple_generic : $@convention(thin) <T, U> () -> () {
+// CHECK-LABEL: sil shared [serialized] [ossa] @tuple_generic
+sil shared [serialized] [ossa] @tuple_generic : $@convention(thin) <T, U> () -> () {
 entry:
   // CHECK: keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
   %a = keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
   // CHECK: keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
   %b = keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+
+  // CHECK: keypath $WritableKeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.x : $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  %c = keypath $WritableKeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.x : $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  // CHECK: keypath $WritableKeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.x : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+  %d = keypath $WritableKeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.x : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+
+  // CHECK: keypath $KeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.y : $(a: τ_0_0, b: τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  %e = keypath $KeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.y : $(a: τ_0_0, b: τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  // CHECK: keypath $KeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.y : $(a: τ_0_0, b: τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+  %f = keypath $KeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.y : $(a: τ_0_0, b: τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+
+  // CHECK: keypath $KeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.z : $(e0: External<τ_0_0>, e1: External<τ_0_1>); tuple_element #0 : $External<τ_0_0>; stored_property #External.ro : $τ_0_0) <T, U>
+  %g = keypath $KeyPath<GenT<T, U>, T>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.z : $(e0: External<τ_0_0>, e1: External<τ_0_1>); tuple_element #0 : $External<τ_0_0>; stored_property #External.ro : $τ_0_0) <T, U>
+  // CHECK: keypath $KeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.z : $(e0: External<τ_0_0>, e1: External<τ_0_1>); tuple_element #1 : $External<τ_0_1>; stored_property #External.ro : $τ_0_1) <T, U>
+  %h = keypath $KeyPath<GenT<T, U>, U>, <τ_0_0, τ_0_1> (root $GenT<τ_0_0, τ_0_1>; stored_property #GenT.z : $(e0: External<τ_0_0>, e1: External<τ_0_1>); tuple_element #1 : $External<τ_0_1>; stored_property #External.ro : $τ_0_1) <T, U>
 
   return undef : $()
 }
