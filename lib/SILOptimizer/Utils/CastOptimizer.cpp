@@ -264,20 +264,10 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedObjCToSwiftCast(
   return (NewI) ? NewI : AI;
 }
 
-/// Create a call of _forceBridgeFromObjectiveC_bridgeable or
-/// _conditionallyBridgeFromObjectiveC_bridgeable which converts an ObjC
-/// instance into a corresponding Swift type, conforming to
-/// _ObjectiveCBridgeable.
-SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
-    SILInstruction *Inst, bool isConditional, SILValue Src, SILValue Dest,
-    CanType Source, CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
+SILInstruction *CastOptimizer::optimizeUnconditionalBridgedObjCToSwiftCast(
+    SILInstruction *Inst, SILValue Src, SILValue Dest, CanType Source,
+    CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
     SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
-  if (isConditional) {
-    return optimizeConditionalBridgedObjCToSwiftCast(
-        Inst, Src, Dest, Source, Target, BridgedSourceTy, BridgedTargetTy,
-        SuccessBB, FailureBB);
-  }
-
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
@@ -421,6 +411,24 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
 
   EraseInstAction(Inst);
   return (NewI) ? NewI : AI;
+}
+
+// Create a call of _forceBridgeFromObjectiveC_bridgeable or
+// _conditionallyBridgeFromObjectiveC_bridgeable which converts an ObjC instance
+// into a corresponding Swift type, conforming to _ObjectiveCBridgeable.
+SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
+    SILInstruction *Inst, bool isConditional, SILValue Src, SILValue Dest,
+    CanType Source, CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
+    SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
+  if (isConditional) {
+    return optimizeConditionalBridgedObjCToSwiftCast(
+        Inst, Src, Dest, Source, Target, BridgedSourceTy, BridgedTargetTy,
+        SuccessBB, FailureBB);
+  }
+
+  return optimizeUnconditionalBridgedObjCToSwiftCast(
+      Inst, Src, Dest, Source, Target, BridgedSourceTy, BridgedTargetTy,
+      SuccessBB, FailureBB);
 }
 
 static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
@@ -735,19 +743,10 @@ SILInstruction *CastOptimizer::optimizeConditionalBridgedSwiftToObjCCast(
   return NewI;
 }
 
-/// Create a call of _bridgeToObjectiveC which converts an _ObjectiveCBridgeable
-/// instance into a bridged ObjC type.
-SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
-    SILInstruction *Inst, CastConsumptionKind ConsumptionKind,
-    bool isConditional, SILValue Src, SILValue Dest, CanType Source,
-    CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
-    SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
-  if (isConditional) {
-    return optimizeConditionalBridgedSwiftToObjCCast(
-        Inst, ConsumptionKind, Src, Dest, Source, Target, BridgedSourceTy,
-        BridgedTargetTy, SuccessBB, FailureBB);
-  }
-
+SILInstruction *CastOptimizer::optimizeUnconditionalBridgedSwiftToObjCCast(
+    SILInstruction *Inst, CastConsumptionKind ConsumptionKind, SILValue Src,
+    SILValue Dest, CanType Source, CanType Target, Type BridgedSourceTy,
+    Type BridgedTargetTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
@@ -1007,6 +1006,24 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
   }
 
   return NewI;
+}
+
+/// Create a call of _bridgeToObjectiveC which converts an _ObjectiveCBridgeable
+/// instance into a bridged ObjC type.
+SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
+    SILInstruction *Inst, CastConsumptionKind ConsumptionKind,
+    bool isConditional, SILValue Src, SILValue Dest, CanType Source,
+    CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
+    SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB) {
+  if (isConditional) {
+    return optimizeConditionalBridgedSwiftToObjCCast(
+        Inst, ConsumptionKind, Src, Dest, Source, Target, BridgedSourceTy,
+        BridgedTargetTy, SuccessBB, FailureBB);
+  }
+
+  return optimizeUnconditionalBridgedSwiftToObjCCast(
+      Inst, ConsumptionKind, Src, Dest, Source, Target, BridgedSourceTy,
+      BridgedTargetTy, SuccessBB, FailureBB);
 }
 
 /// Make use of the fact that some of these casts cannot fail.

@@ -154,6 +154,13 @@ private:
       CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
       SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
 
+  /// Helper function that optimizes bridged objc objects that are only
+  /// conditionally castable to swift. Called by optimizeBridgedObjCToSwiftCast.
+  SILInstruction *optimizeUnconditionalBridgedObjCToSwiftCast(
+      SILInstruction *Inst, SILValue Src, SILValue Dest, CanType Source,
+      CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
+      SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
+
   /// Optimize a cast from a Swift type implementing _ObjectiveCBridgeable into
   /// a bridged ObjC type. Handles the unconditional case itself and the
   /// conditional case by delegating to
@@ -167,6 +174,11 @@ private:
   /// Helper function that optimizes bridged swift objects that are only
   /// conditionally castable to objc. Called by optimizeBridgedSwiftToObjCCast.
   SILInstruction *optimizeConditionalBridgedSwiftToObjCCast(
+      SILInstruction *Inst, CastConsumptionKind ConsumptionKind, SILValue Src,
+      SILValue Dest, CanType Source, CanType Target, Type BridgedSourceTy,
+      Type BridgedTargetTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
+
+  SILInstruction *optimizeUnconditionalBridgedSwiftToObjCCast(
       SILInstruction *Inst, CastConsumptionKind ConsumptionKind, SILValue Src,
       SILValue Dest, CanType Source, CanType Target, Type BridgedSourceTy,
       Type BridgedTargetTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
