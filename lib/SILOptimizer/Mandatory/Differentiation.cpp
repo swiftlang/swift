@@ -4604,7 +4604,7 @@ void AdjointEmitter::materializeAdjointIndirectHelper(
 
 void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
                                       SILLocation loc) {
-  // Lookup `AdditiveArithmetic.zero.getter`.
+  // Look up `AdditiveArithmetic.zero.getter`.
   auto *additiveArithmeticProto =
       getASTContext().getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto initDeclLookup =
@@ -4615,20 +4615,21 @@ void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
   auto methodType =
       getContext().getTypeConverter().getConstantType(accessorDeclRef);
-  // Lookup conformance to `AdditiveArithmetic`.
+  // Look up conformance to `AdditiveArithmetic`.
   auto *swiftMod = getModule().getSwiftModule();
-  auto conf = swiftMod->lookupConformance(type, additiveArithmeticProto);
-  assert(conf.hasValue() && "No conformance to AdditiveArithmetic?");
-  ProtocolConformanceRef confRef(*conf);
+  auto confRef = swiftMod->lookupConformance(type, additiveArithmeticProto);
+  // TODO(TF-202): Diagnose no `AdditiveArithmetic` due to generic signature
+  // minimization bug.
+  assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
   // %wm = witness_method ...
-  auto *getter = builder.createWitnessMethod(loc, type, confRef,
+  auto *getter = builder.createWitnessMethod(loc, type, *confRef,
                                              accessorDeclRef, methodType);
   // %metatype = metatype $T
   auto metatypeType = CanMetatypeType::get(type, MetatypeRepresentation::Thick);
   auto metatype = builder.createMetatype(
       loc, SILType::getPrimitiveObjectType(metatypeType));
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
-      additiveArithmeticProto, type, confRef);
+      additiveArithmeticProto, type, *confRef);
   builder.createApply(loc, getter, subMap, {bufferAccess, metatype},
                       /*isNonThrowing*/ false);
 }
@@ -4838,14 +4839,18 @@ void AdjointEmitter::accumulateIndirect(
     auto adjointParentModule = cotangentSpace->getNominal()
         ? cotangentSpace->getNominal()->getModuleContext()
         : getModule().getSwiftModule();
-    auto confRef = *adjointParentModule->lookupConformance(adjointASTTy, proto);
+    auto confRef = adjointParentModule->lookupConformance(adjointASTTy, proto);
+    // TODO(TF-202): Diagnose no `AdditiveArithmetic` due to generic signature
+    // minimization bug.
+    assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
     SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
     auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
     // %0 = witness_method @+
     auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy,
-                                                     confRef, declRef, silFnTy);
-    auto subMap =
-        SubstitutionMap::getProtocolSubstitutions(proto, adjointASTTy, confRef);
+                                                     *confRef, declRef,
+                                                     silFnTy);
+    auto subMap = SubstitutionMap::getProtocolSubstitutions(
+        proto, adjointASTTy, *confRef);
     // %1 = metatype $T.Type
     auto metatypeType =
         CanMetatypeType::get(adjointASTTy, MetatypeRepresentation::Thick);
@@ -4891,14 +4896,15 @@ void AdjointEmitter::accumulateIndirect(SILValue lhsDestAccess,
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *accumulatorFuncDecl = getContext().getPlusEqualDecl();
     // Call the combiner function and return.
-    auto confRef = *swiftMod->lookupConformance(astType, proto);
+    auto confRef = swiftMod->lookupConformance(astType, proto);
+    assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
     SILDeclRef declRef(accumulatorFuncDecl, SILDeclRef::Kind::Func);
     auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
     // %0 = witness_method @+=
     auto witnessMethod =
-        builder.createWitnessMethod(loc, astType, confRef, declRef, silFnTy);
+        builder.createWitnessMethod(loc, astType, *confRef, declRef, silFnTy);
     auto subMap =
-        SubstitutionMap::getProtocolSubstitutions(proto, astType, confRef);
+        SubstitutionMap::getProtocolSubstitutions(proto, astType, *confRef);
     // %1 = metatype $T.Type
     auto metatypeType =
         CanMetatypeType::get(astType, MetatypeRepresentation::Thick);
