@@ -16,6 +16,7 @@ arguments.
 import os.path
 import re
 import shlex
+import sys
 
 from . import ArgumentTypeError
 
@@ -64,7 +65,8 @@ def _repr(cls, args):
     """
 
     _args = []
-    for key, value in args.viewitems():
+    viewitems = args.viewitems() if sys.version_info[0] == 2 else args.items()
+    for key, value in viewitems:
         _args.append('{}={}'.format(key, repr(value)))
 
     return '{}({})'.format(type(cls).__name__, ', '.join(_args))
