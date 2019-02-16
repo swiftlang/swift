@@ -4274,16 +4274,13 @@ Type ModuleFile::getType(TypeID TID) {
 }
 
 class swift::TypeDeserializer {
-  template <typename T>
-  using Serialized = ModuleFile::Serialized<T>;
   using TypeID = serialization::TypeID;
 
   ModuleFile &MF;
   ASTContext &ctx;
-  Serialized<Type> &typeOrOffset;
 public:
-  TypeDeserializer(ModuleFile &MF, Serialized<Type> &typeOrOffset)
-      : MF(MF), ctx(MF.getContext()), typeOrOffset(typeOrOffset) {}
+  explicit TypeDeserializer(ModuleFile &MF)
+      : MF(MF), ctx(MF.getContext()) {}
 
   Expected<Type> getTypeCheckedImpl();
 };
@@ -4300,7 +4297,24 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(typeOrOffset);
-  return TypeDeserializer(*this, typeOrOffset).getTypeCheckedImpl();
+
+  auto result = TypeDeserializer(*this).getTypeCheckedImpl();
+  if (!result)
+    return result;
+  typeOrOffset = result.get();
+
+#ifndef NDEBUG
+  PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
+  if (typeOrOffset.get()->hasError()) {
+    typeOrOffset.get()->dump();
+    llvm_unreachable("deserialization produced an invalid type "
+                     "(rdar://problem/30382791)");
+  }
+#endif
+
+  // Invoke the callback on the deserialized type.
+  DeserializedTypeCallback(typeOrOffset.get());
+  return typeOrOffset.get();
 }
 
 Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
@@ -4319,6 +4333,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   StringRef blobData;
   unsigned recordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch,
                                                    &blobData);
+  Type result;
 
   switch (recordID) {
   case decls_block::BUILTIN_ALIAS_TYPE: {
@@ -4339,7 +4354,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
         if (!alias ||
             !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
           // Fall back to the canonical type.
-          typeOrOffset = expectedType.get();
+          result = expectedType.get();
           break;
         }
       }
@@ -4348,11 +4363,11 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     // Look through compatibility aliases that are now unavailable.
     if (alias->getAttrs().isUnavailable(ctx) &&
         alias->isCompatibilityAlias()) {
-      typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+      result = alias->getUnderlyingTypeLoc().getType();
       break;
     }
 
-    typeOrOffset = alias->getDeclaredInterfaceType();
+    result = alias->getDeclaredInterfaceType();
     break;
   }
 
@@ -4404,7 +4419,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
     auto parentTypeOrError = MF.getTypeChecked(parentTypeID);
     if (!parentTypeOrError) {
-      typeOrOffset = underlyingType;
+      result = underlyingType;
       break;
     }
 
@@ -4414,17 +4429,17 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
         alias->isCompatibilityAlias()) {
       underlyingType = alias->getUnderlyingTypeLoc().getType().subst(subMap);
       assert(underlyingType);
-      typeOrOffset = underlyingType;
+      result = underlyingType;
       break;
     }
 
     if (!formSugaredType) {
-      typeOrOffset = underlyingType;
+      result = underlyingType;
       break;
     }
 
     auto parentType = parentTypeOrError.get();
-    typeOrOffset = TypeAliasType::get(alias, parentType, subMap,
+    result = TypeAliasType::get(alias, parentType, subMap,
                                       substitutedType);
     break;
   }
@@ -4474,9 +4489,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       return llvm::make_error<XRefError>("declaration is not a nominal type",
                                          tinyTrace, fullName);
     }
-    typeOrOffset = NominalType::get(nominal, parentTy.get(), ctx);
-
-    assert(typeOrOffset.isComplete());
+    result = NominalType::get(nominal, parentTy.get(), ctx);
     break;
   }
 
@@ -4488,7 +4501,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     if (!underlyingTy)
       return underlyingTy.takeError();
 
-    typeOrOffset = ParenType::get(ctx, underlyingTy.get());
+    result = ParenType::get(ctx, underlyingTy.get());
     break;
   }
 
@@ -4517,7 +4530,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       elements.emplace_back(elementTy.get(), MF.getIdentifier(nameID));
     }
 
-    typeOrOffset = TupleType::get(elements, ctx);
+    result = TupleType::get(elements, ctx);
     break;
   }
 
@@ -4594,10 +4607,10 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
     if (recordID == decls_block::FUNCTION_TYPE) {
       assert(genericSig == nullptr);
-      typeOrOffset = FunctionType::get(params, resultTy.get(), info);
+      result = FunctionType::get(params, resultTy.get(), info);
     } else {
       assert(genericSig != nullptr);
-      typeOrOffset = GenericFunctionType::get(genericSig,
+      result = GenericFunctionType::get(genericSig,
                                               params, resultTy.get(), info);
     }
 
@@ -4615,7 +4628,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
     switch (repr) {
     case serialization::MetatypeRepresentation::MR_None:
-      typeOrOffset = ExistentialMetatypeType::get(instanceType.get());
+      result = ExistentialMetatypeType::get(instanceType.get());
       break;
 
     case serialization::MetatypeRepresentation::MR_Thin:
@@ -4623,12 +4636,12 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       break;
 
     case serialization::MetatypeRepresentation::MR_Thick:
-      typeOrOffset = ExistentialMetatypeType::get(instanceType.get(),
+      result = ExistentialMetatypeType::get(instanceType.get(),
                                        MetatypeRepresentation::Thick);
       break;
 
     case serialization::MetatypeRepresentation::MR_ObjC:
-      typeOrOffset = ExistentialMetatypeType::get(instanceType.get(),
+      result = ExistentialMetatypeType::get(instanceType.get(),
                                        MetatypeRepresentation::ObjC);
       break;
 
@@ -4650,21 +4663,21 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
     switch (repr) {
     case serialization::MetatypeRepresentation::MR_None:
-      typeOrOffset = MetatypeType::get(instanceType.get());
+      result = MetatypeType::get(instanceType.get());
       break;
 
     case serialization::MetatypeRepresentation::MR_Thin:
-      typeOrOffset = MetatypeType::get(instanceType.get(),
+      result = MetatypeType::get(instanceType.get(),
                                        MetatypeRepresentation::Thin);
       break;
 
     case serialization::MetatypeRepresentation::MR_Thick:
-      typeOrOffset = MetatypeType::get(instanceType.get(),
+      result = MetatypeType::get(instanceType.get(),
                                        MetatypeRepresentation::Thick);
       break;
 
     case serialization::MetatypeRepresentation::MR_ObjC:
-      typeOrOffset = MetatypeType::get(instanceType.get(),
+      result = MetatypeType::get(instanceType.get(),
                                        MetatypeRepresentation::ObjC);
       break;
 
@@ -4678,7 +4691,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   case decls_block::DYNAMIC_SELF_TYPE: {
     TypeID selfID;
     decls_block::DynamicSelfTypeLayout::readRecord(scratch, selfID);
-    typeOrOffset = DynamicSelfType::get(MF.getType(selfID), ctx);
+    result = DynamicSelfType::get(MF.getType(selfID), ctx);
     break;
   }
 
@@ -4699,7 +4712,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     if (!objectTy)
       return objectTy.takeError();
 
-    typeOrOffset = ReferenceStorageType::get(objectTy.get(),
+    result = ReferenceStorageType::get(objectTy.get(),
                                              ownership.getValue(), ctx);
     break;
   }
@@ -4719,7 +4732,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
     Type interfaceType = GenericTypeParamType::get(depth, index, ctx);
     Type contextType = env->mapTypeIntoContext(interfaceType);
-    typeOrOffset = contextType;
+    result = contextType;
 
     if (contextType->hasError()) {
       MF.error();
@@ -4735,7 +4748,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
                                                        existentialID);
 
-    typeOrOffset = OpenedArchetypeType::get(MF.getType(existentialID));
+    result = OpenedArchetypeType::get(MF.getType(existentialID));
     break;
   }
       
@@ -4777,15 +4790,11 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
         return nullptr;
       }
 
-      // See if we triggered deserialization through our conformances.
-      if (typeOrOffset.isComplete())
-        break;
-
-      typeOrOffset = genericParam->getDeclaredInterfaceType();
+      result = genericParam->getDeclaredInterfaceType();
       break;
     }
 
-    typeOrOffset = GenericTypeParamType::get(declIDOrDepth,indexPlusOne-1,ctx);
+    result = GenericTypeParamType::get(declIDOrDepth,indexPlusOne-1,ctx);
     break;
   }
 
@@ -4804,7 +4813,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       protocols.push_back(protoTy.get());
     }
 
-    typeOrOffset = ProtocolCompositionType::get(ctx, protocols,
+    result = ProtocolCompositionType::get(ctx, protocols,
                                                 hasExplicitAnyObject);
     break;
   }
@@ -4815,7 +4824,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
     decls_block::DependentMemberTypeLayout::readRecord(scratch, baseID,
                                                        assocTypeID);
-    typeOrOffset = DependentMemberType::get(
+    result = DependentMemberType::get(
                      MF.getType(baseID),
                      cast<AssociatedTypeDecl>(MF.getDecl(assocTypeID)));
     break;
@@ -4847,7 +4856,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     }
 
     auto boundTy = BoundGenericType::get(nominal, parentTy, genericArgs);
-    typeOrOffset = boundTy;
+    result = boundTy;
     break;
   }
 
@@ -4855,7 +4864,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     TypeID captureID;
     
     decls_block::SILBlockStorageTypeLayout::readRecord(scratch, captureID);
-    typeOrOffset = SILBlockStorageType::get(MF.getType(captureID)
+    result = SILBlockStorageType::get(MF.getType(captureID)
                                               ->getCanonicalType());
     break;
   }
@@ -4891,7 +4900,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       return nullptr;
 
     auto subMap = MF.getSubstitutionMap(subMapID);
-    typeOrOffset = SILBoxType::get(ctx, layout, subMap);
+    result = SILBoxType::get(ctx, layout, subMap);
     break;
   }
       
@@ -5046,7 +5055,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
     GenericSignature *genericSig = MF.getGenericSignature(rawGenericSig);
 
-    typeOrOffset = SILFunctionType::get(genericSig, extInfo,
+    result = SILFunctionType::get(genericSig, extInfo,
                                         coroutineKind.getValue(),
                                         calleeConvention.getValue(),
                                         allParams, allYields, allResults,
@@ -5063,7 +5072,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     if (!baseTy)
       return baseTy.takeError();
 
-    typeOrOffset = ArraySliceType::get(baseTy.get());
+    result = ArraySliceType::get(baseTy.get());
     break;
   }
 
@@ -5079,7 +5088,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     if (!valueTy)
       return valueTy.takeError();
 
-    typeOrOffset = DictionaryType::get(keyTy.get(), valueTy.get());
+    result = DictionaryType::get(keyTy.get(), valueTy.get());
     break;
   }
 
@@ -5091,7 +5100,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     if (!baseTy)
       return baseTy.takeError();
 
-    typeOrOffset = OptionalType::get(baseTy.get());
+    result = OptionalType::get(baseTy.get());
     break;
   }
 
@@ -5109,7 +5118,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     // FIXME: Check this?
     auto parentTy = MF.getType(parentID);
 
-    typeOrOffset = UnboundGenericType::get(genericDecl, parentTy, ctx);
+    result = UnboundGenericType::get(genericDecl, parentTy, ctx);
     break;
   }
 
@@ -5119,19 +5128,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     return nullptr;
   }
 
-#ifndef NDEBUG
-  PrettyStackTraceType trace(ctx, "deserializing", typeOrOffset.get());
-  if (typeOrOffset.get()->hasError()) {
-    typeOrOffset.get()->dump();
-    llvm_unreachable("deserialization produced an invalid type "
-                     "(rdar://problem/30382791)");
-  }
-#endif
-
-  // Invoke the callback on the deserialized type.
-  MF.DeserializedTypeCallback(typeOrOffset);
-
-  return typeOrOffset;
+  return result;
 }
 
 Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
