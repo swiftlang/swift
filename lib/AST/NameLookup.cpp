@@ -1672,57 +1672,16 @@ namespace {
     if (addGenericParametersHereAndInEnclosingScopes(DC))
       return std::make_pair(ScopeLookupResult::finished, DC);
 
-    // UP TO HERE
-        
-        if (BaseDC && !lookupDecls.empty()) {
-          NLOptions options = baseNLOptions;
-          if (isCascadingUse.getValue())
-            options |= NL_KnownCascadingDependency;
-          else
-            options |= NL_KnownNonCascadingDependency;
-          
-          SmallVector<ValueDecl *, 4> Lookup;
-          DC->lookupQualified(lookupDecls, Name, options, Lookup);
-          bool FoundAny = false;
-          auto startIndex = Results.size();
-          for (auto Result : Lookup) {
-            // Classify this declaration.
-            FoundAny = true;
-            
-            // Types are formally members of the metatype.
-            if (auto TD = dyn_cast<TypeDecl>(Result)) {
-              Results.push_back(LookupResultEntry(MetaBaseDC, Result));
-              continue;
-            }
-            
-            Results.push_back(LookupResultEntry(BaseDC, Result));
-          }
-          
-          if (FoundAny) {
-            // Predicate that determines whether a lookup result should
-            // be unavailable except as a last-ditch effort.
-        auto unavailableLookupResult = [&](const LookupResultEntry &result) {
-              auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-          return result.getValueDecl()->getAttrs().isUnavailableInSwiftVersion(
-              effectiveVersion);
-            };
-            
-            // If all of the results we found are unavailable, keep looking.
-            auto begin = Results.begin() + startIndex;
-            if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
-              UnavailableInnerResults.append(begin, Results.end());
-              Results.erase(begin, Results.end());
-            } else {
-              if (DebugClient)
-                filterForDiscriminator(Results, DebugClient);
-
-              if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-            return std::make_pair(ScopeLookupResult::finished, DC);
-            }
-          }
-        }
-        
-        DC = DC->getParentForLookup();
+    if (BaseDC && !lookupDecls.empty()) {
+      auto startIndexOfInnerResults = Results.size();
+      addContentsOfLookupDecls_RENAME(std::move(lookupDecls), Name, DC,
+                                      isCascadingUse.getValue(), baseNLOptions,
+                                      BaseDC, MetaBaseDC);
+      if (handleUnavailableInnerResults(startIndexOfInnerResults))
+        return std::make_pair(ScopeLookupResult::finished, DC);
+    }
+    // TODO: What if !BaseDC && lookupDecls non-empty?
+    DC = DC->getParentForLookup();
     return std::make_pair(ScopeLookupResult::next, DC);
   }
 
@@ -2057,7 +2016,56 @@ namespace {
       }
       return false;
     }
-    
+
+    /// Return true if found any
+    void addContentsOfLookupDecls_RENAME(LookupDecls lookupDecls, DeclName Name,
+                                         DeclContext *DC,
+                                         const bool isCascadingUse,
+                                         const NLOptions baseNLOptions,
+                                         DeclContext *BaseDC,
+                                         DeclContext *MetaBaseDC) {
+      const NLOptions options =
+          baseNLOptions | (isCascadingUse ? NL_KnownCascadingDependency
+                                          : NL_KnownNonCascadingDependency);
+
+      SmallVector<ValueDecl *, 4> Lookup;
+      DC->lookupQualified(lookupDecls, Name, options, Lookup);
+      auto startIndex = Results.size();
+      for (auto Result : Lookup) {
+        // Classify this declaration.
+        // Types are formally members of the metatype.
+        Results.push_back(LookupResultEntry(
+            dyn_cast<TypeDecl>(Result) ? MetaBaseDC : BaseDC, Result));
+      }
+    }
+
+    /// Return true if finished with lookup
+    bool handleUnavailableInnerResults(const size_t startIndexOfInnerResults) {
+      // An optimization:
+      assert(Results.size() >= startIndexOfInnerResults);
+      if (Results.size() == startIndexOfInnerResults)
+        return false;
+      // Predicate that determines whether a lookup result should
+      // be unavailable except as a last-ditch effort.
+      auto unavailableLookupResult = [&](const LookupResultEntry &result) {
+        auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
+        return result.getValueDecl()->getAttrs().isUnavailableInSwiftVersion(
+            effectiveVersion);
+      };
+
+      // If all of the results we found are unavailable, keep looking.
+      auto begin = Results.begin() + startIndexOfInnerResults;
+      if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
+        UnavailableInnerResults.append(begin, Results.end());
+        Results.erase(begin, Results.end());
+        return false;
+      }
+      if (DebugClient)
+        filterForDiscriminator(Results, DebugClient);
+
+      return isFinishedWithLookupNowThatIsAboutToLookForOuterResults();
+    }
+
     void finishLookupRENAME() {
       
       recordLookupOfTopLevelName(DC, Name, isCascadingUse.getValue());
