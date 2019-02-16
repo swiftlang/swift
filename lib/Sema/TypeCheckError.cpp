@@ -1652,6 +1652,17 @@ private:
   }
 
   void checkPotentiallyThrowingAccessor(Expr *E) {
+    // Look through optional expressions as we could be evaluating something
+    // like try? Foo.baz = "" or let _ = try? Foo.baz
+    if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
+      E = OTE->getSubExpr();
+      if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OTE->getSubExpr())) {
+        E = IIO->getSubExpr();
+      }
+    }
+
+    // Check if we have an assign expression, which implies we're using a
+    // setter rather than a getter
     auto setter = dyn_cast<AssignExpr>(E->getValueProvidingExpr());
     auto expr = setter ? setter->getDest() : E->getValueProvidingExpr();
     if (auto MRE = dyn_cast<MemberRefExpr>(expr)) {
