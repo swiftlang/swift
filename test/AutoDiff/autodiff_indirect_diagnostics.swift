@@ -15,18 +15,14 @@ func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
 }
 _ = gradient(at: 1.0, in: generic) // expected-error {{function is not differentiable}}
 
-// FIXME(TF-202): Diagnose "no conformance to `AdditiveArithmetic`" in differentiation pass.
-// TODO(TF-213): Remove this test after generic signature minimization bug fix.
-/*
+// okay!
 @differentiable
 func directMissingConformance<T : Differentiable>(_ x: T) -> T {
   return x
 }
-*/
 
 @differentiable
-// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
-func direct<T : Differentiable>(_ x: T) -> T where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic {
+func direct<T : Differentiable>(_ x: T) -> T {
   return x
 }
 

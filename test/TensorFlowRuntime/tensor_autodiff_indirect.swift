@@ -35,10 +35,7 @@ TensorADTests.testAllBackends("Concrete") {
   expectEqual(Tensor(18), pullback(at: Tensor<Float>(3), in: indirect)(Tensor(3)))
 }
 
-// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
-extension Tensor where Scalar : Differentiable & FloatingPoint,
-                       Scalar.TangentVector : AdditiveArithmetic,
-                       Scalar.CotangentVector : AdditiveArithmetic {
+extension Tensor where Scalar : Differentiable & FloatingPoint {
   @differentiable(vjp: vjpFoo)
   func foo(_ x: Scalar) -> Scalar {
     return x
@@ -65,9 +62,7 @@ extension Double : Addable {
   }
 }
 TensorADTests.testAllBackends("ResultSelection") {
-  // TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
-  func indirect<T : Addable>(_ x: T, _ y: T) -> (T, T) where T.TangentVector : AdditiveArithmetic,
-                                                             T.CotangentVector : AdditiveArithmetic {
+  func indirect<T : Addable>(_ x: T, _ y: T) -> (T, T) {
     let first = T.add(x, x)
     return (T.add(first, first), T.add(y, 2))
   }

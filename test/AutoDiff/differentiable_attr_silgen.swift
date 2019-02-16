@@ -29,7 +29,7 @@ public func foo_indir_ret<T: Differentiable>(_ x: Float, _ y: T) -> T {
   return y
 }
 
-// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 vjp @dfoo_indir_ret] @foo_indir_ret : $@convention(thin) <T where T : Differentiable> (Float, @in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 vjp @dfoo_indir_ret] @foo_indir_ret : $@convention(thin) <T where T : Differentiable, T.TangentVector == T.TangentVector.TangentVector> (Float, @in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $Float, %2 : @trivial $*T):
 
 @_silgen_name("dfoo_indir_ret")

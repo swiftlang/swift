@@ -58,7 +58,7 @@ func vjpGenericExtraGenericRequirements<T : Differentiable & FloatingPoint>(x: T
 func foo<T : FloatingPoint & Differentiable>(_ x: T) -> T { return x }
 
 // expected-error @+2 {{type 'T' does not conform to protocol 'FloatingPoint'}}
-// expected-error @+1 {{'foo' does not have expected type '<T where T : AdditiveArithmetic, T : Differentiable> (T) -> T'}}
+// expected-error @+1 {{'foo' does not have expected type '<T where T : AdditiveArithmetic, T : Differentiable, T.TangentVector == T.TangentVector.TangentVector> (T) -> T'}}
 @differentiating(foo)
 func vjpFoo<T : AdditiveArithmetic & Differentiable>(_ x: T) -> (value: T, pullback: (T.CotangentVector) -> (T.CotangentVector)) {
   return (x, { $0 })

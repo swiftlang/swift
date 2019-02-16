@@ -1822,10 +1822,21 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       // should go into the new extension we (might) suggest here.
       impliedDisablesMissingWitnessFixits = true;
 
-      diagnoseConformanceImpliedByConditionalConformance(
-          TC.Diags, conformance, implyingConf, issueFixit);
-
-      conformance->setInvalid();
+      // SWIFT_ENABLE_TENSORFLOW
+      //
+      // Before we emit a diagnostic for implied conditional conformances, we
+      // want to see if the implied protocol is an underscored protocol for
+      // internal purposes (e.g. `_KeyPathIterableBase`, and `__Differentiable`
+      // which is really just blocked on TF-213). If so, we allow this implied
+      // conformance.
+      auto *proto = conformance->getProtocol();
+      auto &ctx = DC->getASTContext();
+      // TODO(TF-213): Remove `__Differentiable` and the special case for it.
+      if (proto != ctx.getProtocol(KnownProtocolKind::_Differentiable)) {
+        diagnoseConformanceImpliedByConditionalConformance(
+            TC.Diags, conformance, implyingConf, issueFixit);
+        conformance->setInvalid();
+      }
     }
   }
 
@@ -5467,7 +5478,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return derived.deriveVectorNumeric(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::Differentiable:
+  // TODO(TF-213): Replace with `KnownProtocolKind::Differentiable`.
+  case KnownProtocolKind::_Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
   default:
@@ -5498,7 +5510,8 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveKeyPathIterable(AssocType);
   case KnownProtocolKind::VectorNumeric:
     return derived.deriveVectorNumeric(AssocType);
-  case KnownProtocolKind::Differentiable:
+  // TODO(TF-213): Replace with `KnownProtocolKind::Differentiable`.
+  case KnownProtocolKind::_Differentiable:
     return derived.deriveDifferentiable(AssocType);
   default:
     return nullptr;

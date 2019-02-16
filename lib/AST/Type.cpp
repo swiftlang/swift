@@ -4147,8 +4147,8 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
   // Find the TangentVector/CotangentVector associated type on the
   // Differentiable protocol.
   auto *differentiableProtocol =
-      ctx.getProtocol(KnownProtocolKind::Differentiable);
-  assert(differentiableProtocol && "could not find Differentiable protocol");
+      ctx.getProtocol(KnownProtocolKind::_Differentiable);
+  assert(differentiableProtocol && "could not find _ManifoldPoint protocol");
   Identifier associatedTypeIdentifier;
   switch (kind) {
   case AutoDiffAssociatedVectorSpaceKind::Tangent:
