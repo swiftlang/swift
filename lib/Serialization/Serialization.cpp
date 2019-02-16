@@ -2771,8 +2771,7 @@ void Serializer::writeDecl(const Decl *D) {
     (void)addDeclRef(baseNominal);
 
     auto conformances = extension->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
     for (auto inherited : extension->getInherited()) {
@@ -3027,8 +3026,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theStruct->getDeclContext());
 
     auto conformances = theStruct->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 4> inheritedTypes;
     for (auto inherited : theStruct->getInherited()) {
@@ -3065,8 +3063,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theEnum->getDeclContext());
 
     auto conformances = theEnum->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theEnum->getInherited()) {
@@ -3120,8 +3117,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theClass->getDeclContext());
 
     auto conformances = theClass->getLocalConformances(
-                          ConformanceLookupKind::All,
-                          nullptr, /*sorted=*/true);
+                          ConformanceLookupKind::All, nullptr);
 
     SmallVector<TypeID, 4> inheritedTypes;
     for (auto inherited : theClass->getInherited()) {

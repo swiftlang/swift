@@ -5020,8 +5020,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // Check each of the conformances associated with this context.
   SmallVector<ConformanceDiagnostic, 4> diagnostics;
   auto conformances = dc->getLocalConformances(ConformanceLookupKind::All,
-                                               &diagnostics,
-                                               /*sorted=*/true);
+                                               &diagnostics);
 
   // The conformance checker bundle that checks all conformances in the context.
   MultiConformanceChecker groupChecker(*this);

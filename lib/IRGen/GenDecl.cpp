@@ -879,8 +879,7 @@ IRGenModule::getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto) {
 
 void IRGenModule::addLazyConformances(DeclContext *dc) {
   for (const ProtocolConformance *conf :
-         dc->getLocalConformances(ConformanceLookupKind::All,
-                                  nullptr, /*sorted=*/true)) {
+         dc->getLocalConformances(ConformanceLookupKind::All, nullptr)) {
     IRGen.addLazyWitnessTable(conf);
   }
 }
