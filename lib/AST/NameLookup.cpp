@@ -1669,26 +1669,10 @@ namespace {
     case ScopeLookupResult::finished:
       return std::make_pair(ScopeLookupResult::finished, results.nextDC);
     }
-    // UP TO HERE
-        
-        // Check the generic parameters of our context.
-        GenericParamList *dcGenericParams = nullptr;
-        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
-          dcGenericParams = nominal->getGenericParams();
-        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
-          dcGenericParams = ext->getGenericParams();
-        else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
-          dcGenericParams = subscript->getGenericParams();
-        
-        while (dcGenericParams) {
-          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-          localVal.checkGenericParams(dcGenericParams);
+    if (checkGenericParameters(DC))
+      return std::make_pair(ScopeLookupResult::finished, DC);
 
-          if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-        return std::make_pair(ScopeLookupResult::finished, DC);
-          
-          dcGenericParams = dcGenericParams->getOuterParameters();
-        }
+    // UP TO HERE
         
         if (BaseDC && !lookupDecls.empty()) {
           NLOptions options = baseNLOptions;
@@ -1740,6 +1724,31 @@ namespace {
         
         DC = DC->getParentForLookup();
     return std::make_pair(ScopeLookupResult::next, DC);
+  }
+
+  /// Check the generic parameters of our context.
+  /// Return true if done with lookup
+  bool checkGenericParameters(DeclContext *DC) {
+    for (GenericParamList *dcGenericParams = getGenericParams(DC);
+         dcGenericParams;
+         dcGenericParams = dcGenericParams->getOuterParameters()) {
+      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+      localVal.checkGenericParams(dcGenericParams);
+
+      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+        return true;
+    }
+    return false;
+  }
+
+  static GenericParamList *getGenericParams(const DeclContext *const DC) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
+      return nominal->getGenericParams();
+    if (auto ext = dyn_cast<ExtensionDecl>(DC))
+      return ext->getGenericParams();
+    if (auto subscript = dyn_cast<SubscriptDecl>(DC))
+      return subscript->getGenericParams();
+    return nullptr;
   }
 
   PerScopeLookupState
