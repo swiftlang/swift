@@ -1652,55 +1652,98 @@ private:
   }
 
   void checkPotentiallyThrowingAccessor(Expr *E, ContextScope &scope) {
-    // Look through optional expressions as we could be evaluating something
-    // like try? Foo.baz = "" or let _ = try? Foo.baz
-    if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
-      E = OTE->getSubExpr();
-      if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OTE->getSubExpr())) {
-        E = IIO->getSubExpr();
+    class ThrowingAccessorWalker : public ASTWalker {
+    private:
+      ContextFlags *contextFlags;
+
+      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+        if (isa<AssignExpr>(E)) {
+          return {
+              checkPotentiallyThrowingSetter(cast<AssignExpr>(E), contextFlags),
+              nullptr};
+        }
+        if (isa<MemberRefExpr>(E)) {
+          return {checkPotentiallyThrowingGetter(cast<MemberRefExpr>(E),
+                                                 contextFlags),
+                  nullptr};
+        }
+        return {true, E};
       }
+
+    public:
+      ThrowingAccessorWalker(ContextFlags *flags) : contextFlags(flags) {}
+    };
+
+    auto walker = ThrowingAccessorWalker(&Flags);
+    E->walk(walker);
+  }
+
+  static bool checkPotentiallyThrowingGetter(MemberRefExpr *E,
+                                             ContextFlags *flags) {
+    if (!E) {
+      return false;
     }
 
-    // Check if we have an assign expression, which implies we're using a
-    // setter rather than a getter
-    auto setter = dyn_cast<AssignExpr>(E->getValueProvidingExpr());
-    auto expr = setter ? setter->getDest() : E->getValueProvidingExpr();
-    auto unhandledTry = false;
-    if (auto MRE = dyn_cast<MemberRefExpr>(expr)) {
-      // We're not calling the getter or setter, so return;
-      if (MRE->getAccessSemantics() ==
-              AccessSemantics::DirectToImplementation ||
-          MRE->getAccessSemantics() == AccessSemantics::DirectToStorage) {
-        return;
-      }
+    auto accessSemantics = E->getAccessSemantics();
 
-      // Check if we're referring to an inout parameter and the enclosing
-      // function isn't marked as throws
-      if (auto IOE = dyn_cast<InOutExpr>(MRE->getBase())) {
-        if (auto DRE = dyn_cast<DeclRefExpr>(IOE->getSubExpr())) {
-          if (auto AFD = dyn_cast<AbstractFunctionDecl>(
-                  DRE->getDecl()->getDeclContext())) {
-            unhandledTry = !AFD->hasThrows();
-          }
-        }
-      }
-
-      // Check the variable's getter or setter
-      if (auto VD = dyn_cast_or_null<VarDecl>(MRE->getDecl().getDecl())) {
-        if (VD->getAccessor(setter ? AccessorKind::Set : AccessorKind::Get)
-                ->hasThrows()) {
-          Flags.set(ContextFlags::HasTryThrowSite);
-          Flags.set(ContextFlags::HasAnyThrowSite);
-
-          // If we have a try expression and its not enclosed in a context
-          // which can handle a try, emit a diagnostic
-          if (isa<TryExpr>(E) && unhandledTry &&
-              !Flags.has(ContextFlags::IsTryCovered)) {
-            TC.diagnose(cast<TryExpr>(E)->getTryLoc(), diag::try_unhandled);
-          }
-        }
-      }
+    // If we're not accessing the getter or setter, then return
+    if (accessSemantics == AccessSemantics::DirectToImplementation ||
+        accessSemantics == AccessSemantics::DirectToStorage) {
+      return false;
     }
+
+    // If the member does not point to a variable, then return
+    if (!E->hasDecl() || !isa<VarDecl>(E->getDecl().getDecl())) {
+      return false;
+    }
+
+    auto *variable = cast<VarDecl>(E->getDecl().getDecl());
+
+    if (variable->getAccessor(AccessorKind::Get)->hasThrows()) {
+      flags->set(ContextFlags::HasTryThrowSite);
+      flags->set(ContextFlags::HasAnyThrowSite);
+
+      return true;
+    }
+
+    return false;
+  }
+
+  static bool checkPotentiallyThrowingSetter(AssignExpr *E,
+                                             ContextFlags *flags) {
+    if (!E) {
+      return false;
+    }
+
+    // If we're not assigning to a nominal member, then return
+    if (!isa<MemberRefExpr>(E->getDest())) {
+      return false;
+    }
+
+    auto *dest = cast<MemberRefExpr>(E->getDest());
+    auto accessSemantics = dest->getAccessSemantics();
+
+    // If we're not accessing the getter or setter, then return
+    if (accessSemantics == AccessSemantics::DirectToImplementation ||
+        accessSemantics == AccessSemantics::DirectToStorage) {
+      return false;
+    }
+
+    // If the member does not point to a variable, then return
+    if (!dest->hasDecl() || !isa<VarDecl>(dest->getDecl().getDecl())) {
+      return false;
+    }
+
+    auto *variable = cast<VarDecl>(dest->getDecl().getDecl());
+
+    if (variable->getAccessor(AccessorKind::Set)->hasThrows()) {
+      flags->set(ContextFlags::HasTryThrowSite);
+      flags->set(ContextFlags::HasAnyThrowSite);
+
+      return true;
+    }
+
+    return false;
   }
 };
 
