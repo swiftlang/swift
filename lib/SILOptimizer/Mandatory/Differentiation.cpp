@@ -1622,6 +1622,18 @@ static SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
   return builder.createTuple(loc, elements);
 }
 
+// Emits a release based on the value's type category (address or object).
+static void emitCleanup(SILBuilder &builder, SILLocation loc, SILValue v) {
+  if (v->getType().isAddress()) {
+    if (v->getType().isLoadable(builder.getModule()))
+      builder.createReleaseValueAddr(loc, v, builder.getDefaultAtomicity());
+    else
+      builder.createDestroyAddr(loc, v);
+  } else {
+    builder.createReleaseValue(loc, v, builder.getDefaultAtomicity());
+  }
+}
+
 /// When a function value is used in an instruction (usually `apply`), there's
 /// some conversion instruction in between, e.g. `thin_to_thick_function`. Given
 /// a new function value and an old function value, this helper function
@@ -3542,14 +3554,7 @@ private:
     localAllocBuilder.createEndAccess(
         access->getLoc(), access, /*aborted*/ false);
     // Create cleanup for local buffer.
-    auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-      LLVM_DEBUG(getADDebugStream() << "Cleaning up local buffer " << v);
-      if (v->getType().isLoadable(b.getModule()))
-        b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
-      else
-        b.createDestroyAddr(loc, v);
-    };
-    ValueWithCleanup bufWithCleanup(newBuf, makeCleanup(newBuf, cleanupFn));
+    ValueWithCleanup bufWithCleanup(newBuf, makeCleanup(newBuf, emitCleanup));
     localAllocations.push_back(bufWithCleanup);
     return (insertion.first->getSecond() = bufWithCleanup);
   }
@@ -3623,28 +3628,16 @@ public:
 
     builder.setInsertionPoint(adjointEntry);
     if (seed->getType().isAddress()) {
-      Cleanup::Func cleanupFn = nullptr;
       if (seed->getType().isLoadable(getModule())) {
         builder.createRetainValueAddr(adjLoc, seed,
                                       builder.getDefaultAtomicity());
       }
-      cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-        LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
-        if (v->getType().isLoadable(b.getModule()))
-          b.createReleaseValueAddr(loc, v, b.getDefaultAtomicity());
-        else
-          b.createDestroyAddr(loc, v);
-      };
       setAdjointBuffer(origResult,
-                       ValueWithCleanup(seed, makeCleanup(seed, cleanupFn)));
+                       ValueWithCleanup(seed, makeCleanup(seed, emitCleanup)));
     } else {
       builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
-      auto cleanupFn = [](SILBuilder &b, SILLocation loc, SILValue v) {
-        LLVM_DEBUG(getADDebugStream() << "Cleaning up seed " << v << '\n');
-        b.createReleaseValue(loc, v, b.getDefaultAtomicity());
-      };
       initializeAdjointValue(origResult, makeConcreteAdjointValue(
-          ValueWithCleanup(seed, makeCleanup(seed, cleanupFn))));
+          ValueWithCleanup(seed, makeCleanup(seed, emitCleanup))));
     }
     LLVM_DEBUG(getADDebugStream()
                << "Assigned seed " << *seed
@@ -3886,31 +3879,6 @@ public:
       llvm::for_each(allResults, [&](SILValue v) { s << v; });
     });
 
-    // Set adjoints for all original parameters.
-    auto cleanupFn = [](SILBuilder &b, SILLocation l, SILValue v) {
-      b.createReleaseValue(l, v, b.getDefaultAtomicity());
-    };
-    auto cleanupFnAddr = [](SILBuilder &b, SILLocation l, SILValue v) {
-      if (v->getType().isLoadable(b.getModule()))
-        b.createReleaseValueAddr(l, v, b.getDefaultAtomicity());
-      else
-        b.createDestroyAddr(l, v);
-    };
-
-    // Emits a release based on the value's type category (address or object).
-    // TODO(TF-210): Make this a top-level function and call it everywhere
-    // consistently. This reduces code dupe and may fix some memory leaks.
-    auto emitRelease = [&](SILValue v) {
-      if (v->getType().isAddress()) {
-        if (v->getType().isLoadable(getModule()))
-          builder.createReleaseValueAddr(loc, v, builder.getDefaultAtomicity());
-        else
-          builder.createDestroyAddr(loc, v);
-      } else {
-        builder.createReleaseValue(loc, v, builder.getDefaultAtomicity());
-      }
-    };
-
     // If the applied adjoint returns the adjoint of the original self
     // parameter, then it returns it first. Accumulate adjoint for the original
     // self parameter.
@@ -3922,12 +3890,12 @@ public:
       // If the self cotangent value corresponds to a non-desired self
       // parameter, it won't be used, so release it.
       if (!applyInfo.desiredIndices.isWrtParameter(selfParamIndex))
-        emitRelease(cotanWrtSelf);
+        emitCleanup(builder, loc, cotanWrtSelf);
       else {
         auto origArg = ai->getArgument(origNumIndRes + selfParamIndex);
         if (cotanWrtSelf->getType().isAddress()) {
           addToAdjointBuffer(origArg, ValueWithCleanup(
-            cotanWrtSelf, makeCleanup(cotanWrtSelf, cleanupFnAddr)));
+            cotanWrtSelf, makeCleanup(cotanWrtSelf, emitCleanup)));
         } else {
           if (origArg->getType().isAddress()) {
             auto adjBuf = getAdjointBuffer(origArg);
@@ -3940,11 +3908,12 @@ public:
                 /*noNestedConflict*/ true, /*fromBuiltin*/ false);
             accumulateIndirect(adjBuf, readAccess);
             builder.createEndAccess(loc, readAccess, /*aborted*/ false);
+            emitCleanup(builder, loc, tmpBuf);
             builder.createDeallocStack(loc, tmpBuf);
           }
           else {
             addAdjointValue(origArg, makeConcreteAdjointValue(ValueWithCleanup(
-                cotanWrtSelf, makeCleanup(cotanWrtSelf, cleanupFn))));
+                cotanWrtSelf, makeCleanup(cotanWrtSelf, emitCleanup))));
           }
         }
       }
@@ -3961,12 +3930,12 @@ public:
       // be used, so release it.
       if (i >= applyInfo.desiredIndices.parameters.size() ||
           !applyInfo.desiredIndices.parameters[i]) {
-        emitRelease(cotan);
+        emitCleanup(builder, loc, cotan);
         continue;
       }
       if (cotan->getType().isAddress()) {
         addToAdjointBuffer(origArg, ValueWithCleanup(
-          cotan, makeCleanup(cotan, cleanupFnAddr)));
+            cotan, makeCleanup(cotan, emitCleanup)));
       } else {
         if (origArg->getType().isAddress()) {
           auto adjBuf = getAdjointBuffer(origArg);
@@ -3978,16 +3947,17 @@ public:
               /*noNestedConflict*/ true, /*fromBuiltin*/ false);
           accumulateIndirect(adjBuf, readAccess);
           builder.createEndAccess(loc, readAccess, /*aborted*/ false);
+          emitCleanup(builder, loc, tmpBuf);
           builder.createDeallocStack(loc, tmpBuf);
         }
         else
           addAdjointValue(origArg, makeConcreteAdjointValue(ValueWithCleanup(
-              cotan, makeCleanup(cotan, cleanupFn))));
+              cotan, makeCleanup(cotan, emitCleanup))));
       }
     }
     // Deallocate pullback indirect results.
     for (auto *alloc : reversed(pullbackIndirectResults)) {
-      emitRelease(alloc);
+      emitCleanup(builder, loc, alloc);
       builder.createDeallocStack(loc, alloc);
     }
   }
@@ -4207,13 +4177,7 @@ public:
     emitZeroIndirect(bufType.getASTType(), access, dsi->getLoc());
     builder.createEndAccess(dsi->getLoc(), access, /*aborted*/ false);
     setAdjointBuffer(dsi->getOperand(),
-        ValueWithCleanup(adjBuf, makeCleanup(adjBuf,
-            [](SILBuilder &b, SILLocation l, SILValue v) {
-              if (v->getType().isLoadable(b.getModule()))
-                b.createReleaseValueAddr(l, v, b.getDefaultAtomicity());
-              else
-                b.createDestroyAddr(l, v);
-            })));
+        ValueWithCleanup(adjBuf, makeCleanup(adjBuf, emitCleanup)));
   }
 
   // Handle `load` instruction.
@@ -4258,10 +4222,8 @@ public:
     // Disable the buffer's top-level cleanup (which is supposed to operate on
     // the buffer), create a cleanup for the value that carrys all child
     // cleanups.
-    auto valueCleanup = makeCleanup(adjVal,
-        [](SILBuilder &b, SILLocation l, SILValue v) {
-          b.createReleaseValue(l, v, b.getDefaultAtomicity());
-        }, adjBuf.getCleanup()
+    auto valueCleanup = makeCleanup(adjVal, emitCleanup,
+        adjBuf.getCleanup()
             ? adjBuf.getCleanup()->getChildren() : ArrayRef<Cleanup *>());
     addAdjointValue(si->getSrc(), makeConcreteAdjointValue(
         ValueWithCleanup(adjVal, valueCleanup)));
@@ -4278,13 +4240,7 @@ public:
     } else {
       emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
     }
-    auto cleanup = makeCleanup(adjBuf,
-                               [](SILBuilder &b, SILLocation l, SILValue v) {
-      if (v->getType().isLoadable(b.getModule()))
-        b.createReleaseValueAddr(l, v, b.getDefaultAtomicity());
-      else
-        b.createDestroyAddr(l, v);
-    });
+    auto cleanup = makeCleanup(adjBuf, emitCleanup);
     adjBuf.setCleanup(cleanup);
   }
 
@@ -4297,10 +4253,8 @@ public:
     // Disable the buffer's top-level cleanup (which is supposed to operate on
     // the buffer), create a cleanup for the value that carrys all child
     // cleanups.
-    auto valueCleanup = makeCleanup(adjDest,
-        [](SILBuilder &b, SILLocation l, SILValue v) {
-          b.createReleaseValue(l, v, b.getDefaultAtomicity());
-        }, adjDest.getCleanup()
+    auto valueCleanup = makeCleanup(adjDest, emitCleanup,
+        adjDest.getCleanup()
             ? adjDest.getCleanup()->getChildren() : ArrayRef<Cleanup *>());
     adjDest.setCleanup(valueCleanup);
     auto *readAccess = builder.createBeginAccess(
@@ -4322,13 +4276,7 @@ public:
     } else {
       emitZeroIndirect(destType.getASTType(), adjDest, cai->getLoc());
     }
-    auto cleanup = makeCleanup(adjDest,
-                               [](SILBuilder &b, SILLocation l, SILValue v) {
-      if (v->getType().isLoadable(b.getModule()))
-        b.createReleaseValueAddr(l, v, b.getDefaultAtomicity());
-      else
-        b.createDestroyAddr(l, v);
-    });
+    auto cleanup = makeCleanup(adjDest, emitCleanup);
     adjDest.setCleanup(cleanup);
   }
 
@@ -4611,16 +4559,15 @@ SILValue AdjointEmitter::emitZeroDirect(CanType type, SILLocation loc) {
   emitZeroIndirect(type, initAccess, loc);
   builder.createEndAccess(loc, initAccess, /*aborted*/ false);
   auto readAccess = builder.createBeginAccess(loc, buffer, SILAccessKind::Read,
-                                     SILAccessEnforcement::Static,
-                                     /*noNestedConflict*/ true,
-                                     /*fromBuiltin*/ false);
+                                              SILAccessEnforcement::Static,
+                                              /*noNestedConflict*/ true,
+                                              /*fromBuiltin*/ false);
   auto *loaded = builder.createLoad(loc, readAccess,
                                     getBufferLOQ(type, getAdjoint()));
   builder.createEndAccess(loc, readAccess, /*aborted*/ false);
   builder.createDeallocStack(loc, buffer);
   return loaded;
 }
-
 
 AdjointValue
 AdjointEmitter::accumulateAdjointsDirect(AdjointValue &&lhs,
@@ -5288,9 +5235,6 @@ void DifferentiationTask::createVJP() {
   auto primalConv = primal->getConventions();
   auto vjpConv = vjp->getConventions();
 
-  // Keep track of some stack allocation to clean up.
-  SmallVector<SILValue, 2> stackAllocsToCleanUp;
-
   // Validate signatures.
 #ifndef NDEBUG
   auto adjointConv = adjoint->getConventions();
@@ -5339,20 +5283,7 @@ void DifferentiationTask::createVJP() {
 
   // Call primal with original arguments.
   SmallVector<SILValue, 8> primalArgs;
-  // Allocate space for indirect checkpoint results, and pass the addresses to
-  // the primal.
-  unsigned remainingIndirectCheckpointResults =
-      primalConv.getNumIndirectSILResults() -
-      originalConv.getNumIndirectSILResults();
-  for (auto silType : primalConv.getIndirectSILResultTypes()) {
-    if (remainingIndirectCheckpointResults == 0)
-      break;
-    auto type = vjp->mapTypeIntoContext(silType.getObjectType());
-    auto resultBuf = builder.createAllocStack(loc, type);
-    primalArgs.push_back(resultBuf);
-    stackAllocsToCleanUp.push_back(resultBuf);
-    --remainingIndirectCheckpointResults;
-  }
+
   // Tell the primal to put its indirect results in the vjp indirect result
   // buffers. This assumes that the primal indirect results are exactly the vjp
   // indirect results, an assumption that we check in assertions above.
@@ -5368,10 +5299,6 @@ void DifferentiationTask::createVJP() {
       : vjp->getForwardingSubstitutionMap();
   auto *primalApply = builder.createApply(
       loc, primalRef, vjpSubstMap, primalArgs, /*isNonThrowing*/ false);
-
-  // Clean up the stack allocations for primal application.
-  for (auto alloc : reversed(stackAllocsToCleanUp))
-    builder.createDeallocStack(loc, alloc);
 
   // Collect the primal's direct results to prepare for creating a pullback
   // and return original values and the pullback.
