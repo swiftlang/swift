@@ -51,5 +51,5 @@ def check_impl_args(build_script_impl, argv):
     (_, err) = pipe.communicate()
 
     if pipe.returncode != 0:
-        msg = str(err.splitlines()[0].decode())
+        msg = err.decode()
         raise ValueError(msg)

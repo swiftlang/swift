@@ -11,6 +11,7 @@
 
 from __future__ import print_function
 
+import abc
 import argparse
 import os
 import pipes
@@ -41,6 +42,8 @@ from swift_build_support.swift_build_support.SwiftBuildSupport import (
     SWIFT_SOURCE_ROOT,
 )
 from swift_build_support.swift_build_support.cmake import CMake
+from swift_build_support.swift_build_support.host_specific_configuration \
+    import HostSpecificConfiguration
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 from swift_build_support.swift_build_support.toolchain import host_toolchain
@@ -71,146 +74,10 @@ def call_without_sleeping(command, env=None, dry_run=False, echo=False):
     shell.call(command, env=env, dry_run=dry_run, echo=echo)
 
 
-class HostSpecificConfiguration(object):
-
-    """Configuration information for an individual host."""
-
-    def __init__(self, host_target, invocation):
-        """Initialize for the given `host_target`."""
-
-        # Compute the set of deployment targets to configure/build.
-        args = invocation.args
-        if host_target == args.host_target:
-            # This host is the user's desired product, so honor the requested
-            # set of targets to configure/build.
-            stdlib_targets_to_configure = args.stdlib_deployment_targets
-            if "all" in args.build_stdlib_deployment_targets:
-                stdlib_targets_to_build = set(stdlib_targets_to_configure)
-            else:
-                stdlib_targets_to_build = set(
-                    args.build_stdlib_deployment_targets).intersection(
-                    set(args.stdlib_deployment_targets))
-        else:
-            # Otherwise, this is a host we are building as part of
-            # cross-compiling, so we only need the target itself.
-            stdlib_targets_to_configure = [host_target]
-            stdlib_targets_to_build = set(stdlib_targets_to_configure)
-
-        # Compute the lists of **CMake** targets for each use case (configure
-        # vs. build vs. run) and the SDKs to configure with.
-        self.sdks_to_configure = set()
-        self.swift_stdlib_build_targets = []
-        self.swift_test_run_targets = []
-        self.swift_benchmark_build_targets = []
-        self.swift_benchmark_run_targets = []
-        for deployment_target_name in stdlib_targets_to_configure:
-            # Get the target object.
-            deployment_target = StdlibDeploymentTarget.get_target_for_name(
-                deployment_target_name)
-            if deployment_target is None:
-                diagnostics.fatal("unknown target: %r" % (
-                    deployment_target_name,))
-
-            # Add the SDK to use.
-            deployment_platform = deployment_target.platform
-            self.sdks_to_configure.add(deployment_platform.sdk_name)
-
-            # If we aren't actually building this target (only configuring
-            # it), do nothing else.
-            if deployment_target_name not in stdlib_targets_to_build:
-                continue
-
-            # Compute which actions are desired.
-            build = (
-                deployment_platform not in invocation.platforms_to_skip_build)
-            test = (
-                deployment_platform not in invocation.platforms_to_skip_test)
-            test_host_only = None
-            dt_supports_benchmark = deployment_target.supports_benchmark
-            build_benchmarks = build and dt_supports_benchmark
-            build_external_benchmarks = all([build, dt_supports_benchmark,
-                                             args.build_external_benchmarks])
-
-            # FIXME: Note, `build-script-impl` computed a property here
-            # w.r.t. testing, but it was actually unused.
-
-            # For platforms which normally require a connected device to
-            # test, the default behavior is to run tests that only require
-            # the host (i.e., they do not attempt to execute).
-            if deployment_platform.is_darwin and \
-               deployment_platform.is_embedded and \
-               not deployment_platform.is_simulator:
-                if deployment_platform not in \
-                        invocation.platforms_to_skip_test_host:
-                    test_host_only = True
-                    test = True
-                else:
-                    test = False
-
-            name = deployment_target.name
-
-            for skip_test_arch in invocation.platforms_archs_to_skip_test:
-                if deployment_target.name == skip_test_arch.name:
-                    test = False
-
-            if build:
-                # Validation, long, and stress tests require building the full
-                # standard library, whereas the other targets can build a
-                # slightly smaller subset which is faster to build.
-                if args.build_swift_stdlib_unittest_extra or \
-                        args.validation_test or args.long_test or \
-                        args.stress_test:
-                    self.swift_stdlib_build_targets.append(
-                        "swift-stdlib-" + name)
-                else:
-                    self.swift_stdlib_build_targets.append(
-                        "swift-test-stdlib-" + name)
-            if build_benchmarks:
-                self.swift_benchmark_build_targets.append(
-                    "swift-benchmark-" + name)
-                if args.benchmark:
-                    self.swift_benchmark_run_targets.append(
-                        "check-swift-benchmark-" + name)
-
-            if build_external_benchmarks:
-                # Add support for the external benchmarks.
-                self.swift_benchmark_build_targets.append(
-                    "swift-benchmark-{}-external".format(name))
-                if args.benchmark:
-                    self.swift_benchmark_run_targets.append(
-                        "check-swift-benchmark-{}-external".format(name))
-            if test:
-                if test_host_only:
-                    suffix = "-non-executable"
-                else:
-                    suffix = ""
-                subset_suffix = ""
-                if args.validation_test and args.long_test and \
-                        args.stress_test:
-                    subset_suffix = "-all"
-                elif args.validation_test:
-                    subset_suffix = "-validation"
-                elif args.long_test:
-                    subset_suffix = "-only_long"
-                elif args.stress_test:
-                    subset_suffix = "-only_stress"
-                else:
-                    subset_suffix = ""
-                self.swift_test_run_targets.append("check-swift{}{}-{}".format(
-                    subset_suffix, suffix, name))
-                if args.test_optimized and not test_host_only:
-                    self.swift_test_run_targets.append(
-                        "check-swift{}-optimize-{}".format(
-                            subset_suffix, name))
-                if args.test_optimize_for_size and not test_host_only:
-                    self.swift_test_run_targets.append(
-                        "check-swift{}-optimize_size-{}".format(
-                            subset_suffix, name))
-
-
-class BuildScriptInvocation(object):
-
+class BuildScriptBase(object):
     """Represent a single build script invocation."""
+
+    __metaclass__ = abc.ABCMeta
 
     @staticmethod
     def validate_arguments(toolchain, args):
@@ -247,11 +114,11 @@ class BuildScriptInvocation(object):
         if args.android:
             if args.android_ndk is None or \
                     args.android_api_level is None or \
-                    args.android_icu_uc is None or \
-                    args.android_icu_uc_include is None or \
-                    args.android_icu_i18n is None or \
-                    args.android_icu_i18n_include is None or \
-                    args.android_icu_data is None:
+                    args.icu_uc_path is None or \
+                    args.icu_uc_include_path is None or \
+                    args.icu_i18n_path is None or \
+                    args.icu_i18n_include_path is None or \
+                    args.icu_data_path is None:
                 diagnostics.fatal(
                     "when building for Android, --android-ndk, "
                     "--android-api-level, --android-icu-uc, "
@@ -322,8 +189,6 @@ class BuildScriptInvocation(object):
             args.android = True
             args.build_android = False
 
-# ---
-
     def __init__(self, toolchain, args):
         self.toolchain = toolchain
         self.args = args
@@ -332,89 +197,6 @@ class BuildScriptInvocation(object):
             source_root=SWIFT_SOURCE_ROOT,
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
-        # Compute derived information from the arguments.
-        #
-        # FIXME: We should move the platform-derived arguments to be entirely
-        # data driven, so that we can eliminate this code duplication and just
-        # iterate over all supported platforms.
-
-        self.platforms_to_skip_build = set()
-        if not args.build_linux:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.Linux)
-        if not args.build_freebsd:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.FreeBSD)
-        if not args.build_cygwin:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.Cygwin)
-        if not args.build_osx:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.OSX)
-        if not args.build_ios_device:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.iOS)
-        if not args.build_ios_simulator:
-            self.platforms_to_skip_build.add(
-                StdlibDeploymentTarget.iOSSimulator)
-        if not args.build_tvos_device:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.AppleTV)
-        if not args.build_tvos_simulator:
-            self.platforms_to_skip_build.add(
-                StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.build_watchos_device:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.AppleWatch)
-        if not args.build_watchos_simulator:
-            self.platforms_to_skip_build.add(
-                StdlibDeploymentTarget.AppleWatchSimulator)
-        if not args.build_android:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
-
-        self.platforms_to_skip_test = set()
-        self.platforms_archs_to_skip_test = set()
-        if not args.test_linux:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.Linux)
-        if not args.test_freebsd:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.FreeBSD)
-        if not args.test_cygwin:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
-        if not args.test_osx:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
-        if not args.test_ios_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
-        else:
-            exit_rejecting_arguments("error: iOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_ios_simulator:
-            self.platforms_to_skip_test.add(
-                StdlibDeploymentTarget.iOSSimulator)
-        if not args.test_ios_32bit_simulator:
-            self.platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.iOSSimulator.i386)
-        if not args.test_tvos_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
-        else:
-            exit_rejecting_arguments("error: tvOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_tvos_simulator:
-            self.platforms_to_skip_test.add(
-                StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.test_watchos_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
-        else:
-            exit_rejecting_arguments("error: watchOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_watchos_simulator:
-            self.platforms_to_skip_test.add(
-                StdlibDeploymentTarget.AppleWatchSimulator)
-
-        if not args.test_android_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
-
-        self.platforms_to_skip_test_host = set()
-        if not args.test_ios_host:
-            self.platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
-        if not args.test_tvos_host:
-            self.platforms_to_skip_test_host.add(
-                StdlibDeploymentTarget.AppleTV)
-        if not args.test_watchos_host:
-            self.platforms_to_skip_test_host.add(
-                StdlibDeploymentTarget.AppleWatch)
         self.build_libparser_only = args.build_libparser_only
 
     def initialize_runtime_environment(self):
@@ -450,6 +232,143 @@ class BuildScriptInvocation(object):
         ninja_build.do_build()
         self.toolchain.ninja = ninja_build.ninja_bin_path
 
+    def compute_product_classes(self):
+        """compute_product_classes() -> list
+
+        Compute the list of all Product classes used in this build. This list
+        is constructed in dependency order.
+        """
+
+        # FIXME: This is a weird division (returning a list of class objects),
+        # but it matches the existing structure of the `build-script-impl`.
+
+        product_classes = []
+        product_classes.append(products.CMark)
+        product_classes.append(products.LLVM)
+        if self.args.build_libcxx:
+            product_classes.append(products.LibCXX)
+        if self.args.build_libicu:
+            product_classes.append(products.LibICU)
+        product_classes.append(products.Swift)
+        if self.args.build_lldb:
+            product_classes.append(products.LLDB)
+        if self.args.build_libdispatch:
+            product_classes.append(products.LibDispatch)
+        if self.args.build_foundation:
+            product_classes.append(products.Foundation)
+        if self.args.build_xctest:
+            product_classes.append(products.XCTest)
+        if self.args.build_llbuild:
+            product_classes.append(products.LLBuild)
+        if self.args.build_swiftpm:
+            product_classes.append(products.SwiftPM)
+        if self.args.build_swiftsyntax:
+            product_classes.append(products.SwiftSyntax)
+        if self.args.build_skstresstester:
+            product_classes.append(products.SKStressTester)
+        if self.args.build_swiftevolve:
+            product_classes.append(products.SwiftEvolve)
+        if self.args.build_indexstoredb:
+            product_classes.append(products.IndexStoreDB)
+        if self.args.build_sourcekitlsp:
+            product_classes.append(products.SourceKitLSP)
+        return product_classes
+
+    def execute(self):
+        """Execute the invocation with the configured arguments."""
+
+        # Compute the list of hosts to operate on.
+        all_host_names = [
+            self.args.host_target] + self.args.cross_compile_hosts
+        all_hosts = [StdlibDeploymentTarget.get_target_for_name(name)
+                     for name in all_host_names]
+
+        # Compute the list of product classes to operate on.
+        #
+        # FIXME: This should really be per-host, but the current structure
+        # matches that of `build-script-impl`.
+        product_classes = self.compute_product_classes()
+        impl_product_classes = [cls for cls in product_classes
+                                if cls.is_build_script_impl_product()]
+
+        # Execute each "pass".
+
+        # Build...
+        for host_target in all_hosts:
+            # FIXME: We should only compute these once.
+            try:
+                config = HostSpecificConfiguration(host_target.name, self.args)
+            except argparse.ArgumentError as e:
+                exit_rejecting_arguments(e.message)
+            print("Building the standard library for: {}".format(
+                " ".join(config.swift_stdlib_build_targets)))
+            if config.swift_test_run_targets and (
+                    self.args.test or self.args.long_test):
+                print("Running Swift tests for: {}".format(
+                    " ".join(config.swift_test_run_targets)))
+            if config.swift_benchmark_run_targets and self.args.benchmark:
+                print("Running Swift benchmarks for: {}".format(
+                    " ".join(config.swift_benchmark_run_targets)))
+
+            for product_class in impl_product_classes:
+                self._execute_build_action(host_target, product_class)
+
+        # Test...
+        for host_target in all_hosts:
+            for product_class in impl_product_classes:
+                self._execute_test_action(host_target, product_class)
+
+        # Install...
+        for host_target in all_hosts:
+            for product_class in impl_product_classes:
+                self._execute_install_action(host_target, product_class)
+
+        # Non-build-script-impl products...
+        # Note: currently only supports building for the host.
+        for host_target in [self.args.host_target]:
+            for product_class in product_classes:
+                if product_class.is_build_script_impl_product():
+                    continue
+                self._execute_build_action(host_target, product_class)
+                self._execute_test_action(host_target, product_class)
+
+        # Extract symbols...
+        for host_target in all_hosts:
+            self._execute_extract_symbols_action(host_target)
+
+        # Package...
+        for host_target in all_hosts:
+            self._execute_package_action(host_target)
+
+        # Lipo...
+        self._execute_merged_host_lipo_action()
+
+    @abc.abstractmethod
+    def _execute_build_action(self, host, product_class):
+        pass
+
+    @abc.abstractmethod
+    def _execute_test_action(self, host, product_class):
+        pass
+
+    @abc.abstractmethod
+    def _execute_install_action(self, host, product_class):
+        pass
+
+    @abc.abstractmethod
+    def _execute_extract_symbols_action(self, host):
+        pass
+
+    @abc.abstractmethod
+    def _execute_package_action(self, host):
+        pass
+
+    @abc.abstractmethod
+    def _execute_merged_host_lipo_action(self):
+        pass
+
+
+class BuildScriptInvocation(BuildScriptBase):
     def convert_to_impl_arguments(self):
         """convert_to_impl_arguments() -> (env, args)
 
@@ -482,6 +401,7 @@ class BuildScriptInvocation(object):
                 args.darwin_deployment_version_tvos),
             "--darwin-deployment-version-watchos=%s" % (
                 args.darwin_deployment_version_watchos),
+            "--darwin-toolchain-version=%s" % args.darwin_toolchain_version,
             "--cmake", toolchain.cmake,
             "--cmark-build-type", args.cmark_build_variant,
             "--llvm-build-type", args.llvm_build_variant,
@@ -514,6 +434,9 @@ class BuildScriptInvocation(object):
             "--build-args=%s" % ' '.join(
                 pipes.quote(arg) for arg in cmake.build_args()),
         ]
+
+        if args.reconfigure:
+            impl_args += ['--reconfigure']
 
         # Compute any product specific cmake arguments.
         for product_class in self.compute_product_classes():
@@ -558,6 +481,16 @@ class BuildScriptInvocation(object):
         if args.cross_compile_hosts:
             impl_args += [
                 "--cross-compile-hosts", " ".join(args.cross_compile_hosts)]
+        if args.cross_compile_install_prefixes:
+            impl_args += [
+                "--cross-compile-install-prefixes",
+                ";".join(args.cross_compile_install_prefixes)]
+        if args.cross_compile_with_host_tools:
+            impl_args += ['--cross-compile-with-host-tools']
+        if args.skip_local_host_install:
+            impl_args += ['--skip-local-host-install']
+        if args.build_toolchain_only:
+            impl_args += ['--build-toolchain-only']
 
         if args.test_paths:
             impl_args += ["--test-paths", " ".join(args.test_paths)]
@@ -602,7 +535,6 @@ class BuildScriptInvocation(object):
 
         if args.skip_build:
             impl_args += ["--skip-build-cmark",
-                          "--skip-build-llvm",
                           "--skip-build-swift"]
         if not args.build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
@@ -613,6 +545,10 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-foundation"]
         if not args.build_xctest:
             impl_args += ["--skip-build-xctest"]
+        if not args.build_llvm:
+            impl_args += ['--skip-build-llvm']
+        if not args.build_compiler_rt:
+            impl_args += ["--skip-build-compiler-rt"]
         if not args.build_lldb:
             impl_args += ["--skip-build-lldb"]
         if not args.build_llbuild:
@@ -728,11 +664,11 @@ class BuildScriptInvocation(object):
                 "--android-ndk", args.android_ndk,
                 "--android-api-level", args.android_api_level,
                 "--android-ndk-gcc-version", args.android_ndk_gcc_version,
-                "--android-icu-uc", args.android_icu_uc,
-                "--android-icu-uc-include", args.android_icu_uc_include,
-                "--android-icu-i18n", args.android_icu_i18n,
-                "--android-icu-i18n-include", args.android_icu_i18n_include,
-                "--android-icu-data", args.android_icu_data,
+                "--android-icu-uc", args.icu_uc_path,
+                "--android-icu-uc-include", args.icu_uc_include_path,
+                "--android-icu-i18n", args.icu_i18n_path,
+                "--android-icu-i18n-include", args.icu_i18n_include_path,
+                "--android-icu-data", args.icu_data_path,
             ]
         if args.android_deploy_device_path:
             impl_args += [
@@ -796,6 +732,40 @@ class BuildScriptInvocation(object):
                 os.path.abspath(args.clang_profile_instr_use)
             ]
 
+        if args.llvm_enable_modules:
+            impl_args += ['--llvm-enable-modules', '1']
+        impl_args += ['--llvm-include-tests=%s' % args.llvm_include_tests]
+
+        impl_args += [
+            "--swift-enable-ast-verifier=%d" % args.swift_enable_ast_verifier,
+            "--swift-include-tests=%d" % args.swift_include_tests,
+            "--swift-stdlib-use-nonatomic-rc=%d" %
+                args.swift_stdlib_use_nonatomic_rc,
+            "--build-swift-tools=%d" % args.build_swift_tools,
+            "--build-sil-debugging-stdlib=%d" % args.build_sil_debugging_stdlib,
+            "--check-incremental-compilation=%d" %
+                args.check_incremental_compilation,
+            "--build-swift-examples=%d" % args.build_swift_examples,
+            "--sil-verify-all=%d" % args.sil_verify_all,
+            "--swift-runtime-enable-leak-checker" %
+                args.swift_runtime_enable_leak_checker]
+
+        if args.darwin_crash_reporter_client is not None:
+            impl_args += ["--darwin-crash-reporter-client=%d" %
+                          args.darwin_crash_reporter_client]
+
+        if args.swift_primary_variant_sdk:
+            impl_args += ["--swift-primary-variant-sdk=%s" %
+                          args.swift_primary_variant_sdk]
+
+        if args.swift_primary_variant_arch:
+            impl_args += ["--swift-primary-variant-arch=%s" %
+                          args.swift_primary_variant_arch]
+
+        if args.swift_install_components:
+            impl_args += ['--swift-install-components=%s' %
+                          args.swift_install_components]
+
         if args.lit_args:
             impl_args += ["--llvm-lit-args=%s" % args.lit_args]
 
@@ -804,6 +774,9 @@ class BuildScriptInvocation(object):
                 "--coverage-db=%s" %
                 os.path.abspath(args.coverage_db)
             ]
+
+        if args.install_destdir:
+            impl_args += ['--install-destdir', args.install_destdir]
 
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
@@ -830,7 +803,10 @@ class BuildScriptInvocation(object):
         options = {}
         for host_target in [args.host_target] + args.cross_compile_hosts:
             # Compute the host specific configuration.
-            config = HostSpecificConfiguration(host_target, self)
+            try:
+                config = HostSpecificConfiguration(host_target, args)
+            except argparse.ArgumentError as e:
+                exit_rejecting_arguments(e.message)
 
             # Convert into `build-script-impl` style variables.
             options[host_target] = {
@@ -848,48 +824,6 @@ class BuildScriptInvocation(object):
 
         return options
 
-    def compute_product_classes(self):
-        """compute_product_classes() -> list
-
-        Compute the list of all Product classes used in this build. This list
-        is constructed in dependency order.
-        """
-
-        # FIXME: This is a weird division (returning a list of class objects),
-        # but it matches the existing structure of the `build-script-impl`.
-
-        product_classes = []
-        product_classes.append(products.CMark)
-        product_classes.append(products.LLVM)
-        if self.args.build_libcxx:
-            product_classes.append(products.LibCXX)
-        if self.args.build_libicu:
-            product_classes.append(products.LibICU)
-        product_classes.append(products.Swift)
-        if self.args.build_lldb:
-            product_classes.append(products.LLDB)
-        if self.args.build_libdispatch:
-            product_classes.append(products.LibDispatch)
-        if self.args.build_foundation:
-            product_classes.append(products.Foundation)
-        if self.args.build_xctest:
-            product_classes.append(products.XCTest)
-        if self.args.build_llbuild:
-            product_classes.append(products.LLBuild)
-        if self.args.build_swiftpm:
-            product_classes.append(products.SwiftPM)
-        if self.args.build_swiftsyntax:
-            product_classes.append(products.SwiftSyntax)
-        if self.args.build_skstresstester:
-            product_classes.append(products.SKStressTester)
-        if self.args.build_swiftevolve:
-            product_classes.append(products.SwiftEvolve)
-        if self.args.build_indexstoredb:
-            product_classes.append(products.IndexStoreDB)
-        if self.args.build_sourcekitlsp:
-            product_classes.append(products.SourceKitLSP)
-        return product_classes
-
     def execute(self):
         """Execute the invocation with the configured arguments."""
 
@@ -904,8 +838,8 @@ class BuildScriptInvocation(object):
                                   env=impl_env, echo=True)
             return
 
-        # Otherwise, we compute and execute the individual actions ourselves.
-
+        # This captures the context of this method, that will be invoked through
+        # the abstract methods of BuildScriptBase.
         def execute_one_impl_action(host=None, product_class=None, name=None):
             if host is None:
                 assert (product_class is None and
@@ -922,78 +856,76 @@ class BuildScriptInvocation(object):
                 [build_script_impl] + impl_args + [
                     "--only-execute", action_name],
                 env=impl_env, echo=self.args.verbose_build)
+        self.__execute_one_impl_action = execute_one_impl_action
 
-        # Compute the list of hosts to operate on.
-        all_host_names = [
-            self.args.host_target] + self.args.cross_compile_hosts
-        all_hosts = [StdlibDeploymentTarget.get_target_for_name(name)
-                     for name in all_host_names]
+        # Otherwise, delegate to the base class, which will invoke
+        # _execute_action in the right order.
+        super(BuildScriptInvocation, self).execute()
 
-        # Compute the list of product classes to operate on.
-        #
-        # FIXME: This should really be per-host, but the current structure
-        # matches that of `build-script-impl`.
-        product_classes = self.compute_product_classes()
+    def _execute_build_action(self, host, product_class):
+        if product_class.is_build_script_impl_product():
+            self.__execute_one_impl_action(host, product_class, "build")
+        else:
+            self.__prepare_product(product_class, host).do_build(host)
 
-        impl_product_classes = [cls for cls in product_classes
-                                if cls.is_build_script_impl_product()]
+    def _execute_test_action(self, host, product_class):
+        if product_class.is_build_script_impl_product:
+            self.__execute_one_impl_action(host, product_class, "test")
+        else:
+            self.__prepare_product(product_class, host).do_test()
 
-        # Execute each "pass".
+    def _execute_install_action(self, host, product_class):
+        self.__execute_one_impl_action(host, product_class, "install")
 
-        # Build...
-        for host_target in all_hosts:
-            # FIXME: We should only compute these once.
-            config = HostSpecificConfiguration(host_target.name, self)
-            print("Building the standard library for: {}".format(
-                " ".join(config.swift_stdlib_build_targets)))
-            if config.swift_test_run_targets and (
-                    self.args.test or self.args.long_test):
-                print("Running Swift tests for: {}".format(
-                    " ".join(config.swift_test_run_targets)))
-            if config.swift_benchmark_run_targets and self.args.benchmark:
-                print("Running Swift benchmarks for: {}".format(
-                    " ".join(config.swift_benchmark_run_targets)))
+    def _execute_extract_symbols_action(self, host):
+        self.__execute_one_impl_action(host, None, "extractsymbols")
 
-            for product_class in impl_product_classes:
-                execute_one_impl_action(host_target, product_class, "build")
+    def _execute_package_action(self, host):
+        self.__execute_one_impl_action(host, None, "package")
 
-        # Test...
-        for host_target in all_hosts:
-            for product_class in impl_product_classes:
-                execute_one_impl_action(host_target, product_class, "test")
+    def _execute_merged_host_lipo_action(self):
+        self.__execute_one_impl_action(None, None, "extractsymbols")
 
-        # Install...
-        for host_target in all_hosts:
-            for product_class in impl_product_classes:
-                execute_one_impl_action(host_target, product_class, "install")
+    def __prepare_product(self, product_class, host_target):
+        product_source = product_class.product_source_name()
+        product_name = product_class.product_name()
+        product = product_class(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir=self.workspace.source_dir(product_source),
+            build_dir=self.workspace.build_dir(
+                host_target, product_name))
+        return product
 
-        # Non-build-script-impl products...
-        # Note: currently only supports building for the host.
-        for host_target in [self.args.host_target]:
-            for product_class in product_classes:
-                if product_class.is_build_script_impl_product():
-                    continue
-                product_source = product_class.product_source_name()
-                product_name = product_class.product_name()
-                product = product_class(
-                    args=self.args,
-                    toolchain=self.toolchain,
-                    source_dir=self.workspace.source_dir(product_source),
-                    build_dir=self.workspace.build_dir(
-                        host_target, product_name))
-                product.do_build(host_target)
-                product.do_test(host_target)
 
-        # Extract symbols...
-        for host_target in all_hosts:
-            execute_one_impl_action(host_target, name="extractsymbols")
+class BuildScriptNative(BuildScriptBase):
+    def _execute_build_action(self, host, product_class):
+        builder = self.__make_builder(product_class, host)
+        builder.do_build()
 
-        # Package...
-        for host_target in all_hosts:
-            execute_one_impl_action(host_target, name="package")
+    def _execute_test_action(self, host, product_class):
+        builder = self.__make_builder(product_class, host)
+        builder.do_test()
 
-        # Lipo...
-        execute_one_impl_action(name="merged-hosts-lipo")
+    def _execute_install_action(self, host, product_class):
+        builder = self.__make_builder(product_class, host)
+        builder.do_install()
+
+    def _execute_extract_symbols_action(self, host):
+        # TODO
+        pass
+
+    def _execute_package_action(self, host):
+        # TODO
+        pass
+
+    def _execute_merged_host_lipo_action(self):
+        # TODO
+        pass
+
+    def __make_builder(self, product_class, host):
+        return product_class.builder_class()(
+            product_class, self.args, self.toolchain, self.workspace, host)
 
 
 # Provide a short delay so accidentally invoked clean builds can be canceled.
@@ -1111,7 +1043,13 @@ def main_preset():
             '--distcc can not be used with' +
             ' --cmake-c-launcher or --cmake-cxx-launcher')
 
-    build_script_args = [sys.argv[0]]
+    if platform.system() != 'Windows':
+        build_script_args = [sys.argv[0]]
+    else:
+        # On Windows, we cannot execute the Python script directly, so detour
+        # through build-script.cmd
+        build_script_args = [os.path.join(os.path.dirname(sys.argv[0]),
+                             'build-script.cmd')]
     if args.dry_run:
         build_script_args += ["--dry-run"]
 
@@ -1190,7 +1128,10 @@ def main_normal():
     BuildScriptInvocation.validate_arguments(toolchain, args)
 
     # Create the build script invocation.
-    invocation = BuildScriptInvocation(toolchain, args)
+    if args.native_impl:
+        invocation = BuildScriptNative(toolchain, args)
+    else:
+        invocation = BuildScriptInvocation(toolchain, args)
 
     # Sanitize the runtime environment.
     invocation.initialize_runtime_environment()

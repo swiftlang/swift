@@ -140,6 +140,8 @@ def _apply_default_arguments(args):
         args.build_android = False
         args.build_benchmarks = False
         args.build_external_benchmarks = False
+        args.build_llvm = False
+        args.build_compiler_rt = False
         args.build_lldb = False
         args.build_llbuild = False
         args.build_libcxx = False
@@ -278,8 +280,12 @@ def create_argument_parser():
     option(['-n', '--dry-run'], store_true,
            help='print the commands that would be executed, but do not '
                 'execute them')
-    option('--legacy-impl', store_true('legacy_impl'),
-           help='use legacy implementation')
+
+    with mutually_exclusive_group():
+        option('--legacy-impl', store_true('legacy_impl'),
+               help='use legacy implementation')
+        option('--native-impl', store_true('native_impl'),
+               help='use native implementation')
 
     option('--build-runtime-with-host-compiler', toggle_true,
            help='Use the host compiler, not the self-built one to compile the '
@@ -332,6 +338,8 @@ def create_argument_parser():
            help='the path to install debug symbols into')
     option('--install-destdir', store_path,
            help='the path to use as the filesystem root for the installation')
+    option('--build-toolchain-only', store_true,
+           help='Only build the necessary tools to build an external toolchain')
 
     option(['-j', '--jobs'], store_int('build_jobs'),
            default=multiprocessing.cpu_count(),
@@ -421,6 +429,9 @@ def create_argument_parser():
            default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
            metavar='MAJOR.MINOR',
            help='minimum deployment target version for watchOS')
+    option('--darwin-toolchain-version', store,
+           metavar='MAJOR.MINOR',
+           help='Version for xctoolchain info plist and installer pkg')
 
     option('--extra-cmake-options', append,
            type=argparse.ShellSplitType(),
@@ -500,6 +511,18 @@ def create_argument_parser():
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
 
+    option('--cross-compile-install-prefixes', append,
+           type=argparse.ShellSplitType(),
+           default=[],
+           help='A space separated list of install prefixes to use for the '
+                'cross-compiled hosts. The list expands, so if there are more '
+                'cross-compile hosts than prefixes, unmatched hosts use the '
+                'last prefix in the list')
+
+    option('--cross-compile-with-host-tools', store_true,
+           help='Use the clang we build for the host to then build the '
+                'cross-compile hosts')
+
     option('--stdlib-deployment-targets', append,
            type=argparse.ShellSplitType(),
            default=None,
@@ -511,6 +534,10 @@ def create_argument_parser():
            default=['all'],
            help='A space-separated list that filters which of the configured '
                 'targets to build the Swift standard library for, or "all".')
+
+    option('--skip-local-host-install', store_true,
+           help='If we are cross-compiling multiple targets, skip an install '
+                'pass locally if the hosts match.')
 
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
@@ -562,11 +589,24 @@ def create_argument_parser():
     option(['--build-libparser-only'], store_true('build_libparser_only'),
            help='build only libParser for SwiftSyntax')
 
+    option('--build-llvm', toggle_false('clean_llvm'),
+           default=False,
+           help='If set to false, cleans the LLVM build result.')
+
+    option('--skip-build-llvm', store_false('build_llvm'),
+           help='Skip building LLVM/Clang')
+
+    option('--skip-build-compiler-rt', store_false('build_compiler_rt'),
+           help='Skip building Compiler-RT')
+
     # -------------------------------------------------------------------------
     in_group('Extra actions to perform before or in addition to building')
 
     option(['-c', '--clean'], store_true,
            help='do a clean build')
+
+    option('--reconfigure', store_true,
+           help='force a CMake configuration run even if CMakeCache.txt already exists')
 
     option('--export-compile-commands', toggle_true,
            help='generate compilation databases in addition to building')
@@ -907,6 +947,71 @@ def create_argument_parser():
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
            help='LLVM target generators to build')
 
+    option('--llvm-enable-modules', store_true,
+           help='Enable building LLVM using modules.')
+
+    option('--llvm-include-tests', toggle_true,
+           default=True,
+           help='Generate testing targets for LLVM. Set to true by default.')
+
+    # -------------------------------------------------------------------------
+    in_group('Build settings specific for Swift')
+
+    option('--swift-enable-ast-verifier', toggle_true,
+           default=True,
+           help='If enabled, and the assertions are enabled, the built Swift '
+                'compiler will run the AST verifier every time it is invoked')
+
+    option('--swift-include-tests', toggle_true,
+           default=True,
+           help="Generate testing targets for Swift. This allows the build to "
+                "proceed when 'test' directory is missing (required for B&I "
+                "builds).")
+
+    option('--swift-stdlib-use-nonatomic-rc', toggle_true,
+           default=False,
+           help='Build the Swift stdlib and overlays with nonatomic reference '
+                'count operations enabled.')
+
+    option('--build-swift-tools', toggle_true,
+           default=True,
+           help='Build Swift host tools')
+
+    option('--build-sil-debugging-stdlib', toggle_true,
+           default=False,
+           help='Build the Swift standard library with -gsil to enable '
+                'debugging and profiling on SIL level')
+
+    option('--check-incremental-compilation', toggle_true,
+           default=False,
+           help='Compile swift libraries multiple times to check if '
+                'incremental compilation works')
+
+    option('--build-swift-examples', toggle_true,
+           default=True,
+           help='Build the Swift examples')
+
+    option('--darwin-crash-reporter-client', toggle_true,
+           help='Enable CrashReporter integration')
+
+    option('--sil-verify-all', toggle_true,
+           default=False,
+           help='Run the SIL verifier after each transform when building '
+                'Swift files during this build process')
+
+    option('--swift-runtime-enable-leak-checker', toggle_true,
+           default=False,
+           help='Enable leaks checking routines in the runtime')
+
+    option('--swift-primary-variant-sdk', store,
+           help='Default SDK for target binaries.')
+
+    option('--swift-primary-variant-arch', store,
+           help='Default architecture for target binaries.')
+
+    option('--swift-install-components', store,
+           help='A semicolon-separated list of Swift components to install.')
+
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')
 
@@ -928,15 +1033,15 @@ def create_argument_parser():
                 'versions of the Android NDK not officially supported by '
                 'Swift')
 
-    option('--android-icu-uc', store_path,
+    option('--android-icu-uc', store_path, dest='icu_uc_path',
            help='Path to libicuuc.so')
-    option('--android-icu-uc-include', store_path,
+    option('--android-icu-uc-include', store_path, dest='icu_uc_include_path',
            help='Path to a directory containing headers for libicuuc')
-    option('--android-icu-i18n', store_path,
+    option('--android-icu-i18n', store_path, dest='icu_i18n_path',
            help='Path to libicui18n.so')
-    option('--android-icu-i18n-include', store_path,
+    option('--android-icu-i18n-include', store_path, dest='icu_i18n_include_path',
            help='Path to a directory containing headers libicui18n')
-    option('--android-icu-data', store_path,
+    option('--android-icu-data', store_path, dest='icu_data_path',
            help='Path to libicudata.so')
     option('--android-deploy-device-path', store_path,
            default=android.adb.commands.DEVICE_TEMP_DIR,
@@ -951,6 +1056,20 @@ def create_argument_parser():
            help='The Android target architecture when building for Android. '
                 'Currently only armv7 and aarch64 are supported. '
                 '%(default)s is the default.')
+
+    # -------------------------------------------------------------------------
+    in_group('ICU paths')
+
+    option('--icu-uc', store_path, dest='icu_uc_path',
+           help='Path to libicuuc.so/lib')
+    option('--icu-uc-include', store_path, dest='icu_uc_include_path',
+           help='Path to a directory containing headers for libicuuc')
+    option('--icu-i18n', store_path, dest='icu_i18n_path',
+           help='Path to libicui18n.so/lib')
+    option('--icu-i18n-include', store_path, dest='icu_i18n_include_path',
+           help='Path to a directory containing headers libicui18n')
+    option('--icu-data', store_path, dest='icu_data_path',
+           help='Path to libicudata.so/lib')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')
