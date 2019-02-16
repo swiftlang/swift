@@ -156,24 +156,22 @@ public func withRecomputationInPullbacks<T, U>(
   }
 }
 
-// FIXME: The method variant produces a zero cotangent. Need to investigate.
-//
-// public extension Differentiable {
-//   @inlinable
-//   @differentiable(wrt: self, vjp: _vjp_withRecomputationInPullbacks)
-//   func withRecomputationInPullbacks<Result : Differentiable>(
-//     _ body: @escaping @differentiable (Self) -> Result
-//   ) -> Result {
-//     return body(self)
-//   }
-// 
-//   @usableFromInline
-//   internal func _vjp_withRecomputationInPullbacks<Result : Differentiable>(
-//     _ body: @escaping @differentiable (Self) -> Result
-//   ) -> (Result, (Result.CotangentVector) -> CotangentVector) {
-//     return valueWithPullback(in: Swift.withRecomputationInPullbacks(body))
-//   }
-// }
+public extension Differentiable {
+  @inlinable
+  @differentiable(wrt: self, vjp: _vjp_withRecomputationInPullbacks)
+  func withRecomputationInPullbacks<Result : Differentiable>(
+    _ body: @escaping @differentiable (Self) -> Result
+  ) -> Result {
+    return body(self)
+  }
+
+  @usableFromInline
+  internal func _vjp_withRecomputationInPullbacks<Result : Differentiable>(
+    _ body: @escaping @differentiable (Self) -> Result
+  ) -> (Result, (Result.CotangentVector) -> CotangentVector) {
+    return valueWithPullback(in: Swift.withRecomputationInPullbacks(body))
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Method-style differential operators
