@@ -4567,32 +4567,36 @@ public:
     return deserializeAnyFunctionType(scratch, blobData, /*isGeneric*/true);
   }
 
-  Expected<Type>
-  deserializeExistentialMetatypeType(ArrayRef<uint64_t> scratch,
-                                     StringRef blobData) {
+  template <typename Layout, typename ASTType, bool CanBeThin>
+  Expected<Type> deserializeAnyMetatypeType(ArrayRef<uint64_t> scratch,
+                                            StringRef blobData) {
     TypeID instanceID;
     uint8_t repr;
-    decls_block::ExistentialMetatypeTypeLayout::readRecord(scratch,
-                                                           instanceID, repr);
+    Layout::readRecord(scratch, instanceID, repr);
+
     auto instanceType = MF.getTypeChecked(instanceID);
     if (!instanceType)
       return instanceType.takeError();
 
     switch (repr) {
     case serialization::MetatypeRepresentation::MR_None:
-      return ExistentialMetatypeType::get(instanceType.get());
+      return ASTType::get(instanceType.get());
 
     case serialization::MetatypeRepresentation::MR_Thin:
-      MF.error();
-      llvm_unreachable("an error is fatal");
+      if (!CanBeThin) {
+        MF.error();
+        llvm_unreachable("an error is fatal");
+      }
+      return ASTType::get(instanceType.get(),
+                          MetatypeRepresentation::Thin);
 
     case serialization::MetatypeRepresentation::MR_Thick:
-      return ExistentialMetatypeType::get(instanceType.get(),
-                                          MetatypeRepresentation::Thick);
+      return ASTType::get(instanceType.get(),
+                          MetatypeRepresentation::Thick);
 
     case serialization::MetatypeRepresentation::MR_ObjC:
-      return ExistentialMetatypeType::get(instanceType.get(),
-                                          MetatypeRepresentation::ObjC);
+      return ASTType::get(instanceType.get(),
+                          MetatypeRepresentation::ObjC);
 
     default:
       MF.error();
@@ -4600,36 +4604,20 @@ public:
     }
   }
 
+  Expected<Type>
+  deserializeExistentialMetatypeType(ArrayRef<uint64_t> scratch,
+                                     StringRef blobData) {
+    return
+        deserializeAnyMetatypeType<decls_block::ExistentialMetatypeTypeLayout,
+                                   ExistentialMetatypeType, /*CanBeThin*/false>(
+        scratch, blobData);
+  }
+
   Expected<Type> deserializeMetatypeType(ArrayRef<uint64_t> scratch,
                                          StringRef blobData) {
-    TypeID instanceID;
-    uint8_t repr;
-    decls_block::MetatypeTypeLayout::readRecord(scratch, instanceID, repr);
-
-    auto instanceType = MF.getTypeChecked(instanceID);
-    if (!instanceType)
-      return instanceType.takeError();
-
-    switch (repr) {
-    case serialization::MetatypeRepresentation::MR_None:
-      return MetatypeType::get(instanceType.get());
-
-    case serialization::MetatypeRepresentation::MR_Thin:
-      return MetatypeType::get(instanceType.get(),
-                               MetatypeRepresentation::Thin);
-
-    case serialization::MetatypeRepresentation::MR_Thick:
-      return MetatypeType::get(instanceType.get(),
-                               MetatypeRepresentation::Thick);
-
-    case serialization::MetatypeRepresentation::MR_ObjC:
-      return MetatypeType::get(instanceType.get(),
-                               MetatypeRepresentation::ObjC);
-
-    default:
-      MF.error();
-      llvm_unreachable("an error is fatal");
-    }
+    return deserializeAnyMetatypeType<decls_block::MetatypeTypeLayout,
+                                      MetatypeType, /*CanBeThin*/true>(
+        scratch, blobData);
   }
 
   Expected<Type> deserializeDynamicSelfType(ArrayRef<uint64_t> scratch,
