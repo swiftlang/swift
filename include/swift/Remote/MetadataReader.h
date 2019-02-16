@@ -86,6 +86,26 @@ struct delete_with_free {
   }
 };
 
+/// A structure representing an opened existential type.
+struct RemoteExistential {
+  /// The payload's concrete type metadata.
+  RemoteAddress MetadataAddress;
+
+  /// The address of the payload value.
+  RemoteAddress PayloadAddress;
+
+  /// True if this is an NSError instance transparently bridged to an Error
+  /// existential.
+  bool IsBridgedError;
+
+  RemoteExistential(RemoteAddress MetadataAddress,
+                    RemoteAddress PayloadAddress,
+                    bool IsBridgedError=false)
+    : MetadataAddress(MetadataAddress),
+      PayloadAddress(PayloadAddress),
+      IsBridgedError(IsBridgedError) {}
+};
+
 /// A generic reader of metadata.
 ///
 /// BuilderType must implement a particular interface which is currently
@@ -170,6 +190,38 @@ private:
   StoredPointer IndexedClassesPointer;
   StoredPointer IndexedClassesCountPointer;
   StoredPointer LastIndexedClassesCount = 0;
+
+  enum class TaggedPointerEncodingKind {
+    /// We haven't checked yet.
+    Unknown,
+
+    /// There was an error trying to find out the tagged pointer encoding.
+    Error,
+
+    /// The "extended" encoding.
+    ///
+    /// 1 bit:   is-tagged
+    /// 3 bits:  class index (for objc_debug_taggedpointer_classes[])
+    /// 60 bits: payload
+    ///
+    /// Class index 0b111 represents 256 additional classes:
+    ///
+    /// 1 bit:   is-tagged
+    /// 3 bits:  0b111
+    /// 8 bits:  extended class index (for objc_debug_taggedpointer_ext_classes[])
+    /// 54 bits: payload
+    Extended
+  };
+  TaggedPointerEncodingKind TaggedPointerEncoding =
+      TaggedPointerEncodingKind::Unknown;
+  StoredPointer TaggedPointerMask;
+  StoredPointer TaggedPointerSlotShift;
+  StoredPointer TaggedPointerSlotMask;
+  StoredPointer TaggedPointerClasses;
+  StoredPointer TaggedPointerExtendedMask;
+  StoredPointer TaggedPointerExtendedSlotShift;
+  StoredPointer TaggedPointerExtendedSlotMask;
+  StoredPointer TaggedPointerExtendedClasses;
 
   Demangle::NodeFactory Factory;
 
@@ -294,8 +346,10 @@ public:
   }
 
   /// Given a pointer to a known-error existential, attempt to discover the
-  /// pointer to its metadata address and its value address.
-  Optional<std::pair<RemoteAddress, RemoteAddress>>
+  /// pointer to its metadata address, its value address, and whether this
+  /// is a toll-free-bridged NSError or an actual Error existential wrapper
+  /// around a native Swift value.
+  Optional<RemoteExistential>
   readMetadataAndValueErrorExistential(RemoteAddress ExistentialAddress) {
     // An pointer to an error existential is always an heap object.
     auto MetadataAddress =
@@ -304,6 +358,7 @@ public:
       return None;
 
     bool isObjC = false;
+    bool isBridged = false;
 
     // If we can determine the Objective-C class name, this is probably an
     // error existential with NSError-compatible layout.
@@ -311,6 +366,8 @@ public:
     if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
       if (ObjCClassName == "__SwiftNativeNSError")
         isObjC = true;
+      else
+        isBridged = true;
     } else {
       // Otherwise, we can check to see if this is a class metadata with the
       // kind value's least significant bit set, which indicates a pure
@@ -321,6 +378,13 @@ public:
         return None;
 
       isObjC = ClassMeta->isPureObjC();
+    }
+
+    if (isBridged) {
+      // NSError instances don't need to be unwrapped.
+      return RemoteExistential(RemoteAddress(*MetadataAddress),
+                               ExistentialAddress,
+                               isBridged);
     }
 
     // In addition to the isa pointer and two 32-bit reference counts, if the
@@ -354,14 +418,15 @@ public:
     auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
     InstanceAddress += Offset;
 
-    return Optional<std::pair<RemoteAddress, RemoteAddress>>(
-        {RemoteAddress(*InstanceMetadataAddress),
-         RemoteAddress(InstanceAddress)});
+    return RemoteExistential(
+        RemoteAddress(*InstanceMetadataAddress),
+        RemoteAddress(InstanceAddress),
+        isBridged);
   }
 
   /// Given a known-opaque existential, attemp to discover the pointer to its
   /// metadata address and its value.
-  Optional<std::pair<RemoteAddress, RemoteAddress>>
+  Optional<RemoteExistential>
   readMetadataAndValueOpaqueExistential(RemoteAddress ExistentialAddress) {
     // OpaqueExistentialContainer is the layout of an opaque existential.
     // `Type` is the pointer to the metadata.
@@ -381,8 +446,8 @@ public:
     // Inline representation (the value fits in the existential container).
     // So, the value starts at the first word of the container.
     if (VWT->isValueInline())
-      return Optional<std::pair<RemoteAddress, RemoteAddress>>(
-          {RemoteAddress(MetadataAddress), ExistentialAddress});
+      return RemoteExistential(RemoteAddress(MetadataAddress),
+                               ExistentialAddress);
 
     // Non-inline (box'ed) representation.
     // The first word of the container stores the address to the box.
@@ -393,8 +458,8 @@ public:
     auto AlignmentMask = VWT->getAlignmentMask();
     auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
     auto StartOfValue = BoxAddress + Offset;
-    return Optional<std::pair<RemoteAddress, RemoteAddress>>(
-        {RemoteAddress(MetadataAddress), RemoteAddress(StartOfValue)});
+    return RemoteExistential(RemoteAddress(MetadataAddress),
+                             RemoteAddress(StartOfValue));
   }
 
   /// Read a protocol from a reference to said protocol.
@@ -463,10 +528,28 @@ public:
     if (!Meta) return BuiltType();
 
     switch (Meta->getKind()) {
-    case MetadataKind::Class:
-      if (!cast<TargetClassMetadata<Runtime>>(Meta)->isTypeMetadata())
-        return BuiltType();
+    case MetadataKind::Class: {
+      auto classMeta = cast<TargetClassMetadata<Runtime>>(Meta);
+      if (!classMeta->isTypeMetadata()) {
+        std::string className;
+        if (!readObjCClassName(MetadataAddress, className))
+          return BuiltType();
+
+        BuiltType BuiltObjCClass = Builder.createObjCClassType(std::move(className));
+        if (!BuiltObjCClass) {
+          // Try the superclass.
+          if (!classMeta->Superclass)
+            return BuiltType();
+
+          BuiltObjCClass = readTypeFromMetadata(classMeta->Superclass,
+                                                skipArtificialSubclasses);
+        }
+
+        TypeCache[MetadataAddress] = BuiltObjCClass;
+        return BuiltObjCClass;
+      }
       return readNominalTypeFromMetadata(Meta, skipArtificialSubclasses);
+    }
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
@@ -657,10 +740,48 @@ public:
     return buildContextMangling(context, Dem);
   }
 
+  bool isTaggedPointer(StoredPointer objectAddress) {
+    if (getTaggedPointerEncoding() != TaggedPointerEncodingKind::Extended)
+      return false;
+  
+    return objectAddress & TaggedPointerMask;
+  }
+
+  /// Read the isa pointer of an Object-C tagged pointer value.
+  Optional<StoredPointer>
+  readMetadataFromTaggedPointer(StoredPointer objectAddress) {
+    auto readArrayElement = [&](StoredPointer base, StoredPointer tag)
+        -> Optional<StoredPointer> {
+      StoredPointer addr = base + tag * sizeof(StoredPointer);
+      StoredPointer isa;
+      if (!Reader->readInteger(RemoteAddress(addr), &isa))
+        return None;
+      return isa;
+    };
+
+    // Extended pointers have a tag of 0b111, using 8 additional bits
+    // to specify the class.
+    if (TaggedPointerExtendedMask != 0  &&
+        ((objectAddress & TaggedPointerExtendedMask)
+           == TaggedPointerExtendedMask)) {
+      auto tag = ((objectAddress >> TaggedPointerExtendedSlotShift) &
+                  TaggedPointerExtendedSlotMask);
+      return readArrayElement(TaggedPointerExtendedClasses, tag);
+    }
+
+    // Basic tagged pointers use a 3 bit tag to specify the class.
+    auto tag = ((objectAddress >> TaggedPointerSlotShift) &
+                TaggedPointerSlotMask);
+    return readArrayElement(TaggedPointerClasses, tag);
+  }
+
   /// Read the isa pointer of a class or closure context instance and apply
   /// the isa mask.
   Optional<StoredPointer>
   readMetadataFromInstance(StoredPointer objectAddress) {
+    if (isTaggedPointer(objectAddress))
+      return readMetadataFromTaggedPointer(objectAddress);
+
     StoredPointer isa;
     if (!Reader->readInteger(RemoteAddress(objectAddress), &isa))
       return None;
@@ -2290,7 +2411,69 @@ private:
       }
     }
 
+#   undef tryFindSymbol
+#   undef tryReadSymbol
+#   undef tryFindAndReadSymbol
+
     return finish(IsaEncodingKind::None);
+  }
+
+  TaggedPointerEncodingKind getTaggedPointerEncoding() {
+    if (TaggedPointerEncoding != TaggedPointerEncodingKind::Unknown)
+      return TaggedPointerEncoding;
+
+    auto finish = [&](TaggedPointerEncodingKind result)
+        -> TaggedPointerEncodingKind {
+      TaggedPointerEncoding = result;
+      return result;
+    };
+
+    /// Look up the given global symbol and bind 'varname' to its
+    /// address if its exists.
+#   define tryFindSymbol(varname, symbolName)                \
+      auto varname = Reader->getSymbolAddress(symbolName);   \
+      if (!varname)                                          \
+        return finish(TaggedPointerEncodingKind::Error)
+    /// Read from the given pointer into 'dest'.
+#   define tryReadSymbol(varname, dest) do {                 \
+      if (!Reader->readInteger(varname, &dest))              \
+        return finish(TaggedPointerEncodingKind::Error);     \
+    } while (0)
+    /// Read from the given global symbol into 'dest'.
+#   define tryFindAndReadSymbol(dest, symbolName) do {       \
+      tryFindSymbol(_address, symbolName);                   \
+      tryReadSymbol(_address, dest);                         \
+    } while (0)
+
+    tryFindAndReadSymbol(TaggedPointerMask,
+                         "objc_debug_taggedpointer_mask");
+    tryFindAndReadSymbol(TaggedPointerSlotShift,
+                         "objc_debug_taggedpointer_slot_shift");
+    tryFindAndReadSymbol(TaggedPointerSlotMask,
+                         "objc_debug_taggedpointer_slot_mask");
+    tryFindSymbol(TaggedPointerClassesAddr,
+                  "objc_debug_taggedpointer_classes");
+    if (!TaggedPointerClassesAddr)
+      finish(TaggedPointerEncodingKind::Error);
+    TaggedPointerClasses = TaggedPointerClassesAddr.getAddressData();
+    tryFindAndReadSymbol(TaggedPointerExtendedMask,
+                         "objc_debug_taggedpointer_ext_mask");
+    tryFindAndReadSymbol(TaggedPointerExtendedSlotShift,
+                         "objc_debug_taggedpointer_ext_slot_shift");
+    tryFindAndReadSymbol(TaggedPointerExtendedSlotMask,
+                         "objc_debug_taggedpointer_ext_slot_mask");
+    tryFindSymbol(TaggedPointerExtendedClassesAddr,
+                  "objc_debug_taggedpointer_ext_classes");
+    if (!TaggedPointerExtendedClassesAddr)
+      finish(TaggedPointerEncodingKind::Error);
+    TaggedPointerExtendedClasses =
+        TaggedPointerExtendedClassesAddr.getAddressData();
+
+#   undef tryFindSymbol
+#   undef tryReadSymbol
+#   undef tryFindAndReadSymbol
+
+    return finish(TaggedPointerEncodingKind::Extended);
   }
 
   template <class T>
