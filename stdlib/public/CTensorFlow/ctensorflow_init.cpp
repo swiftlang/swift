@@ -6,14 +6,23 @@
 #include "tensorflow/core/platform/init_main.h"
 
 #include <assert.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
 
 extern "C" {
 
+void handle_sigint(int signal) {
+  printf("Caught interrupt signal, exiting...\n");
+  exit(1);
+}
+
 void InitTensorFlowRuntime(unsigned char enable_debug_logging,
                            int verbose_level) {
+  // Install a signal handler to ensure we exit when interrupted.
+  signal(SIGINT, handle_sigint);
+
   // Synthesize argc and argv
   char arg0[] = "dummyProgramName";
   std::vector<char*> my_argv;
