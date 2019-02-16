@@ -2220,8 +2220,8 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     arguments.push_back(load);
   }
 
-  auto apply = builder.createApply(loc, fnArg, SubstitutionMap(), arguments,
-                                   /*isNonThrowing*/ false);
+  auto *apply = builder.createApply(
+      loc, fnArg, arguments, /*isNonThrowing*/ false);
 
   // Get return elements.
   SmallVector<SILValue, 4> results;
@@ -3950,9 +3950,8 @@ public:
     args.push_back(seed);
 
     // Call the pullback.
-    auto *pullbackCall = builder.createApply(ai->getLoc(), pullback,
-                                             SubstitutionMap(), args,
-                                             /*isNonThrowing*/ false);
+    auto *pullbackCall = builder.createApply(
+        ai->getLoc(), pullback, args, /*isNonThrowing*/ false);
 
     // Extract all results from `pullbackCall`.
     SmallVector<SILValue, 8> dirResults;
@@ -4170,7 +4169,7 @@ public:
 
       // Call the pullback.
       auto *pullbackCall = builder.createApply(
-          loc, pullback, SubstitutionMap(), {vector}, /*isNonThrowing*/ false);
+          loc, pullback, {vector}, /*isNonThrowing*/ false);
       assert(!pullbackCall->hasIndirectResults());
 
       // Accumulate adjoint for the `struct_extract` operand.
@@ -4247,8 +4246,7 @@ public:
 
       // Call the pullback.
       auto *pullbackCall = builder.createApply(
-          loc, pullback, SubstitutionMap(), {pullbackResultBuf, adjElt},
-          /*isNonThrowing*/ false);
+          loc, pullback, {pullbackResultBuf, adjElt}, /*isNonThrowing*/ false);
       assert(pullbackCall->getNumIndirectResults() == 1 &&
              pullbackCall->getIndirectSILResults().front() ==
                   pullbackResultBuf);
@@ -4258,11 +4256,12 @@ public:
       auto *readAccess = builder.createBeginAccess(
           loc, pullbackResultBuf, SILAccessKind::Read,
           SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-           /*fromBuiltin*/ false);
+          /*fromBuiltin*/ false);
       accumulateIndirect(getAdjointBuffer(seai->getOperand()),
                          pullbackResultBuf);
       builder.createEndAccess(loc, readAccess, /*aborted*/ false);
-      // Deallocate pullback indirect result buffer.
+      // Clean up and deallocate pullback indirect result buffer.
+      emitCleanup(builder, loc, pullbackResultBuf);
       builder.createDeallocStack(loc, pullbackResultBuf);
       break;
     }
