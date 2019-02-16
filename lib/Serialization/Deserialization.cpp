@@ -4316,63 +4316,9 @@ public:
 
     return alias->getDeclaredInterfaceType();
   }
-};
 
-Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
-  if (TID == 0)
-    return Type();
-
-  assert(TID <= Types.size() && "invalid type ID");
-  auto &typeOrOffset = Types[TID-1];
-
-  if (typeOrOffset.isComplete())
-    return typeOrOffset;
-
-  BCOffsetRAII restoreOffset(DeclTypeCursor);
-  DeclTypeCursor.JumpToBit(typeOrOffset);
-
-  auto result = TypeDeserializer(*this).getTypeCheckedImpl();
-  if (!result)
-    return result;
-  typeOrOffset = result.get();
-
-#ifndef NDEBUG
-  PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
-  if (typeOrOffset.get()->hasError()) {
-    typeOrOffset.get()->dump();
-    llvm_unreachable("deserialization produced an invalid type "
-                     "(rdar://problem/30382791)");
-  }
-#endif
-
-  // Invoke the callback on the deserialized type.
-  DeserializedTypeCallback(typeOrOffset.get());
-  return typeOrOffset.get();
-}
-
-Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
-  if (auto s = ctx.Stats)
-    s->getFrontendCounters().NumTypesDeserialized++;
-
-  auto entry = MF.DeclTypeCursor.advance();
-
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    // We don't know how to serialize types represented by sub-blocks.
-    MF.error();
-    return nullptr;
-  }
-
-  SmallVector<uint64_t, 64> scratch;
-  StringRef blobData;
-  unsigned recordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch,
-                                                   &blobData);
-  Type result;
-
-  switch (recordID) {
-  case decls_block::BUILTIN_ALIAS_TYPE:
-    return deserializeBuiltinAliasType(scratch, blobData);
-
-  case decls_block::NAME_ALIAS_TYPE: {
+  Expected<Type> deserializeTypeAliasType(ArrayRef<uint64_t> scratch,
+                                          StringRef blobData) {
     DeclID typealiasID;
     TypeID parentTypeID;
     TypeID underlyingTypeID;
@@ -4419,10 +4365,8 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     auto subMap = MF.getSubstitutionMap(substitutionsID);
 
     auto parentTypeOrError = MF.getTypeChecked(parentTypeID);
-    if (!parentTypeOrError) {
-      result = underlyingType;
-      break;
-    }
+    if (!parentTypeOrError)
+      return underlyingType;
 
     // Look through compatibility aliases that are now unavailable.
     if (alias &&
@@ -4430,21 +4374,18 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
         alias->isCompatibilityAlias()) {
       underlyingType = alias->getUnderlyingTypeLoc().getType().subst(subMap);
       assert(underlyingType);
-      result = underlyingType;
-      break;
+      return underlyingType;
     }
 
-    if (!formSugaredType) {
-      result = underlyingType;
-      break;
-    }
+    if (!formSugaredType)
+      return underlyingType;
 
     auto parentType = parentTypeOrError.get();
-    result = TypeAliasType::get(alias, parentType, subMap,
-                                      substitutedType);
-    break;
+    return TypeAliasType::get(alias, parentType, subMap, substitutedType);
   }
-  case decls_block::NOMINAL_TYPE: {
+
+  Expected<Type> deserializeNominalType(ArrayRef<uint64_t> scratch,
+                                        StringRef blobData) {
     DeclID declID;
     TypeID parentID;
     decls_block::NominalTypeLayout::readRecord(scratch, declID, parentID);
@@ -4490,11 +4431,11 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       return llvm::make_error<XRefError>("declaration is not a nominal type",
                                          tinyTrace, fullName);
     }
-    result = NominalType::get(nominal, parentTy.get(), ctx);
-    break;
+    return NominalType::get(nominal, parentTy.get(), ctx);
   }
 
-  case decls_block::PAREN_TYPE: {
+  Expected<Type> deserializeParenType(ArrayRef<uint64_t> scratch,
+                                      StringRef blobData) {
     TypeID underlyingID;
     decls_block::ParenTypeLayout::readRecord(scratch, underlyingID);
 
@@ -4502,11 +4443,11 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     if (!underlyingTy)
       return underlyingTy.takeError();
 
-    result = ParenType::get(ctx, underlyingTy.get());
-    break;
+    return ParenType::get(ctx, underlyingTy.get());
   }
 
-  case decls_block::TUPLE_TYPE: {
+  Expected<Type> deserializeTupleType(SmallVectorImpl<uint64_t> &scratch,
+                                      StringRef blobData) {
     // The tuple record itself is empty. Read all trailing elements.
     SmallVector<TupleTypeElt, 8> elements;
     while (true) {
@@ -4531,18 +4472,18 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       elements.emplace_back(elementTy.get(), MF.getIdentifier(nameID));
     }
 
-    result = TupleType::get(elements, ctx);
-    break;
+    return TupleType::get(elements, ctx);
   }
 
-  case decls_block::FUNCTION_TYPE:
-  case decls_block::GENERIC_FUNCTION_TYPE: {
+  Expected<Type> deserializeAnyFunctionType(SmallVectorImpl<uint64_t> &scratch,
+                                            StringRef blobData,
+                                            bool isGeneric) {
     TypeID resultID;
     uint8_t rawRepresentation;
     bool noescape = false, throws;
     GenericSignature *genericSig = nullptr;
 
-    if (recordID == decls_block::FUNCTION_TYPE) {
+    if (!isGeneric) {
       decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
                                                   rawRepresentation,
                                                   noescape,
@@ -4562,7 +4503,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       MF.error();
       return nullptr;
     }
-    
+
     auto info = FunctionType::ExtInfo(*representation, noescape, throws);
 
     auto resultTy = MF.getTypeChecked(resultID);
@@ -4606,19 +4547,29 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
                                              isEscaping, *ownership));
     }
 
-    if (recordID == decls_block::FUNCTION_TYPE) {
+    if (!isGeneric) {
       assert(genericSig == nullptr);
-      result = FunctionType::get(params, resultTy.get(), info);
-    } else {
-      assert(genericSig != nullptr);
-      result = GenericFunctionType::get(genericSig,
-                                              params, resultTy.get(), info);
+      return FunctionType::get(params, resultTy.get(), info);
     }
 
-    break;
+    assert(genericSig != nullptr);
+    return GenericFunctionType::get(genericSig, params, resultTy.get(), info);
   }
 
-  case decls_block::EXISTENTIAL_METATYPE_TYPE: {
+  Expected<Type> deserializeFunctionType(SmallVectorImpl<uint64_t> &scratch,
+                                         StringRef blobData) {
+    return deserializeAnyFunctionType(scratch, blobData, /*isGeneric*/false);
+  }
+
+  Expected<Type>
+  deserializeGenericFunctionType(SmallVectorImpl<uint64_t> &scratch,
+                                 StringRef blobData) {
+    return deserializeAnyFunctionType(scratch, blobData, /*isGeneric*/true);
+  }
+
+  Expected<Type>
+  deserializeExistentialMetatypeType(ArrayRef<uint64_t> scratch,
+                                     StringRef blobData) {
     TypeID instanceID;
     uint8_t repr;
     decls_block::ExistentialMetatypeTypeLayout::readRecord(scratch,
@@ -4629,31 +4580,28 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
     switch (repr) {
     case serialization::MetatypeRepresentation::MR_None:
-      result = ExistentialMetatypeType::get(instanceType.get());
-      break;
+      return ExistentialMetatypeType::get(instanceType.get());
 
     case serialization::MetatypeRepresentation::MR_Thin:
       MF.error();
-      break;
+      llvm_unreachable("an error is fatal");
 
     case serialization::MetatypeRepresentation::MR_Thick:
-      result = ExistentialMetatypeType::get(instanceType.get(),
-                                       MetatypeRepresentation::Thick);
-      break;
+      return ExistentialMetatypeType::get(instanceType.get(),
+                                          MetatypeRepresentation::Thick);
 
     case serialization::MetatypeRepresentation::MR_ObjC:
-      result = ExistentialMetatypeType::get(instanceType.get(),
-                                       MetatypeRepresentation::ObjC);
-      break;
+      return ExistentialMetatypeType::get(instanceType.get(),
+                                          MetatypeRepresentation::ObjC);
 
     default:
       MF.error();
-      break;
+      llvm_unreachable("an error is fatal");
     }
-    break;
   }
 
-  case decls_block::METATYPE_TYPE: {
+  Expected<Type> deserializeMetatypeType(ArrayRef<uint64_t> scratch,
+                                         StringRef blobData) {
     TypeID instanceID;
     uint8_t repr;
     decls_block::MetatypeTypeLayout::readRecord(scratch, instanceID, repr);
@@ -4664,39 +4612,35 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
     switch (repr) {
     case serialization::MetatypeRepresentation::MR_None:
-      result = MetatypeType::get(instanceType.get());
-      break;
+      return MetatypeType::get(instanceType.get());
 
     case serialization::MetatypeRepresentation::MR_Thin:
-      result = MetatypeType::get(instanceType.get(),
-                                       MetatypeRepresentation::Thin);
-      break;
+      return MetatypeType::get(instanceType.get(),
+                               MetatypeRepresentation::Thin);
 
     case serialization::MetatypeRepresentation::MR_Thick:
-      result = MetatypeType::get(instanceType.get(),
-                                       MetatypeRepresentation::Thick);
-      break;
+      return MetatypeType::get(instanceType.get(),
+                               MetatypeRepresentation::Thick);
 
     case serialization::MetatypeRepresentation::MR_ObjC:
-      result = MetatypeType::get(instanceType.get(),
-                                       MetatypeRepresentation::ObjC);
-      break;
+      return MetatypeType::get(instanceType.get(),
+                               MetatypeRepresentation::ObjC);
 
     default:
       MF.error();
-      break;
+      llvm_unreachable("an error is fatal");
     }
-    break;
   }
 
-  case decls_block::DYNAMIC_SELF_TYPE: {
+  Expected<Type> deserializeDynamicSelfType(ArrayRef<uint64_t> scratch,
+                                            StringRef blobData) {
     TypeID selfID;
     decls_block::DynamicSelfTypeLayout::readRecord(scratch, selfID);
-    result = DynamicSelfType::get(MF.getType(selfID), ctx);
-    break;
+    return DynamicSelfType::get(MF.getType(selfID), ctx);
   }
 
-  case decls_block::REFERENCE_STORAGE_TYPE: {
+  Expected<Type> deserializeReferenceStorageType(ArrayRef<uint64_t> scratch,
+                                                 StringRef blobData) {
     uint8_t rawOwnership;
     TypeID objectTypeID;
     decls_block::ReferenceStorageTypeLayout::readRecord(scratch, rawOwnership,
@@ -4706,19 +4650,18 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
         (serialization::ReferenceOwnership)rawOwnership);
     if (!ownership.hasValue()) {
       MF.error();
-      break;
+      llvm_unreachable("an error is fatal");
     }
 
     auto objectTy = MF.getTypeChecked(objectTypeID);
     if (!objectTy)
       return objectTy.takeError();
 
-    result = ReferenceStorageType::get(objectTy.get(),
-                                             ownership.getValue(), ctx);
-    break;
+    return ReferenceStorageType::get(objectTy.get(), ownership.getValue(), ctx);
   }
 
-  case decls_block::PRIMARY_ARCHETYPE_TYPE: {
+  Expected<Type> deserializePrimaryArchetypeType(ArrayRef<uint64_t> scratch,
+                                                 StringRef blobData) {
     GenericEnvironmentID envID;
     unsigned depth, index;
 
@@ -4728,32 +4671,32 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     auto env = MF.getGenericEnvironment(envID);
     if (!env) {
       MF.error();
-      break;
+      llvm_unreachable("an error is fatal");
     }
 
     Type interfaceType = GenericTypeParamType::get(depth, index, ctx);
     Type contextType = env->mapTypeIntoContext(interfaceType);
-    result = contextType;
 
     if (contextType->hasError()) {
       MF.error();
-      break;
+      llvm_unreachable("an error is fatal");
     }
 
-    break;
+    return contextType;
   }
 
-  case decls_block::OPENED_ARCHETYPE_TYPE: {
+  Expected<Type> deserializeOpenedArchetypeType(ArrayRef<uint64_t> scratch,
+                                                StringRef blobData) {
     TypeID existentialID;
 
     decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
                                                        existentialID);
 
-    result = OpenedArchetypeType::get(MF.getType(existentialID));
-    break;
+    return OpenedArchetypeType::get(MF.getType(existentialID));
   }
       
-  case decls_block::NESTED_ARCHETYPE_TYPE: {
+  Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
+                                                StringRef blobData) {
     TypeID rootID, interfaceTyID;
     decls_block::NestedArchetypeTypeLayout::readRecord(scratch,
                                                        rootID, interfaceTyID);
@@ -4771,11 +4714,11 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
         return t;
       }, LookUpConformanceInModule(MF.getAssociatedModule()));
     
-    typeOrOffset = Type(interfaceTy).subst(subs);
-    break;
+    return Type(interfaceTy).subst(subs);
   }
 
-  case decls_block::GENERIC_TYPE_PARAM_TYPE: {
+  Expected<Type> deserializeGenericTypeParamType(ArrayRef<uint64_t> scratch,
+                                                 StringRef blobData) {
     DeclID declIDOrDepth;
     unsigned indexPlusOne;
 
@@ -4791,15 +4734,14 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
         return nullptr;
       }
 
-      result = genericParam->getDeclaredInterfaceType();
-      break;
+      return genericParam->getDeclaredInterfaceType();
     }
 
-    result = GenericTypeParamType::get(declIDOrDepth,indexPlusOne-1,ctx);
-    break;
+    return GenericTypeParamType::get(declIDOrDepth,indexPlusOne-1,ctx);
   }
 
-  case decls_block::PROTOCOL_COMPOSITION_TYPE: {
+  Expected<Type> deserializeProtocolCompositionType(ArrayRef<uint64_t> scratch,
+                                                    StringRef blobData) {
     bool hasExplicitAnyObject;
     ArrayRef<uint64_t> rawProtocolIDs;
 
@@ -4814,24 +4756,23 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       protocols.push_back(protoTy.get());
     }
 
-    result = ProtocolCompositionType::get(ctx, protocols,
-                                                hasExplicitAnyObject);
-    break;
+    return ProtocolCompositionType::get(ctx, protocols, hasExplicitAnyObject);
   }
 
-  case decls_block::DEPENDENT_MEMBER_TYPE: {
+  Expected<Type> deserializeDependentMemberType(ArrayRef<uint64_t> scratch,
+                                                StringRef blobData) {
     TypeID baseID;
     DeclID assocTypeID;
 
     decls_block::DependentMemberTypeLayout::readRecord(scratch, baseID,
                                                        assocTypeID);
-    result = DependentMemberType::get(
-                     MF.getType(baseID),
-                     cast<AssociatedTypeDecl>(MF.getDecl(assocTypeID)));
-    break;
+    return DependentMemberType::get(
+        MF.getType(baseID),
+        cast<AssociatedTypeDecl>(MF.getDecl(assocTypeID)));
   }
 
-  case decls_block::BOUND_GENERIC_TYPE: {
+  Expected<Type> deserializeBoundGenericType(ArrayRef<uint64_t> scratch,
+                                             StringRef blobData) {
     DeclID declID;
     TypeID parentID;
     ArrayRef<uint64_t> rawArgumentIDs;
@@ -4856,25 +4797,22 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       genericArgs.push_back(argTy.get());
     }
 
-    auto boundTy = BoundGenericType::get(nominal, parentTy, genericArgs);
-    result = boundTy;
-    break;
+    return BoundGenericType::get(nominal, parentTy, genericArgs);
   }
 
-  case decls_block::SIL_BLOCK_STORAGE_TYPE: {
+  Expected<Type> deserializeSILBlockStorageType(ArrayRef<uint64_t> scratch,
+                                                StringRef blobData) {
     TypeID captureID;
-    
     decls_block::SILBlockStorageTypeLayout::readRecord(scratch, captureID);
-    result = SILBlockStorageType::get(MF.getType(captureID)
-                                              ->getCanonicalType());
-    break;
+    return SILBlockStorageType::get(MF.getType(captureID)->getCanonicalType());
   }
 
-  case decls_block::SIL_BOX_TYPE: {
+  Expected<Type> deserializeSILBoxType(ArrayRef<uint64_t> scratch,
+                                       StringRef blobData) {
     SILLayoutID layoutID;
     SubstitutionMapID subMapID;
     decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, subMapID);
-    
+
     // Get the layout.
     auto getLayout = [&]() -> SILLayout * {
       assert(layoutID > 0 && layoutID <= MF.SILLayouts.size()
@@ -4884,7 +4822,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       if (layoutOrOffset.isComplete()) {
         return layoutOrOffset;
       }
-      
+
       BCOffsetRAII saveOffset(MF.DeclTypeCursor);
       MF.DeclTypeCursor.JumpToBit(layoutOrOffset);
       auto layout = MF.readSILLayout(MF.DeclTypeCursor);
@@ -4895,17 +4833,17 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
       layoutOrOffset = layout;
       return layout;
     };
-    
+
     auto layout = getLayout();
     if (!layout)
       return nullptr;
 
     auto subMap = MF.getSubstitutionMap(subMapID);
-    result = SILBoxType::get(ctx, layout, subMap);
-    break;
+    return SILBoxType::get(ctx, layout, subMap);
   }
-      
-  case decls_block::SIL_FUNCTION_TYPE: {
+
+  Expected<Type> deserializeSILFunctionType(ArrayRef<uint64_t> scratch,
+                                            StringRef blobData) {
     uint8_t rawCoroutineKind;
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
@@ -5056,16 +4994,14 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
     GenericSignature *genericSig = MF.getGenericSignature(rawGenericSig);
 
-    result = SILFunctionType::get(genericSig, extInfo,
-                                        coroutineKind.getValue(),
-                                        calleeConvention.getValue(),
-                                        allParams, allYields, allResults,
-                                        errorResult,
-                                        ctx, witnessMethodConformance);
-    break;
+    return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
+                                calleeConvention.getValue(),
+                                allParams, allYields, allResults,
+                                errorResult, ctx, witnessMethodConformance);
   }
 
-  case decls_block::ARRAY_SLICE_TYPE: {
+  Expected<Type> deserializeArraySliceType(ArrayRef<uint64_t> scratch,
+                                           StringRef blobData) {
     TypeID baseID;
     decls_block::ArraySliceTypeLayout::readRecord(scratch, baseID);
 
@@ -5073,11 +5009,11 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     if (!baseTy)
       return baseTy.takeError();
 
-    result = ArraySliceType::get(baseTy.get());
-    break;
+    return ArraySliceType::get(baseTy.get());
   }
 
-  case decls_block::DICTIONARY_TYPE: {
+  Expected<Type> deserializeDictionaryType(ArrayRef<uint64_t> scratch,
+                                           StringRef blobData) {
     TypeID keyID, valueID;
     decls_block::DictionaryTypeLayout::readRecord(scratch, keyID, valueID);
 
@@ -5089,11 +5025,11 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     if (!valueTy)
       return valueTy.takeError();
 
-    result = DictionaryType::get(keyTy.get(), valueTy.get());
-    break;
+    return DictionaryType::get(keyTy.get(), valueTy.get());
   }
 
-  case decls_block::OPTIONAL_TYPE: {
+  Expected<Type> deserializeOptionalType(ArrayRef<uint64_t> scratch,
+                                         StringRef blobData) {
     TypeID baseID;
     decls_block::OptionalTypeLayout::readRecord(scratch, baseID);
 
@@ -5101,11 +5037,11 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     if (!baseTy)
       return baseTy.takeError();
 
-    result = OptionalType::get(baseTy.get());
-    break;
+    return OptionalType::get(baseTy.get());
   }
 
-  case decls_block::UNBOUND_GENERIC_TYPE: {
+  Expected<Type> deserializeUnboundGenericType(ArrayRef<uint64_t> scratch,
+                                               StringRef blobData) {
     DeclID genericID;
     TypeID parentID;
     decls_block::UnboundGenericTypeLayout::readRecord(scratch,
@@ -5119,17 +5055,97 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
     // FIXME: Check this?
     auto parentTy = MF.getType(parentID);
 
-    result = UnboundGenericType::get(genericDecl, parentTy, ctx);
-    break;
+    return UnboundGenericType::get(genericDecl, parentTy, ctx);
   }
+};
+
+Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
+  if (TID == 0)
+    return Type();
+
+  assert(TID <= Types.size() && "invalid type ID");
+  auto &typeOrOffset = Types[TID-1];
+
+  if (typeOrOffset.isComplete())
+    return typeOrOffset;
+
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(typeOrOffset);
+
+  auto result = TypeDeserializer(*this).getTypeCheckedImpl();
+  if (!result)
+    return result;
+  typeOrOffset = result.get();
+
+#ifndef NDEBUG
+  PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
+  if (typeOrOffset.get()->hasError()) {
+    typeOrOffset.get()->dump();
+    llvm_unreachable("deserialization produced an invalid type "
+                     "(rdar://problem/30382791)");
+  }
+#endif
+
+  // Invoke the callback on the deserialized type.
+  DeserializedTypeCallback(typeOrOffset.get());
+  return typeOrOffset.get();
+}
+
+Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
+  if (auto s = ctx.Stats)
+    s->getFrontendCounters().NumTypesDeserialized++;
+
+  auto entry = MF.DeclTypeCursor.advance();
+
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    // We don't know how to serialize types represented by sub-blocks.
+    MF.error();
+    return nullptr;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  unsigned recordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                   &blobData);
+
+  switch (recordID) {
+#define CASE(RECORD_NAME) \
+  case decls_block::RECORD_NAME##TypeLayout::Code: \
+    return deserialize##RECORD_NAME##Type(scratch, blobData);
+
+  CASE(BuiltinAlias)
+  CASE(TypeAlias)
+  CASE(Nominal)
+  CASE(Paren)
+  CASE(Tuple)
+  CASE(Function)
+  CASE(GenericFunction)
+  CASE(ExistentialMetatype)
+  CASE(Metatype)
+  CASE(DynamicSelf)
+  CASE(ReferenceStorage)
+  CASE(PrimaryArchetype)
+  CASE(OpenedArchetype)
+  CASE(NestedArchetype)
+  CASE(GenericTypeParam)
+  CASE(ProtocolComposition)
+  CASE(DependentMember)
+  CASE(BoundGeneric)
+  CASE(SILBlockStorage)
+  CASE(SILBox)
+  CASE(SILFunction)
+  CASE(ArraySlice)
+  CASE(Dictionary)
+  CASE(Optional)
+  CASE(UnboundGeneric)
+
+#undef CASE
 
   default:
     // We don't know how to deserialize this kind of type.
     MF.error();
     return nullptr;
   }
-
-  return result;
 }
 
 Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
