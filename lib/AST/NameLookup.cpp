@@ -1728,6 +1728,7 @@ namespace {
 
   /// Check the generic parameters of our context.
   /// Return true if done with lookup
+  /// TODO: Factor with addGenericParmeters below
   bool checkGenericParameters(DeclContext *DC) {
     for (GenericParamList *dcGenericParams = getGenericParams(DC);
          dcGenericParams;
@@ -1739,6 +1740,18 @@ namespace {
         return true;
     }
     return false;
+  }
+
+  /// Consume generic parameters
+  void addGenericParameters(AbstractFunctionDecl *AFD) {
+    // If we're inside a function context, we've already moved to
+    // the parent DC, so we have to check the function's generic
+    // parameters first.
+    GenericParamList *GenericParams = AFD->getGenericParams();
+    if (GenericParams) {
+      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+      localVal.checkGenericParams(GenericParams);
+    }
   }
 
   static GenericParamList *getGenericParams(const DeclContext *const DC) {
@@ -1919,17 +1932,6 @@ namespace {
     };
   }
   
-  /// Consume generic parameters
-  void addGenericParameters(AbstractFunctionDecl *AFD) {
-    // If we're inside a function context, we've already moved to
-    // the parent DC, so we have to check the function's generic
-    // parameters first.
-    GenericParamList *GenericParams = AFD->getGenericParams();
-    if (GenericParams) {
-      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-      localVal.checkGenericParams(GenericParams);
-    }
-  }
 
   PerScopeLookupState lookupInClosure(AbstractClosureExpr *ACE,
                                       Optional<bool> isCascadingUse) {
