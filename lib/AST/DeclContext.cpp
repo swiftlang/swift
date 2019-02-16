@@ -360,11 +360,18 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       if (AFD->getAttrs().hasAttribute<InlinableAttr>())
         return ResilienceExpansion::Minimal;
 
-      // If a property or subscript is @inlinable, the accessors are
-      // @inlinable also.
-      if (auto accessor = dyn_cast<AccessorDecl>(AFD))
-        if (accessor->getStorage()->getAttrs().getAttribute<InlinableAttr>())
+      if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+        return ResilienceExpansion::Minimal;
+
+      // If a property or subscript is @inlinable or @_alwaysEmitIntoClient,
+      // the accessors are @inlinable or @_alwaysEmitIntoClient also.
+      if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+        auto *storage = accessor->getStorage();
+        if (storage->getAttrs().getAttribute<InlinableAttr>())
           return ResilienceExpansion::Minimal;
+        if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+          return ResilienceExpansion::Minimal;
+      }
     }
   }
 
