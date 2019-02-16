@@ -108,8 +108,9 @@ public:
   ///
   /// If the current DeclContext is nested in a function body, the SourceLoc
   /// is used to determine which declarations in that body are visible.
-  UnqualifiedLookup(const char* dummy, DeclName Name, DeclContext *DC, LazyResolver *TypeResolver,
-                    SourceLoc Loc = SourceLoc(), Options options = Options());
+  UnqualifiedLookup(const char *dummy, DeclName Name, DeclContext *DC,
+                    LazyResolver *TypeResolver, SourceLoc Loc = SourceLoc(),
+                    Options options = Options());
   UnqualifiedLookup(DeclName Name, DeclContext *DC, LazyResolver *TypeResolver,
                     SourceLoc Loc = SourceLoc(), Options options = Options());
 
@@ -127,13 +128,17 @@ public:
 
   /// Get the result as a single type, or a null type if that fails.
   TypeDecl *getSingleTypeResult();
+
+public: // for exp debugging
+  SourceFile const *recordedSF = nullptr;
+  DeclName recordedName;
+  bool recordedIsCascadingUse = false;
 };
 
 inline UnqualifiedLookup::Options operator|(UnqualifiedLookup::Flags flag1,
                                             UnqualifiedLookup::Flags flag2) {
   return UnqualifiedLookup::Options(flag1) | flag2;
 }
-  
   
   /// This class implements and represents the result of performing
   /// unqualified lookup (i.e. lookup for a plain identifier).
@@ -147,8 +152,9 @@ inline UnqualifiedLookup::Options operator|(UnqualifiedLookup::Flags flag1,
     ///
     /// If the current DeclContext is nested in a function body, the SourceLoc
     /// is used to determine which declarations in that body are visible.
-    ExpUnqualifiedLookup(DeclName Name, DeclContext *DC, LazyResolver *TypeResolver,
-                      SourceLoc Loc = SourceLoc(), Options options = Options());
+  ExpUnqualifiedLookup(DeclName Name, DeclContext *DC,
+                       LazyResolver *TypeResolver, SourceLoc Loc = SourceLoc(),
+                       Options options = Options());
     
     SmallVector<LookupResultEntry, 4> Results;
     /// The index of the first result that isn't from the innermost scope
@@ -186,6 +192,27 @@ inline UnqualifiedLookup::Options operator|(UnqualifiedLookup::Flags flag1,
     }
     
     bool verifyEqual(const UnqualifiedLookup &) const;
+
+public: // for exp debugging
+  SourceFile const *recordedSF = nullptr;
+  DeclName recordedName;
+  bool recordedIsCascadingUse = false;
+
+  using LookupDecls = SmallVector<NominalTypeDecl *, 2>;
+  enum class ScopeLookupResult { next, stop, finished };
+  struct PerScopeLookupState {
+    ScopeLookupResult result;
+    DeclContext *nextDC;
+    LookupDecls foundDecls;
+    DeclContext *BaseDC;
+    DeclContext *MetaBaseDC;
+    Optional<bool> isCascadingUse;
+    GenericParamList *GenericParams;
+
+    void dump() const;
+  };
+  std::vector<PerScopeLookupState> breadcrumbs;
+  void dumpBreadcrumbs() const;
   };
 
 /// Describes the reason why a certain declaration is visible.
