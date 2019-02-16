@@ -1669,7 +1669,7 @@ namespace {
     case ScopeLookupResult::finished:
       return std::make_pair(ScopeLookupResult::finished, results.nextDC);
     }
-    if (checkGenericParameters(DC))
+    if (addGenericParametersHereAndInEnclosingScopes(DC))
       return std::make_pair(ScopeLookupResult::finished, DC);
 
     // UP TO HERE
@@ -1729,7 +1729,7 @@ namespace {
   /// Check the generic parameters of our context.
   /// Return true if done with lookup
   /// TODO: Factor with addGenericParmeters below
-  bool checkGenericParameters(DeclContext *DC) {
+  bool addGenericParametersHereAndInEnclosingScopes(DeclContext *DC) {
     for (GenericParamList *dcGenericParams = getGenericParams(DC);
          dcGenericParams;
          dcGenericParams = dcGenericParams->getOuterParameters()) {
@@ -1743,7 +1743,7 @@ namespace {
   }
 
   /// Consume generic parameters
-  void addGenericParameters(AbstractFunctionDecl *AFD) {
+  void addGenericParametersForFunction(AbstractFunctionDecl *AFD) {
     // If we're inside a function context, we've already moved to
     // the parent DC, so we have to check the function's generic
     // parameters first.
@@ -1898,7 +1898,7 @@ namespace {
       populateLookupDeclsFromContext(AFD->getDeclContext(), lookupDecls);
       DeclContext *const MetaBaseDC = AFD->getDeclContext();
 
-      addGenericParameters(AFD);
+      addGenericParametersForFunction(AFD);
       return PerScopeLookupState{
         isFinishedWithLookupNowThatIsAboutToLookForOuterResults()
         ? ScopeLookupResult::finished
@@ -1919,7 +1919,7 @@ namespace {
       };
     }
     // Look in the generic parameters after checking our local declaration.
-    addGenericParameters(AFD);
+    addGenericParametersForFunction(AFD);
     return PerScopeLookupState{
       isFinishedWithLookupNowThatIsAboutToLookForOuterResults()
       ? ScopeLookupResult::finished
