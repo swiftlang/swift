@@ -617,9 +617,10 @@ extension _StringObject {
  isNativelyStored: set for native stored strings
    - `largeAddressBits` holds an instance of `_StringStorage`.
    - I.e. the start of the code units is at the stored address + `nativeBias`
- isTailAllocated: start of the code units is at the stored address + `nativeBias`
+ isTailAllocated: contiguous UTF-8 code units starts at address + `nativeBias`
    - `isNativelyStored` always implies `isTailAllocated`, but not vice versa
       (e.g. literals)
+   - `isTailAllocated` always implies `isFastUTF8`
  TBD: Reserved for future usage
    - Setting a TBD bit to 1 must be semantically equivalent to 0
    - I.e. it can only be used to "cache" fast-path information in the future
@@ -1073,6 +1074,9 @@ extension _StringObject {
     } else {
       _internalInvariant(isLarge)
       _internalInvariant(largeCount == count)
+      if _countAndFlags.isTailAllocated {
+        _internalInvariant(providesFastUTF8)
+      }
       if providesFastUTF8 && largeFastIsTailAllocated {
         _internalInvariant(!isSmall)
         _internalInvariant(!largeIsCocoa)
