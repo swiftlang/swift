@@ -77,4 +77,19 @@ TensorADTests.testAllBackends("ResultSelection") {
   expectEqual((0, 1), gradient(at: Double(3), 3, in: { x, y in indirect(x, y).1 }))
 }
 
+TensorADTests.testAllBackends("GenericLayerMember") {
+  // TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
+  struct GenericLayerWrapper<T: Layer> : Layer
+    where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic,
+          T.Input.TangentVector : AdditiveArithmetic, T.Input.CotangentVector : AdditiveArithmetic,
+          T.Output.TangentVector : AdditiveArithmetic, T.Output.CotangentVector : AdditiveArithmetic
+  {
+    var layer: T
+    @differentiable(wrt: (self, input))
+    func applied(to input: T.Input) -> T.Output {
+      return layer.applied(to: input)
+    }
+  }
+}
+
 runAllTests()

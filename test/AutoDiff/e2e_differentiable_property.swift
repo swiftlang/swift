@@ -73,6 +73,27 @@ E2EDifferentiablePropertyTests.test("stored property") {
   expectEqual(expectedGrad, actualGrad)
 }
 
+// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
+struct GenericMemberWrapper<T : Differentiable> : Differentiable
+  where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic
+{
+  // Stored property.
+  @differentiable(vjp: vjpX)
+  var x: T
+
+  func vjpX() -> (T, (T.CotangentVector) -> GenericMemberWrapper.CotangentVector) {
+    return (x, { CotangentVector(x: $0) })
+  }
+}
+
+E2EDifferentiablePropertyTests.test("generic stored property") {
+  let actualGrad = gradient(at: GenericMemberWrapper<Float>(x: 1)) { point in
+    return 2 * point.x
+  }
+  let expectedGrad = GenericMemberWrapper<Float>.CotangentVector(x: 2)
+  expectEqual(expectedGrad, actualGrad)
+}
+
 @_fieldwiseDifferentiable
 struct ProductSpaceSelfTangent : VectorNumeric {
   let x, y: Float
