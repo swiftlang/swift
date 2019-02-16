@@ -18,9 +18,12 @@
 
 from __future__ import absolute_import
 
+import platform
+
 from . import cache_util
 from . import shell
 
+WHICH_CMD_NAME = 'where' if platform.system() == 'Windows' else 'which'
 
 @cache_util.cached
 def which(cmd):
@@ -34,7 +37,7 @@ def which(cmd):
     We provide our own implementation because shutil.which() has not
     been backported to Python 2.7, which we support.
     """
-    out = shell.capture(['which', cmd],
+    out = shell.capture([WHICH_CMD_NAME, cmd],
                         dry_run=False, echo=False, optional=True)
     if out is None:
         return None
