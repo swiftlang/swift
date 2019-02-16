@@ -1319,6 +1319,7 @@ namespace {
     LazyResolver *const TypeResolver;
     SourceLoc Loc;
     const SourceManager &SM;
+    /// Used to find the file-local names.
     DebuggerClient *const DebugClient;
     const Options options;
     const bool isOriginallyTypeLookup;
@@ -1412,8 +1413,10 @@ namespace {
         baseNLOptions |= NL_IgnoreAccessControl;
       return baseNLOptions;
     }
-    
-    bool shouldReturnBasedOnResults(bool noMoreOuterResults = false) {
+
+    /// Return true if done with lookup.
+    bool isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
+        bool noMoreOuterResults = false) {
       if (Results.empty())
         return false;
       
@@ -1467,7 +1470,7 @@ namespace {
         }
       
         // If we found anything, we're done.
-        if (shouldReturnBasedOnResults())
+        if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
           return std::make_pair(ScopeLookupResult::finished, selfDC);
       
         // When we are in the body of a method, get the 'self' declaration.
@@ -1583,8 +1586,8 @@ namespace {
         } else {
           if (DebugClient)
             filterForDiscriminator(Results, DebugClient);
-          
-          if (shouldReturnBasedOnResults())
+
+          if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
             return std::make_pair(ScopeLookupResult::finished, selfDC);
         }
       }
@@ -1628,7 +1631,7 @@ namespace {
           if (auto *selfParam = PBI->getImplicitSelfDecl()) {
             Consumer.foundDecl(selfParam,
                                DeclVisibilityKind::FunctionParameter);
-            if (shouldReturnBasedOnResults())
+            if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
               return true;
             
             DC = DC->getParent();
@@ -1667,13 +1670,13 @@ namespace {
             
             namelookup::FindLocalVal localVal(SM, Loc, Consumer);
             localVal.visit(AFD->getBody());
-            if (shouldReturnBasedOnResults())
+            if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
               return true;
             
             if (auto *P = AFD->getImplicitSelfDecl())
               localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
             localVal.checkParameterList(AFD->getParameters());
-            if (shouldReturnBasedOnResults())
+            if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
               return true;
           }
           if (!isCascadingUse.hasValue() || isCascadingUse.getValue())
@@ -1708,11 +1711,11 @@ namespace {
               namelookup::FindLocalVal localVal(SM, Loc, Consumer);
               if (auto body = CE->getBody())
                 localVal.visit(body);
-              if (shouldReturnBasedOnResults())
+              if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
                 return true;
               if (auto params = CE->getParameters())
                 localVal.checkParameterList(params);
-              if (shouldReturnBasedOnResults())
+              if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
                 return true;
             }
           }
@@ -1752,8 +1755,8 @@ namespace {
         if (GenericParams) {
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkGenericParams(GenericParams);
-          
-          if (shouldReturnBasedOnResults())
+
+          if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
             return true;
         }
         
@@ -1769,8 +1772,8 @@ namespace {
         while (dcGenericParams) {
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkGenericParams(dcGenericParams);
-          
-          if (shouldReturnBasedOnResults())
+
+          if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
             return true;
           
           dcGenericParams = dcGenericParams->getOuterParameters();
@@ -1818,8 +1821,8 @@ namespace {
             } else {
               if (DebugClient)
                 filterForDiscriminator(Results, DebugClient);
-              
-              if (shouldReturnBasedOnResults())
+
+              if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
                 return true;
             }
           }
@@ -1842,7 +1845,7 @@ namespace {
           // local types.
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkSourceFile(*SF);
-          if (shouldReturnBasedOnResults())
+          if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
             return true;
         }
       }
@@ -1882,14 +1885,16 @@ namespace {
                                      isOriginallyTypeLookup, Results);
       
       // If we've found something, we're done.
-      if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
+      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
+              /*noMoreOuterResults=*/true))
         return;
       
       // If we still haven't found anything, but we do have some
       // declarations that are "unavailable in the current Swift", drop
       // those in.
       Results = std::move(UnavailableInnerResults);
-      if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
+      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
+              /*noMoreOuterResults=*/true))
         return;
       
       if (!Name.isSimpleName())
@@ -1898,7 +1903,8 @@ namespace {
       // Look for a module with the given name.
       if (Name.isSimpleName(M.getName())) {
         Results.push_back(LookupResultEntry(&M));
-        if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
+        if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
+                /*noMoreOuterResults=*/true))
           return;
       }
       
@@ -1915,7 +1921,8 @@ namespace {
         });
       }
       // Make sure we've recorded the inner-result-boundary.
-      (void)shouldReturnBasedOnResults(/*noMoreOuterResults=*/true);
+      (void)isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
+          /*noMoreOuterResults=*/true);
     }
   };
 } // end anon namespace

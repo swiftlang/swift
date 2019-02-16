@@ -157,6 +157,10 @@ inline UnqualifiedLookup::Options operator|(UnqualifiedLookup::Flags flag1,
     /// That is, \c makeArrayRef(Results).take_front(IndexOfFirstOuterResults)
     /// will be Results from the innermost scope that had results, and the
     /// remaining elements of Results will be from parent scopes of this one.
+    ///
+    /// Allows unqualified name lookup to return results from outer scopes.
+    /// This is necessary for disambiguating calls to functions like `min` and
+    /// `max`.
     size_t IndexOfFirstOuterResult;
     
     /// Return true if anything was found by the name lookup.
