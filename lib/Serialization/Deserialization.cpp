@@ -4283,6 +4283,39 @@ public:
       : MF(MF), ctx(MF.getContext()) {}
 
   Expected<Type> getTypeCheckedImpl();
+
+  Expected<Type> deserializeBuiltinAliasType(ArrayRef<uint64_t> scratch,
+                                             StringRef blobData) {
+    DeclID underlyingID;
+    TypeID canonicalTypeID;
+    decls_block::BuiltinAliasTypeLayout::readRecord(scratch, underlyingID,
+                                                    canonicalTypeID);
+    auto aliasOrError = MF.getDeclChecked(underlyingID);
+    if (!aliasOrError)
+      return aliasOrError.takeError();
+    auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
+
+    if (ctx.LangOpts.EnableDeserializationRecovery) {
+      Expected<Type> expectedType = MF.getTypeChecked(canonicalTypeID);
+      if (!expectedType)
+        return expectedType.takeError();
+      if (expectedType.get()) {
+        if (!alias ||
+            !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
+          // Fall back to the canonical type.
+          return expectedType.get();
+        }
+      }
+    }
+
+    // Look through compatibility aliases that are now unavailable.
+    if (alias->getAttrs().isUnavailable(ctx) &&
+        alias->isCompatibilityAlias()) {
+      return alias->getUnderlyingTypeLoc().getType();
+    }
+
+    return alias->getDeclaredInterfaceType();
+  }
 };
 
 Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
@@ -4336,40 +4369,8 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   Type result;
 
   switch (recordID) {
-  case decls_block::BUILTIN_ALIAS_TYPE: {
-    DeclID underlyingID;
-    TypeID canonicalTypeID;
-    decls_block::BuiltinAliasTypeLayout::readRecord(scratch, underlyingID,
-                                                    canonicalTypeID);
-    auto aliasOrError = MF.getDeclChecked(underlyingID);
-    if (!aliasOrError)
-      return aliasOrError.takeError();
-    auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
-
-    if (ctx.LangOpts.EnableDeserializationRecovery) {
-      Expected<Type> expectedType = MF.getTypeChecked(canonicalTypeID);
-      if (!expectedType)
-        return expectedType.takeError();
-      if (expectedType.get()) {
-        if (!alias ||
-            !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
-          // Fall back to the canonical type.
-          result = expectedType.get();
-          break;
-        }
-      }
-    }
-
-    // Look through compatibility aliases that are now unavailable.
-    if (alias->getAttrs().isUnavailable(ctx) &&
-        alias->isCompatibilityAlias()) {
-      result = alias->getUnderlyingTypeLoc().getType();
-      break;
-    }
-
-    result = alias->getDeclaredInterfaceType();
-    break;
-  }
+  case decls_block::BUILTIN_ALIAS_TYPE:
+    return deserializeBuiltinAliasType(scratch, blobData);
 
   case decls_block::NAME_ALIAS_TYPE: {
     DeclID typealiasID;
