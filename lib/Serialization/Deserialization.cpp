@@ -4802,7 +4802,7 @@ public:
     decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, subMapID);
 
     // Get the layout.
-    auto getLayout = [&]() -> SILLayout * {
+    auto getLayout = [this](SILLayoutID layoutID) -> SILLayout * {
       assert(layoutID > 0 && layoutID <= MF.SILLayouts.size()
              && "invalid layout ID");
 
@@ -4822,7 +4822,7 @@ public:
       return layout;
     };
 
-    auto layout = getLayout();
+    auto layout = getLayout(layoutID);
     if (!layout)
       return nullptr;
 
