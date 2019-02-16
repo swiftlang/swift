@@ -207,7 +207,6 @@ public: // for exp debugging
     DeclContext *BaseDC;
     DeclContext *MetaBaseDC;
     Optional<bool> isCascadingUse;
-    GenericParamList *GenericParams;
 
     void dump() const;
   };
