@@ -832,6 +832,93 @@ keyPath.test("tuple key path") {
   expectNotNil(t5 as? ReferenceWritableKeyPath<TupleProperties, String>)
 }
 
+keyPath.test("tuple key path execution") {
+  typealias T0 = (Int, String)
+  typealias T1 = (x: Int, y: String)
+
+  let kp_t0_0 = \T0.0
+  let kp_t0_1 = \T0.1
+
+  let kp_t1_x = \T1.x
+  let kp_t1_y = \T1.y
+  let kp_t1_0 = \T1.0
+  let kp_t1_1 = \T1.1
+
+  var tuple0 = (1, "Hello")
+  let tuple1 = (x: 2, y: "World")
+  let tuple2 = (a: 3, b: "String")
+
+  // in some cases, tuple key paths are interchangeable
+
+  expectEqual(tuple0[keyPath: kp_t0_0], 1)
+  expectEqual(tuple0[keyPath: kp_t1_x], 1)
+  expectEqual(tuple0[keyPath: kp_t1_0], 1)
+
+  expectEqual(tuple0[keyPath: kp_t0_1], "Hello")
+  expectEqual(tuple0[keyPath: kp_t1_y], "Hello")
+  expectEqual(tuple0[keyPath: kp_t1_1], "Hello")
+
+
+  expectEqual(tuple1[keyPath: kp_t0_0], 2)
+  expectEqual(tuple1[keyPath: kp_t1_x], 2)
+  expectEqual(tuple1[keyPath: kp_t1_0], 2)
+
+  expectEqual(tuple1[keyPath: kp_t0_1], "World")
+  expectEqual(tuple1[keyPath: kp_t1_y], "World")
+  expectEqual(tuple1[keyPath: kp_t1_1], "World")
+
+
+  expectEqual(tuple2[keyPath: kp_t0_0], 3)
+  //expectEqual(tuple2[keyPath: kp_t1_x], 3)
+  //expectEqual(tuple2[keyPath: kp_t1_0], 3)
+
+  expectEqual(tuple2[keyPath: kp_t0_1], "String")
+  //expectEqual(tuple2[keyPath: kp_t1_y], "String")
+  //expectEqual(tuple2[keyPath: kp_t1_1], "String")
+
+
+  tuple0[keyPath: kp_t0_1] = "Another String"
+  expectEqual(tuple0[keyPath: kp_t0_1], "Another String")
+}
+
+keyPath.test("tuple key path execution (generic)") {
+  struct Container<T, U> {
+    let x: (T, U)
+    var y: (a: T, b: U)
+  }
+
+  func generic<A: Equatable, B: Equatable>(a: A, b: B) {
+    typealias T = (A, B)
+
+    let kp_t_0 = \T.0
+    let kp_t_1 = \T.1
+ 
+    let kp_c_x = \Container<A, B>.x
+    let kp_c_x_0 = kp_c_x.appending(path: kp_t_0)
+    let kp_c_x_1 = kp_c_x.appending(path: kp_t_1)
+
+    let kp_c_y_a = \Container<A, B>.y.a
+    let kp_c_y_b = \Container<A, B>.y.b
+ 
+
+    let tuple = (a, b)
+    let container = Container(x: (a, b), y: (a, b))
+
+
+    expectEqual(tuple[keyPath: kp_t_0], tuple.0)
+    expectEqual(tuple[keyPath: kp_t_1], tuple.1)
+
+    expectEqual(container[keyPath: kp_c_x_0], container.x.0)
+    expectEqual(container[keyPath: kp_c_x_1], container.x.1)
+
+    expectEqual(container[keyPath: kp_c_y_a], container.y.0)
+    expectEqual(container[keyPath: kp_c_y_b], container.y.1)
+  }
+
+  generic(a: 13, b: "Hello Tuples")
+  generic(a: "Tuples Hello", b: 31)
+}
+
 keyPath.test("let-ness") {
   expectNil(\C<Int>.immutable as? ReferenceWritableKeyPath)
   expectNotNil(\C<Int>.secretlyMutable as? ReferenceWritableKeyPath)
