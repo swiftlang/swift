@@ -60,15 +60,14 @@ CustomDerivativesTests.test("Checkpointing") {
   })
   expectEqual(2, count)
   // Reset and test the method variant.
-  // FIXME: The method variant produces a zero cotangent. Need to investigate.
-  // count = 0
-  // expectEqual(324, gradient(at: 3) { (x: Float) -> Float in
-  //   expectEqual(0, count)
-  //   let y = x.withRecomputationInPullbacks(f)
-  //   expectEqual(1, count)
-  //   return y * 3 * x
-  // })
-  // expectEqual(2, count)
+  count = 0
+  expectEqual(324, gradient(at: 3) { (x: Float) -> Float in
+    expectEqual(0, count)
+    let y = x.withRecomputationInPullbacks(f)
+    expectEqual(1, count)
+    return y * 3 * x
+  })
+  expectEqual(2, count)
 }
 
 runAllTests()
