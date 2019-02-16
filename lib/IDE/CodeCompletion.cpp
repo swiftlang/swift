@@ -4680,10 +4680,11 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     break;
       
   case CompletionKind::NominalMemberBeginning: {
-    bool HasDeclIntroducer = llvm::find_if(ParsedKeywords, [](const StringRef kw) {
+    bool HasDeclIntroducer = llvm::find_if(ParsedKeywords,
+                                           [this](const StringRef kw) {
       return llvm::StringSwitch<bool>(kw)
         .Case("associatedtype", true)
-        .Case("class", true)
+        .Case("class", !CurDeclContext || !isa<ClassDecl>(CurDeclContext))
         .Case("deinit", true)
         .Case("enum", true)
         .Case("extension", true)

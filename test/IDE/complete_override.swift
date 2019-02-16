@@ -140,6 +140,8 @@
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER22 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER22
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER23 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER23
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER24 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER24
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER25 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER23
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER26 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER24
 
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=PROTOINIT_NORM -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_NORM
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=PROTOINIT_FINAL -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_FINAL
@@ -688,6 +690,14 @@ class Override23 : OverrideBase, OverrideP {
 }
 class Override24 : OverrideBase, OverrideP {
   override static #^MODIFIER24^#
+}
+class Override25 : OverrideBase, OverrideP {
+  class #^MODIFIER25^#
+  // Same as MODIFIER23
+}
+class Override26 : OverrideBase, OverrideP {
+  class override #^MODIFIER26^#
+  // Same as MODIFIER24
 }
 
 // MODIFIER1: Begin completions, 9 items

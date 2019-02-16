@@ -2281,9 +2281,18 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
       {
         BacktrackingScope Scope(*this);
         consumeToken(tok::kw_class);
-        if (!isStartOfDecl())
+        // When followed by an 'override' or CC token inside a class,
+        // treat 'class' as a modifier; in the case of a following CC
+        // token, we cannot be sure there is no intention to override
+        // or witness something static.
+        if (isStartOfDecl() || (isa<ClassDecl>(CurDeclContext) &&
+                                (Tok.is(tok::code_complete) ||
+                                 Tok.getRawText().equals("override")))) {
+          /* We're OK */
+        } else {
           // This 'class' is a real ClassDecl introducer.
           break;
+        }
       }
       if (StaticLoc.isValid()) {
         diagnose(Tok, diag::decl_already_static,
