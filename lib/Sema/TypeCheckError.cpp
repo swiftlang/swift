@@ -1603,7 +1603,7 @@ private:
     ContextScope scope(*this, None);
     scope.enterTry();
 
-    checkPotentiallyThrowingAccessor(E);
+    checkPotentiallyThrowingAccessor(E, scope);
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
@@ -1626,7 +1626,7 @@ private:
     ContextScope scope(*this, Context::getHandled());
     scope.enterTry();
 
-    checkPotentiallyThrowingAccessor(E);
+    checkPotentiallyThrowingAccessor(E, scope);
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
@@ -1641,7 +1641,7 @@ private:
     ContextScope scope(*this, Context::getHandled());
     scope.enterTry();
 
-    checkPotentiallyThrowingAccessor(E);
+    checkPotentiallyThrowingAccessor(E, scope);
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
@@ -1651,7 +1651,7 @@ private:
     return ShouldNotRecurse;
   }
 
-  void checkPotentiallyThrowingAccessor(Expr *E) {
+  void checkPotentiallyThrowingAccessor(Expr *E, ContextScope &scope) {
     // Look through optional expressions as we could be evaluating something
     // like try? Foo.baz = "" or let _ = try? Foo.baz
     if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
@@ -1665,11 +1665,39 @@ private:
     // setter rather than a getter
     auto setter = dyn_cast<AssignExpr>(E->getValueProvidingExpr());
     auto expr = setter ? setter->getDest() : E->getValueProvidingExpr();
+    auto unhandledTry = false;
     if (auto MRE = dyn_cast<MemberRefExpr>(expr)) {
+      // We're not calling the getter or setter, so return;
+      if (MRE->getAccessSemantics() ==
+              AccessSemantics::DirectToImplementation ||
+          MRE->getAccessSemantics() == AccessSemantics::DirectToStorage) {
+        return;
+      }
+
+      // Check if we're referring to an inout parameter and the enclosing
+      // function isn't marked as throws
+      if (auto IOE = dyn_cast<InOutExpr>(MRE->getBase())) {
+        if (auto DRE = dyn_cast<DeclRefExpr>(IOE->getSubExpr())) {
+          if (auto AFD = dyn_cast<AbstractFunctionDecl>(
+                  DRE->getDecl()->getDeclContext())) {
+            unhandledTry = !AFD->hasThrows();
+          }
+        }
+      }
+
+      // Check the variable's getter or setter
       if (auto VD = dyn_cast_or_null<VarDecl>(MRE->getDecl().getDecl())) {
         if (VD->getAccessor(setter ? AccessorKind::Set : AccessorKind::Get)
                 ->hasThrows()) {
           Flags.set(ContextFlags::HasTryThrowSite);
+          Flags.set(ContextFlags::HasAnyThrowSite);
+
+          // If we have a try expression and its not enclosed in a context
+          // which can handle a try, emit a diagnostic
+          if (isa<TryExpr>(E) && unhandledTry &&
+              !Flags.has(ContextFlags::IsTryCovered)) {
+            TC.diagnose(cast<TryExpr>(E)->getTryLoc(), diag::try_unhandled);
+          }
         }
       }
     }
