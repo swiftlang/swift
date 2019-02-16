@@ -4273,6 +4273,21 @@ Type ModuleFile::getType(TypeID TID) {
   return deserialized.get();
 }
 
+class swift::TypeDeserializer {
+  template <typename T>
+  using Serialized = ModuleFile::Serialized<T>;
+  using TypeID = serialization::TypeID;
+
+  ModuleFile &MF;
+  ASTContext &ctx;
+  Serialized<Type> &typeOrOffset;
+public:
+  TypeDeserializer(ModuleFile &MF, Serialized<Type> &typeOrOffset)
+      : MF(MF), ctx(MF.getContext()), typeOrOffset(typeOrOffset) {}
+
+  Expected<Type> getTypeCheckedImpl();
+};
+
 Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   if (TID == 0)
     return Type();
@@ -4285,22 +4300,25 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(typeOrOffset);
-  auto entry = DeclTypeCursor.advance();
+  return TypeDeserializer(*this, typeOrOffset).getTypeCheckedImpl();
+}
+
+Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
+  if (auto s = ctx.Stats)
+    s->getFrontendCounters().NumTypesDeserialized++;
+
+  auto entry = MF.DeclTypeCursor.advance();
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     // We don't know how to serialize types represented by sub-blocks.
-    error();
+    MF.error();
     return nullptr;
   }
 
-  ASTContext &ctx = getContext();
-
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-
-  if (auto s = ctx.Stats)
-    s->getFrontendCounters().NumTypesDeserialized++;
+  unsigned recordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                   &blobData);
 
   switch (recordID) {
   case decls_block::BUILTIN_ALIAS_TYPE: {
@@ -4308,13 +4326,13 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID canonicalTypeID;
     decls_block::BuiltinAliasTypeLayout::readRecord(scratch, underlyingID,
                                                     canonicalTypeID);
-    auto aliasOrError = getDeclChecked(underlyingID);
+    auto aliasOrError = MF.getDeclChecked(underlyingID);
     if (!aliasOrError)
       return aliasOrError.takeError();
     auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
 
     if (ctx.LangOpts.EnableDeserializationRecovery) {
-      Expected<Type> expectedType = getTypeChecked(canonicalTypeID);
+      Expected<Type> expectedType = MF.getTypeChecked(canonicalTypeID);
       if (!expectedType)
         return expectedType.takeError();
       if (expectedType.get()) {
@@ -4349,7 +4367,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                                  underlyingTypeID,
                                                  substitutedTypeID,
                                                  substitutionsID);
-    auto aliasOrError = getDeclChecked(typealiasID);
+    auto aliasOrError = MF.getDeclChecked(typealiasID);
     if (!aliasOrError)
       return aliasOrError.takeError();
     auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
@@ -4358,7 +4376,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
     Type underlyingType;
     if (ctx.LangOpts.EnableDeserializationRecovery) {
-      auto underlyingTypeOrError = getTypeChecked(underlyingTypeID);
+      auto underlyingTypeOrError = MF.getTypeChecked(underlyingTypeID);
       if (!underlyingTypeOrError)
         return underlyingTypeOrError.takeError();
 
@@ -4371,20 +4389,20 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       }
 
     } else {
-      underlyingType = getType(underlyingTypeID);
+      underlyingType = MF.getType(underlyingTypeID);
     }
 
     // Read the substituted type.
-    auto substitutedTypeOrError = getTypeChecked(substitutedTypeID);
+    auto substitutedTypeOrError = MF.getTypeChecked(substitutedTypeID);
     if (!substitutedTypeOrError)
       return substitutedTypeOrError.takeError();
 
     auto substitutedType = substitutedTypeOrError.get();
 
     // Read the substitutions.
-    auto subMap = getSubstitutionMap(substitutionsID);
+    auto subMap = MF.getSubstitutionMap(substitutionsID);
 
-    auto parentTypeOrError = getTypeChecked(parentTypeID);
+    auto parentTypeOrError = MF.getTypeChecked(parentTypeID);
     if (!parentTypeOrError) {
       typeOrOffset = underlyingType;
       break;
@@ -4415,11 +4433,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID parentID;
     decls_block::NominalTypeLayout::readRecord(scratch, declID, parentID);
 
-    Expected<Type> parentTy = getTypeChecked(parentID);
+    Expected<Type> parentTy = MF.getTypeChecked(parentID);
     if (!parentTy)
       return parentTy.takeError();
 
-    auto nominalOrError = getDeclChecked(declID);
+    auto nominalOrError = MF.getDeclChecked(declID);
     if (!nominalOrError)
       return nominalOrError.takeError();
 
@@ -4466,7 +4484,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID underlyingID;
     decls_block::ParenTypeLayout::readRecord(scratch, underlyingID);
 
-    auto underlyingTy = getTypeChecked(underlyingID);
+    auto underlyingTy = MF.getTypeChecked(underlyingID);
     if (!underlyingTy)
       return underlyingTy.takeError();
 
@@ -4478,13 +4496,13 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     // The tuple record itself is empty. Read all trailing elements.
     SmallVector<TupleTypeElt, 8> elements;
     while (true) {
-      auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+      auto entry = MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
       if (entry.Kind != llvm::BitstreamEntry::Record)
         break;
 
       scratch.clear();
-      unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
-                                                    &blobData);
+      unsigned recordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                       &blobData);
       if (recordID != decls_block::TUPLE_TYPE_ELT)
         break;
 
@@ -4492,11 +4510,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       TypeID typeID;
       decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID);
 
-      auto elementTy = getTypeChecked(typeID);
+      auto elementTy = MF.getTypeChecked(typeID);
       if (!elementTy)
         return elementTy.takeError();
 
-      elements.emplace_back(elementTy.get(), getIdentifier(nameID));
+      elements.emplace_back(elementTy.get(), MF.getIdentifier(nameID));
     }
 
     typeOrOffset = TupleType::get(elements, ctx);
@@ -4522,29 +4540,29 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                                          rawRepresentation,
                                                          throws,
                                                          rawGenericSig);
-      genericSig = getGenericSignature(rawGenericSig);
+      genericSig = MF.getGenericSignature(rawGenericSig);
     }
 
     auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
     if (!representation.hasValue()) {
-      error();
+      MF.error();
       return nullptr;
     }
     
     auto info = FunctionType::ExtInfo(*representation, noescape, throws);
 
-    auto resultTy = getTypeChecked(resultID);
+    auto resultTy = MF.getTypeChecked(resultID);
     if (!resultTy)
       return resultTy.takeError();
 
     SmallVector<AnyFunctionType::Param, 8> params;
     while (true) {
-      auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+      auto entry = MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
       if (entry.Kind != llvm::BitstreamEntry::Record)
         break;
 
       scratch.clear();
-      unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+      unsigned recordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch,
                                                     &blobData);
       if (recordID != decls_block::FUNCTION_PARAM)
         break;
@@ -4560,16 +4578,16 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
       if (!ownership) {
-        error();
+        MF.error();
         return nullptr;
       }
 
-      auto paramTy = getTypeChecked(typeID);
+      auto paramTy = MF.getTypeChecked(typeID);
       if (!paramTy)
         return paramTy.takeError();
 
       params.emplace_back(paramTy.get(),
-                          getIdentifier(labelID),
+                          MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
                                              isEscaping, *ownership));
     }
@@ -4591,7 +4609,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     uint8_t repr;
     decls_block::ExistentialMetatypeTypeLayout::readRecord(scratch,
                                                            instanceID, repr);
-    auto instanceType = getTypeChecked(instanceID);
+    auto instanceType = MF.getTypeChecked(instanceID);
     if (!instanceType)
       return instanceType.takeError();
 
@@ -4601,7 +4619,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       break;
 
     case serialization::MetatypeRepresentation::MR_Thin:
-      error();
+      MF.error();
       break;
 
     case serialization::MetatypeRepresentation::MR_Thick:
@@ -4615,7 +4633,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       break;
 
     default:
-      error();
+      MF.error();
       break;
     }
     break;
@@ -4626,7 +4644,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     uint8_t repr;
     decls_block::MetatypeTypeLayout::readRecord(scratch, instanceID, repr);
 
-    auto instanceType = getTypeChecked(instanceID);
+    auto instanceType = MF.getTypeChecked(instanceID);
     if (!instanceType)
       return instanceType.takeError();
 
@@ -4651,7 +4669,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       break;
 
     default:
-      error();
+      MF.error();
       break;
     }
     break;
@@ -4660,7 +4678,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   case decls_block::DYNAMIC_SELF_TYPE: {
     TypeID selfID;
     decls_block::DynamicSelfTypeLayout::readRecord(scratch, selfID);
-    typeOrOffset = DynamicSelfType::get(getType(selfID), ctx);
+    typeOrOffset = DynamicSelfType::get(MF.getType(selfID), ctx);
     break;
   }
 
@@ -4673,11 +4691,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto ownership = getActualReferenceOwnership(
         (serialization::ReferenceOwnership)rawOwnership);
     if (!ownership.hasValue()) {
-      error();
+      MF.error();
       break;
     }
 
-    auto objectTy = getTypeChecked(objectTypeID);
+    auto objectTy = MF.getTypeChecked(objectTypeID);
     if (!objectTy)
       return objectTy.takeError();
 
@@ -4693,9 +4711,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::PrimaryArchetypeTypeLayout::readRecord(scratch, envID,
                                                         depth, index);
 
-    auto env = getGenericEnvironment(envID);
+    auto env = MF.getGenericEnvironment(envID);
     if (!env) {
-      error();
+      MF.error();
       break;
     }
 
@@ -4704,7 +4722,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     typeOrOffset = contextType;
 
     if (contextType->hasError()) {
-      error();
+      MF.error();
       break;
     }
 
@@ -4717,7 +4735,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
                                                        existentialID);
 
-    typeOrOffset = OpenedArchetypeType::get(getType(existentialID));
+    typeOrOffset = OpenedArchetypeType::get(MF.getType(existentialID));
     break;
   }
       
@@ -4726,8 +4744,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::NestedArchetypeTypeLayout::readRecord(scratch,
                                                        rootID, interfaceTyID);
     
-    auto rootTy = getType(rootID)->castTo<ArchetypeType>();
-    auto interfaceTy = getType(interfaceTyID)->castTo<DependentMemberType>();
+    auto rootTy = MF.getType(rootID)->castTo<ArchetypeType>();
+    auto interfaceTy = MF.getType(interfaceTyID)->castTo<DependentMemberType>();
     auto rootInterfaceTy = interfaceTy->getRootGenericParam();
     
     auto sig = rootTy->getGenericEnvironment()->getGenericSignature();
@@ -4737,7 +4755,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
         if (t->isEqual(rootInterfaceTy))
           return rootTy;
         return t;
-      }, LookUpConformanceInModule(getAssociatedModule()));
+      }, LookUpConformanceInModule(MF.getAssociatedModule()));
     
     typeOrOffset = Type(interfaceTy).subst(subs);
     break;
@@ -4752,10 +4770,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
     if (indexPlusOne == 0) {
       auto genericParam
-        = dyn_cast_or_null<GenericTypeParamDecl>(getDecl(declIDOrDepth));
+        = dyn_cast_or_null<GenericTypeParamDecl>(MF.getDecl(declIDOrDepth));
 
       if (!genericParam) {
-        error();
+        MF.error();
         return nullptr;
       }
 
@@ -4780,7 +4798,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                                            rawProtocolIDs);
     SmallVector<Type, 4> protocols;
     for (TypeID protoID : rawProtocolIDs) {
-      auto protoTy = getTypeChecked(protoID);
+      auto protoTy = MF.getTypeChecked(protoID);
       if (!protoTy)
         return protoTy.takeError();
       protocols.push_back(protoTy.get());
@@ -4798,8 +4816,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::DependentMemberTypeLayout::readRecord(scratch, baseID,
                                                        assocTypeID);
     typeOrOffset = DependentMemberType::get(
-                     getType(baseID),
-                     cast<AssociatedTypeDecl>(getDecl(assocTypeID)));
+                     MF.getType(baseID),
+                     cast<AssociatedTypeDecl>(MF.getDecl(assocTypeID)));
     break;
   }
 
@@ -4811,17 +4829,17 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
                                                     rawArgumentIDs);
 
-    auto nominalOrError = getDeclChecked(declID);
+    auto nominalOrError = MF.getDeclChecked(declID);
     if (!nominalOrError)
       return nominalOrError.takeError();
     auto nominal = cast<NominalTypeDecl>(nominalOrError.get());
 
     // FIXME: Check this?
-    auto parentTy = getType(parentID);
+    auto parentTy = MF.getType(parentID);
 
     SmallVector<Type, 8> genericArgs;
     for (TypeID ID : rawArgumentIDs) {
-      auto argTy = getTypeChecked(ID);
+      auto argTy = MF.getTypeChecked(ID);
       if (!argTy)
         return argTy.takeError();
 
@@ -4837,7 +4855,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID captureID;
     
     decls_block::SILBlockStorageTypeLayout::readRecord(scratch, captureID);
-    typeOrOffset = SILBlockStorageType::get(getType(captureID)
+    typeOrOffset = SILBlockStorageType::get(MF.getType(captureID)
                                               ->getCanonicalType());
     break;
   }
@@ -4849,19 +4867,19 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     
     // Get the layout.
     auto getLayout = [&]() -> SILLayout * {
-      assert(layoutID > 0 && layoutID <= SILLayouts.size()
+      assert(layoutID > 0 && layoutID <= MF.SILLayouts.size()
              && "invalid layout ID");
 
-      auto &layoutOrOffset = SILLayouts[layoutID - 1];
+      auto &layoutOrOffset = MF.SILLayouts[layoutID - 1];
       if (layoutOrOffset.isComplete()) {
         return layoutOrOffset;
       }
       
-      BCOffsetRAII saveOffset(DeclTypeCursor);
-      DeclTypeCursor.JumpToBit(layoutOrOffset);
-      auto layout = readSILLayout(DeclTypeCursor);
+      BCOffsetRAII saveOffset(MF.DeclTypeCursor);
+      MF.DeclTypeCursor.JumpToBit(layoutOrOffset);
+      auto layout = MF.readSILLayout(MF.DeclTypeCursor);
       if (!layout) {
-        error();
+        MF.error();
         return nullptr;
       }
       layoutOrOffset = layout;
@@ -4872,8 +4890,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     if (!layout)
       return nullptr;
 
-    auto subMap = getSubstitutionMap(subMapID);
-    typeOrOffset = SILBoxType::get(getContext(), layout, subMap);
+    auto subMap = MF.getSubstitutionMap(subMapID);
+    typeOrOffset = SILBoxType::get(ctx, layout, subMap);
     break;
   }
       
@@ -4907,7 +4925,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto representation
       = getActualSILFunctionTypeRepresentation(rawRepresentation);
     if (!representation.hasValue()) {
-      error();
+      MF.error();
       return nullptr;
     }
     SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape);
@@ -4915,14 +4933,14 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     // Process the coroutine kind.
     auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);
     if (!coroutineKind.hasValue()) {
-      error();
+      MF.error();
       return nullptr;
     }
 
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
     if (!calleeConvention.hasValue()) {
-      error();
+      MF.error();
       return nullptr;
     }
 
@@ -4930,10 +4948,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                   -> llvm::Expected<SILParameterInfo> {
       auto convention = getActualParameterConvention(rawConvention);
       if (!convention) {
-        error();
+        MF.error();
         llvm_unreachable("an error is a fatal exit at this point");
       }
-      auto type = getTypeChecked(typeID);
+      auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
       return SILParameterInfo(type.get()->getCanonicalType(), *convention);
@@ -4943,10 +4961,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                   -> llvm::Expected<SILYieldInfo> {
       auto convention = getActualParameterConvention(rawConvention);
       if (!convention) {
-        error();
+        MF.error();
         llvm_unreachable("an error is a fatal exit at this point");
       }
-      auto type = getTypeChecked(typeID);
+      auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
       return SILYieldInfo(type.get()->getCanonicalType(), *convention);
@@ -4956,10 +4974,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                -> llvm::Expected<SILResultInfo> {
       auto convention = getActualResultConvention(rawConvention);
       if (!convention) {
-        error();
+        MF.error();
         llvm_unreachable("an error is a fatal exit at this point");
       }
-      auto type = getTypeChecked(typeID);
+      auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
       return SILResultInfo(type.get()->getCanonicalType(), *convention);
@@ -4968,7 +4986,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     // Bounds check.  FIXME: overflow
     if (2 * numParams + 2 * numResults + 2 * unsigned(hasErrorResult)
           > variableData.size()) {
-      error();
+      MF.error();
       return nullptr;
     }
 
@@ -5023,10 +5041,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
     Optional<ProtocolConformanceRef> witnessMethodConformance;
     if (*representation == SILFunctionTypeRepresentation::WitnessMethod) {
-      witnessMethodConformance = readConformance(DeclTypeCursor);
+      witnessMethodConformance = MF.readConformance(MF.DeclTypeCursor);
     }
 
-    GenericSignature *genericSig = getGenericSignature(rawGenericSig);
+    GenericSignature *genericSig = MF.getGenericSignature(rawGenericSig);
 
     typeOrOffset = SILFunctionType::get(genericSig, extInfo,
                                         coroutineKind.getValue(),
@@ -5041,7 +5059,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID baseID;
     decls_block::ArraySliceTypeLayout::readRecord(scratch, baseID);
 
-    auto baseTy = getTypeChecked(baseID);
+    auto baseTy = MF.getTypeChecked(baseID);
     if (!baseTy)
       return baseTy.takeError();
 
@@ -5053,11 +5071,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID keyID, valueID;
     decls_block::DictionaryTypeLayout::readRecord(scratch, keyID, valueID);
 
-    auto keyTy = getTypeChecked(keyID);
+    auto keyTy = MF.getTypeChecked(keyID);
     if (!keyTy)
       return keyTy.takeError();
 
-    auto valueTy = getTypeChecked(valueID);
+    auto valueTy = MF.getTypeChecked(valueID);
     if (!valueTy)
       return valueTy.takeError();
 
@@ -5069,7 +5087,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID baseID;
     decls_block::OptionalTypeLayout::readRecord(scratch, baseID);
 
-    auto baseTy = getTypeChecked(baseID);
+    auto baseTy = MF.getTypeChecked(baseID);
     if (!baseTy)
       return baseTy.takeError();
 
@@ -5083,13 +5101,13 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::UnboundGenericTypeLayout::readRecord(scratch,
                                                       genericID, parentID);
 
-    auto nominalOrError = getDeclChecked(genericID);
+    auto nominalOrError = MF.getDeclChecked(genericID);
     if (!nominalOrError)
       return nominalOrError.takeError();
     auto genericDecl = cast<GenericTypeDecl>(nominalOrError.get());
 
     // FIXME: Check this?
-    auto parentTy = getType(parentID);
+    auto parentTy = MF.getType(parentID);
 
     typeOrOffset = UnboundGenericType::get(genericDecl, parentTy, ctx);
     break;
@@ -5097,7 +5115,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   default:
     // We don't know how to deserialize this kind of type.
-    error();
+    MF.error();
     return nullptr;
   }
 
@@ -5111,7 +5129,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 #endif
 
   // Invoke the callback on the deserialized type.
-  DeserializedTypeCallback(typeOrOffset);
+  MF.DeserializedTypeCallback(typeOrOffset);
 
   return typeOrOffset;
 }
