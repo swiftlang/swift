@@ -2622,10 +2622,12 @@ public:
     }
     // Reference and apply the VJP.
     auto loc = sei->getLoc();
+    auto *vjp = task->getVJP();
     auto *getterVJPRef = getBuilder().createFunctionRef(loc, task->getVJP());
     auto *getterVJPApply = getBuilder().createApply(
-        loc, getterVJPRef, /*substitutionMap*/ {},
-        {getOpValue(sei->getOperand())}, /*isNonThrowing*/ false);
+        loc, getterVJPRef,
+        getOpSubstitutionMap(vjp->getForwardingSubstitutionMap()),
+        /*args*/ {getOpValue(sei->getOperand())}, /*isNonThrowing*/ false);
     // Extract direct results from `getterVJPApply`.
     SmallVector<SILValue, 8> vjpDirectResults;
     extractAllElements(getterVJPApply, getBuilder(), vjpDirectResults);
@@ -2693,11 +2695,11 @@ public:
         : nullptr;
     Lowering::GenericContextScope genericContextScope(
         getContext().getTypeConverter(), canGenSig);
-    // Reference the VJP.
+    // Reference the getter VJP.
     auto loc = seai->getLoc();
     auto *vjp = task->getVJP();
     auto vjpFnTy = vjp->getLoweredFunctionType();
-    auto *getterVJPRef = getBuilder().createFunctionRef(loc, task->getVJP());
+    auto *getterVJPRef = getBuilder().createFunctionRef(loc, vjp);
     // Store getter VJP arguments and indirect result buffers.
     SmallVector<SILValue, 8> vjpArgs;
     SmallVector<AllocStackInst *, 8> vjpIndirectResults;
