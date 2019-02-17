@@ -228,7 +228,7 @@ public: // for exp debugging
   enum class ScopeLookupResult { next, stop, finished };
   struct PerScopeLookupState {
     ScopeLookupResult result;
-    DeclContext *nextDC; // TODO: rename to child of nextDC
+    DeclContext *childOfNextDC;
     Optional<PlacesToSearch> placesToSearch;
     Optional<bool> isCascadingUse;
 
