@@ -185,7 +185,7 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
     tests = TestComparator(results[0], results[1], threshold)
     changed = tests.decreased + tests.increased
 
-    while len(changed) > 0 and unchanged_length_count < 5:
+    while len(changed) > 0 and unchanged_length_count < 10:
         i += 1
         if VERBOSE:
             log('        test again: ' + str([test.name for test in changed]))

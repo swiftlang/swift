@@ -231,29 +231,6 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   return StdlibModule;
 }
 
-Type TypeChecker::lookupBoolType(const DeclContext *dc) {
-  if (!boolType) {
-    boolType = ([&] {
-      SmallVector<ValueDecl *, 2> results;
-      getStdlibModule(dc)->lookupValue({}, Context.getIdentifier("Bool"),
-                                       NLKind::QualifiedLookup, results);
-      if (results.size() != 1) {
-        diagnose(SourceLoc(), diag::broken_bool);
-        return Type();
-      }
-
-      auto tyDecl = dyn_cast<NominalTypeDecl>(results.front());
-      if (!tyDecl) {
-        diagnose(SourceLoc(), diag::broken_bool);
-        return Type();
-      }
-
-      return tyDecl->getDeclaredType();
-    })();
-  }
-  return *boolType;
-}
-
 /// Bind the given extension to the given nominal type.
 static void bindExtensionToNominal(ExtensionDecl *ext,
                                    NominalTypeDecl *nominal) {

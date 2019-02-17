@@ -265,14 +265,16 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         }
       }
 
-      if (!TheSuccessorBlock)
+      SILBasicBlock *DB = nullptr;
+      if (!TheSuccessorBlock) {
         if (SUI->hasDefault()) {
-          SILBasicBlock *DB= SUI->getDefaultBB();
+          DB = SUI->getDefaultBB();
           if (!isa<UnreachableInst>(DB->getTerminator())) {
             TheSuccessorBlock = DB;
             ReachableBlockIdx = SUI->getNumCases();
           }
         }
+      }
 
       // Not fully covered switches will be diagnosed later. SILGen represents
       // them with a Default basic block with an unreachable instruction.
@@ -285,8 +287,17 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       SILBuilderWithScope B(&BB, TI);
       SILLocation Loc = TI->getLoc();
       if (!TheSuccessorBlock->args_empty()) {
-        assert(TheEnum->hasOperand());
-        B.createBranch(Loc, TheSuccessorBlock, TheEnum->getOperand());
+        // If the successor block that we are looking at is the default block,
+        // we create an argument not for the enum case, but for the original
+        // value.
+        SILValue branchOperand;
+        if (TheSuccessorBlock != DB) {
+          assert(TheEnum->hasOperand());
+          branchOperand = TheEnum->getOperand();
+        } else {
+          branchOperand = TheEnum;
+        }
+        B.createBranch(Loc, TheSuccessorBlock, branchOperand);
       } else
         B.createBranch(Loc, TheSuccessorBlock);
 

@@ -37,9 +37,10 @@ func optionalMembers1(_ a: HasOptionalMembers1) {
 func optionalMembers2<T : HasOptionalMembers1>(_ a: T) {
   T.#^OPTIONAL_MEMBERS_2^#
 }
-// OPTIONAL_MEMBERS_2: Begin completions, 4 items
+// OPTIONAL_MEMBERS_2: Begin completions, 5 items
 // OPTIONAL_MEMBERS_2-DAG: Decl[InstanceMethod]/CurrNominal: optionalInstanceFunc?({#self: HasOptionalMembers1#})[#() -> Int#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_2-DAG: Decl[StaticMethod]/CurrNominal: optionalClassFunc?()[#Int#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_2-DAG: Decl[StaticVar]/CurrNominal: optionalClassProperty[#Int?#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_2-DAG: Keyword[self]/CurrNominal: self[#T.Type#]; name=self
+// OPTIONAL_MEMBERS_2-DAG: Keyword/CurrNominal: Type[#T.Type#]; name=Type
 // OPTIONAL_MEMBERS_2: End completions

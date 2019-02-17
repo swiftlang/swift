@@ -1318,7 +1318,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
 
     // Enumerations with a raw type conform to RawRepresentable.
-    if (theEnum->hasRawType()) {
+    if (theEnum->hasRawType() && !theEnum->getRawType()->hasError()) {
       addSynthesized(KnownProtocolKind::RawRepresentable);
     }
   }
@@ -1381,8 +1381,7 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
 SmallVector<ProtocolDecl *, 2>
 DeclContext::getLocalProtocols(
   ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics,
-  bool sorted) const
+  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
 {
   SmallVector<ProtocolDecl *, 2> result;
 
@@ -1401,19 +1400,13 @@ DeclContext::getLocalProtocols(
     nullptr,
     diagnostics);
 
-  // Sort if required.
-  if (sorted) {
-    llvm::array_pod_sort(result.begin(), result.end(), TypeDecl::compare);
-  }
-
   return result;
 }
 
 SmallVector<ProtocolConformance *, 2>
 DeclContext::getLocalConformances(
   ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics,
-  bool sorted) const
+  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
 {
   SmallVector<ProtocolConformance *, 2> result;
 
@@ -1438,12 +1431,6 @@ DeclContext::getLocalConformances(
     nullptr,
     &result,
     diagnostics);
-
-  // If requested, sort the results.
-  if (sorted) {
-    llvm::array_pod_sort(result.begin(), result.end(),
-                         &ConformanceLookupTable::compareProtocolConformances);
-  }
 
   return result;
 }

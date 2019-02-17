@@ -520,15 +520,14 @@ public:
           readMetadataAndValueOpaqueExistential(ExistentialAddress);
       if (!OptMetaAndValue)
         return false;
-      RemoteAddress MetadataAddress = OptMetaAndValue->first;
-      RemoteAddress ValueAddress = OptMetaAndValue->second;
 
-      auto InstanceTR = readTypeFromMetadata(MetadataAddress.getAddressData());
+      auto InstanceTR = readTypeFromMetadata(
+          OptMetaAndValue->MetadataAddress.getAddressData());
       if (!InstanceTR)
         return false;
 
       *OutInstanceTR = InstanceTR;
-      *OutInstanceAddress = ValueAddress;
+      *OutInstanceAddress = OptMetaAndValue->PayloadAddress;
       return true;
     }
     case RecordKind::ErrorExistential: {
@@ -537,16 +536,15 @@ public:
       if (!OptMetaAndValue)
         return false;
 
-      RemoteAddress InstanceMetadataAddress = OptMetaAndValue->first;
-      RemoteAddress InstanceAddress = OptMetaAndValue->second;
+      // FIXME: Check third value, 'IsBridgedError'
 
-      auto InstanceTR =
-          readTypeFromMetadata(InstanceMetadataAddress.getAddressData());
+      auto InstanceTR = readTypeFromMetadata(
+          OptMetaAndValue->MetadataAddress.getAddressData());
       if (!InstanceTR)
         return false;
 
       *OutInstanceTR = InstanceTR;
-      *OutInstanceAddress = RemoteAddress(InstanceAddress);
+      *OutInstanceAddress = OptMetaAndValue->PayloadAddress;
       return true;
     }
     default:

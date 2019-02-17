@@ -60,10 +60,10 @@ public:
 
   GenericTypeDecl *createTypeDecl(StringRef mangledName, bool &typeAlias);
   
-  GenericTypeDecl *createTypeDecl(const Demangle::NodePointer &node,
+  GenericTypeDecl *createTypeDecl(NodePointer node,
                                   bool &typeAlias);
 
-  ProtocolDecl *createProtocolDecl(const Demangle::NodePointer &node);
+  ProtocolDecl *createProtocolDecl(NodePointer node);
 
   Type createNominalType(GenericTypeDecl *decl);
 
@@ -126,14 +126,22 @@ public:
 
   Type getOpaqueType();
 
+  Type createOptionalType(Type base);
+
+  Type createArrayType(Type base);
+
+  Type createDictionaryType(Type key, Type value);
+
+  Type createParenType(Type base);
+
 private:
   bool validateParentType(TypeDecl *decl, Type parent);
   CanGenericSignature demangleGenericSignature(
       NominalTypeDecl *nominalDecl,
-      const Demangle::NodePointer &node);
-  DeclContext *findDeclContext(const Demangle::NodePointer &node);
-  ModuleDecl *findModule(const Demangle::NodePointer &node);
-  Demangle::NodePointer findModuleNode(const Demangle::NodePointer &node);
+      NodePointer node);
+  DeclContext *findDeclContext(NodePointer node);
+  ModuleDecl *findModule(NodePointer node);
+  Demangle::NodePointer findModuleNode(NodePointer node);
 
   enum class ForeignModuleKind {
     Imported,
@@ -141,7 +149,7 @@ private:
   };
 
   Optional<ForeignModuleKind>
-  getForeignModuleKind(const Demangle::NodePointer &node);
+  getForeignModuleKind(NodePointer node);
 
   GenericTypeDecl *findTypeDecl(DeclContext *dc,
                                 Identifier name,

@@ -708,6 +708,7 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
   }
 
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
+  Invocation.getFrontendOptions().EnableParseableModuleInterface = true;
 
   std::string ErrMsg;
   auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,

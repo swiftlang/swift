@@ -849,7 +849,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   ManagedValue emitInjectEnum(SILLocation loc,
-                              ArgumentSource payload,
+                              ArgumentSource &&payload,
                               SILType enumTy,
                               EnumElementDecl *element,
                               SGFContext C);
@@ -1219,6 +1219,10 @@ public:
                                             SubstitutionMap subs,
                                             AccessStrategy strategy,
                                             Expr *indices);
+
+  RValue prepareEnumPayload(EnumElementDecl *element,
+                            CanFunctionType substFnType,
+                            ArgumentSource &&indexExpr);
 
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,

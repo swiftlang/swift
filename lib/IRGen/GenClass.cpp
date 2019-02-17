@@ -1174,7 +1174,7 @@ namespace {
       llvm::SmallSetVector<ProtocolDecl *, 2> protocols;
       for (auto conformance : dc->getLocalConformances(
                                 ConformanceLookupKind::OnlyExplicit,
-                                nullptr, /*sorted=*/true)) {
+                                nullptr)) {
         ProtocolDecl *proto = conformance->getProtocol();
         getObjCProtocols(proto, protocols);
       }

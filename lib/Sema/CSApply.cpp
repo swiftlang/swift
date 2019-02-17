@@ -1778,19 +1778,15 @@ namespace {
       DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinIntegerLiteral });
 
-      return convertLiteral(
-               expr,
-               type,
-               cs.getType(expr),
-               protocol,
-               tc.Context.Id_IntegerLiteralType,
-               initName,
-               builtinProtocol,
-               tc.Context.TheIntegerLiteralType,
-               builtinInitName,
-               nullptr,
-               diag::integer_literal_broken_proto,
-               diag::builtin_integer_literal_broken_proto);
+      auto *result = convertLiteralInPlace(
+          expr, type, protocol, tc.Context.Id_IntegerLiteralType, initName,
+          builtinProtocol, builtinInitName, diag::integer_literal_broken_proto,
+          diag::builtin_integer_literal_broken_proto);
+      if (result) {
+        // TODO: It seems that callers expect this to have types assigned...
+        result->setType(cs.getType(result));
+      }
+      return result;
     }
     
     Expr *visitNilLiteralExpr(NilLiteralExpr *expr) {
@@ -3556,7 +3552,11 @@ namespace {
           });
         }
 
-        literalInit->setImplicit(false);
+        if (auto *literal = dyn_cast<NumberLiteralExpr>(literalInit)) {
+          literal->setExplicitConversion();
+        } else {
+          literalInit->setImplicit(false);
+        }
 
         cs.setType(expr, toType);
         // Keep the coercion around, because it contains the source range
@@ -6981,6 +6981,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
       stringLiteral->setBuiltinInitializer(witness);
     else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
       booleanLiteral->setBuiltinInitializer(witness);
+    else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
+      numberLiteral->setBuiltinInitializer(witness);
     else {
       cast<MagicIdentifierLiteralExpr>(literal)
         ->setBuiltinInitializer(witness);
@@ -7030,6 +7032,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     stringLiteral->setInitializer(witness);
   else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
     booleanLiteral->setInitializer(witness);
+  else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
+    numberLiteral->setInitializer(witness);
   else
     cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(witness);
 
@@ -8013,6 +8017,12 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   // Match the optional value against its `Some` case.
   auto &ctx = tc.Context;
   auto isSomeExpr = new (ctx) EnumIsCaseExpr(expr, ctx.getOptionalSomeDecl());
-  cs.setType(isSomeExpr, tc.lookupBoolType(cs.DC));
+  auto boolDecl = ctx.getBoolDecl();
+
+  if (!boolDecl) {
+    tc.diagnose(SourceLoc(), diag::broken_bool);
+  }
+
+  cs.setType(isSomeExpr, boolDecl ? boolDecl->getDeclaredType() : Type());
   return isSomeExpr;
 }

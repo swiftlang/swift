@@ -2406,14 +2406,9 @@ void ValueDecl::setInterfaceType(Type type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
 
-    // lldb creates global typealiases with archetypes in them.
-    // FIXME: Add an isDebugAlias() flag, like isDebugVar().
-    //
-    // Also, ParamDecls in closure contexts can have type variables
+    // ParamDecls in closure contexts can have type variables
     // archetype in them during constraint generation.
-    if (!isa<TypeAliasDecl>(this) &&
-        !(isa<ParamDecl>(this) &&
-          isa<AbstractClosureExpr>(getDeclContext()))) {
+    if (!(isa<ParamDecl>(this) && isa<AbstractClosureExpr>(getDeclContext()))) {
       assert(!type->hasArchetype() &&
              "Archetype in interface type");
     }

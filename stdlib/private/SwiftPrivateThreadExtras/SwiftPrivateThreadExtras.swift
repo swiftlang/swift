@@ -96,7 +96,7 @@ public func _stdlib_thread_create_block<Argument, Result>(
   if threadID == 0 {
     return (errno, nil)
   } else {
-    return (0, UnsafeMutablePointer<ThreadHandle>(&threadID).pointee)
+    return (0, unsafeBitCast(threadID, to: ThreadHandle.self))
   }
 #else
   var threadID = _make_pthread_t()

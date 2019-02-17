@@ -2,7 +2,7 @@
 
 func markUsed<T>(_ t: T) {}
 
-class DWARF {
+public class DWARF {
 // CHECK-DAG: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "$ss6UInt32VD"
 // CHECK-DAG: ![[DIEOFFSET:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s9typealias5DWARFC9DIEOffsetaD",{{.*}} line: [[@LINE+1]], baseType: ![[BASE]])
   typealias DIEOffset = UInt32
@@ -12,28 +12,28 @@ class DWARF {
   fileprivate static func usePrivateType() -> PrivateType { return () }
 }
 
-struct Generic<T> {
-  enum Inner {
+public struct Generic<T> {
+  public enum Inner {
     case value
   }
 }
 
-typealias Specific = Generic<Int>
-typealias NotSpecific<T> = Generic<T>.Inner
+public typealias Specific = Generic<Int>
+public typealias NotSpecific<T> = Generic<T>.Inner
 
-struct Outer : P {
-  enum Inner {
+public struct Outer : P {
+  public enum Inner {
     case x
   }
 }
 
-protocol P {
+public protocol P {
   typealias T = Outer
 }
 
 // CHECK-DAG: [[INNER_TYPE:![0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type{{.*}} identifier: "$s9typealias5OuterV5InnerOD"
 
-func main () {
+public func main() {
   // CHECK-DAG: !DILocalVariable(name: "a",{{.*}} type: ![[DIEOFFSET]]
   let a : DWARF.DIEOffset = 123
   markUsed(a)
@@ -72,4 +72,39 @@ func main () {
   markUsed(h)
 }
 
-main()
+public class Halter {}
+
+public class Tack<T> {
+  public typealias A = Halter
+
+  public func f1(y: (Array<A>, Array<A>)) {
+    markUsed(y)
+  }
+
+  public func f2(y: ([A], Array<A>)) {
+    markUsed(y)
+  }
+
+  public func f3(y: (Array<A>, [A])) {
+    markUsed(y)
+  }
+
+  public func f4(y: ([A], [A])) {
+    markUsed(y)
+  }
+}
+
+public class GenericClass<T> {}
+public typealias GenericAlias<T> = GenericClass<T>
+
+public func usesGeneric(y: (GenericAlias<Int>, GenericClass<Int>, GenericAlias<Int>, GenericClass<Int>)) {
+  let x = y
+  markUsed(x)
+}
+
+public struct Ox<T> {}
+extension Ox where T == Int {
+  public typealias Plow = Int
+}
+
+var v: Ox<Int>.Plow = 0

@@ -1820,6 +1820,11 @@ public:
       PrintWithColorRAII(OS, LiteralValueColor) << E->getDigitsText();
     else
       PrintWithColorRAII(OS, LiteralValueColor) << E->getValue();
+    PrintWithColorRAII(OS, LiteralValueColor) << " builtin_initializer=";
+    E->getBuiltinInitializer().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
@@ -1868,12 +1873,12 @@ public:
 
     if (E->isString()) {
       OS << " encoding="
-         << getStringLiteralExprEncodingString(E->getStringEncoding())
-         << " builtin_initializer=";
-      E->getBuiltinInitializer().dump(OS);
-      OS << " initializer=";
-      E->getInitializer().dump(OS);
+         << getStringLiteralExprEncodingString(E->getStringEncoding());
     }
+    OS << " builtin_initializer=";
+    E->getBuiltinInitializer().dump(OS);
+    OS << " initializer=";
+    E->getInitializer().dump(OS);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 

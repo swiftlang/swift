@@ -2923,6 +2923,12 @@ Expr *Parser::parseExprAnonClosureArg() {
   auto closure = dyn_cast_or_null<ClosureExpr>(
       dyn_cast<AbstractClosureExpr>(CurDeclContext));
   if (!closure) {
+    if (Context.LangOpts.DebuggerSupport) {
+      auto refKind = DeclRefKind::Ordinary;
+      auto identifier = Context.getIdentifier(Name);
+      return new (Context) UnresolvedDeclRefExpr(DeclName(identifier), refKind,
+                                                 DeclNameLoc(Loc));
+    }
     diagnose(Loc, diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);
   }

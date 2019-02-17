@@ -166,20 +166,29 @@ protected:
   using DiagInReference = Diag<DescriptiveDeclKind, DeclName, Type, Type, Type>;
   using DiagAsNote = Diag<Type, Type, Type, Type, StringRef>;
 
+  /// If this failure associated with one of the conditional requirements,
+  /// this field would represent conformance where requirement comes from.
+  const ProtocolConformance *Conformance = nullptr;
+
+  /// The source of the requirement, if available. One exception
+  /// is failure associated with conditional requirement where
+  /// underlying conformance is specialized.
+  const GenericSignature *Signature;
+
   const ValueDecl *AffectedDecl;
   /// If possible, find application expression associated
   /// with current generic requirement failure, that helps
   /// to diagnose failures related to arguments.
   const ApplyExpr *Apply = nullptr;
 
-  /// If this failure associated with one of the conditional requirements.
-  bool IsConditional = false;
-
 public:
   RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
                      ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator), AffectedDecl(getDeclRef()) {
+      : FailureDiagnostic(expr, cs, locator),
+        Conformance(getConformanceForConditionalReq(locator)),
+        Signature(getSignature(locator)), AffectedDecl(getDeclRef()) {
     assert(locator);
+    assert(isConditional() || Signature);
     assert(AffectedDecl);
 
     auto path = locator->getPath();
@@ -189,8 +198,6 @@ public:
     assert(last.isTypeParameterRequirement() ||
            last.isConditionalRequirement());
     assert(static_cast<RequirementKind>(last.getValue2()) == kind);
-
-    IsConditional = last.isConditionalRequirement();
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -227,11 +234,7 @@ public:
 
 protected:
   /// Determine whether this is a conditional requirement failure.
-  bool isConditional() const { return IsConditional; }
-
-  /// If this is a failure in condition requirement, retrieve
-  /// conformance information.
-  ProtocolConformanceRef getConformanceRef() const;
+  bool isConditional() const { return bool(Conformance); }
 
   /// Retrieve declaration contextual where current
   /// requirement has been introduced.
@@ -268,11 +271,19 @@ private:
   /// Retrieve declaration associated with failing generic requirement.
   ValueDecl *getDeclRef() const;
 
+  /// Retrieve generic signature where this parameter originates from.
+  GenericSignature *getSignature(ConstraintLocator *locator);
+
   void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
 
   /// Determine whether given declaration represents a static
   /// or instance property/method, excluding operators.
   static bool isStaticOrInstanceMember(const ValueDecl *decl);
+
+  /// If this is a failure in conditional requirement, retrieve
+  /// conformance information.
+  ProtocolConformance *
+  getConformanceForConditionalReq(ConstraintLocator *locator);
 };
 
 /// Diagnostics for failed conformance checks originating from

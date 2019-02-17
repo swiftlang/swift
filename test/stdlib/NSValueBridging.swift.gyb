@@ -91,4 +91,31 @@ nsValueBridging.test("NSValue can only be cast back to its original type") {
   _ = rangeObject as! CGRect
 }
 
+nsValueBridging.test("NSValue fetching method should be able to convert constructed values safely") {
+  let range = NSRange(location: 17, length: 38)
+  let value = NSValue(range: range)
+  expectEqual(value.value(of: NSRange.self)?.location, range.location)
+  expectEqual(value.value(of: NSRange.self)?.length, range.length)
+  expectEqual(value.value(of: CGRect.self), .none)
+  expectEqual(value.value(of: String.self), .none)
+  expectTrue(value.value(of: AnyObject.self) == nil)
+
+
+  class GenericThingNotRootedInObjC<T> {
+    init() { }
+  }
+
+  let obj = GenericThingNotRootedInObjC<String>()
+  // extend the lifetime to ensure that the non retained pointer is valid for the test duration
+  withExtendedLifetime(obj) { () -> Void in
+    let value = NSValue(nonretainedObject: obj)
+    let resString = value.value(of: GenericThingNotRootedInObjC<String>.self)
+    expectEqual(resString === obj, true) // ensure the value is exactly the same
+    
+    let resInt = value.value(of: GenericThingNotRootedInObjC<Int>.self)
+    expectTrue(resInt == nil)
+  }
+
+}
+
 runAllTests()
