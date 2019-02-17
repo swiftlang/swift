@@ -71,7 +71,6 @@ _ = pullback(at: Vector.zero, in: side_effect_release_zero)
 // CHECK:  [[ZERO_GETTER:%.*]] = function_ref @$s11refcounting6VectorV4zeroACvgZ
 // CHECK:  [[ZERO:%.*]] = apply [[ZERO_GETTER]]({{%.*}}) : $@convention(method) (@thin Vector.Type) -> @owned Vector
 // CHECK:  store [[ZERO]] to [[BUF_ACCESS]] : $*Vector
-// CHECK:  release_value_addr [[BUF]] : $*Vector
 // CHECK:  dealloc_stack [[BUF]] : $*Vector
 // CHECK:  release_value [[SEED:%.*]] : $Vector
 // CHECK: }
