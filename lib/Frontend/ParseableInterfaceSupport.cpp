@@ -51,7 +51,7 @@ static swift::version::Version InterfaceFormatVersion({1, 0});
 
 static bool
 extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags, SourceLoc DiagLoc,
-                                    clang::vfs::FileSystem &FS,
+                                    llvm::vfs::FileSystem &FS,
                                     StringRef SwiftInterfacePathIn,
                                     swift::version::Version &Vers,
                                     llvm::StringSaver &SubArgSaver,
@@ -84,7 +84,7 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags, SourceLoc DiagLoc,
 }
 
 static std::unique_ptr<llvm::MemoryBuffer>
-getBufferOfDependency(clang::vfs::FileSystem &FS,
+getBufferOfDependency(llvm::vfs::FileSystem &FS,
                       StringRef ModulePath, StringRef DepPath,
                       DiagnosticEngine &Diags, SourceLoc DiagLoc) {
   auto DepBuf = FS.getBufferForFile(DepPath, /*FileSize=*/-1,
@@ -98,8 +98,8 @@ getBufferOfDependency(clang::vfs::FileSystem &FS,
   return std::move(DepBuf.get());
 }
 
-static Optional<clang::vfs::Status>
-getStatusOfDependency(clang::vfs::FileSystem &FS,
+static Optional<llvm::vfs::Status>
+getStatusOfDependency(llvm::vfs::FileSystem &FS,
                       StringRef ModulePath, StringRef DepPath,
                       DiagnosticEngine &Diags, SourceLoc DiagLoc) {
   auto Status = FS.status(DepPath);
@@ -226,7 +226,7 @@ void ParseableInterfaceModuleLoader::configureSubInvocationInputsAndOutputs(
 
 // Checks that a dependency read from the cached module is up to date compared
 // to the interface file it represents.
-static bool dependencyIsUpToDate(clang::vfs::FileSystem &FS, FileDependency In,
+static bool dependencyIsUpToDate(llvm::vfs::FileSystem &FS, FileDependency In,
                                  StringRef ModulePath, DiagnosticEngine &Diags,
                                  SourceLoc DiagLoc) {
   auto Status = getStatusOfDependency(FS, ModulePath, In.Path, Diags, DiagLoc);
@@ -238,7 +238,7 @@ static bool dependencyIsUpToDate(clang::vfs::FileSystem &FS, FileDependency In,
 // Check that the output .swiftmodule file is at least as new as all the
 // dependencies it read when it was built last time.
 static bool
-swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
+swiftModuleIsUpToDate(llvm::vfs::FileSystem &FS,
                       std::pair<Identifier, SourceLoc> ModuleID,
                       StringRef OutPath,
                       DiagnosticEngine &Diags,
@@ -285,7 +285,7 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
 ///      out to avoid having to do recursive scanning when rechecking this
 ///      dependency in the future.
 static bool
-collectDepsForSerialization(clang::vfs::FileSystem &FS,
+collectDepsForSerialization(llvm::vfs::FileSystem &FS,
                             CompilerInstance &SubInstance,
                             StringRef InPath, StringRef ModuleCachePath,
                             SmallVectorImpl<FileDependency> &Deps,
@@ -343,7 +343,7 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
 }
 
 bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-    clang::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
+    llvm::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
     CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
     StringRef ModuleCachePath, DependencyTracker *OuterTracker,
     bool ShouldSerializeDeps) {
@@ -468,7 +468,7 @@ bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
   return !RunSuccess || SubError;
 }
 
-static bool serializedASTLooksValidOrCannotBeRead(clang::vfs::FileSystem &FS,
+static bool serializedASTLooksValidOrCannotBeRead(llvm::vfs::FileSystem &FS,
                                                   StringRef ModPath) {
   auto ModBuf = FS.getBufferForFile(ModPath, /*FileSize=*/-1,
                                     /*RequiresNullTerminator=*/false);
