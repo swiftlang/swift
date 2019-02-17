@@ -1658,82 +1658,6 @@ private:
     E->walk(walker);
   }
 
-  static bool checkPotentiallyThrowingGetter(MemberRefExpr *E,
-                                             ContextFlags *flags,
-                                             TypeChecker &typeChecker,
-                                             SourceLoc tryLoc) {
-    if (!E) {
-      return false;
-    }
-
-    auto accessSemantics = E->getAccessSemantics();
-
-    // If we're not accessing the getter or setter, then return
-    if (accessSemantics == AccessSemantics::DirectToImplementation ||
-        accessSemantics == AccessSemantics::DirectToStorage) {
-      return false;
-    }
-
-    // If the member does not point to a variable, then return
-    if (!E->hasDecl() || !isa<VarDecl>(E->getDecl().getDecl())) {
-      return false;
-    }
-
-    auto *variable = cast<VarDecl>(E->getDecl().getDecl());
-
-    if (variable->getAccessor(AccessorKind::Get)->hasThrows()) {
-      flags->set(ContextFlags::HasTryThrowSite);
-      flags->set(ContextFlags::HasAnyThrowSite);
-
-      auto walker = ThrowingAccessorCoverageChecker(flags, typeChecker, tryLoc);
-      E->walk(walker);
-
-      return true;
-    }
-
-    return false;
-  }
-
-  static bool checkPotentiallyThrowingSetter(AssignExpr *E, ContextFlags *flags,
-                                             TypeChecker &typeChecker,
-                                             SourceLoc tryLoc) {
-    if (!E) {
-      return false;
-    }
-
-    // If we're not assigning to a nominal member, then return
-    if (!isa<MemberRefExpr>(E->getDest())) {
-      return false;
-    }
-
-    auto *dest = cast<MemberRefExpr>(E->getDest());
-    auto accessSemantics = dest->getAccessSemantics();
-
-    // If we're not accessing the getter or setter, then return
-    if (accessSemantics == AccessSemantics::DirectToImplementation ||
-        accessSemantics == AccessSemantics::DirectToStorage) {
-      return false;
-    }
-
-    // If the member does not point to a variable, then return
-    if (!dest->hasDecl() || !isa<VarDecl>(dest->getDecl().getDecl())) {
-      return false;
-    }
-
-    auto *variable = cast<VarDecl>(dest->getDecl().getDecl());
-
-    if (variable->getAccessor(AccessorKind::Set)->hasThrows()) {
-      flags->set(ContextFlags::HasTryThrowSite);
-      flags->set(ContextFlags::HasAnyThrowSite);
-
-      auto walker = ThrowingAccessorCoverageChecker(flags, typeChecker, tryLoc);
-      E->walk(walker);
-      return true;
-    }
-
-    return false;
-  }
-
   class ThrowingAccessorWalker : public ASTWalker {
   private:
     ContextFlags *contextFlags;
@@ -1753,12 +1677,87 @@ private:
       return {true, E};
     }
 
+    bool checkPotentiallyThrowingSetter(AssignExpr *E, ContextFlags *flags,
+                                        TypeChecker &typeChecker,
+                                        SourceLoc tryLoc) {
+      if (!E) {
+        return false;
+      }
+
+      // If we're not assigning to a nominal member, then return
+      if (!isa<MemberRefExpr>(E->getDest())) {
+        return false;
+      }
+
+      auto *dest = cast<MemberRefExpr>(E->getDest());
+      auto accessSemantics = dest->getAccessSemantics();
+
+      // If we're not accessing the getter or setter, then return
+      if (accessSemantics == AccessSemantics::DirectToImplementation ||
+          accessSemantics == AccessSemantics::DirectToStorage) {
+        return false;
+      }
+
+      // If the member does not point to a variable, then return
+      if (!dest->hasDecl() || !isa<VarDecl>(dest->getDecl().getDecl())) {
+        return false;
+      }
+
+      auto *variable = cast<VarDecl>(dest->getDecl().getDecl());
+
+      if (variable->getAccessor(AccessorKind::Set)->hasThrows()) {
+        flags->set(ContextFlags::HasTryThrowSite);
+        flags->set(ContextFlags::HasAnyThrowSite);
+
+        auto walker = ThrowingAccessorChecker(flags, typeChecker, tryLoc);
+        E->walk(walker);
+        return true;
+      }
+
+      return false;
+    }
+
+    bool checkPotentiallyThrowingGetter(MemberRefExpr *E, ContextFlags *flags,
+                                        TypeChecker &typeChecker,
+                                        SourceLoc tryLoc) {
+      if (!E) {
+        return false;
+      }
+
+      auto accessSemantics = E->getAccessSemantics();
+
+      // If we're not accessing the getter or setter, then return
+      if (accessSemantics == AccessSemantics::DirectToImplementation ||
+          accessSemantics == AccessSemantics::DirectToStorage) {
+        return false;
+      }
+
+      // If the member does not point to a variable, then return
+      if (!E->hasDecl() || !isa<VarDecl>(E->getDecl().getDecl())) {
+        return false;
+      }
+
+      auto *variable = cast<VarDecl>(E->getDecl().getDecl());
+
+      if (variable->getAccessor(AccessorKind::Get)->hasThrows()) {
+        flags->set(ContextFlags::HasTryThrowSite);
+        flags->set(ContextFlags::HasAnyThrowSite);
+
+        auto walker = ThrowingAccessorChecker(flags, typeChecker, tryLoc);
+        E->walk(walker);
+
+        return true;
+      }
+
+      return false;
+    }
+
   public:
     ThrowingAccessorWalker(ContextFlags *flags, TypeChecker &tc, SourceLoc loc)
         : contextFlags(flags), typeChecker(tc), tryLoc(loc) {}
   };
 
-  class ThrowingAccessorCoverageChecker : public ASTWalker {
+  class ThrowingAccessorChecker : public ASTWalker {
     ContextFlags *flags;
     TypeChecker &typeChecker;
     SourceLoc tryLoc;
@@ -1783,8 +1782,8 @@ private:
     }
 
   public:
-    ThrowingAccessorCoverageChecker(ContextFlags *contextFlags, TypeChecker &tc,
-                                    SourceLoc loc)
+    ThrowingAccessorChecker(ContextFlags *contextFlags, TypeChecker &tc,
+                            SourceLoc loc)
         : flags(contextFlags), typeChecker(tc), tryLoc(loc) {}
   };
 };
