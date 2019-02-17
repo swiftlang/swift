@@ -19,6 +19,8 @@
 #define SWIFT_SIL_DYNAMICCASTS_H
 
 #include "swift/Basic/ProfileCounter.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
@@ -95,6 +97,242 @@ CanType getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type);
 
 /// Does the type conform to Error.
 bool isError(ModuleDecl *M, CanType Ty);
+
+struct SILDynamicCastKind {
+  enum innerty : std::underlying_type<SILInstructionKind>::type {
+#define DYNAMICCAST_INST(ID, PARENT) ID = unsigned(SILInstructionKind::ID),
+#include "swift/SIL/SILNodes.def"
+  } value;
+
+  explicit SILDynamicCastKind(SILInstructionKind kind) {
+    auto newValue = SILDynamicCastKind::fromNodeKindHelper(kind);
+    assert(newValue && "Non cast passed into SILDynamicCastKind");
+    value = newValue.getValue();
+  }
+
+  SILDynamicCastKind(innerty value) : value(value) {}
+  operator innerty() const { return value; }
+
+  static Optional<SILDynamicCastKind> fromNodeKind(SILInstructionKind kind) {
+    if (auto innerTyOpt = SILDynamicCastKind::fromNodeKindHelper(kind))
+      return SILDynamicCastKind(*innerTyOpt);
+    return None;
+  }
+
+private:
+  static Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
+    switch (kind) {
+#define DYNAMICCAST_INST(ID, PARENT)                                           \
+  case SILInstructionKind::ID:                                                 \
+    return SILDynamicCastKind::ID;
+#include "swift/SIL/SILNodes.def"
+    default:
+      return None;
+    }
+  }
+};
+
+struct SILDynamicCastInst {
+  SILInstruction *inst;
+
+public:
+  SILDynamicCastInst() : inst(nullptr) {}
+
+  explicit SILDynamicCastInst(SILInstruction *inst) : inst(inst) {
+    assert(classof(inst) && "not a dynamic cast?!");
+  }
+
+  static bool classof(const SILInstruction *inst) {
+    return bool(SILDynamicCastKind::fromNodeKind(inst->getKind()));
+  }
+
+#define DYNAMICCAST_INST(ID, PARENT)                                           \
+  SILDynamicCastInst(ID *i) : inst(i) {}
+#include "swift/SIL/SILNodes.def"
+
+  static SILDynamicCastInst getAs(SILNode *node) {
+    auto *i = dyn_cast<SILInstruction>(node);
+    if (!i)
+      return SILDynamicCastInst();
+    auto kind = SILDynamicCastKind::fromNodeKind(i->getKind());
+    if (!kind)
+      return SILDynamicCastInst();
+    switch (kind.getValue()) {
+#define DYNAMICCAST_INST(ID, PARENT)                                           \
+  case SILDynamicCastKind::ID:                                                 \
+    return SILDynamicCastInst(cast<ID>(node));
+#include "swift/SIL/SILNodes.def"
+    }
+  }
+
+  SILDynamicCastKind getKind() const {
+    return SILDynamicCastKind(inst->getKind());
+  }
+
+  explicit operator bool() const { return inst != nullptr; }
+
+  SILInstruction *getInstruction() const { return inst; }
+
+  CastConsumptionKind getConsumptionKind() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unsupported query");
+    }
+  }
+
+  SILBasicBlock *getSuccessBlock() {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("Unsupported query");
+    }
+  }
+
+  const SILBasicBlock *getSuccessBlock() const {
+    return const_cast<SILDynamicCastInst &>(*this).getSuccessBlock();
+  }
+
+  SILBasicBlock *getFailureBlock() {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("Unsupported query");
+    }
+  }
+
+  const SILBasicBlock *getFailureBlock() const {
+    return const_cast<SILDynamicCastInst &>(*this).getFailureBlock();
+  }
+
+  SILValue getSource() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unsupported");
+    }
+  }
+
+  // Returns the success value.
+  SILValue getDest() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unimplemented");
+    }
+  }
+
+  CanType getSourceType() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unsupported");
+    }
+  }
+
+  SILType getLoweredSourceType() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unsupported");
+    }
+  }
+
+  CanType getTargetType() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unimplemented");
+    }
+  }
+
+  SILType getLoweredTargetType() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unsupported");
+    }
+  }
+
+  bool isSourceTypeExact() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unsupported");
+    }
+  }
+
+  SILLocation getLocation() const { return inst->getLoc(); }
+
+  SILModule &getModule() const { return inst->getModule(); }
+
+  DynamicCastFeasibility classifyDynamicCast() const {
+    return swift::classifyDynamicCast(
+        getModule().getSwiftModule(), getSourceType(), getTargetType(),
+        isSourceTypeExact(), getModule().isWholeModule());
+  }
+
+  bool isBridgingCast() const {
+    // Bridging casts cannot be further simplified.
+    auto TargetIsBridgeable = getTargetType()->isBridgeableObjectType();
+    auto SourceIsBridgeable = getSourceType()->isBridgeableObjectType();
+
+    return TargetIsBridgeable != SourceIsBridgeable;
+  }
+
+  bool isConditionalCast() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+    case SILDynamicCastKind::CheckedCastBranchInst:
+    case SILDynamicCastKind::CheckedCastValueBranchInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+    case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
+      llvm_unreachable("unsupported");
+    }
+  }
+};
+
 } // end namespace swift
 
 #endif
