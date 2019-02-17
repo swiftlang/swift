@@ -3216,8 +3216,10 @@ private:
   Cleanup *cleanup;
 
 public:
-  explicit ValueWithCleanup(SILValue value, Cleanup *cleanup = nullptr)
+  explicit ValueWithCleanup(SILValue value = SILValue(),
+                            Cleanup *cleanup = nullptr)
       : value(value), cleanup(cleanup) {}
+  ValueWithCleanup(const ValueWithCleanup &) = default;
 
 public:
   SILValue getValue() const { return value; }
@@ -3910,21 +3912,22 @@ public:
         remapType(pullback->getType()).castTo<SILFunctionType>();
 
     // Get the seed (i.e. adjoint value of the original result).
-    SILValue seed;
+    ValueWithCleanup seed;
     if (origResult->getType().isObject()) {
       // If original result is a `tuple_extract`, materialize adjoint value of
       // `ai` and extract the corresponding element adjoint value.
       if (auto *tupleExtract = dyn_cast<TupleExtractInst>(origResult)) {
         auto adjointTuple = materializeAdjoint(takeAdjointValue(ai), loc);
-        seed = builder.emitTupleExtract(loc, adjointTuple,
-                                        tupleExtract->getFieldNo());
+        auto seedVal = builder.emitTupleExtract(loc, adjointTuple,
+                                                tupleExtract->getFieldNo());
+        seed = ValueWithCleanup(seedVal, makeCleanup(seedVal, emitCleanup));
       }
       // Otherwise, materialize adjoint value of `ai`.
       else {
         seed = materializeAdjoint(takeAdjointValue(origResult), loc);
       }
     } else {
-      seed = getAdjointBuffer(origResult).getValue();
+      seed = getAdjointBuffer(origResult);
     }
 
     // Create allocations for pullback indirect results.
@@ -3994,7 +3997,8 @@ public:
         auto origArg = ai->getArgument(origNumIndRes + selfParamIndex);
         if (cotanWrtSelf->getType().isAddress()) {
           addToAdjointBuffer(origArg, ValueWithCleanup(
-            cotanWrtSelf, makeCleanup(cotanWrtSelf, emitCleanup)));
+              cotanWrtSelf,
+              makeCleanup(cotanWrtSelf, emitCleanup, {seed.getCleanup()})));
         } else {
           if (origArg->getType().isAddress()) {
             auto adjBuf = getAdjointBuffer(origArg);
@@ -4012,7 +4016,8 @@ public:
           }
           else {
             addAdjointValue(origArg, makeConcreteAdjointValue(ValueWithCleanup(
-                cotanWrtSelf, makeCleanup(cotanWrtSelf, emitCleanup))));
+                cotanWrtSelf,
+                makeCleanup(cotanWrtSelf, emitCleanup, {seed.getCleanup()}))));
           }
         }
       }
@@ -4034,7 +4039,7 @@ public:
       }
       if (cotan->getType().isAddress()) {
         addToAdjointBuffer(origArg, ValueWithCleanup(
-            cotan, makeCleanup(cotan, emitCleanup)));
+            cotan, makeCleanup(cotan, emitCleanup, {seed.getCleanup()})));
       } else {
         if (origArg->getType().isAddress()) {
           auto adjBuf = getAdjointBuffer(origArg);
@@ -4051,7 +4056,7 @@ public:
         }
         else
           addAdjointValue(origArg, makeConcreteAdjointValue(ValueWithCleanup(
-              cotan, makeCleanup(cotan, emitCleanup))));
+              cotan, makeCleanup(cotan, emitCleanup, {seed.getCleanup()}))));
       }
     }
     // Deallocate pullback indirect results.
