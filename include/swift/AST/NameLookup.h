@@ -198,14 +198,38 @@ public: // for exp debugging
   DeclName recordedName;
   bool recordedIsCascadingUse = false;
 
-  using LookupDecls = SmallVector<NominalTypeDecl *, 2>;
+  struct PlacesToSearch {
+    // TODO: constify members?
+    /// The context in which the places where found.
+    DeclContext *fromWhence;
+    /// Nontypes are formally members of the base type
+    DeclContext *whereNonTypesAreMembers;
+    /// Types are formally members of the metatype
+    DeclContext *whereTypesAreMembers;
+    /// Places to search for the lookup.
+    SmallVector<NominalTypeDecl *, 2> places;
+
+    PlacesToSearch(DeclContext *fromWhence,
+                   DeclContext *whereNonTypesAreMembers,
+                   DeclContext *whereTypesAreMembers,
+                   DeclContext *placesHolder);
+    bool empty() const {
+      return whereNonTypesAreMembers == nullptr || places.empty();
+    }
+    // Classify this declaration.
+    // Types are formally members of the metatype.
+    DeclContext *whereValueIsMember(const ValueDecl *const member) {
+      return dyn_cast<TypeDecl>(member) ? whereTypesAreMembers
+                                        : whereNonTypesAreMembers;
+    }
+    void dump() const;
+  };
+
   enum class ScopeLookupResult { next, stop, finished };
   struct PerScopeLookupState {
     ScopeLookupResult result;
-    DeclContext *nextDC;
-    LookupDecls foundDecls;
-    DeclContext *BaseDC;
-    DeclContext *MetaBaseDC;
+    DeclContext *nextDC; // TODO: rename to child of nextDC
+    Optional<PlacesToSearch> placesToSearch;
     Optional<bool> isCascadingUse;
 
     void dump() const;
