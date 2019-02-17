@@ -1401,8 +1401,23 @@ namespace {
           DebugClient->lookupOverrides(Name.getBaseName(), dcAndIsCascadingUse.first, Loc,
                                        isOriginallyTypeLookup, Results))
         return;
-
-      finishLookupRENAME(dcAndIsCascadingUse.first, dcAndIsCascadingUse.second);
+      
+      recordDependencyOnTopLevelName(dcAndIsCascadingUse.first,
+                                     Name,
+                                     dcAndIsCascadingUse.second);
+      addPrivateImports(dcAndIsCascadingUse.first);
+      if (addNamesKnownToDebugClient(dcAndIsCascadingUse.first))
+        return;
+      // If we still haven't found anything, but we do have some
+      // declarations that are "unavailable in the current Swift", drop
+      // those in.
+      if (addUnavailableInnerResults())
+        return;
+      if (lookForAModuleWithTheGivenName(dcAndIsCascadingUse.first))
+        return;
+      // Make sure we've recorded the inner-result-boundary.
+      (void)isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
+                                                                    /*noMoreOuterResults=*/true);
     }
     
   private:
@@ -2017,13 +2032,17 @@ namespace {
 
       return isFinishedWithLookupNowThatIsAboutToLookForOuterResults();
     }
-
-    void finishLookupRENAME(DeclContext *const dc, const bool isCascadingUse) {
-      recordLookupOfTopLevelName(dc, Name, isCascadingUse);
-      recordedSF = dyn_cast<SourceFile>(dc);
+    
+    void recordDependencyOnTopLevelName(DeclContext *topLevelContext,
+                                        DeclName name,
+                                        bool isCascadingUse) {
+      recordLookupOfTopLevelName(topLevelContext, Name, isCascadingUse);
+      recordedSF = dyn_cast<SourceFile>(topLevelContext);
       recordedName = Name;
       recordedIsCascadingUse = isCascadingUse;
-
+    }
+    
+    void addPrivateImports(DeclContext *const dc) {
       // Add private imports to the extra search list.
       SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
       if (auto FU = dyn_cast<FileUnit>(dc))
@@ -2031,11 +2050,12 @@ namespace {
       
       using namespace namelookup;
       SmallVector<ValueDecl *, 8> CurModuleResults;
-      auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
+      auto resolutionKind = isOriginallyTypeLookup
+      ? ResolutionKind::TypesOnly
       : ResolutionKind::Overloadable;
       lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
                      resolutionKind, TypeResolver, dc, extraImports);
-
+      
       // Always perform name shadowing for type lookup.
       if (options.contains(Flags::TypeLookup)) {
         removeShadowedDecls(CurModuleResults, &M);
@@ -2046,36 +2066,37 @@ namespace {
       
       if (DebugClient)
         filterForDiscriminator(Results, DebugClient);
-      
-      // Now add any names the DebugClient knows about to the lookup.
+    }
+    
+    // Return true if done
+    bool addNamesKnownToDebugClient(DeclContext *dc) {
       if (Name.isSimpleName() && DebugClient)
         DebugClient->lookupAdditions(Name.getBaseName(), dc, Loc,
                                      isOriginallyTypeLookup, Results);
-
+      
       // If we've found something, we're done.
-      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-              /*noMoreOuterResults=*/true))
-        return;
-      
-      // If we still haven't found anything, but we do have some
-      // declarations that are "unavailable in the current Swift", drop
-      // those in.
+       return isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
+                                                                      /*noMoreOuterResults=*/true);
+    }
+    
+    /// Return true if done
+    bool addUnavailableInnerResults() {
       Results = std::move(UnavailableInnerResults);
-      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-              /*noMoreOuterResults=*/true))
-        return;
-      
+      return isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
+                                                                     /*noMoreOuterResults=*/true);
+    }
+    
+    bool lookForAModuleWithTheGivenName(DeclContext *const dc) {
+      using namespace namelookup;
       if (!Name.isSimpleName())
-        return;
+        return true;
       
       // Look for a module with the given name.
       if (Name.isSimpleName(M.getName())) {
         Results.push_back(LookupResultEntry(&M));
-        if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-                /*noMoreOuterResults=*/true))
-          return;
+        return isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
+                                                                       /*noMoreOuterResults=*/true);
       }
-      
       ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
       if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
         desiredModule = Ctx.TheBuiltinModule;
@@ -2089,9 +2110,7 @@ namespace {
               return true;
             });
       }
-      // Make sure we've recorded the inner-result-boundary.
-      (void)isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-          /*noMoreOuterResults=*/true);
+      return false;
     }
   };
 } // namespace
