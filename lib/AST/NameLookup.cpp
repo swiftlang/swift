@@ -1341,11 +1341,11 @@ namespace {
     using PerScopeLookupState = ExpUnqualifiedLookup::PerScopeLookupState;
     
     const DeclName Name;
-    DeclContext *const DC; // NOT CONST
+    DeclContext *const DC;
     ModuleDecl &M;
-    ASTContext &Ctx;
+    const ASTContext &Ctx;
     LazyResolver *const TypeResolver;
-    SourceLoc Loc;
+    const SourceLoc Loc;
     const SourceManager &SM;
     /// Used to find the file-local names.
     DebuggerClient *const DebugClient;
@@ -1356,6 +1356,8 @@ namespace {
     Optional<bool> isCascadingUse; // CLEAN ME UP
     SmallVectorImpl<LookupResultEntry> &Results;
     size_t &IndexOfFirstOuterResult;
+    
+    // For debugging:
     SourceFile const *&recordedSF;
     DeclName &recordedName;
     bool &recordedIsCascadingUse;
