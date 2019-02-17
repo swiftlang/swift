@@ -339,6 +339,13 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   assert(kind == AccessorKind::Read || kind == AccessorKind::Modify);
 
   SourceLoc loc = storage->getLoc();
+  AccessorDecl *storageAccessor = nullptr;
+
+  if (kind == AccessorKind::Read) {
+    storageAccessor = storage->getAccessor(AccessorKind::Get);
+  } else if (kind == AccessorKind::Modify) {
+    storageAccessor = storage->getAccessor(AccessorKind::Set);
+  }
 
   bool isStatic = storage->isStatic();
   bool isMutating = storage->isGetterMutating();
@@ -356,13 +363,14 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   GenericParamList *genericParams = createAccessorGenericParams(storage);
 
   auto *accessor = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
-      kind, storage,
+      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(), kind, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*Throws=*/storageAccessor ? storageAccessor->hasThrows() : false,
+      /*ThrowsLoc=*/
+      storageAccessor ? storageAccessor->getThrowsLoc() : SourceLoc(),
       genericParams, params, TypeLoc::withoutLoc(retTy), dc);
   accessor->setImplicit();
-  
+
   if (isMutating)
     accessor->setSelfAccessKind(SelfAccessKind::Mutating);
 
