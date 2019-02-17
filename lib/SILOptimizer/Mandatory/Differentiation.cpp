@@ -3624,6 +3624,7 @@ private:
 
   ValueWithCleanup &getAdjointBuffer(SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
+    assert(originalBuffer->getFunction() == &getOriginal());
     auto insertion = bufferMap.try_emplace(originalBuffer,
                                            ValueWithCleanup(SILValue()));
     if (!insertion.second) // not inserted
@@ -3653,17 +3654,19 @@ private:
     return (insertion.first->getSecond() = bufWithCleanup);
   }
 
-  void addToAdjointBuffer(SILValue originalBuffer,
+  void addToAdjointBuffer(SILValue destBuffer,
                           SILValue newValueBufferAccess) {
-    assert(originalBuffer->getType().isAddress() &&
+    assert(destBuffer->getType().isAddress() &&
            newValueBufferAccess->getType().isAddress());
-    auto buf = getAdjointBuffer(originalBuffer);
-    auto *access = builder.createBeginAccess(
-        newValueBufferAccess.getLoc(), buf, SILAccessKind::Modify,
+    assert(destBuffer->getFunction() == &getAdjoint());
+    assert(newValueBufferAccess->getFunction() == &getAdjoint());
+    auto *destAccess = builder.createBeginAccess(
+        newValueBufferAccess.getLoc(), destBuffer, SILAccessKind::Modify,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
         /*fromBuiltin*/ false);
-    accumulateIndirect(access, newValueBufferAccess);
-    builder.createEndAccess(access->getLoc(), access, /*aborted*/ false);
+    accumulateIndirect(destAccess, newValueBufferAccess);
+    builder.createEndAccess(
+        destAccess->getLoc(), destAccess, /*aborted*/ false);
   }
 
   //--------------------------------------------------------------------------//
@@ -3987,7 +3990,7 @@ public:
       else {
         auto origArg = ai->getArgument(origNumIndRes + selfParamIndex);
         if (cotanWrtSelf->getType().isAddress()) {
-          addToAdjointBuffer(origArg, ValueWithCleanup(
+          addToAdjointBuffer(getAdjointBuffer(origArg), ValueWithCleanup(
             cotanWrtSelf, makeCleanup(cotanWrtSelf, emitCleanup)));
         } else {
           if (origArg->getType().isAddress()) {
@@ -4027,7 +4030,7 @@ public:
         continue;
       }
       if (cotan->getType().isAddress()) {
-        addToAdjointBuffer(origArg, ValueWithCleanup(
+        addToAdjointBuffer(getAdjointBuffer(origArg), ValueWithCleanup(
             cotan, makeCleanup(cotan, emitCleanup)));
       } else {
         if (origArg->getType().isAddress()) {
@@ -4193,7 +4196,7 @@ public:
     case StructExtractDifferentiationStrategy::Fieldwise: {
       // Compute adjoint as follows:
       //   y = struct_element_addr x, #key
-      //   adj[x]#key' = struct_element_addr adj[y], #key'
+      //   adj[x]#key' = struct_element_addr adj[x], #key'
       //   adj[x]#key' += adj[y]
       // where `#key'` is the field in the cotangent space corresponding to
       // `#key`.
@@ -4437,7 +4440,7 @@ public:
         cai->getLoc(), adjDest, SILAccessKind::Read,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
         /*fromBuiltin*/ false);
-    addToAdjointBuffer(cai->getSrc(), readAccess);
+    addToAdjointBuffer(getAdjointBuffer(cai->getSrc()), readAccess);
     builder.createEndAccess(cai->getLoc(), readAccess, /*aborted*/ false);
     // Set the buffer to zero, with a cleanup.
     auto *bai = dyn_cast<BeginAccessInst>(adjDest.getValue());
@@ -4973,6 +4976,8 @@ void AdjointEmitter::accumulateIndirect(SILValue lhsDestAccess,
                                         SILValue rhsAccess) {
   assert(lhsDestAccess->getType().isAddress() &&
          rhsAccess->getType().isAddress());
+  assert(lhsDestAccess->getFunction() == &getAdjoint());
+  assert(rhsAccess->getFunction() == &getAdjoint());
   auto loc = lhsDestAccess.getLoc();
   auto type = lhsDestAccess->getType();
   auto astType = type.getASTType();
