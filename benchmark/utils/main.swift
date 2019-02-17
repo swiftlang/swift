@@ -77,7 +77,6 @@ import FlattenList
 import FloatingPointPrinting
 import Hanoi
 import Hash
-import HashQuadratic
 import Histogram
 import InsertCharacter
 import Integrate
@@ -249,7 +248,6 @@ registerBenchmark(FlattenListFlatMap)
 registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
-registerBenchmark(HashQuadratic)
 registerBenchmark(Histogram)
 registerBenchmark(InsertCharacter)
 registerBenchmark(IntegrateTest)
