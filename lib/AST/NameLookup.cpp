@@ -1341,7 +1341,7 @@ namespace {
     using PerScopeLookupState = ExpUnqualifiedLookup::PerScopeLookupState;
     
     const DeclName Name;
-    DeclContext * DC; // NOT CONST
+    DeclContext *const DC; // NOT CONST
     ModuleDecl &M;
     ASTContext &Ctx;
     LazyResolver *const TypeResolver;
@@ -1356,85 +1356,88 @@ namespace {
     Optional<bool> isCascadingUse; // CLEAN ME UP
     SmallVectorImpl<LookupResultEntry> &Results;
     size_t &IndexOfFirstOuterResult;
-  SourceFile const *&recordedSF;
-  DeclName &recordedName;
-  bool &recordedIsCascadingUse;
-  std::vector<PerScopeLookupState> &breadcrumbs;
+    SourceFile const *&recordedSF;
+    DeclName &recordedName;
+    bool &recordedIsCascadingUse;
+    std::vector<PerScopeLookupState> &breadcrumbs;
     
     SmallVector<LookupResultEntry, 4> UnavailableInnerResults;
-
+    
   public:
-    UnqualifiedLookupFactory(DeclName Name, DeclContext *DC,
+    UnqualifiedLookupFactory(DeclName Name, DeclContext *const DC,
                              LazyResolver *TypeResolver, SourceLoc Loc,
                              Options options,
                              ExpUnqualifiedLookup &lookupToBeCreated)
-      : Name(Name), DC(DC), M(*DC->getParentModule()), Ctx(M.getASTContext()),
+    : Name(Name), DC(DC), M(*DC->getParentModule()), Ctx(M.getASTContext()),
     TypeResolver(TypeResolver ? TypeResolver : Ctx.getLazyResolver()),
-        Loc(Loc), SM(Ctx.SourceMgr), DebugClient(M.getDebugClient()),
+    Loc(Loc), SM(Ctx.SourceMgr), DebugClient(M.getDebugClient()),
     options(options),
     isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
     Consumer(Name, lookupToBeCreated.Results, isOriginallyTypeLookup),
     baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
-        isCascadingUse(options.contains(Flags::KnownPrivate)
-                           ? Optional<bool>(false)
-                           : None),
+    isCascadingUse(options.contains(Flags::KnownPrivate)
+                   ? Optional<bool>(false)
+                   : None),
     Results(lookupToBeCreated.Results),
-        IndexOfFirstOuterResult(lookupToBeCreated.IndexOfFirstOuterResult),
-        recordedSF(lookupToBeCreated.recordedSF),
-        recordedName(lookupToBeCreated.recordedName),
-        recordedIsCascadingUse(lookupToBeCreated.recordedIsCascadingUse),
-        breadcrumbs(lookupToBeCreated.breadcrumbs) {}
+    IndexOfFirstOuterResult(lookupToBeCreated.IndexOfFirstOuterResult),
+    recordedSF(lookupToBeCreated.recordedSF),
+    recordedName(lookupToBeCreated.recordedName),
+    recordedIsCascadingUse(lookupToBeCreated.recordedIsCascadingUse),
+    breadcrumbs(lookupToBeCreated.breadcrumbs) {}
     
     void fillInLookup() {
+      DeclContext *dc;
       if (shouldUseASTScopeLookup()) {
-        if (astScopeBasedLookup())
+        if (!(dc = astScopeBasedLookup(DC)))
           return;
       }
       // Never perform local lookup for operators.
+      
       else if (Name.isOperator()) {
-        if (!(DC = operatorLookup(DC)))
+        if (!(dc = operatorLookup(DC)))
           return;
-      } else if (!(DC = nonASTScopeBasedLookup(DC)))
+      } else if (!(dc = nonASTScopeBasedLookup(DC)))
         return;
       
       // TODO: Does the debugger client care about compound names?
       if (Name.isSimpleName() && DebugClient &&
-          DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
+          DebugClient->lookupOverrides(Name.getBaseName(), dc, Loc,
                                        isOriginallyTypeLookup, Results))
         return;
       
-      finishLookupRENAME();
+      finishLookupRENAME(dc);
     }
     
   private:
-    /// Return true if done with whole enchilada.
-    bool astScopeBasedLookup() {
-    const ASTScope *lookupScope = Name.isOperator()
-                                      ? operatorScopeForASTScopeLookup()
-      : nonoperatorScopeForASTScopeLookup();
+    /// Return nullptr if done with whole enchilada.
+    DeclContext * astScopeBasedLookup(DeclContext *dc) {
+      const ASTScope *lookupScope = Name.isOperator()
+      ? operatorScopeForASTScopeLookup(dc)
+      : nonoperatorScopeForASTScopeLookup(dc);
       // Walk scopes outward from the innermost scope until we find something.
       DeclContext *selfDC = nullptr;
-    for (auto currentScope = lookupScope; currentScope;
+      for (auto currentScope = lookupScope; currentScope;
            currentScope = currentScope->getParent()) {
-        auto statusAndSelfDC = lookInScope(currentScope, selfDC);
-        switch (statusAndSelfDC.first) {
-      case ScopeLookupResult::next:
-        break;
-      case ScopeLookupResult::stop:
-        return false;
-      case ScopeLookupResult::finished:
-        return true;
+        auto stausSelfDCFinalDC = lookInScope(currentScope, selfDC, dc);
+        switch (std::get<0>(stausSelfDCFinalDC)) {
+          case ScopeLookupResult::next:
+            break;
+          case ScopeLookupResult::stop:
+            return std::get<2>(stausSelfDCFinalDC);
+          case ScopeLookupResult::finished:
+            return nullptr;
         }
-        selfDC = statusAndSelfDC.second;
+        selfDC = std::get<1>(stausSelfDCFinalDC);
+        dc = std::get<2>(stausSelfDCFinalDC);
       }
       llvm_unreachable("impossible");
     }
     
-  using ScopeLookupResult = ExpUnqualifiedLookup::ScopeLookupResult;
+    using ScopeLookupResult = ExpUnqualifiedLookup::ScopeLookupResult;
     
-  static NLOptions
-  computeBaseNLOptions(const UnqualifiedLookup::Options options,
-                                          const bool isOriginallyTypeLookup) {
+    static NLOptions
+    computeBaseNLOptions(const UnqualifiedLookup::Options options,
+                         const bool isOriginallyTypeLookup) {
       NLOptions baseNLOptions = NL_UnqualifiedDefault;
       if (options.contains(Flags::AllowProtocolMembers))
         baseNLOptions |= NL_ProtocolMembers;
@@ -1444,83 +1447,83 @@ namespace {
         baseNLOptions |= NL_IgnoreAccessControl;
       return baseNLOptions;
     }
-
+    
     /// Return true if done with lookup.
     bool isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-        bool noMoreOuterResults = false) {
+                                                                 bool noMoreOuterResults = false) {
       if (Results.empty())
         return false;
       
       if (IndexOfFirstOuterResult == 0)
         IndexOfFirstOuterResult = Results.size();
       
-        return !options.contains(Flags::IncludeOuterResults) || noMoreOuterResults;
+      return !options.contains(Flags::IncludeOuterResults) || noMoreOuterResults;
     }
     
     bool shouldUseASTScopeLookup() const {
-    return Loc.isValid() && DC->getParentSourceFile() &&
+      return Loc.isValid() && DC->getParentSourceFile() &&
       DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
       Ctx.LangOpts.EnableASTScopeLookup;
     }
     
-    const ASTScope *operatorScopeForASTScopeLookup() {
+    const ASTScope *operatorScopeForASTScopeLookup(DeclContext *dc) {
       // Find the source file in which we are performing the lookup.
-      SourceFile &sourceFile = *DC->getParentSourceFile();
+      SourceFile &sourceFile = *dc->getParentSourceFile();
       
       // Find the scope from which we will initiate unqualified name lookup.
-    const ASTScope *lookupScope =
-        sourceFile.getScope().findInnermostEnclosingScope(Loc);
+      const ASTScope *lookupScope =
+      sourceFile.getScope().findInnermostEnclosingScope(Loc);
       
-    updateIsCascadingForOperator(
-        lookupScope->getInnermostEnclosingDeclContext());
-
+      updateIsCascadingForOperator(
+                                   lookupScope->getInnermostEnclosingDeclContext());
+      
       // Operator lookup is always at module scope.
       return      &sourceFile.getScope();
     }
     
-    const ASTScope *nonoperatorScopeForASTScopeLookup() const {
+    const ASTScope *nonoperatorScopeForASTScopeLookup(DeclContext *dc) const {
       // Find the source file in which we are performing the lookup.
-      SourceFile &sourceFile = *DC->getParentSourceFile();
+      SourceFile &sourceFile = *dc->getParentSourceFile();
       
       // Find the scope from which we will initiate unqualified name lookup.
-    const ASTScope *lookupScope =
-        sourceFile.getScope().findInnermostEnclosingScope(Loc);
+      const ASTScope *lookupScope =
+      sourceFile.getScope().findInnermostEnclosingScope(Loc);
       
       return lookupScope;
     }
- 
-    /// Return status and new selfDC
-  std::pair<ScopeLookupResult, DeclContext *>
-  lookInScope(const ASTScope *const currentScope, DeclContext *selfDC) {
-        // Perform local lookup within this scope.
-        auto localBindings = currentScope->getLocalBindings();
-        for (auto local : localBindings) {
-      Consumer.foundDecl(local, getLocalDeclVisibilityKind(currentScope));
-        }
+    
+    /// Return status and new selfDC and new DC
+    std::tuple<ScopeLookupResult, DeclContext *, DeclContext *>
+    lookInScope(const ASTScope *const currentScope, DeclContext *selfDC, DeclContext *dc) {
+      // Perform local lookup within this scope.
+      auto localBindings = currentScope->getLocalBindings();
+      for (auto local : localBindings) {
+        Consumer.foundDecl(local, getLocalDeclVisibilityKind(currentScope));
+      }
       
-        // If we found anything, we're done.
-        if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-          return std::make_pair(ScopeLookupResult::finished, selfDC);
+      // If we found anything, we're done.
+      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+        return std::make_tuple(ScopeLookupResult::finished, selfDC, dc);
       
-        // When we are in the body of a method, get the 'self' declaration.
-        if (currentScope->getKind() == ASTScopeKind::AbstractFunctionBody &&
-        currentScope->getAbstractFunctionDecl()
-            ->getDeclContext()
-            ->isTypeContext()) {
-          selfDC = currentScope->getAbstractFunctionDecl();
-          return std::make_pair(ScopeLookupResult::next, selfDC);
-        }
+      // When we are in the body of a method, get the 'self' declaration.
+      if (currentScope->getKind() == ASTScopeKind::AbstractFunctionBody &&
+          currentScope->getAbstractFunctionDecl()
+          ->getDeclContext()
+          ->isTypeContext()) {
+        selfDC = currentScope->getAbstractFunctionDecl();
+        return std::make_tuple(ScopeLookupResult::next, selfDC, dc);
+      }
       
-        // If there is a declaration context associated with this scope, we might
-        // want to look in it.
-        if (auto dc = currentScope->getDeclContext())
-          return lookIntoDeclarationContext(dc, selfDC);
-      return std::make_pair(ScopeLookupResult::next, selfDC);
+      // If there is a declaration context associated with this scope, we might
+      // want to look in it.
+      if (auto scopeDC = currentScope->getDeclContext())
+        return lookIntoDeclarationContext(scopeDC, selfDC, dc);
+      return std::make_tuple(ScopeLookupResult::next, selfDC, dc);
     }
     
-    /// Returns status and selfDC
-  std::pair<ScopeLookupResult, DeclContext *>
-  lookIntoDeclarationContext(DeclContext *dc, DeclContext *selfDC) {
+    /// Returns status and selfDC and DC
+    std::tuple<ScopeLookupResult, DeclContext *, DeclContext *>
+    lookIntoDeclarationContext(DeclContext *dc, DeclContext *selfDC, DeclContext *wasDC) {
       // If we haven't determined whether we have a cascading use, do so now.
       if (!isCascadingUse.hasValue()) {
         isCascadingUse =
@@ -1535,48 +1538,47 @@ namespace {
         if (bindingInit->getImplicitSelfDecl())
           selfDC = bindingInit;
         
-        return std::make_pair(ScopeLookupResult::next, selfDC);
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
       }
       
       // Default arguments only have 'static' access to the members of the
       // enclosing type, if there is one.
       if (isa<DefaultArgumentInitializer>(dc))
-        return std::make_pair(ScopeLookupResult::next, selfDC);
-
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+      
       // Functions/initializers/deinitializers are only interesting insofar as
       // they affect lookup in an enclosing nominal type or extension thereof.
       if (isa<AbstractFunctionDecl>(dc))
-        return std::make_pair(ScopeLookupResult::next, selfDC);
-
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+      
       // Subscripts have no lookup of their own.
       if (isa<SubscriptDecl>(dc))
-        return std::make_pair(ScopeLookupResult::next, selfDC);
-
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+      
       // Closures have no lookup of their own.
       if (isa<AbstractClosureExpr>(dc))
-        return std::make_pair(ScopeLookupResult::next, selfDC);
-
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+      
       // Top-level declarations have no lookup of their own.
       if (isa<TopLevelCodeDecl>(dc))
-        return std::make_pair(ScopeLookupResult::next, selfDC);
-
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+      
       // Typealiases have no lookup of their own.
       if (isa<TypeAliasDecl>(dc))
-        return std::make_pair(ScopeLookupResult::next, selfDC);
-
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+      
       // Lookup in the source file's scope marks the end.
       if (isa<SourceFile>(dc)) {
         // FIXME: A bit of a hack.
-        DC = dc;
-        return std::make_pair(ScopeLookupResult::stop, selfDC);
+        return std::make_tuple(ScopeLookupResult::stop, selfDC, dc);
       }
       
       // We have a nominal type or an extension thereof. Perform lookup into
       // the nominal type.
       auto nominal = dc->getSelfNominalTypeDecl();
       if (!nominal)
-        return std::make_pair(ScopeLookupResult::next, selfDC);
-
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+      
       // Dig out the type we're looking into.
       using LookupDecls = SmallVector<NominalTypeDecl *, 2>;
       LookupDecls lookupDecls;
@@ -1595,18 +1597,18 @@ namespace {
       auto startIndex = Results.size();
       for (auto result : lookup) {
         auto *baseDC = dc;
-      if (!isa<TypeDecl>(result) && selfDC)
-        baseDC = selfDC;
+        if (!isa<TypeDecl>(result) && selfDC)
+          baseDC = selfDC;
         Results.push_back(LookupResultEntry(baseDC, result));
       }
       
       if (!Results.empty()) {
         // Predicate that determines whether a lookup result should
         // be unavailable except as a last-ditch effort.
-      auto unavailableLookupResult = [&](const LookupResultEntry &result) {
+        auto unavailableLookupResult = [&](const LookupResultEntry &result) {
           auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-        return result.getValueDecl()->getAttrs().isUnavailableInSwiftVersion(
-            effectiveVersion);
+          return result.getValueDecl()->getAttrs().isUnavailableInSwiftVersion(
+                                                                               effectiveVersion);
         };
         
         // If all of the results we just found are unavailable, keep looking.
@@ -1617,22 +1619,22 @@ namespace {
         } else {
           if (DebugClient)
             filterForDiscriminator(Results, DebugClient);
-
+          
           if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-            return std::make_pair(ScopeLookupResult::finished, selfDC);
+            return std::make_tuple(ScopeLookupResult::finished, selfDC, wasDC);
         }
       }
       
       // Forget the 'self' declaration.
       selfDC = nullptr;
       
-      return std::make_pair(ScopeLookupResult::next, selfDC);
+      return std::make_tuple(ScopeLookupResult::next, selfDC, dc);
     }
     
-    void updateIsCascadingForOperator(const DeclContext *const DC) {
+    void updateIsCascadingForOperator(const DeclContext *const dc) {
       if (!isCascadingUse.hasValue()) {
         isCascadingUse =
-        DC->isCascadingContextForLookup(/*functionsAreNonCascading=*/true);
+        dc->isCascadingContextForLookup(/*functionsAreNonCascading=*/true);
       }
     }
     
@@ -1643,7 +1645,7 @@ namespace {
       return addLocalVariableResults(msc) ? nullptr : msc;
     }
     
-  /// Return nullptr if done looking up.
+    /// Return nullptr if done looking up.
     DeclContext *nonASTScopeBasedLookup(DeclContext *const dc) {
       // If we are inside of a method, check to see if there are any ivars in
       // scope, and if so, whether this is a reference to one of them.
@@ -1670,279 +1672,279 @@ namespace {
       
       return addLocalVariableResults(nextDC) ? nullptr : nextDC;
     }
-
-  /// Return the next context to search.
-  std::pair<ScopeLookupResult, DeclContext *>
-  lookupInOneDeclContext(DeclContext *dc) {
-    PerScopeLookupState results =
-        lookupInAppropriateContext(dc, isCascadingUse);
-    breadcrumbs.push_back(results);
-
-    isCascadingUse = results.isCascadingUse;
-    switch (results.result) {
-    case ScopeLookupResult::next:
-      break;
-    case ScopeLookupResult::stop:
-      return std::make_pair(ScopeLookupResult::next, results.childOfNextDC);
-    case ScopeLookupResult::finished:
-      return std::make_pair(ScopeLookupResult::finished, results.childOfNextDC);
-    }
-    if (addGenericParametersHereAndInEnclosingScopes(results.childOfNextDC))
-      return std::make_pair(ScopeLookupResult::finished, results.childOfNextDC);
-
-    if (results.placesToSearch.hasValue() &&
-        !results.placesToSearch.getValue().empty()) {
-      auto startIndexOfInnerResults = Results.size();
-      searchPlacesToSearch(std::move(results.placesToSearch.getValue()), Name,
-                           isCascadingUse.getValue(), baseNLOptions, results.childOfNextDC);
-      if (handleUnavailableInnerResults(startIndexOfInnerResults))
+    
+    /// Return the next context to search.
+    std::pair<ScopeLookupResult, DeclContext *>
+    lookupInOneDeclContext(DeclContext *dc) {
+      PerScopeLookupState results =
+      lookupInAppropriateContext(dc, isCascadingUse);
+      breadcrumbs.push_back(results);
+      
+      isCascadingUse = results.isCascadingUse;
+      switch (results.result) {
+        case ScopeLookupResult::next:
+          break;
+        case ScopeLookupResult::stop:
+          return std::make_pair(ScopeLookupResult::next, results.childOfNextDC);
+        case ScopeLookupResult::finished:
+          return std::make_pair(ScopeLookupResult::finished, results.childOfNextDC);
+      }
+      if (addGenericParametersHereAndInEnclosingScopes(results.childOfNextDC))
         return std::make_pair(ScopeLookupResult::finished, results.childOfNextDC);
+      
+      if (results.placesToSearch.hasValue() &&
+          !results.placesToSearch.getValue().empty()) {
+        auto startIndexOfInnerResults = Results.size();
+        searchPlacesToSearch(std::move(results.placesToSearch.getValue()), Name,
+                             isCascadingUse.getValue(), baseNLOptions, results.childOfNextDC);
+        if (handleUnavailableInnerResults(startIndexOfInnerResults))
+          return std::make_pair(ScopeLookupResult::finished, results.childOfNextDC);
+      }
+      // TODO: What if !BaseDC && lookupDecls non-empty?
+      DeclContext *nextDC = results.childOfNextDC->getParentForLookup();
+      return std::make_pair(ScopeLookupResult::next, nextDC);
     }
-    // TODO: What if !BaseDC && lookupDecls non-empty?
-    DeclContext *nextDC = results.childOfNextDC->getParentForLookup();
-    return std::make_pair(ScopeLookupResult::next, nextDC);
-  }
-
-  /// Check the generic parameters of our context.
-  /// Return true if done with lookup
-  /// TODO: Factor with addGenericParmeters below
-  bool addGenericParametersHereAndInEnclosingScopes(DeclContext *dc) {
-    for (GenericParamList *dcGenericParams = getGenericParams(dc);
-         dcGenericParams;
-         dcGenericParams = dcGenericParams->getOuterParameters()) {
-      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-      localVal.checkGenericParams(dcGenericParams);
-
-      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-        return true;
+    
+    /// Check the generic parameters of our context.
+    /// Return true if done with lookup
+    /// TODO: Factor with addGenericParmeters below
+    bool addGenericParametersHereAndInEnclosingScopes(DeclContext *dc) {
+      for (GenericParamList *dcGenericParams = getGenericParams(dc);
+           dcGenericParams;
+           dcGenericParams = dcGenericParams->getOuterParameters()) {
+        namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+        localVal.checkGenericParams(dcGenericParams);
+        
+        if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+          return true;
+      }
+      return false;
     }
-    return false;
-  }
-
-  /// Consume generic parameters
-  void addGenericParametersForFunction(AbstractFunctionDecl *AFD) {
-    // If we're inside a function context, we've already moved to
-    // the parent DC, so we have to check the function's generic
-    // parameters first.
-    GenericParamList *GenericParams = AFD->getGenericParams();
-    if (GenericParams) {
-      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-      localVal.checkGenericParams(GenericParams);
+    
+    /// Consume generic parameters
+    void addGenericParametersForFunction(AbstractFunctionDecl *AFD) {
+      // If we're inside a function context, we've already moved to
+      // the parent DC, so we have to check the function's generic
+      // parameters first.
+      GenericParamList *GenericParams = AFD->getGenericParams();
+      if (GenericParams) {
+        namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+        localVal.checkGenericParams(GenericParams);
+      }
     }
-  }
-
-  static GenericParamList *getGenericParams(const DeclContext *const dc) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
-      return nominal->getGenericParams();
-    if (auto ext = dyn_cast<ExtensionDecl>(dc))
-      return ext->getGenericParams();
-    if (auto subscript = dyn_cast<SubscriptDecl>(dc))
-      return subscript->getGenericParams();
-    return nullptr;
-  }
-
-  PerScopeLookupState
-  lookupInAppropriateContext(DeclContext *dc, Optional<bool> isCascadingUse) {
-    if (auto *PBI = dyn_cast<PatternBindingInitializer>(dc))
-      return lookupInPatternBindingInitializer(PBI, isCascadingUse);
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc))
-      return lookupInFunctionDecl(AFD, isCascadingUse);
-    if (auto *ACE = dyn_cast<AbstractClosureExpr>(dc))
-      return lookupInClosure(ACE, isCascadingUse);
-    if (auto *ED = dyn_cast<ExtensionDecl>(dc))
-      return lookupInExtension(ED, isCascadingUse);
-    if (auto *ND = dyn_cast<NominalTypeDecl>(dc))
-      return lookupInNominalType(ND, isCascadingUse);
-    if (auto I = dyn_cast<DefaultArgumentInitializer>(dc))
-      return lookupInDefaultArgumentInitializer(I, isCascadingUse);
-
-    return lookupInMiscContext(dc, isCascadingUse);
-  }
-
-  PerScopeLookupState
-  lookupInPatternBindingInitializer(PatternBindingInitializer *PBI,
-                                    Optional<bool> isCascadingUse) {
-    auto *PBD = PBI->getBinding();
-    assert(PBD);
-    // Lazy variable initializer contexts have a 'self' parameter for
-    // instance member lookup.
-    if (auto *selfParam = PBI->getImplicitSelfDecl()) {
-      Consumer.foundDecl(selfParam, DeclVisibilityKind::FunctionParameter);
-      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-        return PerScopeLookupState{
-          ScopeLookupResult::finished,
-          PBI,
-          None,
-          // FACTOR THIS LINE
+    
+    static GenericParamList *getGenericParams(const DeclContext *const dc) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
+        return nominal->getGenericParams();
+      if (auto ext = dyn_cast<ExtensionDecl>(dc))
+        return ext->getGenericParams();
+      if (auto subscript = dyn_cast<SubscriptDecl>(dc))
+        return subscript->getGenericParams();
+      return nullptr;
+    }
+    
+    PerScopeLookupState
+    lookupInAppropriateContext(DeclContext *dc, Optional<bool> isCascadingUse) {
+      if (auto *PBI = dyn_cast<PatternBindingInitializer>(dc))
+        return lookupInPatternBindingInitializer(PBI, isCascadingUse);
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc))
+        return lookupInFunctionDecl(AFD, isCascadingUse);
+      if (auto *ACE = dyn_cast<AbstractClosureExpr>(dc))
+        return lookupInClosure(ACE, isCascadingUse);
+      if (auto *ED = dyn_cast<ExtensionDecl>(dc))
+        return lookupInExtension(ED, isCascadingUse);
+      if (auto *ND = dyn_cast<NominalTypeDecl>(dc))
+        return lookupInNominalType(ND, isCascadingUse);
+      if (auto I = dyn_cast<DefaultArgumentInitializer>(dc))
+        return lookupInDefaultArgumentInitializer(I, isCascadingUse);
+      
+      return lookupInMiscContext(dc, isCascadingUse);
+    }
+    
+    PerScopeLookupState
+    lookupInPatternBindingInitializer(PatternBindingInitializer *PBI,
+                                      Optional<bool> isCascadingUse) {
+      auto *PBD = PBI->getBinding();
+      assert(PBD);
+      // Lazy variable initializer contexts have a 'self' parameter for
+      // instance member lookup.
+      if (auto *selfParam = PBI->getImplicitSelfDecl()) {
+        Consumer.foundDecl(selfParam, DeclVisibilityKind::FunctionParameter);
+        if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+          return PerScopeLookupState{
+            ScopeLookupResult::finished,
+            PBI,
+            None,
+            // FACTOR THIS LINE
+            isCascadingUse.hasValue()
+            ? isCascadingUse.getValue()
+            : PBI->isCascadingContextForLookup(false)};
+        DeclContext *const parent = PBI->getParent();
+        
+        return PerScopeLookupState{ScopeLookupResult::next, parent,
+          PlacesToSearch(parent, PBI, parent, parent),
           isCascadingUse.hasValue()
           ? isCascadingUse.getValue()
           : PBI->isCascadingContextForLookup(false)};
-      DeclContext *const parent = PBI->getParent();
-
-      return PerScopeLookupState{ScopeLookupResult::next, parent,
-                                 PlacesToSearch(parent, PBI, parent, parent),
-                                 isCascadingUse.hasValue()
-                                     ? isCascadingUse.getValue()
-                                     : PBI->isCascadingContextForLookup(false)};
-    }
-    // Initializers for stored properties of types perform static
-    // lookup into the surrounding context.
-    if (PBD->getDeclContext()->isTypeContext()) {
-      DeclContext *const surroundingContext = PBI->getParent();
-      return PerScopeLookupState{
+      }
+      // Initializers for stored properties of types perform static
+      // lookup into the surrounding context.
+      if (PBD->getDeclContext()->isTypeContext()) {
+        DeclContext *const surroundingContext = PBI->getParent();
+        return PerScopeLookupState{
           ScopeLookupResult::next, surroundingContext,
           PlacesToSearch(surroundingContext, surroundingContext,
                          surroundingContext, surroundingContext),
           surroundingContext->isCascadingContextForLookup(false)};
+      }
+      // Otherwise, we have an initializer for a global or local property.
+      // There's not much to find here, we'll keep going up to a parent
+      // context.
+      
+      return PerScopeLookupState{ScopeLookupResult::next, PBI, None,
+        isCascadingUse.hasValue()
+        ? isCascadingUse.getValue()
+        : PBI->isCascadingContextForLookup(false)};
     }
-    // Otherwise, we have an initializer for a global or local property.
-    // There's not much to find here, we'll keep going up to a parent
-    // context.
-
-    return PerScopeLookupState{ScopeLookupResult::next, PBI, None,
-                               isCascadingUse.hasValue()
-                                   ? isCascadingUse.getValue()
-                                   : PBI->isCascadingContextForLookup(false)};
-  }
-
-  PerScopeLookupState lookupInFunctionDecl(AbstractFunctionDecl *AFD,
-                                           Optional<bool> isCascadingUse) {
-    // Look for local variables; normally, the parser resolves these
-    // for us, but it can't do the right thing inside local types.
-    // FIXME: when we can parse and typecheck the function body partially
-    // for code completion, AFD->getBody() check can be removed.
-    if (Loc.isValid() && AFD->getBody()) {
-
-      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-      localVal.visit(AFD->getBody());
-      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-        return PerScopeLookupState{
+    
+    PerScopeLookupState lookupInFunctionDecl(AbstractFunctionDecl *AFD,
+                                             Optional<bool> isCascadingUse) {
+      // Look for local variables; normally, the parser resolves these
+      // for us, but it can't do the right thing inside local types.
+      // FIXME: when we can parse and typecheck the function body partially
+      // for code completion, AFD->getBody() check can be removed.
+      if (Loc.isValid() && AFD->getBody()) {
+        
+        namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+        localVal.visit(AFD->getBody());
+        if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+          return PerScopeLookupState{
             ScopeLookupResult::finished, AFD, None,
             // FACTOR INTO A FN
             isCascadingUse.hasValue()
-                ? isCascadingUse.getValue()
-                : !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)};
-
-      if (auto *P = AFD->getImplicitSelfDecl())
-        localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
-      localVal.checkParameterList(AFD->getParameters());
-      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-        return PerScopeLookupState{
+            ? isCascadingUse.getValue()
+            : !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)};
+        
+        if (auto *P = AFD->getImplicitSelfDecl())
+          localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
+        localVal.checkParameterList(AFD->getParameters());
+        if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+          return PerScopeLookupState{
             ScopeLookupResult::finished, AFD, None,
             isCascadingUse.hasValue()
-                ? isCascadingUse.getValue()
-                : !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)};
-    }
-    const bool returnValueForIsCascadingUse =
-        AFD->isCascadingContextForLookup(false) &&
-        (isCascadingUse.hasValue()
-             ? isCascadingUse.getValue()
-             : !Loc.isValid() || !AFD->getBody() ||
-                   !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc));
-
-    if (AFD->getDeclContext()->isTypeContext()) {
-      DeclContext *fnDeclContext = AFD->getDeclContext();
-      DeclContext *fnParent = AFD->getParent();
-      addGenericParametersForFunction(AFD);
-      return PerScopeLookupState{
+            ? isCascadingUse.getValue()
+            : !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)};
+      }
+      const bool returnValueForIsCascadingUse =
+      AFD->isCascadingContextForLookup(false) &&
+      (isCascadingUse.hasValue()
+       ? isCascadingUse.getValue()
+       : !Loc.isValid() || !AFD->getBody() ||
+       !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc));
+      
+      if (AFD->getDeclContext()->isTypeContext()) {
+        DeclContext *fnDeclContext = AFD->getDeclContext();
+        DeclContext *fnParent = AFD->getParent();
+        addGenericParametersForFunction(AFD);
+        return PerScopeLookupState{
           isFinishedWithLookupNowThatIsAboutToLookForOuterResults()
-              ? ScopeLookupResult::finished
-              : ScopeLookupResult::next,
+          ? ScopeLookupResult::finished
+          : ScopeLookupResult::next,
           fnParent,
           PlacesToSearch(
-              fnParent,
-              // If we're not in the body of the function (for example, we
-              // might be type checking a default argument expression and
-              // performing name lookup from there), the base declaration
-              // is the nominal type, not 'self'.
-              isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD, fnDeclContext,
-              AFD->getDeclContext()),
+                         fnParent,
+                         // If we're not in the body of the function (for example, we
+                         // might be type checking a default argument expression and
+                         // performing name lookup from there), the base declaration
+                         // is the nominal type, not 'self'.
+                         isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD, fnDeclContext,
+                         AFD->getDeclContext()),
           returnValueForIsCascadingUse};
-    }
-    // Look in the generic parameters after checking our local declaration.
-    addGenericParametersForFunction(AFD);
-    return PerScopeLookupState{
+      }
+      // Look in the generic parameters after checking our local declaration.
+      addGenericParametersForFunction(AFD);
+      return PerScopeLookupState{
         isFinishedWithLookupNowThatIsAboutToLookForOuterResults()
-            ? ScopeLookupResult::finished
-            : ScopeLookupResult::next,
+        ? ScopeLookupResult::finished
+        : ScopeLookupResult::next,
         AFD, None, returnValueForIsCascadingUse};
-  }
-  
-
-  PerScopeLookupState lookupInClosure(AbstractClosureExpr *ACE,
-                                      Optional<bool> isCascadingUse) {
-    // Look for local variables; normally, the parser resolves these
-    // for us, but it can't do the right thing inside local types.
-    if (Loc.isValid()) {
-      if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-        namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-        if (auto body = CE->getBody())
-          localVal.visit(body);
-        if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults()) {
-          return PerScopeLookupState{ScopeLookupResult::finished, ACE, None,
-                                     isCascadingUse};
-        }
-        if (auto params = CE->getParameters())
-          localVal.checkParameterList(params);
-        if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults()) {
-          return PerScopeLookupState{ScopeLookupResult::finished, ACE, None,
-                                     isCascadingUse};
+    }
+    
+    
+    PerScopeLookupState lookupInClosure(AbstractClosureExpr *ACE,
+                                        Optional<bool> isCascadingUse) {
+      // Look for local variables; normally, the parser resolves these
+      // for us, but it can't do the right thing inside local types.
+      if (Loc.isValid()) {
+        if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+          if (auto body = CE->getBody())
+            localVal.visit(body);
+          if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults()) {
+            return PerScopeLookupState{ScopeLookupResult::finished, ACE, None,
+              isCascadingUse};
+          }
+          if (auto params = CE->getParameters())
+            localVal.checkParameterList(params);
+          if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults()) {
+            return PerScopeLookupState{ScopeLookupResult::finished, ACE, None,
+              isCascadingUse};
+          }
         }
       }
+      return PerScopeLookupState{ScopeLookupResult::next, ACE, None,
+        isCascadingUse.hasValue()
+        ? isCascadingUse.getValue()
+        : ACE->isCascadingContextForLookup(false)};
     }
-    return PerScopeLookupState{ScopeLookupResult::next, ACE, None,
-                               isCascadingUse.hasValue()
-                                   ? isCascadingUse.getValue()
-                                   : ACE->isCascadingContextForLookup(false)};
-  }
-
-  PerScopeLookupState lookupInExtension(ExtensionDecl *ED,
-                                        Optional<bool> isCascadingUse) {
-    return PerScopeLookupState{
+    
+    PerScopeLookupState lookupInExtension(ExtensionDecl *ED,
+                                          Optional<bool> isCascadingUse) {
+      return PerScopeLookupState{
         ScopeLookupResult::next, ED,
         shouldLookupMembers(ED, Loc)
-            ? Optional<PlacesToSearch>(PlacesToSearch(ED, ED, ED, ED))
-            : None,
+        ? Optional<PlacesToSearch>(PlacesToSearch(ED, ED, ED, ED))
+        : None,
         isCascadingUse.hasValue() ? isCascadingUse.getValue()
-                                  : ED->isCascadingContextForLookup(false)};
-  }
-
-  PerScopeLookupState lookupInNominalType(NominalTypeDecl *ND,
-                                          Optional<bool> isCascadingUse) {
-    return PerScopeLookupState{
+        : ED->isCascadingContextForLookup(false)};
+    }
+    
+    PerScopeLookupState lookupInNominalType(NominalTypeDecl *ND,
+                                            Optional<bool> isCascadingUse) {
+      return PerScopeLookupState{
         ScopeLookupResult::next, ND,
         shouldLookupMembers(ND, Loc)
-            ? Optional<PlacesToSearch>(PlacesToSearch(ND, ND, ND, ND))
-            : None,
+        ? Optional<PlacesToSearch>(PlacesToSearch(ND, ND, ND, ND))
+        : None,
         isCascadingUse.hasValue() ? isCascadingUse.getValue()
-                                  : ND->isCascadingContextForLookup(false)};
-  }
-
-  PerScopeLookupState
-  lookupInDefaultArgumentInitializer(DefaultArgumentInitializer *I,
-                                     Optional<bool> isCascadingUse) {
-    // In a default argument, skip immediately out of both the
-    // initializer and the function.
-    return PerScopeLookupState{ScopeLookupResult::stop,
-                               I->getParent()->getParent(), None, false};
-  }
+        : ND->isCascadingContextForLookup(false)};
+    }
+    
+    PerScopeLookupState
+    lookupInDefaultArgumentInitializer(DefaultArgumentInitializer *I,
+                                       Optional<bool> isCascadingUse) {
+      // In a default argument, skip immediately out of both the
+      // initializer and the function.
+      return PerScopeLookupState{ScopeLookupResult::stop,
+        I->getParent()->getParent(), None, false};
+    }
     
     bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const {
       return !AFD->isImplicit() && Loc.isValid() &&
       AFD->getBodySourceRange().isValid() &&
       !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
     }
-
-  PerScopeLookupState lookupInMiscContext(DeclContext *dc,
-                                          Optional<bool> isCascadingUse) {
-    assert(isa<TopLevelCodeDecl>(dc) || isa<Initializer>(dc) ||
-           isa<TypeAliasDecl>(dc) || isa<SubscriptDecl>(dc));
-    return PerScopeLookupState{ScopeLookupResult::next, dc, None,
-                               isCascadingUse.hasValue()
-                                   ? isCascadingUse.getValue()
-                                   : dc->isCascadingContextForLookup(false)};
+    
+    PerScopeLookupState lookupInMiscContext(DeclContext *dc,
+                                            Optional<bool> isCascadingUse) {
+      assert(isa<TopLevelCodeDecl>(dc) || isa<Initializer>(dc) ||
+             isa<TypeAliasDecl>(dc) || isa<SubscriptDecl>(dc));
+      return PerScopeLookupState{ScopeLookupResult::next, dc, None,
+        isCascadingUse.hasValue()
+        ? isCascadingUse.getValue()
+        : dc->isCascadingContextForLookup(false)};
     }
-   
+    
     /// return true if lookup is done
     bool addLocalVariableResults(DeclContext *dc) {
       if (auto SF = dyn_cast<SourceFile>(dc)) {
@@ -1958,7 +1960,7 @@ namespace {
       }
       return false;
     }
-
+    
     /// Return true if found any
     // TODO: make member fn of PlacesToSearch, take ref to Result as arg
     void searchPlacesToSearch(PlacesToSearch placesToSearch, DeclName Name,
@@ -1966,16 +1968,16 @@ namespace {
                               const NLOptions baseNLOptions,
                               DeclContext *contextForLookup) {
       const NLOptions options =
-          baseNLOptions | (isCascadingUse ? NL_KnownCascadingDependency
-                                          : NL_KnownNonCascadingDependency);
-
+      baseNLOptions | (isCascadingUse ? NL_KnownCascadingDependency
+                       : NL_KnownNonCascadingDependency);
+      
       SmallVector<ValueDecl *, 4> Lookup;
       contextForLookup->lookupQualified(placesToSearch.places, Name, options, Lookup);
       for (auto Result : Lookup)
         Results.push_back(LookupResultEntry(
-            placesToSearch.whereValueIsMember(Result), Result));
+                                            placesToSearch.whereValueIsMember(Result), Result));
     }
-
+    
     /// Return true if finished with lookup
     bool handleUnavailableInnerResults(const size_t startIndexOfInnerResults) {
       // An optimization:
@@ -1987,9 +1989,9 @@ namespace {
       auto unavailableLookupResult = [&](const LookupResultEntry &result) {
         auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
         return result.getValueDecl()->getAttrs().isUnavailableInSwiftVersion(
-            effectiveVersion);
+                                                                             effectiveVersion);
       };
-
+      
       // If all of the results we found are unavailable, keep looking.
       auto begin = Results.begin() + startIndexOfInnerResults;
       if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
@@ -1999,20 +2001,19 @@ namespace {
       }
       if (DebugClient)
         filterForDiscriminator(Results, DebugClient);
-
+      
       return isFinishedWithLookupNowThatIsAboutToLookForOuterResults();
     }
-
-    void finishLookupRENAME() {
-      
-      recordLookupOfTopLevelName(DC, Name, isCascadingUse.getValue());
-    recordedSF = dyn_cast<SourceFile>(DC);
-    recordedName = Name;
-    recordedIsCascadingUse = isCascadingUse.getValue();
+    
+    void finishLookupRENAME(DeclContext *const dc) {
+      recordLookupOfTopLevelName(dc, Name, isCascadingUse.getValue());
+      recordedSF = dyn_cast<SourceFile>(dc);
+      recordedName = Name;
+      recordedIsCascadingUse = isCascadingUse.getValue();
       
       // Add private imports to the extra search list.
       SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
-      if (auto FU = dyn_cast<FileUnit>(DC))
+      if (auto FU = dyn_cast<FileUnit>(dc))
         FU->getImportedModules(extraImports, ModuleDecl::ImportFilter::Private);
       
       using namespace namelookup;
@@ -2020,7 +2021,7 @@ namespace {
       auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
       : ResolutionKind::Overloadable;
       lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                     resolutionKind, TypeResolver, DC, extraImports);
+                     resolutionKind, TypeResolver, dc, extraImports);
       
       // Always perform name shadowing for type lookup.
       if (options.contains(Flags::TypeLookup)) {
@@ -2035,12 +2036,12 @@ namespace {
       
       // Now add any names the DebugClient knows about to the lookup.
       if (Name.isSimpleName() && DebugClient)
-        DebugClient->lookupAdditions(Name.getBaseName(), DC, Loc,
+        DebugClient->lookupAdditions(Name.getBaseName(), dc, Loc,
                                      isOriginallyTypeLookup, Results);
       
       // If we've found something, we're done.
       if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-              /*noMoreOuterResults=*/true))
+                                                                  /*noMoreOuterResults=*/true))
         return;
       
       // If we still haven't found anything, but we do have some
@@ -2048,7 +2049,7 @@ namespace {
       // those in.
       Results = std::move(UnavailableInnerResults);
       if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-              /*noMoreOuterResults=*/true))
+                                                                  /*noMoreOuterResults=*/true))
         return;
       
       if (!Name.isSimpleName())
@@ -2058,7 +2059,7 @@ namespace {
       if (Name.isSimpleName(M.getName())) {
         Results.push_back(LookupResultEntry(&M));
         if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-                /*noMoreOuterResults=*/true))
+                                                                    /*noMoreOuterResults=*/true))
           return;
       }
       
@@ -2066,23 +2067,23 @@ namespace {
       if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
         desiredModule = Ctx.TheBuiltinModule;
       if (desiredModule) {
-      forAllVisibleModules(
-          DC, [&](const ModuleDecl::ImportedModule &import) -> bool {
-          if (import.second == desiredModule) {
-            Results.push_back(LookupResultEntry(import.second));
-            return false;
-          }
-          return true;
-        });
+        forAllVisibleModules(
+                             dc, [&](const ModuleDecl::ImportedModule &import) -> bool {
+                               if (import.second == desiredModule) {
+                                 Results.push_back(LookupResultEntry(import.second));
+                                 return false;
+                               }
+                               return true;
+                             });
       }
       // Make sure we've recorded the inner-result-boundary.
       (void)isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-          /*noMoreOuterResults=*/true);
+                                                                    /*noMoreOuterResults=*/true);
     }
   };
 } // namespace
 
-ExpUnqualifiedLookup::ExpUnqualifiedLookup(DeclName Name, DeclContext *DC,
+ExpUnqualifiedLookup::ExpUnqualifiedLookup(DeclName Name, DeclContext *const DC,
                                            LazyResolver *TypeResolver,
                                            SourceLoc Loc, Options options)
     : IndexOfFirstOuterResult(0) {
