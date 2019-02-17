@@ -17,7 +17,6 @@ import TensorFlowUnittest
 var TensorADTests = TestSuite("TensorIndirectAD")
 
 TensorADTests.testAllBackends("Generic") {
-  // TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
   func indirect<Scalar : Differentiable & FloatingPoint>(_ x: Tensor<Scalar>) -> Tensor<Scalar>
     where Scalar == Scalar.CotangentVector
   {
@@ -92,68 +91,71 @@ TensorADTests.testAllBackends("GenericLayerMember") {
   }
 }
 
+// Tests TF-235.
+// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
+struct Sequential<LHS: Layer, RHS: Layer>: Layer
+  where LHS.Output == RHS.Input,
+        LHS.TangentVector: AdditiveArithmetic,
+        RHS.TangentVector: AdditiveArithmetic,
+        LHS.CotangentVector: AdditiveArithmetic,
+        RHS.CotangentVector: AdditiveArithmetic,
+        LHS.Input.CotangentVector: AdditiveArithmetic,
+        LHS.Output.CotangentVector: AdditiveArithmetic,
+        RHS.Output.CotangentVector: AdditiveArithmetic,
+        RHS.Output.TangentVector: AdditiveArithmetic {
+  let lhs: LHS
+  let rhs: RHS
+
+  init(_ lhs: LHS, _ rhs: RHS) {
+    self.lhs = lhs
+    self.rhs = rhs
+  }
+
+  @differentiable(wrt: (self, input))
+  func applied(to input: LHS.Input) -> RHS.Output {
+    let intermediateValue = lhs.applied(to: input)
+    return rhs.applied(to: intermediateValue)
+  }
+}
+
+// Forward function composition operator. Used in F#.
+func >> <LHS: Layer, RHS: Layer>(_ lhs: LHS, _ rhs: RHS) -> Sequential<LHS, RHS> {
+  return Sequential(lhs, rhs)
+}
+
+// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
+struct LayerTriple<T: Layer, U: Layer, V : Layer>: Layer
+  where T.Output == U.Input, U.Output == V.Input,
+        T.TangentVector: AdditiveArithmetic,
+        U.TangentVector: AdditiveArithmetic,
+        V.TangentVector: AdditiveArithmetic,
+        T.CotangentVector: AdditiveArithmetic,
+        U.CotangentVector: AdditiveArithmetic,
+        V.CotangentVector: AdditiveArithmetic,
+        T.Input.CotangentVector: AdditiveArithmetic,
+        T.Output.CotangentVector: AdditiveArithmetic,
+        U.Output.CotangentVector: AdditiveArithmetic,
+        U.Output.TangentVector: AdditiveArithmetic {
+  let first: T
+  let second: U
+  let third: V
+
+  init(_ first: T, _ second: U, _ third: V) {
+    self.first = first
+    self.second = second
+    self.third = third
+  }
+
+  @differentiable(wrt: (self, input))
+  func applied(to input: T.Input) -> V.Output {
+    let intermediate1 = first.applied(to: input)
+    let intermediate2 = second.applied(to: intermediate1)
+    return third.applied(to: intermediate2)
+  }
+}
+
+// Tests TF-235 and TF-242.
 TensorADTests.testAllBackends("GenericLayerMembers") {
-  // Tests TF-235.
-  // TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
-  struct Sequential<LHS: Layer, RHS: Layer>: Layer
-    where LHS.Output == RHS.Input,
-          LHS.TangentVector: AdditiveArithmetic,
-          RHS.TangentVector: AdditiveArithmetic,
-          LHS.CotangentVector: AdditiveArithmetic,
-          RHS.CotangentVector: AdditiveArithmetic,
-          LHS.Input.CotangentVector: AdditiveArithmetic,
-          LHS.Output.CotangentVector: AdditiveArithmetic,
-          RHS.Output.CotangentVector: AdditiveArithmetic,
-          RHS.Output.TangentVector: AdditiveArithmetic {
-    let lhs: LHS
-    let rhs: RHS
-
-    init(_ lhs: LHS, _ rhs: RHS) {
-      self.lhs = lhs
-      self.rhs = rhs
-    }
-
-    @differentiable(wrt: (self, input))
-    func applied(to input: LHS.Input) -> RHS.Output {
-      let intermediateValue = lhs.applied(to: input)
-      return rhs.applied(to: intermediateValue)
-    }
-  }
-
-  // TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
-  struct LayerTriple<T: Layer, U: Layer, V : Layer>: Layer
-    where T.Output == U.Input, U.Output == V.Input,
-          T.TangentVector: AdditiveArithmetic,
-          U.TangentVector: AdditiveArithmetic,
-          V.TangentVector: AdditiveArithmetic,
-          T.CotangentVector: AdditiveArithmetic,
-          U.CotangentVector: AdditiveArithmetic,
-          V.CotangentVector: AdditiveArithmetic,
-          T.Input.CotangentVector: AdditiveArithmetic,
-          T.Output.CotangentVector: AdditiveArithmetic,
-          U.Output.CotangentVector: AdditiveArithmetic,
-          U.Output.TangentVector: AdditiveArithmetic {
-    let first: T
-    let second: U
-    let third: V
-
-    init(_ first: T, _ second: U, _ third: V) {
-      self.first = first
-      self.second = second
-      self.third = third
-    }
-
-    @differentiable(wrt: (self, input))
-    func applied(to input: T.Input) -> V.Output {
-      let intermediate1 = first.applied(to: input)
-      let intermediate2 = second.applied(to: intermediate1)
-      return third.applied(to: intermediate2)
-    }
-  }
-
-  // FIXME(TF-242): Pullback indirect results should not be released.
-  // Otherwise, pullback calls segfault.
-  /*
   func testFixedInput() {
     let lhs = Dense<Float>(inputSize: 3, outputSize: 4, activation: relu)
     let rhs = Dense<Float>(inputSize: 4, outputSize: 5, activation: sigmoid)
@@ -164,7 +166,7 @@ TensorADTests.testAllBackends("GenericLayerMembers") {
     let (𝛁lhs, 𝛁rhs) = pullback(at: lhs, rhs) { lhs, rhs in
       rhs.applied(to: lhs.applied(to: input))
     }(seed)
-    let 𝛁combined = pullback(at: combined) { $0.applied(to: input) }(seed + 1)
+    let 𝛁combined = pullback(at: combined) { $0.applied(to: input) }(seed)
     expectEqual(Sequential.CotangentVector(lhs: 𝛁lhs, rhs: 𝛁rhs), 𝛁combined)
   }
   testFixedInput()
@@ -172,7 +174,8 @@ TensorADTests.testAllBackends("GenericLayerMembers") {
   func testWrtInput(_ input: Tensor<Float>) {
     let lhs = Dense<Float>(inputSize: 3, outputSize: 4, activation: relu)
     let rhs = Dense<Float>(inputSize: 4, outputSize: 5, activation: sigmoid)
-    let combined = Sequential(lhs, rhs)
+    // Test "compose" operator.
+    let combined = lhs >> rhs
 
     let seed = Tensor<Float>(ones: [input.shape[0], rhs.weight.shape[1]])
     let (𝛁lhs, 𝛁rhs) = pullback(at: lhs, rhs) { lhs, rhs in
@@ -182,7 +185,6 @@ TensorADTests.testAllBackends("GenericLayerMembers") {
     expectEqual(Sequential.CotangentVector(lhs: 𝛁lhs, rhs: 𝛁rhs), 𝛁combined)
   }
   testWrtInput(Tensor(randomUniform: [2, 3]))
-  */
 }
 
 runAllTests()
