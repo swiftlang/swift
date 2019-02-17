@@ -1654,7 +1654,9 @@ private:
   void checkPotentiallyThrowingAccessor(Expr *E, ContextScope &scope,
                                         TypeChecker &typeChecker,
                                         SourceLoc tryLoc) {
-    auto walker = ThrowingAccessorWalker(&Flags, typeChecker, tryLoc);
+    auto isTryHandled = isa<OptionalTryExpr>(E) || isa<ForceTryExpr>(E);
+    auto walker = ThrowingAccessorWalker(&Flags, typeChecker, tryLoc,
+                                         /*handled*/ isTryHandled);
     E->walk(walker);
   }
 
@@ -1663,15 +1665,19 @@ private:
     ContextFlags *contextFlags;
     TypeChecker &typeChecker;
     SourceLoc tryLoc;
+    bool isTryHandled;
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (isa<AssignExpr>(E)) {
-        return {checkPotentiallyThrowingSetter(
-                    cast<AssignExpr>(E), contextFlags, typeChecker, tryLoc),
+        return {checkPotentiallyThrowingSetter(cast<AssignExpr>(E),
+                                               contextFlags, typeChecker,
+                                               tryLoc, isTryHandled),
                 nullptr};
       }
       if (isa<MemberRefExpr>(E)) {
-        return {checkPotentiallyThrowingGetter(
-                    cast<MemberRefExpr>(E), contextFlags, typeChecker, tryLoc),
+        return {checkPotentiallyThrowingGetter(cast<MemberRefExpr>(E),
+                                               contextFlags, typeChecker,
+                                               tryLoc, isTryHandled),
                 nullptr};
       }
       return {true, E};
@@ -1679,7 +1685,7 @@ private:
 
     bool checkPotentiallyThrowingSetter(AssignExpr *E, ContextFlags *flags,
                                         TypeChecker &typeChecker,
-                                        SourceLoc tryLoc) {
+                                        SourceLoc tryLoc, bool isTryHandled) {
       if (!E) {
         return false;
       }
@@ -1709,7 +1715,8 @@ private:
         flags->set(ContextFlags::HasTryThrowSite);
         flags->set(ContextFlags::HasAnyThrowSite);
 
-        auto walker = ThrowingAccessorChecker(flags, typeChecker, tryLoc);
+        auto walker =
+            ThrowingAccessorChecker(flags, typeChecker, tryLoc, isTryHandled);
         E->walk(walker);
         return true;
       }
@@ -1719,7 +1726,7 @@ private:
 
     bool checkPotentiallyThrowingGetter(MemberRefExpr *E, ContextFlags *flags,
                                         TypeChecker &typeChecker,
-                                        SourceLoc tryLoc) {
+                                        SourceLoc tryLoc, bool isTryHandled) {
       if (!E) {
         return false;
       }
@@ -1743,7 +1750,8 @@ private:
         flags->set(ContextFlags::HasTryThrowSite);
         flags->set(ContextFlags::HasAnyThrowSite);
 
-        auto walker = ThrowingAccessorChecker(flags, typeChecker, tryLoc);
+        auto walker =
+            ThrowingAccessorChecker(flags, typeChecker, tryLoc, isTryHandled);
         E->walk(walker);
 
         return true;
@@ -1753,14 +1761,17 @@ private:
     }
 
   public:
-    ThrowingAccessorWalker(ContextFlags *flags, TypeChecker &tc, SourceLoc loc)
-        : contextFlags(flags), typeChecker(tc), tryLoc(loc) {}
+    ThrowingAccessorWalker(ContextFlags *flags, TypeChecker &tc, SourceLoc loc,
+                           bool handled = false)
+        : contextFlags(flags), typeChecker(tc), tryLoc(loc),
+          isTryHandled(handled) {}
   };
 
   class ThrowingAccessorChecker : public ASTWalker {
     ContextFlags *flags;
     TypeChecker &typeChecker;
     SourceLoc tryLoc;
+    bool isTryHandled;
 
   private:
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -1770,7 +1781,7 @@ private:
         auto ctx = decl->getDeclContext()->getLocalContext();
 
         if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(ctx)) {
-          if (!AFD->hasThrows() && !flags->has(ContextFlags::IsTryCovered)) {
+          if (!AFD->hasThrows() && !isTryHandled) {
             typeChecker.diagnose(tryLoc, diag::try_unhandled);
           }
         }
@@ -1783,8 +1794,9 @@ private:
 
   public:
     ThrowingAccessorChecker(ContextFlags *contextFlags, TypeChecker &tc,
-                            SourceLoc loc)
-        : flags(contextFlags), typeChecker(tc), tryLoc(loc) {}
+                            SourceLoc loc, bool handled = false)
+        : flags(contextFlags), typeChecker(tc), tryLoc(loc),
+          isTryHandled(handled) {}
   };
 };
 
