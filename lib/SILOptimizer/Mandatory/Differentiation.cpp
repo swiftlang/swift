@@ -573,8 +573,9 @@ private:
   /// `NestedApplyInfo`s.
   DenseMap<ApplyInst *, NestedApplyInfo> nestedApplyInfo;
 
-  /// Mapping from original `struct_extract` instructions to their strategies.
-  DenseMap<StructExtractInst *, StructExtractDifferentiationStrategy>
+  /// Mapping from original `struct_extract` and `struct_element_addr`
+  /// instructions to their strategies.
+  DenseMap<SILInstruction *, StructExtractDifferentiationStrategy>
       structExtractDifferentiationStrategies;
 
   /// Cache for associated functions.
@@ -684,7 +685,7 @@ public:
     return nestedApplyInfo;
   }
 
-  DenseMap<StructExtractInst *, StructExtractDifferentiationStrategy> &
+  DenseMap<SILInstruction *, StructExtractDifferentiationStrategy> &
   getStructExtractDifferentiationStrategies() {
     return structExtractDifferentiationStrategies;
   }
@@ -2219,8 +2220,8 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     arguments.push_back(load);
   }
 
-  auto apply = builder.createApply(loc, fnArg, SubstitutionMap(), arguments,
-                                   /*isNonThrowing*/ false);
+  auto *apply = builder.createApply(
+      loc, fnArg, arguments, /*isNonThrowing*/ false);
 
   // Get return elements.
   SmallVector<SILValue, 4> results;
@@ -2621,23 +2622,116 @@ public:
     }
     // Reference and apply the VJP.
     auto loc = sei->getLoc();
+    auto *vjp = task->getVJP();
     auto *getterVJPRef = getBuilder().createFunctionRef(loc, task->getVJP());
     auto *getterVJPApply = getBuilder().createApply(
-        loc, getterVJPRef, /*substitutionMap*/ {},
-        /*args*/ {getMappedValue(sei->getOperand())}, /*isNonThrowing*/ false);
+        loc, getterVJPRef,
+        getOpSubstitutionMap(vjp->getForwardingSubstitutionMap()),
+        /*args*/ {getOpValue(sei->getOperand())}, /*isNonThrowing*/ false);
+    // Extract direct results from `getterVJPApply`.
     SmallVector<SILValue, 8> vjpDirectResults;
     extractAllElements(getterVJPApply, getBuilder(), vjpDirectResults);
-    // Map original results.
+    // Map original result.
     auto originalDirectResults =
         ArrayRef<SILValue>(vjpDirectResults).drop_back(1);
-    SILValue originalDirectResult = joinElements(originalDirectResults,
-                                                 getBuilder(),
-                                                 getterVJPApply->getLoc());
+    auto originalDirectResult = joinElements(originalDirectResults,
+                                             getBuilder(),
+                                             getterVJPApply->getLoc());
     mapValue(sei, originalDirectResult);
     // Checkpoint the pullback.
     SILValue pullback = vjpDirectResults.back();
     // TODO: Check whether it's necessary to reabstract getter pullbacks.
     getPrimalInfo().addPullbackDecl(sei, getOpType(pullback->getType()));
+    primalValues.push_back(pullback);
+  }
+
+  void visitStructElementAddrInst(StructElementAddrInst *seai) {
+    auto &strategies =
+        getDifferentiationTask()->getStructExtractDifferentiationStrategies();
+    // Special handling logic only applies when the `struct_element_addr` is
+    // active. If not, just do standard cloning.
+    if (!activityInfo.isActive(seai, synthesis.indices)) {
+      LLVM_DEBUG(getADDebugStream() << "Not active:\n" << *seai << '\n');
+      strategies.insert(
+          {seai, StructExtractDifferentiationStrategy::Inactive});
+      SILClonerWithScopes::visitStructElementAddrInst(seai);
+      return;
+    }
+    // This instruction is active. Determine the appropriate differentiation
+    // strategy, and use it.
+    auto *structDecl = seai->getStructDecl();
+    if (structDecl->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>()) {
+      strategies.insert(
+          {seai, StructExtractDifferentiationStrategy::Fieldwise});
+      SILClonerWithScopes::visitStructElementAddrInst(seai);
+      return;
+    }
+    // The FieldwiseProductSpace strategy is not appropriate, so use the Getter
+    // strategy.
+    strategies.insert(
+        {seai, StructExtractDifferentiationStrategy::Getter});
+    // Find the corresponding getter and its VJP.
+    auto *getterDecl = seai->getField()->getGetter();
+    assert(getterDecl);
+    auto *getterFn = getContext().getModule().lookUpFunction(
+        SILDeclRef(getterDecl, SILDeclRef::Kind::Func));
+    if (!getterFn) {
+      getContext().emitNondifferentiabilityError(
+          seai, synthesis.task, diag::autodiff_property_not_differentiable);
+      errorOccurred = true;
+      return;
+    }
+    SILAutoDiffIndices indices(/*source*/ 0, /*parameters*/ {0});
+    auto *task = getContext().lookUpDifferentiationTask(getterFn, indices);
+    if (!task) {
+      getContext().emitNondifferentiabilityError(
+          seai, synthesis.task, diag::autodiff_property_not_differentiable);
+      errorOccurred = true;
+      return;
+    }
+    // Set generic context scope before getting VJP function type.
+    auto canGenSig = SubsMap.getGenericSignature()
+        ? SubsMap.getGenericSignature()->getCanonicalSignature()
+        : nullptr;
+    Lowering::GenericContextScope genericContextScope(
+        getContext().getTypeConverter(), canGenSig);
+    // Reference the getter VJP.
+    auto loc = seai->getLoc();
+    auto *vjp = task->getVJP();
+    auto vjpFnTy = vjp->getLoweredFunctionType();
+    auto *getterVJPRef = getBuilder().createFunctionRef(loc, vjp);
+    // Store getter VJP arguments and indirect result buffers.
+    SmallVector<SILValue, 8> vjpArgs;
+    SmallVector<AllocStackInst *, 8> vjpIndirectResults;
+    for (auto indRes : vjpFnTy->getIndirectFormalResults()) {
+      auto *alloc = getBuilder().createAllocStack(
+          loc, getOpType(indRes.getSILStorageType()));
+      vjpArgs.push_back(alloc);
+      vjpIndirectResults.push_back(alloc);
+    }
+    vjpArgs.push_back(getOpValue(seai->getOperand()));
+    // Apply the getter VJP.
+    auto *getterVJPApply = getBuilder().createApply(
+        loc, getterVJPRef,
+        getOpSubstitutionMap(vjp->getForwardingSubstitutionMap()), vjpArgs,
+        /*isNonThrowing*/ false);
+    // Collect all results from `getterVJPApply` in type-defined order.
+    SmallVector<SILValue, 8> vjpDirectResults;
+    extractAllElements(getterVJPApply, getBuilder(), vjpDirectResults);
+    SmallVector<SILValue, 8> allResults;
+    collectAllActualResultsInTypeOrder(
+        getterVJPApply, vjpDirectResults,
+        getterVJPApply->getIndirectSILResults(), allResults);
+    // Deallocate VJP indirect results.
+    for (auto alloc : vjpIndirectResults)
+      getBuilder().createDeallocStack(loc, alloc);
+    auto originalDirectResult = allResults[indices.source];
+    // Map original result.
+    mapValue(seai, originalDirectResult);
+    // Checkpoint the pullback.
+    SILValue pullback = vjpDirectResults.back();
+    // TODO: Check whether it's necessary to reabstract getter pullbacks.
+    getPrimalInfo().addPullbackDecl(seai, getOpType(pullback->getType()));
     primalValues.push_back(pullback);
   }
 
@@ -2799,7 +2893,7 @@ public:
     // Emit the VJP.
     auto vjpAndVJPIndices = emitAssociatedFunctionReference(
         context, getBuilder(), getDifferentiationTask(), indices,
-        AutoDiffAssociatedFunctionKind::VJP, getMappedValue(ai->getCallee()),
+        AutoDiffAssociatedFunctionKind::VJP, getOpValue(ai->getCallee()),
         /*invoker*/ {ai, synthesis.task}, [&](DifferentiationTask *newTask) {
           primalGen.schedulePrimalSynthesisIfNeeded(newTask);
         });
@@ -2820,15 +2914,15 @@ public:
     auto &nestedApplyInfo = insertion.first->getSecond();
 
     // Call the VJP using the original parameters.
-    SmallVector<SILValue, 8> newArgs;
-    auto vjpFnTy = vjp->getType().castTo<SILFunctionType>();
+    SmallVector<SILValue, 8> vjpArgs;
+    auto vjpFnTy = getOpType(vjp->getType()).castTo<SILFunctionType>();
     auto numVJPArgs =
         vjpFnTy->getNumParameters() + vjpFnTy->getNumIndirectFormalResults();
-    newArgs.reserve(numVJPArgs);
+    vjpArgs.reserve(numVJPArgs);
     // Collect substituted arguments.
     for (auto origArg : ai->getArguments())
-      newArgs.push_back(getOpValue(origArg));
-    assert(newArgs.size() == numVJPArgs);
+      vjpArgs.push_back(getOpValue(origArg));
+    assert(vjpArgs.size() == numVJPArgs);
     // Get the VJP substitution map and apply the VJP.
     auto substMap = getOrDiagnoseAssociatedFunctionSubstitutionMap(ai, vjpFnTy);
     if (!substMap) {
@@ -2836,7 +2930,7 @@ public:
       return;
     }
     auto *vjpCall = getBuilder().createApply(ai->getLoc(), vjp, *substMap,
-                                             newArgs, ai->isNonThrowing());
+                                             vjpArgs, ai->isNonThrowing());
     LLVM_DEBUG(getADDebugStream() << "Applied vjp function\n" << *vjpCall);
 
     // Get the VJP results (original results and pullback).
@@ -3530,6 +3624,7 @@ private:
 
   ValueWithCleanup &getAdjointBuffer(SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
+    assert(originalBuffer->getFunction() == &getOriginal());
     auto insertion = bufferMap.try_emplace(originalBuffer,
                                            ValueWithCleanup(SILValue()));
     if (!insertion.second) // not inserted
@@ -3559,17 +3654,22 @@ private:
     return (insertion.first->getSecond() = bufWithCleanup);
   }
 
+  // Accumulates `rhsBufferAccess` into the adjoint buffer corresponding to
+  // `originalBuffer`.
   void addToAdjointBuffer(SILValue originalBuffer,
-                          SILValue newValueBufferAccess) {
+                          SILValue rhsBufferAccess) {
     assert(originalBuffer->getType().isAddress() &&
-           newValueBufferAccess->getType().isAddress());
-    auto buf = getAdjointBuffer(originalBuffer);
-    auto *access = builder.createBeginAccess(
-        newValueBufferAccess.getLoc(), buf, SILAccessKind::Modify,
+           rhsBufferAccess->getType().isAddress());
+    assert(originalBuffer->getFunction() == &getOriginal());
+    assert(rhsBufferAccess->getFunction() == &getAdjoint());
+    auto adjointBuffer = getAdjointBuffer(originalBuffer);
+    auto *destAccess = builder.createBeginAccess(
+        rhsBufferAccess.getLoc(), adjointBuffer, SILAccessKind::Modify,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
         /*fromBuiltin*/ false);
-    accumulateIndirect(access, newValueBufferAccess);
-    builder.createEndAccess(access->getLoc(), access, /*aborted*/ false);
+    accumulateIndirect(destAccess, rhsBufferAccess);
+    builder.createEndAccess(
+        destAccess->getLoc(), destAccess, /*aborted*/ false);
   }
 
   //--------------------------------------------------------------------------//
@@ -3856,9 +3956,8 @@ public:
     args.push_back(seed);
 
     // Call the pullback.
-    auto *pullbackCall = builder.createApply(ai->getLoc(), pullback,
-                                             SubstitutionMap(), args,
-                                             /*isNonThrowing*/ false);
+    auto *pullbackCall = builder.createApply(
+        ai->getLoc(), pullback, args, /*isNonThrowing*/ false);
 
     // Extract all results from `pullbackCall`.
     SmallVector<SILValue, 8> dirResults;
@@ -3964,9 +4063,9 @@ public:
 
   /// Handle `struct` instruction.
   ///   y = struct (x0, x1, x2, ...)
-  ///   adj[x0] += struct_extract #0, adj[y]
-  ///   adj[x1] += struct_extract #1, adj[y]
-  ///   adj[x2] += struct_extract #2, adj[y]
+  ///   adj[x0] += struct_extract adj[y], #x0
+  ///   adj[x1] += struct_extract adj[y], #x1
+  ///   adj[x2] += struct_extract adj[y], #x2
   ///   ...
   void visitStructInst(StructInst *si) {
     auto *decl = si->getStructDecl();
@@ -4011,10 +4110,10 @@ public:
       return;
     case StructExtractDifferentiationStrategy::Fieldwise: {
       // Compute adjoint as follows:
-      //   y = struct_extract <key>, x
-      //   adj[x] += struct (0, ..., key': adj[y], ..., 0)
-      // where `key'` is the field in the cotangent space corresponding to
-      // `key`.
+      //   y = struct_extract x, #key
+      //   adj[x] += struct (0, ..., #key': adj[y], ..., 0)
+      // where `#key'` is the field in the cotangent space corresponding to
+      // `#key`.
       auto structTy = remapType(sei->getOperand()->getType()).getASTType();
       auto cotangentVectorTy = structTy->getAutoDiffAssociatedVectorSpace(
           AutoDiffAssociatedVectorSpaceKind::Cotangent,
@@ -4039,7 +4138,7 @@ public:
         assert(correspondingFieldLookup.size() == 1);
         correspondingField = cast<VarDecl>(correspondingFieldLookup.front());
       }
-      // Compute adjoint.
+      // Accumulate adjoint for the `struct_extract` operand.
       auto av = takeAdjointValue(sei);
       switch (av.getKind()) {
       case AdjointValueKind::Zero:
@@ -4067,26 +4166,119 @@ public:
       // Get the pullback.
       auto *pullbackField = getPrimalInfo().lookUpPullbackDecl(sei);
       assert(pullbackField);
-      SILValue pullback = builder.createStructExtract(loc,
-                                                      primalValueAggregateInAdj,
-                                                      pullbackField);
+      auto pullback = builder.createStructExtract(
+          loc, primalValueAggregateInAdj, pullbackField);
 
       // Construct the pullback arguments.
-      SmallVector<SILValue, 8> args;
       auto av = takeAdjointValue(sei);
-      assert(av.getType().isObject());
       auto vector = materializeAdjointDirect(std::move(av), loc);
-      args.push_back(vector);
 
       // Call the pullback.
-      auto *pullbackCall = builder.createApply(loc, pullback, SubstitutionMap(),
-                                               args, /*isNonThrowing*/ false);
+      auto *pullbackCall = builder.createApply(
+          loc, pullback, {vector}, /*isNonThrowing*/ false);
       assert(!pullbackCall->hasIndirectResults());
 
-      // Set adjoint for the `struct_extract` operand.
+      // Accumulate adjoint for the `struct_extract` operand.
       addAdjointValue(sei->getOperand(),
           makeConcreteAdjointValue(
               ValueWithCleanup(pullbackCall, vector.getCleanup())));
+      break;
+    }
+    }
+  }
+
+  void visitStructElementAddrInst(StructElementAddrInst *seai) {
+    auto loc = seai->getLoc();
+    auto &differentiationStrategies =
+        getDifferentiationTask()->getStructExtractDifferentiationStrategies();
+    auto strategy = differentiationStrategies.lookup(seai);
+    switch (strategy) {
+    case StructExtractDifferentiationStrategy::Inactive:
+      assert(!activityInfo.isActive(seai, synthesis.indices));
+      return;
+    case StructExtractDifferentiationStrategy::Fieldwise: {
+      // Compute adjoint as follows:
+      //   y = struct_element_addr x, #key
+      //   adj[x]#key' = struct_element_addr adj[x], #key'
+      //   adj[x]#key' += adj[y]
+      // where `#key'` is the field in the cotangent space corresponding to
+      // `#key`.
+      auto structTy = remapType(seai->getOperand()->getType()).getASTType();
+      auto cotangentVectorTy = structTy->getAutoDiffAssociatedVectorSpace(
+          AutoDiffAssociatedVectorSpaceKind::Cotangent,
+          LookUpConformanceInModule(getModule().getSwiftModule()))
+              ->getType()->getCanonicalType();
+      auto *cotangentVectorDecl =
+          cotangentVectorTy->getStructOrBoundGenericStruct();
+      assert(cotangentVectorDecl);
+      // Find the corresponding field in the cotangent space.
+      VarDecl *correspondingField = nullptr;
+      // If the cotangent space is the original struct, then field is the same.
+      if (cotangentVectorDecl == seai->getStructDecl())
+        correspondingField = seai->getField();
+      // Otherwise, look up the field by name.
+      else {
+        auto correspondingFieldLookup =
+        cotangentVectorDecl->lookupDirect(seai->getField()->getName());
+        assert(correspondingFieldLookup.size() == 1);
+        correspondingField = cast<VarDecl>(correspondingFieldLookup.front());
+      }
+      // Extract:
+      // - Adjoint buffer of `struct_element_addr`: `adj[y]`.
+      // - Element address of adjoint buffer of `struct_element_addr` operand:
+      //   `adj[x]#key'`.
+      auto adjElt = getAdjointBuffer(seai);
+      auto adjStructElt =
+          builder.createStructElementAddr(loc,
+              getAdjointBuffer(seai->getOperand()), correspondingField);
+      // Accumulate element address's adjoint buffer into the corresponding
+      // element address of `struct_element_addr` operand's adjoint buffer:
+      // `adj[x]#key' += adj[y]`.
+      auto *destAccess = builder.createBeginAccess(
+          loc, adjStructElt, SILAccessKind::Modify,
+          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+          /*fromBuiltin*/ false);
+      auto *readAccess = builder.createBeginAccess(
+          loc, adjElt, SILAccessKind::Read, SILAccessEnforcement::Static,
+          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+      accumulateIndirect(destAccess, readAccess);
+      builder.createEndAccess(loc, readAccess, /*aborted*/ false);
+      builder.createEndAccess(loc, destAccess, /*aborted*/ false);
+      return;
+    }
+    case StructExtractDifferentiationStrategy::Getter: {
+      // Construct pullback arguments.
+      // Allocate buffer for pullback indirect result.
+      auto *pullbackResultBuf = builder.createAllocStack(
+          loc, remapType(getCotangentType(seai->getOperand()->getType(),
+                                          getModule())));
+      auto adjElt = getAdjointBuffer(seai);
+
+      // Get the pullback.
+      auto *pullbackField = getPrimalInfo().lookUpPullbackDecl(seai);
+      assert(pullbackField);
+      auto pullback = builder.createStructExtract(
+          loc, primalValueAggregateInAdj, pullbackField);
+
+      // Call the pullback.
+      auto *pullbackCall = builder.createApply(
+          loc, pullback, {pullbackResultBuf, adjElt}, /*isNonThrowing*/ false);
+      assert(pullbackCall->getNumIndirectResults() == 1 &&
+             pullbackCall->getIndirectSILResults().front() ==
+                  pullbackResultBuf);
+
+      // Accumulate pullback result buffer into adjoint buffer for original
+      // `struct_element_addr` operand.
+      auto *readAccess = builder.createBeginAccess(
+          loc, pullbackResultBuf, SILAccessKind::Read,
+          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+          /*fromBuiltin*/ false);
+      accumulateIndirect(getAdjointBuffer(seai->getOperand()),
+                         pullbackResultBuf);
+      builder.createEndAccess(loc, readAccess, /*aborted*/ false);
+      // Clean up and deallocate pullback indirect result buffer.
+      emitCleanup(builder, loc, pullbackResultBuf);
+      builder.createDeallocStack(loc, pullbackResultBuf);
       break;
     }
     }
@@ -4797,6 +4989,8 @@ void AdjointEmitter::accumulateIndirect(SILValue lhsDestAccess,
                                         SILValue rhsAccess) {
   assert(lhsDestAccess->getType().isAddress() &&
          rhsAccess->getType().isAddress());
+  assert(lhsDestAccess->getFunction() == &getAdjoint());
+  assert(rhsAccess->getFunction() == &getAdjoint());
   auto loc = lhsDestAccess.getLoc();
   auto type = lhsDestAccess->getType();
   auto astType = type.getASTType();
