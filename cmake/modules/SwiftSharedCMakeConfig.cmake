@@ -1,6 +1,8 @@
 include(CMakeParseArguments)
 include(SwiftXcodeSupport)
 
+include(CheckCXXCompilerFlag)
+
 macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
 

@@ -2,7 +2,6 @@
 
 // REQUIRES: swift-remoteast-test
 // REQUIRES: objc_interop
-// REQUIRES: SR9908
 
 import Foundation
 
@@ -31,3 +30,14 @@ printDynamicTypeAndAddressForExistential(NSString("hello") as AnyObject)
 
 // CHECK: NSString
 printDynamicTypeAndAddressForExistential(NSString("hello") as AnyObject)
+
+// Bridged NSError.
+class ClassError : NSError {
+  required init(coder: NSCoder) { fatalError() }
+  init() {
+    super.init(domain: "ClassError", code: 10, userInfo: [:])
+  }
+}
+
+// CHECK: ClassError
+printDynamicTypeAndAddressForExistential(ClassError() as Error)

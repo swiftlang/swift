@@ -1016,6 +1016,9 @@ bb0(%0 : $ConcreteClass):
 sil @test_assign : $(Int, @inout Int) -> () {    // CHECK-LABEL: sil @test_assign
 bb0(%0 : $Int, %1 : $*Int):
   assign %0 to %1 : $*Int                   // CHECK:   assign %0 to %1
+  assign %0 to [init] %1 : $*Int            // CHECK:   assign %0 to [init] %1
+  assign %0 to [reinit] %1 : $*Int          // CHECK:   assign %0 to [reinit] %1
+  assign %0 to [reassign] %1 : $*Int          // CHECK:   assign %0 to [reassign] %1
   unreachable
 }
 

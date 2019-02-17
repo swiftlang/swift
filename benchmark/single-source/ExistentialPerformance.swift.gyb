@@ -1,0 +1,261 @@
+//===--- ExistentialPerformance.swift -------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% # Ignore the following warning. This _is_ the correct file to edit.
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is manually generated from .gyb template and should not
+// be directly modified. Instead, change ExistentialPerformance.swift.gyb
+// and run scripts/generate_harness/generate_harness.py to regenerate this file.
+////////////////////////////////////////////////////////////////////////////////
+
+import TestsUtils
+
+// The purpose of these benchmarks is to evaluate different scenarios when
+// moving the implementation of existentials (protocol values) to heap based
+// copy-on-write buffers.
+//
+// The performance boost of `Ref4` vs `Ref3` is expected because copying the
+// existential only involves copying one reference of the heap based
+// copy-on-write buffer (outline case) that holds the struct vs copying the
+// individual fields of the struct in the inline case of `Ref3`.
+
+let t: [BenchmarkCategory] = [.skip]
+let ta: [BenchmarkCategory] = [.api, .Array, .skip]
+
+%{
+Setup = """
+  let existential = existentialType.init()
+  let existential2 = existentialType.init()
+  var existential = existentialType.init()
+  let existentialArray = grabArray()
+  var existentialArray = grabArray()
+""".splitlines()
+Setup = [Setup[0], Setup[1], '\n'.join(Setup[1:3]), Setup[3], Setup[4], Setup[5]]
+
+Workloads = [
+  ('method.1x', Setup[1], '20_000', """
+    if !existential.doIt() {
+      fatalError("expected true")
+    }
+"""),
+  ('method.2x', Setup[1], '20_000', """
+    if !existential.doIt()  || !existential.reallyDoIt() {
+      fatalError("expected true")
+    }
+"""),
+  ('Pass.method.1x', Setup[2], '20_000', """
+    if !passExistentialTwiceOneMethodCall(existential, existential2) {
+      fatalError("expected true")
+    }
+"""),
+  ('Pass.method.2x', Setup[2], '20_000', """
+    if !passExistentialTwiceTwoMethodCalls(existential, existential2) {
+      fatalError("expected true")
+    }
+"""),
+  ('Mutating', Setup[3], '10_000', """
+    if !existential.mutateIt()  {
+      fatalError("expected true")
+    }
+"""),
+  ('MutatingAndNonMutating', Setup[3], '10_000', """
+    let _ = existential.doIt()
+    if !existential.mutateIt()  {
+      fatalError("expected true")
+    }
+"""),
+  ('Array.init', Setup[0], '100', """
+    blackHole(Array(repeating: existentialType.init(), count: 128))
+"""),
+  ('Array.method.1x', Setup[4], '100', """
+    for elt in existentialArray {
+      if !elt.doIt()  {
+        fatalError("expected true")
+      }
+    }
+"""),
+  ('Array.method.2x', Setup[4], '100', """
+    for elt in existentialArray {
+      if !elt.doIt() || !elt.reallyDoIt() {
+        fatalError("expected true")
+      }
+    }
+"""),
+  ('Array.Mutating', Setup[5], '100', """
+    for i in 0 ..< existentialArray.count {
+      if !existentialArray[i].mutateIt()  {
+        fatalError("expected true")
+      }
+    }
+"""),
+  ('Array.Shift', Setup[5], '25', """
+    for i in 0 ..< existentialArray.count-1 {
+      existentialArray.swapAt(i, i+1)
+    }
+"""),
+  ('Array.ConditionalShift', Setup[5], '25', """
+    for i in 0 ..< existentialArray.count-1 {
+      let curr = existentialArray[i]
+      if curr.doIt() {
+        existentialArray[i] = existentialArray[i+1]
+        existentialArray[i+1] = curr
+      }
+    }
+"""),
+]
+Vars = [(0, 0), (1, 3), (2, 7), (3, 13)]
+Refs = ['Ref' + str(i) for i in range(1, 5)]
+Vals = ['Val' + str(i) for i in range(0, 5)]
+Names = [(group + '.' + variant, group, variant)
+         for (group, _, _, _) in Workloads for variant in Refs + Vals]
+
+def create_array(group):
+  return 'Array' in group and 'Array.init' not in group
+
+import re
+
+method_variant_re = re.compile(r'\.([a-z])')
+control_flow_separator_re = re.compile(r'-')
+group_separator_re = re.compile(r'\.')
+
+def run_function_name(benchmark_name):
+  return 'run_' + group_separator_re.sub(  # remove dots
+    '', method_variant_re.sub(  # replace .methodName with _methodName
+      r'_\1', control_flow_separator_re.sub( # remove dashes
+        '', benchmark_name)))
+}%
+public let ExistentialPerformance: [BenchmarkInfo] = [
+% for (Name, Group, Variant) in Names:
+  BenchmarkInfo(name: "Existential.${Name}",
+    runFunction: ${run_function_name(Group)
+    }, tags: ${ 'ta' if 'Array' in Name else 't'
+    }, setUpFunction: ${ ('ca' if create_array(Group) else 'et') + Variant }),
+% end
+]
+
+// To exclude the setup overhead of existential array initialization,
+// these are setup functions that **create array** for each variant type.
+var array: [Existential]!
+func ca<T: Existential>(_: T.Type) {
+  array = Array(repeating: T(), count: 128)
+}
+% for Variant in Vals + Refs:
+func ca${Variant}() { ca(${Variant}.self) }
+% end
+@inline(never)
+func grabArray() -> [Existential] { // transfer array ownership to caller
+  // FIXME: This is causing Illegal Instruction: 4 crash
+  // defer { array = nil }
+  // return array
+  // This doesn't work either:
+  // let a = array!
+  // array = nil
+  // return a
+  return array!
+}
+
+// `setUpFunctions` that determine which existential type will be tested
+var existentialType: Existential.Type!
+% for Variant in Vals + Refs:
+func et${Variant}() { existentialType = ${Variant}.self }
+% end
+
+protocol Existential {
+  init()
+  func doIt() -> Bool
+  func reallyDoIt() -> Bool
+  mutating func mutateIt() -> Bool
+}
+
+func next(_ x: inout Int, upto mod: Int) {
+  x = (x + 1) % (mod + 1)
+}
+
+% for (V, i) in [(v, int(filter(str.isdigit, v))) for v in Vals]:
+struct ${V} : Existential {${
+  ''.join(['\n	var f{0}: Int = {1}'.format(vi, v)
+              for (vi, v) in Vars[0:i]]) +
+  '\n' if i > 0 else ''}
+  func doIt() -> Bool {
+    return ${'f0 == 0' if i > 0 else 'true'}
+	}
+  func reallyDoIt() -> Bool {
+    return ${
+      'true' if i == 1 else  # so that Val1 doesn't do more work than Val2
+      ' && '.join(['f{0} == {1}'.format(vi, v) for (vi, v) in Vars[0:i]]) or
+      'true'}
+  }
+  mutating func mutateIt() -> Bool {${
+    ''.join(['\n    next(&f{0}, upto: {1})'.format(vi, (v if v > 0 else 1))
+               for (vi, v) in Vars[0:i]])}
+    return true
+	}
+}
+
+% end
+class Klazz { // body same as Val2
+  var f0: Int = 0
+  var f1: Int = 3
+
+  func doIt() -> Bool {
+    return f0 == 0
+	}
+  func reallyDoIt() -> Bool {
+   return f0 == 0 && f1 == 3
+  }
+  func mutateIt() -> Bool{
+    next(&f0, upto: 1)
+    next(&f1, upto: 3)
+    return true
+	}
+}
+
+% for (V, i) in [(v, int(filter(str.isdigit, v))) for v in Refs]:
+struct ${V} : Existential {
+	${'\n	'.join([('var f{0}: Klazz = Klazz()'.format(vi) if vi < 3 else
+                 'var f3: Int = 0') for (vi, _) in Vars[0:i]])}
+
+  func doIt() -> Bool {
+    return f0.doIt()
+	}
+  func reallyDoIt() -> Bool {
+   return f0.reallyDoIt()
+  }
+  mutating func mutateIt() -> Bool{
+    return f0.mutateIt()
+  }
+}
+
+% end
+
+@inline(never)
+func passExistentialTwiceOneMethodCall(_ e0: Existential, _ e1: Existential)
+  -> Bool {
+  return e0.doIt() && e1.doIt()
+}
+
+@inline(never)
+func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential)
+  -> Bool {
+  return e0.doIt() && e1.doIt() && e0.reallyDoIt() && e1.reallyDoIt()
+}
+% for (group, setup, multiple, workload) in Workloads:
+${"""
+func {0}(_ N: Int) {{
+{1}
+  for _ in 0 ..< N * {2} {{{3}  }}
+}}""".format(run_function_name(group), setup, multiple, workload)}
+% end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

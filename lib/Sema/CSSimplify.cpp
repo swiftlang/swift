@@ -1612,20 +1612,27 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   if (type1->hasDependentMember() || type2->hasDependentMember())
     return nullptr;
 
-  auto req = path.back();
+  auto reqPath = path.take_back(2);
+  auto req = reqPath.back();
 
   ConstraintLocator *reqLoc = nullptr;
   if (req.isConditionalRequirement()) {
-    // If underlaying conformance requirement has been fixed as
-    // we there is no reason to fix up conditional requirements.
-    if (cs.hasFixFor(cs.getConstraintLocator(anchor, req)))
+    // path is - ... -> open generic -> type req # -> cond req #,
+    // to identify type requirement we only need `open generic -> type req #`
+    // part, because that's how fixes for type requirements are recorded.
+    reqPath = path.drop_back().take_back(2);
+    // If underlying conformance requirement has been fixed,
+    // then there is no reason to fix up conditional requirements.
+    if (cs.hasFixFor(cs.getConstraintLocator(anchor, reqPath,
+                                             /*summaryFlags=*/0)))
       return nullptr;
 
     // For conditional requirements we need a full path.
     reqLoc = cs.getConstraintLocator(anchor, path, /*summaryFlags=*/0);
   } else {
     // Build simplified locator which only contains anchor and requirement info.
-    reqLoc = cs.getConstraintLocator(anchor, req);
+    reqLoc = cs.getConstraintLocator(anchor, reqPath,
+                                     /*summaryFlags=*/0);
   }
 
   auto reqKind = static_cast<RequirementKind>(req.getValue2());
@@ -2784,9 +2791,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         path.back().isConditionalRequirement()) {
       ConstraintLocator *reqLoc = nullptr;
       if (path.back().isConditionalRequirement()) {
+        // Drop 'conditional requirement' element remainder
+        // of the path is going to point to type requirement
+        // this conditional comes from.
+        auto reqPath = ArrayRef<LocatorPathElt>(path).drop_back();
         // Underlying conformance requirement is itself fixed,
-        // this wouldn't lead to right solution.
-        if (hasFixFor(getConstraintLocator(anchor, path.back())))
+        // this wouldn't lead to a right solution.
+        if (hasFixFor(getConstraintLocator(anchor, reqPath.take_back(2),
+                                           /*summaryFlags=*/0)))
           return SolutionKind::Error;
 
         // For conditional requirements we need complete path, which includes
@@ -2795,8 +2807,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       } else {
         // Let's strip all of the unnecessary information from locator,
         // diagnostics only care about anchor - to lookup type,
-        // and what was the requirement# which is not satisfied.
-        reqLoc = getConstraintLocator(anchor, path.back());
+        // generic signature where requirement comes from, and
+        // what was the requirement# which is not satisfied.
+        auto reqPath = ArrayRef<LocatorPathElt>(path).take_back(2);
+        reqLoc = getConstraintLocator(anchor, reqPath,
+                                      /*summaryFlags=*/0);
       }
 
       auto *fix = MissingConformance::create(*this, type, protocol, reqLoc);

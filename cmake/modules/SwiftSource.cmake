@@ -440,9 +440,13 @@ function(_compile_swift_files
   #
   # See stdlib/CMakeLists.txt and TypeConverter::TypeConverter() in
   # lib/IRGen/GenType.cpp.
-  set(SWIFTFILE_PLATFORM "${SWIFT_SDK_${SWIFTFILE_SDK}_LIB_SUBDIR}")
-  set(copy_legacy_layouts_dep
-      "copy-legacy-layouts-${SWIFTFILE_PLATFORM}-${SWIFTFILE_ARCHITECTURE}")
+  if(SWIFTFILE_IS_STDLIB_CORE)
+    set(SWIFTFILE_PLATFORM "${SWIFT_SDK_${SWIFTFILE_SDK}_LIB_SUBDIR}")
+    set(copy_legacy_layouts_dep
+        "copy-legacy-layouts-${SWIFTFILE_PLATFORM}-${SWIFTFILE_ARCHITECTURE}")
+  else()
+    set(copy_legacy_layouts_dep)
+  endif()
 
   add_custom_command_target(
       dependency_target

@@ -15,8 +15,8 @@ struct D {
 }
 
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s19default_constructor1DV1iSivpfi : $@convention(thin) () -> (Int, Double)
-// CHECK:      [[METATYPE:%.*]] = metatype $@thin Int.Type
-// CHECK-NEXT: [[VALUE:%.*]] = integer_literal $Builtin.IntLiteral, 2
+// CHECK:      [[VALUE:%.*]] = integer_literal $Builtin.IntLiteral, 2
+// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Int.Type
 // CHECK:      [[FN:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK-NEXT: [[LEFT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Double.Type

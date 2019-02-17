@@ -17,6 +17,7 @@ add_swift_host_library(swiftFrontendTool STATIC
     swiftClangImporter
     swiftDWARFImporter
     swiftOption
+  INTERFACE_LINK_LIBRARIES
     clangAPINotes
     clangBasic
 )

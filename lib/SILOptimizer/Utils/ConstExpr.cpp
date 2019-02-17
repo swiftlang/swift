@@ -41,14 +41,25 @@ enum class WellKnownFunction {
   // String.init()
   StringInitEmpty,
   // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
-  StringMakeUTF8
+  StringMakeUTF8,
+  // static String.+= infix(_: inout String, _: String)
+  StringAppend,
+  // static String.== infix(_: String)
+  StringEquals
 };
 
 static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
   if (fn->hasSemanticsAttr("string.init_empty"))
     return WellKnownFunction::StringInitEmpty;
+  // There are two string initializers in the standard library with the
+  // semantics "string.makeUTF8". They are identical from the perspective of
+  // the interpreter. One of those functions is probably redundant and not used.
   if (fn->hasSemanticsAttr("string.makeUTF8"))
     return WellKnownFunction::StringMakeUTF8;
+  if (fn->hasSemanticsAttr("string.append"))
+    return WellKnownFunction::StringAppend;
+  if (fn->hasSemanticsAttr("string.equals"))
+    return WellKnownFunction::StringEquals;
   return None;
 }
 
@@ -587,15 +598,74 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            conventions.getNumIndirectSILResults() == 0 &&
            conventions.getNumParameters() == 4 && "unexpected signature");
     auto literal = getConstantValue(apply->getOperand(1));
-    if (literal.getKind() != SymbolicValue::String)
-      break;
+    if (literal.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
     auto literalVal = literal.getStringValue();
 
     auto byteCount = getConstantValue(apply->getOperand(2));
     if (byteCount.getKind() != SymbolicValue::Integer ||
-        byteCount.getIntegerValue().getLimitedValue() != literalVal.size())
-      break;
+        byteCount.getIntegerValue().getLimitedValue() != literalVal.size()) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
     setValue(apply, literal);
+    return None;
+  }
+  case WellKnownFunction::StringAppend: {
+    // static String.+= infix(_: inout String, _: String)
+    assert(conventions.getNumDirectSILResults() == 0 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 3 &&
+           "unexpected String.+=() signature");
+
+    auto firstOperand = apply->getOperand(1);
+    auto firstString = getConstAddrAndLoadResult(firstOperand);
+    if (firstString.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
+
+    auto otherString = getConstantValue(apply->getOperand(2));
+    if (otherString.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
+
+    auto result = SmallString<8>(firstString.getStringValue());
+    result.append(otherString.getStringValue());
+    auto resultVal =
+        SymbolicValue::getString(result, evaluator.getASTContext());
+    computeFSStore(resultVal, firstOperand);
+    return None;
+  }
+  case WellKnownFunction::StringEquals: {
+    // static String.== infix(_: String, _: String)
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 3 &&
+           "unexpected String.==() signature");
+
+    auto firstString = getConstantValue(apply->getOperand(1));
+    if (firstString.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
+
+    auto otherString = getConstantValue(apply->getOperand(2));
+    if (otherString.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::Default);
+    }
+
+    // The result is a Swift.Bool which is a struct that wraps an Int1.
+    int isEqual = firstString.getStringValue() == otherString.getStringValue();
+    auto intVal =
+        SymbolicValue::getInteger(APInt(1, isEqual), evaluator.getASTContext());
+    auto result = SymbolicValue::getAggregate(ArrayRef<SymbolicValue>(intVal),
+                                              evaluator.getASTContext());
+    setValue(apply, result);
     return None;
   }
   }

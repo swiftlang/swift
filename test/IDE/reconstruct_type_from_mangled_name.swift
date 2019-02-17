@@ -60,7 +60,7 @@ class Myclass2 {
 
     var arr1 = [1, 2]
 // CHECK: decl: @_hasInitialValue var arr1: [Int]
-// CHECK: type: Array<Int>
+// CHECK: type: [Int]
 
     arr1.append(1)
 // FIXME: missing append()
@@ -69,14 +69,14 @@ class Myclass2 {
 
     var arr2 : [Mystruct1]
 // CHECK: decl: var arr2: [Mystruct1]
-// CHECK: type: Array<Mystruct1>
+// CHECK: type: [Mystruct1]
 
     arr2.append(Mystruct1())
 // CHECK: type: (inout Array<Mystruct1>) -> (__owned Mystruct1) -> ()
 
     var arr3 : [Myclass1]
 // CHECK: decl: var arr3: [Myclass1]
-// CHECK: type: Array<Myclass1>
+// CHECK: type: [Myclass1]
 
     arr3.append(Myclass1())
 // CHECK: type: (inout Array<Myclass1>) -> (__owned Myclass1) -> ()
@@ -156,18 +156,18 @@ let genstruct1 = MyGenStruct1<Int, String, [Float]>(x: 1, y: "", z: [1.0])
 func test001() {
 // CHECK: decl: func test001()
   _ = genstruct1
-// CHECK: type: MyGenStruct1<Int, String, Array<Float>>
+// CHECK: type: MyGenStruct1<Int, String, [Float]>
 
   var genstruct2: MyGenStruct1<Int, String, [Int: Int]>
 // CHECK: decl: var genstruct2: MyGenStruct1<Int, String, [Int : Int]>
   _ = genstruct2
-// CHECK: type: MyGenStruct1<Int, String, Dictionary<Int, Int>>
+// CHECK: type: MyGenStruct1<Int, String, [Int : Int]>
   _ = genstruct2.x
 // CHECK: type: Int
   _ = genstruct2.y
 // CHECK: type: String
   _ = genstruct2.z
-// CHECK: type: Dictionary<Int, Int>
+// CHECK: type: [Int : Int]
 
   genstruct2.takesT(123)
 }

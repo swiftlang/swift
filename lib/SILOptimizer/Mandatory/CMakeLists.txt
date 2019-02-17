@@ -17,5 +17,4 @@ silopt_register_sources(
   SemanticARCOpts.cpp
   ClosureLifetimeFixup.cpp
   RawSILInstLowering.cpp
-  MandatoryOptUtils.cpp
 )

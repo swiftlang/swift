@@ -181,3 +181,5 @@ Subscript Substring.subscript(_:) has been removed
 Func Collection.makeIterator() has self access kind changing from NonMutating to __Consuming
 
 Func Sequence.count(where:) has been removed
+
+Constructor _Pointer.init(_:) has been removed

@@ -259,6 +259,9 @@ def parse_segments(path, arch):
     segment_regex = re.compile(
         r"^        0x[0-9a-f]+ \(\s*0x(?P<size>[0-9a-f]+)\) "
         r"(?P<name>.+?) (?P<name2>.+?)$")
+    object_file_segment_regex = re.compile(
+        r"^        0x[0-9a-f]+ \(\s*0x(?P<size>[0-9a-f]+)\)  "
+        r"SEGMENT$")
     section_regex = re.compile(
         r"^            0x[0-9a-f]+ \(\s*0x(?P<size>[0-9a-f]+)\) "
         r"(?P<name>.+?) (?P<name2>.+?)$")
@@ -277,6 +280,12 @@ def parse_segments(path, arch):
         segment_match = segment_regex.match(line)
         if segment_match:
             new_segment = Segment(segment_match.group('name'))
+            segments.append(new_segment)
+            continue
+
+        object_file_segment_match = object_file_segment_regex.match(line)
+        if object_file_segment_match:
+            new_segment = Segment("SEGMENT")
             segments.append(new_segment)
             continue
 

@@ -1438,7 +1438,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     // Emit witness tables.
     auto nom = cast<NominalTypeDecl>(d);
     for (auto c : nom->getLocalConformances(ConformanceLookupKind::All,
-                                            nullptr, /*sorted=*/true)) {
+                                            nullptr)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
           isa<NormalProtocolConformance>(c) &&

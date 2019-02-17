@@ -6,4 +6,6 @@ add_swift_host_library(swiftTBDGen STATIC
   LINK_LIBRARIES
     swiftAST
     swiftSIL
+  LLVM_COMPONENT_DEPENDS
+    demangle
 )

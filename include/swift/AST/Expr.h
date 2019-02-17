@@ -157,8 +157,9 @@ protected:
     HasTrailingClosure : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NumberLiteralExpr, LiteralExpr, 1,
-    IsNegative : 1
+  SWIFT_INLINE_BITFIELD(NumberLiteralExpr, LiteralExpr, 1+1,
+    IsNegative : 1,
+    IsExplicitConversion : 1
   );
 
   SWIFT_INLINE_BITFIELD(StringLiteralExpr, LiteralExpr, 3+1+1,
@@ -744,7 +745,9 @@ class NumberLiteralExpr : public LiteralExpr {
   /// The value of the literal as an ASTContext-owned string. Underscores must
   /// be stripped.
   StringRef Val;  // Use StringRef instead of APInt or APFloat, which leak.
-  
+  ConcreteDeclRef BuiltinInitializer;
+  ConcreteDeclRef Initializer;
+
 protected:
   SourceLoc MinusLoc;
   SourceLoc DigitsLoc;
@@ -755,12 +758,20 @@ public:
        : LiteralExpr(Kind, Implicit), Val(Val), DigitsLoc(DigitsLoc)
    {
      Bits.NumberLiteralExpr.IsNegative = false;
+     Bits.NumberLiteralExpr.IsExplicitConversion = false;
    }
   
   bool isNegative() const { return Bits.NumberLiteralExpr.IsNegative; }
   void setNegative(SourceLoc Loc) {
     MinusLoc = Loc;
     Bits.NumberLiteralExpr.IsNegative = true;
+  }
+
+  bool isExplicitConversion() const {
+    return Bits.NumberLiteralExpr.IsExplicitConversion;
+  }
+  void setExplicitConversion(bool isExplicitConversion = true) {
+    Bits.NumberLiteralExpr.IsExplicitConversion = isExplicitConversion;
   }
 
   StringRef getDigitsText() const { return Val; }
@@ -778,6 +789,32 @@ public:
 
   SourceLoc getDigitsLoc() const {
     return DigitsLoc;
+  }
+
+  /// Retrieve the builtin initializer that will be used to construct the
+  /// boolean literal.
+  ///
+  /// Any type-checked boolean literal will have a builtin initializer, which is
+  /// called first to form a concrete Swift type.
+  ConcreteDeclRef getBuiltinInitializer() const { return BuiltinInitializer; }
+
+  /// Set the builtin initializer that will be used to construct the boolean
+  /// literal.
+  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
+    BuiltinInitializer = builtinInitializer;
+  }
+
+  /// Retrieve the initializer that will be used to construct the boolean
+  /// literal from the result of the initializer.
+  ///
+  /// Only boolean literals that have no builtin literal conformance will have
+  /// this initializer, which will be called on the result of the builtin
+  /// initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the boolean literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
   }
 
   static bool classof(const Expr *E) {
@@ -1125,37 +1162,32 @@ public:
       = static_cast<unsigned>(encoding);
   }
 
-  /// Retrieve the builtin initializer that will be used to construct the string
+  /// Retrieve the builtin initializer that will be used to construct the
   /// literal.
   ///
-  /// Any type-checked string literal will have a builtin initializer, which is
+  /// Any type-checked literal will have a builtin initializer, which is
   /// called first to form a concrete Swift type.
   ConcreteDeclRef getBuiltinInitializer() const {
-    assert(isString() && "Magic identifier literal is not a string");
     return BuiltinInitializer;
   }
 
-  /// Set the builtin initializer that will be used to construct the string
-  /// literal.
+  /// Set the builtin initializer that will be used to construct the literal.
   void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
-    assert(isString() && "Magic identifier literal is not a string");
     BuiltinInitializer = builtinInitializer;
   }
 
-  /// Retrieve the initializer that will be used to construct the string
-  /// literal from the result of the initializer.
+  /// Retrieve the initializer that will be used to construct the literal from
+  /// the result of the initializer.
   ///
-  /// Only string literals that have no builtin literal conformance will have
+  /// Only literals that have no builtin literal conformance will have
   /// this initializer, which will be called on the result of the builtin
   /// initializer.
   ConcreteDeclRef getInitializer() const {
-    assert(isString() && "Magic identifier literal is not a string");
     return Initializer;
   }
 
-  /// Set the initializer that will be used to construct the string literal.
+  /// Set the initializer that will be used to construct the literal.
   void setInitializer(ConcreteDeclRef initializer) {
-    assert(isString() && "Magic identifier literal is not a string");
     Initializer = initializer;
   }
 
