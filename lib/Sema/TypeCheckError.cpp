@@ -1603,7 +1603,7 @@ private:
     ContextScope scope(*this, None);
     scope.enterTry();
 
-    checkPotentiallyThrowingAccessor(E, scope);
+    checkPotentiallyThrowingAccessor(E, scope, TC, E->getTryLoc());
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
@@ -1626,7 +1626,7 @@ private:
     ContextScope scope(*this, Context::getHandled());
     scope.enterTry();
 
-    checkPotentiallyThrowingAccessor(E, scope);
+    checkPotentiallyThrowingAccessor(E, scope, TC, E->getTryLoc());
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
@@ -1641,7 +1641,7 @@ private:
     ContextScope scope(*this, Context::getHandled());
     scope.enterTry();
 
-    checkPotentiallyThrowingAccessor(E, scope);
+    checkPotentiallyThrowingAccessor(E, scope, TC, E->getTryLoc());
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
@@ -1651,35 +1651,17 @@ private:
     return ShouldNotRecurse;
   }
 
-  void checkPotentiallyThrowingAccessor(Expr *E, ContextScope &scope) {
-    class ThrowingAccessorWalker : public ASTWalker {
-    private:
-      ContextFlags *contextFlags;
-
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-        if (isa<AssignExpr>(E)) {
-          return {
-              checkPotentiallyThrowingSetter(cast<AssignExpr>(E), contextFlags),
-              nullptr};
-        }
-        if (isa<MemberRefExpr>(E)) {
-          return {checkPotentiallyThrowingGetter(cast<MemberRefExpr>(E),
-                                                 contextFlags),
-                  nullptr};
-        }
-        return {true, E};
-      }
-
-    public:
-      ThrowingAccessorWalker(ContextFlags *flags) : contextFlags(flags) {}
-    };
-
-    auto walker = ThrowingAccessorWalker(&Flags);
+  void checkPotentiallyThrowingAccessor(Expr *E, ContextScope &scope,
+                                        TypeChecker &typeChecker,
+                                        SourceLoc tryLoc) {
+    auto walker = ThrowingAccessorWalker(&Flags, typeChecker, tryLoc);
     E->walk(walker);
   }
 
   static bool checkPotentiallyThrowingGetter(MemberRefExpr *E,
-                                             ContextFlags *flags) {
+                                             ContextFlags *flags,
+                                             TypeChecker &typeChecker,
+                                             SourceLoc tryLoc) {
     if (!E) {
       return false;
     }
@@ -1703,14 +1685,18 @@ private:
       flags->set(ContextFlags::HasTryThrowSite);
       flags->set(ContextFlags::HasAnyThrowSite);
 
+      auto walker = ThrowingAccessorCoverageChecker(flags, typeChecker, tryLoc);
+      E->walk(walker);
+
       return true;
     }
 
     return false;
   }
 
-  static bool checkPotentiallyThrowingSetter(AssignExpr *E,
-                                             ContextFlags *flags) {
+  static bool checkPotentiallyThrowingSetter(AssignExpr *E, ContextFlags *flags,
+                                             TypeChecker &typeChecker,
+                                             SourceLoc tryLoc) {
     if (!E) {
       return false;
     }
@@ -1740,11 +1726,67 @@ private:
       flags->set(ContextFlags::HasTryThrowSite);
       flags->set(ContextFlags::HasAnyThrowSite);
 
+      auto walker = ThrowingAccessorCoverageChecker(flags, typeChecker, tryLoc);
+      E->walk(walker);
       return true;
     }
 
     return false;
   }
+
+  class ThrowingAccessorWalker : public ASTWalker {
+  private:
+    ContextFlags *contextFlags;
+    TypeChecker &typeChecker;
+    SourceLoc tryLoc;
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (isa<AssignExpr>(E)) {
+        return {checkPotentiallyThrowingSetter(
+                    cast<AssignExpr>(E), contextFlags, typeChecker, tryLoc),
+                nullptr};
+      }
+      if (isa<MemberRefExpr>(E)) {
+        return {checkPotentiallyThrowingGetter(
+                    cast<MemberRefExpr>(E), contextFlags, typeChecker, tryLoc),
+                nullptr};
+      }
+      return {true, E};
+    }
+
+  public:
+    ThrowingAccessorWalker(ContextFlags *flags, TypeChecker &tc, SourceLoc loc)
+        : contextFlags(flags), typeChecker(tc), tryLoc(loc) {}
+  };
+
+  class ThrowingAccessorCoverageChecker : public ASTWalker {
+    ContextFlags *flags;
+    TypeChecker &typeChecker;
+    SourceLoc tryLoc;
+
+  private:
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+
+      if (isa<DeclRefExpr>(E)) {
+        auto decl = cast<DeclRefExpr>(E)->getDecl();
+        auto ctx = decl->getDeclContext()->getLocalContext();
+
+        if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(ctx)) {
+          if (!AFD->hasThrows() && !flags->has(ContextFlags::IsTryCovered)) {
+            typeChecker.diagnose(tryLoc, diag::try_unhandled);
+          }
+        }
+
+        return {false, nullptr};
+      }
+
+      return {true, E};
+    }
+
+  public:
+    ThrowingAccessorCoverageChecker(ContextFlags *contextFlags, TypeChecker &tc,
+                                    SourceLoc loc)
+        : flags(contextFlags), typeChecker(tc), tryLoc(loc) {}
+  };
 };
 
 } // end anonymous namespace
