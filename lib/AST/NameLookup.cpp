@@ -1864,15 +1864,13 @@ namespace {
         : ScopeLookupResult::next,
         AFD->getParent(),
         std::move(lookupDecls),
-          // If we're not in the body of the function (for example, we
-          // might be type checking a default argument expression and
-          // performing name lookup from there), the base declaration
-          // is the nominal type, not 'self'.
-          !AFD->isImplicit() && Loc.isValid() &&
-                  AFD->getBodySourceRange().isValid() &&
-                  !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)
-              ? MetaBaseDC
-              : AFD,
+        // If we're not in the body of the function (for example, we
+        // might be type checking a default argument expression and
+        // performing name lookup from there), the base declaration
+        // is the nominal type, not 'self'.
+        isOutsideBodyOfFunction(AFD)
+            ? MetaBaseDC
+            : AFD,
         MetaBaseDC,
         returnValueForIsCascadingUse
       };
@@ -1985,6 +1983,12 @@ namespace {
       false
       };
   }
+    
+    bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const {
+      return !AFD->isImplicit() && Loc.isValid() &&
+      AFD->getBodySourceRange().isValid() &&
+      !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
+    }
 
   PerScopeLookupState lookupInMiscContext(DeclContext *DC,
                                           Optional<bool> isCascadingUse) {
