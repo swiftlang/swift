@@ -3654,17 +3654,20 @@ private:
     return (insertion.first->getSecond() = bufWithCleanup);
   }
 
-  void addToAdjointBuffer(SILValue destBuffer,
-                          SILValue newValueBufferAccess) {
-    assert(destBuffer->getType().isAddress() &&
-           newValueBufferAccess->getType().isAddress());
-    assert(destBuffer->getFunction() == &getAdjoint());
-    assert(newValueBufferAccess->getFunction() == &getAdjoint());
+  // Accumulates `rhsBufferAccess` into the adjoint buffer corresponding to
+  // `originalBuffer`.
+  void addToAdjointBuffer(SILValue originalBuffer,
+                          SILValue rhsBufferAccess) {
+    assert(originalBuffer->getType().isAddress() &&
+           rhsBufferAccess->getType().isAddress());
+    assert(originalBuffer->getFunction() == &getOriginal());
+    assert(rhsBufferAccess->getFunction() == &getAdjoint());
+    auto adjointBuffer = getAdjointBuffer(originalBuffer);
     auto *destAccess = builder.createBeginAccess(
-        newValueBufferAccess.getLoc(), destBuffer, SILAccessKind::Modify,
+        rhsBufferAccess.getLoc(), adjointBuffer, SILAccessKind::Modify,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
         /*fromBuiltin*/ false);
-    accumulateIndirect(destAccess, newValueBufferAccess);
+    accumulateIndirect(destAccess, rhsBufferAccess);
     builder.createEndAccess(
         destAccess->getLoc(), destAccess, /*aborted*/ false);
   }
@@ -3990,7 +3993,7 @@ public:
       else {
         auto origArg = ai->getArgument(origNumIndRes + selfParamIndex);
         if (cotanWrtSelf->getType().isAddress()) {
-          addToAdjointBuffer(getAdjointBuffer(origArg), ValueWithCleanup(
+          addToAdjointBuffer(origArg, ValueWithCleanup(
             cotanWrtSelf, makeCleanup(cotanWrtSelf, emitCleanup)));
         } else {
           if (origArg->getType().isAddress()) {
@@ -4030,7 +4033,7 @@ public:
         continue;
       }
       if (cotan->getType().isAddress()) {
-        addToAdjointBuffer(getAdjointBuffer(origArg), ValueWithCleanup(
+        addToAdjointBuffer(origArg, ValueWithCleanup(
             cotan, makeCleanup(cotan, emitCleanup)));
       } else {
         if (origArg->getType().isAddress()) {
@@ -4220,17 +4223,27 @@ public:
         assert(correspondingFieldLookup.size() == 1);
         correspondingField = cast<VarDecl>(correspondingFieldLookup.front());
       }
-      // Accumulate adjoint element buffer into adjoint buffer for original
-      // `struct_element_addr` operand.
+      // Extract:
+      // - Adjoint buffer of `struct_element_addr`: `adj[y]`.
+      // - Element address of adjoint buffer of `struct_element_addr` operand:
+      //   `adj[x]#key'`.
+      auto adjElt = getAdjointBuffer(seai);
       auto adjStructElt =
           builder.createStructElementAddr(loc,
               getAdjointBuffer(seai->getOperand()), correspondingField);
-      auto adjElt = getAdjointBuffer(seai);
+      // Accumulate element address's adjoint buffer into the corresponding
+      // element address of `struct_element_addr` operand's adjoint buffer:
+      // `adj[x]#key' += adj[y]`.
+      auto *destAccess = builder.createBeginAccess(
+          loc, adjStructElt, SILAccessKind::Modify,
+          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+          /*fromBuiltin*/ false);
       auto *readAccess = builder.createBeginAccess(
           loc, adjElt, SILAccessKind::Read, SILAccessEnforcement::Static,
           /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      addToAdjointBuffer(adjStructElt, readAccess);
+      accumulateIndirect(destAccess, readAccess);
       builder.createEndAccess(loc, readAccess, /*aborted*/ false);
+      builder.createEndAccess(loc, destAccess, /*aborted*/ false);
       return;
     }
     case StructExtractDifferentiationStrategy::Getter: {
@@ -4440,7 +4453,7 @@ public:
         cai->getLoc(), adjDest, SILAccessKind::Read,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
         /*fromBuiltin*/ false);
-    addToAdjointBuffer(getAdjointBuffer(cai->getSrc()), readAccess);
+    addToAdjointBuffer(cai->getSrc(), readAccess);
     builder.createEndAccess(cai->getLoc(), readAccess, /*aborted*/ false);
     // Set the buffer to zero, with a cleanup.
     auto *bai = dyn_cast<BeginAccessInst>(adjDest.getValue());
