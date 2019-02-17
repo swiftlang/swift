@@ -1944,7 +1944,7 @@ namespace {
       populateLookupDeclsFromContext(ED, lookupDecls);
     return PerScopeLookupState{
       ScopeLookupResult::next,
-                               DC,
+                               ED,
                                std::move(lookupDecls),
                                ED,
                                ED,
@@ -1961,10 +1961,10 @@ namespace {
       populateLookupDeclsFromContext(ND, lookupDecls);
     return PerScopeLookupState{
       ScopeLookupResult::next,
-                               DC,
+                               ND,
                                std::move(lookupDecls),
-                               DC,
-                               DC,
+                               ND,
+                               ND,
                                isCascadingUse.hasValue()
                                    ? isCascadingUse.getValue()
       : ND->isCascadingContextForLookup(false)
