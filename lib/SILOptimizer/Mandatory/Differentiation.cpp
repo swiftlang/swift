@@ -2743,26 +2743,18 @@ public:
       ApplyInst *ai, CanSILFunctionType assocFnTy) {
     auto &context = getContext();
     auto *swiftModule = context.getModule().getSwiftModule();
+    // Get the remapped substitution map.
     auto origSubstMap = getOpSubstitutionMap(ai->getSubstitutionMap());
+
     auto assocGenSig = assocFnTy->getGenericSignature();
     // If associated derivative has no generic signature, then short-circuit and
-    // return original substitution map.
+    // return remapped substitution map.
     if (!assocGenSig)
       return origSubstMap;
 
     // Get the associated function substitution map.
     auto assocGenEnv = assocGenSig->createGenericEnvironment();
     auto assocSubstMap = assocGenEnv->getForwardingSubstitutionMap();
-    // If the primal function has a generic environment, use it to update
-    // `origSubstMap` (because the primal substitution map may have more
-    // requirements).
-    if (auto primalGenEnv = getPrimal()->getGenericEnvironment())
-      origSubstMap = SubstitutionMap::get(
-          primalGenEnv->getGenericSignature(),
-          QuerySubstitutionMap{origSubstMap},
-          LookUpConformanceInModule(swiftModule));
-    // Get the cloner substitution map.
-    auto substMap = SubsMap.empty() ? origSubstMap : SubsMap;
 
     // Jointly iterate through associated function requirements/conformances.
     // Check whether all requirements are satisfied.
@@ -2774,19 +2766,18 @@ public:
       switch (req.getKind()) {
       // Check same type requirements.
       case RequirementKind::SameType: {
-        if (auto origFirstType = firstType.subst(substMap))
+        if (auto origFirstType = firstType.subst(origSubstMap))
           firstType = origFirstType;
-        if (auto origSecondType = secondType.subst(substMap))
+        if (auto origSecondType = secondType.subst(origSubstMap))
           secondType = origSecondType;
         // If the second type is a dependent member type, try to resolve it
         // using the first type as the base type.
         // TODO: Add checks verifying that first type can be the base type.
         if (auto depMemType = secondType->getAs<DependentMemberType>()) {
-          if (!firstType->hasTypeParameter()) {
+          if (!firstType->hasTypeParameter())
             if (auto substType = depMemType->substBaseType(
                     firstType, LookUpConformanceInModule(swiftModule)))
               secondType = substType->getCanonicalType();
-          }
         }
         if (!firstType->isEqual(secondType))
           unsatisfiedRequirements.push_back(req);
@@ -2811,10 +2802,8 @@ public:
           }
         }
         // Otherwise, try to look up conformance in substitution maps.
-        auto isConformanceMet =
-            origSubstMap.lookupConformance(firstType->getCanonicalType(),
-                                           proto) ||
-            substMap.lookupConformance(firstType->getCanonicalType(), proto);
+        auto isConformanceMet = origSubstMap.lookupConformance(
+            firstType->getCanonicalType(), proto);
         if (!isConformanceMet)
           unsatisfiedRequirements.push_back(req);
         conformances = conformances.slice(1);
@@ -2841,8 +2830,8 @@ public:
     // If all requirements are satisfied, return target substitution map.
     return SubstitutionMap::get(
         assocSubstMap.getGenericSignature(),
-        QuerySubstitutionMap{substMap},
-        LookUpConformanceInModule(context.getModule().getSwiftModule()));
+        QuerySubstitutionMap{origSubstMap},
+        LookUpConformanceInModule(swiftModule));
   }
 
   void visitApplyInst(ApplyInst *ai) {
