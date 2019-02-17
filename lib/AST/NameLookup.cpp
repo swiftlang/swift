@@ -1353,7 +1353,6 @@ namespace {
     const bool isOriginallyTypeLookup;
     NamedDeclConsumer Consumer;
     const NLOptions baseNLOptions;
-    Optional<bool> isCascadingUse; // CLEAN ME UP
     SmallVectorImpl<LookupResultEntry> &Results;
     size_t &IndexOfFirstOuterResult;
     
@@ -1377,9 +1376,6 @@ namespace {
           isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
           Consumer(Name, lookupToBeCreated.Results, isOriginallyTypeLookup),
           baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
-          isCascadingUse(options.contains(Flags::KnownPrivate)
-                             ? Optional<bool>(false)
-                             : None),
           Results(lookupToBeCreated.Results),
           IndexOfFirstOuterResult(lookupToBeCreated.IndexOfFirstOuterResult),
           recordedSF(lookupToBeCreated.recordedSF),
@@ -1388,49 +1384,52 @@ namespace {
           breadcrumbs(lookupToBeCreated.breadcrumbs) {}
 
     void fillInLookup() {
-      DeclContext *dc;
-      if (shouldUseASTScopeLookup()) {
-        if (!(dc = astScopeBasedLookup(DC)))
-          return;
-      }
+      const Optional<bool> isCascadingUse = options.contains(Flags::KnownPrivate)
+      ? Optional<bool>(false)
+      : None;
       // Never perform local lookup for operators.
+      std::pair<DeclContext *, bool> dcAndIsCascadingUse =
+      shouldUseASTScopeLookup() ? astScopeBasedLookup(DC, isCascadingUse)
+      : Name.isOperator() ? operatorLookup(DC, isCascadingUse)
+      : nonASTScopeBasedLookup(DC, isCascadingUse);
 
-      else if (Name.isOperator()) {
-        if (!(dc = operatorLookup(DC)))
-          return;
-      } else if (!(dc = nonASTScopeBasedLookup(DC)))
+      if (!dcAndIsCascadingUse.first)
         return;
       
       // TODO: Does the debugger client care about compound names?
       if (Name.isSimpleName() && DebugClient &&
-          DebugClient->lookupOverrides(Name.getBaseName(), dc, Loc,
+          DebugClient->lookupOverrides(Name.getBaseName(), dcAndIsCascadingUse.first, Loc,
                                        isOriginallyTypeLookup, Results))
         return;
 
-      finishLookupRENAME(dc);
+      finishLookupRENAME(dcAndIsCascadingUse.first, dcAndIsCascadingUse.second);
     }
     
   private:
-    /// Return nullptr if done with whole enchilada.
-    DeclContext *astScopeBasedLookup(DeclContext *dc) {
-      const ASTScope *lookupScope = Name.isOperator()
-                                        ? operatorScopeForASTScopeLookup(dc)
-                                        : nonoperatorScopeForASTScopeLookup(dc);
+    /// Return nullptr if done with whole enchilada and isCascadingUse
+    std::pair<DeclContext *, bool> astScopeBasedLookup(DeclContext *dc, Optional<bool> isCascadingUse) {
+      const std::pair<const ASTScope*, Optional<bool>> lookupScopeAndIsCascadingUse = Name.isOperator()
+                                        ? operatorScopeForASTScopeLookup(dc, isCascadingUse)
+                                        : nonoperatorScopeForASTScopeLookup(dc, isCascadingUse);
       // Walk scopes outward from the innermost scope until we find something.
       DeclContext *selfDC = nullptr;
-      for (auto currentScope = lookupScope; currentScope;
+      Optional<bool> currentIsCascadingUse = lookupScopeAndIsCascadingUse.second;
+      for (auto currentScope = lookupScopeAndIsCascadingUse.first;
+           currentScope;
            currentScope = currentScope->getParent()) {
-        auto stausSelfDCFinalDC = lookInScope(currentScope, selfDC, dc);
-        switch (std::get<0>(stausSelfDCFinalDC)) {
+        auto stausSelfDCFinalDCIsCascadingUse = lookInScope(currentScope, selfDC, dc, currentIsCascadingUse);
+        currentIsCascadingUse = std::get<3>(stausSelfDCFinalDCIsCascadingUse);
+        switch (std::get<0>(stausSelfDCFinalDCIsCascadingUse)) {
         case ScopeLookupResult::next:
           break;
         case ScopeLookupResult::stop:
-          return std::get<2>(stausSelfDCFinalDC);
+            return std::make_pair(std::get<2>(stausSelfDCFinalDCIsCascadingUse), std::get<3>(stausSelfDCFinalDCIsCascadingUse).getValue());
         case ScopeLookupResult::finished:
-          return nullptr;
+            return std::make_pair(nullptr, false);
         }
-        selfDC = std::get<1>(stausSelfDCFinalDC);
-        dc = std::get<2>(stausSelfDCFinalDC);
+        selfDC = std::get<1>(stausSelfDCFinalDCIsCascadingUse);
+        dc = std::get<2>(stausSelfDCFinalDCIsCascadingUse);
+        currentIsCascadingUse = std::get<3>(stausSelfDCFinalDCIsCascadingUse);
       }
       llvm_unreachable("impossible");
     }
@@ -1469,22 +1468,25 @@ namespace {
              Ctx.LangOpts.EnableASTScopeLookup;
     }
 
-    const ASTScope *operatorScopeForASTScopeLookup(DeclContext *dc) {
+    std::pair<const ASTScope *, bool>
+    operatorScopeForASTScopeLookup(DeclContext *dc, Optional<bool> isCascadingUse) {
       // Find the source file in which we are performing the lookup.
       SourceFile &sourceFile = *dc->getParentSourceFile();
 
       // Find the scope from which we will initiate unqualified name lookup.
       const ASTScope *lookupScope =
           sourceFile.getScope().findInnermostEnclosingScope(Loc);
-
-      updateIsCascadingForOperator(
-          lookupScope->getInnermostEnclosingDeclContext());
 
       // Operator lookup is always at module scope.
-      return      &sourceFile.getScope();
+      return std::make_pair(
+                            &sourceFile.getScope(),
+                            updateIsCascadingForOperator(
+                                                         lookupScope->getInnermostEnclosingDeclContext(),
+                                                         isCascadingUse));
     }
 
-    const ASTScope *nonoperatorScopeForASTScopeLookup(DeclContext *dc) const {
+    std::pair <const ASTScope *, Optional<bool>>
+    nonoperatorScopeForASTScopeLookup(DeclContext *dc, Optional<bool> isCascadingUse) const {
       // Find the source file in which we are performing the lookup.
       SourceFile &sourceFile = *dc->getParentSourceFile();
 
@@ -1492,13 +1494,14 @@ namespace {
       const ASTScope *lookupScope =
           sourceFile.getScope().findInnermostEnclosingScope(Loc);
 
-      return lookupScope;
+      return std::make_pair(lookupScope, isCascadingUse);
     }
 
     /// Return status and new selfDC and new DC
-    std::tuple<ScopeLookupResult, DeclContext *, DeclContext *>
+    std::tuple<ScopeLookupResult, DeclContext *, DeclContext *, Optional<bool>>
     lookInScope(const ASTScope *const currentScope, DeclContext *selfDC,
-                DeclContext *dc) {
+                DeclContext *dc,
+                const Optional<bool> isCascadingUse) {
       // Perform local lookup within this scope.
       auto localBindings = currentScope->getLocalBindings();
       for (auto local : localBindings) {
@@ -1507,7 +1510,7 @@ namespace {
 
       // If we found anything, we're done.
       if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-        return std::make_tuple(ScopeLookupResult::finished, selfDC, dc);
+        return std::make_tuple(ScopeLookupResult::finished, selfDC, dc, false);
 
       // When we are in the body of a method, get the 'self' declaration.
       if (currentScope->getKind() == ASTScopeKind::AbstractFunctionBody &&
@@ -1515,25 +1518,24 @@ namespace {
               ->getDeclContext()
               ->isTypeContext()) {
         selfDC = currentScope->getAbstractFunctionDecl();
-        return std::make_tuple(ScopeLookupResult::next, selfDC, dc);
+        return std::make_tuple(ScopeLookupResult::next, selfDC, dc, isCascadingUse);
       }
 
       // If there is a declaration context associated with this scope, we might
       // want to look in it.
       if (auto scopeDC = currentScope->getDeclContext())
-        return lookIntoDeclarationContext(scopeDC, selfDC, dc);
-      return std::make_tuple(ScopeLookupResult::next, selfDC, dc);
+        return lookIntoDeclarationContext(scopeDC, selfDC, dc, isCascadingUse);
+      return std::make_tuple(ScopeLookupResult::next, selfDC, dc, isCascadingUse);
     }
 
     /// Returns status and selfDC and DC
-    std::tuple<ScopeLookupResult, DeclContext *, DeclContext *>
+    std::tuple<ScopeLookupResult, DeclContext *, DeclContext *, bool>
     lookIntoDeclarationContext(DeclContext *dc, DeclContext *selfDC,
-                               DeclContext *wasDC) {
+                               DeclContext *wasDC, Optional<bool> isCascadingUse) {
       // If we haven't determined whether we have a cascading use, do so now.
-      if (!isCascadingUse.hasValue()) {
-        isCascadingUse =
-        dc->isCascadingContextForLookup(/*functionsAreNonCascading=*/false);
-      }
+      const bool isCascadingUseResult = isCascadingUse.hasValue()
+      ?  isCascadingUse.getValue()
+      : dc->isCascadingContextForLookup(/*functionsAreNonCascading=*/false);
       
       // Pattern binding initializers are only interesting insofar as they
       // affect lookup in an enclosing nominal type or extension thereof.
@@ -1543,46 +1545,46 @@ namespace {
         if (bindingInit->getImplicitSelfDecl())
           selfDC = bindingInit;
 
-        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC, isCascadingUseResult);
       }
       
       // Default arguments only have 'static' access to the members of the
       // enclosing type, if there is one.
       if (isa<DefaultArgumentInitializer>(dc))
-        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC, isCascadingUseResult);
 
       // Functions/initializers/deinitializers are only interesting insofar as
       // they affect lookup in an enclosing nominal type or extension thereof.
       if (isa<AbstractFunctionDecl>(dc))
-        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC, isCascadingUseResult);
 
       // Subscripts have no lookup of their own.
       if (isa<SubscriptDecl>(dc))
-        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC, isCascadingUseResult);
 
       // Closures have no lookup of their own.
       if (isa<AbstractClosureExpr>(dc))
-        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC, isCascadingUseResult);
 
       // Top-level declarations have no lookup of their own.
       if (isa<TopLevelCodeDecl>(dc))
-        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC, isCascadingUseResult);
 
       // Typealiases have no lookup of their own.
       if (isa<TypeAliasDecl>(dc))
-        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC, isCascadingUseResult);
 
       // Lookup in the source file's scope marks the end.
       if (isa<SourceFile>(dc)) {
         // FIXME: A bit of a hack.
-        return std::make_tuple(ScopeLookupResult::stop, selfDC, dc);
+        return std::make_tuple(ScopeLookupResult::stop, selfDC, dc, isCascadingUseResult);
       }
       
       // We have a nominal type or an extension thereof. Perform lookup into
       // the nominal type.
       auto nominal = dc->getSelfNominalTypeDecl();
       if (!nominal)
-        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC);
+        return std::make_tuple(ScopeLookupResult::next, selfDC, wasDC, isCascadingUseResult);
 
       // Dig out the type we're looking into.
       using LookupDecls = SmallVector<NominalTypeDecl *, 2>;
@@ -1591,7 +1593,7 @@ namespace {
       
       NLOptions options = baseNLOptions;
       // Perform lookup into the type.
-      if (isCascadingUse.getValue())
+      if (isCascadingUseResult)
         options |= NL_KnownCascadingDependency;
       else
         options |= NL_KnownNonCascadingDependency;
@@ -1626,91 +1628,96 @@ namespace {
             filterForDiscriminator(Results, DebugClient);
 
           if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-            return std::make_tuple(ScopeLookupResult::finished, selfDC, wasDC);
+            return std::make_tuple(ScopeLookupResult::finished, selfDC, wasDC, isCascadingUseResult);
         }
       }
       
       // Forget the 'self' declaration.
       selfDC = nullptr;
 
-      return std::make_tuple(ScopeLookupResult::next, selfDC, dc);
+      return std::make_tuple(ScopeLookupResult::next, selfDC, dc, isCascadingUseResult);
     }
 
-    void updateIsCascadingForOperator(const DeclContext *const dc) {
-      if (!isCascadingUse.hasValue()) {
-        isCascadingUse =
-            dc->isCascadingContextForLookup(/*functionsAreNonCascading=*/true);
-      }
+    // TODO: Use me more often
+    bool updateIsCascadingForOperator(const DeclContext *const dc, Optional<bool> isCascadingUse) {
+      return isCascadingUse.hasValue()
+      ? isCascadingUse.getValue()
+      : dc->isCascadingContextForLookup(/*functionsAreNonCascading=*/true);
     }
     
     // return nullptr if lookup done
-    DeclContext * operatorLookup(DeclContext *dc) {
-      updateIsCascadingForOperator(dc);
+    std::pair<DeclContext *, bool> operatorLookup(DeclContext *dc, Optional<bool> isCascadingUse) {
       auto *msc = dc->getModuleScopeContext();
-      return addLocalVariableResults(msc) ? nullptr : msc;
+      return std::make_pair(addLocalVariableResults(msc) ? nullptr : msc,
+      updateIsCascadingForOperator(dc, isCascadingUse));
     }
 
     /// Return nullptr if done looking up.
-    DeclContext *nonASTScopeBasedLookup(DeclContext *const dc) {
+    std::pair<DeclContext *, bool>
+    nonASTScopeBasedLookup(DeclContext *const dc, const Optional<bool> isCascadingUseArg) {
       // If we are inside of a method, check to see if there are any ivars in
       // scope, and if so, whether this is a reference to one of them.
       // FIXME: We should persist this information between lookups.
       DeclContext *nextDC = dc;
+      auto isCascadingUse = isCascadingUseArg;
       while (!nextDC->isModuleScopeContext()) {
-        auto resultAndDC = lookupInOneDeclContext(nextDC);
+        auto resultAndDCAndIsCascadingUse = lookupInOneDeclContext(nextDC, isCascadingUse);
         DeclContext *oldDC = nextDC; // CLEAN UP
-        nextDC = resultAndDC.second;
-        switch (resultAndDC.first) {
+        nextDC = std::get<1>(resultAndDCAndIsCascadingUse);
+        isCascadingUse = std::get<2>(resultAndDCAndIsCascadingUse);
+        switch (std::get<0>(resultAndDCAndIsCascadingUse)) {
           case ScopeLookupResult::next:
             assert(nextDC != oldDC && "non-termination");
             continue;
           case ScopeLookupResult::stop:
             break;
           case ScopeLookupResult::finished:
-            return nullptr;
+            return std::make_pair(nullptr, false);
         }
         break;
       }
-      
-      if (!isCascadingUse.hasValue())
-        isCascadingUse = true;
-      
-      return addLocalVariableResults(nextDC) ? nullptr : nextDC;
+      return std::make_pair(addLocalVariableResults(nextDC) ? nullptr : nextDC, isCascadingUse.hasValue() ? isCascadingUse.getValue(): true);
     }
 
     /// Return the next context to search.
-    std::pair<ScopeLookupResult, DeclContext *>
-    lookupInOneDeclContext(DeclContext *dc) {
-      PerScopeLookupState results =
-          lookupInAppropriateContext(dc, isCascadingUse);
+    std::tuple<ScopeLookupResult, DeclContext *, Optional<bool>>
+    lookupInOneDeclContext(DeclContext *dc, const Optional<bool> isCascadingUseArg) {
+      const PerScopeLookupState results =
+          lookupInAppropriateContext(dc, isCascadingUseArg);
       breadcrumbs.push_back(results);
 
-      isCascadingUse = results.isCascadingUse;
       switch (results.result) {
       case ScopeLookupResult::next:
         break;
       case ScopeLookupResult::stop:
-        return std::make_pair(ScopeLookupResult::next, results.childOfNextDC);
+        return std::make_tuple(ScopeLookupResult::next,
+                               results.childOfNextDC,
+                               results.isCascadingUse);
       case ScopeLookupResult::finished:
-        return std::make_pair(ScopeLookupResult::finished,
-                              results.childOfNextDC);
+        return std::make_tuple(ScopeLookupResult::finished,
+                               results.childOfNextDC,
+                               results.isCascadingUse);
       }
       if (addGenericParametersHereAndInEnclosingScopes(results.childOfNextDC))
-        return std::make_pair(ScopeLookupResult::finished, results.childOfNextDC);
-
+        return std::make_tuple(ScopeLookupResult::finished,
+                               results.childOfNextDC,
+                               results.isCascadingUse);
       if (results.placesToSearch.hasValue() &&
           !results.placesToSearch.getValue().empty()) {
         auto startIndexOfInnerResults = Results.size();
         searchPlacesToSearch(std::move(results.placesToSearch.getValue()), Name,
-                             isCascadingUse.getValue(), baseNLOptions,
+                             results.isCascadingUse.getValue(), baseNLOptions,
                              results.childOfNextDC);
         if (handleUnavailableInnerResults(startIndexOfInnerResults))
-          return std::make_pair(ScopeLookupResult::finished,
-                                results.childOfNextDC);
+          return std::make_tuple(ScopeLookupResult::finished,
+                                 results.childOfNextDC,
+                                 results.isCascadingUse);
       }
       // TODO: What if !BaseDC && lookupDecls non-empty?
       DeclContext *nextDC = results.childOfNextDC->getParentForLookup();
-      return std::make_pair(ScopeLookupResult::next, nextDC);
+      return std::make_tuple(ScopeLookupResult::next,
+                             nextDC,
+                             results.isCascadingUse);
     }
 
     /// Check the generic parameters of our context.
@@ -2011,11 +2018,11 @@ namespace {
       return isFinishedWithLookupNowThatIsAboutToLookForOuterResults();
     }
 
-    void finishLookupRENAME(DeclContext *const dc) {
-      recordLookupOfTopLevelName(dc, Name, isCascadingUse.getValue());
+    void finishLookupRENAME(DeclContext *const dc, const bool isCascadingUse) {
+      recordLookupOfTopLevelName(dc, Name, isCascadingUse);
       recordedSF = dyn_cast<SourceFile>(dc);
       recordedName = Name;
-      recordedIsCascadingUse = isCascadingUse.getValue();
+      recordedIsCascadingUse = isCascadingUse;
 
       // Add private imports to the extra search list.
       SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
