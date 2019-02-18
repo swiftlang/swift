@@ -112,7 +112,7 @@ class Z4 {
   init() {} // expected-note{{selected non-required initializer}}
 
   convenience init(other: Z4) {
-    other.init() // expected-error{{member 'init' cannot be used on value of type 'Z4'}}
+    other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}}
     type(of: other).init() // expected-error{{must use a 'required' initializer}}
   }
 }
@@ -121,7 +121,7 @@ class Z5 : Z4 {
   override init() { }
 
   convenience init(other: Z5) {
-    other.init() // expected-error{{member 'init' cannot be used on value of type 'Z5'}}
+    other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}}
   }
 }
 
@@ -272,7 +272,7 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
 
   var ci1 = x.init(required: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(required: Int)'}}
   var ci2 = x.init(x: 0) // expected-error{{cannot invoke 'T.init' with an argument list of type '(x: Int)'}}
-  var ci3 = x.init() // expected-error{{member 'init' cannot be used on value of type 'T'}}
+  var ci3 = x.init() // expected-error{{init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
   var ci4 = x.init(proto: "") // expected-error{{cannot invoke 'T.init' with an argument list of type '(proto: String)'}}
 
   var ci1a = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}

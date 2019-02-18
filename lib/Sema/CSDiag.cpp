@@ -861,8 +861,31 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
   }
 
   // FIXME: Emit candidate set....
-  
-  
+
+  auto isInitializer =
+      memberName.isSimpleName(DeclBaseName::createConstructor());
+  if (isInitializer && !baseObjTy->is<AnyMetatypeType>()) {
+    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(E)) {
+      // Diagnose 'super.init', which can only appear inside another
+      // initializer, specially.
+      if (isa<SuperRefExpr>(ctorRef->getBase())) {
+        diagnose(baseExpr->getLoc(),
+                 diag::super_initializer_not_in_initializer);
+        return;
+      }
+
+      // Suggest inserting a call to 'type(of:)' to construct another object
+      // of the same dynamic type.
+      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+
+      // Surround the caller in `type(of:)`.
+      diagnose(baseExpr->getLoc(), diag::init_not_instance_member)
+          .fixItInsert(fixItRng.Start, "type(of: ")
+          .fixItInsertAfter(fixItRng.End, ")");
+      return;
+    }
+  }
+
   // Otherwise, we don't have a specific issue to diagnose.  Just say the vague
   // 'cannot use' diagnostic.
   if (!baseObjTy->isEqual(instanceTy))
