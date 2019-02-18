@@ -210,12 +210,12 @@ public:
 
   Optional<std::string>
   createTypeDecl(Node *node, bool &typeAlias) {
-    return Demangle::mangleNode(node);
+    return Demangle::mangleNode(node, &Dem);
   }
 
   BuiltProtocolDecl
   createProtocolDecl(Node *node) {
-    return std::make_pair(Demangle::mangleNode(node), false);
+    return std::make_pair(Demangle::mangleNode(node, &Dem), false);
   }
 
   BuiltProtocolDecl

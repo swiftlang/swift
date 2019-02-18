@@ -820,8 +820,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
 
     } else if (declNameNode->getKind() ==
                  Demangle::Node::Kind::RelatedEntityDeclName) {
-      name = declNameNode->getChild(0)->getText();
-      relatedEntityKind = declNameNode->getText();
+      name = declNameNode->getChild(1)->getText();
+      relatedEntityKind = declNameNode->getFirstChild()->getText();
 
     // Ignore any other decl-name productions for now.
     } else {

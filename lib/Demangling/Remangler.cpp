@@ -311,8 +311,12 @@ class Remangler {
 #include "swift/Demangling/DemangleNodes.def"
 
 public:
-  Remangler(DemanglerPrinter &Buffer,
-            SymbolicResolver Resolver) : Buffer(Buffer), Resolver(Resolver) {}
+  Remangler(DemanglerPrinter &Buffer, SymbolicResolver Resolver,
+            NodeFactory *BorrowFrom)
+       : Buffer(Buffer), Resolver(Resolver) {
+    if (BorrowFrom)
+      Factory.providePreallocatedMemory(*BorrowFrom);
+  }
 
   void mangle(Node *node) {
     switch (node->getKind()) {
@@ -811,9 +815,9 @@ void Remangler::mangleDefaultArgumentInitializer(Node *node) {
 }
 
 void Remangler::mangleDependentAssociatedTypeRef(Node *node) {
-  mangleIdentifier(node);
-  if (node->getNumChildren() != 0)
-    mangleSingleChildNode(node);
+  mangleIdentifier(node->getFirstChild());
+  if (node->getNumChildren() > 1)
+    mangleChildNode(node, 1);
 }
 
 void Remangler::mangleDependentGenericConformanceRequirement(Node *node) {
@@ -1089,11 +1093,9 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
   Buffer << "Tf";
   bool returnValMangled = false;
   for (NodePointer Child : *node) {
-    if (Child->getKind() == Node::Kind::FunctionSignatureSpecializationParam) {
-      if (Child->getIndex() == Node::IndexType(~0)) {
-        Buffer << '_';
-        returnValMangled = true;
-      }
+    if (Child->getKind() == Node::Kind::FunctionSignatureSpecializationReturn) {
+      Buffer << '_';
+      returnValMangled = true;
     }
     mangle(Child);
 
@@ -1104,6 +1106,10 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
   }
   if (!returnValMangled)
     Buffer << "_n";
+}
+
+void Remangler::mangleFunctionSignatureSpecializationReturn(Node *node) {
+  mangleFunctionSignatureSpecializationParam(node);
 }
 
 void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
@@ -1684,9 +1690,9 @@ void Remangler::mangleProtocol(Node *node) {
 }
 
 void Remangler::mangleRetroactiveConformance(Node *node) {
-  mangleAnyProtocolConformance(node->getChild(0));
+  mangleAnyProtocolConformance(node->getChild(1));
   Buffer << 'g';
-  mangleIndex(node->getIndex());
+  mangleIndex(node->getChild(0)->getIndex());
 }
 
 void Remangler::mangleProtocolConformance(Node *node) {
@@ -1921,10 +1927,11 @@ void Remangler::mangleReturnType(Node *node) {
 }
 
 void Remangler::mangleRelatedEntityDeclName(Node *node) {
-  mangleChildNodes(node);
-  if (node->getText().size() != 1)
+  mangleChildNode(node, 1);
+  NodePointer kindNode = node->getFirstChild();
+  if (kindNode->getText().size() != 1)
     unreachable("cannot handle multi-byte related entities");
-  Buffer << "L" << node->getText();
+  Buffer << "L" << kindNode->getText();
 }
 
 void Remangler::mangleSILBoxType(Node *node) {
@@ -2059,9 +2066,9 @@ void Remangler::mangleUnsafeMutableAddressor(Node *node) {
 }
 
 void Remangler::mangleValueWitness(Node *node) {
-  mangleSingleChildNode(node); // type
+  mangleChildNode(node, 1); // type
   const char *Code = nullptr;
-  switch (ValueWitnessKind(node->getIndex())) {
+  switch (ValueWitnessKind(node->getFirstChild()->getIndex())) {
 #define VALUE_WITNESS(MANGLING, NAME) \
     case ValueWitnessKind::NAME: Code = #MANGLING; break;
 #include "swift/Demangling/ValueWitnessMangling.def"
@@ -2331,19 +2338,20 @@ void Remangler::mangleSugaredParen(Node *node) {
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNode(NodePointer node) {
+std::string Demangle::mangleNode(NodePointer node, NodeFactory *BorrowFrom) {
   return mangleNode(node, [](SymbolicReferenceKind, const void *) -> NodePointer {
     unreachable("should not try to mangle a symbolic reference; "
                 "resolve it to a non-symbolic demangling tree instead");
-  });
+  }, BorrowFrom);
 }
 
 std::string
-Demangle::mangleNode(NodePointer node, SymbolicResolver resolver) {
+Demangle::mangleNode(NodePointer node, SymbolicResolver resolver,
+                     NodeFactory *BorrowFrom) {
   if (!node) return "";
 
   DemanglerPrinter printer;
-  Remangler(printer, resolver).mangle(node);
+  Remangler(printer, resolver, BorrowFrom).mangle(node);
 
   return std::move(printer).str();
 }
