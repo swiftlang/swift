@@ -38,6 +38,12 @@
     ('Or', '|'),
     ('Xor', '^')
   ]
+
+  boolOperations = [
+    ('Toggle', 'Xor',  '^'),
+    ('And',    'And',  '&'),
+    ('Or',     'Or',   '|'),
+  ]
 }%
 
 //===----------------------------------------------------------------------===//
@@ -245,3 +251,379 @@ extension UnsafeMutableRawPointer {
 % end
 }
 
+//------------------------------------------------------------------------------
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
+public struct UnsafeAtomicInt {
+  @usableFromInline
+  internal let _ptr: UnsafeMutableRawPointer
+
+  @inlinable
+  public init(_ pointer: UnsafeMutablePointer<Int>) {
+    self._ptr = UnsafeMutableRawPointer(pointer)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicInt {
+  @_transparent
+  public func atomicLoad(
+    ordering: AtomicMemoryOrdering
+  ) -> Int {
+    return _ptr._atomicLoadWord(ordering: ordering)
+  }
+
+  @_transparent
+  public func atomicStore(
+    _ desired: Int,
+    ordering: AtomicMemoryOrdering
+  ) {
+    _ptr._atomicStoreWord(desired, ordering: ordering)
+  }
+
+  @_transparent
+  public func atomicCompareExchange(
+    expected: inout Int,
+    desired: Int,
+    ordering: AtomicMemoryOrdering
+  ) -> Bool {
+    return _ptr._atomicCompareExchangeWord(
+      expected: &expected,
+      desired: desired,
+      ordering: ordering)
+  }
+
+% for (operationName, op) in integerOperations:
+  @_transparent
+  @discardableResult
+  public func atomicFetchThen${operationName}(
+    _ operand: Int,
+    ordering: AtomicMemoryOrdering
+  ) -> Int {
+    return _ptr._atomicFetchThen${operationName}Word(
+      operand,
+      ordering: ordering)
+  }
+% end
+
+% for (operationName, op) in integerOperations:
+  @_transparent
+  @discardableResult
+  public func atomic${operationName}ThenFetch(
+    _ operand: Int,
+    ordering: AtomicMemoryOrdering
+  ) -> Int {
+    return _ptr._atomic${operationName}ThenFetchWord(
+      operand,
+      ordering: ordering)
+  }
+% end
+}
+
+//------------------------------------------------------------------------------
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
+public struct UnsafeAtomicUInt {
+  @usableFromInline
+  internal let _ptr: UnsafeMutableRawPointer
+
+  @inlinable
+  public init(_ pointer: UnsafeMutablePointer<UInt>) {
+    self._ptr = UnsafeMutableRawPointer(pointer)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicUInt {
+  @_transparent
+  public func atomicLoad(
+    ordering: AtomicMemoryOrdering
+  ) -> UInt {
+    return UInt(bitPattern: _ptr._atomicLoadWord(ordering: ordering))
+  }
+
+  @_transparent
+  public func atomicStore(
+    _ desired: UInt,
+    ordering: AtomicMemoryOrdering
+  ) {
+    _ptr._atomicStoreWord(Int(bitPattern: desired), ordering: ordering)
+  }
+
+  @_transparent
+  public func atomicCompareExchange(
+    expected: inout UInt,
+    desired: UInt,
+    ordering: AtomicMemoryOrdering
+  ) -> Bool {
+    var expectedInt = Int(bitPattern: expected)
+    let success = _ptr._atomicCompareExchangeWord(
+      expected: &expectedInt,
+      desired: Int(bitPattern: desired),
+      ordering: ordering)
+    expected = UInt(bitPattern: expectedInt)
+    return success
+  }
+
+% for (operationName, op) in integerOperations:
+  @_transparent
+  @discardableResult
+  public func atomicFetchThen${operationName}Word(
+    _ operand: UInt,
+    ordering: AtomicMemoryOrdering
+  ) -> UInt {
+    let result = _ptr._atomicFetchThen${operationName}Word(
+      Int(bitPattern: operand),
+      ordering: ordering)
+    return UInt(bitPattern: result)
+  }
+% end
+
+% for (operationName, op) in integerOperations:
+  @_transparent
+  @discardableResult
+  public func atomic${operationName}ThenFetchWord(
+    _ operand: UInt,
+    ordering: AtomicMemoryOrdering
+  ) -> UInt {
+    let result = _ptr._atomic${operationName}ThenFetchWord(
+      Int(bitPattern: operand),
+      ordering: ordering)
+    return UInt(bitPattern: result)
+  }
+% end
+}
+
+//------------------------------------------------------------------------------
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
+public struct UnsafeAtomicBool {
+  @usableFromInline
+  internal let _ptr: UnsafeMutableRawPointer
+
+  @inlinable
+  public init(_ pointer: UnsafeMutablePointer<Bool>) {
+    self._ptr = UnsafeMutableRawPointer(pointer)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicBool {
+  @_transparent
+  public func atomicLoad(
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) -> Bool {
+    let value = _ptr._atomicLoadWord(ordering: ordering)
+    return value != 0
+  }
+
+  @_transparent
+  public func atomicStore(
+    _ desired: Bool,
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) {
+    _ptr._atomicStoreWord(desired ? 1 : 0, ordering: ordering)
+  }
+
+  @_transparent
+  public func atomicCompareExchange(
+    expected: inout Bool,
+    desired: Bool,
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) -> Bool {
+    var expectedInt = desired ? 1 : 0
+    let success = _ptr._atomicCompareExchangeWord(
+      expected: &expectedInt,
+      desired: desired ? 1 : 0,
+      ordering: ordering)
+    expected = (expectedInt != 0)
+    return success
+  }
+
+% for (operationName, intName, op) in boolOperations:
+  @_transparent
+  @discardableResult
+  public func atomicFetchThen${operationName}(
+    _ operand: Bool,
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) -> Bool {
+    let result = _ptr._atomicFetchThen${intName}Word(
+      operand ? 1 : 0,
+      ordering: ordering)
+    return (result != 0)
+  }
+% end
+
+% for (operationName, intName, op) in boolOperations:
+  @_transparent
+  @discardableResult
+  public func atomic${operationName}ThenFetch(
+    _ operand: Bool,
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) -> Bool {
+    let result = _ptr._atomic${intName}ThenFetchWord(
+      operand ? 1 : 0,
+      ordering: ordering)
+    return (result != 0)
+  }
+% end
+}
+
+//------------------------------------------------------------------------------
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
+public struct UnsafeAtomicUnmanaged<Instance: AnyObject> {
+  @usableFromInline
+  internal let _ptr: UnsafeMutableRawPointer
+
+  @inlinable
+  public init(_ pointer: UnsafeMutablePointer<Unmanaged<Instance>?>) {
+    self._ptr = UnsafeMutableRawPointer(pointer)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicUnmanaged {
+  @_transparent
+  public func atomicLoad(
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) -> Unmanaged<Instance>? {
+    let value = _ptr._atomicLoadWord(ordering: ordering)
+    guard let p = UnsafeRawPointer(bitPattern: value) else { return nil }
+    return Unmanaged.fromOpaque(p)
+  }
+
+  @_transparent
+  public func atomicStore(
+    _ desired: Unmanaged<Instance>?,
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) {
+    let desiredInt = Int(bitPattern: desired?.toOpaque())
+    _ptr._atomicStoreWord(desiredInt, ordering: ordering)
+  }
+
+  @_transparent
+  public func atomicCompareExchange(
+    expected: inout Unmanaged<Instance>?,
+    desired: Unmanaged<Instance>?,
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) -> Bool {
+    var expectedInt = Int(bitPattern: expected?.toOpaque())
+    let desiredInt = Int(bitPattern: desired?.toOpaque())
+    let success = _ptr._atomicCompareExchangeWord(
+      expected: &expectedInt,
+      desired: desiredInt,
+      ordering: ordering)
+    if let p = UnsafeRawPointer(bitPattern: expectedInt) {
+      expected = Unmanaged.fromOpaque(p)
+    } else {
+      expected = nil
+    }
+    return success
+  }
+}
+
+//------------------------------------------------------------------------------
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
+public struct UnsafeAtomicUnsafeMutablePointer<Pointee> {
+  @usableFromInline
+  internal let _ptr: UnsafeMutableRawPointer
+
+  @inlinable
+  public init(_ pointer: UnsafeMutablePointer<UnsafeMutablePointer<Pointee>?>) {
+    self._ptr = UnsafeMutableRawPointer(pointer)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicUnsafeMutablePointer {
+  @_transparent
+  public func atomicLoad(
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) -> UnsafeMutablePointer<Pointee>? {
+    let value = _ptr._atomicLoadWord(ordering: ordering)
+    return UnsafeMutablePointer(bitPattern: value)
+  }
+
+  @_transparent
+  public func atomicStore(
+    _ desired: UnsafeMutablePointer<Pointee>?,
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) {
+    let desiredInt = Int(bitPattern: desired)
+    _ptr._atomicStoreWord(desiredInt, ordering: ordering)
+  }
+
+  @_transparent
+  public func atomicCompareExchange(
+    expected: inout UnsafeMutablePointer<Pointee>?,
+    desired: UnsafeMutablePointer<Pointee>?,
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) -> Bool {
+    var expectedInt = Int(bitPattern: expected)
+    let desiredInt = Int(bitPattern: desired)
+    let success = _ptr._atomicCompareExchangeWord(
+      expected: &expectedInt,
+      desired: desiredInt,
+      ordering: ordering)
+    expected = UnsafeMutablePointer(bitPattern: expectedInt)
+    return success
+  }
+}
+
+//------------------------------------------------------------------------------
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
+public struct UnsafeAtomicInitializableReference<Instance: AnyObject> {
+  @usableFromInline
+  internal let _ptr: UnsafeMutableRawPointer
+
+  @inlinable
+  public init(_ pointer: UnsafeMutablePointer<Instance?>) {
+    self._ptr = UnsafeMutableRawPointer(pointer)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicInitializableReference {
+  @_transparent
+  public func atomicInitialize(
+    to value: __owned Instance,
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) -> Instance {
+    let desired = Unmanaged.passRetained(value)
+    let desiredInt = Int(bitPattern: desired.toOpaque())
+    var expectedInt = 0
+    let success = _ptr._atomicCompareExchangeWord(
+      expected: &expectedInt,
+      desired: desiredInt,
+      ordering: ordering)
+    if !success {
+      // The reference has already been initialized. Balance the retain that
+      // we performed on `desired`.
+      desired.release()
+    }
+    _precondition(expectedInt != 0)
+    let result = Unmanaged<Instance>.fromOpaque(
+      UnsafeRawPointer(bitPattern: expectedInt)!)
+    return result.takeUnretainedValue()
+  }
+
+  @_transparent
+  public func atomicLoad(
+    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+  ) -> Instance? {
+    let value = _ptr._atomicLoadWord(ordering: ordering)
+    guard let ptr = UnsafeRawPointer(bitPattern: value) else { return nil }
+    return Unmanaged.fromOpaque(ptr).takeUnretainedValue()
+  }
+}
+
+//------------------------------------------------------------------------------
