@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,9 +19,9 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Config.h"
+#include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
-#include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
@@ -30,6 +30,7 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/VersionTuple.h"
 #include <string>
 #include <vector>
 
@@ -64,12 +65,12 @@ namespace swift {
     Complete,
   };
 
-  /// \brief A collection of options that affect the language dialect and
+  /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions {
   public:
 
-    /// \brief The target we are building for.
+    /// The target we are building for.
     ///
     /// This represents the minimum deployment target.
     llvm::Triple Target;
@@ -78,13 +79,16 @@ namespace swift {
     /// Language features
     ///
 
-    /// \brief User-overridable language version to compile for.
+    /// User-overridable language version to compile for.
     version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
 
-    /// \brief Disable API availability checking.
+    /// PackageDescription version to compile for.
+    version::Version PackageDescriptionVersion;
+
+    /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
-    /// \brief Maximum number of typo corrections we are allowed to perform.
+    /// Maximum number of typo corrections we are allowed to perform.
     unsigned TypoCorrectionLimit = 10;
     
     /// Should access control be respected?
@@ -97,20 +101,23 @@ namespace swift {
     /// Support for alternate usage modes
     ///
 
-    /// \brief Enable features useful for running in the debugger.
+    /// Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
+    bool EnableDWARFImporter = false;
+    
     /// Allows using identifiers with a leading dollar.
     bool EnableDollarIdentifiers = false;
 
-    /// \brief Allow throwing call expressions without annotation with 'try'.
+    /// Allow throwing call expressions without annotation with 'try'.
     bool EnableThrowWithoutTry = false;
 
-    /// \brief Enable features useful for running playgrounds.
+    /// Enable features useful for running playgrounds.
     // FIXME: This should probably be limited to the particular SourceFile.
     bool Playground = false;
 
-    /// \brief Keep comments during lexing and attach them to declarations.
+    /// Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
 
     /// Whether to include initializers when code-completing a postfix
@@ -147,20 +154,17 @@ namespace swift {
     /// Flags for developers
     ///
 
-    /// \brief Whether we are debugging the constraint solver.
+    /// Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint
     /// solver.
     bool DebugConstraintSolver = false;
 
-    /// \brief Specific solution attempt for which the constraint
+    /// Specific solution attempt for which the constraint
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
-    /// \brief Enable the iterative type checker.
-    bool IterativeTypeChecker = false;
-
-    /// \brief Enable named lazy member loading.
+    /// Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
 
     /// Debug the generic signatures computed by the generic signature builder.
@@ -171,27 +175,48 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
-    /// \brief The upper bound, in bytes, of temporary data that can be
+    /// How to diagnose cycles encountered
+    CycleDiagnosticKind EvaluatorCycleDiagnostics =
+        CycleDiagnosticKind::NoDiagnose;
+
+    /// The path to which we should emit GraphViz output for the complete
+    /// request-evaluator graph.
+    std::string RequestEvaluatorGraphVizPath;
+
+    /// The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
 
     unsigned SolverBindingThreshold = 1024 * 1024;
 
-    /// \brief The upper bound to number of sub-expressions unsolved
+    /// The upper bound to number of sub-expressions unsolved
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
+
+    /// Disable the shrink phase of the expression type checker.
+    bool SolverDisableShrink = false;
+
+    /// Disable constraint system performance hacks.
+    bool DisableConstraintSolverPerformanceHacks = false;
+
+    /// Enable experimental operator designated types feature.
+    bool EnableOperatorDesignatedTypes = false;
+
+    /// Enable constraint solver support for experimental
+    ///        operator protocol designator feature.
+    bool SolverEnableOperatorDesignatedTypes = false;
 
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
 
-    /// \brief Perform all dynamic allocations using malloc/free instead of
+    /// Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
-    /// \brief Enable experimental property behavior feature.
-    bool EnableExperimentalPropertyBehaviors = false;
+    /// Enable experimental #assert feature.
+    bool EnableExperimentalStaticAssert = false;
 
-    /// \brief Staging flag for treating inout parameters as Thread Sanitizer
+    /// Staging flag for treating inout parameters as Thread Sanitizer
     /// accesses.
     bool DisableTsanInoutInstrumentation = false;
 
@@ -219,9 +244,6 @@ namespace swift {
     /// This is for bootstrapping. It can't be in SILOptions because the
     /// TypeChecker uses it to set resolve the ParameterConvention.
     bool EnableSILOpaqueValues = false;
-    
-    /// Enables key path resilience.
-    bool EnableKeyPathResilience = false;
 
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
@@ -235,6 +257,9 @@ namespace swift {
     /// of Swift do not.
     Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
       Swift3ObjCInferenceWarnings::None;
+
+    /// Diagnose implicit 'override'.
+    bool WarnImplicitOverrides = false;
 
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;
@@ -266,6 +291,15 @@ namespace swift {
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
+    /// Scaffolding to permit experimentation with finer-grained dependencies
+    /// and faster rebuilds.
+    bool EnableExperimentalDependencies = false;
+
+    /// To mimic existing system, set to false.
+    /// To experiment with including file-private and private dependency info,
+    /// set to true.
+    bool ExperimentalDependenciesIncludeIntrafileOnes = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
@@ -277,7 +311,7 @@ namespace swift {
     ///
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
-    clang::VersionTuple getMinPlatformVersion() const {
+    llvm::VersionTuple getMinPlatformVersion() const {
       unsigned major, minor, revision;
       if (Target.isMacOSX()) {
         Target.getMacOSXVersion(major, minor, revision);
@@ -293,7 +327,7 @@ namespace swift {
       } else {
         llvm_unreachable("Unsupported target OS");
       }
-      return clang::VersionTuple(major, minor, revision);
+      return llvm::VersionTuple(major, minor, revision);
     }
 
     /// Sets an implicit platform condition.
@@ -332,18 +366,13 @@ namespace swift {
       return CustomConditionalCompilationFlags;
     }
 
-    /// Whether our effective Swift version is in the Swift 3 family
-    bool isSwiftVersion3() const {
-      return EffectiveLanguageVersion.isVersion3();
-    }
-
     /// Whether our effective Swift version is at least 'major'.
     ///
     /// This is usually the check you want; for example, when introducing
     /// a new language feature which is only visible in Swift 5, you would
     /// check for isSwiftVersionAtLeast(5).
-    bool isSwiftVersionAtLeast(unsigned major) const {
-      return EffectiveLanguageVersion.isVersionAtLeast(major);
+    bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
+      return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
     /// Returns true if the given platform condition argument represents

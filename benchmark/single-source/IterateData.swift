@@ -16,10 +16,10 @@ import Foundation
 public let IterateData = BenchmarkInfo(
   name: "IterateData",
   runFunction: run_IterateData,
-  tags: [.validation, .api, .Data])
+  tags: [.validation, .api, .Data],
+  setUpFunction: { blackHole(data) })
 
-@inline(never)
-func generateData() -> Data {
+let data: Data = {
   var data = Data(count: 16 * 1024)
   let n = data.count
   data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) -> () in
@@ -28,13 +28,11 @@ func generateData() -> Data {
     }
   }
   return data
-}
+}()
 
 @inline(never)
 public func run_IterateData(_ N: Int) {
-  let data = generateData()
-
-  for _ in 0...10*N {
+  for _ in 1...10*N {
     _ = data.reduce(0, &+)
   }
 }

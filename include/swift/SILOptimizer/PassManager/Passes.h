@@ -28,40 +28,40 @@ namespace swift {
     class IRGenModule;
   }
 
-  /// \brief Run all the SIL diagnostic passes on \p M.
+  /// Run all the SIL diagnostic passes on \p M.
   ///
   /// \returns true if the diagnostic passes produced an error
   bool runSILDiagnosticPasses(SILModule &M);
 
-  /// \brief Prepare SIL for the -O pipeline.
+  /// Prepare SIL for the -O pipeline.
   void runSILOptPreparePasses(SILModule &Module);
 
-  /// \brief Run all the SIL performance optimization passes on \p M.
+  /// Run all the SIL performance optimization passes on \p M.
   void runSILOptimizationPasses(SILModule &M);
 
-  /// \brief Run all SIL passes for -Onone on module \p M.
+  /// Run all SIL passes for -Onone on module \p M.
   void runSILPassesForOnone(SILModule &M);
 
-  /// \brief Run the SIL ownership eliminator pass on \p M.
+  /// Run the SIL ownership eliminator pass on \p M.
   bool runSILOwnershipEliminatorPass(SILModule &M);
 
   void runSILOptimizationPassesWithFileSpecification(SILModule &Module,
                                                      StringRef FileName);
 
-  /// \brief Detect and remove unreachable code. Diagnose provably unreachable
+  /// Detect and remove unreachable code. Diagnose provably unreachable
   /// user code.
   void performSILDiagnoseUnreachable(SILModule *M);
 
-  /// \brief Remove dead functions from \p M.
+  /// Remove dead functions from \p M.
   void performSILDeadFunctionElimination(SILModule *M);
 
-  /// \brief Convert SIL to a lowered form suitable for IRGen.
+  /// Convert SIL to a lowered form suitable for IRGen.
   void runSILLoweringPasses(SILModule &M);
 
-  /// \brief Perform SIL Inst Count on M if needed.
+  /// Perform SIL Inst Count on M if needed.
   void performSILInstCountIfNeeded(SILModule *M);
 
-  /// \brief Identifiers for all passes. Used to procedurally create passes from
+  /// Identifiers for all passes. Used to procedurally create passes from
   /// lists of passes.
   enum class PassKind {
 #define PASS(ID, TAG, NAME) ID,

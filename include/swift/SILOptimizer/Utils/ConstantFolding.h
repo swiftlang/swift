@@ -24,6 +24,8 @@
 
 namespace swift {
 
+class SILOptFunctionBuilder;
+
 /// Evaluates the constant result of a binary bit-operation.
 ///
 /// The \p ID must be the ID of a binary bit-operation builtin.
@@ -54,6 +56,8 @@ APInt constantFoldCast(APInt val, const BuiltinInfo &BI);
 /// A utility class to do constant folding.
 class ConstantFolder {
 private:
+  SILOptFunctionBuilder &FuncBuilder;
+
   /// The worklist of the constants that could be folded into their users.
   llvm::SetVector<SILInstruction *> WorkList;
 
@@ -75,16 +79,22 @@ public:
   /// \param EnableDiagnostics Print diagnostics as part of mandatory constant
   ///                          propagation.
   /// \param Callback Called for each constant folded instruction.
-  ConstantFolder(unsigned AssertConfiguration,
+  ConstantFolder(SILOptFunctionBuilder &FuncBuilder,
+                 unsigned AssertConfiguration,
                  bool EnableDiagnostics = false,
                  std::function<void (SILInstruction *)> Callback =
-                   [](SILInstruction *){}) :
+                 [](SILInstruction *){}) :
+    FuncBuilder(FuncBuilder),
     AssertConfiguration(AssertConfiguration),
     EnableDiagnostics(EnableDiagnostics),
     Callback(Callback) { }
 
   /// Initialize the worklist with all instructions of the function \p F.
   void initializeWorklist(SILFunction &F);
+
+  /// When asserts are enabled, dumps the worklist for diagnostic
+  /// purposes. Without asserts this is a no-op.
+  void dumpWorklist() const;
 
   /// Initialize the worklist with a single instruction \p I.
   void addToWorklist(SILInstruction *I) {

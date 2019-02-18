@@ -29,11 +29,17 @@
 #include "../SwiftShims/RuntimeStubs.h"
 #include "../SwiftShims/GlobalObjects.h"
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <shellapi.h>
+#endif
+
 // Backing storage for overrides of `Swift.CommandLine.arguments`.
 static char **_swift_stdlib_ProcessOverrideUnsafeArgv = nullptr;
 static int _swift_stdlib_ProcessOverrideUnsafeArgc = 0;
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_overrideUnsafeArgvArgc(char **argv, int argc) {
   _swift_stdlib_ProcessOverrideUnsafeArgv = argv;
   _swift_stdlib_ProcessOverrideUnsafeArgc = argc;
@@ -45,7 +51,7 @@ void _swift_stdlib_overrideUnsafeArgvArgc(char **argv, int argc) {
 extern "C" char ***_NSGetArgv(void);
 extern "C" int *_NSGetArgc(void);
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -58,7 +64,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   return *_NSGetArgv();
 }
 #elif defined(__linux__) || defined(__CYGWIN__)
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -92,7 +98,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 #elif defined (_WIN32)
 #include <stdlib.h>
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -101,8 +107,53 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
     return _swift_stdlib_ProcessOverrideUnsafeArgv;
   }
 
-  *outArgLen = __argc;
-  return __argv;
+  *outArgLen = 0;
+
+
+  LPWSTR *szArgList;
+  int nArgs;
+  szArgList = CommandLineToArgvW(GetCommandLineW(), &nArgs);
+  if (szArgList == nullptr)
+    return nullptr;
+
+  std::vector<char *> argv;
+  for (int i = 0; i < nArgs; ++i) {
+    int szBufferSize = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                                           szArgList[i], -1, nullptr, 0,
+                                           nullptr, nullptr);
+    if (szBufferSize == 0) {
+      for (char *arg : argv)
+        free(arg);
+      return nullptr;
+    }
+
+    char *buffer = static_cast<char *>(calloc(static_cast<size_t>(szBufferSize),
+                                              sizeof(char)));
+    if (buffer == nullptr) {
+      for (char *arg : argv)
+        free(arg);
+      return nullptr;
+    }
+
+    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, szArgList[i], -1,
+                             buffer, szBufferSize, nullptr, nullptr)) {
+      for (char *arg : argv)
+        free(arg);
+      return nullptr;
+    }
+
+    argv.push_back(buffer);
+  }
+
+  LocalFree(szArgList);
+
+  char **args = static_cast<char **>(calloc(argv.size() + 1, sizeof(char *)));
+  std::copy(argv.begin(), argv.end(), args);
+  args[argv.size()] = nullptr;
+
+  assert(argv.size() < INT_MAX && "overflow");
+  *outArgLen = static_cast<int>(argv.size());
+  return args;
 }
 #elif defined(__FreeBSD__)
 #include <errno.h>
@@ -111,7 +162,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 #include <sys/param.h>
 #include <sys/sysctl.h>
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -156,7 +207,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   return outBuf;
 }
 #else // __ANDROID__; Add your favorite arch's command line arg grabber here.
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
     *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;

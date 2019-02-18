@@ -1,9 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 struct NonCodable : Hashable {
-    var hashValue: Int {
-        return 1
-    }
+    func hash(into hasher: inout Hasher) {}
 
     static func ==(_ lhs: NonCodable, _ rhs: NonCodable) -> Bool {
         return true

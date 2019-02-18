@@ -1088,6 +1088,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "GlobalToMember_Class_Container",
     key.offset: 323,
     key.length: 87,
@@ -1254,6 +1255,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_Class_Swift4",
     key.offset: 741,
     key.length: 88,
@@ -1327,6 +1329,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_SameContainer_Class_Container",
     key.offset: 958,
     key.length: 105,
@@ -1431,6 +1434,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_SameName_Class_Swift4",
     key.offset: 1253,
     key.length: 93,
@@ -1504,6 +1508,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "GlobalToMember_Typedef_Container",
     key.offset: 1627,
     key.length: 82,
@@ -1641,6 +1646,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_Typedef_Swift4",
     key.offset: 2045,
     key.length: 83,
@@ -1700,6 +1706,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_SameContainer_Typedef_Container",
     key.offset: 2259,
     key.length: 100,
@@ -1790,6 +1797,7 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_SameName_Typedef_Swift4",
     key.offset: 2553,
     key.length: 88,

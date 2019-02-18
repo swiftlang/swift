@@ -680,9 +680,9 @@ class Sub : Base {
   override func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-error {{'unavailableMultiNewlyUnnamed(a:b:)' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{17-45=shinyLabeledArguments}} {{46-46=_ }} {{54-54=_ }}
 
   override init(unavailableArgNames: Int) {} // expected-error {{'init(unavailableArgNames:)' has been renamed to 'init(shinyNewName:)'}} {{17-17=shinyNewName }}
-  override init(_ unavailableUnnamed: Int) {} // expected-error {{'init' has been renamed to 'init(a:)'}} {{17-18=a}}
+  override init(_ unavailableUnnamed: Int) {} // expected-error {{'init(_:)' has been renamed to 'init(a:)'}} {{17-18=a}}
   override init(unavailableNewlyUnnamed: Int) {} // expected-error {{'init(unavailableNewlyUnnamed:)' has been renamed to 'init(_:)'}} {{17-17=_ }}
-  override init(_ unavailableMultiUnnamed: Int, _ b: Int) {} // expected-error {{'init' has been renamed to 'init(a:b:)'}} {{17-18=a}} {{49-51=}}
+  override init(_ unavailableMultiUnnamed: Int, _ b: Int) {} // expected-error {{'init(_:_:)' has been renamed to 'init(a:b:)'}} {{17-18=a}} {{49-51=}}
   override init(unavailableMultiNewlyUnnamed a: Int, b: Int) {} // expected-error {{'init(unavailableMultiNewlyUnnamed:b:)' has been renamed to 'init(_:_:)'}} {{17-45=_}} {{54-54=_ }}
 
   override func unavailableTooFew(a: Int, b: Int) {} // expected-error {{'unavailableTooFew(a:b:)' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}}
@@ -964,9 +964,9 @@ struct DeprecatedAccessors {
     DeprecatedAccessors.staticDeprecated = 0 // expected-warning {{setter for 'staticDeprecated' is deprecated: bad setter}} {{none}}
     DeprecatedAccessors.staticDeprecated += 1 // expected-warning {{getter for 'staticDeprecated' is deprecated: bad getter}} {{none}} expected-warning {{setter for 'staticDeprecated' is deprecated: bad setter}} {{none}}
 
-    _ = other[0] // expected-warning {{getter for 'subscript' is deprecated: bad subscript getter}} {{none}}
-    other[0] = 0 // expected-warning {{setter for 'subscript' is deprecated: bad subscript setter}} {{none}}
-    other[0] += 1 // expected-warning {{getter for 'subscript' is deprecated: bad subscript getter}} {{none}} expected-warning {{setter for 'subscript' is deprecated: bad subscript setter}} {{none}}
+    _ = other[0] // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}} {{none}}
+    other[0] = 0 // expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}} {{none}}
+    other[0] += 1 // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}} {{none}} expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}} {{none}}
 
     _ = other[alsoDeprecated: 0] // expected-warning {{'subscript(alsoDeprecated:)' is deprecated: bad subscript!}} {{none}}
     other[alsoDeprecated: 0] = 0 // expected-warning {{'subscript(alsoDeprecated:)' is deprecated: bad subscript!}} {{none}}
@@ -1019,12 +1019,53 @@ struct UnavailableAccessors {
     UnavailableAccessors.staticUnavailable = 0 // expected-error {{setter for 'staticUnavailable' is unavailable: bad setter}} {{none}}
     UnavailableAccessors.staticUnavailable += 1 // expected-error {{getter for 'staticUnavailable' is unavailable: bad getter}} {{none}} expected-error {{setter for 'staticUnavailable' is unavailable: bad setter}} {{none}}
 
-    _ = other[0] // expected-error {{getter for 'subscript' is unavailable: bad subscript getter}} {{none}}
-    other[0] = 0 // expected-error {{setter for 'subscript' is unavailable: bad subscript setter}} {{none}}
-    other[0] += 1 // expected-error {{getter for 'subscript' is unavailable: bad subscript getter}} {{none}} expected-error {{setter for 'subscript' is unavailable: bad subscript setter}} {{none}}
+    _ = other[0] // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}} {{none}}
+    other[0] = 0 // expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}} {{none}}
+    other[0] += 1 // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}} {{none}} expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}} {{none}}
 
     _ = other[alsoUnavailable: 0] // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
     other[alsoUnavailable: 0] = 0 // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
     other[alsoUnavailable: 0] += 1 // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
   }
 }
+
+class BaseDeprecatedInit {
+  @available(*, deprecated) init(bad: Int) { }
+}
+
+class SubInheritedDeprecatedInit: BaseDeprecatedInit { }
+
+_ = SubInheritedDeprecatedInit(bad: 0) // expected-warning {{'init(bad:)' is deprecated}}
+
+// Should produce no warnings.
+enum SR8634_Enum: Int {
+  case a
+  @available(*, deprecated, message: "I must not be raised in synthesized code")
+  case b
+  case c
+}
+
+struct SR8634_Struct: Equatable {
+  @available(*, deprecated, message: "I must not be raised in synthesized code", renamed: "x")
+  let a: Int
+}
+
+@available(*, deprecated, message: "This is a message", message: "This is another message")
+// expected-warning@-1 {{'message' argument has already been specified}}
+func rdar46348825_message() {}
+
+@available(*, deprecated, renamed: "rdar46348825_message", renamed: "unavailable_func_with_message")
+// expected-warning@-1 {{'renamed' argument has already been specified}}
+func rdar46348825_renamed() {}
+
+@available(swift, introduced: 4.0, introduced: 4.0)
+// expected-warning@-1 {{'introduced' argument has already been specified}}
+func rdar46348825_introduced() {}
+
+@available(swift, deprecated: 4.0, deprecated: 4.0)
+// expected-warning@-1 {{'deprecated' argument has already been specified}}
+func rdar46348825_deprecated() {}
+
+@available(swift, obsoleted: 4.0, obsoleted: 4.0)
+// expected-warning@-1 {{'obsoleted' argument has already been specified}}
+func rdar46348825_obsoleted() {}

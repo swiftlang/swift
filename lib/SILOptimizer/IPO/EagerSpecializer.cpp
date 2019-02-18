@@ -31,6 +31,7 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "llvm/Support/Debug.h"
 
@@ -116,7 +117,7 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
       MergedBB = RetBB->split(RetInst->getIterator());
       SILValue OldRetVal = RetInst->getOperand(0);
       RetInst->setOperand(
-          0, MergedBB->createPHIArgument(OldRetVal->getType(),
+          0, MergedBB->createPhiArgument(OldRetVal->getType(),
                                          ValueOwnershipKind::Owned));
       Builder.setInsertionPoint(RetBB);
       Builder.createBranch(Loc, MergedBB, {OldRetVal});
@@ -168,7 +169,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
   {
     // Emit the rethrow logic.
     Builder.emitBlock(ErrorBB);
-    SILValue Error = ErrorBB->createPHIArgument(fnConv.getSILErrorType(),
+    SILValue Error = ErrorBB->createPhiArgument(fnConv.getSILErrorType(),
                                                 ValueOwnershipKind::Owned);
 
     Builder.createBuiltin(Loc,
@@ -184,7 +185,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
   // result value.
   Builder.clearInsertionPoint();
   Builder.emitBlock(NormalBB);
-  return Builder.getInsertionBB()->createPHIArgument(fnConv.getSILResultType(),
+  return Builder.getInsertionBB()->createPhiArgument(fnConv.getSILResultType(),
                                                      ValueOwnershipKind::Owned);
 }
 
@@ -346,7 +347,11 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   auto GenericSig =
     GenericFunc->getLoweredFunctionType()->getGenericSignature();
   auto SubMap = ReInfo.getClonerParamSubstitutionMap();
-  for (auto ParamTy : GenericSig->getSubstitutableParams()) {
+
+  GenericSig->forEachParam([&](GenericTypeParamType *ParamTy, bool Canonical) {
+    if (!Canonical)
+      return;
+
     auto Replacement = Type(ParamTy).subst(SubMap);
     assert(!Replacement->hasTypeParameter());
 
@@ -367,7 +372,8 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
                                   Replacement, LayoutInfo);
       }
     }
-  }
+  });
+
   static_cast<void>(FailedTypeCheckBB);
 
   if (OldReturnBB == &EntryBB) {
@@ -645,7 +651,7 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
     unsigned ArgIdx = OrigArg->getIndex();
 
     auto CastArg = emitArgumentCast(SubstitutedType, OrigArg, ArgIdx);
-    DEBUG(dbgs() << "  Cast generic arg: "; CastArg->print(dbgs()));
+    LLVM_DEBUG(dbgs() << "  Cast generic arg: "; CastArg->print(dbgs()));
 
     if (!substConv.useLoweredAddresses()) {
       CallArgs.push_back(CastArg);
@@ -701,30 +707,33 @@ public:
 } // end anonymous namespace
 
 /// Specializes a generic function for a concrete type list.
-static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
+static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
+                                    SILFunction *GenericFunc,
                                     const SILSpecializeAttr &SA,
                                     const ReabstractionInfo &ReInfo) {
-  DEBUG(dbgs() << "Specializing " << GenericFunc->getName() << "\n");
+  LLVM_DEBUG(dbgs() << "Specializing " << GenericFunc->getName() << "\n");
 
-  DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
-        dbgs() << "  Generic Sig:";
-        dbgs().indent(2); FT->getGenericSignature()->print(dbgs());
-        dbgs() << "  Generic Env:";
-        dbgs().indent(2); GenericFunc->getGenericEnvironment()->dump(dbgs());
-        dbgs() << "  Specialize Attr:";
-        SA.print(dbgs()); dbgs() << "\n");
+  LLVM_DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
+             dbgs() << "  Generic Sig:";
+             dbgs().indent(2); FT->getGenericSignature()->print(dbgs());
+             dbgs() << "  Generic Env:";
+             dbgs().indent(2);
+             GenericFunc->getGenericEnvironment()->dump(dbgs());
+             dbgs() << "  Specialize Attr:";
+             SA.print(dbgs()); dbgs() << "\n");
 
   IsSerialized_t Serialized = IsNotSerialized;
   if (GenericFunc->isSerialized())
     Serialized = IsSerializable;
 
   GenericFuncSpecializer
-        FuncSpecializer(GenericFunc, ReInfo.getClonerParamSubstitutionMap(),
-                        Serialized, ReInfo);
+      FuncSpecializer(FuncBuilder, GenericFunc,
+                      ReInfo.getClonerParamSubstitutionMap(),
+                      Serialized, ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)
-    DEBUG(dbgs() << "  Failed. Cannot specialize function.\n");
+    LLVM_DEBUG(dbgs() << "  Failed. Cannot specialize function.\n");
   return NewFunc;
 }
 
@@ -733,15 +742,20 @@ void EagerSpecializerTransform::run() {
   if (!EagerSpecializeFlag)
     return;
 
+  SILOptFunctionBuilder FuncBuilder(*this);
+
   // Process functions in any order.
   for (auto &F : *getModule()) {
     if (!F.shouldOptimize()) {
-      DEBUG(dbgs() << "  Cannot specialize function " << F.getName()
-                   << " marked to be excluded from optimizations.\n");
+      LLVM_DEBUG(dbgs() << "  Cannot specialize function " << F.getName()
+                        << " marked to be excluded from optimizations.\n");
       continue;
     }
     // Only specialize functions in their home module.
     if (F.isExternalDeclaration() || F.isAvailableExternally())
+      continue;
+
+    if (F.isDynamicallyReplaceable())
       continue;
 
     if (!F.getLoweredFunctionType()->getGenericSignature())
@@ -757,8 +771,7 @@ void EagerSpecializerTransform::run() {
     for (auto *SA : F.getSpecializeAttrs()) {
       auto AttrRequirements = SA->getRequirements();
       ReInfoVec.emplace_back(&F, AttrRequirements);
-      auto *NewFunc = eagerSpecialize(&F, *SA, ReInfoVec.back());
-      notifyAddFunction(NewFunc);
+      auto *NewFunc = eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back());
 
       SpecializedFuncs.push_back(NewFunc);
 

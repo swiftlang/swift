@@ -41,10 +41,10 @@ struct UnlabeledWitness : LabeledRequirement {
 
 // rdar://problem/21333445
 protocol P2 {
-	init(_ : Int) // expected-note{{requirement 'init' declared here}}
+	init(_ : Int) // expected-note{{requirement 'init(_:)' declared here}}
 }
 
-struct XP2 : P2 { // expected-error{{initializer 'init(foo:)' has different argument labels from those required by protocol 'P2' ('init')}}
+struct XP2 : P2 { // expected-error{{initializer 'init(foo:)' has different argument labels from those required by protocol 'P2' ('init(_:)')}}
   let foo: Int 
 }
 
@@ -54,7 +54,7 @@ protocol P3 {
 }
 
 class MislabeledSubscript : P3 {
-  subscript(val: String, label: String) -> Int { // expected-error{{method 'subscript' has different argument labels from those required by protocol 'P3' ('subscript(_:label:)')}}
+  subscript(val: String, label: String) -> Int { // expected-error{{method 'subscript(_:_:)' has different argument labels from those required by protocol 'P3' ('subscript(_:label:)')}}
     return 1
   }
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -42,14 +42,14 @@ entry(%p : $*(), %i: $Builtin.Word):
 }
 
 // CHECK:      define{{( protected)?}} {{.*}}void @dynamic_size(%swift.opaque* noalias nocapture, i64, %swift.type* %T) {{.*}} {
-// CHECK:        %3 = bitcast %swift.type* %T to i8***
-// CHECK-NEXT:   %4 = getelementptr inbounds i8**, i8*** %3, i64 -1
-// CHECK-NEXT:   %T.valueWitnesses = load i8**, i8*** %4, align 8
-// CHECK-NEXT:   %5 = getelementptr inbounds i8*, i8** %T.valueWitnesses, i32 10
-// CHECK-NEXT:   %6 = load i8*, i8** %5, align 8
-// CHECK-NEXT:   %stride = ptrtoint i8* %6 to i64
-// CHECK-NEXT:   %7 = mul nsw i64 %1, %stride
-// CHECK-NEXT:   %8 = getelementptr inbounds i8, i8* %2, i64 %7
+// CHECK:        [[T0:%.*]] = bitcast %swift.type* %T to i8***
+// CHECK-NEXT:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT:   [[VWT:%T.valueWitnesses]] = load i8**, i8*** [[T1]], align 8
+// CHECK:        [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK:        [[STRIDE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 9
+// CHECK:        [[STRIDE:%.*]] = load i64, i64* [[STRIDE_ADDR]]
+// CHECK-NEXT:   [[T0:%.*]] = mul nsw i64 %1, [[STRIDE]]
+// CHECK-NEXT:   getelementptr inbounds i8, i8* %2, i64 [[T0]]
 
 sil @dynamic_size : $@convention(thin) <T> (@in T, Builtin.Word) -> () {
 entry(%p : $*T, %i: $Builtin.Word):

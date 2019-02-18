@@ -1,7 +1,11 @@
-add_swift_library(swiftDemangle SHARED
-  SwiftDemangle.cpp
-  MangleHack.cpp
-  LINK_LIBRARIES swiftDemangling)
+add_swift_host_library(swiftDemangle
+                  SHARED
+                    SwiftDemangle.cpp
+                    MangleHack.cpp
+                  LINK_LIBRARIES
+                    swiftDemangling
+                  C_COMPILE_FLAGS
+                    -DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
 
 swift_install_in_component(compiler
     TARGETS swiftDemangle

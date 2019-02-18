@@ -80,7 +80,7 @@ _UnimplementedError()
 }
 
 //===----------------------------------------------------------------------===//
-// 'Int(truncatingBitPattern:)' initializer
+// 'Int(truncatingIfNeeded:)' initializer
 //===----------------------------------------------------------------------===//
 
 %{
@@ -97,11 +97,11 @@ truncating_bit_pattern_test_template = gyb.parse_template("truncating_bit_patter
 %
 %       for bit_pattern in test_bit_patterns:
 
-FixedPoint.test("${Dst}(truncatingBitPattern:) from ${Src}(${bit_pattern})") {
+FixedPoint.test("${Dst}(truncatingIfNeeded:) from ${Src}(${bit_pattern})") {
 %       input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
   let input = get${Src}(${input})
 %       input = prepare_bit_pattern(input, src_ty.bits, False)
-  let output = get${Dst}(${Dst}(truncatingBitPattern: input))
+  let output = get${Dst}(${Dst}(truncatingIfNeeded: input))
   let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
   expectEqual(expected, output)
 }
@@ -233,22 +233,23 @@ hash_value_test_template = gyb.parse_template("hash_value",
 % for self_ty in all_integer_types(word_bits):
 %   Self = self_ty.stdlib_name
 
-FixedPoint.test("${Self}.hashValue") {
+FixedPoint.test("${Self}.hash(into:)") {
 
 %   for bit_pattern in test_bit_patterns:
 
   do {
 %     input = prepare_bit_pattern(bit_pattern, self_ty.bits, self_ty.is_signed)
     let input = get${Self}(${input})
-    let output = getInt(input.hashValue)
+    var hasher = Hasher()
+    input.hash(into: &hasher)
+    let output = getInt(hasher.finalize())
 
-    var hasher = _SipHash13(_seed: Hasher._seed)
-%     if prepare_bit_pattern(input, word_bits, self_ty.is_signed) == input:
-    hasher._combine(UInt(truncatingIfNeeded: ${input} as ${"" if self_ty.is_signed else "U"}Int))
+%     reference = prepare_bit_pattern(bit_pattern, self_ty.bits, False)
+%     if self_ty.bits == 64:
+    let expected = Hasher._hash(seed: 0, ${reference} as UInt64)
 %     else:
-    hasher._combine(UInt64(truncatingIfNeeded: input))
+    let expected = Hasher._hash(seed: 0, bytes: ${reference}, count: ${self_ty.bits / 8})
 %     end
-    let expected = getInt(Int(truncatingIfNeeded: hasher.finalize()))
     expectEqual(expected, output, "input: \(input)")
   }
 

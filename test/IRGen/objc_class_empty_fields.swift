@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -enable-objc-interop -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -enable-objc-interop -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
 // SR-1055
 

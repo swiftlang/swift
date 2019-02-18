@@ -1,5 +1,11 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -disable-objc-attr-requires-foundation-module -enable-objc-interop %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-usrs -source-filename %s | %FileCheck %s -strict-whitespace
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -disable-objc-attr-requires-foundation-module -enable-objc-interop -print-usrs -source-filename %s | %FileCheck %s -strict-whitespace
+
+#if os(Windows) && (arch(arm64) || arch(x86_64))
+typealias ObjCEnumType = Int32
+#else
+typealias ObjCEnumType = Int
+#endif
 
 import macros
 
@@ -165,7 +171,7 @@ class Observers {
 }
 
 // CHECK: [[@LINE+2]]:7 c:@M@swift_ide_test@objc(cs)ObjCClass1{{$}}
-@objc
+@objc @objcMembers
 class ObjCClass1 {
   // CHECK: [[@LINE+1]]:7 c:@M@swift_ide_test@objc(cs)ObjCClass1(py)instanceVar{{$}}
   var instanceVar: Int = 1
@@ -197,7 +203,7 @@ class ObjCClass1 {
   func instanceFunc1(_ a: Int) {
 
     // CHECK: [[@LINE+1]]:16 s:14swift_ide_test10ObjCClass1C13instanceFunc1yySiF9LocalEnumL_O
-    @objc enum LocalEnum : Int {
+    @objc enum LocalEnum : ObjCEnumType {
       // CHECK: [[@LINE+1]]:12 s:14swift_ide_test10ObjCClass1C13instanceFunc1yySiF9LocalEnumL_O8someCaseyA2FmF
       case someCase
     }
@@ -240,7 +246,7 @@ class ObjCClass1 {
 }
 
 // CHECK: [[@LINE+1]]:12 c:@M@swift_ide_test@E@ObjCEnum{{$}}
-@objc enum ObjCEnum : Int {
+@objc enum ObjCEnum : ObjCEnumType {
 
   // CHECK: [[@LINE+1]]:8 c:@M@swift_ide_test@E@ObjCEnum@ObjCEnumAmazingCase{{$}}
   case amazingCase

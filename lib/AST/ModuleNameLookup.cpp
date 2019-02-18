@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "NameLookupImpl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
@@ -171,11 +170,6 @@ static void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPa
   if (respectAccessControl) {
     auto newEndIter = std::remove_if(localDecls.begin(), localDecls.end(),
                                     [=](ValueDecl *VD) {
-      if (typeResolver) {
-        typeResolver->resolveAccessControl(VD);
-      }
-      if (!VD->hasAccess())
-        return false;
       return !VD->isAccessibleFrom(moduleScopeContext);
     });
     localDecls.erase(newEndIter, localDecls.end());
@@ -264,8 +258,8 @@ void namelookup::lookupInModule(ModuleDecl *startModule,
                                 ArrayRef<ModuleDecl::ImportedModule> extraImports) {
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   ModuleLookupCache cache;
-  bool respectAccessControl = startModule->getASTContext().LangOpts
-                                .EnableAccessControl;
+  bool respectAccessControl =
+      !startModule->getASTContext().isAccessControlDisabled();
   ::lookupInModule<CanTypeSet>(startModule, topAccessPath, decls,
                                resolutionKind, /*canReturnEarly=*/true,
                                typeResolver, cache, moduleScopeContext,
@@ -288,7 +282,7 @@ void namelookup::lookupVisibleDeclsInModule(
     ArrayRef<ModuleDecl::ImportedModule> extraImports) {
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   ModuleLookupCache cache;
-  bool respectAccessControl = M->getASTContext().LangOpts.EnableAccessControl;
+  bool respectAccessControl = !M->getASTContext().isAccessControlDisabled();
   ::lookupInModule<NamedCanTypeSet>(M, accessPath, decls,
                                     resolutionKind, /*canReturnEarly=*/false,
                                     typeResolver, cache, moduleScopeContext,

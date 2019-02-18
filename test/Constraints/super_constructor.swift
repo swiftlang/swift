@@ -21,7 +21,7 @@ class D : B {
 
   init(g:Int) {
     super.init("aoeu") // expected-error{{argument labels '(_:)' do not match any available overloads}}
-    // expected-note @-1 {{overloads for 'B.init' exist with these partially matching parameter lists: (x: Int), (a: UnicodeScalar), (b: UnicodeScalar), (z: Float)}}
+    // expected-note @-1 {{overloads for 'B.init' exist with these partially matching parameter lists: (a: UnicodeScalar), (b: UnicodeScalar), (x: Int), (z: Float)}}
   }
 
   init(h:Int) {

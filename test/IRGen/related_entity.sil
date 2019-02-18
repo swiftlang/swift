@@ -1,0 +1,50 @@
+// RUN: %empty-directory(%t)
+// RUN: %{python} %utils/chex.py < %s > %t/checkfile
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-ir -o - -primary-file %s -import-objc-header %S/Inputs/error_domains.h | %FileCheck %t/checkfile --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+
+sil_stage canonical
+
+import Swift
+import Foundation
+
+sil public_external @take_metatype : $@convention(thin) <T> (@thick T.Type) -> ()
+
+sil @use_metatypes : $@convention(thin) () -> () {
+bb0:
+  %take = function_ref @take_metatype : $@convention(thin) <T> (@thick T.Type) -> ()
+
+// CHECK:         [[TagError1_NAME:@[0-9]+]] = private constant [14 x i8] c"TagError1\00Re\00\00"
+// CHECK:         @"$sSC9TagError1LeVMn" = linkonce_odr hidden constant
+// CHECK-SAME:    <i32 0x0006_0011>
+// CHECK-SAME:    @"$sSCMXM"
+// CHECK-SAME:    [14 x i8]* [[TagError1_NAME]]
+  %0 = metatype $@thick TagError1.Type
+  apply %take<TagError1>(%0) : $@convention(thin) <T> (@thick T.Type) -> ()
+
+// CHECK:         [[TagError2_NAME:@[0-9]+]] = private constant [17 x i8] c"Code\00NTagError2\00\00"
+// CHECK:         @"$sSo9TagError2VMn" = linkonce_odr hidden constant
+// CHECK-SAME:    <i32 0x0006_0012>
+// CHECK-SAME:    @"$sSoMXM"
+// CHECK-SAME:    [17 x i8]* [[TagError2_NAME]]
+  %1 = metatype $@thick TagError2.Code.Type
+  apply %take<TagError2.Code>(%1) : $@convention(thin) <T> (@thick T.Type) -> ()
+
+// CHECK:         [[TypedefError1_NAME:@[0-9]+]] = private constant [18 x i8] c"TypedefError1\00RE\00\00"
+// CHECK:         @"$sSC13TypedefError1LEVMn" = linkonce_odr hidden constant
+// CHECK-SAME:    <i32 0x0006_0011>
+// CHECK-SAME:    @"$sSCMXM"
+// CHECK-SAME:    [18 x i8]* [[TypedefError1_NAME]]
+  %2 = metatype $@thick TypedefError1.Type
+  apply %take<TypedefError1>(%2) : $@convention(thin) <T> (@thick T.Type) -> ()
+
+// CHECK:         [[TypedefError2Code_NAME:@[0-9]+]] = private constant [24 x i8] c"Code\00NTypedefError2\00St\00\00"
+// CHECK:         @"$sSo13TypedefError2aMn" = linkonce_odr hidden constant
+// CHECK-SAME:    <i32 0x0006_0012>
+// CHECK-SAME:    @"$sSoMXM"
+// CHECK-SAME:    [24 x i8]* [[TypedefError2Code_NAME]]
+  %3 = metatype $@thick TypedefError2.Code.Type
+  apply %take<TypedefError2.Code>(%3) : $@convention(thin) <T> (@thick T.Type) -> ()
+
+  %ret = tuple ()
+  return %ret : $()
+}

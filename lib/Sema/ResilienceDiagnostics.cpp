@@ -58,11 +58,6 @@ TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
         return std::make_pair(FragileFunctionKind::Inlinable,
                               /*treatUsableFromInlineAsPublic=*/true);
 
-      if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
-        if (attr->getKind() == InlineKind::Always)
-          return std::make_pair(FragileFunctionKind::InlineAlways,
-                                /*treatUsableFromInlineAsPublic=*/true);
-
       // If a property or subscript is @inlinable, the accessors are
       // @inlinable also.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD))
@@ -86,6 +81,13 @@ void TypeChecker::diagnoseInlinableLocalType(const NominalTypeDecl *NTD) {
   }
 }
 
+/// A uniquely-typed boolean to reduce the chances of accidentally inverting
+/// a check.
+enum class DowngradeToWarning: bool {
+  No,
+  Yes
+};
+
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
                                            const ValueDecl *D,
                                            const DeclContext *DC,
@@ -104,38 +106,67 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
                               TreatUsableFromInlineAsPublic).isPublic())
     return false;
 
-  // Enum cases are handled as part of their containing enum.
-  if (isa<EnumElementDecl>(D))
+  // Dynamic declarations were mistakenly not checked in Swift 4.2.
+  // Do enforce the restriction even in pre-Swift-5 modes if the module we're
+  // building is resilient, though.
+  if (D->isObjCDynamic() && !Context.isSwiftVersionAtLeast(5) &&
+      DC->getParentModule()->getResilienceStrategy() !=
+        ResilienceStrategy::Resilient) {
     return false;
+  }
 
-  // Protocol requirements are not versioned because there's no
-  // global entry point.
-  if (isa<ProtocolDecl>(D->getDeclContext()) &&
-      D->isProtocolRequirement())
-    return false;
+  // Property initializers that are not exposed to clients are OK.
+  if (auto pattern = dyn_cast<PatternBindingInitializer>(DC)) {
+    auto bindingIndex = pattern->getBindingIndex();
+    auto &patternEntry = pattern->getBinding()->getPatternList()[bindingIndex];
+    auto varDecl = patternEntry.getAnchoringVarDecl();
+    if (!varDecl->isInitExposedToClients())
+      return false;
+  }
 
-  // Dynamic declarations are not versioned because there's no
-  // global entry point.
-  if (D->isDynamic())
-    return false;
+  DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 
-  // FIXME: Figure out what to do with typealiases
-  if (isa<TypeAliasDecl>(D))
-    return false;
+  // Swift 4.2 did not perform any checks for type aliases.
+  if (isa<TypeAliasDecl>(D)) {
+    if (!Context.isSwiftVersionAtLeast(4, 2))
+      return false;
+    if (!Context.isSwiftVersionAtLeast(5))
+      downgradeToWarning = DowngradeToWarning::Yes;
+  }
 
-  diagnose(loc, diag::resilience_decl_unavailable,
-           D->getDescriptiveKind(), D->getFullName(),
+  auto diagName = D->getFullName();
+  bool isAccessor = false;
+
+  // Swift 4.2 did not check accessor accessiblity.
+  if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+    isAccessor = true;
+
+    if (!Context.isSwiftVersionAtLeast(5))
+      downgradeToWarning = DowngradeToWarning::Yes;
+
+    // For accessors, diagnose with the name of the storage instead of the
+    // implicit '_'.
+    diagName = accessor->getStorage()->getFullName();
+  }
+
+  auto diagID = diag::resilience_decl_unavailable;
+  if (downgradeToWarning == DowngradeToWarning::Yes)
+    diagID = diag::resilience_decl_unavailable_warn;
+
+  diagnose(loc, diagID,
+           D->getDescriptiveKind(), diagName,
            D->getFormalAccessScope().accessLevelForDiagnostics(),
-           static_cast<unsigned>(Kind));
+           static_cast<unsigned>(Kind),
+           isAccessor);
 
   if (TreatUsableFromInlineAsPublic) {
     diagnose(D, diag::resilience_decl_declared_here,
-             D->getDescriptiveKind(), D->getFullName());
+             D->getDescriptiveKind(), diagName, isAccessor);
   } else {
     diagnose(D, diag::resilience_decl_declared_here_public,
-             D->getDescriptiveKind(), D->getFullName());
+             D->getDescriptiveKind(), diagName, isAccessor);
   }
 
-  return true;
+  return (downgradeToWarning == DowngradeToWarning::No);
 }
 

@@ -16,6 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTDemangler.h"
+#include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
@@ -42,16 +44,25 @@ void anchorForGetMainExecutable() {}
 
 using namespace llvm::MachO;
 
-static bool validateModule(llvm::StringRef data, bool Verbose,
-                           swift::serialization::ValidationInfo &info,
-                           swift::serialization::ExtendedValidationInfo &extendedInfo) {
+static bool
+validateModule(llvm::StringRef data, bool Verbose,
+               swift::serialization::ValidationInfo &info,
+               swift::serialization::ExtendedValidationInfo &extendedInfo) {
   info = swift::serialization::validateSerializedAST(data, &extendedInfo);
   if (info.status != swift::serialization::Status::Valid)
+    return false;
+
+  swift::CompilerInvocation CI;
+  if (CI.loadFromSerializedAST(data) != swift::serialization::Status::Valid)
     return false;
 
   if (Verbose) {
     if (!info.shortVersion.empty())
       llvm::outs() << "- Swift Version: " << info.shortVersion << "\n";
+    llvm::outs() << "- Compatibility Version: "
+                 << CI.getLangOptions()
+                        .EffectiveLanguageVersion.asAPINotesVersionString()
+                 << "\n";
     llvm::outs() << "- Target: " << info.targetTriple << "\n";
     if (!extendedInfo.getSDKPath().empty())
       llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";
@@ -83,15 +94,16 @@ static void resolveDeclFromMangledNameList(
 
 static void resolveTypeFromMangledNameList(
     swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
-  std::string Error;
   for (auto &Mangled : MangledNames) {
     swift::Type ResolvedType =
-        swift::ide::getTypeFromMangledSymbolname(Ctx, Mangled, Error);
+        swift::Demangle::getTypeForMangling(Ctx, Mangled);
     if (!ResolvedType) {
-      llvm::errs() << "Can't resolve type of " << Mangled << "\n";
+      llvm::outs() << "Can't resolve type of " << Mangled << "\n";
     } else {
-      ResolvedType->print(llvm::errs());
-      llvm::errs() << "\n";
+      swift::PrintOptions PO;
+      PO.PrintStorageRepresentationAttrs = true;
+      ResolvedType->print(llvm::outs(), PO);
+      llvm::outs() << "\n";
     }
   }
 }
@@ -172,27 +184,43 @@ int main(int argc, char **argv) {
   INITIALIZE_LLVM();
 
   // Command line handling.
-  llvm::cl::list<std::string> InputNames(
-    llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
-    llvm::cl::OneOrMore);
+  using namespace llvm::cl;
+  static OptionCategory Visible("Specific Options");
+  HideUnrelatedOptions({&Visible});
 
-  llvm::cl::opt<bool> DumpModule(
-    "dump-module", llvm::cl::desc(
-      "Dump the imported module after checking it imports just fine"));
+  list<std::string> InputNames(Positional, desc("compiled_swift_file1.o ..."),
+                               OneOrMore, cat(Visible));
 
-  llvm::cl::opt<bool> Verbose(
-      "verbose", llvm::cl::desc("Dump informations on the loaded module"));
+  opt<bool> DumpModule(
+      "dump-module",
+      desc("Dump the imported module after checking it imports just fine"),
+      cat(Visible));
 
-  llvm::cl::opt<std::string> ModuleCachePath(
-    "module-cache-path", llvm::cl::desc("Clang module cache path"));
+  opt<bool> Verbose("verbose", desc("Dump informations on the loaded module"),
+                    cat(Visible));
 
-  llvm::cl::opt<std::string> DumpDeclFromMangled(
-      "decl-from-mangled", llvm::cl::desc("dump decl from mangled names list"));
+  opt<std::string> ModuleCachePath(
+      "module-cache-path", desc("Clang module cache path"), cat(Visible));
 
-  llvm::cl::opt<std::string> DumpTypeFromMangled(
-      "type-from-mangled", llvm::cl::desc("dump type from mangled names list"));
+  opt<std::string> DumpDeclFromMangled(
+      "decl-from-mangled", desc("dump decl from mangled names list"),
+      cat(Visible));
 
-  llvm::cl::ParseCommandLineOptions(argc, argv);
+  opt<std::string> DumpTypeFromMangled(
+      "type-from-mangled", desc("dump type from mangled names list"),
+      cat(Visible));
+
+  opt<std::string> ResourceDir(
+      "resource-dir",
+      desc("The directory that holds the compiler resource files"),
+      cat(Visible));
+
+  opt<bool> EnableDWARFImporter(
+      "enable-dwarf-importer",
+      desc("Import with LangOptions.EnableDWARFImporter = true"), cat(Visible));
+
+  ParseCommandLineOptions(argc, argv);
+
   // Unregister our options so they don't interfere with the command line
   // parsing in CodeGen/BackendUtil.cpp.
   ModuleCachePath.removeArgument();
@@ -204,7 +232,7 @@ int main(int argc, char **argv) {
     if (Filename.empty())
       return true;
     if (!llvm::sys::fs::exists(llvm::Twine(Filename))) {
-      llvm::errs() << Filename << " does not exists, exiting.\n";
+      llvm::errs() << Filename << " does not exist, exiting.\n";
       return false;
     }
     if (!llvm::sys::fs::is_regular_file(llvm::Twine(Filename))) {
@@ -253,6 +281,11 @@ int main(int argc, char **argv) {
 
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.getLangOptions().EnableDWARFImporter = EnableDWARFImporter;
+
+  if (!ResourceDir.empty()) {
+    Invocation.setRuntimeResourcePath(ResourceDir);
+  }
 
   if (CI.setup(Invocation))
     return 1;

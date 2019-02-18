@@ -22,6 +22,7 @@ let sequenceCount = 4096
 let prefixCount = 1024
 let dropCount = sequenceCount - prefixCount
 let sumCount = prefixCount * (prefixCount - 1) / 2
+let array: [Int] = Array(0..<sequenceCount)
 
 public let DropLast = [
   BenchmarkInfo(
@@ -51,7 +52,8 @@ public let DropLast = [
   BenchmarkInfo(
     name: "DropLastArray",
     runFunction: run_DropLastArray,
-    tags: [.validation, .api, .Array, .unstable]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
   BenchmarkInfo(
     name: "DropLastCountableRangeLazy",
     runFunction: run_DropLastCountableRangeLazy,
@@ -79,7 +81,8 @@ public let DropLast = [
   BenchmarkInfo(
     name: "DropLastArrayLazy",
     runFunction: run_DropLastArrayLazy,
-    tags: [.validation, .api, .Array, .unstable]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
 ]
 
 @inline(never)
@@ -150,7 +153,7 @@ public func run_DropLastAnyCollection(_ N: Int) {
 }
 @inline(never)
 public func run_DropLastArray(_ N: Int) {
-  let s = Array(0..<sequenceCount)
+  let s = array
   for _ in 1...20*N {
     var result = 0
     for element in s.dropLast(dropCount) {
@@ -227,7 +230,7 @@ public func run_DropLastAnyCollectionLazy(_ N: Int) {
 }
 @inline(never)
 public func run_DropLastArrayLazy(_ N: Int) {
-  let s = (Array(0..<sequenceCount)).lazy
+  let s = (array).lazy
   for _ in 1...20*N {
     var result = 0
     for element in s.dropLast(dropCount) {
@@ -236,3 +239,7 @@ public func run_DropLastArrayLazy(_ N: Int) {
     CheckResults(result == sumCount)
   }
 }
+
+// Local Variables:
+// eval: (read-only-mode 1)
+// End:

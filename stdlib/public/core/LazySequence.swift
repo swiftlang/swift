@@ -108,7 +108,7 @@
 ///       }
 ///     }
 ///
-/// - See also: `LazySequence`, `LazyCollectionProtocol`, `LazyCollection`
+/// - See also: `LazySequence`
 ///
 /// - Note: The explicit permission to implement further operations
 ///   lazily applies only in contexts where the sequence is statically
@@ -132,8 +132,7 @@ public protocol LazySequenceProtocol : Sequence {
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  associatedtype Elements : Sequence = Self
-  where Elements.Iterator.Element == Iterator.Element
+  associatedtype Elements: Sequence = Self where Elements.Element == Element
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
@@ -154,19 +153,19 @@ public protocol LazySequenceProtocol : Sequence {
 /// property is provided.
 extension LazySequenceProtocol where Elements == Self {
   /// Identical to `self`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var elements: Self { return self }
 }
 
 extension LazySequenceProtocol {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: LazySequence<Elements> {
     return elements.lazy
   }
 }
 
 extension LazySequenceProtocol where Elements: LazySequenceProtocol {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: Elements {
     return elements
   }
@@ -177,16 +176,50 @@ extension LazySequenceProtocol where Elements: LazySequenceProtocol {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`
-@_fixed_layout // FIXME(sil-serialize-all)
-public struct LazySequence<Base : Sequence>: _SequenceWrapper {
-  public var _base: Base
+@_fixed_layout // lazy-performance
+public struct LazySequence<Base : Sequence> {
+  @usableFromInline
+  internal var _base: Base
 
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented
   /// lazily.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // lazy-performance
   internal init(_base: Base) {
     self._base = _base
+  }
+}
+
+extension LazySequence: Sequence {
+  public typealias Element = Base.Element
+  public typealias Iterator = Base.Iterator
+
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return _base.makeIterator()
+  }
+  
+  @inlinable // lazy-performance
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
+  }
+
+  @inlinable // lazy-performance
+  @discardableResult
+  public __consuming func _copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    return _base._copyContents(initializing: buf)
+  }
+
+  @inlinable // lazy-performance
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? { 
+    return _base._customContainsEquatableElement(element)
+  }
+  
+  @inlinable // generic-performance
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
+    return _base._copyToContiguousArray()
   }
 }
 
@@ -194,7 +227,7 @@ extension LazySequence: LazySequenceProtocol {
   public typealias Elements = Base
 
   /// The `Base` (presumably non-lazy) sequence from which `self` was created.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // lazy-performance
   public var elements: Elements { return _base }
 }
 
@@ -202,7 +235,7 @@ extension Sequence {
   /// A sequence containing the same elements as this sequence,
   /// but on which some operations, such as `map` and `filter`, are
   /// implemented lazily.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: LazySequence<Self> {
     return LazySequence(_base: self)
   }

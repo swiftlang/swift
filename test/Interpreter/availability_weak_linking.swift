@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -R %S/Inputs/FakeUnavailableObjCFramework.framework %t
 // RUN: %target-clang -dynamiclib %S/Inputs/FakeUnavailableObjCFramework.m -fmodules -F %t -framework Foundation -o %t/FakeUnavailableObjCFramework.framework/FakeUnavailableObjCFramework
-
+// RUN: %target-codesign %t/FakeUnavailableObjCFramework.framework/FakeUnavailableObjCFramework
 // RUN: %target-build-swift -F %t %s -o %t/UseWeaklinkedUnavailableObjCFramework
 // RUN: %target-build-swift -O -F %t %s -o %t/UseWeaklinkedUnavailableObjCFramework.opt
 
@@ -12,6 +12,8 @@
 // at run time.
 // RUN: mv %t/FakeUnavailableObjCFramework.framework %t/FakeUnavailableObjCFramework-MovedAside.framework
 
+// RUN: %target-codesign %t/UseWeaklinkedUnavailableObjCFramework
+// RUN: %target-codesign %t/UseWeaklinkedUnavailableObjCFramework.opt
 // RUN: %target-run %t/UseWeaklinkedUnavailableObjCFramework | %FileCheck %s
 // RUN: %target-run %t/UseWeaklinkedUnavailableObjCFramework.opt | %FileCheck %s
 

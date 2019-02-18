@@ -151,30 +151,44 @@ bool FunctionAccessedStorage::updateUnidentifiedAccess(
 // substitution will be performed if possible. However, there's no guarantee
 // that the merged access values will belong to this function.
 //
-// Note that we may have `this` == `other` for self-recursion. We still need to
-// propagate and merge in that case in case arguments are recursively dependent.
+// Return true if these results changed, requiring further propagation through
+// the call graph.
 bool FunctionAccessedStorage::mergeAccesses(
     const FunctionAccessedStorage &other,
     std::function<StorageAccessInfo(const StorageAccessInfo &)>
       transformStorage) {
 
-  // Insertion in DenseMap invalidates the iterator in the rare case of
-  // self-recursion (`this` == `other`) that passes accessed storage though an
-  // argument. Rather than complicate the code, make a temporary copy of the
-  // AccessedStorage.
-  //
-  // Also note that the storageAccessIndex from otherStorage is relative to its
-  // original context and should not be copied into this context.
-  SmallVector<StorageAccessInfo, 8> otherStorageAccesses;
-  otherStorageAccesses.reserve(other.storageAccessSet.size());
-  otherStorageAccesses.append(other.storageAccessSet.begin(),
-                              other.storageAccessSet.end());
+  // The cost of BottomUpIPAnalysis can be quadratic for large recursive call
+  // graphs. That cost is multiplied by the size of storageAccessSet. Slowdowns
+  // can occur ~1000 elements. 200 is large enough to cover "normal" code,
+  // while ensuring compile time isn't affected.
+  if (storageAccessSet.size() > 200) {
+    llvm::dbgs() << "BIG SET " << storageAccessSet.size() << "\n";
+    setWorstEffects();
+    return true;
+  }
+  // To save compile time, if this storage already has worst-case effects, avoid
+  // growing its storageAccessSet.
+  if (hasWorstEffects())
+    return false;
 
+  // When `this` == `other` (for self-recursion), insertion in DenseMap
+  // invalidates the iterator. We still need to propagate and merge in that case
+  // because arguments can be recursively dependent. The alternative would be
+  // treating all self-recursion conservatively.
+  const FunctionAccessedStorage *otherFunctionAccesses = &other;
+  FunctionAccessedStorage functionAccessCopy;
+  if (this == &other) {
+    functionAccessCopy = other;
+    otherFunctionAccesses = &functionAccessCopy;
+  }
   bool changed = false;
-  for (auto &rawStorageInfo : otherStorageAccesses) {
+  // Nondeterminstically iterate for the sole purpose of inserting into another
+  // unordered set.
+  for (auto &rawStorageInfo : otherFunctionAccesses->storageAccessSet) {
     const StorageAccessInfo &otherStorageInfo =
-      transformStorage(rawStorageInfo);
-    // transformStorage() returns invalid storage object for local storage
+        transformStorage(rawStorageInfo);
+    // If transformStorage() returns invalid storage object for local storage,
     // that should not be merged with the caller.
     if (!otherStorageInfo)
       continue;
@@ -258,9 +272,9 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     if (auto *arg = dyn_cast<SILFunctionArgument>(obj)) {
       SILValue argVal = getCallerArg(fullApply, arg->getIndex());
       if (argVal) {
-        auto &proj = storage.getObjectProjection().getProjection();
+        auto *instr = storage.getObjectProjection().getInstr();
         // Remap the argument source value and inherit the old storage info.
-        return StorageAccessInfo(AccessedStorage(argVal, proj), storage);
+        return StorageAccessInfo(AccessedStorage(argVal, instr), storage);
       }
     }
     // Otherwise, continue to reference the value in the callee because we don't
@@ -272,7 +286,9 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
     if (argVal) {
       // Remap the argument source value and inherit the old storage info.
-      return StorageAccessInfo(findAccessedStorageNonNested(argVal), storage);
+      auto calleeStorage = findAccessedStorageNonNested(argVal);
+      if (calleeStorage)
+        return StorageAccessInfo(calleeStorage, storage);
     }
     // If the argument can't be transformed, demote it to an unidentified
     // access.
@@ -282,11 +298,16 @@ transformCalleeStorage(const StorageAccessInfo &storage,
   }
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected nested access");
+  case AccessedStorage::Yield:
+    // Continue to hold on to yields from the callee because we don't have
+    // any better placeholder in the callee.
+    return storage;
   case AccessedStorage::Unidentified:
     // For unidentified storage, continue to reference the value in the callee
     // because we don't have any better placeholder for a callee-defined object.
     return storage;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool FunctionAccessedStorage::mergeFromApply(

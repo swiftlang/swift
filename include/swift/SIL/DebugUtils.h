@@ -169,7 +169,7 @@ inline SILInstruction *getSingleNonDebugUser(SILValue V) {
 /// Erases the instruction \p I from it's parent block and deletes it, including
 /// all debug instructions which use \p I.
 /// Precondition: The instruction may only have debug instructions as uses.
-/// If the iterator \p InstIter references any deleted debug instruction, it is
+/// If the iterator \p InstIter references any deleted instruction, it is
 /// incremented.
 inline void eraseFromParentWithDebugInsts(SILInstruction *I,
                                           SILBasicBlock::iterator &InstIter) {
@@ -183,15 +183,16 @@ inline void eraseFromParentWithDebugInsts(SILInstruction *I,
         foundAny = true;
         auto *User = result->use_begin()->getUser();
         assert(User->isDebugInstruction());
-        if (InstIter != SILBasicBlock::iterator() &&
-            InstIter != I->getParent()->end() &&
-            &*InstIter == User) {
+        if (InstIter == User->getIterator())
           InstIter++;
-        }
+
         User->eraseFromParent();
       }
     }
   } while (foundAny);
+
+  if (InstIter == I->getIterator())
+    ++InstIter;
 
   I->eraseFromParent();
 }

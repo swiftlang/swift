@@ -22,7 +22,7 @@ struct X : R {
   func assoc() -> Assoc { return Assoc() }
 }
 
-// CHECK-LABEL: sil shared @$S35specialize_refined_adds_constraints1gyyxAA1RRzlFAA1XV_Tg5 :
+// CHECK-LABEL: sil shared @$s35specialize_refined_adds_constraints1gyyxAA1RRzlFAA1XV_Tg5 :
 func test(x: X) {
   g(x)
 }

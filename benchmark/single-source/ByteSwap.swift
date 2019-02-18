@@ -24,7 +24,6 @@ public let ByteSwap = BenchmarkInfo(
 // a naive O(n) implementation of byteswap.
 @inline(never)
 func byteswap_n(_ a: UInt64) -> UInt64 {
-#if swift(>=4)
   return ((a & 0x00000000000000FF) &<< 56) |
          ((a & 0x000000000000FF00) &<< 40) |
          ((a & 0x0000000000FF0000) &<< 24) |
@@ -33,16 +32,6 @@ func byteswap_n(_ a: UInt64) -> UInt64 {
          ((a & 0x0000FF0000000000) &>> 24) |
          ((a & 0x00FF000000000000) &>> 40) |
          ((a & 0xFF00000000000000) &>> 56)
-#else
-  return ((a & 0x00000000000000FF) << 56) |
-         ((a & 0x000000000000FF00) << 40) |
-         ((a & 0x0000000000FF0000) << 24) |
-         ((a & 0x00000000FF000000) <<  8) |
-         ((a & 0x000000FF00000000) >>  8) |
-         ((a & 0x0000FF0000000000) >> 24) |
-         ((a & 0x00FF000000000000) >> 40) |
-         ((a & 0xFF00000000000000) >> 56)
-#endif
 }
 
 // a O(logn) implementation of byteswap.

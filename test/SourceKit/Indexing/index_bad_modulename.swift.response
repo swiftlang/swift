@@ -48,6 +48,13 @@
   ],
   key.entities: [
     {
+      key.kind: source.lang.swift.ref.module,
+      key.name: "ObjectiveC",
+      key.usr: "c:@M@ObjectiveC",
+      key.line: 8,
+      key.column: 8
+    },
+    {
       key.kind: source.lang.swift.decl.var.global,
       key.name: "v",
       key.usr: "s:4main1vSo8NSObjectCSgvp",

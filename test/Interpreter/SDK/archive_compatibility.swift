@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name=test -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out %S/Inputs/test.arc | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -13,6 +14,7 @@
 import Foundation
 
 struct ABC {
+  @objc(_TtCV4test3ABC11NestedClass)
   class NestedClass : NSObject, NSCoding {
     var i : Int
 
@@ -30,6 +32,7 @@ struct ABC {
   }
 }
 
+@objc(_TtC4testP33_25D299289FEB01A726765440D53BD3D112PrivateClass)
 private class PrivateClass : NSObject, NSCoding {
   var pi : Int
 

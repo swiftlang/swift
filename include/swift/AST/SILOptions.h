@@ -50,6 +50,9 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
+  /// Enable existential specializer optimization.
+  bool ExistentialSpecializer = false;
+
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
@@ -66,6 +69,9 @@ public:
 
   /// Whether to dump verbose SIL with scope and location information.
   bool EmitVerboseSIL = false;
+
+  /// Whether to stop the optimization pipeline after serializing SIL.
+  bool StopOptimizationAfterSerialization = false;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
@@ -99,9 +105,6 @@ public:
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   llvm::StringRef ExternalPassPipelineFilename;
 
-  /// Emit normal function arguments using the +0 guaranteed convention.
-  bool EnableGuaranteedNormalArguments = true;
-
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;
 
@@ -110,9 +113,6 @@ public:
 
   /// If set to true, compile with the SIL Ownership Model enabled.
   bool EnableSILOwnership = false;
-
-  /// When parsing SIL, assume unqualified ownership.
-  bool AssumeUnqualifiedOwnershipWhenParsing = false;
 
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
@@ -132,8 +132,12 @@ public:
   /// Enable the mandatory semantic arc optimizer.
   bool EnableMandatorySemanticARCOpts = false;
 
-  /// \brief Enable large loadable types IRGen pass.
+  /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
+
+  /// Should the default pass pipelines strip ownership during the diagnostic
+  /// pipeline.
+  bool StripOwnershipDuringDiagnosticsPipeline = true;
 
   /// The name of the file to which the backend should save YAML optimization
   /// records.

@@ -5,7 +5,7 @@ struct Mystruct1 {
   func s1f1() -> Int { return 0 }
 // CHECK: decl: func s1f1() -> Int
   var intField = 3
-// CHECK: decl: var intField: Int
+// CHECK: decl: @_hasInitialValue var intField: Int
 // CHECK: decl: init(intField: Int)
 // CHECK: decl: init()
 }
@@ -22,14 +22,14 @@ struct MyStruct2 {
 class Myclass1 {
 // CHECK: decl: class Myclass1
   var intField = 4
-// CHECK: decl: var intField: Int
+// CHECK: decl: @_hasInitialValue var intField: Int
 // CHECK: decl: init()
 }
 
 func f1() {
 // CHECK: decl: func f1()
   var s1ins = Mystruct1() // Implicit ctor
-// CHECK: decl: var s1ins: Mystruct1
+// CHECK: decl: @_hasInitialValue var s1ins: Mystruct1
   _ = Mystruct1(intField: 1) // Implicit ctor
 
   s1ins.intField = 34
@@ -37,7 +37,7 @@ func f1() {
 // CHECK: type: Int
 
   var c1ins = Myclass1()
-// CHECK: decl: var c1ins: Myclass1
+// CHECK: decl: @_hasInitialValue var c1ins: Myclass1
 // CHECK: type: Myclass1
 
   c1ins.intField = 3
@@ -59,27 +59,27 @@ class Myclass2 {
 // CHECK: decl: func f1()
 
     var arr1 = [1, 2]
-// CHECK: decl: var arr1: [Int]
-// CHECK: type: Array<Int>
+// CHECK: decl: @_hasInitialValue var arr1: [Int]
+// CHECK: type: [Int]
 
     arr1.append(1)
 // FIXME: missing append()
-// CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyyxF
-// CHECK: type: (inout Array<Int>) -> (Int) -> ()
+// CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyyxnF
+// CHECK: type: (inout Array<Int>) -> (__owned Int) -> ()
 
     var arr2 : [Mystruct1]
 // CHECK: decl: var arr2: [Mystruct1]
-// CHECK: type: Array<Mystruct1>
+// CHECK: type: [Mystruct1]
 
     arr2.append(Mystruct1())
-// CHECK: type: (inout Array<Mystruct1>) -> (Mystruct1) -> ()
+// CHECK: type: (inout Array<Mystruct1>) -> (__owned Mystruct1) -> ()
 
     var arr3 : [Myclass1]
 // CHECK: decl: var arr3: [Myclass1]
-// CHECK: type: Array<Myclass1>
+// CHECK: type: [Myclass1]
 
     arr3.append(Myclass1())
-// CHECK: type: (inout Array<Myclass1>) -> (Myclass1) -> ()
+// CHECK: type: (inout Array<Myclass1>) -> (__owned Myclass1) -> ()
 
     _ = Myclass2.init()
 // CHECK: dref: init()
@@ -151,23 +151,23 @@ struct MyGenStruct1<T, U: ExpressibleByStringLiteral, V: Sequence> {
 }
 
 let genstruct1 = MyGenStruct1<Int, String, [Float]>(x: 1, y: "", z: [1.0])
-// CHECK: decl: let genstruct1: MyGenStruct1<Int, String, [Float]>
+// CHECK: decl: @_hasInitialValue let genstruct1: MyGenStruct1<Int, String, [Float]>
 
 func test001() {
 // CHECK: decl: func test001()
   _ = genstruct1
-// CHECK: type: MyGenStruct1<Int, String, Array<Float>>
+// CHECK: type: MyGenStruct1<Int, String, [Float]>
 
   var genstruct2: MyGenStruct1<Int, String, [Int: Int]>
 // CHECK: decl: var genstruct2: MyGenStruct1<Int, String, [Int : Int]>
   _ = genstruct2
-// CHECK: type: MyGenStruct1<Int, String, Dictionary<Int, Int>>
+// CHECK: type: MyGenStruct1<Int, String, [Int : Int]>
   _ = genstruct2.x
 // CHECK: type: Int
   _ = genstruct2.y
 // CHECK: type: String
   _ = genstruct2.z
-// CHECK: type: Dictionary<Int, Int>
+// CHECK: type: [Int : Int]
 
   genstruct2.takesT(123)
 }
@@ -255,31 +255,29 @@ func takesGeneric(_ t: GenericOuter<Int>.GenericInner<String>) {
 func hasLocalDecls() {
   func localFunction() {}
 
-  // FIXME
-  // CHECK: decl: FAILURE for 'LocalType'
+  // CHECK: decl: struct LocalType  for 'LocalType' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_V
   struct LocalType {
-    // CHECK: FAILURE for 'localMethod'
+    // CHECK: func localMethod() for 'localMethod' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_V11localMethodyyF
     func localMethod() {}
 
-    // CHECK: FAILURE for 'subscript'
-    subscript(x: Int) { get {} set {} }
+    // CHECK: subscript(x: Int) -> Int { get set } for 'subscript' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_VyS2icip
+    subscript(x: Int) -> Int { get {} set {} }
 
-    // CHECK: decl: FAILURE for ''
-    // CHECK: decl: FAILURE for ''
-    // CHECK: decl: FAILURE for ''
+    // CHECK: decl: get for '' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_VyS2icig
+    // CHECK: decl: set for '' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_VyS2icis
+    // CHECK: decl: init() for '' usr=s:14swift_ide_test13hasLocalDeclsyyF0E4TypeL_VADycfc
 
   }
 
-  // FIXME
-  // CHECK: decl: FAILURE for 'LocalClass'
+  // CHECK: decl: class LocalClass for 'LocalClass' usr=s:14swift_ide_test13hasLocalDeclsyyF0E5ClassL_C
   class LocalClass {
-    // CHECK: FAILURE for 'deinit'
+    // CHECK: decl: {{(@objc )?}}deinit for 'deinit' usr=s:14swift_ide_test13hasLocalDeclsyyF0E5ClassL_Cfd
     deinit {}
 
-    // CHECK: decl: FAILURE for ''
+    // CHECK: decl: init() for '' usr=s:14swift_ide_test13hasLocalDeclsyyF0E5ClassL_CADycfc
   }
 
-  // CHECK: decl: FAILURE for 'LocalAlias'
+  // CHECK: decl: typealias LocalAlias = LocalType for 'LocalAlias' usr=s:14swift_ide_test13hasLocalDeclsyyF0E5AliasL_a
   typealias LocalAlias = LocalType
 }
 
@@ -291,11 +289,11 @@ fileprivate func privateFunction(_ d: VeryPrivateData) {}
 struct HasSubscript {
   // CHECK: decl: subscript(t: Int) -> Int { get set }
   subscript(_ t: Int) -> Int {
-    // CHECK: decl: get {}	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icig
+    // CHECK: decl: get	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icig
     get {
       return t
     }
-    // CHECK: decl: set {}	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icis
+    // CHECK: decl: set	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icis
     set {}
   }
 }
@@ -303,23 +301,21 @@ struct HasSubscript {
 // FIXME
 // CHECK: decl: FAILURE	for 'T' usr=s:14swift_ide_test19HasGenericSubscriptV1Txmfp
 struct HasGenericSubscript<T> {
-  // CHECK: subscript<U>(t: T) -> U { get set }	for 'subscript' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xclui
+  // CHECK: subscript<U>(t: T) -> U { get set } for 'subscript' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluip
   // FIXME
   // CHECK: decl: FAILURE	for 'U'
   // FIXME
   // CHECK: decl: FAILURE	for 't'
   subscript<U>(_ t: T) -> U {
 
-    // CHECK: decl: get {}	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluig
+    // CHECK: decl: get for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluig
     // FIXME
     // CHECK: dref: FAILURE	for 't'
     get {
       return t as! U
     }
 
-    // FIXME
-    // CHECK: dref: FAILURE	for 'U'
-    // CHECK: decl: set {}	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluis
+    // CHECK: decl: set	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluis
     set {}
   }
 }
@@ -327,8 +323,8 @@ struct HasGenericSubscript<T> {
 private
 // CHECK: decl: private func patatino<T>(_ vers1: T, _ vers2: T) -> Bool where T : Comparable for
 func patatino<T: Comparable>(_ vers1: T, _ vers2: T) -> Bool {
-  // CHECK: decl: FAILURE   for 'T' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xts10ComparableRzlF1TL_xmfp decl
-  // CHECK: decl: let vers1: T      for 'vers1' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xts10ComparableRzlF5vers1L_xvp
-  // CHECK: decl: let vers2: T      for 'vers2' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xts10ComparableRzlF5vers2L_xvp
+  // CHECK: decl: FAILURE   for 'T' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xtSLRzlF1TL_xmfp decl
+  // CHECK: decl: let vers1: T      for 'vers1' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xtSLRzlF5vers1L_xvp
+  // CHECK: decl: let vers2: T      for 'vers2' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xtSLRzlF5vers2L_xvp
   return vers1 < vers2;
 }

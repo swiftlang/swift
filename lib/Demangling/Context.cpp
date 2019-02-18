@@ -77,7 +77,8 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         MangledName.endswith("TO") ||  // ObjC-as-swift thunk
         MangledName.endswith("TR") ||  // reabstraction thunk helper function
         MangledName.endswith("Tr") ||  // reabstraction thunk
-        MangledName.endswith("TW")) {  // protocol witness thunk
+        MangledName.endswith("TW") ||  // protocol witness thunk
+        MangledName.endswith("fC")) {  // allocating constructor
 
       // To avoid false positives, we need to fully demangle the symbol.
       NodePointer Nd = D->demangleSymbol(MangledName);
@@ -93,6 +94,7 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         case Node::Kind::ReabstractionThunkHelper:
         case Node::Kind::ReabstractionThunk:
         case Node::Kind::ProtocolWitness:
+        case Node::Kind::Allocator:
           return true;
         default:
           break;
@@ -125,6 +127,12 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
         MangledName.endswith("TW") )
       return std::string();
 
+    if (MangledName.endswith("fC")) {
+      std::string target = MangledName.str();
+      target[target.size() - 1] = 'c';
+      return target;
+    }
+
     return MangledName.substr(0, MangledName.size() - 2).str();
   }
   // Old mangling.
@@ -154,6 +162,7 @@ bool Context::hasSwiftCallingConvention(llvm::StringRef MangledName) {
     case Node::Kind::LazyProtocolWitnessTableAccessor:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
+    case Node::Kind::BaseWitnessTableAccessor:
     case Node::Kind::ObjCAttribute:
       return false;
     default:

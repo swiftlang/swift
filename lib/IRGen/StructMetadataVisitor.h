@@ -53,7 +53,7 @@ public:
 
     // Generic arguments.
     // This must always be the first piece of trailing data.
-    asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
+    asImpl().addGenericFields(Target);
 
     // Struct field offsets.
     asImpl().noteStartOfFieldOffsets();
@@ -87,10 +87,8 @@ public:
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
   void addFieldOffset(VarDecl *) { addInt32(); }
-  void addGenericArgument(CanType argument) { addPointer(); }
-  void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf) {
-    addPointer();
-  }
+  void addGenericArgument() { addPointer(); }
+  void addGenericWitnessTable() { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
 
   void noteEndOfFieldOffsets() {

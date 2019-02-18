@@ -10,7 +10,7 @@ import Appliances
 
 // This tests the -disable-swift-bridge-attr flag. Make sure we don't emit bridging code.
 
-// CHECK-LABEL: sil hidden @{{.*}}objc_disable_brigding16updateFridgeTemp
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}objc_disable_brigding16updateFridgeTemp
 func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // CHECK-NOT: function_ref @{{.*}}BridgeFromObjectiveC
   home.fridge.temperature += delta

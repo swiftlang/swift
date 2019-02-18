@@ -149,3 +149,7 @@ extension ${Self} : LosslessStringConvertible {
 % end
 
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

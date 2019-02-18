@@ -51,8 +51,8 @@ struct SomeStruct {
   // Delegating initializer
   init() {
     self.init()
-    self.width = Measurement.self.init(val: width) // expected-error {{'let' property 'width' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
-    self.height = Measurement.self.init(val: height) // expected-error {{'let' property 'height' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
+    self.width = Measurement.self.init(val: width) // expected-error {{cannot convert value of type 'Measurement' to expected argument type 'Int'}}
+    self.height = Measurement.self.init(val: height) // expected-error {{cannot convert value of type 'Measurement' to expected argument type 'Int'}}
   }
 
   // Designated initializer
@@ -64,14 +64,14 @@ struct SomeStruct {
   // Delegating initializer
   init(width: Int) {
     self.init()
-    self.width = width // expected-error {{'let' property 'width' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
+    self.width = width // expected-error {{cannot assign value of type 'Int' to type 'Measurement'}}
     self.height = Measurement(val: 20) // expected-error {{'let' property 'height' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
   }
 
-  // Designated initializer
+  // Delegating initializer
   init(height: Int) {
     self.width = Measurement(val: 10) // expected-error {{'let' property 'width' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
-    self.height = height // expected-error {{'let' property 'height' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
+    self.height = height // expected-error {{cannot assign value of type 'Int' to type 'Measurement'}}
     self.init()
   }
 }

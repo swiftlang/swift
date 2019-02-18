@@ -1,8 +1,0 @@
-@_exported import MapKit // Clang module
-import Foundation
-
-%{
-from gyb_foundation_support import ObjectiveCBridgeableImplementationForNSValue
-}%
-
-${ ObjectiveCBridgeableImplementationForNSValue("MKCoordinateSpan") }

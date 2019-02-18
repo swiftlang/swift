@@ -116,8 +116,8 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // since we will only visit it twice if we go around a back edge due to a
   // different SILArgument that is actually being used for its phi node like
   // purposes.
-  if (auto *A = dyn_cast<SILPHIArgument>(V))
-    if (SILValue Result = A->getSingleIncomingValue())
+  if (auto *A = dyn_cast<SILPhiArgument>(V))
+    if (SILValue Result = A->getSingleTerminatorOperand())
       return Result;
 
   return SILValue();
@@ -301,7 +301,7 @@ static SILValue allIncomingValuesEqual(
 /// potentially mismatch
 SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
                                                       unsigned RecursionDepth) {
-  auto *A = dyn_cast<SILPHIArgument>(V);
+  auto *A = dyn_cast<SILPhiArgument>(V);
   if (!A) {
     return SILValue();
   }
@@ -315,7 +315,8 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
   // SILArgument's incoming values. If we don't have an incoming value for each
   // one of our predecessors, just return SILValue().
   llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> IncomingValues;
-  if (!A->getIncomingValues(IncomingValues) || IncomingValues.empty()) {
+  if (!A->getSingleTerminatorOperands(IncomingValues)
+      || IncomingValues.empty()) {
     return SILValue();
   }
 

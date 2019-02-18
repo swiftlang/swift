@@ -161,7 +161,7 @@ assuming ``E``, ``F`` do not have any overriding declarations in the same file:
   func usingE(_ e: E) {
     e.doSomething() // There is no sub class in the file that declares this class.
                     // The compiler can remove virtual calls to doSomething()
-                    // and directly call A's doSomething method.
+                    // and directly call E's doSomething method.
   }
 
   func usingF(_ f: F) -> Int {
@@ -184,7 +184,7 @@ that value types cannot be included inside an NSArray. Thus when using value
 types, the optimizer can remove most of the overhead in Array that is necessary
 to handle the possibility of the array being backed an NSArray.
 
-Additionally, In contrast to reference types, value types only need reference
+Additionally, in contrast to reference types, value types only need reference
 counting if they contain, recursively, a reference type. By using value types
 without reference types, one can avoid additional retain, release traffic inside
 Array.
@@ -540,7 +540,7 @@ protocols as class-only protocols to get better runtime performance.
 
 ::
 
-  protocol Pingable : class { func ping() -> Int }
+  protocol Pingable : AnyObject { func ping() -> Int }
 
 .. https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html
 

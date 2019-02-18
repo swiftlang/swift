@@ -93,8 +93,9 @@ class RCIdentityAnalysis : public FunctionAnalysisBase<RCIdentityFunctionInfo> {
 
 public:
   RCIdentityAnalysis(SILModule *)
-    : FunctionAnalysisBase<RCIdentityFunctionInfo>(AnalysisKind::RCIdentity),
-      DA(nullptr) {}
+      : FunctionAnalysisBase<RCIdentityFunctionInfo>(
+            SILAnalysisKind::RCIdentity),
+        DA(nullptr) {}
 
   RCIdentityAnalysis(const RCIdentityAnalysis &) = delete;
   RCIdentityAnalysis &operator=(const RCIdentityAnalysis &) = delete;
@@ -112,13 +113,14 @@ public:
   virtual bool needsNotifications() override { return true; }
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::RCIdentity;
+    return S->getKind() == SILAnalysisKind::RCIdentity;
   }
 
   virtual void initialize(SILPassManager *PM) override;
   
-  virtual RCIdentityFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new RCIdentityFunctionInfo(DA);
+  virtual std::unique_ptr<RCIdentityFunctionInfo>
+  newFunctionAnalysis(SILFunction *F) override {
+    return llvm::make_unique<RCIdentityFunctionInfo>(DA);
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

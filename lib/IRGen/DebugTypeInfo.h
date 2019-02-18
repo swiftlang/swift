@@ -37,14 +37,6 @@ class TypeInfo;
 /// for a type.
 class DebugTypeInfo {
 public:
-  /// The DeclContext of the function. This might not be the DeclContext of
-  /// the variable if inlining took place.
-  DeclContext *DeclCtx = nullptr;
-
-  /// The generic environment of the type. Ideally we should need only this and
-  /// retire the DeclCtxt.
-  GenericEnvironment *GenericEnv = nullptr;
-
   /// The type we need to emit may be different from the type
   /// mentioned in the Decl, for example, stripped of qualifiers.
   TypeBase *Type = nullptr;
@@ -56,20 +48,16 @@ public:
   bool DefaultAlignment = true;
 
   DebugTypeInfo() {}
-  DebugTypeInfo(DeclContext *DC, GenericEnvironment *GE, swift::Type Ty,
-                llvm::Type *StorageTy, Size SizeInBytes, Alignment AlignInBytes,
-                bool HasDefaultAlignment);
+  DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size SizeInBytes,
+                Alignment AlignInBytes, bool HasDefaultAlignment);
   /// Create type for a local variable.
-  static DebugTypeInfo getLocalVariable(DeclContext *DeclCtx,
-                                        GenericEnvironment *GE, VarDecl *Decl,
-                                        swift::Type Ty, const TypeInfo &Info,
-                                        bool Unwrap);
+  static DebugTypeInfo getLocalVariable(VarDecl *Decl,
+                                        swift::Type Ty, const TypeInfo &Info);
   /// Create type for an artificial metadata variable.
   static DebugTypeInfo getMetadata(swift::Type Ty, llvm::Type *StorageTy,
                                    Size size, Alignment align);
   /// Create a standalone type from a TypeInfo object.
-  static DebugTypeInfo getFromTypeInfo(DeclContext *DC, GenericEnvironment *GE,
-                                       swift::Type Ty, const TypeInfo &Info);
+  static DebugTypeInfo getFromTypeInfo(swift::Type Ty, const TypeInfo &Info);
   /// Global variables.
   static DebugTypeInfo getGlobal(SILGlobalVariable *GV, llvm::Type *StorageType,
                                  Size size, Alignment align);
@@ -81,24 +69,10 @@ public:
   TypeBase *getType() const { return Type; }
 
   TypeDecl *getDecl() const;
-  DeclContext *getDeclContext() const { return DeclCtx; }
-  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
-
-  void unwrapLValueOrInOutType() {
-    Type = Type->getWithoutSpecifierType().getPointer();
-  }
 
   // Determine whether this type is an Archetype itself.
   bool isArchetype() const {
     return Type->getWithoutSpecifierType()->is<ArchetypeType>();
-  }
-
-  /// LValues, inout args, and Archetypes are implicitly indirect by
-  /// virtue of their DWARF type.
-  //
-  // FIXME: There exists an inverse workaround in LLDB. Both should be removed.
-  bool isImplicitlyIndirect() const {
-    return isArchetype();
   }
 
   bool isNull() const { return Type == nullptr; }
@@ -119,7 +93,6 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   }
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
-        nullptr, nullptr,
         llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr,
         swift::irgen::Size(0), swift::irgen::Alignment(0), false);
   }

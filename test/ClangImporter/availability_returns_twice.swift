@@ -1,14 +1,14 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
+// UNSUPPORTED: OS=windows-msvc
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
   typealias JumpBuffer = Int32
-#elseif os(Android) || os(Cygwin) || os(FreeBSD) || os(Linux)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
   typealias JumpBuffer = jmp_buf
-#elseif os(Windows)
-  import MSVCRT
-  typealias JumpBuffer = jmp_buf
+#else
+#error("Unsupported platform")
 #endif
 
 func test_unavailable_returns_twice_function() {

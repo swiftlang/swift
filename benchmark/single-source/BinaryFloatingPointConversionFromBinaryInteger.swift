@@ -110,6 +110,10 @@ extension MockBinaryInteger : BinaryInteger {
   var trailingZeroBitCount: Int {
     return _value.trailingZeroBitCount
   }
+  
+  func isMultiple(of other: MockBinaryInteger<T>) -> Bool {
+    return _value.isMultiple(of: other._value)
+  }
 
   static func + (
     lhs: MockBinaryInteger<T>, rhs: MockBinaryInteger<T>

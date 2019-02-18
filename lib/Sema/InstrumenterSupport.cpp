@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "InstrumenterSupport.h"
+#include "swift/AST/DiagnosticSuppression.h"
 
 using namespace swift;
 using namespace swift::instrumenter_support;
@@ -77,10 +78,10 @@ void InstrumenterBase::anchor() {}
 
 bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
                                        Expr * &parsedExpr) {
-  DiagnosticEngine diags(Ctx.SourceMgr);
-  ErrorGatherer errorGatherer(diags);
+  DiagnosticSuppression suppression(Ctx.Diags);
+  ErrorGatherer errorGatherer(Ctx.Diags);
 
-  TypeChecker TC(Ctx, diags);
+  TypeChecker &TC = TypeChecker::createForContext(Ctx);
 
   TC.typeCheckExpression(parsedExpr, DC);
 

@@ -1,8 +1,5 @@
-
-// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -parse-as-library -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -parse-as-library -disable-objc-attr-requires-foundation-module  %s | %FileCheck %s --check-prefix=GUARANTEED
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 class X {
   @objc func f() { }
@@ -23,9 +20,9 @@ class X {
   func g()
 }
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup15direct_to_class{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup15direct_to_class{{[_0-9a-zA-Z]*}}F
 func direct_to_class(_ obj: AnyObject) {
-  // CHECK: bb0([[ARG:%.*]] : $AnyObject):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   // CHECK: [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK: [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
@@ -33,11 +30,11 @@ func direct_to_class(_ obj: AnyObject) {
   // CHECK: destroy_value [[OPENED_ARG_COPY]]
   obj.f!()
 }
-// CHECK: } // end sil function '$S14dynamic_lookup15direct_to_class{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$s14dynamic_lookup15direct_to_class{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup18direct_to_protocol{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup18direct_to_protocol{{[_0-9a-zA-Z]*}}F
 func direct_to_protocol(_ obj: AnyObject) {
-  // CHECK: bb0([[ARG:%.*]] : $AnyObject):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   // CHECK:   [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK:   [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
   // CHECK:   [[METHOD:%[0-9]+]] = objc_method [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
@@ -45,11 +42,11 @@ func direct_to_protocol(_ obj: AnyObject) {
   // CHECK:   destroy_value [[OPENED_ARG_COPY]]
   obj.g!()
 }
-// CHECK: } // end sil function '$S14dynamic_lookup18direct_to_protocol{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$s14dynamic_lookup18direct_to_protocol{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup23direct_to_static_method{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup23direct_to_static_method{{[_0-9a-zA-Z]*}}F
 func direct_to_static_method(_ obj: AnyObject) {
-  // CHECK: bb0([[ARG:%.*]] : $AnyObject):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   var obj = obj
   // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
@@ -67,9 +64,9 @@ func direct_to_static_method(_ obj: AnyObject) {
 }
 // } // end sil function '_TF14dynamic_lookup23direct_to_static_method{{.*}}'
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup12opt_to_class{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup12opt_to_class{{[_0-9a-zA-Z]*}}F
 func opt_to_class(_ obj: AnyObject) {
-  // CHECK: bb0([[ARG:%.*]] : $AnyObject):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   var obj = obj
   // CHECK:   [[EXISTBOX:%[0-9]+]] = alloc_box ${ var AnyObject } 
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[EXISTBOX]]
@@ -112,16 +109,16 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK:   return [[RESULT]] : $()
 }
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup20forced_without_outer{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup20forced_without_outer{{[_0-9a-zA-Z]*}}F
 func forced_without_outer(_ obj: AnyObject) {
   // CHECK: dynamic_method_br
   var f = obj.f!
 }
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup20opt_to_static_method{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup20opt_to_static_method{{[_0-9a-zA-Z]*}}F
 func opt_to_static_method(_ obj: AnyObject) {
   var obj = obj
-  // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
+  // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // CHECK:   [[OBJBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
@@ -138,10 +135,10 @@ func opt_to_static_method(_ obj: AnyObject) {
   var optF: (() -> ())! = type(of: obj).staticF
 }
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F
 func opt_to_property(_ obj: AnyObject) {
   var obj = obj
-  // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
+  // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
@@ -167,10 +164,10 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK:   br bb3
   var i: Int = obj.value!
 }
-// CHECK: } // end sil function '$S14dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$s14dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F'
 
-// GUARANTEED-LABEL: sil hidden @$S14dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F
-  // GUARANTEED: bb0([[OBJ:%[0-9]+]] : $AnyObject):
+// GUARANTEED-LABEL: sil hidden [ossa] @$s14dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F
+  // GUARANTEED: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
@@ -188,18 +185,18 @@ func opt_to_property(_ obj: AnyObject) {
   // GUARANTEED:   [[BOUND_METHOD:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[RAWOBJ_SELF_COPY]])
   // GUARANTEED:   [[BEGIN_BORROW:%.*]] = begin_borrow [[BOUND_METHOD]]
   // GUARANTEED:   [[VALUE:%[0-9]+]] = apply [[BEGIN_BORROW]]
-  // GUARANTEED:   end_borrow [[BEGIN_BORROW]] from [[BOUND_METHOD]]
+  // GUARANTEED:   end_borrow [[BEGIN_BORROW]]
   // GUARANTEED:   [[VALUETEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // GUARANTEED:   store [[VALUE]] to [trivial] [[VALUETEMP]]
   // GUARANTEED:   inject_enum_addr [[OPTTEMP]]{{.*}}some
   // GUARANTEED:   destroy_value [[BOUND_METHOD]]
   // GUARANTEED:   br bb3
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F
 func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
-  // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
+  // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
@@ -230,10 +227,10 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   br bb3
   var x: Int = obj[i]!
 }
-// CHECK: } // end sil function '$S14dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$s14dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F'
 
-// GUARANTEED-LABEL: sil hidden @$S14dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F
-  // GUARANTEED: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
+// GUARANTEED-LABEL: sil hidden [ossa] @$s14dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F
+  // GUARANTEED: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
@@ -256,18 +253,18 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // GUARANTEED:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [callee_guaranteed] [[GETTER]]([[OBJ_REF_COPY]])
   // GUARANTEED:   [[BORROW:%.*]] = begin_borrow [[GETTER_WITH_SELF]]
   // GUARANTEED:   [[RESULT:%[0-9]+]] = apply [[BORROW]]([[I]])
-  // GUARANTEED:   end_borrow [[BORROW]] from [[GETTER_WITH_SELF]]
+  // GUARANTEED:   end_borrow [[BORROW]]
   // GUARANTEED:   [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // GUARANTEED:   store [[RESULT]] to [trivial] [[RESULTTEMP]]
   // GUARANTEED:   inject_enum_addr [[OPTTEMP]]{{.*}}some
   // GUARANTEED:   destroy_value [[GETTER_WITH_SELF]]
   // GUARANTEED:   br bb3
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup16opt_to_subscript{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup16opt_to_subscript{{[_0-9a-zA-Z]*}}F
 func opt_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
-  // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
+  // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
@@ -297,10 +294,10 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   obj[i]
 }
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup8downcast{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup8downcast{{[_0-9a-zA-Z]*}}F
 func downcast(_ obj: AnyObject) -> X {
   var obj = obj
-  // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
+  // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
@@ -319,8 +316,8 @@ func downcast(_ obj: AnyObject) -> X {
   @objc optional var juice: Juice { get }
 }
 
-// CHECK-LABEL: sil hidden @$S14dynamic_lookup7consumeyyAA5Fruit_pF
-// CHECK: bb0(%0 : $Fruit):
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup7consumeyyAA5Fruit_pF
+// CHECK: bb0(%0 : @guaranteed $Fruit):
 // CHECK:        [[BOX:%.*]] = alloc_stack $Optional<Juice>
 // CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}") Fruit, #Fruit.juice!getter.1.foreign, bb1, bb2
 

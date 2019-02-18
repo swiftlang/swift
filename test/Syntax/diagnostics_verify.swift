@@ -9,7 +9,7 @@ if true {
 if false {
   [.]
   // expected-error@-1 {{expected identifier after '.' expression}}
-  // expected-error@-2 2 {{unknown expression syntax exists in the source}}
+  // expected-error@-2 {{unknown expression syntax exists in the source}}
 }
 
 class { // expected-error {{unknown declaration syntax exists in the source}}

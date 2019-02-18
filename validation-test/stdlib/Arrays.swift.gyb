@@ -8,7 +8,7 @@
 // RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/ArrayTypesAndHelpers.swift %t/main.swift -o %t/Arrays -Xfrontend -disable-access-control; \
 // RUN: fi
 //
-// RUN: %line-directive %t/main.swift -- %target-run %t/Arrays
+// RUN: %target-codesign %t/Arrays && %line-directive %t/main.swift -- %target-run %t/Arrays
 // REQUIRES: executable_test
 
 import Swift

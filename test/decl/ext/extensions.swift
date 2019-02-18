@@ -17,6 +17,7 @@ extension extension_for_invalid_type_5 { // expected-error {{use of undeclared t
 }
 
 //===--- Test that we only allow extensions at file scope.
+struct Foo { }
 
 extension NestingTest1 { // expected-error {{use of undeclared type 'NestingTest1'}}
   extension Foo {} // expected-error {{declaration is only valid at file scope}}
@@ -120,6 +121,6 @@ extension C1.NestedStruct {
 }
 struct WrapperContext {
   extension C1.NestedStruct { // expected-error {{declaration is only valid at file scope}}
-    static let propUsingMember = originalValue // expected-error {{use of unresolved identifier 'originalValue'}}
+    static let propUsingMember = originalValue
   }
 }

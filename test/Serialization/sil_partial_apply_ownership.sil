@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -assume-parsing-unqualified-ownership-sil -emit-module -Xllvm -verify-skip-convert-escape-to-noescape-attributes -Xfrontend -disable-diagnostic-passes -force-single-frontend-invocation -o %t/sil_partial_apply_ownership.swiftmodule %s
-// RUN: %target-build-swift -Xfrontend -assume-parsing-unqualified-ownership-sil -Xllvm -verify-skip-convert-escape-to-noescape-attributes -emit-sil -I %t %s | %FileCheck %s
+// RUN: %target-build-swift -emit-module -Xllvm -verify-skip-convert-escape-to-noescape-attributes -Xfrontend -disable-diagnostic-passes -force-single-frontend-invocation -o %t/sil_partial_apply_ownership.swiftmodule %s
+// RUN: %target-build-swift -Xllvm -verify-skip-convert-escape-to-noescape-attributes -emit-sil -I %t %s | %FileCheck %s
 
 import Builtin
 
@@ -48,8 +48,6 @@ sil @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 // CHECK-LABEL: sil @partial_apply_convert
 // CHECK:   convert_escape_to_noescape %{{.*}} : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK:   convert_escape_to_noescape [not_guaranteed] %
-// CHECK:   convert_escape_to_noescape [escaped] %
-// CHECK:   convert_escape_to_noescape [not_guaranteed] [escaped] %
 sil @partial_apply_convert : $@convention(thin) () -> () {
 entry:
   %f = function_ref @subject : $@convention(thin) (Builtin.Int64) -> ()
@@ -57,12 +55,24 @@ entry:
   %e = partial_apply [callee_guaranteed] %f(%z) : $@convention(thin) (Builtin.Int64) -> ()
   %n = convert_escape_to_noescape %e : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
   %x2 = convert_escape_to_noescape [not_guaranteed] %e : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-  %x3 = convert_escape_to_noescape [escaped] %e : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-  %x4 = convert_escape_to_noescape [not_guaranteed] [escaped] %e : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
   %n2 = mark_dependence %n : $@noescape @callee_guaranteed () -> () on %e : $@callee_guaranteed () -> ()
   %f2 = function_ref @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   apply %f2(%n2) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   release_value %e : $@callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @partial_apply_on_stack
+// CHECK:  partial_apply [callee_guaranteed] [on_stack] %{{.*}} : $@convention(thin) (Builtin.Int64) -> ()
+sil @partial_apply_on_stack : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @subject : $@convention(thin) (Builtin.Int64) -> ()
+  %z = integer_literal $Builtin.Int64, 0
+  %c = partial_apply [callee_guaranteed] [on_stack] %f(%z) : $@convention(thin) (Builtin.Int64) -> ()
+  %f2 = function_ref @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  apply %f2(%c) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %c : $@noescape @callee_guaranteed () -> ()
   %t = tuple ()
   return %t : $()
 }

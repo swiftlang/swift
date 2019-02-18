@@ -56,8 +56,7 @@ public:
   /// fields.  e.g., if B<T> extends A<T>, the witness for T in A's
   /// section should be enough.
   template <class... T>
-  void addGenericFields(NominalTypeDecl *typeDecl, Type type,
-                        T &&...args) {
+  void addGenericFields(NominalTypeDecl *typeDecl, T &&...args) {
     // The archetype order here needs to be consistent with
     // NominalTypeDescriptorBase::addGenericParams.
     
@@ -65,19 +64,13 @@ public:
     asImpl().noteStartOfGenericRequirements(args...);
 
     GenericTypeRequirements requirements(IGM, typeDecl);
-    if (requirements.empty()) return;
-
-    auto subs = type->getContextSubstitutionMap(IGM.getSwiftModule(),
-                                                typeDecl);
-    requirements.enumerateFulfillments(IGM, subs,
-                    [&](unsigned reqtIndex, CanType argType,
-                        Optional<ProtocolConformanceRef> conf) {
-      if (conf) {
-        asImpl().addGenericWitnessTable(argType, *conf, args...);
+    for (auto reqt : requirements.getRequirements()) {
+      if (reqt.Protocol) {
+        asImpl().addGenericWitnessTable(args...);
       } else {
-        asImpl().addGenericArgument(argType, args...);
+        asImpl().addGenericArgument(args...);
       }
-    });
+    }
 
     asImpl().noteEndOfGenericRequirements(args...);
   }

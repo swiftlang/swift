@@ -27,12 +27,58 @@
   key.entities: [
     {
       key.kind: source.lang.swift.decl.class,
-      key.name: "C2",
-      key.usr: "s:11test_module2C2C",
+      key.name: "Empty",
+      key.usr: "s:11test_module5EmptyC",
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.constructor,
-          key.usr: "s:11test_module2C2CACycfc"
+          key.usr: "s:11test_module5EmptyCACycfc"
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "TwoInts",
+      key.usr: "s:11test_module7TwoIntsC",
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "x",
+          key.usr: "s:11test_module7TwoIntsC1xSivp",
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:11test_module7TwoIntsC1xSivg",
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:11test_module7TwoIntsC1xSivs",
+              key.is_dynamic: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "y",
+          key.usr: "s:11test_module7TwoIntsC1ySivp",
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:11test_module7TwoIntsC1ySivg",
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:11test_module7TwoIntsC1ySivs",
+              key.is_dynamic: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(a:b:)",
+          key.usr: "s:11test_module7TwoIntsC1a1bACSi_Sitcfc"
         }
       ]
     },
@@ -84,69 +130,18 @@
       ]
     },
     {
-      key.kind: source.lang.swift.decl.class,
-      key.name: "TwoInts",
-      key.usr: "s:11test_module7TwoIntsC",
-      key.entities: [
-        {
-          key.kind: source.lang.swift.decl.var.instance,
-          key.name: "x",
-          key.usr: "s:11test_module7TwoIntsC1xSivp",
-          key.entities: [
-            {
-              key.kind: source.lang.swift.decl.function.accessor.getter,
-              key.usr: "s:11test_module7TwoIntsC1xSivg",
-              key.is_dynamic: 1
-            },
-            {
-              key.kind: source.lang.swift.decl.function.accessor.setter,
-              key.usr: "s:11test_module7TwoIntsC1xSivs",
-              key.is_dynamic: 1
-            }
-          ]
-        },
-        {
-          key.kind: source.lang.swift.decl.var.instance,
-          key.name: "y",
-          key.usr: "s:11test_module7TwoIntsC1ySivp",
-          key.entities: [
-            {
-              key.kind: source.lang.swift.decl.function.accessor.getter,
-              key.usr: "s:11test_module7TwoIntsC1ySivg",
-              key.is_dynamic: 1
-            },
-            {
-              key.kind: source.lang.swift.decl.function.accessor.setter,
-              key.usr: "s:11test_module7TwoIntsC1ySivs",
-              key.is_dynamic: 1
-            }
-          ]
-        },
-        {
-          key.kind: source.lang.swift.decl.function.constructor,
-          key.name: "init(a:b:)",
-          key.usr: "s:11test_module7TwoIntsC1a1bACSi_Sitcfc"
-        }
-      ]
-    },
-    {
       key.kind: source.lang.swift.decl.protocol,
       key.name: "Prot3",
       key.usr: "s:11test_module5Prot3P"
     },
     {
-      key.kind: source.lang.swift.decl.function.free,
-      key.name: "globalFunc()",
-      key.usr: "s:11test_module10globalFuncyyF"
-    },
-    {
       key.kind: source.lang.swift.decl.class,
-      key.name: "Empty",
-      key.usr: "s:11test_module5EmptyC",
+      key.name: "C2",
+      key.usr: "s:11test_module2C2C",
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.constructor,
-          key.usr: "s:11test_module5EmptyCACycfc"
+          key.usr: "s:11test_module2C2CACycfc"
         }
       ]
     },
@@ -171,6 +166,11 @@
           key.usr: "s:11test_module5Prot2P"
         }
       ]
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.name: "globalFunc()",
+      key.usr: "s:11test_module10globalFuncyyF"
     }
   ]
 }

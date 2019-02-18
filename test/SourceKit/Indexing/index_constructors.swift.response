@@ -11,17 +11,24 @@
   ],
   key.entities: [
     {
+      key.kind: source.lang.swift.ref.module,
+      key.name: "Foundation",
+      key.usr: "c:@M@Foundation",
+      key.line: 6,
+      key.column: 8
+    },
+    {
       key.kind: source.lang.swift.decl.class,
       key.name: "HorseObject",
       key.usr: "s:18index_constructors11HorseObjectC",
-      key.line: 6,
+      key.line: 8,
       key.column: 7,
       key.related: [
         {
           key.kind: source.lang.swift.ref.class,
           key.name: "DogObject",
           key.usr: "s:18index_constructors9DogObjectC",
-          key.line: 6,
+          key.line: 8,
           key.column: 21
         }
       ],
@@ -30,27 +37,27 @@
           key.kind: source.lang.swift.ref.class,
           key.name: "DogObject",
           key.usr: "s:18index_constructors9DogObjectC",
-          key.line: 6,
+          key.line: 8,
           key.column: 21
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "name",
           key.usr: "s:18index_constructors11HorseObjectC4nameXevp",
-          key.line: 7,
+          key.line: 9,
           key.column: 7,
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
               key.usr: "s:18index_constructors11HorseObjectC4nameXevg",
-              key.line: 7,
+              key.line: 9,
               key.column: 7,
               key.is_dynamic: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
               key.usr: "s:18index_constructors11HorseObjectC4nameXevs",
-              key.line: 7,
+              key.line: 9,
               key.column: 7,
               key.is_dynamic: 1
             }
@@ -60,7 +67,7 @@
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "flip()",
           key.usr: "s:18index_constructors11HorseObjectC4flipyyF",
-          key.line: 9,
+          key.line: 11,
           key.column: 21,
           key.is_dynamic: 1,
           key.attributes: [

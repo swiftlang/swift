@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/Notifications.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -36,7 +37,7 @@ namespace irgen {
 class IRGenModule;
 }
 
-/// \brief The SIL pass manager.
+/// The SIL pass manager.
 class SILPassManager {
   /// The module that the pass manager will transform.
   SILModule *Mod;
@@ -48,7 +49,7 @@ class SILPassManager {
   llvm::SmallVector<SILTransform *, 16> Transformations;
 
   /// A list of registered analysis.
-  llvm::SmallVector<SILAnalysis *, 16> Analysis;
+  llvm::SmallVector<SILAnalysis *, 16> Analyses;
 
   /// An entry in the FunctionWorkList.
   struct WorklistEntry {
@@ -101,6 +102,14 @@ class SILPassManager {
   /// The IRGen SIL passes. These have to be dynamically added by IRGen.
   llvm::DenseMap<unsigned, SILTransform *> IRGenPasses;
 
+  /// The notification handler for this specific SILPassManager.
+  ///
+  /// This is not owned by the pass manager, it is owned by the SILModule which
+  /// is guaranteed to outlive any pass manager associated with it. We keep this
+  /// bare pointer to ensure that we can deregister the notification after this
+  /// pass manager is destroyed.
+  DeserializationNotificationHandler *deserializationNotificationHandler;
+
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
@@ -118,11 +127,11 @@ public:
 
   const SILOptions &getOptions() const;
 
-  /// \brief Searches for an analysis of type T in the list of registered
+  /// Searches for an analysis of type T in the list of registered
   /// analysis. If the analysis is not found, the program terminates.
   template<typename T>
   T *getAnalysis() {
-    for (SILAnalysis *A : Analysis)
+    for (SILAnalysis *A : Analyses)
       if (auto *R = llvm::dyn_cast<T>(A))
         return R;
 
@@ -136,16 +145,16 @@ public:
   /// pass manager.
   irgen::IRGenModule *getIRGenModule() { return IRMod; }
 
-  /// \brief Restart the function pass pipeline on the same function
+  /// Restart the function pass pipeline on the same function
   /// that is currently being processed.
   void restartWithCurrentFunction(SILTransform *T);
   void clearRestartPipeline() { RestartPipeline = false; }
   bool shouldRestartPipeline() { return RestartPipeline; }
 
-  /// \brief Iterate over all analysis and invalidate them.
+  /// Iterate over all analysis and invalidate them.
   void invalidateAllAnalysis() {
     // Invalidate the analysis (unless they are locked)
-    for (auto AP : Analysis)
+    for (auto AP : Analyses)
       if (!AP->isLocked())
         AP->invalidate();
 
@@ -155,29 +164,31 @@ public:
     CompletedPassesMap.clear();
   }
 
-  /// \brief Notify the pass manager of a newly create function for tracing.
+  /// Notify the pass manager of a newly create function for tracing.
   void notifyOfNewFunction(SILFunction *F, SILTransform *T);
 
-  /// \brief Add the function \p F to the function pass worklist.
+  /// Add the function \p F to the function pass worklist.
   /// If not null, the function \p DerivedFrom is the function from which \p F
   /// is derived. This is used to avoid an infinite amount of functions pushed
   /// on the worklist (e.g. caused by a bug in a specializing optimization).
   void addFunctionToWorklist(SILFunction *F, SILFunction *DerivedFrom);
-  
-  /// \brief Iterate over all analysis and notify them of the function.
+
+  /// Iterate over all analysis and notify them of the function.
+  ///
   /// This function does not necessarily have to be newly created function. It
   /// is the job of the analysis to make sure no extra work is done if the
   /// particular analysis has been done on the function.
   void notifyAnalysisOfFunction(SILFunction *F) {
-    for (auto AP : Analysis)
-      AP->notifyAddFunction(F);
+    for (auto AP : Analyses) {
+      AP->notifyAddedOrModifiedFunction(F);
+    }
   }
 
-  /// \brief Broadcast the invalidation of the function to all analysis.
+  /// Broadcast the invalidation of the function to all analysis.
   void invalidateAnalysis(SILFunction *F,
                           SILAnalysis::InvalidationKind K) {
     // Invalidate the analysis (unless they are locked)
-    for (auto AP : Analysis)
+    for (auto AP : Analyses)
       if (!AP->isLocked())
         AP->invalidate(F, K);
     
@@ -186,11 +197,11 @@ public:
     CompletedPassesMap[F].reset();
   }
 
-  /// \brief Iterate over all analysis and notify them of a change in witness-
+  /// Iterate over all analysis and notify them of a change in witness-
   /// or vtables.
   void invalidateFunctionTables() {
     // Invalidate the analysis (unless they are locked)
-    for (auto AP : Analysis)
+    for (auto AP : Analyses)
       if (!AP->isLocked())
         AP->invalidateFunctionTables();
 
@@ -200,28 +211,28 @@ public:
     CompletedPassesMap.clear();
   }
 
-  /// \brief Iterate over all analysis and notify them of a deleted function.
-  void notifyDeleteFunction(SILFunction *F) {
+  /// Iterate over all analysis and notify them of a deleted function.
+  void notifyWillDeleteFunction(SILFunction *F) {
     // Invalidate the analysis (unless they are locked)
-    for (auto AP : Analysis)
+    for (auto AP : Analyses)
       if (!AP->isLocked())
-        AP->notifyDeleteFunction(F);
-    
+        AP->notifyWillDeleteFunction(F);
+
     CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();
   }
 
-  /// \brief Reset the state of the pass manager and remove all transformation
+  /// Reset the state of the pass manager and remove all transformation
   /// owned by the pass manager. Analysis passes will be kept.
   void resetAndRemoveTransformations();
 
-  /// \brief Set the name of the current optimization stage.
+  /// Set the name of the current optimization stage.
   ///
   /// This is useful for debugging.
   void setStageName(llvm::StringRef NextStage = "");
 
-  /// \brief Get the name of the current optimization stage.
+  /// Get the name of the current optimization stage.
   ///
   /// This is useful for debugging.
   StringRef getStageName() const;
@@ -231,7 +242,7 @@ public:
 
   /// Verify all analyses.
   void verifyAnalyses() const {
-    for (auto *A : Analysis) {
+    for (auto *A : Analyses) {
       A->verify();
     }
   }
@@ -243,7 +254,7 @@ public:
   /// this. If no override is provided the SILAnalysis should just call the
   /// normal verify method.
   void verifyAnalyses(SILFunction *F) const {
-    for (auto *A : Analysis) {
+    for (auto *A : Analyses) {
       A->verify(F);
     }
   }

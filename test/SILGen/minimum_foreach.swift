@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name Swift -parse-stdlib -parse-as-library -enable-sil-ownership %s
+// RUN: %target-swift-emit-silgen -module-name Swift -parse-stdlib -parse-as-library %s
 
 // This files contains a minimal implementation for Swift to emit foreach loops
 // for a type. It acts partially as a guide for users and since it is in the

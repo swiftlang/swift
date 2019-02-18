@@ -87,3 +87,11 @@ public struct ResilientWeakRef {
     ref = r
   }
 }
+
+public struct ResilientRef {
+  public var r: Referent
+}
+
+public struct ResilientWithInternalField {
+  var x: Int
+}

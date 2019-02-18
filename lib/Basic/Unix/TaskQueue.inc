@@ -123,18 +123,18 @@ public:
   int getPipe() const { return Pipe; }
   int getErrorPipe() const { return ErrorPipe; }
 
-  /// \brief Begins execution of this Task.
+  /// Begins execution of this Task.
   /// \returns true on error.
   bool execute();
 
-  /// \brief Reads data from the pipes, if any is available.
+  /// Reads data from the pipes, if any is available.
   ///
   /// If \p UntilEnd is true, reads until the end of the stream; otherwise reads
   /// once (possibly with a retry on EINTR), and returns.
   /// \returns true on error.
   bool readFromPipes(bool UntilEnd);
 
-  /// \brief Performs any post-execution work for this Task, such as reading
+  /// Performs any post-execution work for this Task, such as reading
   /// piped output and closing the pipe.
   void finishExecution();
 };
@@ -556,6 +556,7 @@ void TaskMonitor::verifyEvents(const short events) const {
   assert((events & POLLNVAL) == 0 && "Asked poll() to watch a closed fd");
   const short expectedEvents = POLLIN | POLLPRI | POLLHUP | POLLERR;
   assert((events & ~expectedEvents) == 0 && "Received unexpected event");
+  (void)expectedEvents;
 }
 
 void TaskMonitor::readDataIfAvailable(const short events, const int fd,

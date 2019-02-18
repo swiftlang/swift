@@ -29,7 +29,6 @@ enum class ArrayCallKind {
   kGetCount,
   kGetCapacity,
   kGetElement,
-  kGetArrayOwner,
   kGetElementAddress,
   kMakeMutable,
   kMutateUnknown,

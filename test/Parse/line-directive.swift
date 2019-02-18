@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -c %s 2>&1 | %FileCheck %s
 
 let x = 0 // We need this because of the #sourceLocation-ends-with-a-newline requirement.
 
@@ -53,3 +54,9 @@ enum E {
     case C, D
 #sourceLocation()
 }
+
+#sourceLocation(file: "sr8772.swift", line: 400)
+2., 3
+// CHECK: sr8772.swift:400:2: error: expected member name following '.'
+// CHECK: sr8772.swift:400:3: error: consecutive statements on a line must be separated by ';'
+// CHECK: sr8772.swift:400:3: error: expected expression

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -profile-generate -profile-coverage-mapping -emit-ir -o - -module-name=irgen | %FileCheck %s
+// RUN: %target-swift-frontend %s -profile-generate -profile-coverage-mapping -emit-ir -o - -module-name=irgen | %FileCheck %s
 
 // CHECK-NOT: @__llvm_coverage_mapping
 

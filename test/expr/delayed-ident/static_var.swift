@@ -35,3 +35,19 @@ struct Foo {
 func & (x: Foo, y: Foo) -> Foo { }
 
 var fooValue: Foo = .Bar & .Wibble
+
+// Static closure variables.
+struct HasClosure {
+  static var factoryNormal: (Int) -> HasClosure = { _ in .init() }
+  static var factoryReturnOpt: (Int) -> HasClosure? = { _ in .init() }
+  static var factoryIUO: ((Int) -> HasClosure)! = { _ in .init() }
+  static var factoryOpt: ((Int) -> HasClosure)? = { _ in .init() }
+}
+var _: HasClosure = .factoryNormal(0)
+var _: HasClosure = .factoryReturnOpt(1)!
+var _: HasClosure = .factoryIUO(2)
+var _: HasClosure = .factoryOpt(3)
+// expected-error@-1 {{value of optional type '((Int) -> HasClosure)?' must be unwrapped to a value of type '(Int) -> HasClosure'}}
+// expected-note@-2 {{coalesce}}
+// expected-note@-3 {{force-unwrap}}
+var _: HasClosure = .factoryOpt!(4) // expected-error {{type of expression is ambiguous without more context}}

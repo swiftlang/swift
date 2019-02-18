@@ -15,9 +15,9 @@
 
 // REQUIRES: asserts
 
-// CHECK: 4 Serialization - # of same-module nested types resolved without lookup
+// CHECK: 4 Serialization - # of nested types resolved without full lookup
 // DISABLED: Statistics
-// DISABLED-NOT: same-module nested types resolved without lookup
+// DISABLED-NOT: nested types resolved without full lookup
 
 public func useTypes(
   _: Outer.Inner,

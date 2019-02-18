@@ -207,11 +207,11 @@ void InlineTree::buildTree(Function *F) {
   Node *rootNode = getNode(F->getName(), Functions2Nodes);
   rootNode->isTopLevel = true;
 
-  DEBUG(dbgs() << "\nFunction " << F->getName() << '\n');
+  LLVM_DEBUG(dbgs() << "\nFunction " << F->getName() << '\n');
   for (BasicBlock &BB : *F) {
     for (Instruction &I : BB) {
 
-      DEBUG(dbgs() << I << '\n');
+      LLVM_DEBUG(dbgs() << I << '\n');
 
       totalNumberOfInstructions++;
       SmallVector<DILocation *, 8> InlineChain;
@@ -228,14 +228,14 @@ void InlineTree::buildTree(Function *F) {
         DILocalScope *Sc = DL->getScope();
         DISubprogram *SP = Sc->getSubprogram();
         assert(SP);
-        DEBUG(dbgs() << "    f=" << SP->getLinkageName());
+        LLVM_DEBUG(dbgs() << "    f=" << SP->getLinkageName());
         if (Nd) {
           Nd = getNode(SP->getLinkageName(), Nd->UnsortedChildren);
           Nd->UniqueLocations.insert(LocationKey(PrevDL));
-          DEBUG(dbgs() << ", loc="; PrevDL->print(dbgs()); dbgs() << '\n');
+          LLVM_DEBUG(dbgs() << ", loc="; PrevDL->print(dbgs()); dbgs() << '\n');
         } else {
           Nd = rootNode;
-          DEBUG(dbgs() << ", root\n");
+          LLVM_DEBUG(dbgs() << ", root\n");
         }
         Nd->numTotalInsts++;
         PrevDL = DL;

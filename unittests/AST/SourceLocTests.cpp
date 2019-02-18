@@ -157,7 +157,6 @@ TEST(SourceLoc, StmtConditionElement) {
                                      /*IsCaptureList*/false,
                                      start.getAdvancedLoc(7)
                                     , C.Ctx.getIdentifier("x")
-                                    , Type()
                                     , nullptr);
   auto pattern = new (C.Ctx) NamedPattern(vardecl);
   auto init = new (C.Ctx) IntegerLiteralExpr( "1", start.getAdvancedLoc(25)
@@ -290,4 +289,55 @@ TEST(SourceLoc, TupleExpr) {
   EXPECT_EQ(start.getAdvancedLoc(4), quadValidMids->getEndLoc());
   EXPECT_EQ(SourceRange(start, start.getAdvancedLoc(4)), quadValidMids->getSourceRange());
   
+}
+
+TEST(SourceLoc, CharSourceRangeOverlaps) {
+  TestContext C;
+  auto bufferID = C.Ctx.SourceMgr.addMemBufferCopy("func foo()");
+  SourceLoc start = C.Ctx.SourceMgr.getLocForBufferStart(bufferID);
+
+  // Create exclusive ranges for each of the tokens.
+
+  CharSourceRange funcRange(start, 4);
+  CharSourceRange fooRange(funcRange.getEnd().getAdvancedLoc(1), 3);
+  CharSourceRange lParenRange(fooRange.getEnd(), 1);
+  CharSourceRange rParenRange(lParenRange.getEnd(), 1);
+  CharSourceRange fullRange = C.Ctx.SourceMgr.getRangeForBuffer(bufferID);
+  CharSourceRange zeroRange = CharSourceRange(start, 0);
+
+  // None of the ranges should overlap, and their results should be symmetric.
+
+  EXPECT_FALSE(funcRange.overlaps(fooRange));
+  EXPECT_FALSE(fooRange.overlaps(funcRange));
+
+  EXPECT_FALSE(fooRange.overlaps(lParenRange));
+  EXPECT_FALSE(lParenRange.overlaps(fooRange));
+
+  EXPECT_FALSE(lParenRange.overlaps(rParenRange));
+  EXPECT_FALSE(rParenRange.overlaps(lParenRange));
+
+  // The 'full range' overlaps all the other tokens and those results should
+  // be symmetric.
+
+  EXPECT_TRUE(fullRange.overlaps(funcRange));
+  EXPECT_TRUE(fullRange.overlaps(fooRange));
+  EXPECT_TRUE(fullRange.overlaps(lParenRange));
+  EXPECT_TRUE(fullRange.overlaps(rParenRange));
+
+  EXPECT_TRUE(funcRange.overlaps(fullRange));
+  EXPECT_TRUE(fooRange.overlaps(fullRange));
+  EXPECT_TRUE(lParenRange.overlaps(fullRange));
+  EXPECT_TRUE(rParenRange.overlaps(fullRange));
+
+  // The zero range should not overlap any, and that result should be symmetric.
+
+  EXPECT_FALSE(zeroRange.overlaps(funcRange));
+  EXPECT_FALSE(zeroRange.overlaps(fooRange));
+  EXPECT_FALSE(zeroRange.overlaps(lParenRange));
+  EXPECT_FALSE(zeroRange.overlaps(rParenRange));
+
+  EXPECT_FALSE(funcRange.overlaps(zeroRange));
+  EXPECT_FALSE(fooRange.overlaps(zeroRange));
+  EXPECT_FALSE(lParenRange.overlaps(zeroRange));
+  EXPECT_FALSE(rParenRange.overlaps(zeroRange));
 }

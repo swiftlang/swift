@@ -122,9 +122,9 @@ public enum DC_PublicEnum {
 private protocol EA_PrivateProtocol {
   // CHECK: {{^}} associatedtype Foo
   associatedtype Foo
-  // CHECK: fileprivate var Bar
+  // CHECK: {{^}} var Bar
   var Bar: Int { get }
-  // CHECK: fileprivate func baz()
+  // CHECK: {{^}} func baz()
   func baz()
 } // CHECK: {{^[}]}}
 
@@ -132,9 +132,9 @@ private protocol EA_PrivateProtocol {
 public protocol EB_PublicProtocol {
   // CHECK: {{^}} associatedtype Foo
   associatedtype Foo
-  // CHECK: public var Bar
+  // CHECK: {{^}} var Bar
   var Bar: Int { get }
-  // CHECK: public func baz()
+  // CHECK: {{^}} func baz()
   func baz()
 } // CHECK: {{^[}]}}
 
@@ -365,12 +365,12 @@ public class PublicInitBase {
 
 // CHECK-LABEL: public{{(\*/)?}} class PublicInitInheritor : PublicInitBase {
 public class PublicInitInheritor : PublicInitBase {
-  // CHECK: {{^}} public init()
-  // CHECK: {{^}} fileprivate init(other: PublicInitBase)
+  // CHECK: {{^}} override public init()
+  // CHECK: {{^}} override fileprivate init(other: PublicInitBase)
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: {{(/\*)?private(\*/)?}} class PublicInitPrivateInheritor : PublicInitBase {
 private class PublicInitPrivateInheritor : PublicInitBase {
-  // CHECK: {{^}} internal init()
-  // CHECK: {{^}} fileprivate init(other: PublicInitBase)
+  // CHECK: {{^}} override internal init()
+  // CHECK: {{^}} override fileprivate init(other: PublicInitBase)
 } // CHECK: {{^[}]}}

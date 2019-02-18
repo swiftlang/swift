@@ -86,13 +86,14 @@ DECL_NODES = [
     #    ('#if' | '#elseif' | '#else') expr? (stmt-list | switch-case-list)
     Node('IfConfigClause', kind='Syntax',
          children=[
-             Child('PoundKeyword', kind='Token',
+             Child('PoundKeyword', kind='Token', 
+                   classification='BuildConfigId',
                    token_choices=[
                        'PoundIfToken',
                        'PoundElseifToken',
                        'PoundElseToken',
                    ]),
-             Child('Condition', kind='Expr',
+             Child('Condition', kind='Expr', classification='BuildConfigId',
                    is_optional=True),
              Child('Elements', kind='Syntax',
                    node_choices=[
@@ -110,7 +111,8 @@ DECL_NODES = [
     Node('IfConfigDecl', kind='Decl',
          children=[
              Child('Clauses', kind='IfConfigClauseList'),
-             Child('PoundEndif', kind='PoundEndifToken'),
+             Child('PoundEndif', kind='PoundEndifToken', 
+                   classification='BuildConfigId'),
          ]),
 
     Node('PoundErrorDecl', kind='Decl',
@@ -155,7 +157,7 @@ DECL_NODES = [
 
     Node('DeclModifier', kind='Syntax',
          children=[
-             Child('Name', kind='Token',
+             Child('Name', kind='Token', classification='Attribute',
                    text_choices=[
                        'class', 'convenience', 'dynamic', 'final', 'infix',
                        'lazy', 'optional', 'override', 'postfix', 'prefix',
@@ -333,7 +335,7 @@ DECL_NODES = [
                    is_optional=True),
              Child('Type', kind='Type',
                    is_optional=True),
-             Child('Ellipsis', kind='Token',
+             Child('Ellipsis', kind='EllipsisToken',
                    is_optional=True),
              Child('DefaultArgument', kind='InitializerClause',
                    is_optional=True),
@@ -441,7 +443,10 @@ DECL_NODES = [
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
              # the body is not necessary inside a protocol definition
-             Child('Accessor', kind='AccessorBlock', is_optional=True),
+             Child('Accessor', kind='Syntax', is_optional=True,
+                   node_choices=[
+                      Child('Accessors', kind='AccessorBlock'),
+                      Child('Getter', kind='CodeBlock')]),
          ]),
 
     # access-level-modifier -> 'private' | 'private' '(' 'set' ')'
@@ -500,10 +505,10 @@ DECL_NODES = [
                    text_choices=[
                       'get', 'set', 'didSet', 'willSet', 'unsafeAddress', 
                       'addressWithOwner', 'addressWithNativeOwner', 
-                      'addressWithPinnedNativeOwner', 'unsafeMutableAddress', 
+                      'unsafeMutableAddress', 
                       'mutableAddressWithOwner', 
                       'mutableAddressWithNativeOwner', 
-                      'mutableAddressWithPinnedNativeOwner',
+                      '_read', '_modify'
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
              Child('Body', kind='CodeBlock', is_optional=True),
@@ -514,10 +519,7 @@ DECL_NODES = [
     Node('AccessorBlock', kind="Syntax", traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             Child('AccessorListOrStmtList', kind='Syntax',
-                   node_choices=[
-                      Child('Accessors', kind='AccessorList'),
-                      Child('Statements', kind='CodeBlockItemList')]),
+             Child('Accessors', kind='AccessorList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
@@ -528,7 +530,10 @@ DECL_NODES = [
              Child('Pattern', kind='Pattern'),
              Child('TypeAnnotation', kind='TypeAnnotation', is_optional=True),
              Child('Initializer', kind='InitializerClause', is_optional=True),
-             Child('Accessor', kind='AccessorBlock', is_optional=True),
+             Child('Accessor', kind='Syntax', is_optional=True,
+                   node_choices=[
+                      Child('Accessors', kind='AccessorBlock'),
+                      Child('Getter', kind='CodeBlock')]),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
@@ -644,6 +649,7 @@ DECL_NODES = [
                    The attributes applied to the 'operator' declaration.
                    '''),
              Child('Modifiers', kind='ModifierList', is_optional=True,
+                   classification='Attribute',
                    description='''
                    The declaration modifiers applied to the 'operator'
                    declaration.
@@ -656,23 +662,26 @@ DECL_NODES = [
                        'PrefixOperatorToken',
                        'PostfixOperatorToken',
                    ]),
-             Child('InfixOperatorGroup', kind='InfixOperatorGroup',
+             Child('OperatorPrecedenceAndTypes', kind='OperatorPrecedenceAndTypes',
                    description='''
-                   Optionally specifiy a precedence group
+                   Optionally specify a precedence group and designated types.
                    ''',
                    is_optional=True),
          ]),
 
-    # infix-operator-group -> ':' identifier
-    Node('InfixOperatorGroup', kind='Syntax',
+    Node('IdentifierList', kind='SyntaxCollection',
+         element='IdentifierToken'),
+
+    # infix-operator-group -> ':' identifier ','? identifier?
+    Node('OperatorPrecedenceAndTypes', kind='Syntax',
          description='''
-         A clause to specify precedence group in infix operator declaration.
+         A clause to specify precedence group in infix operator declarations, and designated types in any operator declaration.
          ''',
          children=[
              Child('Colon', kind='ColonToken'),
-             Child('PrecedenceGroupName', kind='IdentifierToken',
+             Child('PrecedenceGroupAndDesignatedTypes', kind='IdentifierList',
                    description='''
-                   The name of the precedence group for the operator
+                   The precedence group and designated types for this operator
                    '''),
          ]),
 
@@ -723,7 +732,8 @@ DECL_NODES = [
          groups.
          ''',
          children=[
-             Child('HigherThanOrLowerThan', kind='IdentifierToken',
+             Child('HigherThanOrLowerThan', kind='IdentifierToken', 
+                   classification='Keyword',
                    text_choices=[
                       'higherThan', 'lowerThan',
                    ],
@@ -782,8 +792,8 @@ DECL_NODES = [
          are grouped together in the absence of grouping parentheses.
          ''',
          children=[
-             Child('AssociativityKeyword', kind='IdentifierToken',
-                   text_choices=['associativity']),
+             Child('AssociativityKeyword', kind='IdentifierToken', 
+                   classification='Keyword', text_choices=['associativity']),
              Child('Colon', kind='ColonToken'),
              Child('Value', kind='IdentifierToken',
                    text_choices=['left', 'right', 'none'],

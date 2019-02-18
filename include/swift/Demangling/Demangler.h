@@ -280,6 +280,17 @@ public:
   }
 };
 
+/// Kinds of symbolic reference supported.
+enum class SymbolicReferenceKind : uint8_t {
+  /// A symbolic reference to a context descriptor, representing the
+  /// (unapplied generic) context.
+  Context,  
+};
+
+using SymbolicReferenceResolver_t = NodePointer (SymbolicReferenceKind,
+                                                 Directness,
+                                                 int32_t, const void *);
+
 /// The demangler.
 ///
 /// It de-mangles a string and it also owns the returned node-tree. This means
@@ -296,13 +307,12 @@ protected:
 
   Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
-  Vector<unsigned> PendingSubstitutions;
 
   static const int MaxNumWords = 26;
   StringRef Words[MaxNumWords];
   int NumWords = 0;
   
-  std::function<NodePointer (int32_t, const void *)> SymbolicReferenceResolver;
+  std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
 
   bool nextIf(StringRef str) {
     if (!Text.substr(Pos).startswith(str)) return false;
@@ -430,6 +440,7 @@ protected:
   NodePointer demangleBoundGenericArgs(NodePointer nominalType,
                                     const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx);
+  NodePointer popAnyProtocolConformanceList();
   NodePointer demangleRetroactiveConformance();
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention();
@@ -447,6 +458,14 @@ protected:
   NodePointer getDependentGenericParamType(int depth, int index);
   NodePointer demangleGenericParamIndex();
   NodePointer popProtocolConformance();
+  NodePointer demangleRetroactiveProtocolConformanceRef();
+  NodePointer popAnyProtocolConformance();
+  NodePointer demangleConcreteProtocolConformance();
+  NodePointer popDependentProtocolConformance();
+  NodePointer demangleDependentProtocolConformanceRoot();
+  NodePointer demangleDependentProtocolConformanceInherited();
+  NodePointer popDependentAssociatedConformance();
+  NodePointer demangleDependentProtocolConformanceAssociated();
   NodePointer demangleThunkOrSpecialization();
   NodePointer demangleGenericSpecialization(Node::Kind SpecKind);
   NodePointer demangleFunctionSpecialization();
@@ -454,8 +473,7 @@ protected:
   NodePointer addFuncSpecParamNumber(NodePointer Param,
                               FunctionSigSpecializationParamKind Kind);
 
-  NodePointer demangleSpecAttributes(Node::Kind SpecKind,
-                                     bool demangleUniqueID = false);
+  NodePointer demangleSpecAttributes(Node::Kind SpecKind);
 
   NodePointer demangleWitness();
   NodePointer demangleSpecialType();
@@ -474,7 +492,8 @@ protected:
 
   NodePointer demangleObjCTypeName();
   NodePointer demangleTypeMangling();
-  NodePointer demangleSymbolicReference(const void *at);
+  NodePointer demangleSymbolicReference(unsigned char rawKind,
+                                        const void *at);
 
   void dump();
 
@@ -485,10 +504,16 @@ public:
 
   /// Install a resolver for symbolic references in a mangled string.
   void setSymbolicReferenceResolver(
-                  std::function<NodePointer (int32_t, const void*)> resolver) {
+                          std::function<SymbolicReferenceResolver_t> resolver) {
     SymbolicReferenceResolver = resolver;
   }
-  
+
+  /// Take the symbolic reference resolver.
+  std::function<SymbolicReferenceResolver_t> &&
+  takeSymbolicReferenceResolver() {
+    return std::move(SymbolicReferenceResolver);
+  }
+
   /// Demangle the given symbol and return the parse tree.
   ///
   /// \param MangledName The mangled symbol string, which start with the

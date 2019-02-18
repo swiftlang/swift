@@ -25,9 +25,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+
 from collections import namedtuple
 from operator import attrgetter
+
 import gyb
+
 from jobstats import load_stats_dir, merge_all_jobstats
 
 
@@ -109,6 +112,8 @@ def run_once_with_primary(args, ast, rng, primary_idx):
         mode = "-c"
         if args.typecheck:
             mode = "-typecheck"
+        if args.parse:
+            mode = "-parse"
 
         focus = ["-primary-file", primary]
         if args.whole_module_optimization:
@@ -716,6 +721,9 @@ def main():
         '--exponential-threshold', type=float,
         default=1.2,
         help='minimum base for exponential fit to consider "bad scaling"')
+    parser.add_argument(
+        '-parse', '--parse', action='store_true',
+        default=False, help='only run compiler with -parse')
     parser.add_argument(
         '-typecheck', '--typecheck', action='store_true',
         default=False, help='only run compiler with -typecheck')

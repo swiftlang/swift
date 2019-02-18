@@ -59,7 +59,8 @@ static Type deriveRawRepresentable_Raw(DerivedConformance &derived) {
   return derived.getConformanceContext()->mapTypeIntoContext(rawInterfaceType);
 }
 
-static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
+static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl,
+                                           void *) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
   //   @derived
@@ -76,7 +77,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   auto parentDC = toRawDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto enumDecl = parentDC->getSelfEnumDecl();
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
@@ -89,6 +90,27 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
     assert(elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy));
   }
 #endif
+
+  if (enumDecl->isObjC()) {
+    // Special case: ObjC enums are represented by their raw value, so just use
+    // a bitcast.
+
+    // return unsafeBitCast(self, to: RawType.self)
+    DeclName name(C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
+    auto functionRef = new (C) UnresolvedDeclRefExpr(name,
+                                                     DeclRefKind::Ordinary,
+                                                     DeclNameLoc());
+    auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
+    auto bareTypeExpr = TypeExpr::createImplicit(rawTy, C);
+    auto typeExpr = new (C) DotSelfExpr(bareTypeExpr, SourceLoc(), SourceLoc());
+    auto call = CallExpr::createImplicit(C, functionRef, {selfRef, typeExpr},
+                                         {Identifier(), C.Id_to});
+    auto returnStmt = new (C) ReturnStmt(SourceLoc(), call);
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
+                                  SourceLoc());
+    toRawDecl->setBody(body);
+    return;
+  }
 
   Type enumType = parentDC->getDeclaredTypeInContext();
 
@@ -121,6 +143,22 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   toRawDecl->setBody(body);
 }
 
+static void maybeMarkAsInlinable(DerivedConformance &derived,
+                                 AbstractFunctionDecl *afd) {
+  ASTContext &C = derived.TC.Context;
+  auto parentDC = derived.getConformanceContext();
+  if (parentDC->getParentModule()->getResilienceStrategy() !=
+      ResilienceStrategy::Resilient) {
+    AccessScope access =
+        afd->getFormalAccessScope(nullptr,
+                                  /*treatUsableFromInlineAsPublic*/true);
+    if (auto *attr = afd->getAttrs().getAttribute<UsableFromInlineAttr>())
+      attr->setInvalid();
+    if (access.isPublic())
+      afd->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
+  }
+}
+
 static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
   ASTContext &C = derived.TC.Context;
 
@@ -143,24 +181,98 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
 
   // If the containing module is not resilient, make sure clients can get at
   // the raw value without function call overhead.
-  if (parentDC->getParentModule()->getResilienceStrategy() !=
-      ResilienceStrategy::Resilient) {
-    AccessScope access =
-        enumDecl->getFormalAccessScope(nullptr,
-                                       /*treatUsableFromInlineAsPublic*/true);
-    if (access.isPublic())
-      getterDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
-  }
+  maybeMarkAsInlinable(derived, getterDecl);
 
   derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
 
   return propDecl;
 }
 
+/// Contains information needed to synthesize a runtime version check.
+struct RuntimeVersionCheck {
+  PlatformKind Platform;
+  llvm::VersionTuple Version;
+
+  RuntimeVersionCheck(PlatformKind Platform, llvm::VersionTuple Version)
+    : Platform(Platform), Version(Version)
+  { }
+
+  VersionRange getVersionRange() const {
+    return VersionRange::allGTE(Version);
+  }
+
+  /// Synthesizes a statement which returns nil if the runtime version check
+  /// fails, e.g. "guard #available(iOS 10, *) else { return nil }".
+  Stmt *createEarlyReturnStmt(ASTContext &C) const {
+    // platformSpec = "\(attr.platform) \(attr.introduced)"
+    auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
+                            Platform, SourceLoc(),
+                            Version, SourceLoc()
+                        );
+
+    // otherSpec = "*"
+    auto otherSpec = new (C) OtherPlatformAvailabilitySpec(SourceLoc());
+
+    // availableInfo = "#available(\(platformSpec), \(otherSpec))"
+    auto availableInfo = PoundAvailableInfo::create(
+        C, SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
+
+    // This won't be filled in by TypeCheckAvailability because we have
+    // invalid SourceLocs in this area of the AST.
+    availableInfo->setAvailableRange(getVersionRange());
+
+    // earlyReturnBody = "{ return nil }"
+    auto earlyReturn = new (C) FailStmt(SourceLoc(), SourceLoc());
+    auto earlyReturnBody = BraceStmt::create(C, SourceLoc(),
+                                             ASTNode(earlyReturn),
+                                             SourceLoc(), /*implicit=*/true);
+
+    // guardStmt = "guard \(availableInfo) else \(earlyReturnBody)"
+    StmtConditionElement conds[1] = { availableInfo };
+    auto guardStmt = new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conds),
+                                       earlyReturnBody, /*implicit=*/true);
+
+    return guardStmt;
+  }
+};
+
+/// Checks if the case will be available at runtime given the current target
+/// platform. If it will never be available, returns false. If it will always
+/// be available, returns true. If it will sometimes be available, adds
+/// information about the runtime check needed to ensure it is available to
+/// \c versionCheck and returns true.
+static bool checkAvailability(const EnumElementDecl* elt, ASTContext &C,
+    Optional<RuntimeVersionCheck> &versionCheck) {
+  auto *attr = elt->getAttrs().getPotentiallyUnavailable(C);
+
+  // Is it always available?
+  if (!attr)
+    return true;
+
+  AvailableVersionComparison availability = attr->getVersionAvailability(C);
+
+  assert(availability != AvailableVersionComparison::Available &&
+         "DeclAttributes::getPotentiallyUnavailable() shouldn't "
+         "return an available attribute");
+
+  // Is it never available?
+  if (availability != AvailableVersionComparison::PotentiallyUnavailable)
+    return false;
+
+  // It's conditionally available; create a version constraint and return true.
+  assert(attr->getPlatformAgnosticAvailability() ==
+             PlatformAgnosticAvailabilityKind::None &&
+         "can only express #available(somePlatform version) checks");
+  versionCheck.emplace(attr->Platform, *attr->Introduced);
+
+  return true;
+}
+
 static void
-deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
+deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
+  //   @available(iOS 10, *) case C = 333
   //   @derived
   //   init?(rawValue: SomeType) {
   //     switch rawValue {
@@ -168,6 +280,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   //       self = .A
   //     case 222:
   //       self = .B
+  //     case 333:
+  //       guard #available(iOS 10, *) else { return nil }
+  //       self = .C
   //     default:
   //       return nil
   //     }
@@ -177,7 +292,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   auto parentDC = initDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto nominalTypeDecl = parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominalTypeDecl = parentDC->getSelfNominalTypeDecl();
   auto enumDecl = cast<EnumDecl>(nominalTypeDecl);
 
   Type rawTy = enumDecl->getRawType();
@@ -203,37 +318,56 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   SmallVector<ASTNode, 4> cases;
   unsigned Idx = 0;
   for (auto elt : enumDecl->getAllElements()) {
+    // First, check case availability. If the case will definitely be
+    // unavailable, skip it. If it might be unavailable at runtime, save
+    // information about that check in versionCheck and keep processing this
+    // element.
+    Optional<RuntimeVersionCheck> versionCheck(None);
+    if (!checkAvailability(elt, C, versionCheck))
+      continue;
+
+    // litPat = elt.rawValueExpr as a pattern
     LiteralExpr *litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
     if (isStringEnum) {
       // In case of a string enum we are calling the _findStringSwitchCase
       // function from the library and switching on the returned Int value.
       stringExprs.push_back(litExpr);
-      llvm::SmallString<16> IdxAsStringBuffer;
-      APInt(64, Idx).toStringUnsigned(IdxAsStringBuffer);
-      StringRef IndexAsString(C.AllocateCopy(IdxAsStringBuffer.str()));
-      litExpr = new (C) IntegerLiteralExpr(IndexAsString, SourceLoc());
+      litExpr = IntegerLiteralExpr::createFromUnsigned(C, Idx); 
     }
     auto litPat = new (C) ExprPattern(litExpr, /*isResolved*/ true,
                                       nullptr, nullptr);
     litPat->setImplicit();
 
-    auto labelItem = CaseLabelItem(litPat);
+    /// Statements in the body of this case.
+    SmallVector<ASTNode, 2> stmts;
 
+    // If checkAvailability() discovered we need a runtime version check,
+    // add it now.
+    if (versionCheck.hasValue())
+      stmts.push_back(ASTNode(versionCheck->createEarlyReturnStmt(C)));
+
+    // Create a statement which assigns the case to self.
+
+    // valueExpr = "\(enumType).\(elt)"
     auto eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto metaTyRef = TypeExpr::createImplicit(enumType, C);
     auto valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
     
+    // assignment = "self = \(valueExpr)"
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/true,
                                        AccessSemantics::DirectToStorage);
-
     auto assignment = new (C) AssignExpr(selfRef, SourceLoc(), valueExpr,
                                          /*implicit*/ true);
-    
-    auto body = BraceStmt::create(C, SourceLoc(),
-                                  ASTNode(assignment), SourceLoc());
 
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
+    stmts.push_back(ASTNode(assignment));
+    
+    // body = "{ \(stmts) }" (the braces are silent)
+    auto body = BraceStmt::create(C, SourceLoc(),
+                                  stmts, SourceLoc());
+
+    // cases.append("case \(litPat): \(body)")
+    cases.push_back(CaseStmt::create(C, SourceLoc(), CaseLabelItem(litPat),
                                      /*HasBoundDecls=*/false, SourceLoc(),
                                      SourceLoc(), body));
     Idx++;
@@ -250,7 +384,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
                                    /*HasBoundDecls=*/false, SourceLoc(),
                                    SourceLoc(), dfltBody));
 
-  auto rawDecl = initDecl->getParameterList(1)->get(0);
+  auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
   Expr *switchArg = rawRef;
   if (isStringEnum) {
@@ -290,13 +424,11 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   assert(equatableProto);
   assert(tc.conformsToProtocol(rawType, equatableProto, enumDecl, None));
   (void)equatableProto;
-
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
-                                         /*static*/false, /*inout*/true);
+  (void)rawType;
 
   auto *rawDecl = new (C)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                C.Id_rawValue, SourceLoc(), C.Id_rawValue, rawType, parentDC);
+                C.Id_rawValue, SourceLoc(), C.Id_rawValue, parentDC);
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
@@ -308,56 +440,23 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
                             /*Failability=*/ OTK_Optional,
                             /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                            selfDecl, paramList,
+                            paramList,
                             /*GenericParams=*/nullptr, parentDC);
   
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
-  // Compute the type of the initializer.
-  TupleTypeElt element(rawType, C.Id_rawValue);
-  TupleTypeElt interfaceElement(rawInterfaceType, C.Id_rawValue);
-  auto interfaceArgType = TupleType::get(interfaceElement, C);
-
   // Compute the interface type of the initializer.
-  Type retInterfaceType
-    = OptionalType::get(parentDC->getDeclaredInterfaceType());
-  Type interfaceType = FunctionType::get(interfaceArgType, retInterfaceType);
-  auto selfParam = computeSelfParam(initDecl);
-  auto initSelfParam = computeSelfParam(initDecl, /*init*/ true);
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    initDecl->setGenericEnvironment(env);
+  initDecl->computeType();
 
-  Type allocIfaceType;
-  Type initIfaceType;
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    initDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-
-    allocIfaceType = GenericFunctionType::get(sig, {selfParam},
-                                              interfaceType,
-                                              FunctionType::ExtInfo());
-    initIfaceType = GenericFunctionType::get(sig, {initSelfParam},
-                                             interfaceType,
-                                             FunctionType::ExtInfo());
-  } else {
-    allocIfaceType = FunctionType::get({selfParam},
-                                       interfaceType, FunctionType::ExtInfo());
-    initIfaceType = FunctionType::get({initSelfParam},
-                                      interfaceType, FunctionType::ExtInfo());
-  }
-  initDecl->setInterfaceType(allocIfaceType);
-  initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
-  initDecl->setValidationStarted();
+  initDecl->setValidationToChecked();
 
   // If the containing module is not resilient, make sure clients can construct
   // an instance without function call overhead.
-  if (parentDC->getParentModule()->getResilienceStrategy() !=
-      ResilienceStrategy::Resilient) {
-    AccessScope access =
-        enumDecl->getFormalAccessScope(nullptr,
-                                       /*treatUsableFromInlineAsPublic*/true);
-    if (access.isPublic())
-      initDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
-  }
+  maybeMarkAsInlinable(derived, initDecl);
 
   C.addSynthesizedDecl(initDecl);
 

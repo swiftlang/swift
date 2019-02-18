@@ -71,15 +71,15 @@ extension D {
 // RUN: %target-swift-ide-test -print-type-interface -usr=_TtGSaSi_ -module-name print_type_interface -source-filename %s | %FileCheck %s -check-prefix=TYPE4
 // TYPE4-DAG: public typealias Index = Int
 // TYPE4-DAG: public func min() -> Int?
-// TYPE4-DAG: public mutating func insert<C>(contentsOf newElements: C, at i: Int)
-// TYPE4-DAG: public mutating func removeFirst(_ n: Int)
-// TYPE4-DAG: public func makeIterator() -> IndexingIterator<Array<Int>>
+// TYPE4-DAG: public mutating func insert<C>(contentsOf newElements: __owned C, at i: Int)
+// TYPE4-DAG: public mutating func removeFirst(_ k: Int)
+// TYPE4-DAG: public __consuming func makeIterator() -> IndexingIterator<Array<Int>>
 // TYPE4-NOT: public func joined
 
 // RUN: %target-swift-ide-test -print-type-interface -usr=_TtGSaSS_ -module-name print_type_interface -source-filename %s | %FileCheck %s -check-prefix=TYPE5
-// TYPE5-DAG: public func prefix(_ maxLength: Int) -> ArraySlice<String>
-// TYPE5-DAG: public func suffix(_ maxLength: Int) -> ArraySlice<String>
-// TYPE5-DAG: public func split(separator: String, maxSplits: Int = default, omittingEmptySubsequences: Bool = default) -> [ArraySlice<String>]
-// TYPE5-DAG: public func formIndex(_ i: inout Int, offsetBy n: Int)
+// TYPE5-DAG: public __consuming func prefix(_ maxLength: Int) -> ArraySlice<String>
+// TYPE5-DAG: public __consuming func suffix(_ maxLength: Int) -> ArraySlice<String>
+// TYPE5-DAG: public __consuming func split(separator: String, maxSplits: Int = Int.max, omittingEmptySubsequences: Bool = true) -> [ArraySlice<String>]
+// TYPE5-DAG: public func formIndex(_ i: inout Int, offsetBy distance: Int)
 // TYPE5-DAG: public func distance(from start: Int, to end: Int) -> Int
-// TYPE5-DAG: public func joined(separator: String = default) -> String
+// TYPE5-DAG: public func joined(separator: String = "") -> String

@@ -1,10 +1,11 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -typecheck %s
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
-// UNSUPPORTED: OS=macosx
 
 import Photos
+
+#if os(iOS) || os(tvOS)
 
 if #available(iOS 8.0, tvOS 10.0, *) {
   // compile time only validation test for the SDK overlay,
@@ -40,3 +41,22 @@ if #available(iOS 8.0, tvOS 10.0, *) {
     }
   }
 }
+
+#elseif os(macOS)
+
+if #available(macOS 10.14, *) {
+  // compile time only validation test for the SDK overlay,
+  // because PHProjectChangeRequest pretty much requires a GUI app
+  struct GenericPHProjectChangeRequest {
+    let asset: PHAsset!
+    let assetsFetch: PHFetchResult<PHAsset>!
+    
+    func testPHProjectChangeRequest(changeRequest: PHProjectChangeRequest) {
+        changeRequest.removeAssets(assetsFetch)
+        changeRequest.removeAssets([asset])
+    }
+  }
+  
+}
+
+#endif

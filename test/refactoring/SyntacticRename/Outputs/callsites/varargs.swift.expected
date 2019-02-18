@@ -28,6 +28,10 @@ func /*trailing:def*/withTrailingClosure(x: Int, y: () -> Int) {}
 /*trailing:call*/withTrailingClosure(x: 2)
 { return 1}
 
+func /*trailing-only:def*/trailingOnly(a: () -> ()) {}
+/*trailing-only:call*/trailingOnly(a: {})
+/*trailing-only:call*/trailingOnly {}
+
 
 func /*varargs:def*/betterName(a: Int..., b: Int, c: Int) {}
 

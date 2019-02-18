@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -dump-ast %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -dump-ast %s | %FileCheck %s
 
 protocol P1 {
   associatedtype A

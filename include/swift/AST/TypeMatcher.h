@@ -102,6 +102,7 @@ class TypeMatcher {
 
     TRIVIAL_CASE(ErrorType)
     TRIVIAL_CASE(BuiltinIntegerType)
+    TRIVIAL_CASE(BuiltinIntegerLiteralType)
     TRIVIAL_CASE(BuiltinFloatType)
     TRIVIAL_CASE(BuiltinRawPointerType)
     TRIVIAL_CASE(BuiltinNativeObjectType)
@@ -208,8 +209,7 @@ class TypeMatcher {
 
         auto sugaredFirstFunc = sugaredFirstType->castTo<AnyFunctionType>();
         if (firstFunc->getParams().size() != secondFunc->getParams().size())
-          return mismatch(firstFunc.getInput().getPointer(), secondFunc->getInput(),
-                          sugaredFirstFunc->getInput());
+          return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstFunc);
 
         for (unsigned i = 0, n = firstFunc->getParams().size(); i != n; ++i) {
           const auto &firstElt = firstFunc->getParams()[i];
@@ -218,14 +218,14 @@ class TypeMatcher {
           if (firstElt.getLabel() != secondElt.getLabel() ||
               firstElt.isVariadic() != secondElt.isVariadic() ||
               firstElt.isInOut() != secondElt.isInOut())
-            return mismatch(firstFunc.getInput().getPointer(),
-                            secondFunc->getInput(),
-                            sugaredFirstFunc->getInput());
+            return mismatch(firstElt.getOldType().getPointer(),
+                            secondElt.getOldType(),
+                            sugaredFirstFunc->getParams()[i].getOldType());
 
           // Recurse on parameter components.
-          if (!this->visit(firstElt.getType()->getCanonicalType(),
-                           secondElt.getType(),
-                           sugaredFirstFunc->getParams()[i].getType()))
+          if (!this->visit(firstElt.getOldType()->getCanonicalType(),
+                           secondElt.getOldType(),
+                           sugaredFirstFunc->getParams()[i].getOldType()))
             return false;
         }
 

@@ -17,6 +17,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -40,7 +41,7 @@ const SILDebugScope *SILInstruction::getDebugScope() const {
   return Location.getScope();
 }
 
-void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
+void SILInstruction::setDebugScope(const SILDebugScope *DS) {
   if (getDebugScope() && getDebugScope()->InlinedCallSite)
     assert(DS->InlinedCallSite && "throwing away inlined scope info");
 
@@ -85,8 +86,10 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   if (ThisParent == L2.getContainingBlock()) return;
 
   // Update the parent fields in the instructions.
-  for (; first != last; ++first)
+  for (; first != last; ++first) {
+    SWIFT_FUNC_STAT_NAMED("sil");
     first->ParentBB = ThisParent;
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -154,7 +157,7 @@ void SILInstruction::dropAllReferences() {
 
   // If we have a function ref inst, we need to especially drop its function
   // argument so that it gets a proper ref decrement.
-  if (auto *FRI = dyn_cast<FunctionRefInst>(this)) {
+  if (auto *FRI = dyn_cast<FunctionRefBaseInst>(this)) {
     if (!FRI->getReferencedFunction())
       return;
     FRI->dropReferencedFunction();
@@ -420,10 +423,6 @@ namespace {
       return true;
     }
 
-    bool visitStrongRetainUnownedInst(const StrongRetainUnownedInst *RHS) {
-      return true;
-    }
-
     bool visitLoadInst(const LoadInst *RHS) {
       auto LHSQualifier = cast<LoadInst>(LHS)->getOwnershipQualifier();
       return LHSQualifier == RHS->getOwnershipQualifier();
@@ -452,6 +451,15 @@ namespace {
 
     bool visitFunctionRefInst(const FunctionRefInst *RHS) {
       auto *X = cast<FunctionRefInst>(LHS);
+      return X->getReferencedFunction() == RHS->getReferencedFunction();
+    }
+    bool visitDynamicFunctionRefInst(const DynamicFunctionRefInst *RHS) {
+      auto *X = cast<DynamicFunctionRefInst>(LHS);
+      return X->getReferencedFunction() == RHS->getReferencedFunction();
+    }
+    bool visitPreviousDynamicFunctionRefInst(
+        const PreviousDynamicFunctionRefInst *RHS) {
+      auto *X = cast<PreviousDynamicFunctionRefInst>(LHS);
       return X->getReferencedFunction() == RHS->getReferencedFunction();
     }
 
@@ -484,12 +492,6 @@ namespace {
       auto LHS_ = cast<StringLiteralInst>(LHS);
       return LHS_->getEncoding() == RHS->getEncoding()
         && LHS_->getValue().equals(RHS->getValue());
-    }
-
-    bool visitConstStringLiteralInst(const ConstStringLiteralInst *RHS) {
-      auto LHS_ = cast<ConstStringLiteralInst>(LHS);
-      return LHS_->getEncoding() == RHS->getEncoding() &&
-             LHS_->getValue().equals(RHS->getValue());
     }
 
     bool visitStructInst(const StructInst *RHS) {
@@ -715,21 +717,18 @@ namespace {
       return true;
     }
 
-    bool visitRefToUnownedInst(RefToUnownedInst *RHS) {
-      return true;
+#define LOADABLE_REF_STORAGE_HELPER(Name) \
+    bool visit##Name##ToRefInst(Name##ToRefInst *RHS) { return true; } \
+    bool visitRefTo##Name##Inst(RefTo##Name##Inst *RHS) { return true; }
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    LOADABLE_REF_STORAGE_HELPER(Name) \
+    bool visitStrongRetain##Name##Inst(const StrongRetain##Name##Inst *RHS) { \
+      return true; \
     }
-
-    bool visitUnownedToRefInst(UnownedToRefInst *RHS) {
-      return true;
-    }
-
-    bool visitRefToUnmanagedInst(RefToUnmanagedInst *RHS) {
-      return true;
-    }
-
-    bool visitUnmanagedToRefInst(UnmanagedToRefInst *RHS) {
-      return true;
-    }
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+    LOADABLE_REF_STORAGE_HELPER(Name)
+#include "swift/AST/ReferenceStorage.def"
+#undef LOADABLE_REF_STORAGE_HELPER
 
     bool visitThinToThickFunctionInst(ThinToThickFunctionInst *RHS) {
       return true;
@@ -1014,7 +1013,9 @@ bool SILInstruction::mayRelease() const {
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::StrongReleaseInst:
-  case SILInstructionKind::UnownedReleaseInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::ReleaseValueAddrInst:
     return true;
@@ -1074,7 +1075,6 @@ bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsEscapingClosureInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
     return true;
   default:
     return mayRelease();
@@ -1102,7 +1102,7 @@ namespace {
       Result = Cloned;
       SILCloner<TrivialCloner>::postProcess(Orig, Cloned);
     }
-    SILValue remapValue(SILValue Value) {
+    SILValue getMappedValue(SILValue Value) {
       return Value;
     }
     SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
@@ -1117,6 +1117,10 @@ bool SILInstruction::isAllocatingStack() const {
     if (ARI->canAllocOnStack())
       return true;
   }
+
+  if (auto *PA = dyn_cast<PartialApplyInst>(this))
+    return PA->isOnStack();
+
   return false;
 }
 
@@ -1178,6 +1182,21 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // instructions must directly operate on the BeginAccess.
   if (isa<BeginAccessInst>(this))
     return false;
+
+  // begin_apply creates a token that has to be directly used by the
+  // corresponding end_apply and abort_apply.
+  if (isa<BeginApplyInst>(this))
+    return false;
+
+  // dynamic_method_br is not duplicatable because IRGen does not support phi
+  // nodes of objc_method type.
+  if (isa<DynamicMethodBranchInst>(this))
+    return false;
+
+  if (auto *PA = dyn_cast<PartialApplyInst>(this))
+    return !PA->isOnStack();
+
+  // If you add more cases here, you should also update SILLoop:canDuplicate.
 
   return true;
 }
@@ -1361,33 +1380,6 @@ SILInstructionResultArray::getTypes() const {
     return V->getType();
   };
   return {llvm::map_iterator(begin(), F), llvm::map_iterator(end(), F)};
-}
-
-SILInstructionResultArray::iterator SILInstructionResultArray::begin() const {
-  return iterator(*this, 0);
-}
-
-SILInstructionResultArray::iterator SILInstructionResultArray::end() const {
-  return iterator(*this, size());
-}
-
-SILInstructionResultArray::reverse_iterator
-SILInstructionResultArray::rbegin() const {
-  return llvm::make_reverse_iterator(end());
-}
-
-SILInstructionResultArray::reverse_iterator
-SILInstructionResultArray::rend() const {
-  return llvm::make_reverse_iterator(begin());
-}
-
-SILInstructionResultArray::range SILInstructionResultArray::getValues() const {
-  return {begin(), end()};
-}
-
-SILInstructionResultArray::reverse_range
-SILInstructionResultArray::getReversedValues() const {
-  return {rbegin(), rend()};
 }
 
 const ValueBase *SILInstructionResultArray::front() const {

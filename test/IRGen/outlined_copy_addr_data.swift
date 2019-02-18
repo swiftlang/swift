@@ -8,14 +8,15 @@ struct Resource<A> {
     let parse: (Data) -> A?
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$S11outcopyaddr13CrashMetaTypeC10apiRequest4base8resourceySS_AA8ResourceVyxGtlFZ"
+// CHECK-LABEL: define hidden swiftcc void @"$s11outcopyaddr13CrashMetaTypeC10apiRequest4base8resourceySS_AA8ResourceVyxGtlFZ"
 // CHECK: entry:
-// CHECK-NEXT: alloca %swift.type*
-// CHECK-NEXT: alloca
-// CHECK-NEXT: alloca
-// CHECK:      store %swift.type*
-// CHECK:      store %swift.type*
-// CHECK-NEXT: ret void
+// CHECK: alloca
+// CHECK: alloca
+// CHECK: alloca
+// CHECK: store
+// CHECK: store
+// CHECK: store
+// CHECK: ret void
 class CrashMetaType {
     required init() { }
     class func apiRequest<A>(base: String, resource: Resource<A>) {}

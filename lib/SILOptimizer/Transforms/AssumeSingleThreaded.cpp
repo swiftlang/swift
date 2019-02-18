@@ -45,8 +45,6 @@ class AssumeSingleThreaded : public swift::SILFunctionTransform {
       for (auto &I : BB) {
         if (auto RCInst = dyn_cast<RefCountingInst>(&I))
           RCInst->setNonAtomic();
-        if (auto RCInst = dyn_cast<StrongPinInst>(&I))
-          RCInst->setNonAtomic();
       }
     }
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

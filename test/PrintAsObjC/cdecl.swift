@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/cdecl.swiftmodule -typecheck -emit-objc-header-path %t/cdecl.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/cdecl.h
 // RUN: %check-in-clang %t/cdecl.h
-// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/cdecl.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
+// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/cdecl.h -include ctypes.h -include CoreFoundation.h
 
 // REQUIRES: objc_interop
 

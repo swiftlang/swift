@@ -11,10 +11,21 @@
 //===----------------------------------------------------------------------===//
 
 import TestsUtils
-public let ArrayInClass = BenchmarkInfo(
-  name: "ArrayInClass",
-  runFunction: run_ArrayInClass,
-  tags: [.validation, .api, .Array])
+public let ArrayInClass = [
+  BenchmarkInfo(
+    name: "ArrayInClass",
+    runFunction: run_ArrayInClass,
+    tags: [.validation, .api, .Array],
+    setUpFunction: { ac = ArrayContainer() },
+    tearDownFunction: { ac = nil }),
+  BenchmarkInfo(name: "DistinctClassFieldAccesses",
+    runFunction: run_DistinctClassFieldAccesses,
+    tags: [.unstable, .api, .Array],
+    setUpFunction: { workload = ClassWithArrs(N: 100_000) },
+    tearDownFunction: { workload = nil }),
+]
+
+var ac: ArrayContainer!
 
 class ArrayContainer {
   final var arr : [Int]
@@ -33,12 +44,42 @@ class ArrayContainer {
 }
 
 @inline(never)
-func getArrayContainer() -> ArrayContainer {
-  return ArrayContainer()
+public func run_ArrayInClass(_ N: Int) {
+  let a = ac!
+  a.runLoop(N)
 }
 
-@inline(never)
-public func run_ArrayInClass(_ N: Int) {
-  let a = getArrayContainer()
-  a.runLoop(N)
+class ClassWithArrs {
+  var N: Int = 0
+  var A: [Int]
+  var B: [Int]
+
+  init(N: Int) {
+    self.N = N
+
+    A = [Int](repeating: 0, count: N)
+    B = [Int](repeating: 0, count: N)
+  }
+
+  func readArr() {
+    for i in 0..<self.N {
+      guard A[i] == B[i] else { fatalError("") }
+    }
+  }
+
+  func writeArr() {
+    for i in 0..<self.N {
+      A[i] = i
+      B[i] = i
+    }
+  }
+}
+
+var workload: ClassWithArrs!
+
+public func run_DistinctClassFieldAccesses(_ N: Int) {
+  for _ in 1...N {
+    workload.writeArr()
+    workload.readArr()
+  }
 }

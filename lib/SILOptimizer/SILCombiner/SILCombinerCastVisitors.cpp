@@ -289,16 +289,19 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
-  CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI);
+  if (CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI))
+    MadeChange = true;
+
   return nullptr;
 }
 
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
-  if (CastOpt.optimizeUnconditionalCheckedCastInst(UCCI))
+  if (CastOpt.optimizeUnconditionalCheckedCastInst(UCCI)) {
+    MadeChange = true;
     return nullptr;
-
+  }
   // FIXME: rename from RemoveCondFails to RemoveRuntimeAsserts.
   if (RemoveCondFails) {
     auto LoweredTargetType = UCCI->getType();
@@ -388,32 +391,6 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   return nullptr;
 }
 
-/// Helper function for simplifying conversions between
-/// thick and objc metatypes.
-static SILInstruction *
-visitMetatypeConversionInst(SILBuilder &Builder, ConversionInst *MCI,
-                            MetatypeRepresentation Representation) {
-  SILValue Op = MCI->getOperand(0);
-  // Instruction has a proper target type already.
-  SILType Ty = MCI->getType();
-  auto MetatypeTy = Op->getType().getAs<AnyMetatypeType>();
-
-  if (MetatypeTy->getRepresentation() != Representation)
-    return nullptr;
-
-  if (isa<MetatypeInst>(Op))
-    return Builder.createMetatype(MCI->getLoc(), Ty);
-
-  if (auto *VMI = dyn_cast<ValueMetatypeInst>(Op))
-    return Builder.createValueMetatype(MCI->getLoc(), Ty, VMI->getOperand());
-
-  if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op))
-    return Builder.createExistentialMetatype(MCI->getLoc(), Ty,
-                                             EMI->getOperand());
-
-  return nullptr;
-}
-
 SILInstruction *
 SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   // Perform the following transformations:
@@ -425,8 +402,10 @@ SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   //
   // (thick_to_objc_metatype (existential_metatype @thick)) ->
   // (existential_metatype @objc_metatype)
-  return visitMetatypeConversionInst(Builder, TTOCMI,
-                                     MetatypeRepresentation::Thick);
+  if (CastOpt.optimizeMetatypeConversion(TTOCMI, MetatypeRepresentation::Thick))
+    MadeChange = true;
+
+  return nullptr;
 }
 
 SILInstruction *
@@ -440,20 +419,26 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   //
   // (objc_to_thick_metatype (existential_metatype @objc_metatype)) ->
   // (existential_metatype @thick)
-  return visitMetatypeConversionInst(Builder, OCTTMI,
-                                     MetatypeRepresentation::ObjC);
+  if (CastOpt.optimizeMetatypeConversion(OCTTMI, MetatypeRepresentation::ObjC))
+    MadeChange = true;
+
+  return nullptr;
 }
 
 SILInstruction *
 SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
-  CastOpt.optimizeCheckedCastBranchInst(CBI);
+  if (CastOpt.optimizeCheckedCastBranchInst(CBI))
+    MadeChange = true;
+
   return nullptr;
 }
 
 SILInstruction *
 SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
-  CastOpt.optimizeCheckedCastAddrBranchInst(CCABI);
+  if (CastOpt.optimizeCheckedCastAddrBranchInst(CCABI))
+    MadeChange = true;
+
   return nullptr;
 }
 

@@ -217,3 +217,16 @@ class HasIVarCaptures {
     })()
   }
 }
+
+// https://bugs.swift.org/browse/SR-9760
+protocol SR_9760 {
+  typealias F = () -> Void
+  typealias G<T> = (T) -> Void
+  func foo<T>(_: T, _: @escaping F) // Ok
+  func bar<T>(_: @escaping G<T>) // Ok
+}
+
+extension SR_9760 {
+  func fiz<T>(_: T, _: @escaping F) {} // Ok
+  func baz<T>(_: @escaping G<T>) {} // Ok
+}

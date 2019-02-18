@@ -38,6 +38,11 @@ public struct BaseStruct {
   public func memberFunc3() -> Int { return 1; }
   public func memberFunc4() -> Int { return 1; }
   public func memberFunc5() -> Int { return 1; }
+  public func memberFunc6() -> Int { return 1; }
+  public func memberFunc7() -> Int { return 1; }
+  public func memberFunc8() -> Int { return 1; }
+  public func memberFunc9() -> Int { return 1; }
+  public init() {}
 }
 
 public enum BaseEnum {

@@ -18,7 +18,14 @@
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
 // RUN: %FileCheck %s -check-prefix=QUX_ENUM_TYPE_CONTEXT < %t.enum.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_6 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=QUX_ENUM_TYPE_CONTEXT < %t.enum.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_DOT_1 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_ELEMENTS < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_DOT_2 > %t.enum.txt
 // RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_ELEMENTS < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_QUAL_1 > %t.enum.txt
@@ -28,7 +35,7 @@
 // RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_1 > %t.enum.txt
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS_INVALID < %t.enum.txt
 // RUN: %FileCheck %s -check-prefix=ENUM_SW_IN_PATTERN_1 < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_2 > %t.enum.txt
@@ -92,10 +99,12 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal: .AllCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal: .allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Keyword[self]/CurrNominal:   .self[#FooEnum.Type#]; name=self
+// FOO_ENUM_NO_DOT-NEXT: Keyword/CurrNominal: .Type[#FooEnum.Type#]; name=Type
 // FOO_ENUM_NO_DOT-NEXT: End completions
 
 // FOO_ENUM_DOT: Begin completions
 // FOO_ENUM_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooEnum.Type#]; name=self
+// FOO_ENUM_DOT-NEXT: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: hash({#self: FooEnum#})[#(into: inout Hasher) -> Void#]; name=hash(FooEnum)
@@ -105,6 +114,7 @@ enum FooEnum: CaseIterable {
 
 // FOO_ENUM_DOT_INVALID: Begin completions
 // FOO_ENUM_DOT_INVALID-NEXT: Keyword[self]/CurrNominal: self[#FooEnum.Type#]; name=self
+// FOO_ENUM_DOT_INVALID-NEXT: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: hash({#self: FooEnum#})[#(into: inout Hasher) -> Void#]; name=hash(FooEnum)
@@ -169,10 +179,12 @@ enum BarEnum {
 // BAR_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal:        .staticVar[#Int#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:     .barStaticFunc()[#Void#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-NEXT: Keyword[self]/CurrNominal:          .self[#BarEnum.Type#]; name=self
+// BAR_ENUM_NO_DOT-NEXT: Keyword/CurrNominal:                .Type[#BarEnum.Type#]; name=Type
 // BAR_ENUM_NO_DOT-NEXT: End completions
 
 // BAR_ENUM_DOT: Begin completions
 // BAR_ENUM_DOT-NEXT: Keyword[self]/CurrNominal:          self[#BarEnum.Type#]; name=self
+// BAR_ENUM_DOT-NEXT: Keyword/CurrNominal:                Type[#BarEnum.Type#]; name=Type
 // BAR_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:      Bar1[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:      Bar2()[#() -> BarEnum#]{{; name=.+$}}
 // BAR_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:      Bar3({#Int#})[#(Int) -> BarEnum#]{{; name=.+$}}
@@ -206,7 +218,7 @@ enum BazEnum<T> {
 // BAZ_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific: .Baz2({#T#})[#(T) -> BazEnum<T>#]{{; name=.+$}}
 // BAZ_ENUM_TYPE_CONTEXT: End completions
 
-// BAZ_INT_ENUM_NO_DOT: Begin completions, 7 items
+// BAZ_INT_ENUM_NO_DOT: Begin completions, 8 items
 // BAZ_INT_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Baz1[#BazEnum<T>#]{{; name=.+$}}
 // BAZ_INT_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Baz2({#T#})[#(T) -> BazEnum<T>#]{{; name=.+$}}
 // BAZ_INT_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .bazInstanceFunc({#self: &BazEnum<Int>#})[#() -> Void#]{{; name=.+$}}
@@ -214,6 +226,7 @@ enum BazEnum<T> {
 // BAZ_INT_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal:      .staticVarT[#Int#]{{; name=.+$}}
 // BAZ_INT_ENUM_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .bazStaticFunc()[#Void#]{{; name=.+$}}
 // BAZ_INT_ENUM_NO_DOT-NEXT: Keyword[self]/CurrNominal:        .self[#BazEnum<Int>.Type#]; name=self
+// BAZ_INT_ENUM_NO_DOT-NEXT: Keyword/CurrNominal:              .Type[#BazEnum<Int>.Type#]; name=Type
 // BAZ_INT_ENUM_NO_DOT-NEXT: End completions
 
 // BAZ_T_ENUM_NO_DOT: Begin completions
@@ -224,10 +237,12 @@ enum BazEnum<T> {
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal:      .staticVarT[#_#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .bazStaticFunc()[#Void#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-NEXT: Keyword[self]/CurrNominal:        .self[#BazEnum<_>.Type#]; name=self
+// BAZ_T_ENUM_NO_DOT-NEXT: Keyword/CurrNominal:              .Type[#BazEnum<_>.Type#]; name=Type
 // BAZ_T_ENUM_NO_DOT-NEXT: End completions
 
-// BAZ_INT_ENUM_DOT: Begin completions, 7 items
+// BAZ_INT_ENUM_DOT: Begin completions, 8 items
 // BAZ_INT_ENUM_DOT-NEXT: Keyword[self]/CurrNominal:        self[#BazEnum<Int>.Type#]; name=self
+// BAZ_INT_ENUM_DOT-NEXT: Keyword/CurrNominal:              Type[#BazEnum<Int>.Type#]; name=Type
 // BAZ_INT_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Baz1[#BazEnum<T>#]{{; name=.+$}}
 // BAZ_INT_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Baz2({#T#})[#(T) -> BazEnum<T>#]{{; name=.+$}}
 // BAZ_INT_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: bazInstanceFunc({#self: &BazEnum<Int>#})[#() -> Void#]{{; name=.+$}}
@@ -236,8 +251,9 @@ enum BazEnum<T> {
 // BAZ_INT_ENUM_DOT-NEXT: Decl[StaticMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]:   bazStaticFunc()[#Void#]{{; name=.+$}}
 // BAZ_INT_ENUM_DOT-NEXT: End completions
 
-// BAZ_T_ENUM_DOT: Begin completions, 7 items
+// BAZ_T_ENUM_DOT: Begin completions, 8 items
 // BAZ_T_ENUM_DOT-NEXT: Keyword[self]/CurrNominal:        self[#BazEnum<_>.Type#]; name=self
+// BAZ_T_ENUM_DOT-NEXT: Keyword/CurrNominal:              Type[#BazEnum<_>.Type#]; name=Type
 // BAZ_T_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Baz1[#BazEnum<T>#]{{; name=.+$}}
 // BAZ_T_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Baz2({#T#})[#(T) -> BazEnum<T>#]{{; name=.+$}}
 // BAZ_T_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: bazInstanceFunc({#self: &BazEnum<_>#})[#() -> Void#]{{; name=.+$}}
@@ -256,22 +272,24 @@ enum QuxEnum : Int {
 // QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific: .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_TYPE_CONTEXT: End completions
 
-// QUX_ENUM_NO_DOT: Begin completions, 6 items
+// QUX_ENUM_NO_DOT: Begin completions, 7 items
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      .RawValue[#Int#]{{; name=.+$}}
-// QUX_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .hash({#self: QuxEnum#})[#(into: inout Hasher) -> Void#]; name=hash(QuxEnum)
 // QUX_ENUM_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:    ({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
+// QUX_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/Super: .hash({#self: QuxEnum#})[#(into: inout Hasher) -> Void#]; name=hash(QuxEnum)
 // QUX_ENUM_NO_DOT-NEXT: Keyword[self]/CurrNominal:        .self[#QuxEnum.Type#]; name=self
+// QUX_ENUM_NO_DOT-NEXT: Keyword/CurrNominal:              .Type[#QuxEnum.Type#]; name=Type
 // QUX_ENUM_NO_DOT-NEXT: End completions
 
-// QUX_ENUM_DOT: Begin completions, 6 items
+// QUX_ENUM_DOT: Begin completions, 7 items
 // QUX_ENUM_DOT-NEXT: Keyword[self]/CurrNominal:        self[#QuxEnum.Type#]; name=self
+// QUX_ENUM_DOT-NEXT: Keyword/CurrNominal:              Type[#QuxEnum.Type#]; name=Type
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      RawValue[#Int#]{{; name=.+$}}
-// QUX_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: hash({#self: QuxEnum#})[#(into: inout Hasher) -> Void#]; name=hash(QuxEnum)
 // QUX_ENUM_DOT-NEXT: Decl[Constructor]/CurrNominal:    init({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
+// QUX_ENUM_DOT-NEXT: Decl[InstanceMethod]/Super/NotRecommended/TypeRelation[Invalid]: hash({#self: QuxEnum#})[#(into: inout Hasher) -> Void#]; name=hash(QuxEnum)
 // QUX_ENUM_DOT-NEXT: End completions
 
 func freeFunc() {}
@@ -279,6 +297,10 @@ func freeFunc() {}
 // WITH_GLOBAL_RESULTS: Begin completions
 // WITH_GLOBAL_RESULTS: Decl[FreeFunction]/CurrModule: freeFunc()[#Void#]{{; name=.+$}}
 // WITH_GLOBAL_RESULTS: End completions
+
+// WITH_GLOBAL_RESULTS_INVALID: Begin completions
+// WITH_GLOBAL_RESULTS_INVALID: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: freeFunc()[#Void#]{{; name=.+$}}
+// WITH_GLOBAL_RESULTS_INVALID: End completions
 
 //===--- Complete enum elements in 'switch'.
 
@@ -309,10 +331,20 @@ func testSwitch5(e: QuxEnum) {
   }
 }
 
+// Test for top level code
+switch QuxEnum.Qux1 {
+case #^ENUM_SW_6^#
+}
+
 func testSwitchWithDot1(e: FooEnum) {
   switch e {
   case .#^ENUM_SW_WITH_DOT_1^#
   }
+}
+
+// Test for top level code
+switch FooEnum.Foo2 {
+case .#^ENUM_SW_WITH_DOT_2^#
 }
 
 func testSwitchWithQualification1(e: FooEnum) {

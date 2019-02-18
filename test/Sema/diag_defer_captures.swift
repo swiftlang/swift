@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 // This used to crash in SILGen (rightly so).
 func sr3210_crash() {

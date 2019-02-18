@@ -792,6 +792,30 @@ inline T accumulate(const Container &C, T init, BinaryOperation op) {
   return std::accumulate(C.begin(), C.end(), init, op);
 }
 
+/// Returns true if the range defined by \p mainBegin ..< \p mainEnd starts with
+/// the same elements as the range defined by \p prefixBegin ..< \p prefixEnd.
+///
+/// This includes cases where the prefix range is empty, as well as when the two
+/// ranges are the same length and contain the same elements.
+template <typename MainInputIterator, typename PrefixInputIterator>
+inline bool hasPrefix(MainInputIterator mainBegin,
+                      const MainInputIterator mainEnd,
+                      PrefixInputIterator prefixBegin,
+                      const PrefixInputIterator prefixEnd) {
+  while (prefixBegin != prefixEnd) {
+    // If "main" is shorter than "prefix", it does not start with "prefix".
+    if (mainBegin == mainEnd)
+      return false;
+    // If there's a mismatch, "main" does not start with "prefix".
+    if (*mainBegin != *prefixBegin)
+      return false;
+    ++prefixBegin;
+    ++mainBegin;
+  }
+  // If we checked every element of "prefix", "main" does start with "prefix".
+  return true;
+}
+
 /// Provides default implementations of !=, <=, >, and >= based on == and <.
 template <typename T>
 class RelationalOperationsBase {

@@ -4,5 +4,11 @@
 
 class SubSub1 : Sub1 {
   @objc func a() { } // expected-error{{method 'a()' with Objective-C selector 'a' conflicts with method 'f()' from superclass 'Super1' with the same Objective-C selector}}
+
+  func test() {
+    // Needed to force enough checking of Super1.f() to record its
+    // Objective-C selector.
+    f()
+  }
 }
 

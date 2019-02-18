@@ -191,7 +191,6 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
     auto *User = Opd->getUser();
     // Ignore reference counting and debug instructions.
     if (isa<RefCountingInst>(User) ||
-        isa<StrongPinInst>(User) ||
         isa<DebugValueInst>(User))
       continue;
 
@@ -298,8 +297,8 @@ public:
     if (Repls.empty())
       return false;
 
-    DEBUG(llvm::dbgs() << "Array append contentsOf calls replaced in "
-                       << Fn.getName() << " (" << Repls.size() << ")\n");
+    LLVM_DEBUG(llvm::dbgs() << "Array append contentsOf calls replaced in "
+                            << Fn.getName() << " (" << Repls.size() << ")\n");
 
     FuncDecl *AppendFnDecl = Ctx.getArrayAppendElementDecl();
     if (!AppendFnDecl)
@@ -345,6 +344,10 @@ public:
   void run() override {
     auto &Fn = *getFunction();
 
+    // FIXME: Update for ownership.
+    if (Fn.hasOwnership())
+      return;
+
     // Propagate the elements an of array value to its users.
     llvm::SmallVector<ArrayAllocation::GetElementReplacement, 16>
       GetElementReplacements;
@@ -363,7 +366,7 @@ public:
       }
     }
 
-    DEBUG(if (!GetElementReplacements.empty()) {
+    LLVM_DEBUG(if (!GetElementReplacements.empty()) {
       llvm::dbgs() << "Array elements replaced in " << Fn.getName() << " ("
                    << GetElementReplacements.size() << ")\n";
     });

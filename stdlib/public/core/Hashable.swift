@@ -106,6 +106,9 @@ public protocol Hashable : Equatable {
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
+  ///
+  /// - Important: `hashValue` is deprecated as a `Hashable` requirement. To
+  ///   conform to `Hashable`, implement the `hash(into:)` requirement instead.
   var hashValue: Int { get }
 
   /// Hashes the essential components of this value by feeding them into the
@@ -126,17 +129,13 @@ public protocol Hashable : Equatable {
   // Raw top-level hashing interface. Some standard library types (mostly
   // primitives) specialize this to eliminate small resiliency overheads. (This
   // only matters for tiny keys.)
-  //
-  // FIXME(hasher): Change to take a Hasher instead. To achieve the same
-  // performance, this requires Set and Dictionary to store their fully
-  // initialized local hashers, not just their seeds.
-  func _rawHashValue(seed: (UInt64, UInt64)) -> Int
+  func _rawHashValue(seed: Int) -> Int
 }
 
 extension Hashable {
   @inlinable
   @inline(__always)
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     var hasher = Hasher(_seed: seed)
     hasher.combine(self)
     return hasher._finalize()
@@ -147,7 +146,7 @@ extension Hashable {
 @inlinable
 @inline(__always)
 public func _hashValue<H: Hashable>(for value: H) -> Int {
-  return value._rawHashValue(seed: Hasher._seed)
+  return value._rawHashValue(seed: 0)
 }
 
 // Called by the SwiftValue implementation.

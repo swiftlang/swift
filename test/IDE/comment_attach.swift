@@ -216,6 +216,11 @@ func weirdBlockDocComment() {}
 // ###line 1010
 func docCommentWithGybLineNumber() {}
 
+#sourceLocation(file: "custom.swuft", line: 2000)
+/// Oooh, custom!
+func customSourceLocation() {}
+#sourceLocation() // reset
+
 /**
 func unterminatedBlockDocComment() {}
 
@@ -307,3 +312,4 @@ func unterminatedBlockDocComment() {}
 // CHECK-NEXT: comment_attach.swift:207:6: Func/emptyBlockDocComment RawComment=[/***/]
 // CHECK-NEXT: comment_attach.swift:210:6: Func/weirdBlockDocComment RawComment=[/**/]
 // CHECK-NEXT: comment_attach.swift:217:6: Func/docCommentWithGybLineNumber RawComment=[/// docCommentWithGybLineNumber Aaa.\n/// Bbb.\n/// Ccc.\n]
+// CHECK-NEXT: custom.swuft:2001:6: Func/customSourceLocation RawComment=[/// Oooh, custom!\n]

@@ -19,11 +19,11 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Util.h"
-#include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
@@ -74,8 +74,6 @@ enum class PreserveOnSignal : bool {
 };
 
 class Compilation {
-  friend class PerformJobsState;
-
 public:
   /// The filelist threshold value to pass to ensure file lists are never used
   static const size_t NEVER_USE_FILELIST = SIZE_MAX;
@@ -174,9 +172,13 @@ private:
   /// Provides a randomization seed to batch-mode partitioning, for debugging.
   const unsigned BatchSeed;
 
-  /// In order to test repartitioning, set to true if
-  /// -driver-force-one-batch-repartition is present.
-  const bool ForceOneBatchRepartition = false;
+  /// Overrides parallelism level and \c BatchSizeLimit, sets exact
+  /// count of batches, if in batch-mode.
+  const Optional<unsigned> BatchCount;
+
+  /// Overrides maximum batch size, if in batch-mode and not overridden
+  /// by \c BatchCount.
+  const Optional<unsigned> BatchSizeLimit;
 
   /// True if temporary files should not be deleted.
   const bool SaveTemps;
@@ -204,6 +206,20 @@ private:
   /// limit filelists will be used.
   size_t FilelistThreshold;
 
+  /// Scaffolding to permit experimentation with finer-grained dependencies and
+  /// faster rebuilds.
+  const bool EnableExperimentalDependencies;
+
+  /// Helpful for debugging, but slows down the driver. So, only turn on when
+  /// needed.
+  const bool VerifyExperimentalDependencyGraphAfterEveryImport;
+  /// Helpful for debugging, but slows down the driver. So, only turn on when
+  /// needed.
+  const bool EmitExperimentalDependencyDotFileAfterEveryImport;
+
+  /// Experiment with inter-file dependencies
+  const bool ExperimentalDependenciesIncludeIntrafileOnes;
+
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -214,6 +230,7 @@ private:
       ArrayRefView<std::unique_ptr<T>, T *, Compilation::unwrap<T>>;
 
 public:
+  // clang-format off
   Compilation(DiagnosticEngine &Diags, const ToolChain &TC,
               OutputInfo const &OI,
               OutputLevel Level,
@@ -228,10 +245,16 @@ public:
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
-              bool ForceOneBatchRepartition = false,
+              Optional<unsigned> BatchCount = None,
+              Optional<unsigned> BatchSizeLimit = None,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
-              std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
+              std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
+              bool EnableExperimentalDependencies = false,
+              bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
+              bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
+              bool ExperimentalDependenciesIncludeIntrafileOnes = false);
+  // clang-format on
   ~Compilation();
 
   ToolChain const &getToolChain() const {
@@ -240,6 +263,10 @@ public:
 
   OutputInfo const &getOutputInfo() const {
     return TheOutputInfo;
+  }
+
+  DiagnosticEngine &getDiags() const {
+    return Diags;
   }
 
   UnwrappedArrayView<const Action> getActions() const {
@@ -282,11 +309,25 @@ public:
     EnableIncrementalBuild = false;
   }
 
+  bool getEnableExperimentalDependencies() const {
+    return EnableExperimentalDependencies;
+  }
+
+  bool getVerifyExperimentalDependencyGraphAfterEveryImport() const {
+    return VerifyExperimentalDependencyGraphAfterEveryImport;
+  }
+
+  bool getEmitExperimentalDependencyDotFileAfterEveryImport() const {
+    return EmitExperimentalDependencyDotFileAfterEveryImport;
+  }
+
+  bool getExperimentalDependenciesIncludeIntrafileOnes() const {
+    return ExperimentalDependenciesIncludeIntrafileOnes;
+  }
+
   bool getBatchModeEnabled() const {
     return EnableBatchMode;
   }
-
-  bool getForceOneBatchRepartition() const { return ForceOneBatchRepartition; }
 
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
@@ -295,12 +336,22 @@ public:
     ContinueBuildingAfterErrors = Value;
   }
 
-  void setShowsIncrementalBuildDecisions(bool value = true) {
+  bool getShowIncrementalBuildDecisions() const {
+    return ShowIncrementalBuildDecisions;
+  }
+  void setShowIncrementalBuildDecisions(bool value = true) {
     ShowIncrementalBuildDecisions = value;
   }
 
+  bool getShowJobLifecycle() const {
+    return ShowJobLifecycle;
+  }
   void setShowJobLifecycle(bool value = true) {
     ShowJobLifecycle = value;
+  }
+
+  bool getShowDriverTimeCompilation() const {
+    return ShowDriverTimeCompilation;
   }
 
   size_t getFilelistThreshold() const {
@@ -309,6 +360,32 @@ public:
 
   UnifiedStatsReporter *getStatsReporter() const {
     return Stats.get();
+  }
+
+  /// True if extra work has to be done when tracing through the dependency
+  /// graph, either in order to print dependencies or to collect statistics.
+  bool getTraceDependencies() const {
+    return getShowIncrementalBuildDecisions() || getStatsReporter();
+  }
+
+  OutputLevel getOutputLevel() const {
+    return Level;
+  }
+
+  unsigned getBatchSeed() const {
+    return BatchSeed;
+  }
+
+  llvm::sys::TimePoint<> getLastBuildTime() const {
+    return LastBuildTime;
+  }
+
+  Optional<unsigned> getBatchCount() const {
+    return BatchCount;
+  }
+
+  Optional<unsigned> getBatchSizeLimit() const {
+    return BatchSizeLimit;
   }
 
   /// Requests the path to a file containing all input source files. This can
@@ -345,7 +422,7 @@ public:
   }
 
 private:
-  /// \brief Perform all jobs.
+  /// Perform all jobs.
   ///
   /// \param[out] abnormalExit Set to true if any job exits abnormally (i.e.
   /// crashes).
@@ -355,7 +432,7 @@ private:
   /// crashes during execution, a negative value will be returned.
   int performJobsImpl(bool &abnormalExit, std::unique_ptr<sys::TaskQueue> &&TQ);
 
-  /// \brief Performs a single Job by executing in place, if possible.
+  /// Performs a single Job by executing in place, if possible.
   ///
   /// \param Cmd the Job which should be performed.
   ///

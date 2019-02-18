@@ -41,6 +41,5 @@ func completeInKeyPath2() {
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop1[#String#]; name=prop1
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop2[#ObjCClass?#]; name=prop2
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/Super:            hashValue[#Int#]; name=hashValue
-// CHECK-IN_KEYPATH: Decl[InstanceVar]/Super:            hash[#Int#]; name=hash
 
 

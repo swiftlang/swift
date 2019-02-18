@@ -14,9 +14,9 @@ struct Triple {
   var a, b, c : Int
 }
 
-// CHECK-LABEL: sil @TripleTest
-sil @TripleTest : $@convention(method) (Int, @inout Triple) -> Triple {
-bb0(%0 : @trivial $Int, %1 : @trivial $*Triple):
+// CHECK-LABEL: sil [ossa] @TripleTest
+sil [ossa] @TripleTest : $@convention(method) (Int, @inout Triple) -> Triple {
+bb0(%0 : $Int, %1 : $*Triple):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Triple>
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Triple>, 0
   %5 = load [trivial] %1 : $*Triple
@@ -33,9 +33,9 @@ struct Single {
   var a : Int
 }
 
-// CHECK-LABEL: sil @SingleTest
-sil @SingleTest : $@convention(method) (@inout Single, Int) -> Single {
-bb0(%0 : @trivial $*Single, %1 : @trivial $Int):
+// CHECK-LABEL: sil [ossa] @SingleTest
+sil [ossa] @SingleTest : $@convention(method) (@inout Single, Int) -> Single {
+bb0(%0 : $*Single, %1 : $Int):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Single>
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Single>, 0
   %5 = load [trivial] %0 : $*Single
@@ -56,12 +56,12 @@ enum SomeUnion {
   case y(SomeClass)
 }
 
-sil @getSomeClass : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
-sil @getSomeUnion : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
+sil [ossa] @getSomeClass : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
+sil [ossa] @getSomeUnion : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
 
 
-// CHECK-LABEL: sil @test_union_release
-sil @test_union_release : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @test_union_release
+sil [ossa] @test_union_release : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeUnion>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <SomeUnion>, 0
@@ -85,20 +85,20 @@ protocol Error {}
 public struct MyErrorType : Error {}
 
 public struct NonTrivial {
-  @sil_stored let ptr: Builtin.NativeObject
+  @_hasStorage let ptr: Builtin.NativeObject
 }
 
 public struct AStruct {
-  @sil_stored public let name: NonTrivial
-  @sil_stored public let foobar: NonTrivial
-  @sil_stored public let protoType: Proto.Type
+  @_hasStorage public let name: NonTrivial
+  @_hasStorage public let foobar: NonTrivial
+  @_hasStorage public let protoType: Proto.Type
 }
 
 sil @mayThrow : $@convention(thin) () -> (@owned NonTrivial, @error Error)
 
-// CHECK-LABEL: sil @assign_of_non_primitive_object_element_type
-sil @assign_of_non_primitive_object_element_type : $@convention(thin) (@thick Proto.Type) -> (@owned AStruct, @error Error) {
-bb0(%0 : @trivial $@thick Proto.Type):
+// CHECK-LABEL: sil [ossa] @assign_of_non_primitive_object_element_type
+sil [ossa] @assign_of_non_primitive_object_element_type : $@convention(thin) (@thick Proto.Type) -> (@owned AStruct, @error Error) {
+bb0(%0 : $@thick Proto.Type):
   %3 = alloc_stack $AStruct
   %4 = mark_uninitialized [rootself] %3 : $*AStruct
   %7 = function_ref @mayThrow : $@convention(thin) () -> (@owned NonTrivial, @error Error)

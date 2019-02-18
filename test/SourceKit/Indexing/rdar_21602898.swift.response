@@ -25,6 +25,43 @@
       key.column: 7,
       key.entities: [
         {
+          key.kind: source.lang.swift.decl.extension.struct,
+          key.name: "Int",
+          key.usr: "s:e:s:Sis:13rdar_216028981PP",
+          key.line: 6,
+          key.column: 11,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.protocol,
+              key.name: "P",
+              key.usr: "s:13rdar_216028981PP",
+              key.line: 6,
+              key.column: 16
+            }
+          ],
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 6,
+              key.column: 11
+            },
+            {
+              key.kind: source.lang.swift.ref.protocol,
+              key.name: "P",
+              key.usr: "s:13rdar_216028981PP",
+              key.line: 6,
+              key.column: 16
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute._fixed_layout
+            }
+          ]
+        },
+        {
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: "s:13rdar_216028981CCACycfc",
           key.line: 5,

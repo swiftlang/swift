@@ -38,7 +38,7 @@ func test010(x: E1, y: FooBar) {
 // RUN: %sourcekitd-test -req=complete.open -pos=26:11 -req-opts=filtertext=one %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_0b
 // INNER_POSTFIX_0b-NOT: key.description: "one{{.+}}"
 // INNER_POSTFIX_0b: key.description: "one",{{$}}
-// INNER_POSTFIX_0b: key.description: "one...",{{$}}
+// INNER_POSTFIX_0b: key.description: "one.",{{$}}
 // INNER_POSTFIX_0b-NOT: key.description: "one{{.+}}"
 
 // RUN: %sourcekitd-test -req=complete.open -pos=29:9 -req-opts=filtertext=pro %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_1
@@ -63,6 +63,7 @@ func test001() {
 // TOP_LEVEL_0-NEXT:   Foo(
 // TOP_LEVEL_0-NEXT:   FooBar
 // TOP_LEVEL_0-NEXT:   Foo.self
+// TOP_LEVEL_0-NEXT:   Foo.Type
 // TOP_LEVEL_0-NEXT:   Foo()
 // TOP_LEVEL_0-NEXT: ]
 
@@ -75,6 +76,7 @@ func test001() {
 // TOP_LEVEL_0-NEXT:   FooBar.
 // TOP_LEVEL_0-NEXT:   FooBar(
 // TOP_LEVEL_0-NEXT:   FooBar.self
+// TOP_LEVEL_0-NEXT:   FooBar.Type
 // TOP_LEVEL_0-NEXT:   FooBar()
 // TOP_LEVEL_0-NEXT:   FooBar(x: Foo)
 // TOP_LEVEL_0-NEXT:   FooBar.fooBar()

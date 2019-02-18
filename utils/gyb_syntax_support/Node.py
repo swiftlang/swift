@@ -58,7 +58,7 @@ class Node(object):
 
     def requires_validation(self):
         """
-        Returns `True` if this node should have a `valitate` method associated.
+        Returns `True` if this node should have a `validate` method associated.
         """
         return self.is_buildable()
 
@@ -78,7 +78,7 @@ class Node(object):
 
     def shall_be_omitted_when_empty(self):
         """
-        Returns 'True' if this node shall not be created while parsing if it 
+        Returns 'True' if this node shall not be created while parsing if it
         has no children.
         """
         return self.omit_when_empty

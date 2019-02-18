@@ -34,12 +34,12 @@ namespace swift {
   class TypeChecker;
   class ValueDecl;
 
-/// \brief Emit diagnostics for syntactic restrictions on a given expression.
+/// Emit diagnostics for syntactic restrictions on a given expression.
 void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
                                      const DeclContext *DC,
                                      bool isExprStmt);
 
-/// \brief Emit diagnostics for a given statement.
+/// Emit diagnostics for a given statement.
 void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
 void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
@@ -51,8 +51,11 @@ void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD);
 /// Emit a fix-it to set the access of \p VD to \p desiredAccess.
 ///
 /// This actually updates \p VD as well.
-void fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
-                 AccessLevel desiredAccess, bool isForSetter = false);
+void fixItAccess(InFlightDiagnostic &diag,
+                 ValueDecl *VD,
+                 AccessLevel desiredAccess,
+                 bool isForSetter = false,
+                 bool shouldUseDefaultAccess = false);
 
 /// Emit fix-its to correct the argument labels in \p expr, which is the
 /// argument tuple or single argument of a call.
@@ -61,7 +64,8 @@ void fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
 /// error diagnostic.
 ///
 /// \returns true if the issue was diagnosed
-bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
+bool diagnoseArgumentLabelError(ASTContext &ctx,
+                                const Expr *expr,
                                 ArrayRef<Identifier> newNames,
                                 bool isSubscript,
                                 InFlightDiagnostic *existingDiag = nullptr);
@@ -78,6 +82,7 @@ void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
 /// emit a warning that the bound instance will be immediately deallocated.
 void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
                                           const Pattern *pattern,
+                                          SourceLoc equalLoc,
                                           const Expr *initializer);
 
 /// Attempt to fix the type of \p decl so that it's a valid override for

@@ -37,13 +37,15 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
-#include "clang/Basic/VersionTuple.h"
+#include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 class ASTPrinter;
 class ASTContext;
 struct PrintOptions;
 class Decl;
+class AbstractFunctionDecl;
+class FuncDecl;
 class ClassDecl;
 class GenericFunctionType;
 class LazyConformanceLoader;
@@ -111,19 +113,16 @@ public:
     return getOwnership() != ReferenceOwnership::Strong;
   }
   ReferenceOwnership getOwnership() const {
-    if (has(TAK_sil_weak))
-      return ReferenceOwnership::Weak;
-    if (has(TAK_sil_unowned))
-      return ReferenceOwnership::Unowned;
-    if (has(TAK_sil_unmanaged))
-      return ReferenceOwnership::Unmanaged;
+#define REF_STORAGE(Name, name, ...) \
+    if (has(TAK_sil_##name)) return ReferenceOwnership::Name;
+#include "swift/AST/ReferenceStorage.def"
     return ReferenceOwnership::Strong;
   }
   
   void clearOwnership() {
-    clearAttribute(TAK_sil_weak);
-    clearAttribute(TAK_sil_unowned);
-    clearAttribute(TAK_sil_unmanaged);
+#define REF_STORAGE(Name, name, ...) \
+    clearAttribute(TAK_sil_##name);
+#include "swift/AST/ReferenceStorage.def"
   }
 
   bool hasOpenedID() const { return OpenedID.hasValue(); }
@@ -206,6 +205,12 @@ protected:
       /// Whether the @objc was inferred using Swift 3's deprecated inference
       /// rules.
       Swift3Inferred : 1
+    );
+
+    SWIFT_INLINE_BITFIELD(DynamicReplacementAttr, DeclAttribute, 1,
+      /// Whether this attribute has location information that trails the main
+      /// record, which contains the locations of the parentheses and any names.
+      HasTrailingLocationInfo : 1
     );
 
     SWIFT_INLINE_BITFIELD(AbstractAccessControlAttr, DeclAttribute, 3,
@@ -338,6 +343,7 @@ public:
     UserInaccessible = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 7),
   };
 
+  LLVM_READNONE
   static uint64_t getOptions(DeclAttrKind DK);
 
   uint64_t getOptions() const {
@@ -389,6 +395,7 @@ public:
     return canAttributeAppearOnDecl(getKind(), D);
   }
 
+  LLVM_READONLY
   static bool canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D);
 
   /// Returns true if multiple instances of an attribute kind
@@ -442,6 +449,7 @@ public:
     return isNotSerialized(getKind());
   }
 
+  LLVM_READNONE
   static bool canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK);
 
   /// Returns the source name of the attribute, without the @ or any arguments.
@@ -608,6 +616,10 @@ enum class PlatformAgnosticAvailabilityKind {
   /// The declaration is available in some but not all versions
   /// of Swift, as specified by the VersionTuple members.
   SwiftVersionSpecific,
+  /// The declaration is available in some but not all versions
+  /// of SwiftPM's PackageDescription library, as specified by
+  /// the VersionTuple members.
+  PackageDescriptionVersionSpecific,
   /// The declaration is unavailable for other reasons.
   Unavailable,
 };
@@ -616,16 +628,16 @@ enum class PlatformAgnosticAvailabilityKind {
 class AvailableAttr : public DeclAttribute {
 public:
 #define INIT_VER_TUPLE(X)\
-  X(X.empty() ? Optional<clang::VersionTuple>() : X)
+  X(X.empty() ? Optional<llvm::VersionTuple>() : X)
 
   AvailableAttr(SourceLoc AtLoc, SourceRange Range,
                    PlatformKind Platform,
                    StringRef Message, StringRef Rename,
-                   const clang::VersionTuple &Introduced,
+                   const llvm::VersionTuple &Introduced,
                    SourceRange IntroducedRange,
-                   const clang::VersionTuple &Deprecated,
+                   const llvm::VersionTuple &Deprecated,
                    SourceRange DeprecatedRange,
-                   const clang::VersionTuple &Obsoleted,
+                   const llvm::VersionTuple &Obsoleted,
                    SourceRange ObsoletedRange,
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
                    bool Implicit)
@@ -652,19 +664,19 @@ public:
   const StringRef Rename;
 
   /// Indicates when the symbol was introduced.
-  const Optional<clang::VersionTuple> Introduced;
+  const Optional<llvm::VersionTuple> Introduced;
 
   /// Indicates where the Introduced version was specified.
   const SourceRange IntroducedRange;
 
   /// Indicates when the symbol was deprecated.
-  const Optional<clang::VersionTuple> Deprecated;
+  const Optional<llvm::VersionTuple> Deprecated;
 
   /// Indicates where the Deprecated version was specified.
   const SourceRange DeprecatedRange;
 
   /// Indicates when the symbol was obsoleted.
-  const Optional<clang::VersionTuple> Obsoleted;
+  const Optional<llvm::VersionTuple> Obsoleted;
 
   /// Indicates where the Obsoleted version was specified.
   const SourceRange ObsoletedRange;
@@ -677,6 +689,9 @@ public:
 
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;
+
+  /// Whether this is a PackageDescription version specific entity.
+  bool isPackageDescriptionVersionSpecific() const;
 
   /// Whether this is an unconditionally unavailable entity.
   bool isUnconditionallyUnavailable() const;
@@ -714,6 +729,12 @@ public:
   /// Returns true if this attribute is active given the current platform.
   bool isActivePlatform(const ASTContext &ctx) const;
 
+  /// Returns the active version from the AST context corresponding to
+  /// the available kind. For example, this will return the effective language
+  /// version for swift version-specific availability kind, PackageDescription
+  /// version for PackageDescription version-specific availability.
+  llvm::VersionTuple getActiveVersion(const ASTContext &ctx) const;
+
   /// Compare this attribute's version information against the platform or
   /// language version (assuming the this attribute pertains to the active
   /// platform).
@@ -725,8 +746,8 @@ public:
   createPlatformAgnostic(ASTContext &C, StringRef Message, StringRef Rename = "",
                       PlatformAgnosticAvailabilityKind Reason
                          = PlatformAgnosticAvailabilityKind::Unavailable,
-                         clang::VersionTuple Obsoleted
-                         = clang::VersionTuple());
+                         llvm::VersionTuple Obsoleted
+                         = llvm::VersionTuple());
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Available;
@@ -890,6 +911,96 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ObjC;
+  }
+};
+
+class PrivateImportAttr final
+: public DeclAttribute {
+  StringRef SourceFile;
+
+  PrivateImportAttr(SourceLoc atLoc, SourceRange baseRange,
+                    StringRef sourceFile, SourceRange parentRange);
+
+public:
+  static PrivateImportAttr *create(ASTContext &Ctxt, SourceLoc AtLoc,
+                                   SourceLoc PrivateLoc, SourceLoc LParenLoc,
+                                   StringRef sourceFile, SourceLoc RParenLoc);
+
+  StringRef getSourceFile() const {
+    return SourceFile;
+  }
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_PrivateImport;
+  }
+};
+
+/// The @_dynamicReplacement(for:) attribute.
+class DynamicReplacementAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<DynamicReplacementAttr, SourceLoc> {
+  friend TrailingObjects;
+
+  DeclName ReplacedFunctionName;
+  AbstractFunctionDecl *ReplacedFunction;
+
+  /// Create an @_dynamicReplacement(for:) attribute written in the source.
+  DynamicReplacementAttr(SourceLoc atLoc, SourceRange baseRange,
+                         DeclName replacedFunctionName, SourceRange parenRange);
+
+  explicit DynamicReplacementAttr(DeclName name)
+      : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
+                      /*Implicit=*/false),
+        ReplacedFunctionName(name), ReplacedFunction(nullptr) {
+    Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
+  }
+
+  /// Retrieve the trailing location information.
+  MutableArrayRef<SourceLoc> getTrailingLocations() {
+    assert(Bits.DynamicReplacementAttr.HasTrailingLocationInfo);
+    unsigned length = 2;
+    return {getTrailingObjects<SourceLoc>(), length};
+  }
+
+  /// Retrieve the trailing location information.
+  ArrayRef<SourceLoc> getTrailingLocations() const {
+    assert(Bits.DynamicReplacementAttr.HasTrailingLocationInfo);
+    unsigned length = 2; // lParens, rParens
+    return {getTrailingObjects<SourceLoc>(), length};
+  }
+
+public:
+  static DynamicReplacementAttr *
+  create(ASTContext &Context, SourceLoc AtLoc, SourceLoc DynReplLoc,
+         SourceLoc LParenLoc, DeclName replacedFunction, SourceLoc RParenLoc);
+
+  static DynamicReplacementAttr *create(ASTContext &ctx,
+                                        DeclName replacedFunction);
+
+  static DynamicReplacementAttr *create(ASTContext &ctx,
+                                        DeclName replacedFunction,
+                                        AbstractFunctionDecl *replacedFuncDecl);
+
+  DeclName getReplacedFunctionName() const {
+    return ReplacedFunctionName;
+  }
+
+  AbstractFunctionDecl *getReplacedFunction() const {
+    return ReplacedFunction;
+  }
+
+  void setReplacedFunction(AbstractFunctionDecl *f) {
+    assert(ReplacedFunction == nullptr);
+    ReplacedFunction = f;
+  }
+
+  /// Retrieve the location of the opening parentheses, if there is one.
+  SourceLoc getLParenLoc() const;
+
+  /// Retrieve the location of the closing parentheses, if there is one.
+  SourceLoc getRParenLoc() const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_DynamicReplacement;
   }
 };
 
@@ -1289,6 +1400,7 @@ public:
     case Kind::NSErrorWrapperAnon:
       return "E";
     }
+    llvm_unreachable("unhandled kind");
   }
 
   static bool classof(const DeclAttribute *DA) {
@@ -1296,7 +1408,7 @@ public:
   }
 };
 
-/// \brief Attributes that may be applied to declarations.
+/// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
   DeclAttribute *DeclAttrs;
@@ -1333,6 +1445,11 @@ public:
   /// unavailable relative to the provided language version.
   bool
   isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
+
+  /// Returns the first @available attribute that indicates
+  /// a declaration is unavailable, or the first one that indicates it's
+  /// potentially unavailable, or null otherwise.
+  const AvailableAttr *getPotentiallyUnavailable(const ASTContext &ctx) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or null otherwise.
@@ -1385,7 +1502,7 @@ public:
   /// Retrieve the first attribute of the given attribute class.
   template <typename ATTR>
   const ATTR *getAttribute(bool AllowInvalid = false) const {
-    return const_cast<DeclAttributes *>(this)->getAttribute<ATTR>();
+    return const_cast<DeclAttributes *>(this)->getAttribute<ATTR>(AllowInvalid);
   }
 
   template <typename ATTR>

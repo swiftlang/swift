@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 
 sil_stage canonical
 
@@ -50,8 +50,8 @@ sil @get_condition : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
 public final class AA {
 }
 public final class BB {
-  @sil_stored internal weak final var n:  BB!
-  @sil_stored internal final var o: AA!
+  @_hasStorage internal weak final var n:  BB!
+  @_hasStorage internal final var o: AA!
 }
 
 // Test that SimplifyCFG does not hang when compiling an infinite loop with switch_enum.

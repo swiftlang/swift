@@ -14,6 +14,7 @@
 #define SWIFT_SIL_OWNERSHIPUTILS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -34,8 +35,10 @@ struct ErrorBehaviorKind {
     ReturnFalse = 1,
     PrintMessage = 2,
     Assert = 4,
+    ReturnFalseOnLeak = 8,
     PrintMessageAndReturnFalse = PrintMessage | ReturnFalse,
     PrintMessageAndAssert = PrintMessage | Assert,
+    ReturnFalseOnLeakAssertOtherwise = ReturnFalseOnLeak | Assert,
   } Value;
 
   ErrorBehaviorKind() : Value(Invalid) {}
@@ -44,6 +47,11 @@ struct ErrorBehaviorKind {
   bool shouldAssert() const {
     assert(Value != Invalid);
     return Value & Assert;
+  }
+
+  bool shouldReturnFalseOnLeak() const {
+    assert(Value != Invalid);
+    return Value & ReturnFalseOnLeak;
   }
 
   bool shouldPrintMessage() const {
@@ -59,28 +67,61 @@ struct ErrorBehaviorKind {
 
 } // end namespace ownership
 
-/// This class is a higher level interface to the ownership checker meant for
-/// use with SILPasses. It uses the actual checker as an internal PImpl detail
-/// so types/etc do not leak.
-struct OwnershipChecker {
-  /// The module that we are in.
-  SILModule &Mod;
+class LinearLifetimeError {
+  ownership::ErrorBehaviorKind errorBehavior;
+  bool foundUseAfterFree = false;
+  bool foundLeak = false;
+  bool foundOverConsume = false;
 
-  /// A cache of dead-end basic blocks that we use to determine if we can
-  /// ignore "leaks".
-  DeadEndBlocks &DEBlocks;
+public:
+  LinearLifetimeError(ownership::ErrorBehaviorKind errorBehavior)
+      : errorBehavior(errorBehavior) {}
 
-  /// The list of regular users from the last run of the checker.
-  SmallVector<SILInstruction *, 16> RegularUsers;
+  bool getFoundError() const {
+    return foundUseAfterFree || foundLeak || foundOverConsume;
+  }
 
-  /// The list of regular users from the last run of the checker.
-  SmallVector<SILInstruction *, 16> LifetimeEndingUsers;
+  bool getFoundLeak() const { return foundLeak; }
 
-  /// The live blocks for the SILValue we processed. This can be used to
-  /// determine if a block is in the "live" region of our SILInstruction.
-  SmallPtrSet<SILBasicBlock *, 32> LiveBlocks;
+  bool getFoundUseAfterFree() const { return foundUseAfterFree; }
 
-  bool checkValue(SILValue Value);
+  bool getFoundOverConsume() const { return foundOverConsume; }
+
+  void handleLeak(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundLeak = true;
+
+    if (errorBehavior.shouldPrintMessage())
+      messagePrinterFunc();
+
+    if (errorBehavior.shouldReturnFalseOnLeak())
+      return;
+
+    // We already printed out our error if we needed to, so don't pass it along.
+    handleError([]() {});
+  }
+
+  void handleOverConsume(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundOverConsume = true;
+    handleError(std::move(messagePrinterFunc));
+  }
+
+  void handleUseAfterFree(llvm::function_ref<void()> &&messagePrinterFunc) {
+    foundUseAfterFree = true;
+    handleError(std::move(messagePrinterFunc));
+  }
+
+private:
+  void handleError(llvm::function_ref<void()> &&messagePrinterFunc) {
+    if (errorBehavior.shouldPrintMessage())
+      messagePrinterFunc();
+
+    if (errorBehavior.shouldReturnFalse()) {
+      return;
+    }
+
+    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
+    llvm_unreachable("triggering standard assertion failure routine");
+  }
 };
 
 /// Returns true if:
@@ -89,12 +130,42 @@ struct OwnershipChecker {
 /// non-consuming uses, or from the producer instruction.
 /// 2. The consuming use set jointly post dominates producers and all non
 /// consuming uses.
-bool valueHasLinearLifetime(SILValue value,
-                            ArrayRef<BranchPropagatedUser> consumingUses,
-                            ArrayRef<BranchPropagatedUser> nonConsumingUses,
-                            SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-                            DeadEndBlocks &deBlocks,
-                            ownership::ErrorBehaviorKind errorBehavior);
+///
+/// \p value The value whose lifetime we are checking.
+/// \p consumingUses the array of users that destroy or consume a value.
+/// \p nonConsumingUses regular uses
+/// \p deadEndBlocks a cache for the dead end block computation
+/// \p errorBehavior If we detect an error, should we return false or hard
+/// error.
+/// \p leakingBlocks If non-null a list of blocks where the value was detected
+/// to leak. Can be used to insert missing destroys.
+LinearLifetimeError valueHasLinearLifetime(
+    SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
+    ArrayRef<BranchPropagatedUser> nonConsumingUses,
+    SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+    DeadEndBlocks &deadEndBlocks, ownership::ErrorBehaviorKind errorBehavior,
+    SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
+
+/// Returns true if v is an address or trivial.
+bool isValueAddressOrTrivial(SILValue v, SILModule &m);
+
+/// These operations forward both owned and guaranteed ownership.
+bool isOwnershipForwardingValueKind(SILNodeKind kind);
+
+/// These operations forward guaranteed ownership, but don't necessarily forward
+/// owned values.
+bool isGuaranteedForwardingValueKind(SILNodeKind kind);
+
+bool isGuaranteedForwardingValue(SILValue value);
+
+bool isOwnershipForwardingInst(SILInstruction *i);
+
+bool isGuaranteedForwardingInst(SILInstruction *i);
+
+/// Look up through the def-use chain of \p inputValue, recording any "borrow"
+/// introducers that we find into \p out.
+bool getUnderlyingBorrowIntroducers(SILValue inputValue,
+                                    SmallVectorImpl<SILValue> &out);
 
 } // namespace swift
 

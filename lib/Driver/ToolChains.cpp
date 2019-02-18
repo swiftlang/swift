@@ -16,12 +16,12 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
@@ -182,13 +182,17 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_warn_swift3_objc_inference_minimal,
                        options::OPT_warn_swift3_objc_inference_complete);
+  inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
+  inputArgs.AddLastArg(arguments, options::OPT_debug_info_format);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_parseable_module_interface);
   inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
@@ -215,9 +219,18 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
   inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_enable_experimental_dependencies);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_experimental_dependency_include_intrafile);
+  inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
+  inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
+
+  // Pass on file paths that should be remapped in debug info.
+  inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map);
 
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
@@ -234,6 +247,12 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(workingDirectory));
   }
 
+  // -g implies -enable-anonymous-context-mangled-names, because the extra
+  // metadata aids debugging.
+  if (inputArgs.hasArg(options::OPT_g)) {
+    arguments.push_back("-enable-anonymous-context-mangled-names");
+  }
+
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
@@ -247,6 +266,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
                                const JobContext &context) const {
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
   Arguments.push_back("-frontend");
 
@@ -364,6 +384,11 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       Arguments.push_back("-index-system-modules");
   }
 
+  if (context.Args.hasArg(options::OPT_debug_info_store_invocation) ||
+      shouldStoreInvocationInDebugInfo()) {
+    Arguments.push_back("-debug-info-store-invocation");
+  }
+
   return II;
 }
 
@@ -382,6 +407,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-c";
   case file_types::TY_PCH:
     return "-emit-pch";
+  case file_types::TY_ASTDump:
+    return "-dump-ast";
   case file_types::TY_RawSIL:
     return "-emit-silgen";
   case file_types::TY_SIL:
@@ -425,10 +452,12 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_ModuleTrace:
   case file_types::TY_TBD:
   case file_types::TY_OptRecord:
+  case file_types::TY_SwiftParseableInterfaceFile:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
   }
+  llvm_unreachable("unhandled output type");
 }
 
 void ToolChain::JobContext::addFrontendInputAndOutputArguments(
@@ -491,7 +520,7 @@ void ToolChain::JobContext::addFrontendCommandLineInputArguments(
     const bool mayHavePrimaryInputs, const bool useFileList,
     const bool usePrimaryFileList, const bool filterByType,
     ArgStringList &arguments) const {
-  llvm::StringSet<> primaries;
+  llvm::DenseSet<StringRef> primaries;
 
   if (mayHavePrimaryInputs) {
     for (const Action *A : InputActions) {
@@ -533,6 +562,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-module-doc-path");
 
   addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_SwiftParseableInterfaceFile,
+                   "-emit-parseable-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
 
@@ -557,7 +590,10 @@ ToolChain::InvocationInfo
 ToolChain::constructInvocation(const InterpretJobAction &job,
                                const JobContext &context) const {
   assert(context.OI.CompilerMode == OutputInfo::Mode::Immediate);
-  ArgStringList Arguments;
+
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
   Arguments.push_back("-frontend");
   Arguments.push_back("-interpret");
@@ -586,7 +622,7 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   // The immediate arguments must be last.
   context.Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
 
-  return {SWIFT_EXECUTABLE_NAME, Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo
@@ -628,6 +664,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ImportedModules:
     case file_types::TY_TBD:
     case file_types::TY_SwiftModuleFile:
+    case file_types::TY_ASTDump:
     case file_types::TY_RawSIL:
     case file_types::TY_RawSIB:
     case file_types::TY_SIL:
@@ -648,6 +685,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
     case file_types::TY_OptRecord:
+    case file_types::TY_SwiftParseableInterfaceFile:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -733,6 +771,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                                const JobContext &context) const {
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
   Arguments.push_back("-frontend");
 
@@ -781,10 +820,15 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SwiftModuleDocFile, "-emit-module-doc-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_SwiftParseableInterfaceFile,
+                   "-emit-parseable-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_ObjCHeader, "-emit-objc-header-path");
+  addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
+                   "-emit-tbd-path");
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
@@ -805,7 +849,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const ModuleWrapJobAction &job,
                                const JobContext &context) const {
-  ArgStringList Arguments;
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
   Arguments.push_back("-modulewrap");
 
@@ -826,7 +872,7 @@ ToolChain::constructInvocation(const ModuleWrapJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return {SWIFT_EXECUTABLE_NAME, Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo
@@ -926,7 +972,9 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
          (job.isPersistentPCH() &&
           context.Output.getPrimaryOutputType() == file_types::TY_Nothing));
 
-  ArgStringList Arguments;
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
   Arguments.push_back("-frontend");
 
@@ -950,7 +998,7 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
         context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
   }
 
-  return {SWIFT_EXECUTABLE_NAME, Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo

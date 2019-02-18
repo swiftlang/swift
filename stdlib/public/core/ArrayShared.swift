@@ -25,6 +25,7 @@ public struct _DependenceToken {
 /// This function is referenced by the compiler to allocate array literals.
 ///
 /// - Precondition: `storage` is `_ContiguousArrayStorage`.
+@inlinable // FIXME(inline-always)
 @inline(__always)
 public // COMPILER_INTRINSIC
 func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
@@ -57,56 +58,32 @@ func _deallocateUninitializedArray<Element>(
 }
 
 
-
-// Utility method for collections that wish to implement CustomStringConvertible
-// and CustomDebugStringConvertible using a bracketed list of elements,
-// like an array.
-@inlinable // FIXME(sil-serialize-all)
-internal func _makeCollectionDescription<C: Collection>
-  (for items: C, withTypeName type: String?) -> String {
-  var result = ""
-  if let type = type {
-    result += "\(type)(["
-  } else {
-    result += "["
-  }
-  var first = true
-  for item in items {
-    if first {
-      first = false
+extension Collection {  
+  // Utility method for collections that wish to implement
+  // CustomStringConvertible and CustomDebugStringConvertible using a bracketed
+  // list of elements, like an array.
+  internal func _makeCollectionDescription(
+    withTypeName type: String? = nil
+  ) -> String {
+    var result = ""
+    if let type = type {
+      result += "\(type)(["
     } else {
-      result += ", "
+      result += "["
     }
-    debugPrint(item, terminator: "", to: &result)
-  }
-  result += type != nil ? "])" : "]"
-  return result
-}
 
-@usableFromInline
-@_fixed_layout
-internal struct _InitializeMemoryFromCollection<
-  C: Collection
-> : _PointerFunction {
-  @inlinable
-  internal func call(_ rawMemory: UnsafeMutablePointer<C.Element>, count: Int) {
-    var p = rawMemory
-    var q = newValues.startIndex
-    for _ in 0..<count {
-      p.initialize(to: newValues[q])
-      newValues.formIndex(after: &q)
-      p += 1
+    var first = true
+    for item in self {
+      if first {
+        first = false
+      } else {
+        result += ", "
+      }
+      debugPrint(item, terminator: "", to: &result)
     }
-    _expectEnd(of: newValues, is: q)
+    result += type != nil ? "])" : "]"
+    return result
   }
-
-  @inlinable
-  internal init(_ newValues: C) {
-    self.newValues = newValues
-  }
-
-  @usableFromInline
-  internal var newValues: C
 }
 
 extension _ArrayBufferProtocol {
@@ -114,7 +91,7 @@ extension _ArrayBufferProtocol {
   @inline(never)
   internal mutating func _arrayOutOfPlaceReplace<C: Collection>(
     _ bounds: Range<Int>,
-    with newValues: C,
+    with newValues: __owned C,
     count insertCount: Int
   ) where C.Element == Element {
 
@@ -124,9 +101,17 @@ extension _ArrayBufferProtocol {
       newCount: newCount, requiredCapacity: newCount)
 
     _arrayOutOfPlaceUpdate(
-      &newBuffer,
-      bounds.lowerBound - startIndex, insertCount,
-      _InitializeMemoryFromCollection(newValues)
+      &newBuffer, bounds.lowerBound - startIndex, insertCount,
+      { rawMemory, count in
+        var p = rawMemory
+        var q = newValues.startIndex
+        for _ in 0..<count {
+          p.initialize(to: newValues[q])
+          newValues.formIndex(after: &q)
+          p += 1
+        }
+        _expectEnd(of: newValues, is: q)
+      }
     )
   }
 }
@@ -193,9 +178,9 @@ extension _ArrayBufferProtocol {
     countForBuffer: Int, minNewCapacity: Int,
     requiredCapacity: Int
   ) -> _ContiguousArrayBuffer<Element> {
-    _sanityCheck(countForBuffer >= 0)
-    _sanityCheck(requiredCapacity >= countForBuffer)
-    _sanityCheck(minNewCapacity >= countForBuffer)
+    _internalInvariant(countForBuffer >= 0)
+    _internalInvariant(requiredCapacity >= countForBuffer)
+    _internalInvariant(minNewCapacity >= countForBuffer)
 
     let minimumCapacity = Swift.max(requiredCapacity,
       minNewCapacity > capacity
@@ -204,12 +189,6 @@ extension _ArrayBufferProtocol {
     return _ContiguousArrayBuffer(
       _uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
   }
-}
-
-@usableFromInline
-internal protocol _PointerFunction {
-  associatedtype Element
-  func call(_: UnsafeMutablePointer<Element>, count: Int)
 }
 
 extension _ArrayBufferProtocol {
@@ -222,22 +201,23 @@ extension _ArrayBufferProtocol {
   /// copying when it isUniquelyReferenced.
   @inline(never)
   @inlinable // @specializable
-  internal mutating func _arrayOutOfPlaceUpdate<Initializer>(
+  internal mutating func _arrayOutOfPlaceUpdate(
     _ dest: inout _ContiguousArrayBuffer<Element>,
     _ headCount: Int, // Count of initial source elements to copy/move
     _ newCount: Int,  // Number of new elements to insert
-    _ initializeNewElements: Initializer
-  ) where
-    Initializer: _PointerFunction,
-    Initializer.Element == Element {
+    _ initializeNewElements: 
+        ((UnsafeMutablePointer<Element>, _ count: Int) -> ()) = { ptr, count in
+      _internalInvariant(count == 0)
+    }
+  ) {
 
-    _sanityCheck(headCount >= 0)
-    _sanityCheck(newCount >= 0)
+    _internalInvariant(headCount >= 0)
+    _internalInvariant(newCount >= 0)
 
     // Count of trailing source elements to copy/move
     let sourceCount = self.count
     let tailCount = dest.count - headCount - newCount
-    _sanityCheck(headCount + tailCount <= sourceCount)
+    _internalInvariant(headCount + tailCount <= sourceCount)
 
     let oldCount = sourceCount - headCount - tailCount
     let destStart = dest.firstElementAddress
@@ -263,7 +243,7 @@ extension _ArrayBufferProtocol {
       // Destroy unused source items
       oldStart.deinitialize(count: oldCount)
 
-      initializeNewElements.call(newStart, count: newCount)
+      initializeNewElements(newStart, newCount)
 
       // Move the tail items
       newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
@@ -281,25 +261,12 @@ extension _ArrayBufferProtocol {
       let newStart = _copyContents(
         subRange: headStart..<headEnd,
         initializing: destStart)
-      initializeNewElements.call(newStart, count: newCount)
+      initializeNewElements(newStart, newCount)
       let tailStart = headEnd + oldCount
       let tailEnd = endIndex
       _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
     }
     self = Self(_buffer: dest, shiftedToStartIndex: startIndex)
-  }
-}
-
-@usableFromInline
-@_fixed_layout
-internal struct _IgnorePointer<T>: _PointerFunction {
-  @inlinable
-  internal func call(_: UnsafeMutablePointer<T>, count: Int) {
-    _sanityCheck(count == 0)
-  }
-
-  @inlinable
-  internal init() {
   }
 }
 
@@ -315,18 +282,18 @@ extension _ArrayBufferProtocol {
 
     var newBuffer = _forceCreateUniqueMutableBuffer(
       newCount: bufferCount, requiredCapacity: bufferCount)
-    _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer())
+    _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0)
   }
 
   /// Append items from `newItems` to a buffer.
   @inlinable
   internal mutating func _arrayAppendSequence<S: Sequence>(
-    _ newItems: S
+    _ newItems: __owned S
   ) where S.Element == Element {
     
     // this function is only ever called from append(contentsOf:)
     // which should always have exhausted its capacity before calling
-    _sanityCheck(count == capacity)
+    _internalInvariant(count == capacity)
     var newCount = self.count
 
     // there might not be any elements to append remaining,
@@ -343,7 +310,7 @@ extension _ArrayBufferProtocol {
         // need to request 1 more than current count/capacity
         minNewCapacity: newCount + 1)
 
-      _arrayOutOfPlaceUpdate(&newBuffer, newCount, 0, _IgnorePointer())
+      _arrayOutOfPlaceUpdate(&newBuffer, newCount, 0)
 
       let currentCapacity = self.capacity
       let base = self.firstElementAddress

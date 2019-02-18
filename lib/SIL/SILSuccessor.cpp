@@ -37,15 +37,3 @@ void SILSuccessor::operator=(SILBasicBlock *BB) {
   
   SuccessorBlock = BB;
 }
-
-// Dereferencing the pred_iterator returns the predecessor's SILBasicBlock.
-SILBasicBlock *SILSuccessor::pred_iterator::operator*() {
-  assert(Cur && "Can't deference end (or default constructed) iterator");
-  return Cur->ContainingInst->getParent();
-}
-
-// Dereferencing the pred_iterator returns the predecessor's SILBasicBlock.
-const SILBasicBlock *SILSuccessor::pred_iterator::operator*() const {
-  assert(Cur && "Can't deference end (or default constructed) iterator");
-  return Cur->ContainingInst->getParent();
-}

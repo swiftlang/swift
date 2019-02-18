@@ -28,7 +28,6 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Parse/SyntaxParsingCache.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
@@ -79,6 +78,7 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
+  class SyntaxParsingCache;
   
 namespace syntax {
   class SourceFileSyntax;
@@ -94,15 +94,16 @@ enum class FileUnitKind {
   SerializedAST,
   /// An imported Clang module.
   ClangModule,
-  /// A derived declaration.
-  Derived,
+  /// A Clang module imported from DWARF.
+  DWARFModule
 };
 
 enum class SourceFileKind {
   Library,  ///< A normal .swift file.
   Main,     ///< A .swift file that can have top-level code.
   REPL,     ///< A virtual file that holds the user's input in the REPL.
-  SIL       ///< Came from a .sil file.
+  SIL,      ///< Came from a .sil file.
+  Interface ///< Came from a .swiftinterface file, representing another module.
 };
 
 /// Discriminator for resilience strategy.
@@ -152,8 +153,47 @@ public:
     }
   };
 
+  /// Produces the components of a given module's full name in reverse order.
+  ///
+  /// For a Swift module, this will only ever have one component, but an
+  /// imported Clang module might actually be a submodule.
+  class ReverseFullNameIterator {
+  public:
+    // Make this look like a valid STL iterator.
+    using difference_type = int;
+    using value_type = StringRef;
+    using pointer = StringRef *;
+    using reference = StringRef;
+    using iterator_category = std::forward_iterator_tag;
+
+  private:
+    PointerUnion<const ModuleDecl *, const /* clang::Module */ void *> current;
+  public:
+    ReverseFullNameIterator() = default;
+    explicit ReverseFullNameIterator(const ModuleDecl *M);
+    explicit ReverseFullNameIterator(const clang::Module *clangModule) {
+      current = clangModule;
+    }
+
+    StringRef operator*() const;
+    ReverseFullNameIterator &operator++();
+
+    friend bool operator==(ReverseFullNameIterator left,
+                           ReverseFullNameIterator right) {
+      return left.current == right.current;
+    }
+    friend bool operator!=(ReverseFullNameIterator left,
+                           ReverseFullNameIterator right) {
+      return !(left == right);
+    }
+
+    /// This is a convenience function that writes the entire name, in forward
+    /// order, to \p out.
+    void printForward(raw_ostream &out) const;
+  };
+
 private:
-  /// If non-NULL, an plug-in that should be used when performing external
+  /// If non-NULL, a plug-in that should be used when performing external
   /// lookups.
   // FIXME: Do we really need to bloat all modules with this?
   DebuggerClient *DebugClient = nullptr;
@@ -203,13 +243,6 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
-  struct {
-    unsigned TestingEnabled : 1;
-    unsigned FailedToLoad : 1;
-    unsigned ResilienceStrategy : 1;
-    unsigned HasResolvedImports : 1;
-  } Flags;
-
   ModuleDecl(Identifier name, ASTContext &ctx);
 
 public:
@@ -226,6 +259,7 @@ public:
     return { Files.begin(), Files.size() };
   }
 
+  bool isClangModule() const;
   void addFile(FileUnit &newFile);
   void removeFile(FileUnit &existingFile);
 
@@ -245,32 +279,49 @@ public:
 
   /// Returns true if this module was or is being compiled for testing.
   bool isTestingEnabled() const {
-    return Flags.TestingEnabled;
+    return Bits.ModuleDecl.TestingEnabled;
   }
   void setTestingEnabled(bool enabled = true) {
-    Flags.TestingEnabled = enabled;
+    Bits.ModuleDecl.TestingEnabled = enabled;
+  }
+
+  // Returns true if this module is compiled with implicit dynamic.
+  bool isImplicitDynamicEnabled() const {
+    return Bits.ModuleDecl.ImplicitDynamicEnabled;
+  }
+  void setImplicitDynamicEnabled(bool enabled = true) {
+    Bits.ModuleDecl.ImplicitDynamicEnabled = enabled;
+  }
+
+  /// Returns true if this module was or is begin compile with
+  /// `-enable-private-imports`.
+  bool arePrivateImportsEnabled() const {
+    return Bits.ModuleDecl.PrivateImportsEnabled;
+  }
+  void setPrivateImportsEnabled(bool enabled = true) {
+    Bits.ModuleDecl.PrivateImportsEnabled = true;
   }
 
   /// Returns true if there was an error trying to load this module.
   bool failedToLoad() const {
-    return Flags.FailedToLoad;
+    return Bits.ModuleDecl.FailedToLoad;
   }
   void setFailedToLoad(bool failed = true) {
-    Flags.FailedToLoad = failed;
+    Bits.ModuleDecl.FailedToLoad = failed;
   }
 
   bool hasResolvedImports() const {
-    return Flags.HasResolvedImports;
+    return Bits.ModuleDecl.HasResolvedImports;
   }
   void setHasResolvedImports() {
-    Flags.HasResolvedImports = true;
+    Bits.ModuleDecl.HasResolvedImports = true;
   }
 
   ResilienceStrategy getResilienceStrategy() const {
-    return ResilienceStrategy(Flags.ResilienceStrategy);
+    return ResilienceStrategy(Bits.ModuleDecl.RawResilienceStrategy);
   }
   void setResilienceStrategy(ResilienceStrategy strategy) {
-    Flags.ResilienceStrategy = unsigned(strategy);
+    Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope
@@ -336,6 +387,17 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(Type type, ProtocolDecl *protocol);
 
+  /// Look for the conformance of the given existential type to the given
+  /// protocol.
+  Optional<ProtocolConformanceRef>
+  lookupExistentialConformance(Type type, ProtocolDecl *protocol);
+
+  /// Exposes TypeChecker functionality for querying protocol conformance.
+  /// Returns a valid ProtocolConformanceRef only if all conditional
+  /// requirements are successfully resolved.
+  Optional<ProtocolConformanceRef>
+  conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol);
+
   /// Find a member named \p name in \p container that was declared in this
   /// module.
   ///
@@ -374,6 +436,12 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
+  /// Uniques the items in \p imports, ignoring the source locations of the
+  /// access paths.
+  ///
+  /// The order of items in \p imports is \e not preserved.
+  static void removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports);
+
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -385,6 +453,12 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const;
+
+  /// Finds all precedence group decls of this module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const;
 
   /// Finds all top-level decls that should be displayed to a client of this
   /// module.
@@ -448,7 +522,7 @@ public:
   /// Source locations are ignored here.
   static bool isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs);
 
-  /// \brief Get the path for the file that this module came from, or an empty
+  /// Get the path for the file that this module came from, or an empty
   /// string if this is not applicable.
   StringRef getModuleFilename() const;
 
@@ -460,6 +534,9 @@ public:
 
   /// \returns true if this module is the "builtin" module.
   bool isBuiltinModule() const;
+
+  /// \returns true if this module is the "SwiftOnoneSupport" module;
+  bool isOnoneSupportModule() const;
 
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
@@ -482,10 +559,19 @@ public:
   /// Returns the associated clang module if one exists.
   const clang::Module *findUnderlyingClangModule() const;
 
+  /// Returns a generator with the components of this module's full,
+  /// hierarchical name.
+  ///
+  /// For a Swift module, this will only ever have one component, but an
+  /// imported Clang module might actually be a submodule.
+  ReverseFullNameIterator getReverseFullModuleName() const {
+    return ReverseFullNameIterator(this);
+  }
+
   SourceRange getSourceRange() const { return SourceRange(); }
 
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -632,6 +718,13 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
 
+
+  /// Finds all precedence group decls in this file.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  virtual void
+  getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {}
 
   /// Finds all local type decls in this file.
   ///
@@ -781,11 +874,29 @@ public:
 
     /// This source file has access to testable declarations in the imported
     /// module.
-    Testable = 0x2
+    Testable = 0x2,
+
+    /// This source file has access to private declarations in the imported
+    /// module.
+    PrivateImport = 0x4,
   };
 
   /// \see ImportFlags
   using ImportOptions = OptionSet<ImportFlags>;
+
+  typedef std::pair<ImportOptions, StringRef> ImportOptionsAndFilename;
+
+  struct ImportedModuleDesc {
+    ModuleDecl::ImportedModule module;
+    ImportOptions importOptions;
+    StringRef filename;
+
+    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options)
+        : module(module), importOptions(options) {}
+    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
+                       StringRef filename)
+        : module(module), importOptions(options), filename(filename) {}
+  };
 
 private:
   std::unique_ptr<LookupCache> Cache;
@@ -794,7 +905,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
+  ArrayRef<ImportedModuleDesc> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -817,9 +928,10 @@ private:
 
   /// A hash of all interface-contributing tokens that have been lexed for
   /// this source file so far.
-  llvm::MD5 InterfaceHash;
+  /// We only collect interface hash for primary input files.
+  llvm::Optional<llvm::MD5> InterfaceHash;
 
-  /// \brief The ID for the memory buffer containing this file's source.
+  /// The ID for the memory buffer containing this file's source.
   ///
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
@@ -833,8 +945,6 @@ private:
 
   friend ASTContext;
   friend Impl;
-
-  ~SourceFile();
 public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
@@ -899,10 +1009,20 @@ public:
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false);
 
-  void
-  addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
+  void addImports(ArrayRef<ImportedModuleDesc> IM);
 
-  bool hasTestableImport(const ModuleDecl *module) const;
+  enum ImportQueryKind {
+    /// Return the results for testable or private imports.
+    TestableAndPrivate,
+    /// Return the results only for testable imports.
+    TestableOnly,
+    /// Return the results only for private imports.
+    PrivateOnly
+  };
+
+  bool
+  hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
+                             ImportQueryKind kind = TestableAndPrivate) const;
 
   void clearLookupCache();
 
@@ -928,6 +1048,11 @@ public:
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &results) const override;
+
+  virtual TypeDecl *lookupLocalType(llvm::StringRef MangledName) const override;
 
   virtual void
   getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;
@@ -977,9 +1102,13 @@ public:
   ReferencedNameTracker *getReferencedNameTracker() {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
+  const ReferencedNameTracker *getReferencedNameTracker() const {
+    return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
+  }
+
   void createReferencedNameTracker();
 
-  /// \brief The buffer ID for the file that was imported, or None if there
+  /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
   Optional<unsigned> getBufferID() const {
     if (BufferID == -1)
@@ -997,7 +1126,7 @@ public:
   void dump() const;
   void dump(raw_ostream &os) const;
 
-  /// \brief Pretty-print the contents of this source file.
+  /// Pretty-print the contents of this source file.
   ///
   /// \param Printer The AST printer used for printing the contents.
   /// \param PO Options controlling the printing process.
@@ -1019,6 +1148,7 @@ public:
       return true;
       
     case SourceFileKind::Library:
+    case SourceFileKind::Interface:
     case SourceFileKind::SIL:
       return false;
     }
@@ -1056,20 +1186,26 @@ public:
   /// Set the root refinement context for the file.
   void setTypeRefinementContext(TypeRefinementContext *TRC);
 
-  void recordInterfaceToken(StringRef token) {
-    assert(!token.empty());
-    InterfaceHash.update(token);
-    // Add null byte to separate tokens.
-    uint8_t a[1] = {0};
-    InterfaceHash.update(a);
+  void enableInterfaceHash() {
+    assert(!hasInterfaceHash());
+    InterfaceHash.emplace();
   }
 
-  const llvm::MD5 &getInterfaceHashState() { return InterfaceHash; }
-  void setInterfaceHashState(const llvm::MD5 &state) { InterfaceHash = state; }
+  bool hasInterfaceHash() const {
+    return InterfaceHash.hasValue();
+  }
+
+  void recordInterfaceToken(StringRef token) {
+    assert(!token.empty());
+    InterfaceHash->update(token);
+    // Add null byte to separate tokens.
+    uint8_t a[1] = {0};
+    InterfaceHash->update(a);
+  }
 
   void getInterfaceHash(llvm::SmallString<32> &str) {
     llvm::MD5::MD5Result result;
-    InterfaceHash.final(result);
+    InterfaceHash->final(result);
     llvm::MD5::stringifyResult(result, str);
   }
 
@@ -1087,6 +1223,8 @@ public:
 
   bool shouldBuildSyntaxTree() const;
 
+  bool canBeParsedInFull() const;
+
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
@@ -1096,7 +1234,7 @@ private:
   /// If not None, the underlying vector should contain tokens of this source file.
   Optional<std::vector<Token>> AllCorrectedTokens;
 
-  SourceFileSyntaxInfo &SyntaxInfo;
+  std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 };
 
 
@@ -1148,11 +1286,28 @@ protected:
     assert(classof(this) && "invalid kind");
   }
 
+  /// A map from private/fileprivate decls to the file they were defined in.
+  llvm::DenseMap<const ValueDecl *, Identifier> FilenameForPrivateDecls;
+
 public:
+
   /// Returns an arbitrary string representing the storage backing this file.
   ///
   /// This is usually a filesystem path.
   virtual StringRef getFilename() const;
+
+  void addFilenameForPrivateDecl(const ValueDecl *decl, Identifier id) {
+    assert(!FilenameForPrivateDecls.count(decl) ||
+           FilenameForPrivateDecls[decl] == id);
+    FilenameForPrivateDecls[decl] = id;
+  }
+
+  StringRef getFilenameForPrivateDecl(const ValueDecl *decl) {
+    auto it = FilenameForPrivateDecls.find(decl);
+    if (it == FilenameForPrivateDecls.end())
+      return StringRef();
+    return it->second.str();
+  }
 
   /// Look up an operator declaration.
   ///
@@ -1170,6 +1325,9 @@ public:
     return nullptr;
   }
 
+  /// Returns the Swift module that overlays a Clang module.
+  virtual ModuleDecl *getAdapterModule() const { return nullptr; }
+
   virtual bool isSystemModule() const { return false; }
 
   /// Retrieve the set of generic signatures stored within this module.
@@ -1183,7 +1341,8 @@ public:
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||
-           file->getKind() == FileUnitKind::ClangModule;
+           file->getKind() == FileUnitKind::ClangModule ||
+           file->getKind() == FileUnitKind::DWARFModule;
   }
   static bool classof(const DeclContext *DC) {
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
@@ -1222,12 +1381,18 @@ public:
   bool isSystemModule() const;
   bool isBuiltinModule() const;
   const ModuleDecl *getAsSwiftModule() const;
+  const clang::Module *getAsClangModule() const;
+
+  void *getOpaqueValue() const {
+    assert(!Mod.isNull());
+    return Mod.getOpaqueValue();
+  }
 
   explicit operator bool() const { return !Mod.isNull(); }
 };
 
 inline bool DeclContext::isModuleContext() const {
-  if (auto D = getAsDeclOrDeclExtensionContext())
+  if (auto D = getAsDecl())
     return ModuleDecl::classof(D);
   return false;
 }

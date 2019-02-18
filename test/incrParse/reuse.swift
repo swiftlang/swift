@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %incparse-test %s --test-case ADD_PROPERTY
-// RUN: %incparse-test %s --test-case WRAP_IN_CLASS
-// RUN: %incparse-test %s --test-case UNWRAP_CLASS
-// RUN: %incparse-test %s --test-case NEXT_TOKEN_CALCULATION
+// RUN: %validate-incrparse %s --test-case ADD_PROPERTY
+// RUN: %validate-incrparse %s --test-case WRAP_IN_CLASS
+// RUN: %validate-incrparse %s --test-case UNWRAP_CLASS
+// RUN: %validate-incrparse %s --test-case NEXT_TOKEN_CALCULATION
 
 func start() {}
 

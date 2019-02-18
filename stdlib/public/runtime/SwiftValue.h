@@ -25,32 +25,32 @@
 #include <objc/runtime.h>
 #include "swift/Runtime/Metadata.h"
 
-// _SwiftValue is an Objective-C class, but we shouldn't interface with it
+// __SwiftValue is an Objective-C class, but we shouldn't interface with it
 // directly as such. Keep the type opaque.
 #if __OBJC__
-@class _SwiftValue;
+@class __SwiftValue;
 #else
-typedef struct _SwiftValue _SwiftValue;
+typedef struct __SwiftValue __SwiftValue;
 #endif
 
 namespace swift {
 
-/// Bridge a Swift value to an Objective-C object by boxing it as a _SwiftValue.
-_SwiftValue *bridgeAnythingToSwiftValueObject(OpaqueValue *src,
+/// Bridge a Swift value to an Objective-C object by boxing it as a __SwiftValue.
+__SwiftValue *bridgeAnythingToSwiftValueObject(OpaqueValue *src,
                                               const Metadata *srcType,
                                               bool consume);
 
 /// Get the type metadata for a value in a Swift box.
-const Metadata *getSwiftValueTypeMetadata(_SwiftValue *v);
+const Metadata *getSwiftValueTypeMetadata(__SwiftValue *v);
 
 /// Get the value out of a Swift box along with its type metadata. The value
 /// inside the box is immutable and must not be modified or taken from the box.
 std::pair<const Metadata *, const OpaqueValue *>
-getValueFromSwiftValue(_SwiftValue *v);
+getValueFromSwiftValue(__SwiftValue *v);
 
-/// Return the object reference as a _SwiftValue* if it is a _SwiftValue instance,
+/// Return the object reference as a __SwiftValue* if it is a __SwiftValue instance,
 /// or nil if it is not.
-_SwiftValue *getAsSwiftValue(id object);
+__SwiftValue *getAsSwiftValue(id object);
 
 /// Find conformances for SwiftValue to the given existential type.
 ///

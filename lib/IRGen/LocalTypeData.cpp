@@ -41,8 +41,7 @@ LocalTypeDataKind LocalTypeDataKind::getCachingKind() const {
 
   // Map protocol conformances to their root normal conformance.
   auto conformance = getConcreteProtocolConformance();
-  return forConcreteProtocolWitnessTable(
-                                     conformance->getRootNormalConformance());
+  return forConcreteProtocolWitnessTable(conformance->getRootConformance());
 }
 
 LocalTypeDataCache &IRGenFunction::getOrCreateLocalTypeData() {
@@ -212,6 +211,9 @@ llvm::Value *IRGenFunction::tryGetLocalTypeData(LocalTypeDataKey key) {
 MetadataResponse
 LocalTypeDataCache::tryGet(IRGenFunction &IGF, LocalTypeDataKey key,
                            bool allowAbstract, DynamicMetadataRequest request) {
+  // Use the caching key.
+  key = key.getCachingKey();
+
   auto it = Map.find(key);
   if (it == Map.end()) return MetadataResponse();
   auto &chain = it->second;
@@ -334,7 +336,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   auto type = dyn_cast<ArchetypeType>(key.Type);
   if (!type)
     return;
-  if (type->getOpenedExistentialType())
+  if (isa<OpenedArchetypeType>(type))
     return;
 
   llvm::Value *data = value.getMetadata();
@@ -353,7 +355,18 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
     return;
 
   // Emit debug info for the metadata.
-  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, name);
+  llvm::SmallString<8> AssocType;
+  auto *oocTy = type->mapTypeOutOfContext().getPointer();
+  {
+    llvm::raw_svector_ostream OS(AssocType);
+    while (auto *dependentMemberType = dyn_cast<DependentMemberType>(oocTy)) {
+      OS << '.' << dependentMemberType->getName();
+      oocTy = dependentMemberType->getBase().getPointer();
+    }
+  }
+  auto *typeParam = cast<GenericTypeParamType>(oocTy);
+  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, typeParam->getDepth(),
+                                      typeParam->getIndex(), AssocType);
 }
 
 void
@@ -562,7 +575,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
     }
 
     // Find the chain for the key.
-    auto key = getKey(type, localDataKind);
+    auto key = getKey(type, localDataKind).getCachingKey();
     auto &chain = Map[key];
 
     // Check whether there's already an entry that's at least as good as the
@@ -667,6 +680,7 @@ LLVM_DUMP_METHOD void LocalTypeDataCache::dump() const {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void LocalTypeDataKey::dump() const {
   print(llvm::errs());
+  llvm::errs() << "\n";
 }
 #endif
 
@@ -680,6 +694,7 @@ void LocalTypeDataKey::print(llvm::raw_ostream &out) const {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void LocalTypeDataKind::dump() const {
   print(llvm::errs());
+  llvm::errs() << "\n";
 }
 #endif
 
@@ -717,7 +732,7 @@ IRGenFunction::ConditionalDominanceScope::~ConditionalDominanceScope() {
 
 void LocalTypeDataCache::eraseConditional(ArrayRef<LocalTypeDataKey> keys) {
   for (auto &key : keys) {
-    auto &chain = Map[key];
+    auto &chain = Map[key.getCachingKey()];
 
     // Our ability to simply delete the front of the chain relies on an
     // assumption that (1) conditional additions always go to the front of

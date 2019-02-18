@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %incparse-test %s --test-case NO_CHANGES
-// RUN: %incparse-test %s --test-case ADD_FUNC_PARENS
-// RUN: %incparse-test %s --test-case ADD_OPENING_BRACE
-// RUN: %incparse-test %s --test-case REMOVE_FUNC_KEYWORD
-// RUN: %incparse-test %s --test-case ADD_PARAM_NAME
-// RUN: %incparse-test %s --test-case ADD_PARAM_TYPE
+// RUN: %validate-incrparse %s --test-case NO_CHANGES
+// RUN: %validate-incrparse %s --test-case ADD_FUNC_PARENS
+// RUN: %validate-incrparse %s --test-case ADD_OPENING_BRACE
+// RUN: %validate-incrparse %s --test-case REMOVE_FUNC_KEYWORD
+// RUN: %validate-incrparse %s --test-case ADD_PARAM_NAME
+// RUN: %validate-incrparse %s --test-case ADD_PARAM_TYPE
 
 func start() {}
 

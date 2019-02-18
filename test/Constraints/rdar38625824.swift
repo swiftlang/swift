@@ -7,5 +7,5 @@ func foo<T>(_: Any?) -> T {
   fatalError()
 }
 
-// CHECK: function_ref @$S12rdar386258243fooyxyplF : $@convention(thin) <τ_0_0> (@in_guaranteed Any) -> @out τ_0_0
+// CHECK: function_ref @$s12rdar386258243fooyxyplF : $@convention(thin) <τ_0_0> (@in_guaranteed Any) -> @out τ_0_0
 var _: String = foo("hello")

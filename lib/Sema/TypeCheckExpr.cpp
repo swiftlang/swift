@@ -19,6 +19,8 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Lexer.h"
 using namespace swift;
 
@@ -189,12 +191,73 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
     return lookupPrecedenceGroupForInfixOperator(DC, binaryExpr->getFn());
   }
 
+  if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E)) {
+    return lookupPrecedenceGroupForInfixOperator(DC, DSCE->getFn());
+  }
+
+  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+    Identifier name = MRE->getDecl().getDecl()->getBaseName().getIdentifier();
+    return lookupPrecedenceGroupForOperator(*this, DC, name, MRE->getLoc());
+  }
+
   // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
   // otherwise emit an error.
   if (!isa<ErrorExpr>(E))
     diagnose(E->getLoc(), diag::unknown_binop);
 
   return nullptr;
+}
+
+/// Find LHS as if we append binary operator to existing pre-folded expresion.
+/// Returns found expression, or \c nullptr if the operator is not applicable.
+///
+/// For example, given '(== R (* A B))':
+/// 'findLHS(DC, expr, "+")' returns '(* A B)'.
+/// 'findLHS(DC, expr, "<<")' returns 'B'.
+/// 'findLHS(DC, expr, '==')' returns nullptr.
+Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
+  auto right = lookupPrecedenceGroupForOperator(*this, DC, name, E->getEndLoc());
+  while (true) {
+
+    // Look through implicit conversions.
+    if (auto ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+      E = ICE->getSyntacticSubExpr();
+      continue;
+    }
+    if (auto ACE = dyn_cast<AutoClosureExpr>(E)) {
+      E = ACE->getSingleExpressionBody();
+      continue;
+    }
+
+    auto left = lookupPrecedenceGroupForInfixOperator(DC, E);
+    if (!left)
+      // LHS is not binary expression.
+      return E;
+    switch (Context.associateInfixOperators(left, right)) {
+      case swift::Associativity::None:
+        return nullptr;
+      case swift::Associativity::Left:
+        return E;
+      case swift::Associativity::Right:
+        break;
+    }
+    // Find the RHS of the current binary expr.
+    if (auto *assignExpr = dyn_cast<AssignExpr>(E)) {
+      E = assignExpr->getSrc();
+    } else if (auto *ifExpr = dyn_cast<IfExpr>(E)) {
+      E = ifExpr->getElseExpr();
+    } else if (auto *binaryExpr = dyn_cast<BinaryExpr>(E)) {
+      auto *Args = dyn_cast<TupleExpr>(binaryExpr->getArg());
+      if (!Args || Args->getNumElements() != 2)
+        return nullptr;
+      E = Args->getElement(1);
+    } else {
+      // E.g. 'fn() as Int << 2'.
+      // In this case '<<' has higher precedence than 'as', but the LHS should
+      // be 'fn() as Int' instead of 'Int'.
+      return E;
+    }
+  }
 }
 
 // The way we compute isEndOfSequence relies on the assumption that
@@ -493,21 +556,21 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
 }
 
 bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
-  if (Context.hasOptionalIntrinsics(this)) return false;
+  if (Context.hasOptionalIntrinsics()) return false;
 
   diagnose(loc, diag::optional_intrinsics_not_found);
   return true;
 }
 
 bool TypeChecker::requirePointerArgumentIntrinsics(SourceLoc loc) {
-  if (Context.hasPointerArgumentIntrinsics(this)) return false;
+  if (Context.hasPointerArgumentIntrinsics()) return false;
 
   diagnose(loc, diag::pointer_argument_intrinsics_not_found);
   return true;
 }
 
 bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
-  if (Context.hasArrayLiteralIntrinsics(this)) return false;
+  if (Context.hasArrayLiteralIntrinsics()) return false;
   
   diagnose(loc, diag::array_literal_intrinsics_not_found);
   return true;
@@ -539,7 +602,39 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   return result;
 }
 
-static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
+Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
+                                        FunctionType *closureType) {
+  bool isInDefaultArgumentContext = false;
+  if (auto *init = dyn_cast<Initializer>(DC))
+    isInDefaultArgumentContext =
+        init->getInitializerKind() == InitializerKind::DefaultArgument;
+
+  auto info = closureType->getExtInfo();
+  auto newClosureType = closureType;
+
+  if (isInDefaultArgumentContext && info.isNoEscape())
+    newClosureType = closureType->withExtInfo(info.withNoEscape(false))
+                         ->castTo<FunctionType>();
+
+  auto *closure = new (Context) AutoClosureExpr(
+      expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
+
+  closure->setParameterList(ParameterList::createEmpty(Context));
+
+  ClosuresWithUncomputedCaptures.push_back(closure);
+
+  if (!newClosureType->isEqual(closureType)) {
+    assert(isInDefaultArgumentContext);
+    assert(newClosureType
+               ->withExtInfo(newClosureType->getExtInfo().withNoEscape(true))
+               ->isEqual(closureType));
+    return new (Context) FunctionConversionExpr(closure, closureType);
+  }
+
+  return closure;
+}
+
+static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
                                      StringRef name) {
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(dc))
@@ -561,112 +656,59 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
   return cast<TypeAliasDecl>(TD)->getDeclaredInterfaceType();
 }
 
+static Optional<KnownProtocolKind>
+getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
+  TypeChecker &tc = TypeChecker::createForContext(protocol->getASTContext());
+
+  // clang-format off
+  #define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)            \
+    if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))        \
+      return KnownProtocolKind::Id;
+  #include "swift/AST/KnownProtocols.def"
+  #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+  // clang-format on
+
+  return None;
+}
+
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
-  Type *type = nullptr;
-  const char *name = nullptr;
+  if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
+    Type t = evaluateOrDefault(
+        Context.evaluator,
+        DefaultTypeRequest{knownProtocolKindIfAny.getValue(), dc}, nullptr);
+    return t;
+  }
+  return nullptr;
+}
 
-  // ExpressibleByUnicodeScalarLiteral -> UnicodeScalarType
-  if (protocol ==
-           getProtocol(
-               SourceLoc(),
-               KnownProtocolKind::ExpressibleByUnicodeScalarLiteral)) {
-    type = &UnicodeScalarType;
-    name = "UnicodeScalarType";
-  }
-  // ExpressibleByExtendedGraphemeClusterLiteral -> ExtendedGraphemeClusterType
-  else if (protocol ==
-           getProtocol(
-               SourceLoc(),
-               KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral)) {
-    type = &ExtendedGraphemeClusterType;
-    name = "ExtendedGraphemeClusterType";
-  }
-  // ExpressibleByStringLiteral -> StringLiteralType
-  // ExpressibleByStringInterpolation -> StringLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByStringLiteral) ||
-           protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByStringInterpolation)) {
-    type = &StringLiteralType;
-    name = "StringLiteralType";
-  }
-  // ExpressibleByIntegerLiteral -> IntegerLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-    type = &IntLiteralType;
-    name = "IntegerLiteralType";
-  }
-  // ExpressibleByFloatLiteral -> FloatLiteralType
-  else if (protocol == getProtocol(SourceLoc(),
-                                   KnownProtocolKind::ExpressibleByFloatLiteral)){
-    type = &FloatLiteralType;
-    name = "FloatLiteralType";
-  }
-  // ExpressibleByBooleanLiteral -> BoolLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByBooleanLiteral)){
-    type = &BooleanLiteralType;
-    name = "BooleanLiteralType";
-  }
-  // ExpressibleByArrayLiteral -> Array
-  else if (protocol == getProtocol(SourceLoc(),
-                                   KnownProtocolKind::ExpressibleByArrayLiteral)){
-    type = &ArrayLiteralType;
-    name = "Array";
-  }
-  // ExpressibleByDictionaryLiteral -> Dictionary
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByDictionaryLiteral)) {
-    type = &DictionaryLiteralType;
-    name = "Dictionary";
-  }
-  // _ExpressibleByColorLiteral -> _ColorLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByColorLiteral)) {
-    type = &ColorLiteralType;
-    name = "_ColorLiteralType";
-  }
-  // _ExpressibleByImageLiteral -> _ImageLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByImageLiteral)) {
-    type = &ImageLiteralType;
-    name = "_ImageLiteralType";
-  }
-  // _ExpressibleByFileReferenceLiteral -> _FileReferenceLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByFileReferenceLiteral)) {
-    type = &FileReferenceLiteralType;
-    name = "_FileReferenceLiteralType";
-  }
-
-  if (!type)
+llvm::Expected<Type>
+swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
+                                    KnownProtocolKind knownProtocolKind,
+                                    const DeclContext *dc) const {
+  const char *const name = getTypeName(knownProtocolKind);
+  if (!name)
     return nullptr;
 
-  // If we haven't found the type yet, look for it now.
-  if (!*type) {
-    *type = lookupDefaultLiteralType(*this, dc, name);
+  TypeChecker &tc = getTypeChecker();
 
-    if (!*type)
-      *type = lookupDefaultLiteralType(*this, getStdlibModule(dc), name);
+  Type type;
+  if (getPerformLocalLookup(knownProtocolKind))
+    type = lookupDefaultLiteralType(tc, dc, name);
 
-    // Strip off one level of sugar; we don't actually want to print
-    // the name of the typealias itself anywhere.
-    if (type && *type) {
-      if (auto boundTypeAlias =
-                 dyn_cast<NameAliasType>(type->getPointer()))
-        *type = boundTypeAlias->getSinglyDesugaredType();
-    }
+  if (!type)
+    type = lookupDefaultLiteralType(tc, tc.getStdlibModule(dc), name);
+
+  // Strip off one level of sugar; we don't actually want to print
+  // the name of the typealias itself anywhere.
+  if (type) {
+    if (auto boundTypeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
+      type = boundTypeAlias->getSinglyDesugaredType();
   }
+  return type;
+}
 
-  return *type;
+TypeChecker &DefaultTypeRequest::getTypeChecker() const {
+  return TypeChecker::createForContext(getDeclContext()->getASTContext());
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {

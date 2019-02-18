@@ -74,20 +74,27 @@ std::string SpecializationMangler::finalize() {
 //                           Generic Specialization
 //===----------------------------------------------------------------------===//
 
-std::string GenericSpecializationMangler::mangle() {
+std::string GenericSpecializationMangler::mangle(GenericSignature *Sig) {
   beginMangling();
-  
-  SILFunctionType *FTy = Function->getLoweredFunctionType();
-  CanGenericSignature Sig = FTy->getGenericSignature();
+
+  if (!Sig) {
+    SILFunctionType *FTy = Function->getLoweredFunctionType();
+    Sig = FTy->getGenericSignature();
+  }
 
   bool First = true;
-  for (auto ParamType : Sig->getSubstitutableParams()) {
-    appendType(Type(ParamType).subst(SubMap)->getCanonicalType());
-    appendListSeparator(First);
-  }
+  Sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
+    if (Canonical) {
+      appendType(Type(ParamType).subst(SubMap)->getCanonicalType());
+      appendListSeparator(First);
+    }
+  });
   assert(!First && "no generic substitutions");
-  
-  appendSpecializationOperator(isReAbstracted ? "Tg" : "TG");
+
+  if (isInlined)
+    appendSpecializationOperator("Ti");
+  else
+    appendSpecializationOperator(isReAbstracted ? "Tg" : "TG");
   return finalize();
 }
 
@@ -195,6 +202,12 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   switch (LI->getKind()) {
   default:
     llvm_unreachable("unknown literal");
+  case SILInstructionKind::DynamicFunctionRefInst: {
+    SILFunction *F = cast<DynamicFunctionRefInst>(LI)->getReferencedFunction();
+    ArgOpBuffer << 'f';
+    appendIdentifier(F->getName());
+    break;
+  }
   case SILInstructionKind::FunctionRefInst: {
     SILFunction *F = cast<FunctionRefInst>(LI)->getReferencedFunction();
     ArgOpBuffer << 'f';
@@ -231,6 +244,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
 
     ArgOpBuffer << 's';
     switch (SLI->getEncoding()) {
+      case StringLiteralInst::Encoding::Bytes: ArgOpBuffer << 'B'; break;
       case StringLiteralInst::Encoding::UTF8: ArgOpBuffer << 'b'; break;
       case StringLiteralInst::Encoding::UTF16: ArgOpBuffer << 'w'; break;
       case StringLiteralInst::Encoding::ObjCSelector: ArgOpBuffer << 'c'; break;
@@ -339,12 +353,9 @@ mangleReturnValue(ReturnValueModifierIntBase RetMod) {
   }
 }
 
-std::string FunctionSignatureSpecializationMangler::mangle(int UniqueID) {
+std::string FunctionSignatureSpecializationMangler::mangle() {
   ArgOpStorage.clear();
   beginMangling();
-
-  if (UniqueID)
-    ArgOpBuffer << UniqueID;
 
   for (unsigned i : indices(OrigArgs)) {
     ArgumentModifierIntBase ArgMod;

@@ -50,20 +50,25 @@ TypeRefBuilder::getRemoteAddrOfTypeRefPointer(const void *pointer) {
 
 TypeRefBuilder::TypeRefBuilder() : TC(*this) {}
 
-/// Determine whether the given reflection protocol name matches.
-static bool reflectionNameMatches(Demangler &dem,
-                                  StringRef reflectionName,
-                                  StringRef searchName) {
+/// Normalize a mangled name so it can be matched with string equality.
+static std::string normalizeReflectionName(Demangler &dem, StringRef reflectionName) {
   reflectionName = dropSwiftManglingPrefix(reflectionName);
   
   // Remangle the reflection name to resolve symbolic references.
   if (auto node = dem.demangleType(reflectionName)) {
-    auto remangled = mangleNode(node);
-    return remangled == searchName;
+    return mangleNode(node);
   }
-  
-  // Fall back to string matching.
-  return reflectionName.equals(searchName);
+
+  // Fall back to the raw string.
+  return reflectionName;
+}
+
+/// Determine whether the given reflection protocol name matches.
+static bool reflectionNameMatches(Demangler &dem,
+                                  StringRef reflectionName,
+                                  StringRef searchName) {
+  auto normalized = normalizeReflectionName(dem, reflectionName);
+  return searchName.equals(normalized);
 }
 
 const TypeRef * TypeRefBuilder::
@@ -119,6 +124,9 @@ lookupSuperclass(const TypeRef *TR) {
   if (FD.first == nullptr)
     return nullptr;
 
+  if (!FD.first->hasSuperclass())
+    return nullptr;
+
   auto TypeRefOffset = FD.second->Field.SectionOffset
                      - FD.second->TypeReference.SectionOffset;
   auto Demangled = Dem.demangleType(FD.first->getSuperclass(TypeRefOffset));
@@ -126,7 +134,10 @@ lookupSuperclass(const TypeRef *TR) {
   if (!Unsubstituted)
     return nullptr;
 
-  return Unsubstituted->subst(*this, TR->getSubstMap());
+  auto SubstMap = TR->getSubstMap();
+  if (!SubstMap)
+    return nullptr;
+  return Unsubstituted->subst(*this, *SubstMap);
 }
 
 std::pair<const FieldDescriptor *, const ReflectionInfo *>
@@ -139,6 +150,12 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   else
     return {};
 
+  // Try the cache.
+  auto Found = FieldTypeInfoCache.find(MangledName);
+  if (Found != FieldTypeInfoCache.end())
+    return Found->second;
+
+  // On failure, fill out the cache with everything we know about.
   std::vector<std::pair<std::string, const TypeRef *>> Fields;
   for (auto &Info : ReflectionInfos) {
     uintptr_t TypeRefOffset = Info.Field.SectionOffset
@@ -147,11 +164,16 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
       if (!FD.hasMangledTypeName())
         continue;
       auto CandidateMangledName = FD.getMangledTypeName(TypeRefOffset);
-      if (!reflectionNameMatches(Dem, CandidateMangledName, MangledName))
-        continue;
-      return {&FD, &Info};
+      auto NormalizedName = normalizeReflectionName(Dem, CandidateMangledName);
+      FieldTypeInfoCache[NormalizedName] = {&FD, &Info};
+      Dem.clear();
     }
   }
+
+  // We've filled the cache with everything we know about now. Try the cache again.
+  Found = FieldTypeInfoCache.find(MangledName);
+  if (Found != FieldTypeInfoCache.end())
+    return Found->second;
 
   return {nullptr, 0};
 }
@@ -164,6 +186,8 @@ bool TypeRefBuilder::getFieldTypeRefs(
     return false;
 
   auto Subs = TR->getSubstMap();
+  if (!Subs)
+    return false;
 
   for (auto &Field : *FD.first) {
     auto TypeRefOffset = FD.second->Field.SectionOffset
@@ -183,7 +207,7 @@ bool TypeRefBuilder::getFieldTypeRefs(
     if (!Unsubstituted)
       return false;
 
-    auto Substituted = Unsubstituted->subst(*this, Subs);
+    auto Substituted = Unsubstituted->subst(*this, *Subs);
 
     if (FD.first->isEnum() && Field.isIndirectCase()) {
       Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName, Substituted));
@@ -212,7 +236,7 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
                             - Info.TypeReference.SectionOffset;
     for (auto &BuiltinTypeDescriptor : Info.Builtin.Metadata) {
       assert(BuiltinTypeDescriptor.Size > 0);
-      assert(BuiltinTypeDescriptor.Alignment > 0);
+      assert(BuiltinTypeDescriptor.getAlignment() > 0);
       assert(BuiltinTypeDescriptor.Stride > 0);
       if (!BuiltinTypeDescriptor.hasMangledTypeName())
         continue;
@@ -366,9 +390,10 @@ void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &OS) {
 
       OS << "\n- " << typeName << ":\n";
       OS << "Size: " << descriptor.Size << "\n";
-      OS << "Alignment: " << descriptor.Alignment << "\n";
+      OS << "Alignment: " << descriptor.getAlignment() << "\n";
       OS << "Stride: " << descriptor.Stride << "\n";
       OS << "NumExtraInhabitants: " << descriptor.NumExtraInhabitants << "\n";
+      OS << "BitwiseTakable: " << descriptor.isBitwiseTakable() << "\n";
     }
   }
 }

@@ -37,7 +37,5 @@ intptr_t _swift_stdlib_getDefaultErrorCode(OpaqueValue *error,
       break;
   }
 
-  // Destroy the value.
-  SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(error));
   return result;
 }

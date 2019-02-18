@@ -29,11 +29,14 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
+#include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/ValueUtils.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ilist.h"
@@ -62,12 +65,13 @@ class SILInstructionResultArray;
 class SILOpenedArchetypesState;
 class SILType;
 class SILArgument;
+class SILPhiArgument;
 class SILUndef;
 class Stmt;
 class StringLiteralExpr;
 class ValueDecl;
 class VarDecl;
-class FunctionRefInst;
+class FunctionRefBaseInst;
 
 template <typename ImplClass> class SILClonerWithScopes;
 
@@ -253,6 +257,36 @@ public:
   friend bool operator!=(iterator lhs, iterator rhs) { return !(lhs == rhs); }
 };
 
+inline SILInstructionResultArray::iterator
+SILInstructionResultArray::begin() const {
+  return iterator(*this, 0);
+}
+
+inline SILInstructionResultArray::iterator
+SILInstructionResultArray::end() const {
+  return iterator(*this, size());
+}
+
+inline SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rbegin() const {
+  return llvm::make_reverse_iterator(end());
+}
+
+inline SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rend() const {
+  return llvm::make_reverse_iterator(begin());
+}
+
+inline SILInstructionResultArray::range
+SILInstructionResultArray::getValues() const {
+  return {begin(), end()};
+}
+
+inline SILInstructionResultArray::reverse_range
+SILInstructionResultArray::getReversedValues() const {
+  return {rbegin(), rend()};
+}
+
 /// This is the root class for all instructions that can be used as the
 /// contents of a Swift SILBasicBlock.
 ///
@@ -292,7 +326,7 @@ class SILInstruction
   /// Update this instruction's SILDebugScope. This function should
   /// never be called directly. Use SILBuilder, SILBuilderWithScope or
   /// SILClonerWithScope instead.
-  void setDebugScope(SILBuilder &B, const SILDebugScope *DS);
+  void setDebugScope(const SILDebugScope *DS);
 
   /// Total number of created and deleted SILInstructions.
   /// It is used only for collecting the compiler statistics.
@@ -336,11 +370,11 @@ public:
     None,
     /// The instruction may read memory.
     MayRead,
-    /// \brief The instruction may write to memory.
+    /// The instruction may write to memory.
     MayWrite,
     /// The instruction may read or write memory.
     MayReadWrite,
-    /// \brief The instruction may have side effects not captured
+    /// The instruction may have side effects not captured
     ///        solely by its users. Specifically, it can return,
     ///        release memory, or store. Note, alloc is not considered
     ///        to have side effects because its result/users represent
@@ -396,22 +430,22 @@ public:
   /// the basic block that Earlier lives in, right after Earlier.
   void moveAfter(SILInstruction *Earlier);
 
-  /// \brief Drops all uses that belong to this instruction.
+  /// Drops all uses that belong to this instruction.
   void dropAllReferences();
 
-  /// \brief Replace all uses of all results of this instruction with undef.
+  /// Replace all uses of all results of this instruction with undef.
   void replaceAllUsesOfAllResultsWithUndef();
 
-  /// \brief Replace all uses of all results of this instruction
+  /// Replace all uses of all results of this instruction
   /// with the parwise-corresponding results of the given instruction.
   void replaceAllUsesPairwiseWith(SILInstruction *other);
 
-  /// \brief Replace all uses of all results of this instruction with the
+  /// Replace all uses of all results of this instruction with the
   /// parwise-corresponding results of the passed in array.
   void
   replaceAllUsesPairwiseWith(const llvm::SmallVectorImpl<SILValue> &NewValues);
 
-  /// \brief Are there uses of any of the results of this instruction?
+  /// Are there uses of any of the results of this instruction?
   bool hasUsesOfAnyResult() const {
     for (auto result : getResults()) {
       if (!result->use_empty())
@@ -483,6 +517,8 @@ public:
   SILInstructionResultArray getResults() const { return getResultsImpl(); }
   unsigned getNumResults() const { return getResults().size(); }
 
+  SILValue getResult(unsigned index) const { return getResults()[index]; }
+
   /// Return the types of the results produced by this instruction.
   SILInstructionResultArray::type_range getResultTypes() const {
     return getResultsImpl().getTypes();
@@ -533,7 +569,7 @@ public:
     return hasIdenticalState(RHS);
   }
 
-  /// \brief Returns true if the instruction may have side effects.
+  /// Returns true if the instruction may have side effects.
   ///
   /// Instructions that store into memory or change retain counts as well as
   /// calls and deallocation instructions are considered to have side effects
@@ -747,6 +783,25 @@ inline SingleValueInstruction *SILNode::castToSingleValueInstruction() {
     return inst->getKind() >= SILInstructionKind::First_##ID && \
            inst->getKind() <= SILInstructionKind::Last_##ID;    \
   }
+
+/// A single value inst that also forwards either owned or guaranteed ownership.
+///
+/// The specific forwarded ownership is static since it is set upon
+/// construction. After that point the instruction can not have a different form
+/// of ownership.
+class OwnershipForwardingSingleValueInst : public SingleValueInstruction {
+  ValueOwnershipKind ownershipKind;
+
+protected:
+  OwnershipForwardingSingleValueInst(SILInstructionKind kind,
+                                     SILDebugLocation debugLoc, SILType ty,
+                                     ValueOwnershipKind ownershipKind)
+      : SingleValueInstruction(kind, debugLoc, ty),
+        ownershipKind(ownershipKind) {}
+
+public:
+  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+};
 
 /// A value base result of a multiple value instruction.
 ///
@@ -1239,7 +1294,7 @@ public:
   /// Returns the name of the source variable, if it is stored in the
   /// instruction.
   StringRef getName(const char *buf) const;
-  bool isLet() const  { return Bits.Data.Constant; }
+  bool isLet() const { return Bits.Data.Constant; }
 
   Optional<SILDebugVariable> get(VarDecl *VD, const char *buf) const {
     if (!Bits.Data.HasValue)
@@ -1328,12 +1383,12 @@ public:
 
   ArrayRef<Operand> getAllOperands() const {
     return { getTrailingObjects<Operand>(),
-             SILInstruction::Bits.AllocStackInst.NumOperands };
+             static_cast<size_t>(SILInstruction::Bits.AllocStackInst.NumOperands) };
   }
 
   MutableArrayRef<Operand> getAllOperands() {
     return { getTrailingObjects<Operand>(),
-             SILInstruction::Bits.AllocStackInst.NumOperands };
+             static_cast<size_t>(SILInstruction::Bits.AllocStackInst.NumOperands) };
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -1753,7 +1808,7 @@ public:
 
   /// Gets the referenced function if the callee is a function_ref instruction.
   SILFunction *getReferencedFunction() const {
-    if (auto *FRI = dyn_cast<FunctionRefInst>(getCallee()))
+    if (auto *FRI = dyn_cast<FunctionRefBaseInst>(getCallee()))
       return FRI->getReferencedFunction();
     return nullptr;
   }
@@ -1784,6 +1839,14 @@ public:
   bool isCalleeThin() const {
     auto Rep = getSubstCalleeType()->getRepresentation();
     return Rep == FunctionType::Representation::Thin;
+  }
+
+  /// Returns true if the callee function is annotated with
+  /// @_semantics("programtermination_point")
+  bool isCalleeKnownProgramTerminationPoint() const {
+    auto calleeFn = getCalleeFunction();
+    if (!calleeFn) return false;
+    return calleeFn->hasSemanticsAttr(SEMANTICS_PROGRAMTERMINATION_POINT);
   }
 
   /// True if this application has generic substitutions.
@@ -1930,16 +1993,10 @@ public:
     assert(hasSelfArgument() && "Must have a self argument");
     assert(getNumArguments() && "Should only be called when Callee has "
            "at least a self parameter.");
-    assert(hasSubstitutions() && "Should only be called when Callee has "
-           "substitutions.");
     ArrayRef<Operand> ops = this->getArgumentOperands();
     ArrayRef<Operand> opsWithoutSelf = ArrayRef<Operand>(&ops[0],
                                                          ops.size()-1);
     return OperandValueArrayRef(opsWithoutSelf);
-  }
-
-  SILArgumentConvention getArgumentConvention(unsigned index) const {
-    return getSubstCalleeConv().getSILArgumentConvention(index);
   }
 
   Optional<SILResultInfo> getSingleResult() const {
@@ -2017,6 +2074,12 @@ class PartialApplyInst final
       public llvm::TrailingObjects<PartialApplyInst, Operand> {
   friend SILBuilder;
 
+public:
+  enum OnStackKind {
+    NotOnStack, OnStack
+  };
+
+private:
   PartialApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
                    SILType SubstCalleeType,
                    SubstitutionMap Substitutions,
@@ -2029,7 +2092,8 @@ class PartialApplyInst final
   create(SILDebugLocation DebugLoc, SILValue Callee, ArrayRef<SILValue> Args,
          SubstitutionMap Substitutions, ParameterConvention CalleeConvention,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
-         const GenericSpecializationInformation *SpecializationInfo);
+         const GenericSpecializationInformation *SpecializationInfo,
+         OnStackKind onStack);
 
 public:
   /// Return the result function type of this partial apply.
@@ -2038,6 +2102,10 @@ public:
   }
   bool hasCalleeGuaranteedContext() const {
     return getType().castTo<SILFunctionType>()->isCalleeGuaranteed();
+  }
+
+  OnStackKind isOnStack() const {
+    return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
   }
 };
 
@@ -2179,24 +2247,18 @@ public:
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(LiteralInst)
 };
 
-/// FunctionRefInst - Represents a reference to a SIL function.
-class FunctionRefInst
-    : public InstructionBase<SILInstructionKind::FunctionRefInst,
-                             LiteralInst> {
-  friend SILBuilder;
+class FunctionRefBaseInst : public LiteralInst {
+  SILFunction *f;
 
-  SILFunction *Function;
-  /// Construct a FunctionRefInst.
-  ///
-  /// \param DebugLoc  The location of the reference.
-  /// \param F         The function being referenced.
-  FunctionRefInst(SILDebugLocation DebugLoc, SILFunction *F);
+protected:
+  FunctionRefBaseInst(SILInstructionKind Kind, SILDebugLocation DebugLoc,
+                      SILFunction *F);
 
 public:
-  ~FunctionRefInst();
+  ~FunctionRefBaseInst();
 
   /// Return the referenced function.
-  SILFunction *getReferencedFunction() const { return Function; }
+  SILFunction *getReferencedFunction() const { return f; }
 
   void dropReferencedFunction();
 
@@ -2209,6 +2271,73 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(const SILNode *node) {
+    return (node->getKind() == SILNodeKind::FunctionRefInst ||
+        node->getKind() == SILNodeKind::DynamicFunctionRefInst ||
+        node->getKind() == SILNodeKind::PreviousDynamicFunctionRefInst);
+  }
+  static bool classof(const SingleValueInstruction *node) {
+    return (node->getKind() == SILInstructionKind::FunctionRefInst ||
+        node->getKind() == SILInstructionKind::DynamicFunctionRefInst ||
+        node->getKind() == SILInstructionKind::PreviousDynamicFunctionRefInst);
+  }
+};
+
+/// FunctionRefInst - Represents a reference to a SIL function.
+class FunctionRefInst : public FunctionRefBaseInst {
+  friend SILBuilder;
+
+  /// Construct a FunctionRefInst.
+  ///
+  /// \param DebugLoc  The location of the reference.
+  /// \param F         The function being referenced.
+  FunctionRefInst(SILDebugLocation DebugLoc, SILFunction *F);
+
+public:
+  static bool classof(const SILNode *node) {
+    return node->getKind() == SILNodeKind::FunctionRefInst;
+  }
+  static bool classof(const SingleValueInstruction *node) {
+    return node->getKind() == SILInstructionKind::FunctionRefInst;
+  }
+};
+
+class DynamicFunctionRefInst : public FunctionRefBaseInst {
+  friend SILBuilder;
+
+  /// Construct a DynamicFunctionRefInst.
+  ///
+  /// \param DebugLoc  The location of the reference.
+  /// \param F         The function being referenced.
+  DynamicFunctionRefInst(SILDebugLocation DebugLoc, SILFunction *F);
+
+public:
+  static bool classof(const SILNode *node) {
+    return node->getKind() == SILNodeKind::DynamicFunctionRefInst;
+  }
+  static bool classof(const SingleValueInstruction *node) {
+    return node->getKind() == SILInstructionKind::DynamicFunctionRefInst;
+  }
+};
+
+class PreviousDynamicFunctionRefInst : public FunctionRefBaseInst {
+  friend SILBuilder;
+
+  /// Construct a PreviousDynamicFunctionRefInst.
+  ///
+  /// \param DebugLoc  The location of the reference.
+  /// \param F         The function being referenced.
+  PreviousDynamicFunctionRefInst(SILDebugLocation DebugLoc, SILFunction *F);
+
+public:
+  static bool classof(const SILNode *node) {
+    return node->getKind() == SILNodeKind::PreviousDynamicFunctionRefInst;
+  }
+  static bool classof(const SingleValueInstruction *node) {
+    return node->getKind() ==
+           SILInstructionKind::PreviousDynamicFunctionRefInst;
+  }
 };
 
 /// Component of a KeyPathInst.
@@ -2281,7 +2410,6 @@ public:
     StoredProperty,
     GettableProperty,
     SettableProperty,
-    External,
     OptionalChain,
     OptionalForce,
     OptionalWrap,
@@ -2300,7 +2428,6 @@ private:
   enum PackedKind: unsigned {
     PackedStored,
     PackedComputed,
-    PackedExternal,
     Unpacked,
   };
   
@@ -2313,8 +2440,6 @@ private:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
       return PackedComputed;
-    case Kind::External:
-      return PackedExternal;
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
@@ -2325,23 +2450,18 @@ private:
   // Value is the VarDecl* for StoredProperty, the SILFunction* of the
   // Getter for computed properties, or the Kind for other kinds
   llvm::PointerIntPair<void *, KindPackingBits, unsigned> ValueAndKind;
-  union {
-    // Valid if Kind == GettableProperty || Kind == SettableProperty
-    struct {
-      llvm::PointerIntPair<SILFunction *, 2,
-                           ComputedPropertyId::KindType> SetterAndIdKind;
-      ComputedPropertyId::ValueType IdValue;
-    } Computed;
-    // Valid if Kind == External
-    SubstitutionMap ExternalSubstitutions;
-  };
+  llvm::PointerIntPair<SILFunction *, 2,
+                       ComputedPropertyId::KindType> SetterAndIdKind;
+  ComputedPropertyId::ValueType IdValue;
   ArrayRef<Index> Indices;
   struct {
     SILFunction *Equal;
     SILFunction *Hash;
   } IndexEquality;
   CanType ComponentType;
-  
+  AbstractStorageDecl *ExternalStorage;
+  SubstitutionMap ExternalSubstitutions;
+
   /// Constructor for stored components
   KeyPathPatternComponent(VarDecl *storedProp,
                           CanType ComponentType)
@@ -2355,26 +2475,18 @@ private:
                           ArrayRef<Index> indices,
                           SILFunction *indicesEqual,
                           SILFunction *indicesHash,
+                          AbstractStorageDecl *externalStorage,
+                          SubstitutionMap externalSubstitutions,
                           CanType ComponentType)
     : ValueAndKind(getter, PackedComputed),
-      Computed{{setter, id.Kind}, {id.Value}},
+      SetterAndIdKind{setter, id.Kind},
+      IdValue{id.Value},
       Indices(indices),
       IndexEquality{indicesEqual, indicesHash},
-      ComponentType(ComponentType) {
-  }
-  
-  /// Constructor for external components
-  KeyPathPatternComponent(AbstractStorageDecl *externalStorage,
-                          SubstitutionMap substitutions,
-                          ArrayRef<Index> indices,
-                          SILFunction *indicesEqual,
-                          SILFunction *indicesHash,
-                          CanType componentType)
-    : ValueAndKind(externalStorage, PackedExternal),
-      ExternalSubstitutions(substitutions),
-      Indices(indices),
-      IndexEquality{indicesEqual, indicesHash},
-      ComponentType(componentType) {
+      ComponentType(ComponentType),
+      ExternalStorage(externalStorage),
+      ExternalSubstitutions(externalSubstitutions)
+  {
   }
   
   /// Constructor for optional components.
@@ -2398,15 +2510,14 @@ public:
     case PackedStored:
       return Kind::StoredProperty;
     case PackedComputed:
-      return Computed.SetterAndIdKind.getPointer()
+      return SetterAndIdKind.getPointer()
         ? Kind::SettableProperty : Kind::GettableProperty;
-    case PackedExternal:
-      return Kind::External;
     case Unpacked:
       return (Kind)((uintptr_t)ValueAndKind.getPointer() >> KindPackingBits);
     }
+    llvm_unreachable("unhandled kind");
   }
-  
+
   CanType getComponentType() const {
     return ComponentType;
   }
@@ -2420,35 +2531,32 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-    case Kind::External:
       llvm_unreachable("not a stored property");
     }
     llvm_unreachable("unhandled kind");
   }
-  
+
   ComputedPropertyId getComputedPropertyId() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-    case Kind::External:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
-      return ComputedPropertyId(Computed.IdValue,
-                                Computed.SetterAndIdKind.getInt());
+      return ComputedPropertyId(IdValue,
+                                SetterAndIdKind.getInt());
     }
     llvm_unreachable("unhandled kind");
   }
-  
+
   SILFunction *getComputedPropertyGetter() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-    case Kind::External:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2464,14 +2572,13 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-    case Kind::External:
       llvm_unreachable("not a settable computed property");
     case Kind::SettableProperty:
-      return Computed.SetterAndIdKind.getPointer();
+      return SetterAndIdKind.getPointer();
     }
     llvm_unreachable("unhandled kind");
   }
-  
+
   ArrayRef<Index> getSubscriptIndices() const {
     switch (getKind()) {
     case Kind::StoredProperty:
@@ -2481,11 +2588,11 @@ public:
       return {};
     case Kind::GettableProperty:
     case Kind::SettableProperty:
-    case Kind::External:
       return Indices;
     }
+    llvm_unreachable("unhandled kind");
   }
-  
+
   SILFunction *getSubscriptIndexEquals() const {
     switch (getKind()) {
     case Kind::StoredProperty:
@@ -2493,11 +2600,11 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
       llvm_unreachable("not a computed property");
-    case Kind::External:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
       return IndexEquality.Equal;
     }
+    llvm_unreachable("unhandled kind");
   }
   SILFunction *getSubscriptIndexHash() const {
     switch (getKind()) {
@@ -2506,13 +2613,13 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
       llvm_unreachable("not a computed property");
-    case Kind::External:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
       return IndexEquality.Hash;
     }
+    llvm_unreachable("unhandled kind");
   }
-  
+
   bool isComputedSettablePropertyMutating() const;
   
   static KeyPathPatternComponent forStoredProperty(VarDecl *property,
@@ -2521,15 +2628,31 @@ public:
   }
   
   AbstractStorageDecl *getExternalDecl() const {
-    assert(getKind() == Kind::External
-           && "not an external property");
-    return (AbstractStorageDecl*)ValueAndKind.getPointer();
+    switch (getKind()) {
+    case Kind::StoredProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
+      llvm_unreachable("not a computed property");
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return ExternalStorage;
+    }
+    llvm_unreachable("unhandled kind");
   }
-  
+
   SubstitutionMap getExternalSubstitutions() const {
-    assert(getKind() == Kind::External
-           && "not an external property");
-    return ExternalSubstitutions;
+    switch (getKind()) {
+    case Kind::StoredProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
+      llvm_unreachable("not a computed property");
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return ExternalSubstitutions;
+    }
+    llvm_unreachable("unhandled kind");
   }
 
   static KeyPathPatternComponent
@@ -2538,10 +2661,14 @@ public:
                               ArrayRef<Index> indices,
                               SILFunction *indicesEquals,
                               SILFunction *indicesHash,
+                              AbstractStorageDecl *externalDecl,
+                              SubstitutionMap externalSubs,
                               CanType ty) {
     return KeyPathPatternComponent(identifier,
                                    getter, nullptr, indices,
-                                   indicesEquals, indicesHash, ty);
+                                   indicesEquals, indicesHash,
+                                   externalDecl, externalSubs,
+                                   ty);
   }
 
   static KeyPathPatternComponent
@@ -2551,10 +2678,14 @@ public:
                               ArrayRef<Index> indices,
                               SILFunction *indicesEquals,
                               SILFunction *indicesHash,
+                              AbstractStorageDecl *externalDecl,
+                              SubstitutionMap externalSubs,
                               CanType ty) {
     return KeyPathPatternComponent(identifier,
                                    getter, setter, indices,
-                                   indicesEquals, indicesHash, ty);
+                                   indicesEquals, indicesHash,
+                                   externalDecl, externalSubs,
+                                   ty);
   }
   
   static KeyPathPatternComponent
@@ -2570,21 +2701,9 @@ public:
     case Kind::StoredProperty:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
-    case Kind::External:
       llvm_unreachable("not an optional kind");
     }
     return KeyPathPatternComponent(kind, ty);
-  }
-  
-  static KeyPathPatternComponent
-  forExternal(AbstractStorageDecl *externalDecl,
-              SubstitutionMap substitutions,
-              ArrayRef<Index> indices,
-              SILFunction *indicesEquals,
-              SILFunction *indicesHash,
-              CanType ty) {
-    return KeyPathPatternComponent(externalDecl, substitutions,
-                                   indices, indicesEquals, indicesHash, ty);
   }
   
   void incrementRefCounts() const;
@@ -2735,17 +2854,17 @@ public:
   Identifier getName() const { return Name; }
   void setName(Identifier I) { Name = I; }
   
-  /// \brief Looks up the llvm intrinsic ID and type for the builtin function.
+  /// Looks up the llvm intrinsic ID and type for the builtin function.
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
   /// intrinsic. The particular intrinsic functions which correspond to the
   /// returned value are defined in llvm/Intrinsics.h.
   const IntrinsicInfo &getIntrinsicInfo() const;
   
-  /// \brief Looks up the lazily cached identification for the builtin function.
+  /// Looks up the lazily cached identification for the builtin function.
   const BuiltinInfo &getBuiltinInfo() const;
 
-  /// \brief Looks up the llvm intrinsic ID of this builtin. Returns None if
+  /// Looks up the llvm intrinsic ID of this builtin. Returns None if
   /// this is not an intrinsic.
   llvm::Optional<llvm::Intrinsic::ID> getIntrinsicID() const {
     auto I = getIntrinsicInfo();
@@ -2754,7 +2873,7 @@ public:
     return I.ID;
   }
 
-  /// \brief Looks up the BuiltinKind of this builtin. Returns None if this is
+  /// Looks up the BuiltinKind of this builtin. Returns None if this is
   /// not a builtin.
   llvm::Optional<BuiltinValueKind> getBuiltinKind() const {
     auto I = getBuiltinInfo();
@@ -2890,10 +3009,10 @@ class FloatLiteralInst final
                                   const APFloat &Value, SILModule &M);
 
 public:
-  /// \brief Return the APFloat for the underlying FP literal.
+  /// Return the APFloat for the underlying FP literal.
   APFloat getValue() const;
 
-  /// \brief Return the bitcast representation of the FP literal as an APInt.
+  /// Return the bitcast representation of the FP literal as an APInt.
   APInt getBits() const;
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -2912,6 +3031,7 @@ class StringLiteralInst final
 
 public:
   enum class Encoding {
+    Bytes,
     UTF8,
     UTF16,
     /// UTF-8 encoding of an Objective-C selector.
@@ -2935,51 +3055,6 @@ public:
   /// getEncoding - Return the desired encoding of the text.
   Encoding getEncoding() const {
     return Encoding(SILInstruction::Bits.StringLiteralInst.TheEncoding);
-  }
-
-  /// getCodeUnitCount - Return encoding-based length of the string
-  /// literal in code units.
-  uint64_t getCodeUnitCount();
-
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
-};
-
-/// ConstStringLiteralInst - Encapsulates a string constant, as defined
-/// originally by
-/// a StringLiteralExpr.  This produces the address of the string data as a
-/// Builtin.RawPointer.
-class ConstStringLiteralInst final
-    : public InstructionBase<SILInstructionKind::ConstStringLiteralInst,
-                             LiteralInst>,
-      private llvm::TrailingObjects<ConstStringLiteralInst, char> {
-  friend TrailingObjects;
-  friend SILBuilder;
-
-public:
-  enum class Encoding {
-    UTF8,
-    UTF16,
-  };
-
-private:
-  ConstStringLiteralInst(SILDebugLocation DebugLoc, StringRef text,
-                         Encoding encoding, SILType ty);
-
-  static ConstStringLiteralInst *create(SILDebugLocation DebugLoc,
-                                        StringRef Text, Encoding encoding,
-                                        SILModule &M);
-
-public:
-  /// getValue - Return the string data for the literal, in UTF-8.
-  StringRef getValue() const {
-    return {getTrailingObjects<char>(),
-            SILInstruction::Bits.ConstStringLiteralInst.Length};
-  }
-
-  /// getEncoding - Return the desired encoding of the text.
-  Encoding getEncoding() const {
-    return Encoding(SILInstruction::Bits.ConstStringLiteralInst.TheEncoding);
   }
 
   /// getCodeUnitCount - Return encoding-based length of the string
@@ -3084,6 +3159,8 @@ class LoadBorrowInst :
                              LValue->getType().getObjectType()) {}
 };
 
+class EndBorrowInst;
+
 /// Represents the begin scope of a borrowed value. Must be paired with an
 /// end_borrow instruction in its use-def list.
 class BeginBorrowInst
@@ -3094,7 +3171,31 @@ class BeginBorrowInst
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {}
+
+private:
+  /// Predicate used to filer EndBorrowRange.
+  struct UseToEndBorrow;
+
+public:
+  using EndBorrowRange =
+      OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;
+
+  /// Find all associated end_borrow instructions for this begin_borrow.
+  EndBorrowRange getEndBorrows() const;
 };
+
+struct BeginBorrowInst::UseToEndBorrow {
+  Optional<EndBorrowInst *> operator()(Operand *use) const {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
+      return ebi;
+    }
+    return None;
+  }
+};
+
+inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
+  return EndBorrowRange(getUses(), UseToEndBorrow());
+}
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
 /// address. Must be paired with an end_borrow in its use-def list.
@@ -3123,49 +3224,66 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
-/// Represents the end of a borrow scope for a value or address from another
-/// value or address.
+/// Represents the end of a borrow scope of a value %val from a
+/// value or address %src.
 ///
-/// The semantics of the instruction here is that the "dest" SILValue can not be
-/// used after this instruction and the "src" SILValue must stay alive up to
-/// EndBorrowInst.
+/// While %val is "live" in a region then,
+///
+///   1. If %src is an object, it is undefined behavior for %src to be
+///   destroyed. This is enforced by the ownership verifier.
+///
+///   2. If %src is an address, it is undefined behavior for %src to be
+///   destroyed or written to.
 class EndBorrowInst
-    : public InstructionBase<SILInstructionKind::EndBorrowInst,
-                             NonValueInstruction> {
-  friend class SILBuilder;
-
-public:
-  enum {
-    /// The borrowed value.
-    BorrowedValue,
-    /// The original value that was borrowed from.
-    OriginalValue
-  };
-
-private:
-  FixedOperandList<2> Operands;
-  EndBorrowInst(SILDebugLocation DebugLoc, SILValue BorrowedValue,
-                SILValue OriginalValue);
-
-public:
-  SILValue getBorrowedValue() const { return Operands[BorrowedValue].get(); }
-
-  SILValue getOriginalValue() const { return Operands[OriginalValue].get(); }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-};
-
-/// Represents the end of a borrow scope for an argument. The reason why this is
-/// separate from end_borrow is that an argument is not borrowed from a
-/// specific SSA value. Instead it is borrowed from potentially many different
-/// incoming values.
-class EndBorrowArgumentInst
-    : public UnaryInstructionBase<SILInstructionKind::EndBorrowArgumentInst,
+    : public UnaryInstructionBase<SILInstructionKind::EndBorrowInst,
                                   NonValueInstruction> {
   friend class SILBuilder;
 
-  EndBorrowArgumentInst(SILDebugLocation DebugLoc, SILArgument *Arg);
+  EndBorrowInst(SILDebugLocation debugLoc, SILValue borrowedValue)
+      : UnaryInstructionBase(debugLoc, borrowedValue) {}
+
+public:
+  /// Return the value that this end_borrow is ending the borrow of if we are
+  /// borrowing a single value.
+  SILValue getSingleOriginalValue() const {
+    SILValue v = getOperand();
+    if (auto *bbi = dyn_cast<BeginBorrowInst>(v))
+      return bbi->getOperand();
+    if (auto *lbi = dyn_cast<LoadBorrowInst>(v))
+      return lbi->getOperand();
+    llvm::errs() << "Can not end borrow for value: " << v;
+    llvm_unreachable("standard error assertion");
+  }
+
+  /// Return the set of guaranteed values that have scopes ended by this
+  /// end_borrow.
+  ///
+  /// Discussion: We can only have multiple values associated with an end_borrow
+  /// in the case of having Phi arguments with guaranteed inputs. This is
+  /// necessary to represent certain conditional operations such as:
+  ///
+  /// class Klass {
+  ///   let k1: Klass
+  ///   let k2: Klass
+  /// }
+  ///
+  /// func useKlass(k: Klass) { ... }
+  /// var boolValue : Bool { ... }
+  ///
+  /// func f(k: Klass) {
+  ///   useKlass(boolValue ? k.k1 : k.k2)
+  /// }
+  ///
+  /// Today, when we SILGen such code, we copy k.k1 and k.k2 before the Phi when
+  /// it could potentially be avoided. So today this just appends
+  /// getSingleOriginalValue() to originalValues.
+  ///
+  /// TODO: Once this changes, this code must be update.
+  void getOriginalValues(SmallVectorImpl<SILValue> &originalValues) const {
+    SILValue value = getSingleOriginalValue();
+    assert(value && "Guaranteed phi arguments are not supported now");
+    originalValues.emplace_back(value);
+  }
 };
 
 /// Different kinds of access.
@@ -3487,6 +3605,25 @@ public:
   }
 };
 
+// *NOTE* When serializing, we can only represent up to 4 values here. If more
+// qualifiers are added, SIL serialization must be updated.
+enum class AssignOwnershipQualifier {
+  /// Unknown initialization method
+  Unknown,
+
+  /// The box contains a fully-initialized value.
+  Reassign,
+
+  /// The box contains a class instance that we own, but the instance has
+  /// not been initialized and should be freed with a special SIL
+  /// instruction made for this purpose.
+  Reinit,
+
+  /// The box contains an undefined value that should be ignored.
+  Init,
+};
+static_assert(2 == SILNode::NumAssignOwnershipQualifierBits, "Size mismatch");
+
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in
 /// Raw SIL.
@@ -3497,7 +3634,9 @@ class AssignInst
 
   FixedOperandList<2> Operands;
 
-  AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+  AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+             AssignOwnershipQualifier Qualifier =
+                AssignOwnershipQualifier::Unknown);
 
 public:
   enum {
@@ -3510,22 +3649,24 @@ public:
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
-  bool isUnownedAssign() const {
-    return getDest()->getType().getObjectType().is<UnownedStorageType>();
-  }
-
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  AssignOwnershipQualifier getOwnershipQualifier() const {
+    return AssignOwnershipQualifier(
+      SILInstruction::Bits.AssignInst.OwnershipQualifier);
+  }
+  void setOwnershipQualifier(AssignOwnershipQualifier qualifier) {
+    SILInstruction::Bits.AssignInst.OwnershipQualifier = unsigned(qualifier);
+  }
 };
 
-/// Abstract base class for instructions that mark storage as uninitialized.
-
-/// Indicates that a memory location is uninitialized at
-/// this point and needs to be initialized by the end of the function and before
-/// any escape point for this instruction.  This is only valid in Raw SIL.
+/// Indicates that a memory location is uninitialized at this point and needs to
+/// be initialized by the end of the function and before any escape point for
+/// this instruction. This is only valid in Raw SIL.
 class MarkUninitializedInst
     : public UnaryInstructionBase<SILInstructionKind::MarkUninitializedInst,
-                                  SingleValueInstruction> {
+                                  OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
 public:
@@ -3555,12 +3696,17 @@ public:
     /// DelegatingSelf designates "self" on a struct, enum, or class
     /// in a delegating constructor (one that calls self.init).
     DelegatingSelf,
+
+    /// DelegatingSelfAllocated designates "self" in a delegating class
+    /// initializer where memory has already been allocated.
+    DelegatingSelfAllocated,
   };
 private:
   Kind ThisKind;
 
-  MarkUninitializedInst(SILDebugLocation DebugLoc, SILValue Address, Kind K)
-      : UnaryInstructionBase(DebugLoc, Address, Address->getType()),
+  MarkUninitializedInst(SILDebugLocation DebugLoc, SILValue Value, Kind K)
+      : UnaryInstructionBase(DebugLoc, Value, Value->getType(),
+                             Value.getOwnershipKind()),
         ThisKind(K) {}
 
 public:
@@ -3583,78 +3729,9 @@ public:
   bool isDelegatingSelf() const {
     return ThisKind == DelegatingSelf;
   }
-};
-
-/// MarkUninitializedBehaviorInst - Indicates that a logical property
-/// is uninitialized at this point and needs to be initialized by the end of the
-/// function and before any escape point for this instruction. Assignments
-/// to the property trigger the behavior's `init` or `set` logic based on
-/// the logical initialization state of the property.
-///
-/// This is only valid in Raw SIL.
-class MarkUninitializedBehaviorInst final
-    : public InstructionBase<SILInstructionKind::MarkUninitializedBehaviorInst,
-                             SingleValueInstruction>
-{
-  friend SILBuilder;
-
-  FixedOperandList<4> Operands;
-  SubstitutionMap InitStorageSubstitutions;
-  SubstitutionMap SetterSubstitutions;
-
-  enum {
-    // The initialization function for the storage.
-    InitStorageFunc,
-    // Address of the behavior storage being initialized.
-    Storage,
-    // The setter function for the behavior property.
-    SetterFunc,
-    // The address or reference to the parent `self` being initialized.
-    Self,
-  };
-  
-  MarkUninitializedBehaviorInst(SILDebugLocation DebugLoc,
-                                SILValue InitStorage,
-                                SubstitutionMap InitStorageSubs,
-                                SILValue Storage,
-                                SILValue Setter,
-                                SubstitutionMap SetterSubs,
-                                SILValue Self,
-                                SILType Ty);
-  
-  static MarkUninitializedBehaviorInst *create(SILModule &M,
-                                         SILDebugLocation DebugLoc,
-                                         SILValue InitStorage,
-                                         SubstitutionMap InitStorageSubs,
-                                         SILValue Storage,
-                                         SILValue Setter,
-                                         SubstitutionMap SetterSubs,
-                                         SILValue Self,
-                                         SILType Ty);
-
-public:
-  SILValue getInitStorageFunc() const {
-    return Operands[InitStorageFunc].get();
+  bool isDelegatingSelfAllocated() const {
+    return ThisKind == DelegatingSelfAllocated;
   }
-  SubstitutionMap getInitStorageSubstitutions() const {
-    return InitStorageSubstitutions;
-  }
-  SILValue getStorage() const {
-    return Operands[Storage].get();
-  }
-
-  SILValue getSetterFunc() const {
-    return Operands[SetterFunc].get();
-  }
-  SubstitutionMap getSetterSubstitutions() const {
-    return SetterSubstitutions;
-  }
-  SILValue getSelf() const {
-    return Operands[Self].get();
-  }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
 /// MarkFunctionEscape - Represents the escape point of set of variables due to
@@ -3796,59 +3873,38 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
-/// Represents a load from a @weak memory location.
-class LoadWeakInst
-  : public LoadReferenceInstBase<SILInstructionKind::LoadWeakInst>
-{
-  friend SILBuilder;
-
-  /// \param loc The location of the expression that caused the load.
-  /// \param lvalue The SILValue representing the address to
-  ///        use for the load.
-  LoadWeakInst(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake)
-    : LoadReferenceInstBase(loc, lvalue, isTake) {}
-};
-
-/// Represents a store to a @weak memory location.
-class StoreWeakInst
-  : public StoreReferenceInstBase<SILInstructionKind::StoreWeakInst>
-{
-  friend SILBuilder;
-
-  StoreWeakInst(SILDebugLocation loc, SILValue src, SILValue dest,
-                IsInitialization_t isInit)
-    : StoreReferenceInstBase(loc, src, dest, isInit) {}
-};
-
-/// Represents a load from an @unowned memory location.
+/// Represents a load from a dynamic reference storage memory location.
+/// This is required for address-only scenarios; for loadable references,
+/// it's better to use a load and a strong_retain_#name.
 ///
-/// This is only required for address-only unowned references; for loadable
-/// unowned references, it's better to use a load and a strong_retain_unowned.
-class LoadUnownedInst
-  : public LoadReferenceInstBase<SILInstructionKind::LoadUnownedInst>
-{
-  friend SILBuilder;
-
-  /// \param loc The location of the expression that caused the load.
-  /// \param lvalue The SILValue representing the address to
-  ///        use for the load.
-  LoadUnownedInst(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake)
-    : LoadReferenceInstBase(loc, lvalue, isTake) {}
+/// \param loc The location of the expression that caused the load.
+/// \param lvalue The SILValue representing the address to
+///        use for the load.
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+class Load##Name##Inst \
+    : public LoadReferenceInstBase<SILInstructionKind::Load##Name##Inst> { \
+  friend SILBuilder; \
+  Load##Name##Inst(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake) \
+    : LoadReferenceInstBase(loc, lvalue, isTake) {} \
 };
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
 
-/// Represents a store to an @unowned memory location.
-///
-/// This is only required for address-only unowned references; for loadable
-/// unowned references, it's better to use a ref_to_unowned and a store.
-class StoreUnownedInst
-  : public StoreReferenceInstBase<SILInstructionKind::StoreUnownedInst>
-{
-  friend SILBuilder;
-
-  StoreUnownedInst(SILDebugLocation loc, SILValue src, SILValue dest,
-                   IsInitialization_t isInit)
-    : StoreReferenceInstBase(loc, src, dest, isInit) {}
+/// Represents a store to a dynamic reference storage memory location.
+/// This is only required for address-only scenarios; for loadable
+/// references, it's better to use a ref_to_##name and a store.
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+class Store##Name##Inst \
+    : public StoreReferenceInstBase<SILInstructionKind::Store##Name##Inst> { \
+  friend SILBuilder; \
+  Store##Name##Inst(SILDebugLocation loc, SILValue src, SILValue dest, \
+                IsInitialization_t isInit) \
+    : StoreReferenceInstBase(loc, src, dest, isInit) {} \
 };
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
 
 /// CopyAddrInst - Represents a copy from one memory location to another. This
 /// is similar to:
@@ -3963,18 +4019,37 @@ public:
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(ConversionInst)
 };
 
+/// A conversion inst that produces a static OwnershipKind set upon the
+/// instruction's construction.
+class OwnershipForwardingConversionInst : public ConversionInst {
+  ValueOwnershipKind ownershipKind;
+
+protected:
+  OwnershipForwardingConversionInst(SILInstructionKind kind,
+                                    SILDebugLocation debugLoc, SILType ty,
+                                    ValueOwnershipKind ownershipKind)
+      : ConversionInst(kind, debugLoc, ty), ownershipKind(ownershipKind) {}
+
+public:
+  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+};
+
 /// ConvertFunctionInst - Change the type of a function value without
 /// affecting how it will codegen.
 class ConvertFunctionInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
-          SILInstructionKind::ConvertFunctionInst,
-          ConvertFunctionInst, ConversionInst> {
+          SILInstructionKind::ConvertFunctionInst, ConvertFunctionInst,
+          OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   ConvertFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
-                      ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+                      ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
+                      bool WithoutActuallyEscaping)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty) {
+            DebugLoc, Operand, TypeDependentOperands, Ty,
+            Operand.getOwnershipKind()) {
+    SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping =
+        WithoutActuallyEscaping;
     assert((Operand->getType().castTo<SILFunctionType>()->isNoEscape() ==
                 Ty.castTo<SILFunctionType>()->isNoEscape() ||
             Ty.castTo<SILFunctionType>()->getRepresentation() !=
@@ -3982,9 +4057,24 @@ class ConvertFunctionInst final
            "Change of escapeness is not ABI compatible");
   }
 
-  static ConvertFunctionInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  static ConvertFunctionInst *create(SILDebugLocation DebugLoc,
+                                     SILValue Operand, SILType Ty,
+                                     SILFunction &F,
+                                     SILOpenedArchetypesState &OpenedArchetypes,
+                                     bool WithoutActuallyEscaping);
+
+public:
+  /// Returns `true` if this converts a non-escaping closure into an escaping
+  /// function type. `True` must be returned whenever the closure operand has an
+  /// unboxed capture (via @inout_aliasable) *and* the resulting function type
+  /// is escaping. (This only happens as a result of
+  /// withoutActuallyEscaping()). If `true` is returned, then the resulting
+  /// function type must be escaping, but the operand's function type may or may
+  /// not be @noescape. Note that a non-escaping closure may have unboxed
+  /// captured even though its SIL function type is "escaping".
+  bool withoutActuallyEscaping() const {
+    return SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping;
+  }
 };
 
 /// ConvertEscapeToNoEscapeInst - Change the type of a escaping function value
@@ -3996,18 +4086,14 @@ class ConvertEscapeToNoEscapeInst final
   friend SILBuilder;
 
   bool lifetimeGuaranteed;
-  bool isEscaped; // Even if we can analyze this
-                        // instruction the user might have
-                        // escaped it.
 
   ConvertEscapeToNoEscapeInst(SILDebugLocation DebugLoc, SILValue Operand,
                               ArrayRef<SILValue> TypeDependentOperands,
-                              SILType Ty, bool isEscapedByUser,
+                              SILType Ty,
                               bool isLifetimeGuaranteed)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, Ty),
-        lifetimeGuaranteed(isLifetimeGuaranteed),
-        isEscaped(isEscapedByUser) {
+        lifetimeGuaranteed(isLifetimeGuaranteed) {
     assert(!Operand->getType().castTo<SILFunctionType>()->isNoEscape());
     assert(Ty.castTo<SILFunctionType>()->isNoEscape());
   }
@@ -4015,17 +4101,11 @@ class ConvertEscapeToNoEscapeInst final
   static ConvertEscapeToNoEscapeInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
-         bool isEscapedByUser, bool lifetimeGuaranteed);
+         bool lifetimeGuaranteed);
 public:
   bool isLifetimeGuaranteed() const {
     return lifetimeGuaranteed;
   }
-
-  bool isEscapedByUser() const {
-    return isEscaped;
-  }
-
-  void setEscapedByUser(bool isEscaped = true) { this->isEscaped = isEscaped; }
 };
 
 /// ThinFunctionToPointerInst - Convert a thin function pointer to a
@@ -4062,18 +4142,16 @@ class PointerToThinFunctionInst final
 };
 
 /// UpcastInst - Perform a conversion of a class instance to a supertype.
-class UpcastInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-                             SILInstructionKind::UpcastInst,
-                             UpcastInst, ConversionInst>
-
-{
+class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
+                             SILInstructionKind::UpcastInst, UpcastInst,
+                             OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   UpcastInst(SILDebugLocation DebugLoc, SILValue Operand,
              ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty) {}
+            DebugLoc, Operand, TypeDependentOperands, Ty,
+            Operand.getOwnershipKind()) {}
 
   static UpcastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
@@ -4123,17 +4201,16 @@ public:
 /// Convert a heap object reference to a different type without any runtime
 /// checks.
 class UncheckedRefCastInst final
-  : public UnaryInstructionWithTypeDependentOperandsBase<
-                                SILInstructionKind::UncheckedRefCastInst,
-                                UncheckedRefCastInst,
-                                ConversionInst>
-{
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::UncheckedRefCastInst, UncheckedRefCastInst,
+          OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   UncheckedRefCastInst(SILDebugLocation DebugLoc, SILValue Operand,
                        ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                                               TypeDependentOperands, Ty) {}
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, Ty,
+            Operand.getOwnershipKind()) {}
   static UncheckedRefCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
@@ -4235,13 +4312,14 @@ class UncheckedBitwiseCastInst final
 /// in bits from a word.
 class RefToBridgeObjectInst
     : public InstructionBase<SILInstructionKind::RefToBridgeObjectInst,
-                             ConversionInst> {
+                             OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   FixedOperandList<2> Operands;
   RefToBridgeObjectInst(SILDebugLocation DebugLoc, SILValue ConvertedValue,
                         SILValue MaskValue, SILType BridgeObjectTy)
-      : InstructionBase(DebugLoc, BridgeObjectTy),
+      : InstructionBase(DebugLoc, BridgeObjectTy,
+                        ConvertedValue.getOwnershipKind()),
         Operands(this, ConvertedValue, MaskValue) {}
 
 public:
@@ -4265,14 +4343,13 @@ class ClassifyBridgeObjectInst
 
 /// Extract the heap object reference from a BridgeObject.
 class BridgeObjectToRefInst
-  : public UnaryInstructionBase<SILInstructionKind::BridgeObjectToRefInst,
-                                ConversionInst>
-{
+    : public UnaryInstructionBase<SILInstructionKind::BridgeObjectToRefInst,
+                                  OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
-  BridgeObjectToRefInst(SILDebugLocation DebugLoc, SILValue Operand,
-                        SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+  BridgeObjectToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty,
+                             Operand.getOwnershipKind()) {}
 };
 
 /// Sets the BridgeObject to a tagged pointer representation holding its
@@ -4320,62 +4397,25 @@ class RawPointerToRefInst
   RawPointerToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
       : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
 };
-  
-/// RefToUnownedInst - Given a value of a reference type,
-/// convert it to an unowned reference.
-///
+
+/// Transparent reference storage to underlying reference type conversion.
 /// This does nothing at runtime; it just changes the formal type.
-class RefToUnownedInst
-  : public UnaryInstructionBase<SILInstructionKind::RefToUnownedInst,
-                                ConversionInst>
-{
-  friend SILBuilder;
-
-  RefToUnownedInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+#define LOADABLE_REF_STORAGE(Name, ...) \
+class RefTo##Name##Inst \
+    : public UnaryInstructionBase<SILInstructionKind::RefTo##Name##Inst, \
+                                  ConversionInst> { \
+  friend SILBuilder; \
+  RefTo##Name##Inst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty) \
+      : UnaryInstructionBase(DebugLoc, Operand, Ty) {} \
+}; \
+class Name##ToRefInst \
+  : public UnaryInstructionBase<SILInstructionKind::Name##ToRefInst, \
+                                ConversionInst> { \
+  friend SILBuilder; \
+  Name##ToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty) \
+      : UnaryInstructionBase(DebugLoc, Operand, Ty) {} \
 };
-
-/// UnownedToRefInst - Given a value of an @unowned type,
-/// convert it to the underlying reference type.
-///
-/// This does nothing at runtime; it just changes the formal type.
-class UnownedToRefInst
-  : public UnaryInstructionBase<SILInstructionKind::UnownedToRefInst,
-                                ConversionInst>
-{
-  friend SILBuilder;
-
-  UnownedToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
-};
-
-/// RefToUnmanagedInst - Given a value of a reference type,
-/// convert it to an unmanaged reference.
-///
-/// This does nothing at runtime; it just changes the formal type.
-class RefToUnmanagedInst
-  : public UnaryInstructionBase<SILInstructionKind::RefToUnmanagedInst,
-                                ConversionInst>
-{
-  friend SILBuilder;
-
-  RefToUnmanagedInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
-};
-
-/// UnmanagedToRefInst - Given a value of an unmanaged reference type,
-/// convert it to the underlying reference type.
-///
-/// This does nothing at runtime; it just changes the formal type.
-class UnmanagedToRefInst
-  : public UnaryInstructionBase<SILInstructionKind::UnmanagedToRefInst,
-                                ConversionInst>
-{
-  friend SILBuilder;
-
-  UnmanagedToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
-};
+#include "swift/AST/ReferenceStorage.def"
 
 /// ThinToThickFunctionInst - Given a thin function reference, adds a null
 /// context to convert the value to a thick function type.
@@ -4475,19 +4515,17 @@ public:
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst final
-  : public UnaryInstructionWithTypeDependentOperandsBase<
-                                SILInstructionKind::UnconditionalCheckedCastInst,
-                                UnconditionalCheckedCastInst,
-                                ConversionInst>
-{
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::UnconditionalCheckedCastInst,
+          UnconditionalCheckedCastInst, OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   UnconditionalCheckedCastInst(SILDebugLocation DebugLoc, SILValue Operand,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILType DestTy)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                                               TypeDependentOperands,
-                                               DestTy) {}
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, DestTy,
+            Operand.getOwnershipKind()) {}
 
   static UnconditionalCheckedCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
@@ -4562,19 +4600,20 @@ class UnconditionalCheckedCastValueInst final
 };
 
 /// StructInst - Represents a constructed loadable struct.
-class StructInst final
-    : public InstructionBaseWithTrailingOperands<SILInstructionKind::StructInst,
-                                           StructInst, SingleValueInstruction> {
+class StructInst final : public InstructionBaseWithTrailingOperands<
+                             SILInstructionKind::StructInst, StructInst,
+                             OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   /// Because of the storage requirements of StructInst, object
   /// creation goes through 'create()'.
-  StructInst(SILDebugLocation DebugLoc, SILType Ty,
-             ArrayRef<SILValue> Elements);
+  StructInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elements,
+             bool HasOwnership);
 
   /// Construct a StructInst.
   static StructInst *create(SILDebugLocation DebugLoc, SILType Ty,
-                            ArrayRef<SILValue> Elements, SILModule &M);
+                            ArrayRef<SILValue> Elements, SILModule &M,
+                            bool HasOwnership);
 
 public:
   /// The elements referenced by this StructInst.
@@ -4811,82 +4850,31 @@ class SetDeallocatingInst
   }
 };
 
-/// StrongPinInst - Ensure that the operand is retained and pinned, if
-/// not by this operation then by some enclosing pin.
-///
-/// Transformations must not do anything which reorders pin and unpin
-/// operations.  (This should generally be straightforward, as pin and
-/// unpin may be conservatively assumed to have arbitrary
-/// side-effects.)
-///
-/// This can't be a RefCountingInst because it returns a value.
-class StrongPinInst
-  : public UnaryInstructionBase<SILInstructionKind::StrongPinInst,
-                                SingleValueInstruction>
-{
-public:
-  using Atomicity = RefCountingInst::Atomicity;
-
-private:
-  friend SILBuilder;
-
-  StrongPinInst(SILDebugLocation DebugLoc, SILValue operand,
-                Atomicity atomicity);
-
-public:
-  void setAtomicity(Atomicity flag) {
-    SILInstruction::Bits.StrongPinInst.atomicity = bool(flag);
-  }
-  void setNonAtomic() {
-    SILInstruction::Bits.StrongPinInst.atomicity = bool(Atomicity::NonAtomic);
-  }
-  void setAtomic() {
-    SILInstruction::Bits.StrongPinInst.atomicity = bool(Atomicity::Atomic);
-  }
-  Atomicity getAtomicity() const {
-    return Atomicity(SILInstruction::Bits.StrongPinInst.atomicity);
-  }
-  bool isNonAtomic() const { return getAtomicity() == Atomicity::NonAtomic; }
-  bool isAtomic() const { return getAtomicity() == Atomicity::Atomic; }
-};
-
-/// StrongUnpinInst - Given that the operand is the result of a
-/// strong_pin instruction, unpin it.
-class StrongUnpinInst
-  : public UnaryInstructionBase<SILInstructionKind::StrongUnpinInst,
-                                RefCountingInst>
-{
-  friend SILBuilder;
-
-  StrongUnpinInst(SILDebugLocation DebugLoc, SILValue operand,
-                  Atomicity atomicity)
-      : UnaryInstructionBase(DebugLoc, operand) {
-    setAtomicity(atomicity);
-  }
-};
-
 /// ObjectInst - Represents a object value type.
 ///
 /// This instruction can only appear at the end of a gobal variable's
 /// static initializer list.
-class ObjectInst final
-    : public InstructionBaseWithTrailingOperands<SILInstructionKind::ObjectInst,
-                                                 ObjectInst,
-                                                 SingleValueInstruction> {
+class ObjectInst final : public InstructionBaseWithTrailingOperands<
+                             SILInstructionKind::ObjectInst, ObjectInst,
+                             OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   /// Because of the storage requirements of ObjectInst, object
   /// creation goes through 'create()'.
-  ObjectInst(SILDebugLocation DebugLoc, SILType Ty,
-            ArrayRef<SILValue> Elements, unsigned NumBaseElements)
-    : InstructionBaseWithTrailingOperands(Elements, DebugLoc, Ty) {
-      SILInstruction::Bits.ObjectInst.NumBaseElements = NumBaseElements;
+  ObjectInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elements,
+             unsigned NumBaseElements, bool HasOwnership)
+      : InstructionBaseWithTrailingOperands(
+            Elements, DebugLoc, Ty,
+            HasOwnership ? *mergeSILValueOwnership(Elements)
+                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {
+    SILInstruction::Bits.ObjectInst.NumBaseElements = NumBaseElements;
   }
 
   /// Construct an ObjectInst.
   static ObjectInst *create(SILDebugLocation DebugLoc, SILType Ty,
                             ArrayRef<SILValue> Elements,
-                            unsigned NumBaseElements, SILModule &M);
+                            unsigned NumBaseElements, SILModule &M,
+                            bool HasOwnership);
 
 public:
   /// All elements referenced by this ObjectInst.
@@ -4913,20 +4901,24 @@ public:
 };
 
 /// TupleInst - Represents a constructed loadable tuple.
-class TupleInst final
-    : public InstructionBaseWithTrailingOperands<SILInstructionKind::TupleInst,
-                                                  TupleInst,
-                                                  SingleValueInstruction> {
+class TupleInst final : public InstructionBaseWithTrailingOperands<
+                            SILInstructionKind::TupleInst, TupleInst,
+                            OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   /// Because of the storage requirements of TupleInst, object
   /// creation goes through 'create()'.
-  TupleInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elems)
-    : InstructionBaseWithTrailingOperands(Elems, DebugLoc, Ty) {}
+  TupleInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elems,
+            bool HasOwnership)
+      : InstructionBaseWithTrailingOperands(
+            Elems, DebugLoc, Ty,
+            HasOwnership ? *mergeSILValueOwnership(Elems)
+                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {}
 
   /// Construct a TupleInst.
   static TupleInst *create(SILDebugLocation DebugLoc, SILType Ty,
-                           ArrayRef<SILValue> Elements, SILModule &M);
+                           ArrayRef<SILValue> Elements, SILModule &M,
+                           bool HasOwnership);
 
 public:
   /// The elements referenced by this TupleInst.
@@ -4986,9 +4978,8 @@ public:
 
 /// Represents a loadable enum constructed from one of its
 /// elements.
-class EnumInst
-    : public InstructionBase<SILInstructionKind::EnumInst,
-                             SingleValueInstruction> {
+class EnumInst : public InstructionBase<SILInstructionKind::EnumInst,
+                                        OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   Optional<FixedOperandList<1>> OptionalOperand;
@@ -4996,7 +4987,10 @@ class EnumInst
 
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
            EnumElementDecl *Element, SILType ResultTy)
-      : InstructionBase(DebugLoc, ResultTy),
+      : InstructionBase(DebugLoc, ResultTy,
+                        Operand
+                            ? Operand.getOwnershipKind()
+                            : ValueOwnershipKind(ValueOwnershipKind::Any)),
         Element(Element) {
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
@@ -5024,16 +5018,17 @@ public:
 /// Unsafely project the data for an enum case out of an enum without checking
 /// the tag.
 class UncheckedEnumDataInst
-  : public UnaryInstructionBase<SILInstructionKind::UncheckedEnumDataInst,
-                                SingleValueInstruction>
-{
+    : public UnaryInstructionBase<SILInstructionKind::UncheckedEnumDataInst,
+                                  OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   EnumElementDecl *Element;
 
   UncheckedEnumDataInst(SILDebugLocation DebugLoc, SILValue Operand,
                         EnumElementDecl *Element, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), Element(Element) {}
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy,
+                             Operand.getOwnershipKind()),
+        Element(Element) {}
 
 public:
   EnumElementDecl *getElement() const { return Element; }
@@ -5136,11 +5131,13 @@ public:
 // Subclasses must provide tail allocated storage.
 // The first operand is the operand of select_xxx instruction. The rest of
 // the operands are the case values and results of a select instruction.
-template <class Derived, class T>
-class SelectInstBase : public SingleValueInstruction {
+template <class Derived, class T, class Base = SingleValueInstruction>
+class SelectInstBase : public Base {
 public:
-  SelectInstBase(SILInstructionKind kind, SILDebugLocation Loc, SILType type)
-      : SingleValueInstruction(kind, Loc, type) {}
+  template <typename... Args>
+  SelectInstBase(SILInstructionKind kind, SILDebugLocation Loc, SILType type,
+                 Args &&... otherArgs)
+      : Base(kind, Loc, type, std::forward<Args>(otherArgs)...) {}
 
   SILValue getOperand() const { return getAllOperands()[0].get(); }
 
@@ -5194,9 +5191,8 @@ protected:
   createSelectEnum(SILDebugLocation DebugLoc, SILValue Enum, SILType Type,
                    SILValue DefaultValue,
                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-                   SILFunction &F,
-                   Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                   ProfileCounter DefaultCount);
+                   SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                   ProfileCounter DefaultCount, bool HasOwnership);
 
 public:
   ArrayRef<Operand> getAllOperands() const;
@@ -5223,7 +5219,7 @@ public:
     return getDefaultResult();
   }
   
-  /// \brief If the default refers to exactly one case decl, return it.
+  /// If the default refers to exactly one case decl, return it.
   NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
 
   bool hasDefault() const {
@@ -5247,27 +5243,45 @@ public:
   /// not to need this.
   NullablePtr<EnumElementDecl> getSingleTrueElement() const;
 };
-  
+
+/// A select enum inst that produces a static OwnershipKind set upon the
+/// instruction's construction.
+class OwnershipForwardingSelectEnumInstBase : public SelectEnumInstBase {
+  ValueOwnershipKind ownershipKind;
+
+protected:
+  OwnershipForwardingSelectEnumInstBase(
+      SILInstructionKind kind, SILDebugLocation debugLoc, SILType type,
+      bool defaultValue, Optional<ArrayRef<ProfileCounter>> caseCounts,
+      ProfileCounter defaultCount, ValueOwnershipKind ownershipKind)
+      : SelectEnumInstBase(kind, debugLoc, type, defaultValue, caseCounts,
+                           defaultCount),
+        ownershipKind(ownershipKind) {}
+
+public:
+  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+};
+
 /// Select one of a set of values based on the case of an enum.
 class SelectEnumInst final
     : public InstructionBaseWithTrailingOperands<
-                                        SILInstructionKind::SelectEnumInst,
-                                        SelectEnumInst,
-                                        SelectEnumInstBase, EnumElementDecl *> {
+          SILInstructionKind::SelectEnumInst, SelectEnumInst,
+          OwnershipForwardingSelectEnumInstBase, EnumElementDecl *> {
   friend SILBuilder;
 
 private:
   friend SelectEnumInstBase;
 
   SelectEnumInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-                 bool DefaultValue,
-                 ArrayRef<SILValue> CaseValues,
+                 bool DefaultValue, ArrayRef<SILValue> CaseValues,
                  ArrayRef<EnumElementDecl *> CaseDecls,
                  Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                 ProfileCounter DefaultCount)
-      : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
-                                            bool(DefaultValue), CaseCounts,
-                                            DefaultCount) {
+                 ProfileCounter DefaultCount, bool HasOwnership)
+      : InstructionBaseWithTrailingOperands(
+            Operand, CaseValues, DebugLoc, Type, bool(DefaultValue), CaseCounts,
+            DefaultCount,
+            HasOwnership ? *mergeSILValueOwnership(CaseValues)
+                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -5276,8 +5290,8 @@ private:
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
-         ProfileCounter DefaultCount);
+         SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         ProfileCounter DefaultCount, bool HasOwnership);
 };
 
 /// Select one of a set of values based on the case of an enum.
@@ -5289,16 +5303,15 @@ class SelectEnumAddrInst final
   friend SILBuilder;
   friend SelectEnumInstBase;
 
-  SelectEnumAddrInst(
-      SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-      bool DefaultValue,
-      ArrayRef<SILValue> CaseValues,
-      ArrayRef<EnumElementDecl *> CaseDecls,
-      Optional<ArrayRef<ProfileCounter>> CaseCounts,
-      ProfileCounter DefaultCount)
+  SelectEnumAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
+                     bool DefaultValue, ArrayRef<SILValue> CaseValues,
+                     ArrayRef<EnumElementDecl *> CaseDecls,
+                     Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                     ProfileCounter DefaultCount, bool HasOwnership)
       : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
                                             bool(DefaultValue), CaseCounts,
                                             DefaultCount) {
+    (void)HasOwnership;
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -5307,7 +5320,7 @@ class SelectEnumAddrInst final
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
          ProfileCounter DefaultCount);
 };
 
@@ -5317,21 +5330,20 @@ class SelectEnumAddrInst final
 /// followed by an optional default operand.
 class SelectValueInst final
     : public InstructionBaseWithTrailingOperands<
-                                    SILInstructionKind::SelectValueInst,
-                                    SelectValueInst,
-                                    SelectInstBase<SelectValueInst, SILValue>> {
+          SILInstructionKind::SelectValueInst, SelectValueInst,
+          SelectInstBase<SelectValueInst, SILValue,
+                         OwnershipForwardingSingleValueInst>> {
   friend SILBuilder;
 
   SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                   SILValue DefaultResult,
-                  ArrayRef<SILValue> CaseValuesAndResults)
-      : InstructionBaseWithTrailingOperands(Operand, CaseValuesAndResults,
-                                            DebugLoc, Type) {}
+                  ArrayRef<SILValue> CaseValuesAndResults, bool HasOwnership);
 
   static SelectValueInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
-         ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILFunction &F);
+         ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILModule &M,
+         bool HasOwnership);
 
 public:
   std::pair<SILValue, SILValue>
@@ -5716,8 +5728,7 @@ class WitnessMethodInst final
 public:
   CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
-    return getMember().getDecl()->getDeclContext()
-             ->getAsProtocolOrProtocolExtensionContext();
+    return getMember().getDecl()->getDeclContext()->getSelfProtocolDecl();
   }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
@@ -5771,13 +5782,12 @@ class OpenExistentialValueInst
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
 class OpenExistentialRefInst
-  : public UnaryInstructionBase<SILInstructionKind::OpenExistentialRefInst,
-                                SingleValueInstruction>
-{
+    : public UnaryInstructionBase<SILInstructionKind::OpenExistentialRefInst,
+                                  OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   OpenExistentialRefInst(SILDebugLocation DebugLoc, SILValue Operand,
-                         SILType Ty);
+                         SILType Ty, bool HasOwnership);
 };
 
 /// Given an existential metatype,
@@ -5902,11 +5912,9 @@ public:
 /// conformances, creates a class existential value referencing the
 /// class instance.
 class InitExistentialRefInst final
-  : public UnaryInstructionWithTypeDependentOperandsBase<
-                                SILInstructionKind::InitExistentialRefInst,
-                                InitExistentialRefInst,
-                                SingleValueInstruction>
-{
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::InitExistentialRefInst, InitExistentialRefInst,
+          OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   CanType ConcreteType;
@@ -5916,9 +5924,9 @@ class InitExistentialRefInst final
                          CanType FormalConcreteType, SILValue Instance,
                          ArrayRef<SILValue> TypeDependentOperands,
                          ArrayRef<ProtocolConformanceRef> Conformances)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Instance,
-                                               TypeDependentOperands,
-                                               ExistentialType),
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Instance, TypeDependentOperands, ExistentialType,
+            Instance.getOwnershipKind()),
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
   static InitExistentialRefInst *
@@ -6085,50 +6093,47 @@ class StrongReleaseInst
   }
 };
 
-/// StrongRetainUnownedInst - Increase the strong reference count of an object
-/// and assert that it has not been deallocated.
+/// Simple reference storage logic.
 ///
-/// The operand must be an @unowned type.
-class StrongRetainUnownedInst :
-    public UnaryInstructionBase<SILInstructionKind::StrongRetainUnownedInst,
-                                RefCountingInst>
-{
-  friend SILBuilder;
-
-  StrongRetainUnownedInst(SILDebugLocation DebugLoc, SILValue operand,
-                          Atomicity atomicity)
-      : UnaryInstructionBase(DebugLoc, operand) {
-    setAtomicity(atomicity);
-  }
+/// StrongRetain##Name##Inst - Increase the strong reference count of an object
+/// and assert that it has not been deallocated.
+/// The operand must be of type @name.
+///
+/// Name##RetainInst - Increase the 'name' reference count of an object.
+///
+/// Name##ReleaseInst - Decrease the 'name' reference count of an object.
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+class StrongRetain##Name##Inst \
+    : public UnaryInstructionBase<SILInstructionKind::StrongRetain##Name##Inst,\
+                                  RefCountingInst> { \
+  friend SILBuilder; \
+  StrongRetain##Name##Inst(SILDebugLocation DebugLoc, SILValue operand, \
+                           Atomicity atomicity) \
+      : UnaryInstructionBase(DebugLoc, operand) { \
+    setAtomicity(atomicity); \
+  } \
+}; \
+class Name##RetainInst \
+    : public UnaryInstructionBase<SILInstructionKind::Name##RetainInst, \
+                                RefCountingInst> { \
+  friend SILBuilder; \
+  Name##RetainInst(SILDebugLocation DebugLoc, SILValue Operand, \
+                   Atomicity atomicity) \
+      : UnaryInstructionBase(DebugLoc, Operand) { \
+    setAtomicity(atomicity); \
+  } \
+}; \
+class Name##ReleaseInst \
+    : public UnaryInstructionBase<SILInstructionKind::Name##ReleaseInst, \
+                                  RefCountingInst> { \
+  friend SILBuilder; \
+  Name##ReleaseInst(SILDebugLocation DebugLoc, SILValue Operand, \
+                    Atomicity atomicity) \
+      : UnaryInstructionBase(DebugLoc, Operand) { \
+    setAtomicity(atomicity); \
+  } \
 };
-
-/// UnownedRetainInst - Increase the unowned reference count of an object.
-class UnownedRetainInst :
-    public UnaryInstructionBase<SILInstructionKind::UnownedRetainInst,
-                                RefCountingInst>
-{
-  friend SILBuilder;
-
-  UnownedRetainInst(SILDebugLocation DebugLoc, SILValue Operand,
-                    Atomicity atomicity)
-      : UnaryInstructionBase(DebugLoc, Operand) {
-    setAtomicity(atomicity);
-  }
-};
-
-/// UnownedReleaseInst - Decrease the unowned reference count of an object.
-class UnownedReleaseInst :
-     public UnaryInstructionBase<SILInstructionKind::UnownedReleaseInst,
-                                 RefCountingInst>
-{
-  friend SILBuilder;
-
-  UnownedReleaseInst(SILDebugLocation DebugLoc, SILValue Operand,
-                     Atomicity atomicity)
-      : UnaryInstructionBase(DebugLoc, Operand) {
-    setAtomicity(atomicity);
-  }
-};
+#include "swift/AST/ReferenceStorage.def"
 
 /// FixLifetimeInst - An artificial use of a value for the purposes of ARC or
 /// RVO optimizations.
@@ -6182,7 +6187,8 @@ class UncheckedOwnershipConversionInst
 
 public:
   ValueOwnershipKind getConversionOwnershipKind() const {
-    return SILInstruction::Bits.UncheckedOwnershipConversionInst.Kind;
+    unsigned kind = SILInstruction::Bits.UncheckedOwnershipConversionInst.Kind;
+    return ValueOwnershipKind(kind);
   }
 };
 
@@ -6266,16 +6272,17 @@ class CopyValueInst
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
-class CopyUnownedValueInst
-    : public UnaryInstructionBase<SILInstructionKind::CopyUnownedValueInst,
-                                  SingleValueInstruction> {
-  friend class SILBuilder;
-
-  CopyUnownedValueInst(SILDebugLocation DebugLoc, SILValue operand,
-                       SILModule &M)
-      : UnaryInstructionBase(DebugLoc, operand,
-                             operand->getType().getReferentType(M)) {}
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+class Copy##Name##ValueInst \
+    : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
+                                  SingleValueInstruction> { \
+  friend class SILBuilder; \
+  Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand, \
+                       SILModule &M) \
+      : UnaryInstructionBase(DebugLoc, operand, \
+                             operand->getType().getReferentType(M)) {} \
 };
+#include "swift/AST/ReferenceStorage.def"
 
 class DestroyValueInst
     : public UnaryInstructionBase<SILInstructionKind::DestroyValueInst,
@@ -6295,19 +6302,6 @@ class IsUniqueInst
   friend SILBuilder;
 
   IsUniqueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType BoolTy)
-      : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
-};
-
-/// Given an object reference, return true iff it is non-nil and either refers
-/// to a native swift object with strong reference count of 1 or refers to a
-/// pinned object (for simultaneous access to multiple subobjects).
-class IsUniqueOrPinnedInst
-    : public UnaryInstructionBase<SILInstructionKind::IsUniqueOrPinnedInst,
-                                  SingleValueInstruction> {
-  friend SILBuilder;
-
-  IsUniqueOrPinnedInst(SILDebugLocation DebugLoc, SILValue Operand,
-                       SILType BoolTy)
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
 };
 
@@ -6696,13 +6690,21 @@ public:
     return const_cast<TermInst *>(this)->getSingleSuccessorBlock();
   }
 
-  /// \brief Returns true if \p BB is a successor of this block.
+  /// Returns true if \p BB is a successor of this block.
   bool isSuccessorBlock(SILBasicBlock *BB) const {
     auto Range = getSuccessorBlocks();
     return any_of(Range, [&BB](const SILBasicBlock *SuccBB) -> bool {
       return BB == SuccBB;
     });
   }
+
+  using SuccessorBlockArgumentsListTy =
+      TransformRange<ConstSuccessorListTy,
+                     function_ref<PhiArgumentArrayRef(const SILSuccessor &)>>;
+
+  /// Return the range of Argument arrays for each successor of this
+  /// block.
+  SuccessorBlockArgumentsListTy getSuccessorBlockArguments() const;
 
   using SuccessorBlockListTy =
       TransformRange<SuccessorListTy,
@@ -6734,6 +6736,9 @@ public:
 
   /// Returns true if this terminator exits the function.
   bool isFunctionExiting() const;
+
+  /// Returns true if this terminator terminates the program.
+  bool isProgramTerminating() const;
 
   TermKind getTermKind() const { return TermKind(getKind()); }
 };
@@ -6902,7 +6907,7 @@ class BranchInst final
                             ArrayRef<SILValue> Args, SILFunction &F);
 
 public:
-  /// \brief returns jump target for the branch.
+  /// returns jump target for the branch.
   SILBasicBlock *getDestBB() const { return DestBB; }
 
   /// The arguments for the destination BB.
@@ -6916,6 +6921,11 @@ public:
 
   unsigned getNumArgs() const { return getAllOperands().size(); }
   SILValue getArg(unsigned i) const { return getAllOperands()[i].get(); }
+
+  /// Return the SILPhiArgument for the given operand.
+  ///
+  /// See SILArgument.cpp.
+  const SILPhiArgument *getArgForOperand(const Operand *oper) const;
 };
 
 /// A conditional branch.
@@ -7057,6 +7067,15 @@ public:
   SILValue getArgForDestBB(const SILBasicBlock *DestBB,
                            unsigned ArgIndex) const;
 
+  /// Return the SILPhiArgument from either the true or false destination for
+  /// the given operand.
+  ///
+  /// Returns nullptr for an operand with no block argument
+  /// (i.e the branch condition).
+  ///
+  /// See SILArgument.cpp.
+  const SILPhiArgument *getArgForOperand(const Operand *oper) const;
+
   void swapSuccessors();
 };
 
@@ -7197,7 +7216,7 @@ public:
   // Swap the cases at indices \p i and \p j.
   void swapCase(unsigned i, unsigned j);
 
-  /// \brief Return the block that will be branched to on the specified enum
+  /// Return the block that will be branched to on the specified enum
   /// case.
   SILBasicBlock *getCaseDestination(EnumElementDecl *D) {
     for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
@@ -7209,20 +7228,24 @@ public:
     return getDefaultBB();
   }
 
-  /// \brief If the default refers to exactly one case decl, return it.
+  /// If the default refers to exactly one case decl, return it.
   NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
 
-  /// \brief If the given block only has one enum element decl matched to it,
+  /// If the given block only has one enum element decl matched to it,
   /// return it.
   NullablePtr<EnumElementDecl> getUniqueCaseForDestination(SILBasicBlock *BB);
 
   bool hasDefault() const {
     return SILInstruction::Bits.SwitchEnumInstBase.HasDefault;
   }
+
   SILBasicBlock *getDefaultBB() const {
     assert(hasDefault() && "doesn't have a default");
     return getSuccessorBuf()[getNumCases()];
   }
+
+  NullablePtr<SILBasicBlock> getDefaultBBOrNull() const;
+
   ProfileCounter getDefaultCount() const {
     assert(hasDefault() && "doesn't have a default");
     return getSuccessorBuf()[getNumCases()].getCount();
@@ -7466,7 +7489,10 @@ class CheckedCastAddrBranchInst
       : InstructionBase(DebugLoc), ConsumptionKind(consumptionKind),
         Operands{this, src, dest}, DestBBs{{this, successBB, Target1Count},
                                            {this, failureBB, Target2Count}},
-        SourceType(srcType), TargetType(targetType) {}
+        SourceType(srcType), TargetType(targetType) {
+    assert(ConsumptionKind != CastConsumptionKind::BorrowAlways &&
+           "BorrowAlways is not supported on addresses");
+  }
 
 public:
   enum {
@@ -7563,348 +7589,6 @@ class TryApplyInst final
          const GenericSpecializationInformation *SpecializationInfo);
 };
 
-/// An apply instruction.
-class ApplySite {
-  SILInstruction *Inst;
-
-protected:
-  explicit ApplySite(void *p) : Inst(static_cast<SILInstruction *>(p)) {}
-
-public:
-  ApplySite() : Inst(nullptr) {}
-  explicit ApplySite(SILInstruction *inst)
-    : Inst(static_cast<SILInstruction*>(inst)) {
-    assert(classof(inst) && "not an apply instruction?");
-  }
-  ApplySite(ApplyInst *inst) : Inst(inst) {}
-  ApplySite(PartialApplyInst *inst) : Inst(inst) {}
-  ApplySite(TryApplyInst *inst) : Inst(inst) {}
-  ApplySite(BeginApplyInst *inst) : Inst(inst) {}
-
-  SILModule &getModule() const {
-    return Inst->getModule();
-  }
-
-  static ApplySite isa(SILNode *node) {
-    switch (node->getKind()) {
-    case SILNodeKind::ApplyInst:
-      return ApplySite(cast<ApplyInst>(node));
-    case SILNodeKind::BeginApplyInst:
-      return ApplySite(cast<BeginApplyInst>(node));
-    case SILNodeKind::TryApplyInst:
-      return ApplySite(cast<TryApplyInst>(node));
-    case SILNodeKind::PartialApplyInst:
-      return ApplySite(cast<PartialApplyInst>(node));
-    default:
-      return ApplySite();
-    }
-  }
-
-  explicit operator bool() const {
-    return Inst != nullptr;
-  }
-
-  SILInstruction *getInstruction() const { return Inst; }
-  SILLocation getLoc() const { return Inst->getLoc(); }
-  const SILDebugScope *getDebugScope() const { return Inst->getDebugScope(); }
-  SILFunction *getFunction() const { return Inst->getFunction(); }
-  SILBasicBlock *getParent() const { return Inst->getParent(); }
-
-#define FOREACH_IMPL_RETURN(OPERATION) do {                             \
-    switch (Inst->getKind()) {                                          \
-    case SILInstructionKind::ApplyInst:                                 \
-      return cast<ApplyInst>(Inst)->OPERATION;                          \
-    case SILInstructionKind::BeginApplyInst:                            \
-      return cast<BeginApplyInst>(Inst)->OPERATION;                     \
-    case SILInstructionKind::PartialApplyInst:                          \
-      return cast<PartialApplyInst>(Inst)->OPERATION;                   \
-    case SILInstructionKind::TryApplyInst:                              \
-      return cast<TryApplyInst>(Inst)->OPERATION;                       \
-    default:                                                            \
-      llvm_unreachable("not an apply instruction!");                    \
-    }                                                                   \
-  } while (0)
-
-  /// Return the callee operand.
-  SILValue getCallee() const {
-    FOREACH_IMPL_RETURN(getCallee());
-  }
-
-  /// Return the callee value by looking through function conversions until we
-  /// find a function_ref, partial_apply, or unrecognized callee value.
-  SILValue getCalleeOrigin() const {
-    FOREACH_IMPL_RETURN(getCalleeOrigin());
-  }
-
-  /// Gets the referenced function by looking through partial apply,
-  /// convert_function, and thin to thick function until we find a function_ref.
-  SILFunction *getCalleeFunction() const {
-    FOREACH_IMPL_RETURN(getCalleeFunction());
-  }
-
-  /// Return the referenced function if the callee is a function_ref
-  /// instruction.
-  SILFunction *getReferencedFunction() const {
-    FOREACH_IMPL_RETURN(getReferencedFunction());
-  }
-
-  /// Return the type.
-  SILType getType() const { return getSubstCalleeConv().getSILResultType(); }
-
-  /// Get the type of the callee without the applied substitutions.
-  CanSILFunctionType getOrigCalleeType() const {
-    return getCallee()->getType().castTo<SILFunctionType>();
-  }
-  /// Get the conventions of the callee without the applied substitutions.
-  SILFunctionConventions getOrigCalleeConv() const {
-    return SILFunctionConventions(getOrigCalleeType(), getModule());
-  }
-
-  /// Get the type of the callee with the applied substitutions.
-  CanSILFunctionType getSubstCalleeType() const {
-    return getSubstCalleeSILType().castTo<SILFunctionType>();
-  }
-  SILType getSubstCalleeSILType() const {
-    FOREACH_IMPL_RETURN(getSubstCalleeSILType());
-  }
-  /// Get the conventions of the callee with the applied substitutions.
-  SILFunctionConventions getSubstCalleeConv() const {
-    return SILFunctionConventions(getSubstCalleeType(), getModule());
-  }
-
-  /// Check if this is a call of a never-returning function.
-  bool isCalleeNoReturn() const {
-    FOREACH_IMPL_RETURN(isCalleeNoReturn());
-  }
-
-  bool isCalleeThin() const {
-    switch (getSubstCalleeType()->getRepresentation()) {
-    case SILFunctionTypeRepresentation::CFunctionPointer:
-    case SILFunctionTypeRepresentation::Thin:
-    case SILFunctionTypeRepresentation::Method:
-    case SILFunctionTypeRepresentation::ObjCMethod:
-    case SILFunctionTypeRepresentation::WitnessMethod:
-    case SILFunctionTypeRepresentation::Closure:
-      return true;
-    case SILFunctionTypeRepresentation::Block:
-    case SILFunctionTypeRepresentation::Thick:
-      return false;
-    }
-  }
-
-  /// True if this application has generic substitutions.
-  bool hasSubstitutions() const {
-    FOREACH_IMPL_RETURN(hasSubstitutions());
-  }
-
-  /// The substitutions used to bind the generic arguments of this function.
-  SubstitutionMap getSubstitutionMap() const {
-    FOREACH_IMPL_RETURN(getSubstitutionMap());
-  }
-
-  /// The arguments passed to this instruction.
-  MutableArrayRef<Operand> getArgumentOperands() const {
-    FOREACH_IMPL_RETURN(getArgumentOperands());
-  }
-
-  /// The arguments passed to this instruction.
-  OperandValueArrayRef getArguments() const {
-    FOREACH_IMPL_RETURN(getArguments());
-  }
-
-  /// The number of call arguments.
-  unsigned getNumArguments() const {
-    FOREACH_IMPL_RETURN(getNumArguments());
-  }
-
-  unsigned getOperandIndexOfFirstArgument() {
-    FOREACH_IMPL_RETURN(getArgumentOperandNumber());
-  }
-
-  /// Return the associated specialization information.
-  const GenericSpecializationInformation *getSpecializationInfo() const {
-    FOREACH_IMPL_RETURN(getSpecializationInfo());
-  }
-#undef FOREACH_IMPL_RETURN
-
-  /// The arguments passed to this instruction, without self.
-  OperandValueArrayRef getArgumentsWithoutSelf() const {
-    switch (Inst->getKind()) {
-    case SILInstructionKind::ApplyInst:
-      return cast<ApplyInst>(Inst)->getArgumentsWithoutSelf();
-    case SILInstructionKind::BeginApplyInst:
-      return cast<BeginApplyInst>(Inst)->getArgumentsWithoutSelf();
-    case SILInstructionKind::TryApplyInst:
-      return cast<TryApplyInst>(Inst)->getArgumentsWithoutSelf();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
-    }
-  }
-
-  // Get the callee argument index corresponding to the caller's first applied
-  // argument. Returns 0 for full applies. May return > 0 for partial applies.
-  unsigned getCalleeArgIndexOfFirstAppliedArg() const {
-    switch (Inst->getKind()) {
-    case SILInstructionKind::ApplyInst:
-    case SILInstructionKind::BeginApplyInst:
-    case SILInstructionKind::TryApplyInst:
-      return 0;
-    case SILInstructionKind::PartialApplyInst:
-      // The arguments to partial_apply are a suffix of the partial_apply's
-      // callee. Note that getSubstCalleeConv is function type of the callee
-      // argument passed to this apply, not necessarilly the function type of
-      // the underlying callee function (i.e. it is based on the `getCallee`
-      // type, not the `getCalleeOrigin` type).
-      //
-      // pa1 = partial_apply f(c) : $(a, b, c)
-      // pa2 = partial_apply pa1(b) : $(a, b)
-      // apply pa2(a)
-      return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
-    }
-  }
-
-  // Translate the index of the argument to the full apply or partial_apply into
-  // to the corresponding index into the arguments of the called function.
-  unsigned getCalleeArgIndex(const Operand &oper) {
-    assert(oper.getUser() == Inst);
-    assert(oper.getOperandNumber() >= getOperandIndexOfFirstArgument());
-
-    unsigned appliedArgIdx =
-        oper.getOperandNumber() - getOperandIndexOfFirstArgument();
-
-    return getCalleeArgIndexOfFirstAppliedArg() + appliedArgIdx;
-  }
-
-  Operand &getArgumentRef(unsigned i) const { return getArgumentOperands()[i]; }
-
-  /// Return the ith argument passed to this instruction.
-  SILValue getArgument(unsigned i) const { return getArguments()[i]; }
-
-  /// Set the ith argument of this instruction.
-  void setArgument(unsigned i, SILValue V) const {
-    getArgumentOperands()[i].set(V);
-  }
-
-  /// Return the self argument passed to this instruction.
-  bool hasSelfArgument() const {
-    switch (Inst->getKind()) {
-    case SILInstructionKind::ApplyInst:
-      return cast<ApplyInst>(Inst)->hasSelfArgument();
-    case SILInstructionKind::BeginApplyInst:
-      return cast<BeginApplyInst>(Inst)->hasSelfArgument();
-    case SILInstructionKind::TryApplyInst:
-      return cast<TryApplyInst>(Inst)->hasSelfArgument();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
-    }
-  }
-
-  /// Return the self argument passed to this instruction.
-  SILValue getSelfArgument() const {
-    switch (Inst->getKind()) {
-    case SILInstructionKind::ApplyInst:
-      return cast<ApplyInst>(Inst)->getSelfArgument();
-    case SILInstructionKind::BeginApplyInst:
-      return cast<BeginApplyInst>(Inst)->getSelfArgument();
-    case SILInstructionKind::TryApplyInst:
-      return cast<TryApplyInst>(Inst)->getSelfArgument();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
-    }
-  }
-
-  /// Return the self operand passed to this instruction.
-  Operand &getSelfArgumentOperand() {
-    switch (Inst->getKind()) {
-    case SILInstructionKind::ApplyInst:
-      return cast<ApplyInst>(Inst)->getSelfArgumentOperand();
-    case SILInstructionKind::BeginApplyInst:
-      return cast<BeginApplyInst>(Inst)->getSelfArgumentOperand();
-    case SILInstructionKind::TryApplyInst:
-      return cast<TryApplyInst>(Inst)->getSelfArgumentOperand();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
-    }
-  }
-
-  SILArgumentConvention getArgumentConvention(unsigned index) const {
-    return getSubstCalleeConv().getSILArgumentConvention(index);
-  }
-
-  static ApplySite getFromOpaqueValue(void *p) {
-    return ApplySite(p);
-  }
-
-  friend bool operator==(ApplySite lhs, ApplySite rhs) {
-    return lhs.getInstruction() == rhs.getInstruction();
-  }
-  friend bool operator!=(ApplySite lhs, ApplySite rhs) {
-    return lhs.getInstruction() != rhs.getInstruction();
-  }
-
-  static bool classof(const SILInstruction *inst) {
-    return (inst->getKind() == SILInstructionKind::ApplyInst ||
-            inst->getKind() == SILInstructionKind::BeginApplyInst ||
-            inst->getKind() == SILInstructionKind::PartialApplyInst ||
-            inst->getKind() == SILInstructionKind::TryApplyInst);
-  }
-};
-
-/// A full function application.
-class FullApplySite : public ApplySite {
-  explicit FullApplySite(void *p) : ApplySite(p) {}
-
-public:
-  FullApplySite() : ApplySite() {}
-  explicit FullApplySite(SILInstruction *inst) : ApplySite(inst) {
-    assert(classof(inst) && "not an apply instruction?");
-  }
-  FullApplySite(ApplyInst *inst) : ApplySite(inst) {}
-  FullApplySite(BeginApplyInst *inst) : ApplySite(inst) {}
-  FullApplySite(TryApplyInst *inst) : ApplySite(inst) {}
-
-  static FullApplySite isa(SILNode *node) {
-    switch (node->getKind()) {
-    case SILNodeKind::ApplyInst:
-      return FullApplySite(cast<ApplyInst>(node));
-    case SILNodeKind::BeginApplyInst:
-      return FullApplySite(cast<BeginApplyInst>(node));
-    case SILNodeKind::TryApplyInst:
-      return FullApplySite(cast<TryApplyInst>(node));
-    default:
-      return FullApplySite();
-    }
-  }
-
-  bool hasIndirectSILResults() const {
-    return getSubstCalleeConv().hasIndirectSILResults();
-  }
-
-  unsigned getNumIndirectSILResults() const {
-    return getSubstCalleeConv().getNumIndirectSILResults();
-  }
-
-  OperandValueArrayRef getIndirectSILResults() const {
-    return getArguments().slice(0, getNumIndirectSILResults());
-  }
-
-  OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
-    return getArguments().slice(getNumIndirectSILResults());
-  }
-
-  static FullApplySite getFromOpaqueValue(void *p) {
-    return FullApplySite(p);
-  }
-
-  static bool classof(const SILInstruction *inst) {
-    return (inst->getKind() == SILInstructionKind::ApplyInst ||
-            inst->getKind() == SILInstructionKind::BeginApplyInst ||
-            inst->getKind() == SILInstructionKind::TryApplyInst);
-  }
-};
-
 // This is defined out of line to work around the fact that this depends on
 // PartialApplyInst being defined, but PartialApplyInst is a subclass of
 // ApplyInstBase, so we can not place ApplyInstBase after it.
@@ -7933,6 +7617,9 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
   SILValue Callee = getCalleeOrigin();
 
   while (true) {
+    // Intentionally don't lookup throught dynamic_function_ref and
+    // previous_dynamic_function_ref as the target of those functions is not
+    // statically known.
     if (auto *FRI = dyn_cast<FunctionRefInst>(Callee))
       return FRI->getReferencedFunction();
 
@@ -8094,6 +7781,15 @@ inline EnumElementDecl **SelectEnumInstBase::getEnumElementDeclStorage() {
   llvm_unreachable("Unhandled SelectEnumInstBase subclass");
 }
 
+inline void SILSuccessor::pred_iterator::cacheBasicBlock() {
+  if (Cur != nullptr) {
+    Block = Cur->ContainingInst->getParent();
+    assert(Block != nullptr);
+  } else {
+    Block = nullptr;
+  }
+}
+
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
@@ -8104,7 +7800,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILInstruction> :
-  public ilist_default_traits<::swift::SILInstruction> {
+  public ilist_node_traits<::swift::SILInstruction> {
   using SILInstruction = ::swift::SILInstruction;
 
 private:
@@ -8124,57 +7820,6 @@ public:
 
 private:
   void createNode(const SILInstruction &);
-};
-
-// An ApplySite casts like a SILInstruction*.
-template<> struct simplify_type<const ::swift::ApplySite> {
-  using SimpleType = ::swift::SILInstruction *;
-  static SimpleType getSimplifiedValue(const ::swift::ApplySite &Val) {
-    return Val.getInstruction();
-  }
-};
-template<> struct simplify_type< ::swift::ApplySite>
-  : public simplify_type<const ::swift::ApplySite> {};
-template<> struct simplify_type< ::swift::FullApplySite>
-  : public simplify_type<const ::swift::ApplySite> {};
-template<> struct simplify_type<const ::swift::FullApplySite>
-  : public simplify_type<const ::swift::ApplySite> {};
-
-
-template<> struct DenseMapInfo< ::swift::ApplySite> {
-  static ::swift::ApplySite getEmptyKey() {
-    return ::swift::ApplySite::getFromOpaqueValue(
-      llvm::DenseMapInfo<void *>::getEmptyKey());
-  }
-  static ::swift::ApplySite getTombstoneKey() {
-    return ::swift::ApplySite::getFromOpaqueValue(
-      llvm::DenseMapInfo<void *>::getTombstoneKey());
-  }
-  static unsigned getHashValue( ::swift::ApplySite AS) {
-    auto *I = AS.getInstruction();
-    return DenseMapInfo< ::swift::SILInstruction *>::getHashValue(I);
-  }
-  static bool isEqual( ::swift::ApplySite LHS, ::swift::ApplySite RHS) {
-    return LHS == RHS;
-  }
-};
-
-template<> struct DenseMapInfo< ::swift::FullApplySite> {
-  static ::swift::FullApplySite getEmptyKey() {
-    return ::swift::FullApplySite::getFromOpaqueValue(
-      llvm::DenseMapInfo<void*>::getEmptyKey());
-  }
-  static ::swift::FullApplySite getTombstoneKey() {
-    return ::swift::FullApplySite::getFromOpaqueValue(
-      llvm::DenseMapInfo<void*>::getTombstoneKey());
-  }
-  static unsigned getHashValue( ::swift::FullApplySite AS) {
-    auto *I = AS.getInstruction();
-    return DenseMapInfo< ::swift::SILInstruction *>::getHashValue(I);
-  }
-  static bool isEqual( ::swift::FullApplySite LHS, ::swift::FullApplySite RHS) {
-    return LHS == RHS;
-  }
 };
 
 } // end llvm namespace

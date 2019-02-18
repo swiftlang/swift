@@ -9,8 +9,8 @@ public func foo(line: String) {
   // from the default argument expression passed to `RegEx(pattern:options:)`
   // below. Ensure that a local copy of the definition was deserialized
   // and lowered to IR.
-  // CHECK-LABEL: define {{.*}} i8** @"$SSo26NSRegularExpressionOptionsVs10SetAlgebraSCWa"
-  // CHECK-LABEL: define {{.*}} void @"$SSo26NSRegularExpressionOptionsVs10SetAlgebraSCsACPxycfCTW"
+  // CHECK-LABEL: define {{.*}} void @"$sSo26NSRegularExpressionOptionsVs10SetAlgebraSCsACPxycfCTW"
+  // CHECK-LABEL: define {{.*}} i8** @"$sSo26NSRegularExpressionOptionsVABSQSCWl"()
   let versionRegex = try! RegEx(pattern: "Apple")
   _ = versionRegex.firstMatch(in: line)  
 }

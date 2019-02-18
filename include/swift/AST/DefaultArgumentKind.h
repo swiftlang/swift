@@ -55,10 +55,6 @@ enum class DefaultArgumentKind : uint8_t {
 };
 enum { NumDefaultArgumentKindBits = 4 };
 
-/// Retrieve the spelling of this default argument in source code, or
-/// an empty string if it has none.
-llvm::StringRef getDefaultArgumentSpelling(DefaultArgumentKind kind);
-
 } // end namespace swift
 
 #endif // LLVM_SWIFT_DEFAULTARGUMENTKIND_H

@@ -82,7 +82,7 @@ $ utils/build-script \
     --android-api-level 21 \                   # The Android API level to target. Swift only supports 21 or greater.
     --android-icu-uc ${ARM_DIR}/libicuucswift.so \
     --android-icu-uc-include ${ARM_DIR}/icu/source/common \
-    --android-icu-i18 ${ARM_DIR}/libicui18nswift.so \
+    --android-icu-i18n ${ARM_DIR}/libicui18nswift.so \
     --android-icu-i18n-include ${ARM_DIR}/icu/source/i18n
 ```
 

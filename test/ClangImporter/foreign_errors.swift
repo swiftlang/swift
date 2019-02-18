@@ -17,7 +17,7 @@ func test0() {
 func testAndReturnError() throws {
   try ErrorProne.fail()
   try ErrorProne.go()
-  try ErrorProne.tryAndReturnError() // collides with 'try' keyword
+  try ErrorProne.tryAndReturnError(()) // collides with 'try' keyword
 
   ErrorProne.messUpSignatureAndReturnError(nil) // wrong signature
 }

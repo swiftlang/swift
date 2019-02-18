@@ -586,3 +586,31 @@ func testOptionalBlock() {
   var x = 0
   takesInoutAndOptionalBlock(&x) { x += 1 }
 }
+
+// Diagnost a conflict on a noescape closure that is conditionally passed as a function argument.
+//
+// <rdar://problem/42560459> [Exclusivity] Failure to statically diagnose a conflict when passing conditional noescape closures.
+struct S {
+  var x: Int
+
+  mutating func takeNoescapeClosure(_ f: ()->()) { f() }
+
+  mutating func testNoescapePartialApplyPhiUse(z : Bool) {
+    func f1() {
+      x = 1 // expected-note {{conflicting access is here}}
+    }
+    func f2() {
+      x = 1 // expected-note {{conflicting access is here}}
+    }
+    takeNoescapeClosure(z ? f1 : f2)
+    // expected-error@-1 2 {{overlapping accesses to 'self', but modification requires exclusive access; consider copying to a local variable}}
+  }
+}
+
+// TODO: A conflict should also be detected here. However, the
+// typechecker does not allow it. Enable the following test if we ever
+// remove this case from the typechecker test:
+// diag_invalid_inout_captures.swift.
+// public func nestedConflict(x: inout Int) {
+//   doit(x: &x, x == 0 ? { x = 1 } : { x = 2})
+// }

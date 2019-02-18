@@ -15,7 +15,7 @@
 set -o pipefail
 set -e
 
-OVERLAY_NAME_ALTERNATION="AppKit|AssetsLibrary|AVFoundation|CallKit|CloudKit|Contacts|CoreAudio|CoreData|CoreGraphics|CoreImage|CoreLocation|CoreMedia|CryptoTokenKit|dispatch|Foundation|GameplayKit|GLKit|HomeKit|IOKit|Intents|MapKit|objc|OpenCL|os|Photos|QuartzCore|SafariServices|SceneKit|simd|SpriteKit|UIKit|WatchKit|XCTest|xpc"
+OVERLAY_NAME_ALTERNATION="AppKit|AssetsLibrary|AVFoundation|CallKit|CloudKit|Compression|Contacts|CoreAudio|CoreData|CoreGraphics|CoreImage|CoreLocation|CoreMedia|CryptoTokenKit|dispatch|Foundation|GameplayKit|GLKit|HomeKit|IOKit|Intents|MapKit|objc|OpenCL|os|Photos|QuartzCore|SafariServices|SceneKit|simd|SpriteKit|UIKit|WatchKit|XCTest|xpc"
 
 function find_deps() {
     local OVERLAY_ARG=$1
@@ -39,7 +39,7 @@ function find_deps() {
         exit 123
     fi
 
-    local REGEX="./Frameworks/(${OVERLAY_NAME_ALTERNATION}).framework/.*|.*/usr/include/(xpc|dispatch|os|objc|simd)/.*\.h"
+    local REGEX="./Frameworks/(${OVERLAY_NAME_ALTERNATION}).framework/.*|.*/usr/include/(xpc|dispatch|os|objc|simd|compression)/.*\.h"
 
     # shellcheck disable=SC1004
     IFS='\

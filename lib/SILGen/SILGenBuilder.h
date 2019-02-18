@@ -63,6 +63,14 @@ public:
                 SILBasicBlock::iterator insertInst)
       : SILGenBuilder(SGF, &*insertBB, insertInst) {}
 
+  // Create a new builder, inheriting the given builder's context and debug
+  // scope.
+  SILGenBuilder(SILGenBuilder &builder, SILBasicBlock *insertBB)
+    : SILBuilder(insertBB, builder.getCurrentDebugScope(),
+                 builder.getBuilderContext()),
+      SGF(builder.SGF)
+  {}
+
   SILGenModule &getSILGenModule() const;
   SILGenFunction &getSILGenFunction() const { return SGF; }
 
@@ -83,6 +91,10 @@ public:
                                SubstitutionMap subs,
                                ArrayRef<SILValue> args, SILBasicBlock *normalBB,
                                SILBasicBlock *errorBB);
+
+  BeginApplyInst *createBeginApply(SILLocation loc, SILValue fn,
+                                   SubstitutionMap subs,
+                                   ArrayRef<SILValue> args);
 
   PartialApplyInst *createPartialApply(SILLocation loc, SILValue fn,
                                        SILType substFnTy, SubstitutionMap subs,
@@ -154,7 +166,6 @@ public:
                                     VarDecl *field, SILType resultTy);
 
   using SILBuilder::createCopyValue;
-  using SILBuilder::createCopyUnownedValue;
 
   /// Emit a +1 copy on \p originalValue that lives until the end of the current
   /// lexical scope.
@@ -179,13 +190,17 @@ public:
   ManagedValue createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue);
 
-  ManagedValue createCopyUnownedValue(SILLocation loc,
-                                      ManagedValue originalValue);
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  using SILBuilder::createCopy##Name##Value; \
+  ManagedValue createCopy##Name##Value(SILLocation loc, \
+                                       ManagedValue originalValue);
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  ManagedValue createUnsafeCopy##Name##Value(SILLocation loc, \
+                                             ManagedValue originalValue);
+#include "swift/AST/ReferenceStorage.def"
 
-  ManagedValue createUnsafeCopyUnownedValue(SILLocation loc,
-                                            ManagedValue originalValue);
-  ManagedValue createOwnedPHIArgument(SILType type);
-  ManagedValue createGuaranteedPHIArgument(SILType type);
+  ManagedValue createOwnedPhiArgument(SILType type);
+  ManagedValue createGuaranteedPhiArgument(SILType type);
 
   using SILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
@@ -358,13 +373,13 @@ public:
 
   using SILBuilder::createConvertFunction;
   ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
-                                     SILType resultTy);
+                                     SILType resultTy,
+                                     bool WithoutActuallyEscaping = false);
 
   using SILBuilder::createConvertEscapeToNoEscape;
   ManagedValue
   createConvertEscapeToNoEscape(SILLocation loc, ManagedValue fn,
-                                SILType resultTy,
-                                bool isEscapedByUser);
+                                SILType resultTy);
 
   using SILBuilder::createStore;
   /// Forward \p value into \p address.
@@ -402,6 +417,17 @@ public:
 
   using SILBuilder::createReturn;
   ReturnInst *createReturn(SILLocation Loc, ManagedValue ReturnValue);
+
+  using SILBuilder::emitDestructureValueOperation;
+  /// Perform either a tuple or struct destructure and then pass its components
+  /// as managed value one by one with an index to the closure.
+  void emitDestructureValueOperation(
+      SILLocation loc, ManagedValue value,
+      function_ref<void(unsigned, ManagedValue)> func);
+
+  using SILBuilder::createProjectBox;
+  ManagedValue createProjectBox(SILLocation loc, ManagedValue mv,
+                                unsigned index);
 };
 
 } // namespace Lowering

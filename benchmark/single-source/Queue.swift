@@ -17,15 +17,15 @@ public let QueueGeneric = BenchmarkInfo(
   runFunction: run_QueueGeneric,
   tags: [.validation, .api],
   setUpFunction: { buildWorkload() },
-  tearDownFunction: nil)
+  legacyFactor: 10)
 
 public let QueueConcrete = BenchmarkInfo(
   name: "QueueConcrete",
   runFunction: run_QueueConcrete,
   tags: [.validation, .api],
   setUpFunction: { buildWorkload() },
-  tearDownFunction: nil)
- 
+  legacyFactor: 10)
+
 // TODO: remove when there is a native equivalent in the std lib
 extension RangeReplaceableCollection where Self: BidirectionalCollection {
   public mutating func popLast() -> Element? {
@@ -40,14 +40,14 @@ where Storage: BidirectionalCollection {
 
   internal var _in: Storage
   internal var _out: Storage
-  
+
   public init() {
     _in = Storage()
     _out = Storage()
   }
 }
 
-extension Queue {  
+extension Queue {
   public mutating func enqueue(_ newElement: Element) {
     _in.append(newElement)
   }
@@ -72,7 +72,7 @@ where Elements.Element: Equatable {
   CheckResults(j == elements.count*2)
 }
 
-let n = 10_000
+let n = 1_000
 let workload = (0..<n).map { "\($0): A long enough string to defeat the SSO, or so I hope." }
 
 public func buildWorkload() {
@@ -90,14 +90,14 @@ func run_QueueGeneric(_ scale: Int) {
 public struct ConcreteQueue {
   internal var _in: [String]
   internal var _out: [String]
-  
+
   public init() {
     _in = Array()
     _out = Array()
   }
 }
 
-extension ConcreteQueue {  
+extension ConcreteQueue {
   public mutating func enqueue(_ newElement: String) {
     _in.append(newElement)
   }
@@ -128,4 +128,3 @@ func run_QueueConcrete(_ scale: Int) {
     testConcreteQueue(elements: workload)
   }
 }
-

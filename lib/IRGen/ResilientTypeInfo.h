@@ -137,28 +137,18 @@ public:
   bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
     return true;
   }
-  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src,
-                                       SILType T) const override {
-    return emitGetExtraInhabitantIndexCall(IGF, T, src);
-  }
-  void storeExtraInhabitant(IRGenFunction &IGF,
-                            llvm::Value *index,
-                            Address dest,
-                            SILType T) const override {
-    emitStoreExtraInhabitantCall(IGF, T, index, dest);
-  }
 
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                        llvm::Value *numEmptyCases,
                                        Address enumAddr,
-                                       SILType T) const override {
+                                       SILType T,
+                                       bool isOutlined) const override {
     return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, enumAddr);
   }
 
   void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
                                  llvm::Value *numEmptyCases, Address enumAddr,
-                                 SILType T) const override {
+                                 SILType T, bool isOutlined) const override {
     emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases, enumAddr);
   }
 

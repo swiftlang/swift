@@ -3,6 +3,6 @@
 import Swift
 protocol P {
   func join<
-    S : Sequence where S.Iterator.Element == Self
-  >(elements: S) -> Self
+    S : Sequence
+  >(elements: S) -> Self where S.Iterator.Element == Self
 }

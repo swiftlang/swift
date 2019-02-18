@@ -63,6 +63,9 @@ ERROR(alignment_dynamic_type_layout_unsupported,none,
 ERROR(alignment_less_than_natural,none,
       "@_alignment cannot decrease alignment below natural alignment of %0",
       (unsigned))
+ERROR(alignment_more_than_maximum,none,
+      "@_alignment cannot increase alignment above maximum alignment of %0",
+      (unsigned))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -9,8 +9,8 @@
 
 // Make sure the ConcreteDerived : Base conformance is available here.
 
-// CHECK-LABEL: sil shared [noinline] @$S30specialize_inherited_multifile17takesHasAssocType1tyx_tAA0efG0RzlFAA08ConcreteefG0C_Tg5 : $@convention(thin) (@guaranteed ConcreteHasAssocType) -> ()
-// CHECK: [[FN:%.*]] = function_ref @$S30specialize_inherited_multifile9takesBase1tyx_tAA0E0RzlF
+// CHECK-LABEL: sil shared [noinline] @$s30specialize_inherited_multifile17takesHasAssocType1tyx_tAA0efG0RzlFAA08ConcreteefG0C_Tg5 : $@convention(thin) (@guaranteed ConcreteHasAssocType) -> ()
+// CHECK: [[FN:%.*]] = function_ref @$s30specialize_inherited_multifile9takesBase1tyx_tAA0E0RzlF
 // CHECK: apply [[FN]]<ConcreteDerived>({{%.*}})
 // CHECK: return
 

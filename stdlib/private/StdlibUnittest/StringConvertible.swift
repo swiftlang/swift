@@ -65,6 +65,10 @@ public struct CustomPrintableValue
     return value.hashValue
   }
 
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
+
   public typealias Stride = Int
 
   public func distance(to other: CustomPrintableValue) -> Stride {
@@ -168,7 +172,3 @@ public func expectDumped<T>(
   expectEqual(expected, actual, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
-
-// Local Variables:
-// eval: (read-only-mode 1)
-// End:

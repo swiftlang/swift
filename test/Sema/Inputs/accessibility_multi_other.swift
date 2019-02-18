@@ -8,7 +8,7 @@ struct Members {
   }
 }
 
-struct PrivateConformance : PrivateProtocol {}
+struct PrivateConformance : PrivateProtocol, FilePrivateProtocol {}
 
 private protocol PrivateProtocol {}
 
@@ -18,4 +18,14 @@ extension PrivateProtocol {
 
   internal func internalExtensionMember() {}
   // expected-note@-1 {{'internalExtensionMember' declared here}}
+}
+
+fileprivate protocol FilePrivateProtocol {}
+
+extension FilePrivateProtocol {
+  public func publicFPExtensionMember() {}
+  // expected-note@-1 {{'publicFPExtensionMember' declared here}}
+
+  internal func internalFPExtensionMember() {}
+  // expected-note@-1 {{'internalFPExtensionMember' declared here}}
 }

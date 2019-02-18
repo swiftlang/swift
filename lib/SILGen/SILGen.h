@@ -23,7 +23,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ProfileData/InstrProfReader.h"
 #include <deque>
 
 namespace swift {
@@ -218,12 +217,10 @@ public:
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
 
-  void emitPropertyBehavior(VarDecl *vd);
-
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
   /// Generate code for a source file of the module.
-  void emitSourceFile(SourceFile *sf, unsigned startElem);
+  void emitSourceFile(SourceFile *sf);
   
   /// Generates code for the given FuncDecl and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
@@ -231,7 +228,7 @@ public:
   /// added to the current SILModule.
   void emitFunction(FuncDecl *fd);
   
-  /// \brief Generates code for the given closure expression and adds the
+  /// Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   SILFunction *emitClosure(AbstractClosureExpr *ce);
   /// Generates code for the given ConstructorDecl and adds
@@ -249,7 +246,7 @@ public:
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                               DefaultArgumentKind kind);
+                               DefaultArgumentKind kind, DeclContext *DC);
 
   /// Emits the stored property initializer for the given pattern.
   void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);
@@ -297,7 +294,7 @@ public:
 
   /// Get or emit the witness table for a protocol conformance.
   SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
-  
+
   /// Emit a protocol witness entry point.
   SILFunction *
   emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,
@@ -307,6 +304,9 @@ public:
 
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);
+
+  /// Emit the self-conformance witness table for a protocol.
+  void emitSelfConformanceWitnessTable(ProtocolDecl *protocol);
 
   /// Emit the lazy initializer function for a global pattern binding
   /// declaration.
@@ -332,16 +332,25 @@ public:
 
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
-  
-  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
-                                 AccessKind accessKind);
-  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
+
+  /// Should the self argument of the given method always be emitted as
+  /// an r-value (meaning that it can be borrowed only if that is not
+  /// semantically detectable), or it acceptable to emit it as a borrowed
+  /// storage reference?
+  bool shouldEmitSelfAsRValue(FuncDecl *method, CanType selfType);
+
+  /// Is the self method of the given nonmutating method passed indirectly?
+  bool isNonMutatingSelfIndirect(SILDeclRef method);
+
+  SILDeclRef getAccessorDeclRef(AccessorDecl *accessor);
+
+  bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
+                                           ResilienceExpansion expansion);
 
   KeyPathPatternComponent
   emitKeyPathComponentForDecl(SILLocation loc,
                               GenericEnvironment *genericEnv,
+                              ResilienceExpansion expansion,
                               unsigned &baseOperand,
                               bool &needsGenericContext,
                               SubstitutionMap subs,
@@ -403,6 +412,9 @@ public:
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
 
+  SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
+                                             KeyPathTypeKind typeKind);
+
   /// Report a diagnostic.
   template<typename...T, typename...U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
@@ -437,6 +449,13 @@ public:
   /// property.
   SubstitutionMap
   getNonMemberVarDeclSubstitutions(VarDecl *var);
+
+  /// Map the substitutions for the original declaration to substitutions for
+  /// the overridden declaration.
+  static SubstitutionMap mapSubstitutionsForWitnessOverride(
+                                               AbstractFunctionDecl *original,
+                                               AbstractFunctionDecl *overridden,
+                                               SubstitutionMap subs);
 
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);

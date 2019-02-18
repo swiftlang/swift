@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -swift-version 3 -parse-stdlib -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=GenericSpecializer -emit-ir -O %s | %FileCheck %s
 // RUN: %target-swift-frontend -swift-version 4 -parse-stdlib -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=GenericSpecializer -emit-ir -O %s | %FileCheck %s
 //
 // Check that the -O pipeline always preserves the runtime calls for Builtin access markers and that the KeyPath implementation is fully inlined.
@@ -12,7 +11,7 @@ func marker2() -> ()
 @_silgen_name("marker3")
 func marker3() -> ()
 
-// IR-LABEL: define {{.*}}swiftcc void @"$S20preserve_exclusivity11beginAccessyyBp_BpxmtlF"(i8*, i8*, %swift.type*{{.*}}, %swift.type*{{.*}} %T1)
+// IR-LABEL: define {{.*}}swiftcc void @"$s20preserve_exclusivity11beginAccessyyBp_BpxmtlF"(i8*, i8*, %swift.type*{{.*}}, %swift.type*{{.*}} %T1)
 // IR:   call void @swift_beginAccess
 // IR-NEXT: ret void
 
@@ -21,7 +20,7 @@ public func beginAccess<T1>(_ address: Builtin.RawPointer, _ scratch: Builtin.Ra
   Builtin.beginUnpairedModifyAccess(address, scratch, ty1);
 }
 
-// CHECK-LABEL: define {{.*}}swiftcc void @"$S20preserve_exclusivity9endAccessyyBpF"(i8*{{.*}})
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s20preserve_exclusivity9endAccessyyBpF"(i8*{{.*}})
 // CHECK:   call void @swift_endAccess
 // CHECK-NEXT: ret void
 public func endAccess(_ address: Builtin.RawPointer) {
@@ -29,10 +28,9 @@ public func endAccess(_ address: Builtin.RawPointer) {
   Builtin.endUnpairedAccess(address)
 }
 
-// CHECK-LABEL: define {{.*}}swiftcc void @"$S20preserve_exclusivity10readAccessyyBp_xmtlF"(i8*, %swift.type*{{.*}}, %swift.type*{{.*}} %T1)
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s20preserve_exclusivity10readAccessyyBp_xmtlF"(i8*, %swift.type*{{.*}}, %swift.type*{{.*}} %T1)
 // CHECK:   call void @swift_beginAccess
 // CHECK: ret void
-@_semantics("optimize.sil.preserve_exclusivity")
 public func readAccess<T1>(_ address: Builtin.RawPointer, _ ty1: T1.Type) {
   marker3()
   Builtin.performInstantaneousReadAccess(address, ty1);
@@ -40,7 +38,7 @@ public func readAccess<T1>(_ address: Builtin.RawPointer, _ ty1: T1.Type) {
 
 // Make sure testAccess properly inlines in our functions.
 //
-// CHECK-LABEL: define {{.*}}swiftcc void @"$S20preserve_exclusivity10testAccessyyBpF"(i8*)
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s20preserve_exclusivity10testAccessyyBpF"(i8*)
 // CHECK: call swiftcc void @marker1
 // CHECK: call void @swift_beginAccess
 // CHECK: call swiftcc void @marker2

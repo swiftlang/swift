@@ -147,7 +147,7 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   }
 
   CompilerInvocation Invocation;
-  bool Failed = Lang.getASTManager().initCompilerInvocation(
+  bool Failed = Lang.getASTManager()->initCompilerInvocation(
       Invocation, Args, CI.getDiags(), InputFile->getBufferIdentifier(), Error);
   if (Failed) {
     return false;

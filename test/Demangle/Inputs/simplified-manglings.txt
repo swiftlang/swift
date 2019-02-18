@@ -1,4 +1,4 @@
-_TtBf80_ ---> Builtin.Float80
+_TtBf80_ ---> Builtin.FPIEEE80
 _TtBi32_ ---> Builtin.Int32
 _TtBw ---> Builtin.Word
 _TtBO ---> Builtin.UnknownObject

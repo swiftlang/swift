@@ -184,10 +184,10 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
   else if (Target.isOSFreeBSD())
     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
-  else if (Target.isOSWindows())
-    addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
   else if (Target.isWindowsCygwinEnvironment())
     addPlatformConditionValue(PlatformConditionKind::OS, "Cygwin");
+  else if (Target.isOSWindows())
+    addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
   else if (Target.isPS4())
     addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
   else if (Target.isOSHaiku())

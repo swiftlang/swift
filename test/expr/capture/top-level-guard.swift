@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s > /dev/null
 
-// RUN: %target-swift-frontend -dump-ast -DVAR %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast -DVAR %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir -DVAR %s > /dev/null
 
 // CHECK: (top_level_code_decl
@@ -32,7 +32,7 @@ let closure: () -> Void = {
 // CHECK: location={{.*}}top-level-guard.swift:[[@LINE+5]]
 // CHECK: (closure_expr
 // CHECK: location={{.*}}top-level-guard.swift:[[@LINE+3]]
-// CHECK: captures=(x)
+// CHECK: captures=(x<direct>)
 // CHECK: (var_decl{{.*}}"closureCapture"
 let closureCapture: () -> Void = { [x] in
   _ = x

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -emit-sorted-sil -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -emit-sorted-sil %s | %FileCheck %s
 
 import Builtin
 import Swift

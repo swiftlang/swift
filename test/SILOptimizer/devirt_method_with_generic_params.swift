@@ -10,7 +10,7 @@ class S<T> {
 // No remaining class_method or apply instructions
 // should be present after optimizations are applied.
 
-// CHECK-LABEL: sil @$S33devirt_method_with_generic_params38testDevirtMethodWithItsOwnGenericParamSiyF
+// CHECK-LABEL: sil @$s33devirt_method_with_generic_params38testDevirtMethodWithItsOwnGenericParamSiyF
 // CHECK-NOT: class_method
 // CHECK-NOT: apply
 // CHECK: return

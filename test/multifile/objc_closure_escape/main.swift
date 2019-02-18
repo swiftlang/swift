@@ -2,6 +2,7 @@
 // RUN: %target-swiftc_driver -emit-objc-header %S/../Inputs/objc-escape/DangerousEscaper.swift -emit-objc-header-path %t/DangerousEscaper.h
 // RUN: %target-clang -c %S/../Inputs/objc-escape/Escaper.m -fobjc-arc -I %t -o %t/Escaper.o
 // RUN: %target-swiftc_driver -import-objc-header %S/../Inputs/objc-escape/Escaper.h %S/../Inputs/objc-escape/DangerousEscaper.swift %s %t/Escaper.o -o %t/TestObjcProto
+// RUN: %target-codesign %t/TestObjcProto
 // RUN: %target-run %t/TestObjcProto 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -41,7 +42,7 @@ public func test() {
 }
 
 testSuite.test("testEscaping") {
-// CHECK: closure argument passed as @noescape to Objective-C has escaped: file {{.*}}main.swift, line 19, column 26
+// CHECK: closure argument passed as @noescape to Objective-C has escaped: file {{.*}}main.swift, line 20, column 26
   expectCrashLater()
   test()
 }

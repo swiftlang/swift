@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift %t/main.swift %S/Inputs/CodableMultifileOther.swift -module-name main -o %t/main
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 // REQUIRES: executable_test
 

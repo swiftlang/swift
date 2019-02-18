@@ -19,8 +19,8 @@
 namespace swift {
 namespace hashable_support {
 
-extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s8Hashable);
-static constexpr auto &HashableProtocolDescriptor = PROTOCOL_DESCR_SYM(s8Hashable);
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(SH);
+static constexpr auto &HashableProtocolDescriptor = PROTOCOL_DESCR_SYM(SH);
 
 struct HashableWitnessTable;
 

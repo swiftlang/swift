@@ -84,6 +84,11 @@ protected:
     CaseCount : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(YieldStmt, Stmt, 32,
+    : NumPadBits,
+    NumYields : 32
+  );
+
   } Bits;
 
   /// Return the given value for the 'implicit' flag if present, or if None,
@@ -101,17 +106,17 @@ public:
 
   StmtKind getKind() const { return StmtKind(Bits.Stmt.Kind); }
 
-  /// \brief Retrieve the name of the given statement kind.
+  /// Retrieve the name of the given statement kind.
   ///
   /// This name should only be used for debugging dumps and other
   /// developer aids, and should never be part of a diagnostic or exposed
   /// to the user of the compiler in any way.
   static StringRef getKindName(StmtKind kind);
 
-  /// \brief Return the location of the start of the statement.
+  /// Return the location of the start of the statement.
   SourceLoc getStartLoc() const;
   
-  /// \brief Return the location of the end of the statement.
+  /// Return the location of the end of the statement.
   SourceLoc getEndLoc() const;
   
   SourceRange getSourceRange() const;
@@ -128,7 +133,7 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
-  void print(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
+  void dump(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
@@ -209,7 +214,49 @@ public:
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Return;}
 };
+
+/// YieldStmt - A yield statement.  The yield-values sequence is not optional,
+/// but the parentheses are.
+///    yield 42
+class YieldStmt final
+    : public Stmt, private llvm::TrailingObjects<YieldStmt, Expr*> {
+  friend TrailingObjects;
+
+  SourceLoc YieldLoc;
+  SourceLoc LPLoc;
+  SourceLoc RPLoc;
+
+  YieldStmt(SourceLoc yieldLoc, SourceLoc lpLoc, ArrayRef<Expr *> yields,
+            SourceLoc rpLoc, Optional<bool> implicit = None)
+    : Stmt(StmtKind::Yield, getDefaultImplicitFlag(implicit, yieldLoc)),
+      YieldLoc(yieldLoc), LPLoc(lpLoc), RPLoc(rpLoc) {
+    Bits.YieldStmt.NumYields = yields.size();
+    memcpy(getMutableYields().data(), yields.data(),
+           yields.size() * sizeof(Expr*));
+  }
+
+public:
+  static YieldStmt *create(const ASTContext &ctx, SourceLoc yieldLoc,
+                           SourceLoc lp, ArrayRef<Expr*> yields, SourceLoc rp,
+                           Optional<bool> implicit = None);
+
+  SourceLoc getYieldLoc() const { return YieldLoc; }
+  SourceLoc getLParenLoc() const { return LPLoc; }
+  SourceLoc getRParenLoc() const { return RPLoc; }
+
+  SourceLoc getStartLoc() const { return YieldLoc; }
+  SourceLoc getEndLoc() const;
+
+  ArrayRef<Expr*> getYields() const {
+    return {getTrailingObjects<Expr*>(), Bits.YieldStmt.NumYields};
+  }
+  MutableArrayRef<Expr*> getMutableYields() {
+    return {getTrailingObjects<Expr*>(), Bits.YieldStmt.NumYields};
+  }
   
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Yield; }
+};
+
 /// DeferStmt - A 'defer' statement.  This runs the substatement it contains
 /// when the enclosing scope is exited.
 ///
@@ -260,7 +307,7 @@ public:
 };
 
   
-/// \brief An expression that guards execution based on whether the run-time
+/// An expression that guards execution based on whether the run-time
 /// configuration supports a given API, e.g.,
 /// #available(OSX >= 10.9, iOS >= 7.0).
 class alignas(8) PoundAvailableInfo final :
@@ -1175,6 +1222,31 @@ public:
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Throw;
+  }
+};
+
+/// PoundAssertStmt - Asserts that a condition is true, at compile time.
+class PoundAssertStmt : public Stmt {
+  SourceRange Range;
+  Expr *Condition;
+  StringRef Message;
+
+ public:
+  PoundAssertStmt(SourceRange Range, Expr *condition, StringRef message)
+      : Stmt(StmtKind::PoundAssert, /*Implicit=*/false),
+        Range(Range),
+        Condition(condition),
+        Message(message) {}
+
+  SourceRange getSourceRange() const { return Range; }
+
+  Expr *getCondition() const { return Condition; }
+  StringRef getMessage() const { return Message; }
+
+  void setCondition(Expr *condition) { Condition = condition; }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::PoundAssert;
   }
 };
 

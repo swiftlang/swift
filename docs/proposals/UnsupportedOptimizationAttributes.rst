@@ -50,7 +50,7 @@ about 10 times.
 
     public init (_ v : T) {t = v}
 
-    @_specialize(Int)
+    @_specialize(where T == Int)
     public func play() {
       for _ in 0...100_000_000 { t = t.ping() }
     }
@@ -59,5 +59,5 @@ about 10 times.
   /// -----------------
   /// Application.swift
 
-  Game(10).play
+  Game(10).play()
 

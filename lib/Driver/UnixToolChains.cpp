@@ -21,7 +21,6 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
@@ -86,7 +85,10 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
     const AutolinkExtractJobAction &job, const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_AutolinkFile);
 
-  ArgStringList Arguments;
+  InvocationInfo II{"swift-autolink-extract"};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
+
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
@@ -95,12 +97,13 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return {"swift-autolink-extract", Arguments};
+  return II;
 }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
   switch (getTriple().getArch()) {
   case llvm::Triple::arm:
+  case llvm::Triple::aarch64:
   case llvm::Triple::armeb:
   case llvm::Triple::thumb:
   case llvm::Triple::thumbeb:
@@ -109,6 +112,7 @@ std::string toolchains::GenericUnix::getDefaultLinker() const {
     // final executables, as such, unless specified, we default to gold
     // linker.
     return "gold";
+  case llvm::Triple::x86:
   case llvm::Triple::x86_64:
   case llvm::Triple::ppc64:
   case llvm::Triple::ppc64le:
@@ -298,9 +302,13 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
       if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
 
+      if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
+        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "ubsan", *this);
+
       if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
         addLinkRuntimeLib(context.Args, Arguments,
                           sanitizerRuntimeLibName("fuzzer"));
+
     }
   }
 
@@ -317,25 +325,35 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
         Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
   }
 
-  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
+  // Run clang++ in verbose mode if "-v" is set
+  if (context.Args.hasArg(options::OPT_v)) {
+    Arguments.push_back("-v");
+  }
+
+  // These custom arguments should be right before the object file at the end.
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
+  context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return {Clang, Arguments};
+  InvocationInfo II{Clang, Arguments};
+  II.allowsResponseFiles = true;
+
+  return II;
 }
 
 std::string toolchains::Android::getTargetForLinker() const {
-  // Explicitly set the linker target to "androideabi", as opposed to the
-  // llvm::Triple representation of "armv7-none-linux-android".
-  // This is the only ABI we currently support for Android.
-  assert(getTriple().getArch() == llvm::Triple::arm &&
-         getTriple().getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7 &&
-         "Only armv7 targets are supported for Android");
-  return "armv7-none-linux-androideabi";
+  const llvm::Triple &T = getTriple();
+  if (T.getArch() == llvm::Triple::arm &&
+      T.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7)
+    // Explicitly set the linker target to "androideabi", as opposed to the
+    // llvm::Triple representation of "armv7-none-linux-android".
+    return "armv7-none-linux-androideabi";
+  return T.str();
 }
 
 bool toolchains::Android::shouldProvideRPathToLinker() const { return false; }

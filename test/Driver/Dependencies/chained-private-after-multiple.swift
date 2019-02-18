@@ -1,7 +1,8 @@
 /// other --> main ==> yet-another
 /// other ==>+ main ==> yet-another
 
-// RUN: rm -rf %t && cp -r %S/Inputs/chained-private-after-multiple/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/chained-private-after-multiple/* %t
 // RUN: touch -t 201401240005 %t/*.swift
 
 // Generate the build record...

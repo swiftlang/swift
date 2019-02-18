@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s
+// RUN: %target-sil-opt %s
 // REQUIRES: asserts
 
 sil_stage canonical

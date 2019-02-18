@@ -34,14 +34,14 @@ public:
       ProtocolImplementations;
 
   ClassHierarchyAnalysis(SILModule *Mod)
-      : SILAnalysis(AnalysisKind::ClassHierarchy), M(Mod) {
-      init(); 
-    }
+      : SILAnalysis(SILAnalysisKind::ClassHierarchy), M(Mod) {
+    init();
+  }
 
   ~ClassHierarchyAnalysis();
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::ClassHierarchy;
+    return S->getKind() == SILAnalysisKind::ClassHierarchy;
   }
 
   /// Invalidate all information in this analysis.
@@ -54,11 +54,11 @@ public:
   virtual void invalidate(SILFunction *F, InvalidationKind K) override { }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override { }
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override { }
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {}
 
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() override { }

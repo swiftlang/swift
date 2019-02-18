@@ -14,7 +14,7 @@ struct Baz {
   var x = 42
 }
 
-// CHECK: sil hidden @$S27capture_promotion_ownership05test_a1_B0SiycyF
+// CHECK: sil hidden @$s27capture_promotion_ownership05test_a1_B0SiycyF
 func test_capture_promotion() -> () -> Int {
   var x : Int = 1; x = 1
   var y : Foo = Foo(); y = Foo()
@@ -22,11 +22,11 @@ func test_capture_promotion() -> () -> Int {
 
 // CHECK-NOT: alloc_box
 
-// CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @$S27capture_promotion_ownership05test_a1_B0SiycyFSiycfU_Tf2iii_n
+// CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @$s27capture_promotion_ownership05test_a1_B0SiycyFSiycfU_Tf2iii_n
 // CHECK: partial_apply [callee_guaranteed] [[CLOSURE0_PROMOTE0]]({{%[0-9]*}}, {{%[0-9]*}}, {{%[0-9]*}})
 
   return { x + y.foo() + z.x }
 }
 
-// CHECK: sil private @$S27capture_promotion_ownership05test_a1_B0SiycyFSiycfU_Tf2iii_n : $@convention(thin) (Int, @guaranteed Foo, @guaranteed Baz) -> Int
+// CHECK: sil private @$s27capture_promotion_ownership05test_a1_B0SiycyFSiycfU_Tf2iii_n : $@convention(thin) (Int, @guaranteed Foo, @guaranteed Baz) -> Int
 

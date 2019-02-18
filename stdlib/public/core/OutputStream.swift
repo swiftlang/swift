@@ -72,13 +72,17 @@ public protocol TextOutputStream {
 
   /// Appends the given string to the stream.
   mutating func write(_ string: String)
+
+  mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>)
 }
 
 extension TextOutputStream {
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func _lock() {}
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func _unlock() {}
+
+  public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
+    write(String._fromASCII(buffer))
+  }
 }
 
 /// A source of text-streaming operations.
@@ -269,16 +273,13 @@ public protocol CustomDebugStringConvertible {
 // Default (ad-hoc) printing
 //===----------------------------------------------------------------------===//
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_EnumCaseName")
 internal func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_OpaqueSummary")
 internal func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 
 /// Do our best to print a value that cannot be printed directly.
-@inlinable // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.never")
 internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream,
@@ -374,7 +375,6 @@ internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
 }
 
 @usableFromInline
-@inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
 internal func _print_unlocked<T, TargetStream : TextOutputStream>(
   _ value: T, _ target: inout TargetStream
@@ -408,31 +408,6 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
   _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: false)
 }
 
-/// Returns the result of `print`'ing `x` into a `String`.
-///
-/// Exactly the same as `String`, but annotated 'readonly' to allow
-/// the optimizer to remove calls where results are unused.
-///
-/// This function is forbidden from being inlined because when building the
-/// standard library inlining makes us drop the special semantics.
-@inline(never) @effects(readonly)
-@usableFromInline
-internal func _toStringReadOnlyStreamable<
-  T : TextOutputStreamable
->(_ x: T) -> String {
-  var result = ""
-  x.write(to: &result)
-  return result
-}
-
-@inline(never) @effects(readonly)
-@usableFromInline
-internal func _toStringReadOnlyPrintable<
-  T : CustomStringConvertible
->(_ x: T) -> String {
-  return x.description
-}
-
 //===----------------------------------------------------------------------===//
 // `debugPrint`
 //===----------------------------------------------------------------------===//
@@ -461,7 +436,6 @@ public func _debugPrint_unlocked<T, TargetStream : TextOutputStream>(
   _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
 }
 
-@inlinable // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.never")
 internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream
@@ -533,46 +507,36 @@ internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
 // OutputStreams
 //===----------------------------------------------------------------------===//
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal struct _Stdout : TextOutputStream {
-  @inlinable // FIXME(sil-serialize-all)
   internal init() {}
 
-  @inlinable // FIXME(sil-serialize-all)
   internal mutating func _lock() {
     _swift_stdlib_flockfile_stdout()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal mutating func _unlock() {
     _swift_stdlib_funlockfile_stdout()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal mutating func write(_ string: String) {
     if string.isEmpty { return }
 
-    if _fastPath(string._guts.isASCII) {
-      defer { _fixLifetime(string) }
-      let ascii = string._guts._unmanagedASCIIView
-      _stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
-      return
-    }
-
-    for c in string.utf8 {
-      _stdlib_putchar_unlocked(Int32(c))
+    _ = string._withUTF8 { utf8 in
+      _swift_stdlib_fwrite_stdout(utf8.baseAddress!, 1, utf8.count)
     }
   }
 }
 
 extension String : TextOutputStream {
   /// Appends the given string to this string.
-  /// 
+  ///
   /// - Parameter other: A string to append.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func write(_ other: String) {
     self += other
+  }
+
+  public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
+    self._guts.append(_StringGuts(buffer, isASCII: true))
   }
 }
 
@@ -582,9 +546,8 @@ extension String : TextOutputStream {
 
 extension String : TextOutputStreamable {
   /// Writes the string into the given output stream.
-  /// 
+  ///
   /// - Parameter target: An output stream.
-  @inlinable // FIXME(sil-serialize-all)
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(self)
   }
@@ -594,7 +557,6 @@ extension Character : TextOutputStreamable {
   /// Writes the character into the given output stream.
   ///
   /// - Parameter target: An output stream.
-  @inlinable // FIXME(sil-serialize-all)
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(String(self))
   }
@@ -605,7 +567,6 @@ extension Unicode.Scalar : TextOutputStreamable {
   /// output stream.
   ///
   /// - Parameter target: An output stream.
-  @inlinable // FIXME(sil-serialize-all)
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(String(Character(self)))
   }
@@ -614,42 +575,24 @@ extension Unicode.Scalar : TextOutputStreamable {
 /// A hook for playgrounds to print through.
 public var _playgroundPrintHook : ((String) -> Void)? = nil
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal struct _TeeStream<
   L : TextOutputStream,
   R : TextOutputStream
 > : TextOutputStream {
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init(left: L, right: R) {
     self.left = left
     self.right = right
   }
 
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var left: L
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var right: R
   
   /// Append the given `string` to this stream.
-  @inlinable // FIXME(sil-serialize-all)
   internal mutating func write(_ string: String) {
     left.write(string); right.write(string)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal mutating func _lock() { left._lock(); right._lock() }
-  @inlinable // FIXME(sil-serialize-all)
   internal mutating func _unlock() { right._unlock(); left._unlock() }
-}
-
-@available(*, unavailable, renamed: "TextOutputStream")
-public typealias OutputStreamType = TextOutputStream
-
-extension TextOutputStreamable {
-  @available(*, unavailable, renamed: "write(to:)")
-  public func writeTo<Target : TextOutputStream>(_ target: inout Target) {
-    Builtin.unreachable()
-  }
 }

@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/main -import-objc-header %S/Inputs/objc_bridge_cast_newtype.h
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 
 // REQUIRES: executable_test

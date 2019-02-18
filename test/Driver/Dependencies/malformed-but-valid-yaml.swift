@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && cp -r %S/Inputs/malformed-but-valid-yaml/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/malformed-but-valid-yaml/* %t
 // RUN: touch -t 201401240005 %t/*.swift
 
 // Generate the build record...
@@ -24,7 +25,8 @@
 // CHECK-THIRD: Handled main.swift
 // CHECK-THIRD: Handled other.swift
 
-// RUN: rm -rf %t && cp -r %S/Inputs/malformed-but-valid-yaml/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/malformed-but-valid-yaml/* %t
 // RUN: touch -t 201401240005 %t/*.swift
 
 // Generate the build record...

@@ -78,6 +78,7 @@ public protocol _ObjectiveCBridgeable {
   /// implementation of `Swift.Array`'s conformance to
   /// `_ObjectiveCBridgeable` will produce an empty array rather than
   /// dynamically failing.
+  @_effects(readonly)
   static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self
 }
@@ -93,24 +94,19 @@ public protocol _ObjectiveCBridgeable {
 /// a metatype, make it conform to _ObjectiveCBridgeable, and its witness table
 /// will be ABI-compatible with one that directly provided conformance to the
 /// metatype type itself.
-@_fixed_layout
 public struct _BridgeableMetatype: _ObjectiveCBridgeable {
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var value: AnyObject.Type
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init(value: AnyObject.Type) {
     self.value = value
   }
 
   public typealias _ObjectiveCType = AnyObject
 
-  @inlinable // FIXME(sil-serialize-all)
   public func _bridgeToObjectiveC() -> AnyObject {
     return value
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public static func _forceBridgeFromObjectiveC(
     _ source: AnyObject,
     result: inout _BridgeableMetatype?
@@ -118,7 +114,6 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
     result = _BridgeableMetatype(value: source as! AnyObject.Type)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public static func _conditionallyBridgeFromObjectiveC(
     _ source: AnyObject,
     result: inout _BridgeableMetatype?
@@ -132,7 +127,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
     return false
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
       -> _BridgeableMetatype {
     var result: _BridgeableMetatype?
@@ -144,7 +139,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 
 //===--- Bridging facilities written in Objective-C -----------------------===//
 // Functions that must discover and possibly use an arbitrary type's
-// conformance to a given protocol.  See ../runtime/Metadata.cpp for
+// conformance to a given protocol.  See ../runtime/Casting.cpp for
 // implementations.
 //===----------------------------------------------------------------------===//
 
@@ -161,8 +156,8 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 ///   that is `id`-compatible and dynamically castable back to the type of
 ///   the boxed value, but is otherwise opaque.
 ///
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
+@inlinable
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
@@ -171,7 +166,8 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
 }
 
 @_silgen_name("")
-public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObject
+public // @testable
+func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObject
 
 /// Convert a purportedly-nonnull `id` value from Objective-C into an Any.
 ///
@@ -179,8 +175,7 @@ public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObje
 /// this includes a failsafe against nil `AnyObject`s, wrapping them up as
 /// a nil `AnyObject?`-inside-an-`Any`.
 ///
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
 public func _bridgeAnyObjectToAny(_ possiblyNullObject: AnyObject?) -> Any {
   if let nonnullObject = possiblyNullObject {
     return nonnullObject // AnyObject-in-Any
@@ -199,7 +194,7 @@ public func _bridgeAnyObjectToAny(_ possiblyNullObject: AnyObject?) -> Any {
 ///     or a subclass of it, trap;
 ///   + otherwise, returns the result of `T._forceBridgeFromObjectiveC(x)`;
 /// - otherwise, trap.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as! T
@@ -212,8 +207,8 @@ public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
 
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
+@inlinable
 public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -235,7 +230,7 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
 ///   + otherwise, returns the result of
 ///     `T._conditionallyBridgeFromObjectiveC(x)`;
 /// - otherwise, the result is empty.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _conditionallyBridgeFromObjectiveC<T>(
   _ x: AnyObject,
   _: T.Type
@@ -251,8 +246,8 @@ public func _conditionallyBridgeFromObjectiveC<T>(
 
 /// Attempt to convert `x` from its Objective-C representation to its Swift
 /// representation.
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
+@inlinable
 public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -263,7 +258,8 @@ public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeabl
 }
 
 @_silgen_name("")
-public func _bridgeNonVerbatimFromObjectiveC<T>(
+@usableFromInline
+internal func _bridgeNonVerbatimFromObjectiveC<T>(
   _ x: AnyObject,
   _ nativeType: T.Type,
   _ result: inout T?
@@ -307,7 +303,6 @@ public func _bridgeNonVerbatimFromObjectiveCConditional<T>(
 ///
 /// - If `T` is a class type, returns `true`;
 /// - otherwise, returns whether `T` conforms to `_ObjectiveCBridgeable`.
-@inlinable // FIXME(sil-serialize-all)
 public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return true
@@ -341,12 +336,6 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-internal var _nilNativeObject: AnyObject? {
-  return nil
-}
-
 /// A mutable pointer-to-ObjC-pointer argument.
 ///
 /// This type has implicit conversions to allow passing any of the following
@@ -373,7 +362,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
 
   public let _rawValue: Builtin.RawPointer
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public // COMPILER_INTRINSIC
   init(_ _rawValue: Builtin.RawPointer) {
@@ -386,10 +374,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///   `Pointee`.
   @inlinable
   public var pointee: Pointee {
-    /// Retrieve the value the pointer points to.
-    @_transparent get {
+    @_transparent _read {
       // We can do a strong load normally.
-      return UnsafePointer(self).pointee
+      yield UnsafePointer(self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -423,46 +410,44 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// `self`.
   ///
   /// - Precondition: `self != nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public subscript(i: Int) -> Pointee {
     @_transparent
-    get {
+    _read {
       // We can do a strong load normally.
-      return (UnsafePointer<Pointee>(self) + i).pointee
+      yield ((UnsafePointer<Pointee>(self) + i).pointee)
     }
   }
 
-  /// Explicit construction from an UnsafeMutablePointer.
-  ///
-  /// This is inherently unsafe; UnsafeMutablePointer assumes the
-  /// referenced memory has +1 strong ownership semantics, whereas
-  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
-  ///
-  /// - Warning: Accessing `pointee` as a type that is unrelated to
-  ///   the underlying memory's bound type is undefined.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init<U>(_ from: UnsafeMutablePointer<U>) {
-    self._rawValue = from._rawValue
-  }
+  /// Explicit construction from an UnsafeMutablePointer.		
+  ///		
+  /// This is inherently unsafe; UnsafeMutablePointer assumes the		
+  /// referenced memory has +1 strong ownership semantics, whereas		
+  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.		
+  ///		
+  /// - Warning: Accessing `pointee` as a type that is unrelated to		
+  ///   the underlying memory's bound type is undefined.		
+  @_transparent		
+  public init<U>(_ from: UnsafeMutablePointer<U>) {		
+   self._rawValue = from._rawValue		
+  }		
 
-  /// Explicit construction from an UnsafeMutablePointer.
-  ///
-  /// Returns nil if `from` is nil.
-  ///
-  /// This is inherently unsafe; UnsafeMutablePointer assumes the
-  /// referenced memory has +1 strong ownership semantics, whereas
-  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
-  ///
-  /// - Warning: Accessing `pointee` as a type that is unrelated to
-  ///   the underlying memory's bound type is undefined.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?<U>(_ from: UnsafeMutablePointer<U>?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
+  /// Explicit construction from an UnsafeMutablePointer.		
+  ///		
+  /// Returns nil if `from` is nil.		
+  ///		
+  /// This is inherently unsafe; UnsafeMutablePointer assumes the		
+  /// referenced memory has +1 strong ownership semantics, whereas		
+  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.		
+  ///		
+  /// - Warning: Accessing `pointee` as a type that is unrelated to		
+  ///   the underlying memory's bound type is undefined.		
+  @_transparent		
+  public init?<U>(_ from: UnsafeMutablePointer<U>?) {		
+   guard let unwrapped = from else { return nil }		
+   self.init(unwrapped)		
   }
-
+     
   /// Explicit construction from a UnsafePointer.
   ///
   /// This is inherently unsafe because UnsafePointers do not imply
@@ -470,8 +455,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init<U>(_ from: UnsafePointer<U>) {
     self._rawValue = from._rawValue
   }
@@ -485,22 +469,10 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init?<U>(_ from: UnsafePointer<U>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
-  }
-}
-
-extension AutoreleasingUnsafeMutablePointer: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func == (
-    lhs: AutoreleasingUnsafeMutablePointer,
-    rhs: AutoreleasingUnsafeMutablePointer
-  ) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
 }
 
@@ -509,7 +481,6 @@ extension UnsafeMutableRawPointer {
   /// instance.
   ///
   /// - Parameter other: The pointer to convert.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
@@ -520,7 +491,6 @@ extension UnsafeMutableRawPointer {
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -533,7 +503,6 @@ extension UnsafeRawPointer {
   /// instance.
   ///
   /// - Parameter other: The pointer to convert.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
@@ -544,7 +513,6 @@ extension UnsafeRawPointer {
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -552,58 +520,30 @@ extension UnsafeRawPointer {
   }
 }
 
-extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
-  @inlinable
-  public var debugDescription: String {
-    return _rawPointerToString(_rawValue)
-  }
-}
-
-@_fixed_layout
-@usableFromInline
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item0: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item1: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item2: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item3: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item4: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item5: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item6: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item7: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item8: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item9: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item10: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item11: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item12: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item13: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item14: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item15: UnsafeRawPointer?
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   internal var count: Int {
     return 16
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init() {
     _item0 = nil
     _item1 = _item0
@@ -622,7 +562,7 @@ internal struct _CocoaFastEnumerationStackBuf {
     _item14 = _item0
     _item15 = _item0
 
-    _sanityCheck(MemoryLayout.size(ofValue: self) >=
+    _internalInvariant(MemoryLayout.size(ofValue: self) >=
                    MemoryLayout<Optional<UnsafeRawPointer>>.size * count)
   }
 }
@@ -631,7 +571,6 @@ internal struct _CocoaFastEnumerationStackBuf {
 ///
 /// This is used by the Foundation overlays. The compiler will error if the
 /// passed-in type is generic or not representable in Objective-C
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func _getObjCTypeEncoding<T>(_ type: T.Type) -> UnsafePointer<Int8> {
   // This must be `@_transparent` because `Builtin.getObjCTypeEncoding` is
@@ -648,8 +587,8 @@ public func _getObjCTypeEncoding<T>(_ type: T.Type) -> UnsafePointer<Int8> {
 
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
-/// COMPILER_INTRINSIC
-@_inlineable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
+@inlinable
 public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -661,8 +600,8 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
 
 /// Attempt to convert `x` from its Objective-C representation to its Swift
 /// representation.
-/// COMPILER_INTRINSIC
-@_inlineable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
+@inlinable
 public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -680,7 +619,7 @@ protocol _NSSwiftValue: class {
 }
 
 @usableFromInline
-internal class _SwiftValue {
+internal class __SwiftValue {
   @usableFromInline
   let value: Any
   
@@ -690,7 +629,7 @@ internal class _SwiftValue {
   }
   
   @usableFromInline
-  static let null = _SwiftValue(Optional<Any>.none as Any)
+  static let null = __SwiftValue(Optional<Any>.none as Any)
 }
 
 // Internal stdlib SPI
@@ -707,7 +646,7 @@ public func swift_unboxFromSwiftValueWithType<T>(
     }
   }
     
-  if let box = source as? _SwiftValue {
+  if let box = source as? __SwiftValue {
     if let value = box.value as? T {
       result.initialize(to: value)
       return true
@@ -728,7 +667,7 @@ public func _swiftValueConformsTo<T>(_ type: T.Type) -> Bool {
   if let foundationType = _foundationSwiftValueType {
     return foundationType is T.Type
   } else {
-    return _SwiftValue.self is T.Type
+    return __SwiftValue.self is T.Type
   }
 }
 
@@ -738,25 +677,24 @@ public func _extractDynamicValue<T>(_ value: T) -> AnyObject?
 @_silgen_name("_swift_bridgeToObjectiveCUsingProtocolIfPossible")
 public func _bridgeToObjectiveCUsingProtocolIfPossible<T>(_ value: T) -> AnyObject?
 
-@usableFromInline
-protocol _Unwrappable {
-  func unwrap() -> Any?
+internal protocol _Unwrappable {
+  func _unwrap() -> Any?
 }
 
 extension Optional: _Unwrappable {
-  func unwrap() -> Any? {
+  internal func _unwrap() -> Any? {
     return self
   }
 }
 
-private let _foundationSwiftValueType = _typeByName("Foundation._SwiftValue") as? _NSSwiftValue.Type
+private let _foundationSwiftValueType = _typeByName("Foundation.__SwiftValue") as? _NSSwiftValue.Type
 
 @usableFromInline
 internal var _nullPlaceholder: AnyObject {
   if let foundationType = _foundationSwiftValueType {
     return foundationType.null
   } else {
-    return _SwiftValue.null
+    return __SwiftValue.null
   }
 }
 
@@ -765,7 +703,7 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
   if let foundationType = _foundationSwiftValueType {
     return foundationType.init(value)
   } else {
-    return _SwiftValue(value)
+    return __SwiftValue(value)
   }
 }
 
@@ -782,13 +720,12 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
 ///   that is `id`-compatible and dynamically castable back to the type of
 ///   the boxed value, but is otherwise opaque.
 ///
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   var done = false
   var result: AnyObject!
   
-  var source: Any = x
+  let source: Any = x
   
   if let dynamicSource = _extractDynamicValue(x) {
     result = dynamicSource as AnyObject
@@ -796,7 +733,7 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   }
   
   if !done, let wrapper = source as? _Unwrappable {
-    if let value = wrapper.unwrap() {
+    if let value = wrapper._unwrap() {
       result = value as AnyObject
     } else {
       result = _nullPlaceholder

@@ -124,7 +124,8 @@ extension L {
 // INSIDE_L_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
 
 // FIXME: <rdar://problem/20530021> Code complete generic parameters in extensions
-// disabled_INSIDE_L_0-DAG: Decl[Constructor]/CurrNominal:    X({#x: A#})[#X#]{{; name=.+}}
+// INSIDE_L_0-DAG: Decl[GenericTypeParam]/Local:     X[#X#]; name=X
+// INSIDE_L_0-DAG: Decl[Constructor]/Local:          X({#x: A#})[#G#]{{; name=.+}}
 
 // INSIDE_L_0: End completions
 
@@ -136,7 +137,7 @@ struct M<X: G> {
 }
 // INSIDE_M_0: Begin completions
 // INSIDE_M_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
-// INSIDE_M_0-DAG: Decl[Constructor]/CurrNominal:    X({#x: A#})[#G#]{{; name=.+}}
+// INSIDE_M_0-DAG: Decl[Constructor]/Local:          X({#x: A#})[#G#]{{; name=.+}}
 // INSIDE_M_0: End completions
 
 typealias CAlias = C

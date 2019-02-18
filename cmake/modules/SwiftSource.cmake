@@ -17,7 +17,7 @@ function(handle_swift_sources
   cmake_parse_arguments(SWIFTSOURCES
       "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT"
-      "DEPENDS;API_NOTES;COMPILE_FLAGS;MODULE_NAME"
+      "DEPENDS;COMPILE_FLAGS;MODULE_NAME"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
   translate_flag(${SWIFTSOURCES_IS_STDLIB} "IS_STDLIB" IS_STDLIB_arg)
@@ -74,10 +74,6 @@ function(handle_swift_sources
     # <rdar://problem/15972329>
     list(APPEND swift_compile_flags "-force-single-frontend-invocation")
 
-    if(SWIFTSOURCES_IS_STDLIB_CORE)
-      list(APPEND swift_compile_flags "-Xcc" "-D__SWIFT_CURRENT_DYLIB=swiftCore")
-    endif()
-
     _compile_swift_files(
         dependency_target
         module_dependency_target
@@ -90,7 +86,6 @@ function(handle_swift_sources
         FLAGS ${swift_compile_flags}
         SDK ${SWIFTSOURCES_SDK}
         ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
-        API_NOTES ${SWIFTSOURCES_API_NOTES}
         MODULE_NAME ${SWIFTSOURCES_MODULE_NAME}
         ${IS_MAIN_arg}
         ${IS_STDLIB_arg}
@@ -159,7 +154,7 @@ function(_compile_swift_files
   cmake_parse_arguments(SWIFTFILE
     "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT"
-    "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS;MODULE_DIR"
+    "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
 
   # Check arguments.
@@ -241,8 +236,13 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 
-  if(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP AND SWIFTFILE_IS_STDLIB)
+  if(SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
+    list(APPEND swift_flags "-Xfrontend" "-enable-mandatory-semantic-arc-opts")
+  endif()
+
+  if(NOT SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING AND SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-enforce-exclusivity=unchecked")
   endif()
 
   if(SWIFT_EMIT_SORTED_SIL_OUTPUT)
@@ -257,9 +257,9 @@ function(_compile_swift_files
                             "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
   endif()
 
-  # Force swift 3 compatibility mode for Standard Library.
+  # Force swift 5 mode for Standard Library.
   if (SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-swift-version" "3")
+    list(APPEND swift_flags "-swift-version" "5")
   endif()
   
   # Force swift 4 compatibility mode for overlays.
@@ -298,6 +298,7 @@ function(_compile_swift_files
 
   set(module_file)
   set(module_doc_file)
+  set(interface_file)
 
   if(NOT SWIFTFILE_IS_MAIN)
     # Determine the directory where the module file should be placed.
@@ -318,6 +319,11 @@ function(_compile_swift_files
     set(sibgen_file "${module_base}.sibgen")
     set(module_doc_file "${module_base}.swiftdoc")
 
+    if(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES)
+      set(interface_file "${module_base}.swiftinterface")
+      list(APPEND swift_flags "-emit-parseable-module-interface")
+    endif()
+
     list(APPEND command_create_dirs
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
 
@@ -332,12 +338,21 @@ function(_compile_swift_files
     endif()
   endif()
 
-  # If we want to build a single overlay, don't install the swiftmodule and swiftdoc files.
-  if(NOT BUILD_STANDALONE)
-    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-        FILES "${module_file}" "${module_doc_file}"
-        DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+  set(module_outputs "${module_file}" "${module_doc_file}")
+  if(interface_file)
+    list(APPEND module_outputs "${interface_file}")
   endif()
+
+  set(optional_arg)
+  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+    # Allow installation of stdlib without building all variants on Darwin.
+    set(optional_arg "OPTIONAL")
+  endif()
+
+  swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
+    FILES ${module_outputs}
+    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+    "${optional_arg}")
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
   set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
@@ -346,30 +361,6 @@ function(_compile_swift_files
     # Depend on the binary itself, in addition to the symlink.
     set(swift_compiler_tool_dep "swift")
   endif()
-
-  # Generate API notes if requested.
-  set(command_create_apinotes)
-  set(depends_create_apinotes)
-  set(apinote_files)
-
-  foreach(apinote_module ${SWIFTFILE_API_NOTES})
-    set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
-    set(apinote_input_file
-      "${SWIFT_API_NOTES_PATH}/${apinote_module}.apinotes")
-
-    list(APPEND command_create_apinotes
-      COMMAND
-      "${swift_compiler_tool}" "-apinotes" "-yaml-to-binary"
-      "-o" "${apinote_file}"
-      "-target" "${SWIFT_SDK_${SWIFTFILE_SDK}_ARCH_${SWIFTFILE_ARCHITECTURE}_TRIPLE}"
-      "${apinote_input_file}")
-    list(APPEND depends_create_apinotes "${apinote_input_file}")
-
-    list(APPEND apinote_files "${apinote_file}")
-    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-      FILES ${apinote_file}
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
-  endforeach()
 
   # If there are more than one output files, we assume that they are specified
   # otherwise e.g. with an output file map.
@@ -394,8 +385,6 @@ function(_compile_swift_files
   endif()
 
   set(standard_outputs ${SWIFTFILE_OUTPUT})
-  set(apinotes_outputs ${apinote_files})
-  set(module_outputs "${module_file}" "${module_doc_file}")
   set(sib_outputs "${sib_file}")
   set(sibopt_outputs "${sibopt_file}")
   set(sibgen_outputs "${sibgen_file}")
@@ -415,8 +404,6 @@ function(_compile_swift_files
     # always gets updated.
     set(command_touch_standard_outputs
       COMMAND "${CMAKE_COMMAND}" -E touch ${standard_outputs})
-    set(command_touch_apinotes_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${apinotes_outputs})
     set(command_touch_module_outputs
       COMMAND "${CMAKE_COMMAND}" -E touch ${module_outputs})
     set(command_touch_sib_outputs
@@ -435,34 +422,32 @@ function(_compile_swift_files
       OUTPUT ${obj_dirs}
       COMMENT "Generating obj dirs for ${first_output}")
 
-  # Generate the api notes if we need them.
-  if (apinotes_outputs)
-    add_custom_command_target(
-        api_notes_dependency_target
-        # Create API notes before compiling, because this will affect the APIs
-        # the overlay sees.
-        ${command_create_apinotes}
-        ${command_touch_apinotes_outputs}
-        COMMAND ""
-        OUTPUT ${apinotes_outputs}
-        DEPENDS
-          ${swift_compiler_tool_dep}
-          ${depends_create_apinotes}
-          ${obj_dirs_dependency_target}
-        COMMENT "Generating API notes ${first_output}")
-  endif()
-
   # Then we can compile both the object files and the swiftmodule files
   # in parallel in this target for the object file, and ...
 
-  # Windows doesn't support long command line paths, of 8191 chars or over.
-  # We need to work around this by avoiding long command line arguments. This can be
-  # achieved by writing the list of file paths to a file, then reading that list
-  # in the Python script.
+  # Windows doesn't support long command line paths, of 8191 chars or over. We
+  # need to work around this by avoiding long command line arguments. This can
+  # be achieved by writing the list of file paths to a file, then reading that
+  # list in the Python script.
   string(RANDOM file_name)
   set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
-  file(WRITE "${file_path}" "${source_files}")
+  string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
+  file(WRITE "${file_path}" "'${source_files_quoted}'")
   
+  # If this platform/architecture combo supports backward deployment to old
+  # Objective-C runtimes, we need to copy a YAML file with legacy type layout
+  # information to the build directory so that the compiler can find it.
+  #
+  # See stdlib/CMakeLists.txt and TypeConverter::TypeConverter() in
+  # lib/IRGen/GenType.cpp.
+  if(SWIFTFILE_IS_STDLIB_CORE)
+    set(SWIFTFILE_PLATFORM "${SWIFT_SDK_${SWIFTFILE_SDK}_LIB_SUBDIR}")
+    set(copy_legacy_layouts_dep
+        "copy-legacy-layouts-${SWIFTFILE_PLATFORM}-${SWIFTFILE_ARCHITECTURE}")
+  else()
+    set(copy_legacy_layouts_dep)
+  endif()
+
   add_custom_command_target(
       dependency_target
       COMMAND
@@ -474,8 +459,9 @@ function(_compile_swift_files
       DEPENDS
         ${swift_compiler_tool_dep}
         ${file_path} ${source_files} ${SWIFTFILE_DEPENDS}
-        ${swift_ide_test_dependency} ${api_notes_dependency_target}
+        ${swift_ide_test_dependency}
         ${obj_dirs_dependency_target}
+        ${copy_legacy_layouts_dep}
       COMMENT "Compiling ${first_output}")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
 
@@ -483,13 +469,14 @@ function(_compile_swift_files
   #
   # 1. *.swiftmodule
   # 2. *.swiftdoc
-  # 3. *.Onone.sib
-  # 4. *.O.sib
-  # 5. *.sibgen
+  # 3. *.swiftinterface
+  # 4. *.Onone.sib
+  # 5. *.O.sib
+  # 6. *.sibgen
   #
-  # Only 1,2 are built by default. 3,4,5 are utility targets for use by engineers
-  # and thus even though the targets are generated, the targets are not built by
-  # default.
+  # Only 1,2,3 are built by default. 4,5,6 are utility targets for use by
+  # engineers and thus even though the targets are generated, the targets are
+  # not built by default.
   #
   # We only build these when we are not producing a main file. We could do this
   # with sib/sibgen, but it is useful for looking at the stdlib.
@@ -497,19 +484,17 @@ function(_compile_swift_files
     add_custom_command_target(
         module_dependency_target
         COMMAND
-          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_file}"
-        COMMAND
-          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_doc_file}"
+          "${CMAKE_COMMAND}" "-E" "remove" "-f" ${module_outputs}
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
-          "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}" ${swift_flags}
-          "@${file_path}"
+          "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
+          ${swift_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
-          ${swift_ide_test_dependency} ${api_notes_dependency_target}
+          ${swift_ide_test_dependency}
           ${obj_dirs_dependency_target}
         COMMENT "Generating ${module_file}")
     set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)

@@ -19,6 +19,7 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.9" CACHE STRING "")
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "7.0" CACHE STRING "")
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "9.0" CACHE STRING "")
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING "")
+set(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES TRUE)
 
 set(SWIFT_SOURCE_DIR "${SWIFT_SOURCE_ROOT}/src/swift" CACHE PATH "")
 set(SWIFT_PATH_TO_LLVM_SOURCE "${SWIFT_SOURCE_ROOT}/src/llvm" CACHE PATH "")
@@ -32,11 +33,13 @@ list(APPEND CMAKE_MODULE_PATH
   ${LLVM_CMAKE_MODULES_PATH}
 )
 
-message(STATUS "FINDING LIPO")
-  execute_process(
-  COMMAND "xcrun" "-find" "lipo"
-  OUTPUT_VARIABLE LIPO
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
+set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
+    "The name of the toolchain to pass to 'xcrun'")
+
+include(SwiftToolchainUtils)
+if(NOT SWIFT_LIPO)
+  find_toolchain_tool(SWIFT_LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+endif()
 
 include(AddLLVM)
 include(SwiftUtils)
@@ -58,6 +61,11 @@ precondition(TOOLCHAIN_DIR)
 
 # Without this line, installing components is broken. This needs refactoring.
 swift_configure_components()
+
+# Some overlays include the runtime's headers,
+# and some of those headers are generated at build time.
+add_subdirectory("${SWIFT_SOURCE_DIR}/include" "${SWIFT_SOURCE_DIR}/include")
+add_subdirectory("${SWIFT_SOURCE_DIR}/apinotes" "${SWIFT_SOURCE_DIR}/apinotes")
 
 precondition(unknown_sdks NEGATE MESSAGE "Unknown SDKs: ${unknown_sdks}")
 precondition(SWIFT_CONFIGURED_SDKS MESSAGE "No SDKs selected.")

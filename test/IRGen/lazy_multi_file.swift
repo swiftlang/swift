@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s %S/Inputs/lazy_multi_file_helper.swift -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s %S/Inputs/lazy_multi_file_helper.swift -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
@@ -13,14 +13,14 @@ class Subclass : LazyContainerClass {
   // an indirect return value. When it shrinks back, remove the optional
   // indirect out.
   //
-  // CHECK-LABEL: @"$S15lazy_multi_file8SubclassC6getStrSSyF"({{(\%TSS\* noalias nocapture sret, )?}}%T15lazy_multi_file8SubclassC* swiftself) {{.*}} {
+  // CHECK-LABEL: @"$s15lazy_multi_file8SubclassC6getStrSSyF"({{(\%TSS\* noalias nocapture sret, )?}}%T15lazy_multi_file8SubclassC* swiftself) {{.*}} {
   func getStr() -> String {
     // CHECK: = getelementptr inbounds %T15lazy_multi_file8SubclassC, %T15lazy_multi_file8SubclassC* %0, i32 0, i32 3
     return str
   }
 }
 
-// CHECK-LABEL: @"$S15lazy_multi_file4testSiyF"() {{.*}} {
+// CHECK-LABEL: @"$s15lazy_multi_file4testSiyF"() {{.*}} {
 func test() -> Int {
   var container = LazyContainer()
   useLazyContainer(container)

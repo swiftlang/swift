@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -verify -I %S/../IDE/Inputs/custom-modules %s
+// RUN: %target-swift-frontend -emit-ir -verify -I %S/../IDE/Inputs/custom-modules %s
 
 sil_stage canonical
 

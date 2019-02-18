@@ -3,8 +3,11 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   set(EXTRA_AST_FLAGS "FORCE_BUILD_OPTIMIZED")
 endif()
 
-add_swift_library(swiftAST STATIC
+add_swift_host_library(swiftAST STATIC
+  AccessScopeChecker.cpp
+  AccessRequests.cpp
   ASTContext.cpp
+  ASTDemangler.cpp
   ASTDumper.cpp
   ASTMangler.cpp
   ASTNode.cpp
@@ -22,22 +25,25 @@ add_swift_library(swiftAST STATIC
   Decl.cpp
   DeclContext.cpp
   DeclNameLoc.cpp
-  DefaultArgumentKind.cpp
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
   DiagnosticList.cpp
   DocComment.cpp
+  Evaluator.cpp
+  ExperimentalDependencies.cpp
+  ExperimentalDependenciesSourceFileDepGraphConstructor.cpp
   Expr.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp
   GenericSignatureBuilder.cpp
   Identifier.cpp
+  InlinableText.cpp
   LayoutConstraint.cpp
-  LookupVisibleDecls.cpp
   Module.cpp
   ModuleLoader.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
+  NameLookupRequests.cpp
   Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
@@ -51,6 +57,7 @@ add_swift_library(swiftAST STATIC
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
   Type.cpp
+  TypeCheckRequests.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp

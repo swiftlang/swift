@@ -93,17 +93,12 @@ template <class T> class SILVTableVisitor {
   void maybeAddConstructor(ConstructorDecl *cd) {
     assert(!cd->hasClangNode());
 
-    // Required constructors (or overrides thereof) have their allocating entry
-    // point in the vtable.
-    if (cd->isRequired()) {
-      SILDeclRef constant(cd, SILDeclRef::Kind::Allocator);
-      maybeAddEntry(constant, constant.requiresNewVTableEntry());
-    }
-
-    // All constructors have their initializing constructor in the
-    // vtable, which can be used by a convenience initializer.
-    SILDeclRef constant(cd, SILDeclRef::Kind::Initializer);
-    maybeAddEntry(constant, constant.requiresNewVTableEntry());
+    // The allocating entry point is what is used for dynamic dispatch.
+    // The initializing entry point for designated initializers is only
+    // necessary for super.init chaining, which is sufficiently constrained
+    // to never need dynamic dispatch.
+    SILDeclRef constant(cd, SILDeclRef::Kind::Allocator);
+    maybeAddEntry(constant, constant.requiresNewVTableEntry());    
   }
 
   void maybeAddEntry(SILDeclRef declRef, bool needsNewEntry) {

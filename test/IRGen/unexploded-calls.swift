@@ -1,6 +1,6 @@
-// RUN: %swift -target thumbv7-unknown-windows-msvc -parse-stdlib -parse-as-library -I %S/Inputs/usr/include -module-name Swift -S -emit-ir -o - %s | %FileCheck %s
-// RUN: %swift -target thumbv7-unknown-linux-gnueabihf -parse-stdlib -parse-as-library -I %S/Inputs/usr/include -module-name Swift -S -emit-ir -o - %s | %FileCheck %s
-// RUN: %swift -target thumbv7-unknown-linux-gnueabi -Xcc -mfloat-abi=hard -parse-stdlib -parse-as-library -I %S/Inputs/usr/include -module-name Swift -S -emit-ir -o - %s | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target thumbv7-unknown-windows-msvc -parse-stdlib -parse-as-library -I %S/Inputs/usr/include -module-name Swift -S -emit-ir -o - %s | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target thumbv7-unknown-linux-gnueabihf -parse-stdlib -parse-as-library -I %S/Inputs/usr/include -module-name Swift -S -emit-ir -o - %s | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target thumbv7-unknown-linux-gnueabi -Xcc -mfloat-abi=hard -parse-stdlib -parse-as-library -I %S/Inputs/usr/include -module-name Swift -S -emit-ir -o - %s | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=ARM
 
@@ -17,7 +17,7 @@ public func g(_ s : S) {
   return f(s)
 }
 
-// CHECK: define {{.*}}swiftcc void @"$Ss1gyySo1SVF"(float, float) {{.*}}{
+// CHECK: define {{.*}}swiftcc void @"$ss1gyySo1SVF"(float, float) {{.*}}{
 // CHECK: entry:
 // CHECK:   alloca
 // CHECK:   [[ALLOCA:%[-._0-9a-zA-Z]+]] = alloca %TSo1SV, align 4

@@ -1,4 +1,4 @@
-add_swift_library(swiftImmediate STATIC
+add_swift_host_library(swiftImmediate STATIC
   Immediate.cpp
   REPL.cpp
   LINK_LIBRARIES
@@ -8,5 +8,8 @@ add_swift_library(swiftImmediate STATIC
     swiftSILOptimizer
     swiftIRGen
   LLVM_COMPONENT_DEPENDS
-    linker mcjit)
+    executionengine
+    linker
+    mcjit
+    transformutils)
 

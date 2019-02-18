@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && cp -r %S/Inputs/one-way/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/one-way/* %t
 // RUN: touch -t 201401240005 %t/*
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/fake-build-for-bitcode.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -embed-bitcode -module-name main -j1 -parseable-output 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s

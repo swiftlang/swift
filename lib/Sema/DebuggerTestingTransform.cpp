@@ -215,7 +215,7 @@ private:
     CheckExpectExpr->setThrows(false);
 
     // Create the closure.
-    TypeChecker TC{Ctx};
+    TypeChecker &TC = TypeChecker::createForContext(Ctx);
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
         ClosureExpr(Params, SourceLoc(), SourceLoc(), SourceLoc(), TypeLoc(),

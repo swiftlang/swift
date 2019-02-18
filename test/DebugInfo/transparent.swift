@@ -15,15 +15,15 @@ let z = transparent(0)
 use(z)
 
 // Check that a transparent function has no debug information.
-// CHECK: define {{.*}}$S11transparentAA
+// CHECK: define {{.*}}$s11transparentAA
 // CHECK-SAME: !dbg ![[SP:[0-9]+]]
 // CHECK-NEXT: entry:
 // CHECK-NEXT: !dbg ![[ZERO:[0-9]+]]
 // CHECK-NEXT: !dbg ![[ZERO]]
 // CHECK-NEXT: }
 
+// CHECK: ![[FILE:[0-9]+]] = {{.*}}"<compiler-generated>"
 // CHECK: ![[SP]] = {{.*}}name: "transparent"
 // CHECK-SAME: file: ![[FILE:[0-9]+]]
 // CHECK-NOT: line:
-// CHECK: ![[FILE]] = {{.*}}"<compiler-generated>"
 // CHECK: ![[ZERO]] = !DILocation(line: 0,

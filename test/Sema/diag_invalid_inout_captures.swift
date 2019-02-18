@@ -6,7 +6,8 @@ func do_escape(_ not_a_price_you_are_willing_to_pay: @escaping () -> ()) {}
 struct you_cry_in_your_tea {
   mutating func which_you_hurl_in_the_sea_when_you_see_me_go_by() {
     no_escape { _ = self } // OK
-    do_escape { _ = self } // expected-error {{closure cannot implicitly capture a mutating self parameter}}
+    do_escape { _ = self } // expected-error {{escaping closure cannot capture a mutating self parameter}}
+    // expected-note@-1 {{create a mutating copy of self, or explicitly capture self for immutability}}
     do_escape {
       [self] in
       _ = self // OK
@@ -33,3 +34,30 @@ func remember(line: inout String) -> () -> Void {
     return despite_our_estrangement // expected-error {{nested function cannot capture inout parameter and escape}}
 }
 
+// This arrangement should be legal, but the type checker does not currently allow it.
+//
+// TODO: If the type checker is ever fixed, we should enable the corresponding test in
+// SILOptimizer/exclusivity_static_diagnostics.swift.
+func its_complicated(condition: inout Int) {
+  no_escape(condition == 0 ? { condition = 1 } : { condition = 2}) // expected-error 2 {{escaping closures can only capture inout parameters explicitly by value}}
+}
+
+// rdar://problem/46322943 - Improve error message about mutating self capture in escaping closures
+func rdar46322943() {
+  struct S {
+    var bar = 1
+
+    func foo(_ fn: () -> Void) {
+      fn()
+    }
+
+    mutating func main() {
+      let fn = {
+        self.bar += 1
+        // expected-error@-1 {{escaping closure cannot capture a mutating self parameter}}
+        // expected-note@-2 {{create a mutating copy of self, or explicitly capture self for immutability}}
+      }
+      self.foo(fn)
+    }
+  }
+}

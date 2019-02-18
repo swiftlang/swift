@@ -23,7 +23,7 @@ namespace llvm {
 
 namespace SourceKit {
 
-/// \brief A string identifier that is uniqued for the process lifetime.
+/// A string identifier that is uniqued for the process lifetime.
 /// The string identifier should not contain any spaces.
 class UIdent {
   void *Ptr = 0;

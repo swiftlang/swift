@@ -25,17 +25,17 @@ protocol P {
 class C : P {
   required init() {}
 
-// CHECK-LABEL: sil hidden @$S19generic_inline_self1CC18returnsNewInstanceACXDyF : $@convention(method) (@guaranteed C) -> @owned C
+// CHECK-LABEL: sil hidden @$s19generic_inline_self1CC18returnsNewInstanceACXDyF : $@convention(method) (@guaranteed C) -> @owned C
 // CHECK:       bb0(%0 : $C):
 // CHECK:         [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self C.Type, %0 : $C
-// CHECK:         [[FN:%.*]] = function_ref @$S19generic_inline_self12makeInstanceyxxmAA1CCRbzlF : $@convention(thin) <τ_0_0 where τ_0_0 : C> (@thick τ_0_0.Type) -> @owned τ_0_0
+// CHECK:         [[FN:%.*]] = function_ref @$s19generic_inline_self12makeInstanceyxxmAA1CCRbzlF : $@convention(thin) <τ_0_0 where τ_0_0 : C> (@thick τ_0_0.Type) -> @owned τ_0_0
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]<@dynamic_self C>([[METATYPE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : C> (@thick τ_0_0.Type) -> @owned τ_0_0
 // CHECK-NEXT:    return [[RESULT]] : $C
   func returnsNewInstance() -> Self {
     return makeInstance(type(of: self))
   }
 
-// CHECK-LABEL: sil hidden @$S19generic_inline_self1CC29returnsNewInstanceTransparentACXDyF : $@convention(method) (@guaranteed C) -> @owned C
+// CHECK-LABEL: sil hidden @$s19generic_inline_self1CC29returnsNewInstanceTransparentACXDyF : $@convention(method) (@guaranteed C) -> @owned C
 // CHECK:       bb0(%0 : $C):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thick @dynamic_self C.Type
 // CHECK-NEXT:    [[STATIC_METATYPE:%.*]] = upcast [[METATYPE]] : $@thick @dynamic_self C.Type to $@thick C.Type
@@ -47,7 +47,7 @@ class C : P {
     return makeInstanceTransparent(type(of: self))
   }
 
-// CHECK-LABEL: sil hidden @$S19generic_inline_self1CC37returnsNewInstanceTransparentProtocolACXDyF : $@convention(method) (@guaranteed C) -> @owned C
+// CHECK-LABEL: sil hidden @$s19generic_inline_self1CC37returnsNewInstanceTransparentProtocolACXDyF : $@convention(method) (@guaranteed C) -> @owned C
 // CHECK:       bb0(%0 : $C):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thick @dynamic_self C.Type
 // CHECK-NEXT:    [[STATIC_METATYPE:%.*]] = upcast [[METATYPE]] : $@thick @dynamic_self C.Type to $@thick C.Type

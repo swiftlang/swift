@@ -43,6 +43,7 @@
 ///         print(i)
 ///         i -= 1
 ///     }
+///     // error: 'Int' is not convertible to 'Bool'
 ///
 /// The correct approach in Swift is to compare the `i` value with zero in the
 /// `while` statement.
@@ -68,21 +69,19 @@ public struct Bool {
   ///
   /// Do not call this initializer directly. Instead, use the Boolean literal
   /// `false` to create a new `Bool` instance.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init() {
     let zero: Int8 = 0
     self._value = Builtin.trunc_Int8_Int1(zero._value)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init(_ v: Builtin.Int1) { self._value = v }
   
   /// Creates an instance equal to the given Boolean value.
   ///
   /// - Parameter value: The Boolean value to copy.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(_ value: Bool) {
     self = value
   }
@@ -94,12 +93,18 @@ public struct Bool {
   /// method to generate a random Boolean value when you are using a custom
   /// random number generator.
   ///
-  ///     let flippedHeads = Boolean.random(using: &myGenerator)
+  ///     let flippedHeads = Bool.random(using: &myGenerator)
   ///     if flippedHeads {
   ///         print("Heads, you win!")
   ///     } else {
   ///         print("Maybe another try?")
   ///     }
+  ///
+  /// - Note: The algorithm used to create random values may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same sequence of Boolean values each time you run your program, that
+  ///   sequence may change when your program is compiled using a different
+  ///   version of Swift.
   ///
   /// - Parameter generator: The random number generator to use when creating
   ///   the new random value.
@@ -116,27 +121,26 @@ public struct Bool {
   ///
   /// This method returns `true` and `false` with equal probability.
   ///
-  ///     let flippedHeads = Boolean.random()
+  ///     let flippedHeads = Bool.random()
   ///     if flippedHeads {
   ///         print("Heads, you win!")
   ///     } else {
   ///         print("Maybe another try?")
   ///     }
   ///
-  /// `Bool.random()` uses the default random generator, `Random.default`. The
-  /// call in the example above is equivalent to
-  /// `Bool.random(using: &Random.default)`.
+  /// This method is equivalent to calling `Bool.random(using:)`, passing in
+  /// the system's default random generator.
   ///
   /// - Returns: Either `true` or `false`, randomly chosen with equal
   ///   probability.
   @inlinable
   public static func random() -> Bool {
-    return Bool.random(using: &Random.default)
+    var g = SystemRandomNumberGenerator()
+    return Bool.random(using: &g)
   }
 }
 
 extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
     self._value = value
@@ -160,39 +164,21 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   /// this Boolean literal initializer behind the scenes.
   ///
   /// - Parameter value: The value of the new instance.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(booleanLiteral value: Bool) {
     self = value
   }
 }
 
-extension Bool {
-  // This is a magic entry point known to the compiler.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public // COMPILER_INTRINSIC
-  func _getBuiltinLogicValue() -> Builtin.Int1 {
-    return _value
-  }
-}
-
 extension Bool : CustomStringConvertible {
   /// A textual representation of the Boolean value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var description: String {
     return self ? "true" : "false"
   }
 }
 
-// This is a magic entry point known to the compiler.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-public // COMPILER_INTRINSIC
-func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
-
 extension Bool: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: Bool, rhs: Bool) -> Bool {
     return Bool(Builtin.cmp_eq_Int1(lhs._value, rhs._value))
@@ -205,7 +191,7 @@ extension Bool: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine((self ? 1 : 0) as UInt8)
   }
@@ -218,7 +204,7 @@ extension Bool : LosslessStringConvertible {
   /// `"false"`, the result is `nil`. This initializer is case sensitive.
   ///
   /// - Parameter description: A string representation of the Boolean value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init?(_ description: String) {
     if description == "true" {
       self = true
@@ -250,7 +236,6 @@ extension Bool {
   ///     // Prints "You look nice today!"
   ///
   /// - Parameter a: The Boolean value to negate.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static prefix func ! (a: Bool) -> Bool {
     return Bool(Builtin.xor_Int1(a._value, true._value))
@@ -290,7 +275,6 @@ extension Bool {
   /// - Parameters:
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @inline(__always)
   public static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
@@ -331,7 +315,6 @@ extension Bool {
   /// - Parameters:
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @inline(__always)
   public static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
@@ -341,16 +324,16 @@ extension Bool {
 }
 
 extension Bool {
+  /// Toggles the Boolean variable's value.
+  ///
+  /// Use this method to toggle a Boolean value from `true` to `false` or from
+  /// `false` to `true`.
+  ///
+  ///     var bools = [true, false]
+  ///
+  ///     bools[0].toggle()
+  ///     // bools == [false, false]
   @inlinable
-  /// Toggles the value of the Boolean. 
-  ///
-  /// Calling this method sets the variable to `true` if it was `false`,
-  /// and sets it to `false` if it was `true`. For example:
-  ///
-  ///    var bools = [true, false]
-  ///
-  ///    bools[0].toggle()
-  ///    // bools now contains [false, false]
   public mutating func toggle() {
     self = !self
   }

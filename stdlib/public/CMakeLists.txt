@@ -1,3 +1,4 @@
+
 set(SWIFT_RUNTIME_CXX_FLAGS)
 set(SWIFT_RUNTIME_LINK_FLAGS)
 set(SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS)
@@ -47,10 +48,11 @@ if(CXX_SUPPORTS_DEFAULT_HIDDEN_VISIBILITY)
   list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-fvisibility=hidden")
 endif()
 
+add_subdirectory(SwiftShims)
+
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
-  add_subdirectory(SwiftShims)
   add_subdirectory(runtime)
   add_subdirectory(stubs)
   add_subdirectory(core)
@@ -66,8 +68,14 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   add_subdirectory(Platform)
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  if(SWIFT_BUILD_SDK_OVERLAY)
-    add_subdirectory(SDK)
+if(SWIFT_BUILD_SDK_OVERLAY)
+  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+  if(building_darwin_sdks)
+    add_subdirectory(Darwin)
+  endif()
+
+  if(WINDOWS IN_LIST SWIFT_SDKS)
+    add_subdirectory(Windows)
   endif()
 endif()
+

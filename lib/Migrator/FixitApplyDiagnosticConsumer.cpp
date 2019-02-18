@@ -59,12 +59,12 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc,
 
     // Ignore meaningless Fix-its.
     if (Length == 0 && Text.size() == 0)
-      return;
+      continue;
 
     // Ignore pre-applied equivalents.
     Replacement R { Offset, Length, Text };
     if (Replacements.count(R)) {
-      return;
+      continue;
     } else {
       Replacements.insert(R);
     }

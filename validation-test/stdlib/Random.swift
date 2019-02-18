@@ -3,10 +3,18 @@
 
 import StdlibUnittest
 import StdlibCollectionUnittest
+import SwiftShims // for swift_stdlib_random
 
 let RandomTests = TestSuite("Random")
 
 // _fill(bytes:)
+
+extension RandomNumberGenerator {
+  func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
+    guard let start = buffer.baseAddress else { return }
+    swift_stdlib_random(start, buffer.count)
+  }
+}
 
 RandomTests.test("_fill(bytes:)") {
   for count in [100, 1000] {
@@ -17,11 +25,12 @@ RandomTests.test("_fill(bytes:)") {
     expectEqual(bytes1, zeros)
     expectEqual(bytes2, zeros)
     
-    bytes1.withUnsafeMutableBytes { Random.default._fill(bytes: $0) }
+    var g = SystemRandomNumberGenerator()
+    bytes1.withUnsafeMutableBytes { g._fill(bytes: $0) }
     expectNotEqual(bytes1, bytes2)
     expectNotEqual(bytes1, zeros)
     
-    bytes2.withUnsafeMutableBytes { Random.default._fill(bytes: $0) }
+    bytes2.withUnsafeMutableBytes { g._fill(bytes: $0) }
     expectNotEqual(bytes1, bytes2)
     expectNotEqual(bytes2, zeros)
   }
@@ -43,8 +52,7 @@ RandomTests.test("basic random numbers") {
 
 // Random integers in ranges
 
-func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type) 
-  where T.Stride: SignedInteger, T.Magnitude: UnsignedInteger {
+func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type) {
     
   func testRange(_ range: Range<T>, iterations: Int = 1_000) {
     var integerSet: Set<T> = []
@@ -104,10 +112,8 @@ RandomTests.test("random integers in ranges") {
 // Random floating points in ranges
 
 func floatingPointRangeTest<T: BinaryFloatingPoint>(_ type: T.Type) 
-  where T.RawSignificand: FixedWidthInteger,
-        T.RawSignificand.Stride: SignedInteger & FixedWidthInteger,
-        T.RawSignificand.Magnitude: UnsignedInteger {
-          
+  where T.RawSignificand: FixedWidthInteger {
+  
   let testRange = 0 ..< 1_000
   
   // open range
@@ -230,6 +236,56 @@ RandomTests.test("different random number generators") {
   expectEqual(shufflePasses[0], shufflePasses[1])
 }
 
+// Random floating points with max values (SR-8178)
+
+var lcrng = LCRNG(seed: 1234567890)
+
+public struct RotatingRNG: RandomNumberGenerator {
+  public let rotation: [() -> UInt64] = [
+    { return .min },
+    { return .max },
+    { return lcrng.next() }
+  ]
+  public var rotationIndex = 0
+  
+  public mutating func next() -> UInt64 {
+    if rotationIndex == rotation.count {
+      rotationIndex = 0
+    }
+    
+    defer {
+      rotationIndex += 1
+    }
+    
+    return rotation[rotationIndex]()
+  }
+}
+
+func floatingPointRangeMaxTest<T: BinaryFloatingPoint>(_ type: T.Type)
+  where T.RawSignificand: FixedWidthInteger {
+  
+  let testRange = 0 ..< 1_000
+  
+  var rng = RotatingRNG()
+  let ranges: [Range<T>] = [0 ..< 1, 1 ..< 2, 10 ..< 11, 0 ..< 10]
+  for range in ranges {
+    for _ in testRange {
+      let random = T.random(in: range, using: &rng)
+      expectTrue(range.contains(random))
+      expectTrue(range.lowerBound <= random)
+      expectTrue(random < range.upperBound)
+    }
+  }
+}
+
+RandomTests.test("random floating point range maxes") {
+  floatingPointRangeMaxTest(Float.self)
+  floatingPointRangeMaxTest(Double.self)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+  floatingPointRangeMaxTest(Float80.self)
+#endif
+}
+
 // Uniform Distribution
 
 func chi2Test(_ samples: [Double]) -> Bool {
@@ -248,7 +304,7 @@ func chi2Test(_ samples: [Double]) -> Bool {
 
   if chi2 > cvHigh {
     return false
-  }else {
+  } else {
     return true
   }
 }

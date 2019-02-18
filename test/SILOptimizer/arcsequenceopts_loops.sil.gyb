@@ -1,7 +1,7 @@
 %# -*- mode: sil -*-
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s > %t/arc-sequence-opts-loops.sil
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -arc-sequence-opts %t/arc-sequence-opts-loops.sil -enable-loop-arc=0 | %FileCheck %t/arc-sequence-opts-loops.sil
+// RUN: %target-sil-opt -enable-sil-verify-all -arc-sequence-opts %t/arc-sequence-opts-loops.sil -enable-loop-arc=0 | %FileCheck %t/arc-sequence-opts-loops.sil
 
 %# Ignore the following admonition; it applies to the resulting .sil
 %# test file only.

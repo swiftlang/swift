@@ -16,8 +16,11 @@
 #include "swift/Syntax/SyntaxNodes.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
+#include <unordered_set>
 
-namespace {
+namespace swift {
+
+using namespace swift::syntax;
 
 /// A single edit to the original source file in which a continuous range of
 /// characters have been replaced by a new string
@@ -31,21 +34,23 @@ struct SourceEdit {
   /// The length of the string that replaced the range described above.
   size_t ReplacementLength;
 
+  SourceEdit(size_t Start, size_t End, size_t ReplacementLength)
+      : Start(Start), End(End), ReplacementLength(ReplacementLength){};
+
   /// The length of the range that has been replaced
-  size_t originalLength() { return End - Start; }
+  size_t originalLength() const { return End - Start; }
 
   /// Check if the characters replaced by this edit fall into the given range
   /// or are directly adjacent to it
   bool intersectsOrTouchesRange(size_t RangeStart, size_t RangeEnd) {
-    return !(End <= RangeStart || Start >= RangeEnd);
+    return End >= RangeStart && Start <= RangeEnd;
   }
 };
 
-} // anonymous namespace
-
-namespace swift {
-
-using namespace swift::syntax;
+struct SyntaxReuseRegion {
+  AbsolutePosition Start;
+  AbsolutePosition End;
+};
 
 class SyntaxParsingCache {
   /// The syntax tree prior to the edit
@@ -55,45 +60,52 @@ class SyntaxParsingCache {
   /// the source file that is now parsed incrementally
   llvm::SmallVector<SourceEdit, 4> Edits;
 
-  /// Whether or not information about reused nodes shall be recored in
-  /// \c ReusedRanges
-  bool RecordReuseInformation = false;
-
-  /// If \c RecordReuseInformation buffer offsets of ranges that have been
-  /// successfully looked up in this cache are stored.
-  std::vector<std::pair<unsigned, unsigned>> ReusedRanges;
+  /// The IDs of all syntax nodes that got reused are collected in this vector.
+  std::unordered_set<SyntaxNodeId> ReusedNodeIds;
 
 public:
   SyntaxParsingCache(SourceFileSyntax OldSyntaxTree)
       : OldSyntaxTree(OldSyntaxTree) {}
 
   /// Add an edit that transformed the source file which created this cache into
-  /// the source file that is now being parsed incrementally. The order in which
-  /// the edits are added using this method needs to be the same order in which
-  /// the edits were applied to the source file.
-  void addEdit(size_t Start, size_t End, size_t ReplacementLength) {
-    Edits.push_back({Start, End, ReplacementLength});
-  }
+  /// the source file that is now being parsed incrementally. \c Start must be a
+  /// position from the *original* source file, and it must not overlap any
+  /// other edits previously added. For instance, given:
+  ///   (aaa, bbb)
+  ///   0123456789
+  /// When you want to turn this into:
+  ///   (c, dddd)
+  ///   0123456789
+  /// edits should be: { 1, 4, 1 } and { 6, 9, 4 }.
+  void addEdit(size_t Start, size_t End, size_t ReplacementLength);
 
   /// Check if a syntax node of the given kind at the given position can be
   /// reused for a new syntax tree.
   llvm::Optional<Syntax> lookUp(size_t NewPosition, SyntaxKind Kind);
 
-  /// Turn recording of reused ranges on
-  void setRecordReuseInformation() { RecordReuseInformation = true; }
-
-  /// Return the ranges of the new source file that have been successfully
-  /// looked up in this cache as a (start, end) pair of byte offsets in the
-  /// post-edit file.
-  std::vector<std::pair<unsigned, unsigned>> getReusedRanges() const {
-    return ReusedRanges;
+  const std::unordered_set<SyntaxNodeId> &getReusedNodeIds() const {
+    return ReusedNodeIds;
   }
 
-private:
-  llvm::Optional<Syntax> lookUpFrom(const Syntax &Node, size_t Position,
-                                    SyntaxKind Kind);
+  /// Get the source regions of the new source file, represented by
+  /// \p SyntaxTree that have been reused as part of the incremental parse.
+  std::vector<SyntaxReuseRegion>
+  getReusedRegions(const SourceFileSyntax &SyntaxTree) const;
 
-  bool nodeCanBeReused(const Syntax &Node, size_t Position,
+  /// Translates a post-edit position to a pre-edit position by undoing the
+  /// specified edits. Returns \c None if no pre-edit position exists because
+  /// the post-edit position has been inserted by an edit.
+  /// 
+  /// Should not be invoked externally. Only public for testing purposes.
+  static Optional<size_t>
+  translateToPreEditPosition(size_t PostEditPosition,
+                             ArrayRef<SourceEdit> Edits);
+
+private:
+  llvm::Optional<Syntax> lookUpFrom(const Syntax &Node, size_t NodeStart,
+                                    size_t Position, SyntaxKind Kind);
+
+  bool nodeCanBeReused(const Syntax &Node, size_t Position, size_t NodeStart,
                        SyntaxKind Kind) const;
 };
 

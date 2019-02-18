@@ -41,7 +41,7 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
 TEST(FunctionNameDemangleTests, NewManglingPrefix) {
   char OutputBuffer[128];
 
-  const char *FunctionName = "$S1a10run_MatMulyySiF";
+  const char *FunctionName = "$s1a10run_MatMulyySiF";
   const char *FunctionNameNew = "$s1a10run_MatMulyySiF";
   const char *DemangledName = "a.run_MatMul(Swift.Int) -> ()";
   const char *SimplifiedName = "run_MatMul(_:)";

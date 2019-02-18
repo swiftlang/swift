@@ -8,9 +8,8 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH1 | %FileCheck %s -check-prefix=CATCH1
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW1 | %FileCheck %s -check-prefix=THROW1
 
-// FIXME: <rdar://problem/21001526> No dot code completion results in switch case or catch stmt at top-level
-// RUNdisabled: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH2 | %FileCheck %s -check-prefix=CATCH2
-// RUNdisabled: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW2 | %FileCheck %s -check-prefix=THROW2
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH2 | %FileCheck %s -check-prefix=CATCH2
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW2 | %FileCheck %s -check-prefix=THROW2
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH1 > %t.inside_catch1
 // RUN: %FileCheck %s -check-prefix=STMT < %t.inside_catch1

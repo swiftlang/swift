@@ -29,27 +29,43 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 }
 
 /// Represents the identity of a stored class property as a combination
-/// of a base and a single projection. Eventually the goal is to make this
-/// more precise and consider, casts, etc.
+/// of a base, projection and projection path.
+/// we pre-compute the base and projection path, even though we can
+/// lazily do so, because it is more expensive otherwise
+/// We lazily compute the projection path,
+/// In the rare occasions we need it, because of Its destructor and
+/// its non-trivial copy constructor
 class ObjectProjection {
   SILValue object;
+  const RefElementAddrInst *REA;
   Projection proj;
 
 public:
-  ObjectProjection(SILValue object, const Projection &proj)
-      : object(object), proj(proj) {
-    assert(object->getType().isObject());
-  }
+  ObjectProjection(const RefElementAddrInst *REA)
+      : object(stripBorrow(REA->getOperand())), REA(REA),
+        proj(Projection(REA)) {}
+
+  ObjectProjection(SILValue object, const RefElementAddrInst *REA)
+      : object(object), REA(REA), proj(Projection(REA)) {}
+
+  const RefElementAddrInst *getInstr() const { return REA; }
 
   SILValue getObject() const { return object; }
+
   const Projection &getProjection() const { return proj; }
 
+  const Optional<ProjectionPath> getProjectionPath() const {
+    return ProjectionPath::getProjectionPath(stripBorrow(REA->getOperand()),
+                                             REA);
+  }
+
   bool operator==(const ObjectProjection &other) const {
-    return object == other.object && proj == other.proj;
+    return getObject() == other.getObject() &&
+           getProjection() == other.getProjection();
   }
 
   bool operator!=(const ObjectProjection &other) const {
-    return object != other.object || proj != other.proj;
+    return !operator==(other);
   }
 };
 
@@ -64,7 +80,7 @@ public:
 /// while global variables and class properties are not. Unidentified storage is
 /// associated with a SILValue that produces the accessed address but has not
 /// been determined to be the base of a storage object. It may, for example,
-/// be a SILPHIArgument.
+/// be a SILPhiArgument.
 ///
 /// An invalid AccessedStorage object is marked Unidentified and contains an
 /// invalid value. This signals that analysis has failed to recognize an
@@ -90,14 +106,11 @@ public:
   /// Enumerate over all valid begin_access bases. Clients can use a covered
   /// switch to warn if findAccessedAddressBase ever adds a case.
   enum Kind : uint8_t {
-    Box,
-    Stack,
-    Global,
-    Class,
-    Argument,
-    Nested,
-    Unidentified,
-    NumKindBits = countBitsUsed(static_cast<unsigned>(Unidentified))
+#define ACCESSED_STORAGE(Name) Name,
+#define ACCESSED_STORAGE_RANGE(Name, Start, End)                               \
+  First_##Name = Start, Last_##Name = End,
+#include "swift/SIL/AccessedStorage.def"
+    NumKindBits = countBitsUsed(unsigned(Last_AccessedStorageKind))
   };
 
   static const char *getKindName(Kind k);
@@ -167,8 +180,8 @@ public:
 
   AccessedStorage(SILValue base, Kind kind);
 
-  AccessedStorage(SILValue object, Projection projection)
-      : objProj(object, projection) {
+  AccessedStorage(SILValue object, const RefElementAddrInst *REA)
+      : objProj(object, REA) {
     initKind(Class);
   }
 
@@ -209,6 +222,7 @@ public:
     switch (getKind()) {
     case Box:
     case Stack:
+    case Yield:
     case Nested:
     case Unidentified:
       return value == other.value;
@@ -219,8 +233,10 @@ public:
     case Class:
       return objProj == other.objProj;
     }
+    llvm_unreachable("unhandled kind");
   }
 
+  /// Return true if the storage is guaranteed local.
   bool isLocal() const {
     switch (getKind()) {
     case Box:
@@ -229,10 +245,12 @@ public:
     case Global:
     case Class:
     case Argument:
+    case Yield:
     case Nested:
     case Unidentified:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   bool isUniquelyIdentified() const {
@@ -243,15 +261,38 @@ public:
       return true;
     case Class:
     case Argument:
+    case Yield:
     case Nested:
     case Unidentified:
       return false;
     }
+    llvm_unreachable("unhandled kind");
+  }
+
+  bool isUniquelyIdentifiedOrClass() const {
+    if (isUniquelyIdentified())
+      return true;
+    return (getKind() == Class);
   }
 
   bool isDistinctFrom(const AccessedStorage &other) const {
-    return isUniquelyIdentified() && other.isUniquelyIdentified()
-           && !hasIdenticalBase(other);
+    if (isUniquelyIdentified() && other.isUniquelyIdentified()) {
+      return !hasIdenticalBase(other);
+    }
+    if (getKind() != Class || other.getKind() != Class) {
+      return false;
+    }
+    if (getObjectProjection().getProjection() ==
+        other.getObjectProjection().getProjection()) {
+      return false;
+    }
+    auto projPath = getObjectProjection().getProjectionPath();
+    auto otherProjPath = other.getObjectProjection().getProjectionPath();
+    if (!projPath.hasValue() || !otherProjPath.hasValue()) {
+      return false;
+    }
+    return projPath.getValue().hasNonEmptySymmetricDifference(
+        otherProjPath.getValue());
   }
 
   /// Returns the ValueDecl for the underlying storage, if it can be
@@ -269,6 +310,51 @@ private:
   bool operator==(const AccessedStorage &) const = delete;
   bool operator!=(const AccessedStorage &) const = delete;
 };
+
+/// Return true if the given storage objects have identical storage locations.
+///
+/// This compares only the AccessedStorage base class bits, ignoring the
+/// subclass bits.
+inline bool accessingIdenticalLocations(AccessedStorage LHS,
+                                        AccessedStorage RHS) {
+  if (LHS.getKind() != RHS.getKind())
+    return false;
+
+  switch (LHS.getKind()) {
+  case swift::AccessedStorage::Box:
+  case swift::AccessedStorage::Stack:
+  case swift::AccessedStorage::Nested:
+  case swift::AccessedStorage::Yield:
+  case swift::AccessedStorage::Unidentified:
+    return LHS.getValue() == RHS.getValue();
+  case swift::AccessedStorage::Argument:
+    return LHS.getParamIndex() == RHS.getParamIndex();
+  case swift::AccessedStorage::Global:
+    return LHS.getGlobal() == RHS.getGlobal();
+  case swift::AccessedStorage::Class:
+    return LHS.getObjectProjection() == RHS.getObjectProjection();
+  }
+}
+
+template <class ImplTy, class ResultTy = void, typename... ArgTys>
+class AccessedStorageVisitor {
+  ImplTy &asImpl() { return static_cast<ImplTy &>(*this); }
+
+public:
+#define ACCESSED_STORAGE(Name)                                                 \
+  ResultTy visit##Name(const AccessedStorage &storage, ArgTys &&... args);
+#include "swift/SIL/AccessedStorage.def"
+
+  ResultTy visit(const AccessedStorage &storage, ArgTys &&... args) {
+    switch (storage.getKind()) {
+#define ACCESSED_STORAGE(Name)                                                 \
+  case AccessedStorage::Name:                                                  \
+    return asImpl().visit##Name(storage, std::forward<ArgTys>(args)...);
+#include "swift/SIL/AccessedStorage.def"
+    }
+  }
+};
+
 } // end namespace swift
 
 namespace llvm {
@@ -294,6 +380,7 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
     case swift::AccessedStorage::Box:
     case swift::AccessedStorage::Stack:
     case swift::AccessedStorage::Nested:
+    case swift::AccessedStorage::Yield:
     case swift::AccessedStorage::Unidentified:
       return DenseMapInfo<swift::SILValue>::getHashValue(storage.getValue());
     case swift::AccessedStorage::Argument:
@@ -309,23 +396,7 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
   }
 
   static bool isEqual(swift::AccessedStorage LHS, swift::AccessedStorage RHS) {
-    if (LHS.getKind() != RHS.getKind())
-      return false;
-
-    switch (LHS.getKind()) {
-    case swift::AccessedStorage::Box:
-    case swift::AccessedStorage::Stack:
-    case swift::AccessedStorage::Nested:
-    case swift::AccessedStorage::Unidentified:
-      return LHS.getValue() == RHS.getValue();
-    case swift::AccessedStorage::Argument:
-      return LHS.getParamIndex() == RHS.getParamIndex();
-    case swift::AccessedStorage::Global:
-      return LHS.getGlobal() == RHS.getGlobal();
-    case swift::AccessedStorage::Class:
-        return LHS.getObjectProjection() == RHS.getObjectProjection();
-    }
-    llvm_unreachable("Unhandled AccessedStorageKind");
+    return swift::accessingIdenticalLocations(LHS, RHS);
   }
 };
 
@@ -339,7 +410,7 @@ namespace swift {
 /// The returned AccessedStorage represents the best attempt to find the base of
 /// the storage object being accessed at `sourceAddr`. This may be a fully
 /// identified storage base of known kind, or a valid but Unidentified storage
-/// object, such as a SILPHIArgument.
+/// object, such as a SILPhiArgument.
 ///
 /// This may return an invalid storage object if the address producer is not
 /// recognized by a whitelist of recognizable access patterns. The result must
@@ -356,7 +427,8 @@ AccessedStorage findAccessedStorage(SILValue sourceAddr);
 /// through any Nested access to find the original storage.
 ///
 /// This is identical to findAccessedStorage(), but never returns Nested
-/// storage.
+/// storage and may return invalid storage for nested access when the outer
+/// access has Unsafe enforcement.
 AccessedStorage findAccessedStorageNonNested(SILValue sourceAddr);
 
 /// Return true if the given address operand is used by a memory operation that
@@ -366,6 +438,8 @@ bool memInstMustInitialize(Operand *memOper);
 
 /// Return true if the given address producer may be the source of a formal
 /// access (a read or write of a potentially aliased, user visible variable).
+///
+/// `storage` must be a valid AccessedStorage object.
 ///
 /// If this returns false, then the address can be safely accessed without
 /// a begin_access marker. To determine whether to emit begin_access:

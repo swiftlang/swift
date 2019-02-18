@@ -11,13 +11,15 @@ public var Radix2CooleyTukey = [
     runFunction: run_Radix2CooleyTukey,
     tags: [.validation, .algorithm],
     setUpFunction: setUpRadix2CooleyTukey,
-    tearDownFunction: tearDownRadix2CooleyTukey),
+    tearDownFunction: tearDownRadix2CooleyTukey,
+    legacyFactor: 48),
   BenchmarkInfo(
     name: "Radix2CooleyTukeyf",
     runFunction: run_Radix2CooleyTukeyf,
     tags: [.validation, .algorithm],
     setUpFunction: setUpRadix2CooleyTukeyf,
-    tearDownFunction: tearDownRadix2CooleyTukeyf),
+    tearDownFunction: tearDownRadix2CooleyTukeyf,
+  legacyFactor: 48),
 ]
 
 //===----------------------------------------------------------------------===//
@@ -31,7 +33,7 @@ var double_output_imag: UnsafeMutablePointer<Double>?
 var double_temp_real: UnsafeMutablePointer<Double>?
 var double_temp_imag: UnsafeMutablePointer<Double>?
 
-let doubleN = 65_536
+let doubleN = 2_048
 let doubleSize = { MemoryLayout<Double>.size * doubleN }()
 
 func setUpRadix2CooleyTukey() {
@@ -108,12 +110,12 @@ func testDouble(iter: Int) {
   let size = doubleSize
   let level = Int(log2(Double(doubleN)))
 
-  let input_real = double_input_real._unsafelyUnwrappedUnchecked
-  let input_imag = double_input_imag._unsafelyUnwrappedUnchecked
-  let output_real = double_output_real._unsafelyUnwrappedUnchecked
-  let output_imag = double_output_imag._unsafelyUnwrappedUnchecked
-  let temp_real = double_temp_real._unsafelyUnwrappedUnchecked
-  let temp_imag = double_temp_imag._unsafelyUnwrappedUnchecked
+  let input_real = double_input_real.unsafelyUnwrapped
+  let input_imag = double_input_imag.unsafelyUnwrapped
+  let output_real = double_output_real.unsafelyUnwrapped
+  let output_imag = double_output_imag.unsafelyUnwrapped
+  let temp_real = double_temp_real.unsafelyUnwrapped
+  let temp_imag = double_temp_imag.unsafelyUnwrapped
 
   for _ in 0..<iter {
     memset(UnsafeMutableRawPointer(input_real), 0, size)
@@ -143,7 +145,7 @@ public func run_Radix2CooleyTukey(_ N: Int) {
 // Float Benchmark
 //===----------------------------------------------------------------------===//
 
-let floatN = 65_536
+let floatN = 2_048
 let floatSize = { MemoryLayout<Float>.size * floatN }()
 
 var float_input_real: UnsafeMutablePointer<Float>?
@@ -224,12 +226,12 @@ func testFloat(iter: Int) {
   let n = floatN
   let size = floatSize
 
-  let input_real = float_input_real._unsafelyUnwrappedUnchecked
-  let input_imag = float_input_imag._unsafelyUnwrappedUnchecked
-  let output_real = float_output_real._unsafelyUnwrappedUnchecked
-  let output_imag = float_output_imag._unsafelyUnwrappedUnchecked
-  let temp_real = float_temp_real._unsafelyUnwrappedUnchecked
-  let temp_imag = float_temp_imag._unsafelyUnwrappedUnchecked
+  let input_real = float_input_real.unsafelyUnwrapped
+  let input_imag = float_input_imag.unsafelyUnwrapped
+  let output_real = float_output_real.unsafelyUnwrapped
+  let output_imag = float_output_imag.unsafelyUnwrapped
+  let temp_real = float_temp_real.unsafelyUnwrapped
+  let temp_imag = float_temp_imag.unsafelyUnwrapped
 
   let level = Int(log2(Float(n)))
 

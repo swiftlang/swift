@@ -8,7 +8,7 @@
 
 // CHECK: sil shared [serializable] [clang c_inline_func] @c_inline_func : $@convention(c) (Int32) -> Int32
 
-// CHECK-IR-LABEL: define{{.*}} i32 @"$S13static_inline6testit1xs5Int32VAE_tF"(i32)
+// CHECK-IR-LABEL: define{{.*}} i32 @"$s13static_inline6testit1xs5Int32VAE_tF"(i32)
 // CHECK-IR: = add {{.*}}, 27
 // CHECK-IR: ret
 

@@ -7,7 +7,7 @@ Protocols:
     SwiftName: SwiftTypeWithMethodRight
 
 SwiftVersions:
-- Version: 3
+- Version: 4
   Typedefs:
   - Name: AnimalAttributeName
     SwiftName: AnimalAttributeName

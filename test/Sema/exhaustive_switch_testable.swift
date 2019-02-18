@@ -17,7 +17,7 @@ func testFrozen(_ e: FrozenEnum) -> Int {
 }
 
 func testNonFrozen(_ e: NonFrozenEnum) -> Int {
-  // VERIFY-NON-FROZEN: exhaustive_switch_testable.swift:[[@LINE+1]]:{{[0-9]+}}: warning: switch must be exhaustive
+  // VERIFY-NON-FROZEN: exhaustive_switch_testable.swift:[[@LINE+1]]:{{[0-9]+}}: warning: switch covers known cases, but 'NonFrozenEnum' may have additional unknown values
   switch e {
   case .a: return 1
   case .b, .c: return 2

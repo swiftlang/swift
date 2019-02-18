@@ -1,10 +1,11 @@
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.mod)
 // RUN: %target-swift-frontend -emit-module -o %t.mod/Cities.swiftmodule %S/Inputs/Cities.swift -module-name Cities -parse-as-library
-// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s  -I %t.mod -api-diff-data-file %S/Inputs/string-representable.json -emit-migrated-file-path %t/string-representable.swift.result -disable-migrator-fixits -o /dev/null
+// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s  -I %t.mod -api-diff-data-file %S/Inputs/string-representable.json -emit-migrated-file-path %t/string-representable.swift.result -disable-migrator-fixits -o /dev/null -F %S/mock-sdk
 // RUN: diff -u %S/string-representable.swift.expected %t/string-representable.swift.result
 
 import Cities
+import Bar
 
 func foo(_ c: Container) -> String {
   c.Value = ""
@@ -41,4 +42,34 @@ func foo(_ c: Container) -> String {
   c.Value = GlobalAttribute
   c.optionalAttrDict = nil
   return c.Value
+}
+
+class C: BarForwardDeclaredClass {}
+
+func revert(_ a: AwesomeCityAttribute, b: Wrapper.Attribute) {
+  _ = AwesomeCityAttribute(rawValue: "somevalue")
+  _ = AwesomeCityAttribute.init(rawValue: "somevalue")
+  _ = AwesomeCityAttribute("somevalue")
+  _ = AwesomeCityAttribute.init("somevalue")
+  _ = a.rawValue
+  _ = Wrapper.Attribute(rawValue: "somevalue")
+  _ = Wrapper.Attribute.init(rawValue: "somevalue")
+  _ = b.rawValue
+  _ = Wrapper.Attribute.KnownAttr.rawValue
+  _ = Wrapper.Attribute("somevalue")
+  _ = Wrapper.Attribute.init("somevalue")
+}
+
+
+func bar(_ c: Container) {
+  let attr: AliasAttribute = ""
+  c.add(single: attr)
+}
+
+public class SubContainer: Container {
+  public override func adding(optionalAttributes subname: [String: Any]?) {}
+  public override func adding(attributes myname: [String: Any]) {}
+  public override func adding(attrArray: [String]) {}
+  public override func add(single: String) {}
+  public override func add(singleOptional: String?) {}
 }

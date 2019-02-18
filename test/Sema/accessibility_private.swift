@@ -126,13 +126,13 @@ private struct VIPPrivateType : VeryImportantProto {
 private struct VIPPrivateProp : VeryImportantProto {
   typealias Assoc = Int
   private var value: Int // expected-error {{property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{none}}
-  // expected-note@-1 {{mark the var as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  // expected-note@-1 {{mark the property as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 }
 
 private struct VIPPrivateSetProp : VeryImportantProto {
   typealias Assoc = Int
   private(set) var value: Int // expected-error {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}}
-  // expected-note@-1 {{mark the var as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  // expected-note@-1 {{mark the property as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 }
 
 private class VIPPrivateSetBase {
@@ -144,7 +144,7 @@ private class VIPPrivateSetSub : VIPPrivateSetBase, VeryImportantProto { // expe
 
 private class VIPPrivateSetPropBase {
   private(set) var value: Int = 0
-  // expected-note@-1 {{mark the var as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  // expected-note@-1 {{mark the property as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 }
 private class VIPPrivateSetPropSub : VIPPrivateSetPropBase, VeryImportantProto {
   // expected-error@-1 {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{none}}
@@ -194,7 +194,7 @@ extension Container {
   fileprivate subscript(_: VeryPrivateStruct) -> Void { return () } // expected-error {{subscript cannot be declared fileprivate because its index uses a private type}} {{none}}
   fileprivate func privateMethod(_: VeryPrivateStruct) -> Void {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}} {{none}}
   fileprivate enum PrivateRawValue: VeryPrivateStruct {} // expected-error {{enum cannot be declared fileprivate because its raw type uses a private type}} {{none}}
-  // expected-error@-1 {{raw type 'Container.VeryPrivateStruct' is not expressible by any literal}}
+  // expected-error@-1 {{raw type 'Container.VeryPrivateStruct' is not expressible by a string, integer, or floating-point literal}}
   // expected-error@-2 {{'Container.PrivateRawValue' declares raw type 'Container.VeryPrivateStruct', but does not conform to RawRepresentable and conformance could not be synthesized}}
   // expected-error@-3 {{RawRepresentable conformance cannot be synthesized because raw type 'Container.VeryPrivateStruct' is not Equatable}}
   fileprivate enum PrivatePayload {

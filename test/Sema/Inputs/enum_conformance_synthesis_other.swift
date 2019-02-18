@@ -23,3 +23,9 @@ enum GenericOtherFileNonconforming<T> {
 // expected-note@-1 {{type declared here}}
     case A(T)
 }
+
+protocol ImplierOther: Equatable {}
+extension ImpliedMain: ImplierMain {}
+enum ImpliedOther: ImplierOther {
+    case a(Int)
+}

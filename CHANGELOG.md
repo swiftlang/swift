@@ -24,9 +24,222 @@ CHANGELOG
 Swift 5.0
 ---------
 
-- [SR-419][]
+* Swift 3 mode has been removed. Supported values for the `-swift-version`
+  flag are `4`, `4.2`, and `5`.
 
-  In Swift 5 mode, when setting a property from within its own `didSet` or `willSet` observer, the observer will now only avoid being recursively called if the property is set on `self` (either implicitly or explicitly).
+* [SE-0228][]:
+
+  String interpolation has been overhauled to improve its performance,
+  clarity, and efficiency.
+
+  Note that the old `_ExpressibleByStringInterpolation` protocol has been
+  removed; any code making use of this protocol will need to be updated
+  for the new design. An `#if compiler` block can be used to conditionalize
+  code between 4.2 and 5.0, for example:
+  
+  ```swift
+  #if compiler(<5.0)
+  extension MyType : _ExpressibleByStringInterpolation { ... }
+  #else
+  extension MyType : ExpressibleByStringInterpolation { ... }
+  #endif
+  ```
+
+* [SE-0213][]:
+
+  If `T` conforms to one of the `ExpressibleBy*` protocols and `literal` is a
+  literal expression, then `T(literal)` will construct a literal of type `T`
+  using the corresponding protocol, rather than calling a constructor member
+  of `T` with a value of  the protocol's default literal type.
+
+  For example, expressions like `UInt64(0xffff_ffff_ffff_ffff)` are now valid,
+  where previously they would overflow the default integer literal type of `Int`.
+
+* [SE-0230][]:
+
+  In Swift 5 mode, `try?` with an expression of Optional type will flatten the
+  resulting Optional, instead of returning an Optional of an Optional.
+
+* [SR-5719][]:
+
+  In Swift 5 mode, `@autoclosure` parameters can no longer be forwarded to
+  `@autoclosure` arguments in another function call. Instead, you must explicitly
+  call the function value with `()`; the call itself is wrapped inside an
+  implicit closure, guaranteeing the same behavior as in Swift 4 mode.
+
+  Example:
+
+  ```swift
+  func foo(_ fn: @autoclosure () -> Int) {}
+  func bar(_ fn: @autoclosure () -> Int) {
+    foo(fn)   // Incorrect, `fn` can't be forwarded and has to be called
+    foo(fn()) // Ok
+  }
+  ```
+
+* [SR-8109][]:
+
+  Single-element labeled tuple expressions, for example `(label: 123)`, were
+  allowed in some contexts but often resulted in surprising, inconsistent
+  behavior that varied across compiler releases. They are now completely
+  disallowed.
+
+  Note that single-element labeled _types_, for example `var x: (label: Int)`,
+  have already been prohibited since Swift 3.
+
+* [SR-695][]:
+
+  In Swift 5 mode, a class method returning `Self` can no longer be overridden
+  with a method returning a non-final concrete class type. Such code is not
+  type safe and will need to be updated.
+
+  For example,
+
+  ```swift
+  class Base {
+    class func factory() -> Self { ... }
+  }
+
+  class Derived : Base {
+    class override func factory() -> Derived { ... }
+  }
+  ```
+
+* In Swift 5 mode, the type of `self` in a convenience initializer of a non-final
+  class is now the dynamic `Self` type, and not the concrete class type.
+
+* [SR-5581][]:
+
+  Protocols can now constrain their conforming types to those that subclasses a
+  given class. Two equivalent forms are supported:
+
+  ```swift
+  protocol MyView : UIView { ... }
+  protocol MyView where Self : UIView { ... }
+  ```
+
+  Note that Swift 4.2 accepted the second form, but it was not fully implemented
+  and could sometimes crash at compile time or run time.
+
+* [SR-631][]:
+
+  Extension binding now supports extensions of nested types which themselves are
+  defined inside extensions. Previously this could fail with some declaration orders,
+  producing spurious "undeclared type" errors.
+
+* [SR-7139][]:
+
+  Exclusive memory access is now enforced at runtime by default in
+  optimized (`-O`/`-Osize`) builds. Programs that violate exclusivity will
+  trap at runtime with an "overlapping access" diagnostic
+  message. This can be disabled via a command line flag:
+  `-enforce-exclusivity=unchecked`, but doing so may result in undefined
+  behavior.
+
+  Runtime violations of exclusivity typically result from
+  simultaneous access of class properties, global variables (including
+  variables in top-level code), or variables captured by escaping
+  closures.
+
+* [SE-0216][]:
+
+  The `@dynamicCallable` attribute enables nominal types to be "callable" via a
+  simple syntactic sugar. The primary use case is dynamic language
+  interoperability.
+
+  Toy example:
+
+  ```swift
+  @dynamicCallable
+  struct ToyCallable {
+    func dynamicallyCall(withArguments: [Int]) {}
+    func dynamicallyCall(withKeywordArguments: KeyValuePairs<String, Int>) {}
+  }
+  let x = ToyCallable()
+  x(1, 2, 3) // desugars to `x.dynamicallyCall(withArguments: [1, 2, 3])`
+  x(label: 1, 2) // desugars to `x.dynamicallyCall(withKeywordArguments: ["label": 1, "": 2])`
+  ```
+
+* [SR-7251][]:
+
+  In Swift 5 mode, attempting to declare a static property with the same name as a
+  nested type is now always correctly rejected. Previously, it was possible to
+  perform such a redeclaration in an extension of a generic type.
+  
+  For example:
+  ```swift
+  struct Foo<T> {}
+  extension Foo {
+    struct i {}
+    
+    // compiler error: Invalid redeclaration of 'i'
+    // (prior to Swift 5, this did not produce an error)
+    static var i: Int { return 0 }
+  }
+  ```
+
+* [SR-4248][]:
+
+  In Swift 5 mode, when casting an optional value to a generic placeholder type,
+  the compiler will be more conservative with the unwrapping of the value. The 
+  result of such a cast now more closely matches the result you would get in a
+  non-generic context.
+  
+  For example:
+  ```swift
+  func forceCast<U>(_ value: Any?, to type: U.Type) -> U {
+    return value as! U
+  }
+
+  let value: Any? = 42
+  print(forceCast(value, to: Any.self)) 
+  // prints: Optional(42)
+  // (prior to Swift 5, this would print: 42)
+  
+  print(value as! Any)                  
+  // prints: Optional(42)
+  ```
+
+* [SE-0227][]:
+
+  Key paths now support the `\.self` keypath, which is a `WritableKeyPath`
+  that refers to its entire input value:
+
+    ```swift
+    let id = \Int.self
+
+    var x = 2
+    print(x[keyPath: id]) // prints 2
+    x[keyPath: id] = 3
+    print(x[keyPath: id]) // prints 3
+    ```
+
+* [SE-0214][]:
+
+  The `DictionaryLiteral` type has been renamed to `KeyValuePairs`.
+  A typealias preserves the old name for compatibility.
+
+* [SR-2608][]
+
+  Default arguments are now printed in SourceKit-generated interfaces for Swift
+  modules, instead of just using a placeholder `default`.
+
+* `unowned` and `unowned(unsafe)` variables now support Optional types.
+
+* Designated initializers with variadic parameters are now correctly inherited
+  in subclasses.
+
+* Extensions of concrete subclasses of generic classes can now contain
+  `@objc` members.
+
+* Complex recursive type definitions involving classes and generics that would
+  previously cause deadlocks at run time are now fully supported.
+
+* [SR-419][]
+
+  In Swift 5 mode, when setting a property from within its own `didSet` or
+  `willSet` observer, the observer will now only avoid being recursively called
+  if the property is set on `self` (either implicitly or explicitly).
 
   For example:
   ```swift
@@ -56,6 +269,65 @@ Swift 5.0
 
 Swift 4.2
 ---------
+
+### 2018-09-17 (Xcode 10.0)
+
+* [SE-0202][]
+
+  The standard library now provides a unified set of randomization functionality.
+  Integer types, floating point types, and Bool all introduce a new static
+  method that creates a random value.
+  
+  ```swift
+  let diceRoll = Int.random(in: 1 ... 6)
+  let randomUnit = Double.random(in: 0 ..< 1)
+  let randomBool = Bool.random()
+  ```
+  
+  There are also additions to select a random element from a collection or
+  shuffle its contents.
+  
+  ```swift
+  let greetings = ["hey", "hello", "hi", "hola"]
+  let randomGreeting = greetings.randomElement()! // This returns an Optional
+  let newGreetings = greetings.shuffled() // ["hola", "hi", "hey", "hello"]
+  ```
+
+  Core to the randomization functionality is a new `RandomNumberGenerator`
+  protocol. The standard library defines its own random number generator
+  called `SystemRandomNumberGenerator` which is backed by a secure and
+  thread-safe random number generator on each platform. All the randomization
+  functions have a `using:` parameter that take a `RandomNumberGenerator` that
+  users can pass in their own random number generator.
+  
+  ```swift
+  struct MersenneTwister: RandomNumberGenerator {
+    func next() -> UInt64 {
+      // implementation
+    }
+  }
+  
+  var mt = MersenneTwister()
+  let diceRoll = Int.random(in: 1 ... 6, using: &mt)
+  ```
+
+* [SE-0194][]
+
+  The new CaseIterable protocol describes types which have a static
+  “allCases” property that is used to describe all of the cases of the
+  type. Swift will synthesize this “allCases” property for enums that
+  have no associated values. For example:
+
+  ```swift
+  enum Suit: CaseIterable {
+    case heart
+    case club
+    case diamond
+    case spade
+  }
+
+  print(Suit.allCases) // prints [Suit.heart, Suit.club, Suit.diamond, Suit.spade]
+  ```
 
 * [SE-0185][]
 
@@ -207,11 +479,10 @@ Swift 4.2
 * [SE-0143][]
 
   The standard library types `Optional`, `Array`, `ArraySlice`,
-  `ContiguousArray`, `Dictionary`, `DictionaryLiteral`, `Range`, and
-  `ClosedRange` now conform to the `Hashable` protocol when their element or
-  bound types (as the case may be) conform to `Hashable`.  This makes
-  synthesized `Hashable` implementations available for types that include stored
-  properties of these types.
+  `ContiguousArray`, `Dictionary`, `Range`, and `ClosedRange` now conform to the
+  `Hashable` protocol when their element or bound types (as the case may be)
+  conform to `Hashable`.  This makes synthesized `Hashable` implementations
+  available for types that include stored properties of these types.
 
 * [SE-0196][]
   
@@ -244,8 +515,6 @@ Swift 4.2
   a dynamic cast such as `value as? P`, where the dynamic type of `value`
   conditionally conforms to `P`, will succeed when the conditional
   requirements are met.
-
-**Add new entries to the top of this section, not here!**
 
 Swift 4.1
 ---------
@@ -7120,12 +7389,38 @@ Swift 1.0
 [SE-0210]: <https://github.com/apple/swift-evolution/blob/master/proposals/0210-key-path-offset.md>
 [SE-0211]: <https://github.com/apple/swift-evolution/blob/master/proposals/0211-unicode-scalar-properties.md>
 [SE-0212]: <https://github.com/apple/swift-evolution/blob/master/proposals/0212-compiler-version-directive.md>
+[SE-0213]: <https://github.com/apple/swift-evolution/blob/master/proposals/0213-literal-init-via-coercion.md>
+[SE-0214]: <https://github.com/apple/swift-evolution/blob/master/proposals/0214-DictionaryLiteral.md>
+[SE-0215]: <https://github.com/apple/swift-evolution/blob/master/proposals/0215-conform-never-to-hashable-and-equatable.md>
+[SE-0216]: <https://github.com/apple/swift-evolution/blob/master/proposals/0216-dynamic-callable.md>
+[SE-0217]: <https://github.com/apple/swift-evolution/blob/master/proposals/0217-bangbang.md>
+[SE-0218]: <https://github.com/apple/swift-evolution/blob/master/proposals/0218-introduce-compact-map-values.md>
+[SE-0219]: <https://github.com/apple/swift-evolution/blob/master/proposals/0219-package-manager-dependency-mirroring.md>
+[SE-0220]: <https://github.com/apple/swift-evolution/blob/master/proposals/0220-count-where.md>
+[SE-0221]: <https://github.com/apple/swift-evolution/blob/master/proposals/0221-character-properties.md>
+[SE-0222]: <https://github.com/apple/swift-evolution/blob/master/proposals/0222-lazy-compactmap-sequence.md>
+[SE-0223]: <https://github.com/apple/swift-evolution/blob/master/proposals/0223-array-uninitialized-initializer.md>
+[SE-0224]: <https://github.com/apple/swift-evolution/blob/master/proposals/0224-ifswift-lessthan-operator.md>
+[SE-0225]: <https://github.com/apple/swift-evolution/blob/master/proposals/0225-binaryinteger-iseven-isodd-ismultiple.md>
+[SE-0226]: <https://github.com/apple/swift-evolution/blob/master/proposals/0226-package-manager-target-based-dep-resolution.md>
+[SE-0227]: <https://github.com/apple/swift-evolution/blob/master/proposals/0227-identity-keypath.md>
+[SE-0228]: <https://github.com/apple/swift-evolution/blob/master/proposals/0228-fix-expressiblebystringinterpolation.md>
+[SE-0230]: <https://github.com/apple/swift-evolution/blob/master/proposals/0230-flatten-optional-try.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
+[SR-631]: <https://bugs.swift.org/browse/SR-631>
+[SR-695]: <https://bugs.swift.org/browse/SR-695>
 [SR-1009]: <https://bugs.swift.org/browse/SR-1009>
 [SR-1446]: <https://bugs.swift.org/browse/SR-1446>
 [SR-1529]: <https://bugs.swift.org/browse/SR-1529>
 [SR-2131]: <https://bugs.swift.org/browse/SR-2131>
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
+[SR-2608]: <https://bugs.swift.org/browse/SR-2608>
+[SR-4248]: <https://bugs.swift.org/browse/SR-4248>
+[SR-5581]: <https://bugs.swift.org/browse/SR-5581>
+[SR-5719]: <https://bugs.swift.org/browse/SR-5719>
+[SR-7139]: <https://bugs.swift.org/browse/SR-7139>
+[SR-7251]: <https://bugs.swift.org/browse/SR-7251>
+[SR-8109]: <https://bugs.swift.org/browse/SR-8109>

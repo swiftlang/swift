@@ -18,15 +18,20 @@
 #ifndef SWIFT_SEMA_CSDIAG_H
 #define SWIFT_SEMA_CSDIAG_H
 
+#include "ConstraintSystem.h"
+#include <string>
+
 namespace swift {
-  
+  class Expr;
+  class Type;
+  class SourceLoc;
+
   std::string getTypeListString(Type type);
   
   /// Rewrite any type variables & archetypes in the specified type with
   /// UnresolvedType.
   Type replaceTypeParametersWithUnresolved(Type ty);
   Type replaceTypeVariablesWithUnresolved(Type ty);
-  
 };
 
 #endif /* SWIFT_SEMA_CSDIAG_H */

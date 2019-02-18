@@ -387,7 +387,7 @@ public:
 };
 
 class TextReplacementsRenamer : public Renamer {
-  llvm::StringMap<char> &ReplaceTextContext;
+  llvm::StringSet<> &ReplaceTextContext;
   std::vector<Replacement> Replacements;
 
 public:
@@ -395,7 +395,9 @@ public:
 
 private:
   StringRef registerText(StringRef Text) {
-    return ReplaceTextContext.insert({Text, char()}).first->getKey();
+    if (Text.empty())
+      return Text;
+    return ReplaceTextContext.insert(Text).first->getKey();
   }
 
   StringRef getCallArgLabelReplacement(StringRef OldLabelRange,
@@ -497,7 +499,7 @@ private:
 public:
   TextReplacementsRenamer(const SourceManager &SM, StringRef OldName,
                           StringRef NewName,
-                          llvm::StringMap<char> &ReplaceTextContext)
+                          llvm::StringSet<> &ReplaceTextContext)
       : Renamer(SM, OldName), ReplaceTextContext(ReplaceTextContext),
         New(NewName) {
     assert(Old.isValid() && New.isValid());
@@ -933,6 +935,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
   switch (RangeInfo.RangeContext->getContextKind()) {
   case swift::DeclContextKind::Initializer:
   case swift::DeclContextKind::SubscriptDecl:
+  case swift::DeclContextKind::EnumElementDecl:
   case swift::DeclContextKind::AbstractFunctionDecl:
   case swift::DeclContextKind::AbstractClosureExpr:
   case swift::DeclContextKind::TopLevelCodeDecl:
@@ -963,6 +966,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
       success({CannotExtractReason::VoidType});
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static StringRef correctNameInternal(ASTContext &Ctx, StringRef Name,
@@ -1492,6 +1496,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     case RangeKind::Invalid:
       return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool RefactoringActionExtractExpr::performChange() {
@@ -1514,6 +1519,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     case RangeKind::Invalid:
       return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 bool RefactoringActionExtractRepeatedExpr::performChange() {
   return RefactoringActionExtractExprBase(TheFile, RangeInfo,
@@ -1573,6 +1579,7 @@ bool RefactoringActionMoveMembersToExtension::isApplicable(
   case RangeKind::Invalid:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool RefactoringActionMoveMembersToExtension::performChange() {
@@ -1612,8 +1619,7 @@ class FindAllSubDecls : public SourceEntityWalker {
       return false;
 
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
-      llvm::SmallVector<Decl *, 6> accessors;
-      ASD->getAllAccessorFunctions(accessors);
+      auto accessors = ASD->getAllAccessors();
       Found.insert(accessors.begin(), accessors.end());
     }
     return true;
@@ -1644,6 +1650,7 @@ bool RefactoringActionReplaceBodiesWithFatalError::isApplicable(
   case RangeKind::Invalid:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool RefactoringActionReplaceBodiesWithFatalError::performChange() {
@@ -2394,7 +2401,8 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
 
 static EnumDecl* getEnumDeclFromSwitchStmt(SwitchStmt *SwitchS) {
   if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
-    return SubjectTy->getAnyNominal()->getAsEnumOrEnumExtensionContext();
+    // FIXME: Support more complex subject like '(Enum1, Enum2)'.
+    return dyn_cast_or_null<EnumDecl>(SubjectTy->getAnyNominal());
   }
   return nullptr;
 }
@@ -2568,6 +2576,110 @@ bool RefactoringActionLocalizeString::performChange() {
     return true;
   EditConsumer.accept(SM, Target->getStartLoc(), "NSLocalizedString(");
   EditConsumer.insertAfter(SM, Target->getEndLoc(), ", comment: \"\")");
+  return false;
+}
+
+static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
+                            SourceManager &SM,
+                            SmallVectorImpl<std::string>& memberNameVector,
+                            SmallVectorImpl<std::string>& memberTypeVector,
+                            SourceLoc targetLocation) {
+  
+  assert(!memberTypeVector.empty());
+  assert(memberTypeVector.size() == memberNameVector.size());
+  
+  EditConsumer.accept(SM, targetLocation, "\ninternal init(");
+  
+  for (size_t i = 0, n = memberTypeVector.size(); i < n ; i++) {
+    EditConsumer.accept(SM, targetLocation, memberNameVector[i] + ": " +
+                        memberTypeVector[i]);
+    
+    if (i != memberTypeVector.size() - 1) {
+      EditConsumer.accept(SM, targetLocation, ", ");
+    }
+  }
+  
+  EditConsumer.accept(SM, targetLocation, ") {\n");
+  
+  for (auto varName: memberNameVector) {
+    EditConsumer.accept(SM, targetLocation,
+                        "self." + varName + " = " + varName + "\n");
+  }
+  
+  EditConsumer.accept(SM, targetLocation, "}\n");
+}
+  
+static SourceLoc collectMembersForInit(ResolvedCursorInfo CursorInfo,
+                           SmallVectorImpl<std::string>& memberNameVector,
+                           SmallVectorImpl<std::string>& memberTypeVector) {
+  
+  if (!CursorInfo.ValueD)
+    return SourceLoc();
+  
+  ClassDecl *classDecl = dyn_cast<ClassDecl>(CursorInfo.ValueD);
+  if (!classDecl || classDecl->getStoredProperties().empty() ||
+      CursorInfo.IsRef) {
+    return SourceLoc();
+  }
+  
+  SourceLoc bracesStart = classDecl->getBraces().Start;
+  if (!bracesStart.isValid())
+    return SourceLoc();
+  
+  SourceLoc targetLocation = bracesStart.getAdvancedLoc(1);
+  if (!targetLocation.isValid())
+    return SourceLoc();
+  
+  for (auto varDecl : classDecl->getStoredProperties()) {
+    auto parentPatternBinding = varDecl->getParentPatternBinding();
+    if (!parentPatternBinding)
+      continue;
+    
+    auto varDeclIndex =
+      parentPatternBinding->getPatternEntryIndexForVarDecl(varDecl);
+    
+    if (auto init = varDecl->getParentPatternBinding()->getInit(varDeclIndex)) {
+      if (init->getStartLoc().isValid())
+        continue;
+    }
+    
+    StringRef memberName = varDecl->getName().str();
+    memberNameVector.push_back(memberName.str());
+    
+    std::string memberType = varDecl->getType().getString();
+    memberTypeVector.push_back(memberType);
+  }
+  
+  if (memberNameVector.empty() || memberTypeVector.empty()) {
+    return SourceLoc();
+  }
+  
+  return targetLocation;
+}
+
+bool RefactoringActionMemberwiseInitLocalRefactoring::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+  
+  SmallVector<std::string, 8> memberNameVector;
+  SmallVector<std::string, 8> memberTypeVector;
+  
+  return collectMembersForInit(Tok, memberNameVector,
+                               memberTypeVector).isValid();
+}
+    
+bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
+  
+  SmallVector<std::string, 8> memberNameVector;
+  SmallVector<std::string, 8> memberTypeVector;
+  
+  SourceLoc targetLocation = collectMembersForInit(CursorInfo, memberNameVector,
+                                         memberTypeVector);
+  if (targetLocation.isInvalid())
+    return true;
+  
+  generateMemberwiseInit(EditConsumer, SM, memberNameVector,
+                         memberTypeVector, targetLocation);
+  
   return false;
 }
 
@@ -2776,7 +2888,7 @@ bool RefactoringActionTrailingClosure::performChange() {
     return true;
   Expr *Args = CE->getArg();
   if (auto *TSE = dyn_cast<TupleShuffleExpr>(Args))
-    Args = TSE;
+    Args = TSE->getSubExpr();
 
   Expr *ClosureArg = nullptr;
   Expr *PrevArg = nullptr;
@@ -2862,6 +2974,7 @@ static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
     case RangeKind::Invalid:
       return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 }// end of anonymous namespace
 
@@ -2873,6 +2986,7 @@ getDescriptiveRefactoringKindName(RefactoringKind Kind) {
 #define REFACTORING(KIND, NAME, ID) case RefactoringKind::KIND: return NAME;
 #include "swift/IDE/RefactoringKinds.def"
     }
+    llvm_unreachable("unhandled kind");
   }
 
   StringRef swift::ide::
@@ -2891,6 +3005,7 @@ getDescriptiveRefactoringKindName(RefactoringKind Kind) {
       case RenameAvailableKind::Unavailable_decl_from_clang:
         return "cannot rename a Clang symbol from its Swift reference";
     }
+    llvm_unreachable("unhandled kind");
   }
 
 SourceLoc swift::ide::RangeConfig::getStart(SourceManager &SM) {
@@ -2926,6 +3041,7 @@ struct swift::ide::FindRenameRangesAnnotatingConsumer::Implementation {
       case RefactoringRangeKind::SelectorArgumentLabel:
         return "sel";
     }
+    llvm_unreachable("unhandled kind");
   }
   void accept(SourceManager &SM, const RenameRangeDetail &Range) {
     std::string NewText;
@@ -2968,8 +3084,6 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
     AvailKind = RenameAvailableKind::Unavailable_has_no_location;
   } else if (!VD->hasName()) {
     AvailKind = RenameAvailableKind::Unavailable_has_no_name;
-  } else if (!VD->hasAccess()) {
-    return llvm::makeArrayRef(Scratch);
   }
 
   if (isa<AbstractFunctionDecl>(VD)) {
@@ -3110,6 +3224,7 @@ case RefactoringKind::KIND: {                                                  \
     case RefactoringKind::None:
       llvm_unreachable("should not enter here.");
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static std::vector<ResolvedLoc>
@@ -3183,7 +3298,7 @@ int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
     return true; // Already diagnosed.
 
   size_t index = 0;
-  llvm::StringMap<char> ReplaceTextContext;
+  llvm::StringSet<> ReplaceTextContext;
   for(const RenameLoc &Rename: RenameLocs) {
     ResolvedLoc &Resolved = ResolvedLocs[index++];
     TextReplacementsRenamer Renamer(SM, Rename.OldName, Rename.NewName,

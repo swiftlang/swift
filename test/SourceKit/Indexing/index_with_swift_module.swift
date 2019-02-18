@@ -21,6 +21,10 @@ func foo(a: TwoInts) {
 // CHECK-NEXT: key.filepath: "{{.*[/\\]}}test_module.swiftmodule"
 // CHECK-NEXT: key.hash:
 
+// CHECK:      key.kind: source.lang.swift.ref.module
+// CHECK-NEXT: key.name: "test_module"
+// CHECK-NEXT: key.usr: "c:@M@test_module"
+
 // CHECK:      key.kind: source.lang.swift.ref.class
 // CHECK-NEXT: key.name: "TwoInts"
 // CHECK-NEXT: key.usr: "s:11test_module7TwoIntsC"

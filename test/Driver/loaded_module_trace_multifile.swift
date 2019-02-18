@@ -10,10 +10,10 @@
 // CHECK: "name":"loaded_module_trace_multifile"
 // CHECK: "arch":"{{[^"]*}}"
 // CHECK: "swiftmodules":[
-// CHECK: "{{[^"]*}}/Module2.swiftmodule"
-// CHECK: "{{[^"]*}}/Module.swiftmodule"
-// CHECK: "{{[^"]*}}/Swift.swiftmodule"
-// CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule"
+// CHECK: "{{[^"]*[/\\]}}Module2.swiftmodule"
+// CHECK: "{{[^"]*[/\\]}}Module.swiftmodule"
+// CHECK: "{{[^"]*[/\\]}}Swift.swiftmodule"
+// CHECK: "{{[^"]*[/\\]}}SwiftOnoneSupport.swiftmodule"
 // CHECK: ]
 // CHECK: }
 

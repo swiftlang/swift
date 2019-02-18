@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/test_runtime_function_counters
+// RUN: %target-codesign %t/test_runtime_function_counters
 // RUN: %target-run %t/test_runtime_function_counters 2>&1 | %FileCheck %s
 // REQUIRES: runtime_function_counters
 // REQUIRES: executable_test

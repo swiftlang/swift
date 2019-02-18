@@ -15,7 +15,6 @@ extension C1: P {}
 public class C2<T> {}
 public class C3 : C2<Int> {}
 extension C3: P {}
-// expected-error@-1 {{conformance of subclass of a generic class 'C3' to @objc protocol 'P' cannot be in an extension}}
 
 class Outer<T> {
     class Inner {}
@@ -28,7 +27,6 @@ extension Outer.Inner: P {}
 class SubInner: Outer<Int>.Inner2 {}
 
 extension SubInner: P {}
-// expected-error@-1 {{conformance of subclass of a class from generic context 'SubInner' to @objc protocol 'P' cannot be in an extension}}
 
 // Lightweight generic ObjC classes can still be extended to conform.
 
@@ -55,6 +53,6 @@ public class SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric
   : SwiftGenericSubclassOfObjCGeneric<AnyObject>
 {}
 
-extension SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric: OBJCProtocol3 {} // expected-error {{cannot be in an extension}}
-extension SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric: R {} // expected-error {{cannot be in an extension}}
+extension SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric: OBJCProtocol3 {}
+extension SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric: R {}
 

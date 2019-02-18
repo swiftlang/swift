@@ -6,14 +6,14 @@
 
 func test(_ value: EnumWithDefaultExhaustivity) {
   // We want to assume such enums are non-frozen.
-  switch value { // expected-error {{switch must be exhaustive}} expected-note {{handle unknown values using "@unknown default"}}
+  switch value { // expected-error {{switch covers known cases, but 'EnumWithDefaultExhaustivity' may have additional unknown values}} expected-note {{handle unknown values using "@unknown default"}}
   case .loneCase: break
   }
 }
 
 func test(_ value: EnumWithSpecialAttributes) {
   // Same, but with the attributes macro shipped in the Xcode 9 SDKs.
-  switch value { // expected-error {{switch must be exhaustive}} expected-note {{handle unknown values using "@unknown default"}}
+  switch value { // expected-error {{switch covers known cases, but 'EnumWithSpecialAttributes' may have additional unknown values}} expected-note {{handle unknown values using "@unknown default"}}
   case .loneCase: break
   }
 }

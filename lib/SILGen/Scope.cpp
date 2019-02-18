@@ -22,7 +22,7 @@ ManagedValue Scope::popPreservingValue(ManagedValue mv) {
   // stack location that will be destroyed by this scope.
   assert(mv && mv.getType().isObject() &&
          (mv.getType().isTrivial(cleanups.SGF.getModule()) ||
-          mv.getOwnershipKind() == ValueOwnershipKind::Trivial ||
+          mv.getOwnershipKind() == ValueOwnershipKind::Any ||
           mv.hasCleanup()));
   CleanupCloner cloner(cleanups.SGF, mv);
   SILValue value = mv.forward(cleanups.SGF);
@@ -120,14 +120,16 @@ RValue Scope::popPreservingValue(RValue &&rv) {
 }
 
 void Scope::popImpl() {
-  SmallVector<SILValue, 16> cleanupsToPropagateToOuterScope;
-
-  cleanups.stack.checkIterator(depth);
-  cleanups.stack.checkIterator(cleanups.innermostScope);
-  assert(cleanups.innermostScope == depth && "popping scopes out of order");
-
+  verify();
   cleanups.innermostScope = savedInnermostScope;
   cleanups.endScope(depth, loc);
-  cleanups.stack.checkIterator(cleanups.innermostScope);
-  cleanups.popTopDeadCleanups(cleanups.innermostScope);
+  if (cleanups.innermostScope)
+    cleanups.stack.checkIterator(cleanups.innermostScope->depth);
+  cleanups.popTopDeadCleanups();
+}
+
+void Scope::verify() {
+  assert(cleanups.innermostScope == this && "popping scopes out of order");
+  assert(depth.isValid());
+  cleanups.stack.checkIterator(depth);
 }

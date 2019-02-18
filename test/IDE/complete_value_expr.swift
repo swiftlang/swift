@@ -116,6 +116,20 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP3 | %FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ1 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ2 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ3 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ4 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ5 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ6 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_TYPE1 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_TYPE1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_TYPE2 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_TYPE2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_TYPE3 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_TYPE3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_NODOT1 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_NODOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_NODOT2 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_NODOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_NODOT3 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_NODOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CHECK_PROT_OVERRIDES1 | %FileCheck %s -check-prefix=CHECK_PROT_OVERRIDES
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CHECK_PROT_OVERRIDES2 | %FileCheck %s -check-prefix=CHECK_PROT_OVERRIDES
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
@@ -134,6 +148,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_TA_2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_TA
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_3 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_4 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_T_DOT_1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_T_DOT_1
@@ -165,6 +181,14 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 | %FileCheck %s -check-prefix=DEPRECATED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DOT_EXPR_NON_NOMINAL_1 | %FileCheck %s -check-prefix=DOT_EXPR_NON_NOMINAL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DOT_EXPR_NON_NOMINAL_2 | %FileCheck %s -check-prefix=DOT_EXPR_NON_NOMINAL_2
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_1 | %FileCheck %s -check-prefix=KEYWORD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_2 | %FileCheck %s -check-prefix=KEYWORD_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_3 | %FileCheck %s -check-prefix=KEYWORD_3
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_1 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_2 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLTYPE_DOT_3 | %FileCheck %s -check-prefix=PROTOCOLTYPE_DOT_3
 
 // Test code completion of expressions that produce a value.
 
@@ -369,6 +393,7 @@ var fooObject: FooStruct
 
 // FOO_STRUCT_DOT: Begin completions
 // FOO_STRUCT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct.Type#]; name=self
+// FOO_STRUCT_DOT-NEXT: Keyword/CurrNominal: Type[#FooStruct.Type#]; name=Type
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0({#self: &FooStruct#})[#() -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#self: &FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc2({#self: &FooStruct#})[#(Int, b: inout Double) -> Void#]{{; name=.+$}}
@@ -461,6 +486,7 @@ var fooObject: FooStruct
 // FOO_STRUCT_NO_DOT-NEXT: Decl[Enum]/CurrNominal:           .ExtNestedEnum[#FooStruct.ExtNestedEnum#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      .ExtNestedTypealias[#Int#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Keyword[self]/CurrNominal:        .self[#FooStruct.Type#]; name=self
+// FOO_STRUCT_NO_DOT-NEXT: Keyword/CurrNominal:              .Type[#FooStruct.Type#]; name=Type
 // FOO_STRUCT_NO_DOT-NEXT: End completions
 
 func testObjectExpr() {
@@ -721,7 +747,7 @@ func testInsideFunctionCall4() {
 func testInsideFunctionCall5() {
   FooStruct().instanceFunc2(42, #^INSIDE_FUNCTION_CALL_5^#
 // INSIDE_FUNCTION_CALL_5: Begin completions
-// INSIDE_FUNCTION_CALL_5-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_5-DAG: Keyword/ExprSpecific:               b: [#Argument name#]; name=b: 
 // INSIDE_FUNCTION_CALL_5: End completions
 }
 
@@ -866,6 +892,7 @@ func testLookInBaseStatic() {
   MembersDerived.#^BASE_MEMBERS_STATIC^#
 // BASE_MEMBERS_STATIC: Begin completions
 // BASE_MEMBERS_STATIC-NEXT: Keyword[self]/CurrNominal: self[#MembersDerived.Type#]; name=self
+// BASE_MEMBERS_STATIC-NEXT: Keyword/CurrNominal: Type[#MembersDerived.Type#]; name=Type
 // BASE_MEMBERS_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: derivedInstanceFunc({#self: MembersDerived#})[#() -> Void#]{{; name=.+$}}
 // BASE_MEMBERS_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   derivedStaticFunc()[#Void#]{{; name=.+$}}
 // BASE_MEMBERS_STATIC-NEXT: Decl[Constructor]/CurrNominal:    init()[#MembersDerived#]; name=init(){{$}}
@@ -986,10 +1013,10 @@ func testResolveFuncParam3<Foo : FooProtocol>(_ foo: Foo) {
   foo.#^RESOLVE_FUNC_PARAM_3^#
 // RESOLVE_FUNC_PARAM_3: Begin completions
 // RESOLVE_FUNC_PARAM_3-NEXT: Keyword[self]/CurrNominal: self[#Foo#]; name=self
-// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_3-NEXT: End completions
 }
 
@@ -997,13 +1024,13 @@ func testResolveFuncParam4<FooBar : FooProtocol & BarProtocol>(_ fooBar: FooBar)
   fooBar.#^RESOLVE_FUNC_PARAM_4^#
 // RESOLVE_FUNC_PARAM_4: Begin completions
 // RESOLVE_FUNC_PARAM_4-NEXT: Keyword[self]/CurrNominal: self[#FooBar#]; name=self
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/Super:    barInstanceVar[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/Super: barInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/Super: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/CurrNominal:    barInstanceVar[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/CurrNominal: barInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/CurrNominal: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_4-NEXT: End completions
 }
 
@@ -1011,15 +1038,15 @@ func testResolveFuncParam5<FooExBarEx : FooExProtocol & BarExProtocol>(_ a: FooE
   a.#^RESOLVE_FUNC_PARAM_5^#
 // RESOLVE_FUNC_PARAM_5: Begin completions
 // RESOLVE_FUNC_PARAM_5-NEXT: Keyword[self]/CurrNominal: self[#FooExBarEx#]; name=self
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super:    barInstanceVar[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super: barInstanceVar[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: barInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: barExInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/CurrNominal: barExInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super: fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super: fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: fooExInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/CurrNominal: fooExInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-NEXT: End completions
 }
 
@@ -1027,13 +1054,13 @@ func testResolveFuncParam6<Foo : FooProtocol where Foo : FooClass>(_ foo: Foo) {
   foo.#^RESOLVE_FUNC_PARAM_6^#
 // RESOLVE_FUNC_PARAM_6: Begin completions
 // RESOLVE_FUNC_PARAM_6-NEXT: Keyword[self]/CurrNominal: self[#Foo#]; name=self
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/Super:    fooClassInstanceVar[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/Super: fooClassInstanceFunc0()[#Void#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/Super: fooClassInstanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/CurrNominal: fooClassInstanceVar[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/CurrNominal: fooClassInstanceFunc0()[#Void#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/CurrNominal: fooClassInstanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_6-NEXT: End completions
 }
 
@@ -1048,10 +1075,10 @@ class TestResolveConstructorParam2 {
     foo.#^RESOLVE_CONSTRUCTOR_PARAM_2^#
 // RESOLVE_CONSTRUCTOR_PARAM_2: Begin completions
 // RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Keyword[self]/CurrNominal: self[#Foo#]; name=self
-// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceVar]/CurrNominal:  fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceVar]/CurrNominal:  fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: End completions
   }
 }
@@ -1061,10 +1088,10 @@ class TestResolveConstructorParam3<Foo : FooProtocol> {
     foo.#^RESOLVE_CONSTRUCTOR_PARAM_3^#
 // RESOLVE_CONSTRUCTOR_PARAM_3: Begin completions
 // RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Keyword[self]/CurrNominal: self[#Foo#]; name=self
-// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceVar]/CurrNominal:  fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceVar]/CurrNominal:  fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: End completions
   }
 }
@@ -1101,6 +1128,7 @@ func testFuncParenPattern2(_ fpp: FuncParenPattern) {
 // FUNC_PAREN_PATTERN_2-NEXT: Decl[Constructor]/CurrNominal: ({#(Int, Int)#})[#FuncParenPattern#]{{; name=.+$}}
 // FUNC_PAREN_PATTERN_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#self: &FuncParenPattern#})[#(Int) -> Void#]{{; name=.+$}}
 // FUNC_PAREN_PATTERN_2-NEXT: Keyword[self]/CurrNominal: .self[#FuncParenPattern.Type#]; name=self
+// FUNC_PAREN_PATTERN_2-NEXT: Keyword/CurrNominal: .Type[#FuncParenPattern.Type#]; name=Type
 // FUNC_PAREN_PATTERN_2-NEXT: End completions
 }
 
@@ -1178,6 +1206,7 @@ func testResolveGenericParams1() {
 // RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<FooStruct>.Type#]; name=Type
 // RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: End completions
 }
 
@@ -1205,6 +1234,8 @@ func testResolveGenericParams2<Foo : FooProtocol>(_ foo: Foo) {
 // RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooProtocol#})[#FooProtocol#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<Foo>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<Foo>.Type#]; name=Type
+
 // RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: End completions
 }
 
@@ -1221,7 +1252,7 @@ struct TestResolveGenericParams3_4<T> {
 // RESOLVE_GENERIC_PARAMS_3-NEXT: End completions
 
     FooGenericStruct<FooStruct>#^RESOLVE_GENERIC_PARAMS_3_STATIC^#
-// RESOLVE_GENERIC_PARAMS_3_STATIC: Begin completions, 11 items
+// RESOLVE_GENERIC_PARAMS_3_STATIC: Begin completions, 12 items
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[Constructor]/CurrNominal:    ()[#FooGenericStruct<FooStruct>#]; name=()
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[Constructor]/CurrNominal:    ({#t: FooStruct#})[#FooGenericStruct<FooStruct>#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#self: &FooGenericStruct<FooStruct>#})[#(FooStruct) -> Void#]{{; name=.+$}}
@@ -1233,6 +1264,7 @@ struct TestResolveGenericParams3_4<T> {
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<FooStruct>.Type#]; name=Type
 // RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: End completions
   }
 
@@ -1260,6 +1292,7 @@ struct TestResolveGenericParams3_4<T> {
 // RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): T#})[#T#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<T>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<T>.Type#]; name=Type
 // RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: End completions
   }
 
@@ -1287,6 +1320,7 @@ struct TestResolveGenericParams3_4<T> {
 // RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<U>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<U>.Type#]; name=Type
 // RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: End completions
   }
 }
@@ -1496,30 +1530,160 @@ func testGenericConforming1<T: P1>(x: T) {
   x.#^PROTOCOL_EXT_GENERICP1^#
 }
 // PROTOCOL_EXT_GENERICP1: Begin completions
-// PROTOCOL_EXT_GENERICP1-DAG: Decl[InstanceMethod]/Super:   reqP1()[#Void#]{{; name=.+$}}
-// PROTOCOL_EXT_GENERICP1-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP1-DAG: Decl[InstanceMethod]/CurrNominal: reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP1-DAG: Decl[InstanceMethod]/CurrNominal: extP1()[#Void#]{{; name=.+$}}
 // PROTOCOL_EXT_GENERICP1: End completions
 
 func testGenericConforming2<T: P2>(x: T) {
   x.#^PROTOCOL_EXT_GENERICP2^#
 }
 // PROTOCOL_EXT_GENERICP2: Begin completions
-// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/Super:   reqP1()[#Void#]{{; name=.+$}}
-// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/Super:   reqP2()[#Void#]{{; name=.+$}}
-// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
-// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/Super:   extP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/Super: reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/CurrNominal:  reqP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/Super: extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/CurrNominal: extP2()[#Void#]{{; name=.+$}}
 // PROTOCOL_EXT_GENERICP2: End completions
 
 func testGenericConforming3<T: P3>(x: T) {
   x.#^PROTOCOL_EXT_GENERICP3^#
 }
 // PROTOCOL_EXT_GENERICP3: Begin completions
-// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   reqP1()[#Void#]{{; name=.+$}}
-// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   reqP2()[#Void#]{{; name=.+$}}
-// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
-// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   extP2()[#Void#]{{; name=.+$}}
-// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   extP3()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super: reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super: reqP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super: extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super: extP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/CurrNominal: extP3()[#Void#]{{; name=.+$}}
 // PROTOCOL_EXT_GENERICP3: End completions
+
+protocol NoDupReq1 {
+  func foo()
+  func roo(arg1: Int)
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+protocol NoDupReq2 {
+  func foo()
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+protocol NoDupReq3 {
+  func foo()
+  func roo(arg2: Int)
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+
+protocol NoDupReq4 {
+  func foo()
+  func roo(arg1: Int)
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+protocol NoDupReq5: NoDupReq4 {
+  func foo()
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+protocol NoDupReq6: NoDupReq5 {
+  func foo()
+  func roo(arg2: Int)
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+
+typealias NoDupReq23 = NoDupReq2 & NoDupReq3
+
+protocol Override {
+  func foo<T: NoDupReq1>(_ arg: T)
+  func foo<T: NoDupReq2>(_ arg: T)
+}
+protocol Override2 {
+  func foo<T: NoDupReq1>(_ arg: T)
+}
+protocol Override3: Override2 {
+  func foo<T: NoDupReq2>(_ arg: T)
+}
+
+func checkRestatementNoDup1(_ arg: NoDupReq1 & NoDupReq2 & NoDupReq3) {
+  arg.#^NODUP_RESTATED_REQ1^#
+  arg#^NODUP_RESTATED_REQ_NODOT1^#
+}
+func checkRestatementNoDup2(_ arg: NoDupReq6) {
+  arg.#^NODUP_RESTATED_REQ2^#
+}
+func checkRestatementNoDup3<T: NoDupReq6>(_ arg: T) {
+  arg.#^NODUP_RESTATED_REQ3^#
+  T.#^NODUP_RESTATED_REQ_TYPE1^#
+  arg#^NODUP_RESTATED_REQ_NODOT2^#
+}
+func checkRestatementNoDup4<T: NoDupReq1 & NoDupReq2 & NoDupReq3>(_ arg: T) {
+  arg.#^NODUP_RESTATED_REQ4^#
+  T.#^NODUP_RESTATED_REQ_TYPE2^#
+}
+func checkRestatementNoDup5<T: NoDupReq1 & NoDupReq23>(_ arg: T) {
+  arg.#^NODUP_RESTATED_REQ5^#
+  T.#^NODUP_RESTATED_REQ_TYPE3^#
+}
+func checkRestatementNoDup6(_ arg: NoDupReq1 & NoDupReq23) {
+  arg.#^NODUP_RESTATED_REQ6^#
+  arg#^NODUP_RESTATED_REQ_NODOT3^#
+}
+func checkOverrideInclusion1(_ arg: Override) {
+  arg.#^CHECK_PROT_OVERRIDES1^#
+}
+func checkOverrideInclusion2(_ arg: Override3) {
+  arg.#^CHECK_PROT_OVERRIDES2^#
+}
+
+// CHECK_NODUP_RESTATED_REQ: Begin completions
+// CHECK_NODUP_RESTATED_REQ-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: foo()[#Void#]; name=foo()
+// CHECK_NODUP_RESTATED_REQ-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: roo({#arg1: Int#})[#Void#]
+// CHECK_NODUP_RESTATED_REQ-DAG: Decl[InstanceVar]/{{Super|CurrNominal}}:    doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: roo({#arg2: Int#})[#Void#]
+// CHECK_NODUP_RESTATED_REQ-NOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: foo()[#Void#]; name=foo()
+// CHECK_NODUP_RESTATED_REQ-NOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ: End completions
+
+// CHECK_NODUP_RESTATED_REQ_NODOT: Begin completions
+// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .foo()[#Void#]; name=foo()
+// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg1: Int#})[#Void#];
+// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[Subscript]/{{Super|CurrNominal}}:      [{#Bool#}][#Bool#]; name=[Bool]
+// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg2: Int#})[#Void#];
+// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .foo()[#Void#]; name=foo()
+// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[Subscript]/{{Super|CurrNominal}}:      [{#Bool#}][#Bool#]; name=[Bool]
+// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ_NODOT: End completions
+
+// CHECK_NODUP_RESTATED_REQ_TYPE1: Begin completions, 6 items
+// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/Super: foo({#self: NoDupReq6#})[#() -> Void#]; name=foo(NoDupReq6)
+// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/Super: roo({#self: NoDupReq6#})[#(arg1: Int) -> Void#]; name=roo(NoDupReq6
+// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[AssociatedType]/Super: E; name=E
+// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/CurrNominal: roo({#self: NoDupReq6#})[#(arg2: Int) -> Void#]; name=roo(NoDupReq6)
+// CHECK_NODUP_RESTATED_REQ_TYPE1: End completions
+
+// CHECK_NODUP_RESTATED_REQ_TYPE2: Begin completions, 6 items
+// CHECK_NODUP_RESTATED_REQ_TYPE2: Decl[InstanceMethod]/CurrNominal: foo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#() -> Void#]; name=foo(NoDupReq1 & NoDupReq2 & NoDupReq3)
+// CHECK_NODUP_RESTATED_REQ_TYPE2: Decl[InstanceMethod]/CurrNominal: roo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#(arg1: Int) -> Void#]; name=roo(NoDupReq1 & NoDupReq2 & NoDupReq3)
+// CHECK_NODUP_RESTATED_REQ_TYPE2: Decl[AssociatedType]/CurrNominal: E; name=E
+// CHECK_NODUP_RESTATED_REQ_TYPE2: Decl[InstanceMethod]/CurrNominal: roo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#(arg2: Int) -> Void#]; name=roo(NoDupReq1 & NoDupReq2 & NoDupReq3)
+// CHECK_NODUP_RESTATED_REQ_TYPE2: End completions
+
+// CHECK_NODUP_RESTATED_REQ_TYPE3: Begin completions, 6 items
+// CHECK_NODUP_RESTATED_REQ_TYPE3: Decl[InstanceMethod]/CurrNominal: foo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#() -> Void#]; name=foo(NoDupReq1 & NoDupReq2 & NoDupReq3)
+// CHECK_NODUP_RESTATED_REQ_TYPE3: Decl[InstanceMethod]/CurrNominal: roo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#(arg1: Int) -> Void#]; name=roo(NoDupReq1 & NoDupReq2 & NoDupReq3)
+// CHECK_NODUP_RESTATED_REQ_TYPE3: Decl[AssociatedType]/CurrNominal: E; name=E
+// CHECK_NODUP_RESTATED_REQ_TYPE3: Decl[InstanceMethod]/CurrNominal: roo({#self: NoDupReq1 & NoDupReq2 & NoDupReq3#})[#(arg2: Int) -> Void#]; name=roo(NoDupReq1 & NoDupReq2 & NoDupReq3)
+// CHECK_NODUP_RESTATED_REQ_TYPE3: End completions
+
+// CHECK_PROT_OVERRIDES: Decl[InstanceMethod]/{{Super|CurrNominal}}: foo({#(arg): NoDupReq1#})[#Void#]; name=foo(arg: NoDupReq1)
+// CHECK_PROT_OVERRIDES: Decl[InstanceMethod]/{{Super|CurrNominal}}: foo({#(arg): NoDupReq2#})[#Void#]; name=foo(arg: NoDupReq2)
 
 struct OnlyMe {}
 protocol P4 {
@@ -1577,8 +1741,8 @@ extension Concrete1 {
 }
 // PROTOCOL_EXT_P4_P1: Begin completions
 // PROTOCOL_EXT_P4_P1-NOT: extP4OnlyMe()
-// PROTOCOL_EXT_P4_P1-DAG: Decl[InstanceMethod]/Super:         extP4WhenP1()[#Void#]{{; name=.+$}}
-// PROTOCOL_EXT_P4_P1-DAG: Decl[InstanceVar]/Super:         x[#Int#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_P1-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: extP4WhenP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_P1-DAG: Decl[InstanceVar]/{{Super|CurrNominal}}: x[#Int#]{{; name=.+$}}
 // PROTOCOL_EXT_P4_P1-NOT: extP4OnlyMe()
 // PROTOCOL_EXT_P4_P1: End completions
 
@@ -1608,13 +1772,13 @@ extension Concrete2 {
 // PROTOCOL_EXT_P4_ONLYME: Begin completions
 // PROTOCOL_EXT_P4_ONLYME-NOT: extP4WhenP1()
 // PROTOCOL_EXT_P4_ONLYME-NOT: x[#Int#]
-// PROTOCOL_EXT_P4_ONLYME-DAG: Decl[InstanceMethod]/Super:    extP4OnlyMe()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_ONLYME-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: extP4OnlyMe()[#Void#]{{; name=.+$}}
 // PROTOCOL_EXT_P4_ONLYME-NOT: extP4WhenP1()
 // PROTOCOL_EXT_P4_ONLYME-NOT: x[#Int#]
 // PROTOCOL_EXT_P4_ONLYME: End completions
 
 // PROTOCOL_EXT_P4_ONLYME_SUB: Begin completions
-// PROTOCOL_EXT_P4_ONLYME_SUB: Decl[Subscript]/Super:              [{#Int#}][#Int#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_ONLYME_SUB: Decl[Subscript]/{{Super|CurrNominal}}: [{#Int#}][#Int#]{{; name=.+$}}
 // PROTOCOL_EXT_P4_ONLYME_SUB: End completions
 
 func testTypealias1() {
@@ -1632,16 +1796,18 @@ func testProtExtInit1() {
 }
 
 // PROTOCOL_EXT_INIT_1: Begin completions
-// PROTOCOL_EXT_INIT_1: Decl[Constructor]/Super:            ['(']{#x: Int#}[')'][#Concrete1#]{{; name=.+$}}
+// PROTOCOL_EXT_INIT_1: Decl[Constructor]/{{Super|CurrNominal}}: ['(']{#x: Int#}[')'][#Concrete1#]{{; name=.+$}}
 // PROTOCOL_EXT_INIT_1: End completions
 
 func testProtExtInit2<S: P4 where S.T : P1>() {
   S(#^PROTOCOL_EXT_INIT_2^#
+  S.#^PROTOCOL_EXT_INIT_3^#
+  S#^PROTOCOL_EXT_INIT_4^#
 }
 
-// PROTOCOL_EXT_INIT_2: Begin completions
-// PROTOCOL_EXT_INIT_2: Decl[Constructor]/Super:            ['(']{#x: Int#}[')'][#P4#]{{; name=.+$}}
-// PROTOCOL_EXT_INIT_2: End completions
+// PROTOCOL_EXT_INIT_2: Decl[Constructor]/CurrNominal: ['(']{#x: Int#}[')'][#P4#]{{; name=.+$}}
+// PROTOCOL_EXT_INIT_3: Decl[Constructor]/CurrNominal: init({#x: Int#})[#P4#]{{; name=.+$}}
+// PROTOCOL_EXT_INIT_4: Decl[Constructor]/CurrNominal: ({#x: Int#})[#P4#]{{; name=.+$}}
 
 extension P4 where Self.T == OnlyMe {
   final func test1() {
@@ -1653,7 +1819,7 @@ extension P4 where Self.T == OnlyMe {
 }
 // PROTOCOL_EXT_P4_DOT: Begin completions
 // PROTOCOL_EXT_P4_DOT-NOT: extP4WhenP1()
-// PROTOCOL_EXT_P4_DOT-DAG: Decl[InstanceMethod]/Super:         extP4OnlyMe()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_DOT-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: extP4OnlyMe()[#Void#]{{; name=.+$}}
 // PROTOCOL_EXT_P4_DOT-NOT: extP4WhenP1()
 // PROTOCOL_EXT_P4_DOT: End completions
 
@@ -1710,16 +1876,18 @@ struct dedupS : dedupP {
 func testDeDuped(_ x: dedupS) {
   x#^PROTOCOL_EXT_DEDUP_1^#
 // FIXME: Should produce 3 items (?)
-// PROTOCOL_EXT_DEDUP_1: Begin completions, 7 items
+
+// PROTOCOL_EXT_DEDUP_1: Begin completions, 5 items
 // PROTOCOL_EXT_DEDUP_1: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
 // PROTOCOL_EXT_DEDUP_1: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
 // PROTOCOL_EXT_DEDUP_1: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]
+// PROTOCOL_EXT_DEDUP_1: Decl[InstanceVar]/Super:            .bar[#Int#]; name=bar
 // PROTOCOL_EXT_DEDUP_1: Keyword[self]/CurrNominal:          .self[#dedupS#]; name=self
 // PROTOCOL_EXT_DEDUP_1: End completions
 }
 func testDeDuped2(_ x: dedupP) {
   x#^PROTOCOL_EXT_DEDUP_2^#
-// PROTOCOL_EXT_DEDUP_2: Begin completions, 4 items
+// PROTOCOL_EXT_DEDUP_2: Begin completions, 5 items
 // PROTOCOL_EXT_DEDUP_2: Decl[InstanceMethod]/CurrNominal:   .foo()[#dedupP.T#]; name=foo()
 // PROTOCOL_EXT_DEDUP_2: Decl[InstanceVar]/CurrNominal:      .bar[#dedupP.T#]; name=bar
 // PROTOCOL_EXT_DEDUP_2: Decl[Subscript]/CurrNominal:        [{#Self.T#}][#Self.T#]; name=[Self.T]
@@ -1728,11 +1896,11 @@ func testDeDuped2(_ x: dedupP) {
 }
 func testDeDuped3<T : dedupP where T.T == Int>(_ x: T) {
   x#^PROTOCOL_EXT_DEDUP_3^#
-// PROTOCOL_EXT_DEDUP_3: Begin completions, 4 items
-// PROTOCOL_EXT_DEDUP_3: Decl[InstanceMethod]/Super:   .foo()[#Int#]; name=foo()
-// PROTOCOL_EXT_DEDUP_3: Decl[InstanceVar]/Super:      .bar[#Int#]; name=bar
-// PROTOCOL_EXT_DEDUP_3: Decl[Subscript]/Super:        [{#Self.T#}][#Self.T#]; name=[Self.T]
-// PROTOCOL_EXT_DEDUP_3: Keyword[self]/CurrNominal:    .self[#T#]; name=self
+// PROTOCOL_EXT_DEDUP_3: Begin completions, 5 items
+// PROTOCOL_EXT_DEDUP_3: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
+// PROTOCOL_EXT_DEDUP_3: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
+// PROTOCOL_EXT_DEDUP_3: Decl[Subscript]/CurrNominal:        [{#Self.T#}][#Self.T#]; name=[Self.T]
+// PROTOCOL_EXT_DEDUP_3: Keyword[self]/CurrNominal:          .self[#T#]; name=self
 // PROTOCOL_EXT_DEDUP_3: End completions
 }
 
@@ -1856,4 +2024,63 @@ class TestDotExprWithNonNominal {
 // DOT_EXPR_NON_NOMINAL_2-NOT: otherField
 // DOT_EXPR_NON_NOMINAL_2-NOT: firstName
   }
+}
+
+class Cat {
+  struct Inner {
+    var prop1: String
+    var prop2: String
+  }
+  var `class`: Inner
+}
+func testKeyword(cat: Cat) {
+  let _ = cat.#^KEYWORD_1^#
+// KEYWORD_1: Begin completions
+// KEYWORD_1-DAG: Keyword[self]/CurrNominal:          self[#Cat#]; name=self
+// KEYWORD_1-DAG: Decl[InstanceVar]/CurrNominal:      class[#Cat.Inner#]; name=class
+// KEYWORD_1: End completions
+
+  let _ = cat.class#^KEYWORD_2^#
+// KEYWORD_2: Begin completions
+// KEYWORD_2-DAG: Decl[InstanceVar]/CurrNominal:      .prop1[#String#]; name=prop1
+// KEYWORD_2-DAG: Decl[InstanceVar]/CurrNominal:      .prop2[#String#]; name=prop2
+// KEYWORD_2-DAG: BuiltinOperator/None:                = {#Cat.Inner#}[#Void#]; name== Cat.Inner
+// KEYWORD_2: End completions
+
+  let _ = cat.class.#^KEYWORD_3^#
+// KEYWORD_3: Begin completions
+// KEYWORD_3-DAG: Decl[InstanceVar]/CurrNominal:      prop1[#String#]; name=prop1
+// KEYWORD_3-DAG: Decl[InstanceVar]/CurrNominal:      prop2[#String#]; name=prop2
+// KEYWORD_3: End completions
+}
+
+protocol ExistentialProto {
+  static func staticMethod()
+  func instanceMethod()
+}
+
+func testExistential() {
+  let _ = ExistentialProto.#^PROTOCOLTYPE_DOT_1^#
+// PROTOCOLTYPE_DOT_1: Begin completions, 5 items
+// PROTOCOLTYPE_DOT_1-DAG: Keyword[self]/CurrNominal:          self[#ExistentialProto.Protocol#]; name=self
+// PROTOCOLTYPE_DOT_1-DAG: Keyword/CurrNominal:                Protocol[#ExistentialProto.Protocol#]; name=Protocol
+// PROTOCOLTYPE_DOT_1-DAG: Keyword/CurrNominal:                Type[#ExistentialProto.Type#]; name=Type
+// FIXME(SR-75, rdar://problem/21289579): These 2 are invalid: {
+// PROTOCOLTYPE_DOT_1-DAG: Decl[StaticMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: staticMethod()[#Void#]; name=staticMethod()
+// PROTOCOLTYPE_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceMethod({#self: ExistentialProto#})[#() -> Void#]; name=instanceMethod(ExistentialProto)
+// }
+// PROTOCOLTYPE_DOT_1: End completions
+
+  let _ = ExistentialProto.Type.#^PROTOCOLTYPE_DOT_2^#
+// PROTOCOLTYPE_DOT_2: Begin completions, 3 items
+// PROTOCOLTYPE_DOT_2-DAG: Keyword[self]/CurrNominal:          self[#ExistentialProto.Type.Protocol#]; name=self
+// PROTOCOLTYPE_DOT_2-DAG: Keyword/CurrNominal:                Protocol[#ExistentialProto.Type.Protocol#]; name=Protocol
+// PROTOCOLTYPE_DOT_2-DAG: Keyword/CurrNominal:                Type[#ExistentialProto.Type.Type#]; name=Type
+// PROTOCOLTYPE_DOT_2: End completions
+
+  let _ = ExistentialProto.Protocol.#^PROTOCOLTYPE_DOT_3^#
+// PROTOCOLTYPE_DOT_3: Begin completions, 2 items
+// PROTOCOLTYPE_DOT_3-DAG: Keyword[self]/CurrNominal:          self[#ExistentialProto.Protocol.Type#]; name=self
+// PROTOCOLTYPE_DOT_3-DAG: Keyword/CurrNominal:                Type[#ExistentialProto.Protocol.Type#]; name=Type
+// PROTOCOLTYPE_DOT_3: End completions
 }

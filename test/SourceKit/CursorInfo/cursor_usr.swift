@@ -22,7 +22,7 @@ func foo(x: FooStruct1) -> S1 {}
 // CHECK_SANITY1-NEXT: global
 // CHECK_SANITY1-NEXT: s:10cursor_usr6globalSiv
 // CHECK_SANITY1-NEXT: Int
-// CHECK_SANITY1-NEXT: $SSiD
+// CHECK_SANITY1-NEXT: $sSiD
 // CHECK_SANITY1-NEXT: <Declaration>var global: <Type usr="s:Si">Int</Type></Declaration>
 // CHECK_SANITY1-NEXT: <decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>global</decl.name>: <decl.var.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.type></decl.var.global>
 
@@ -41,7 +41,7 @@ func foo(x: FooStruct1) -> S1 {}
 
 // RUN: %sourcekitd-test -req=cursor -usr "s:10cursor_usr2S1V" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=CHECK1
 // CHECK1: source.lang.swift.decl.struct (7:8-7:10)
-// CHECK1: S1
+// CHECK1: s1
 // CHECK1: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
 
 // RUN: %sourcekitd-test -req=cursor -usr "s:14FooSwiftModule03fooB4FuncSiyF" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=CHECK2

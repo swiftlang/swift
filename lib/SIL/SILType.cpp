@@ -42,6 +42,10 @@ SILType SILType::getRawPointerType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheRawPointerType);
 }
 
+SILType SILType::getBuiltinIntegerLiteralType(const ASTContext &C) {
+  return getPrimitiveObjectType(C.TheIntegerLiteralType);
+}
+
 SILType SILType::getBuiltinIntegerType(unsigned bitWidth,
                                        const ASTContext &C) {
   return getPrimitiveObjectType(CanType(BuiltinIntegerType::get(bitWidth, C)));
@@ -171,11 +175,22 @@ bool SILType::isLoadableOrOpaque(SILModule &M) const {
   return isLoadable(M) || !SILModuleConventions(M).useLoweredAddresses();
 }
 
+bool SILType::isLoadableOrOpaque(SILFunction *inFunction) const {
+  SILModule &M = inFunction->getModule();
+  return isLoadable(inFunction) ||
+         !SILModuleConventions(M).useLoweredAddresses();
+}
+
 /// True if the type, or the referenced type of an address type, is
 /// address-only. For example, it could be a resilient struct or something of
 /// unknown size.
 bool SILType::isAddressOnly(SILModule &M) const {
   return M.getTypeLowering(*this).isAddressOnly();
+}
+
+bool SILType::isAddressOnly(SILFunction *inFunction) const {
+  return inFunction->getModule().getTypeLowering(*this,
+                        inFunction->getResilienceExpansion()).isAddressOnly();
 }
 
 SILType SILType::substGenericArgs(SILModule &M,
@@ -356,20 +371,22 @@ SILType::canUseExistentialRepresentation(SILModule &M,
 
     auto layout = getASTType().getExistentialLayout();
 
+    switch (layout.getKind()) {
+    // A class-constrained composition uses ClassReference representation;
+    // otherwise, we use a fixed-sized buffer.
+    case ExistentialLayout::Kind::Class:
+      return repr == ExistentialRepresentation::Class;
     // The (uncomposed) Error existential uses a special boxed
-    // representation. It can also adopt class references of bridged error types
-    // directly.
-    if (layout.isErrorExistential())
+    // representation. It can also adopt class references of bridged
+    // error types directly.
+    case ExistentialLayout::Kind::Error:
       return repr == ExistentialRepresentation::Boxed
         || (repr == ExistentialRepresentation::Class
             && isBridgedErrorClass(M, containedType));
-    
-    // A class-constrained composition uses ClassReference representation;
-    // otherwise, we use a fixed-sized buffer.
-    if (layout.requiresClass())
-      return repr == ExistentialRepresentation::Class;
-
-    return repr == ExistentialRepresentation::Opaque;
+    case ExistentialLayout::Kind::Opaque:
+      return repr == ExistentialRepresentation::Opaque;
+    }
+    llvm_unreachable("unknown existential kind!");
   }
   case ExistentialRepresentation::Metatype:
     return is<ExistentialMetatypeType>();
@@ -381,6 +398,12 @@ SILType::canUseExistentialRepresentation(SILModule &M,
 SILType SILType::getReferentType(SILModule &M) const {
   auto Ty = castTo<ReferenceStorageType>();
   return M.Types.getLoweredType(Ty->getReferentType()->getCanonicalType());
+}
+
+SILType SILType::mapTypeOutOfContext() const {
+  return SILType::getPrimitiveType(getASTType()->mapTypeOutOfContext()
+                                               ->getCanonicalType(),
+                                   getCategory());
 }
 
 CanType
@@ -408,7 +431,7 @@ SILResultInfo::getOwnershipKind(SILModule &M,
   switch (getConvention()) {
   case ResultConvention::Indirect:
     return SILModuleConventions(M).isSILIndirect(*this)
-               ? ValueOwnershipKind::Trivial
+               ? ValueOwnershipKind::Any
                : ValueOwnershipKind::Owned;
   case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
@@ -416,7 +439,7 @@ SILResultInfo::getOwnershipKind(SILModule &M,
   case ResultConvention::Unowned:
   case ResultConvention::UnownedInnerPointer:
     if (IsTrivial)
-      return ValueOwnershipKind::Trivial;
+      return ValueOwnershipKind::Any;
     return ValueOwnershipKind::Unowned;
   }
 
@@ -442,8 +465,14 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
   return false;
 }
 
-bool SILFunctionType::isNoReturnFunction() {
-  return getDirectFormalResultsType().getASTType()->isUninhabited();
+
+bool SILFunctionType::isNoReturnFunction() const {
+  for (unsigned i = 0, e = getNumResults(); i < e; ++i) {
+    if (getResults()[i].getType()->isUninhabited())
+      return true;
+  }
+
+  return false;
 }
 
 #ifndef NDEBUG

@@ -20,7 +20,8 @@ import Darwin
 public let StringEdits = BenchmarkInfo(
   name: "StringEdits",
   runFunction: run_StringEdits,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  legacyFactor: 100)
 
 var editWords: [String] = [
   "woodshed",
@@ -34,13 +35,13 @@ func edits(_ word: String) -> Set<String> {
   let splits = word.indices.map {
     (String(word[..<$0]), String(word[$0...]))
   }
-  
+
   var result: Array<String> = []
-  
+
   for (left, right) in splits {
     // drop a character
     result.append(left + right.dropFirst())
-    
+
     // transpose two characters
     if let fst = right.first {
       let drop1 = right.dropFirst()
@@ -48,28 +49,27 @@ func edits(_ word: String) -> Set<String> {
         result.append(left + [snd,fst] + drop1.dropFirst())
       }
     }
-    
+
     // replace each character with another
     for letter in alphabet {
       result.append(left + [letter] + right.dropFirst())
     }
-    
+
     // insert rogue characters
     for letter in alphabet {
       result.append(left + [letter] + right)
     }
   }
-  
+
   // have to map back to strings right at the end
   return Set(result)
 }
 
 @inline(never)
 public func run_StringEdits(_ N: Int) {
-  for _ in 1...N*100 {
+  for _ in 1...N {
     for word in editWords {
-      _ = edits(word)      
+      _ = edits(word)
     }
   }
 }
-

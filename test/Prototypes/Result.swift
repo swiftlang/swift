@@ -138,8 +138,8 @@ func mayFail(_ fail: Bool) throws -> Int {
 print(catchResult { try mayFail(true) })
 print(catchResult { try mayFail(false) })
 
-print(catchResult { _ in 1 }.flatMap { _ in Result(success: 4) }.flatMap { _ in Result<String>(error: Icky.Poor) })
-print(catchResult { _ in 1 }.map { _ in three }.flatMap {$0} )
+print(catchResult { 1 }.flatMap { _ in Result(success: 4) }.flatMap { _ in Result<String>(error: Icky.Poor) })
+print(catchResult { 1 }.map { _ in three }.flatMap {$0} )
 
 let results = [three, nasty, four]
 print(results.flatMap { $0.success })

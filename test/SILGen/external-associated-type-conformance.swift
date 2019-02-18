@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -import-objc-header %S/Inputs/external-associated-type-conformance.h %s -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -import-objc-header %S/Inputs/external-associated-type-conformance.h %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 extension BadError: LocalizedError {}

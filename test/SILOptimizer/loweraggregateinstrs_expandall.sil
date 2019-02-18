@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-expand-all %s -lower-aggregate-instrs | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-expand-all %s -lower-aggregate-instrs | %FileCheck %s
 
 // This file makes sure that the mechanics of expanding aggregate instructions
 // work. With that in mind, we expand all structs here ignoring code-size
@@ -37,7 +37,7 @@ struct S {
 }
 
 enum E {
-  case NoElement()
+  case NoElement(Void)
   case TrivialElement(Builtin.Int64)
   case ReferenceElement(C1)
   case StructNonTrivialElt(S)

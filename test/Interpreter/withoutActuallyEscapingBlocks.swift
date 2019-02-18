@@ -41,4 +41,34 @@ WithoutEscapingSuite.test("ExpectNoCrash2") {
   }
 }
 
+if #available(OSX 10.10, iOS 8.0, *) {
+
+enum Result<T> {
+  case error
+  case t(T)
+}
+
+func foo<T>(block: () throws -> T) {
+  let q = DispatchQueue(label: "Test")
+  var result: Result<T>! = nil
+  withoutActuallyEscaping(block) { (block) -> () in
+    let item = DispatchWorkItem(qos: .unspecified, flags: []) {
+      do {
+        result = .t(try block())
+      }
+      catch {
+        result = .error
+      }
+    }
+    q.sync(execute: item)
+  }
+}
+
+WithoutEscapingSuite.test("ExpectNoCrash3") {
+  for _ in 1...10 {
+    foo(block: { return 10 })
+  }
+}
+
+}
 runAllTests()

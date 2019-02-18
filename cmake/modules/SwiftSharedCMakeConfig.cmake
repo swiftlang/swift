@@ -1,11 +1,15 @@
 include(CMakeParseArguments)
 include(SwiftXcodeSupport)
 
+include(CheckCXXCompilerFlag)
+
 macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
 
   precondition_translate_flag(${product}_PATH_TO_LLVM_SOURCE PATH_TO_LLVM_SOURCE)
   precondition_translate_flag(${product}_PATH_TO_LLVM_BUILD PATH_TO_LLVM_BUILD)
+
+  file(TO_CMAKE_PATH "${PATH_TO_LLVM_BUILD}" PATH_TO_LLVM_BUILD)
 
   set(SWIFT_LLVM_CMAKE_PATHS
       "${PATH_TO_LLVM_BUILD}/share/llvm/cmake"
@@ -24,7 +28,7 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   # Then we import LLVMConfig. This is going to override whatever cached value
   # we have for LLVM_ENABLE_ASSERTIONS.
   find_package(LLVM REQUIRED CONFIG
-    HINTS "${PATH_TO_LLVM_BUILD}" NO_DEFAULT_PATH)
+    HINTS "${PATH_TO_LLVM_BUILD}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
 
   # If we did not have a cached value for LLVM_ENABLE_ASSERTIONS, set
   # LLVM_ENABLE_ASSERTIONS_saved to be the ENABLE_ASSERTIONS value from LLVM so
@@ -69,7 +73,7 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   endif()
 
   find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
-    NO_DEFAULT_PATH)
+    NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
   if ("${LLVM_TABLEGEN_EXE}" STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
     message(FATAL_ERROR "Failed to find tablegen in ${${product}_NATIVE_LLVM_TOOLS_PATH}")
   endif()
@@ -86,9 +90,9 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   # then applied to all targets. This causes issues in cross-compiling to
   # Windows from a Linux host.
   # 
-  # To work around this, we unconditionally remove the flag here and then 
-  # selectively add it to the per-target link flags; this is currently done
-  # in add_swift_library within AddSwift.cmake.
+  # To work around this, we unconditionally remove the flag here and then
+  # selectively add it to the per-target link flags; this is currently done in
+  # add_swift_host_library and add_swift_target_library within AddSwift.cmake.
   string(REGEX REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
   string(REGEX REPLACE "-Wl,-z,nodelete" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
 
@@ -139,6 +143,9 @@ macro(swift_common_standalone_build_config_clang product is_cross_compiling)
   set(PATH_TO_CLANG_SOURCE "${${product}_PATH_TO_CLANG_SOURCE}")
   set(PATH_TO_CLANG_BUILD "${${product}_PATH_TO_CLANG_BUILD}")
 
+  file(TO_CMAKE_PATH "${PATH_TO_CLANG_SOURCE}" PATH_TO_CLANG_SOURCE)
+  file(TO_CMAKE_PATH "${PATH_TO_CLANG_BUILD}" PATH_TO_CLANG_BUILD)
+
   # Add all Clang CMake paths to our cmake module path.
   set(SWIFT_CLANG_CMAKE_PATHS
     "${PATH_TO_CLANG_BUILD}/share/clang/cmake"
@@ -149,7 +156,7 @@ macro(swift_common_standalone_build_config_clang product is_cross_compiling)
 
   # Then include Clang.
   find_package(Clang REQUIRED CONFIG
-    HINTS "${PATH_TO_CLANG_BUILD}" NO_DEFAULT_PATH)
+    HINTS "${PATH_TO_CLANG_BUILD}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
 
   if(NOT EXISTS "${PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
     message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
@@ -188,12 +195,17 @@ macro(swift_common_standalone_build_config_cmark product)
     ABSOLUTE)
   get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
     ABSOLUTE)
+
   set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src")
   set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
+
+  file(TO_CMAKE_PATH "${CMARK_MAIN_INCLUDE_DIR}" CMARK_MAIN_INCLUDE_DIR)
+  file(TO_CMAKE_PATH "${CMARK_BUILD_INCLUDE_DIR}" CMARK_BUILD_INCLUDE_DIR)
+
   include_directories("${CMARK_MAIN_INCLUDE_DIR}"
                       "${CMARK_BUILD_INCLUDE_DIR}")
 
-  include(${${product}_PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
+  include(${PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
   add_definitions(-DCMARK_STATIC_DEFINE)
 endmacro()
 
@@ -226,7 +238,7 @@ macro(swift_common_unified_build_config product)
   set(PATH_TO_LLVM_BUILD "${CMAKE_BINARY_DIR}")
   set(${product}_PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
   set(PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
-  set(CLANG_MAIN_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/tools/clang/include")
+  set(CLANG_MAIN_INCLUDE_DIR "${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include")
   set(CLANG_BUILD_INCLUDE_DIR "${CMAKE_BINARY_DIR}/tools/clang/include")
   set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
@@ -235,8 +247,8 @@ macro(swift_common_unified_build_config product)
 
   # If cmark was checked out into tools/cmark, expect to build it as
   # part of the unified build.
-  if(EXISTS "${CMAKE_SOURCE_DIR}/tools/cmark/")
-    set(${product}_PATH_TO_CMARK_SOURCE "${CMAKE_SOURCE_DIR}/tools/cmark")
+  if(EXISTS "${LLVM_EXTERNAL_CMARK_SOURCE_DIR}")
+    set(${product}_PATH_TO_CMARK_SOURCE "${LLVM_EXTERNAL_CMARK_SOURCE_DIR}")
     set(${product}_PATH_TO_CMARK_BUILD "${CMAKE_BINARY_DIR}/tools/cmark")
     set(${product}_CMARK_LIBRARY_DIR "${CMAKE_BINARY_DIR}/lib")
 
@@ -270,7 +282,11 @@ endmacro()
 macro(swift_common_cxx_warnings)
   # Make unhandled switch cases be an error in assert builds
   if(DEFINED LLVM_ENABLE_ASSERTIONS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=switch")
+    check_cxx_compiler_flag("-Werror=switch" CXX_SUPPORTS_WERROR_SWITCH_FLAG)
+    append_if(CXX_SUPPORTS_WERROR_SWITCH_FLAG "-Werror=switch" CMAKE_CXX_FLAGS)
+
+    check_cxx_compiler_flag("/we4062" CXX_SUPPORTS_WE4062)
+    append_if(CXX_SUPPORTS_WE4062 "/we4062" CMAKE_CXX_FLAGS)
   endif()
 
   check_cxx_compiler_flag("-Werror -Wdocumentation" CXX_SUPPORTS_DOCUMENTATION_FLAG)

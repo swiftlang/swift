@@ -57,9 +57,8 @@ TYPE_ATTR(escaping)
 TYPE_ATTR(block_storage)
 TYPE_ATTR(box)
 TYPE_ATTR(dynamic_self)
-TYPE_ATTR(sil_unowned)
-TYPE_ATTR(sil_unmanaged)
-TYPE_ATTR(sil_weak)
+#define REF_STORAGE(Name, name, ...) TYPE_ATTR(sil_##name)
+#include "swift/AST/ReferenceStorage.def"
 TYPE_ATTR(error)
 TYPE_ATTR(out)
 TYPE_ATTR(in)
@@ -115,7 +114,7 @@ DECL_ATTR(_silgen_name, SILGenName,
   0)
 DECL_ATTR(available, Available,
   OnAbstractFunction | OnGenericType | OnVar | OnSubscript | OnEnumElement |
-  OnExtension |
+  OnExtension | OnGenericTypeParam |
   AllowMultipleAttributes | LongAttribute,
   1)
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
@@ -134,7 +133,9 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(optional, Optional,
   OnConstructor | OnFunc | OnAccessor | OnVar | OnSubscript |
   DeclModifier,
   5)
-// NOTE: 6 is unused
+SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
+  OnNominalType,
+  6)
 SIMPLE_DECL_ATTR(noreturn, NoReturn,
   OnFunc | OnAccessor,
   7)
@@ -178,7 +179,7 @@ SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
   UserInaccessible,
   19)
 DECL_ATTR(inline, Inline,
-  OnFunc | OnAccessor | OnConstructor,
+  OnVar | OnSubscript | OnAbstractFunction,
   20)
 DECL_ATTR(_semantics, Semantics,
   OnAbstractFunction | OnSubscript |
@@ -226,6 +227,7 @@ SIMPLE_DECL_ATTR(objcMembers, ObjCMembers,
 CONTEXTUAL_SIMPLE_DECL_ATTR(__consuming, Consuming,
   OnFunc | OnAccessor |
   DeclModifier |
+  UserInaccessible |
   NotSerialized, 40)
 CONTEXTUAL_SIMPLE_DECL_ATTR(mutating, Mutating,
   OnFunc | OnAccessor |
@@ -240,12 +242,12 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(convenience, Convenience,
   DeclModifier |
   NotSerialized, 43)
 CONTEXTUAL_SIMPLE_DECL_ATTR(override, Override,
-  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor |
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
   DeclModifier |
   NotSerialized, 44)
-SIMPLE_DECL_ATTR(sil_stored, SILStored,
+SIMPLE_DECL_ATTR(_hasStorage, HasStorage,
   OnVar |
-  SILOnly |
+  UserInaccessible |
   NotSerialized, 45)
 DECL_ATTR(private, AccessControl,
   OnFunc | OnAccessor | OnExtension | OnGenericType | OnVar | OnSubscript |
@@ -265,11 +267,11 @@ DECL_ATTR(__raw_doc_comment, RawDocComment,
   RejectByParser |
   NotSerialized, 48)
 CONTEXTUAL_DECL_ATTR(weak, ReferenceOwnership,
-  OnVar | OnParam |
+  OnVar |
   DeclModifier |
   NotSerialized, 49)
 CONTEXTUAL_DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
-DECL_ATTR(effects, Effects,
+DECL_ATTR(_effects, Effects,
   OnAbstractFunction |
   UserInaccessible,
   50)
@@ -320,7 +322,7 @@ DECL_ATTR(_cdecl, CDecl,
   LongAttribute | UserInaccessible,
   63)
 SIMPLE_DECL_ATTR(usableFromInline, UsableFromInline,
-  OnAbstractFunction | OnVar | OnSubscript | OnNominalType |
+  OnAbstractFunction | OnVar | OnSubscript | OnNominalType | OnTypeAlias |
   LongAttribute,
   64)
 SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
@@ -336,7 +338,7 @@ DECL_ATTR(_implements, Implements,
   NotSerialized, 67)
 DECL_ATTR(_objcRuntimeName, ObjCRuntimeName,
   OnClass |
-  UserInaccessible | RejectByParser |
+  UserInaccessible |
   NotSerialized, 68)
 SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
   OnClass | LongAttribute | RejectByParser |
@@ -345,12 +347,7 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   OnProtocol |
   LongAttribute | RejectByParser |
   NotSerialized, 70)
-// HACK: Attribute needed to preserve source compatibility by downgrading errors
-// due to an SDK change in Dispatch
-SIMPLE_DECL_ATTR(_downgrade_exhaustivity_check, DowngradeExhaustivityCheck,
-  OnEnumElement |
-  LongAttribute | UserInaccessible,
-  71)
+// NOTE: 71 is unused
 SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional, ImplicitlyUnwrappedOptional,
   OnFunc | OnAccessor | OnVar | OnParam | OnSubscript | OnConstructor |
   RejectByParser,
@@ -364,14 +361,35 @@ DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
   LongAttribute | RejectByParser | UserInaccessible |
   NotSerialized, 74)
 SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
-  OnNominalType | OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor |
-  OnEnumElement |
-  UserInaccessible,
+  OnNominalType | OnAssociatedType | OnFunc | OnAccessor | OnVar |
+  OnSubscript | OnConstructor | OnEnumElement | OnExtension | UserInaccessible,
   75)
 SIMPLE_DECL_ATTR(_frozen, Frozen,
   OnEnum |
   UserInaccessible,
   76)
+SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,
+  OnAnyDecl |
+  LongAttribute | RejectByParser | UserInaccessible | NotSerialized,
+  77)
+SIMPLE_DECL_ATTR(_hasInitialValue, HasInitialValue,
+  OnVar |
+  UserInaccessible,
+  78)
+SIMPLE_DECL_ATTR(_nonoverride, NonOverride,
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
+  UserInaccessible | NotSerialized,
+  79)
+DECL_ATTR(_dynamicReplacement, DynamicReplacement,
+  OnAbstractFunction | OnVar | OnSubscript | UserInaccessible,
+  80)
+SIMPLE_DECL_ATTR(_borrowed, Borrowed,
+  OnVar | OnSubscript | UserInaccessible |
+  NotSerialized, 81)
+DECL_ATTR(_private, PrivateImport,
+  OnImport |
+  UserInaccessible |
+  NotSerialized, 82)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

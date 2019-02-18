@@ -1,4 +1,4 @@
-add_swift_library(swiftFrontendTool STATIC
+add_swift_host_library(swiftFrontendTool STATIC
   FrontendTool.cpp
   ImportedModules.cpp
   ReferenceDependencies.cpp
@@ -15,7 +15,9 @@ add_swift_library(swiftFrontendTool STATIC
     swiftPrintAsObjC
     swiftFrontend
     swiftClangImporter
+    swiftDWARFImporter
     swiftOption
+  INTERFACE_LINK_LIBRARIES
     clangAPINotes
     clangBasic
 )

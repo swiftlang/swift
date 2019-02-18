@@ -479,10 +479,10 @@ private:
       return subregion_iterator(Subregions.end(), &Subloops);
     }
     subregion_reverse_iterator rbegin() const {
-      return subregion_reverse_iterator(begin());
+      return subregion_reverse_iterator(end());
     }
     subregion_reverse_iterator rend() const {
-      return subregion_reverse_iterator(end());
+      return subregion_reverse_iterator(begin());
     }
 
     unsigned size() const { return Subregions.size(); }
@@ -1066,7 +1066,8 @@ class LoopRegionAnalysis : public FunctionAnalysisBase<LoopRegionFunctionInfo> {
 
 public:
   LoopRegionAnalysis(SILModule *M)
-    : FunctionAnalysisBase<LoopRegionFunctionInfo>(AnalysisKind::LoopRegion) {}
+      : FunctionAnalysisBase<LoopRegionFunctionInfo>(
+            SILAnalysisKind::LoopRegion) {}
 
   LoopRegionAnalysis(const LoopRegionAnalysis &) = delete;
   LoopRegionAnalysis &operator=(const LoopRegionAnalysis &) = delete;
@@ -1076,11 +1077,13 @@ public:
   virtual void initialize(SILPassManager *PM) override;
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::LoopRegion;
+    return S->getKind() == SILAnalysisKind::LoopRegion;
   }
 
-  virtual LoopRegionFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new LoopRegionFunctionInfo(F, POA->get(F), SLA->get(F));
+  virtual std::unique_ptr<LoopRegionFunctionInfo>
+  newFunctionAnalysis(SILFunction *F) override {
+    return llvm::make_unique<LoopRegionFunctionInfo>(F, POA->get(F),
+                                                     SLA->get(F));
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

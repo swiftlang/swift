@@ -39,6 +39,7 @@ typedef long NSInteger;
 - (Gizmo*) init OBJC_DESIGNATED_INITIALIZER;
 - (Gizmo*) initWithBellsOn:(NSInteger)x OBJC_DESIGNATED_INITIALIZER;
 - (instancetype) initWithoutBells:(NSInteger)x;
++ (instancetype) gizmoWithWhistles:(NSInteger)x;
 - (void) fork NS_CONSUMES_SELF;
 - (void) enumerateSubGizmos: (void (^ _Nullable)(Gizmo*))f;
 + (void) consume: (NS_CONSUMED Gizmo*) gizmo;

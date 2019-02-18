@@ -21,7 +21,7 @@ class Conditional<T> {
   }
 }
 
-extension Conditional: Encodable where T: Encodable {
+extension Conditional: Encodable where T: Encodable { // expected-note {{where 'T' = 'OnlyDec'}}
 }
 
 extension Conditional: Decodable where T: Decodable {
@@ -37,7 +37,7 @@ let _ = Conditional<OnlyEnc>.encode(to:)
 
 // but only for the appropriately *codable parameters.
 let _ = Conditional<OnlyEnc>.init(from:) // expected-error {{type 'Conditional<OnlyEnc>' has no member 'init(from:)'}}
-let _ = Conditional<OnlyDec>.encode(to:) // expected-error {{type 'OnlyDec' does not conform to protocol 'Encodable'}}
+let _ = Conditional<OnlyDec>.encode(to:) // expected-error {{referencing instance method 'encode(to:)' on 'Conditional' requires that 'OnlyDec' conform to 'Encodable'}}
 
 // The synthesized CodingKeys type should not be accessible from outside the
 // struct.

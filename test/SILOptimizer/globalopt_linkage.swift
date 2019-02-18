@@ -19,10 +19,10 @@ _ = testit()
 // CHECK: sil hidden @{{.*}}testit
 
 // CHECK:      // MyStruct.StaticVar.getter
-// CHECK-NEXT: sil private @$S{{.*}}StaticVar
+// CHECK-NEXT: sil private @$s{{.*}}StaticVar
 
 // CHECK:      // Global.getter
-// CHECK-NEXT: sil private @$S{{.*}}Global
+// CHECK-NEXT: sil private @$s{{.*}}Global
 
 // CHECK:      // PublicGlobal.getter
-// CHECK-NEXT: sil non_abi @$S{{.*}}PublicGlobal
+// CHECK-NEXT: sil non_abi @$s{{.*}}PublicGlobal

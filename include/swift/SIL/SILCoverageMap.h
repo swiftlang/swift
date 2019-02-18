@@ -144,7 +144,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILCoverageMap>
-    : public ilist_default_traits<::swift::SILCoverageMap> {
+    : public ilist_node_traits<::swift::SILCoverageMap> {
   using SILCoverageMap = ::swift::SILCoverageMap;
 
 public:

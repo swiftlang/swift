@@ -33,6 +33,7 @@ enum SILStringEncoding : uint8_t {
   SIL_UTF8,
   SIL_UTF16,
   SIL_OBJC_SELECTOR,
+  SIL_BYTES
 };
 
 enum SILLinkageEncoding : uint8_t {
@@ -75,6 +76,7 @@ enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_TAKE_ALWAYS,
   SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS,
   SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS,
+  SIL_CAST_CONSUMPTION_BORROW_ALWAYS,
 };
 
 enum class KeyPathComponentKindEncoding : uint8_t {
@@ -84,7 +86,7 @@ enum class KeyPathComponentKindEncoding : uint8_t {
   OptionalChain,
   OptionalForce,
   OptionalWrap,
-  External,
+  Trivial,
 };
 enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   Property,
@@ -106,7 +108,7 @@ enum {
 /// \sa SIL_INDEX_BLOCK_ID
 namespace sil_index_block {
   // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
+  // the module version.
   enum RecordKind {
     SIL_FUNC_NAMES = 1,
     SIL_FUNC_OFFSETS,
@@ -138,7 +140,7 @@ namespace sil_index_block {
 /// \sa SIL_BLOCK_ID
 namespace sil_block {
   // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
+  // the module version.
   enum RecordKind : uint8_t {
     SIL_FUNCTION = 1,
     SIL_BASIC_BLOCK,
@@ -163,7 +165,6 @@ namespace sil_block {
     SIL_WITNESS_ASSOC_ENTRY,
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
-    SIL_DEFAULT_WITNESS_TABLE_ENTRY,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
@@ -179,7 +180,7 @@ namespace sil_block {
       = decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE,
     INHERITED_PROTOCOL_CONFORMANCE
       = decls_block::INHERITED_PROTOCOL_CONFORMANCE,
-    GENERIC_PARAM = decls_block::GENERIC_PARAM,
+    INVALID_PROTOCOL_CONFORMANCE = decls_block::INVALID_PROTOCOL_CONFORMANCE,
     GENERIC_REQUIREMENT = decls_block::GENERIC_REQUIREMENT,
     LAYOUT_REQUIREMENT = decls_block::LAYOUT_REQUIREMENT,
   };
@@ -261,12 +262,6 @@ namespace sil_block {
     // Default witness table entries will be serialized after.
   >;
 
-  using DefaultWitnessTableEntryLayout = BCRecordLayout<
-    SIL_DEFAULT_WITNESS_TABLE_ENTRY,
-    DeclIDField,  // SILFunction name
-    BCArray<ValueIDField> // SILDeclRef
-  >;
-
   using DefaultWitnessTableNoEntryLayout = BCRecordLayout<
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY
   >;
@@ -285,7 +280,8 @@ namespace sil_block {
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
                      BCFixed<1>,  // transparent
                      BCFixed<2>,  // serialized
-                     BCFixed<2>,  // thunk/reabstraction_thunk
+                     BCFixed<2>,  // thunks: signature optimized/reabstraction
+                     BCFixed<1>,  // without_actually_escaping
                      BCFixed<1>,  // global_init
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode
@@ -293,7 +289,9 @@ namespace sil_block {
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
+                     BCFixed<1>,  // is dynamically replacable
                      TypeIDField, // SILFunctionType
+                     DeclIDField,  // SILFunction name or 0 (replaced function)
                      GenericEnvironmentIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
@@ -381,7 +379,7 @@ namespace sil_block {
     SIL_BEGIN_APPLY,
     SIL_NON_THROWING_BEGIN_APPLY
   };
-  
+
   using SILInstApplyLayout = BCRecordLayout<
     SIL_INST_APPLY,
     BCFixed<3>,           // ApplyKind

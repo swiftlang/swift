@@ -5,9 +5,9 @@
 # (Objective-)C APIs, any API notes added on top of those APIs, and the
 # Clang importer itself. One can execute it to dump the API of a given
 # module within a particular SDK, e.g., UIKit from the iOS SDK as seen in
-# Swift 3 compatibility mode:
+# Swift 4 compatibility mode:
 #
-#   /path/to/bin/dir/swift-api-dump.py -swift-version 3 -o output-dir \
+#   /path/to/bin/dir/swift-api-dump.py -swift-version 4 -o output-dir \
 #       -m UIKit -s iphoneos
 #
 # The "-m" argument can be omitted, in which case the script will collect
@@ -15,9 +15,9 @@
 #
 # One can supply multiple SDKs, written as a list. For example, to
 # dump the API for all frameworks across macOS, iOS, watchOS, and tvOS,
-# in Swift 4, use:
+# in Swift 4.2, use:
 #
-#  /path/to/bin/dir/swift-api-dump.py -swift-version 4 -o output-dir \
+#  /path/to/bin/dir/swift-api-dump.py -swift-version 4.2 -o output-dir \
 #      -s macosx iphoneos watchos appletvos
 #
 
@@ -102,7 +102,7 @@ def create_parser():
     parser.add_argument('--enable-infer-import-as-member', action='store_true',
                         help='Infer when a global could be imported as a ' +
                         'member.')
-    parser.add_argument('-swift-version', type=int, metavar='N',
+    parser.add_argument('-swift-version', metavar='N',
                         help='the Swift version to use')
     parser.add_argument('-show-overlay', action='store_true',
                         help='Show overlay API in addition to Objective-C ' +
@@ -326,7 +326,7 @@ def main():
     if args.enable_infer_import_as_member:
         extra_args = extra_args + ['-enable-infer-import-as-member']
     if args.swift_version:
-        extra_args = extra_args + ['-swift-version', '%d' % args.swift_version]
+        extra_args = extra_args + ['-swift-version', '%s' % args.swift_version]
 
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])

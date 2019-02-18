@@ -17,7 +17,7 @@ import TestsUtils
 public let Ackermann = BenchmarkInfo(
   name: "Ackermann",
   runFunction: run_Ackermann,
-  tags: [.unstable, .algorithm])
+  tags: [.algorithm])
 
 func ackermann(_ M: Int, _ N : Int) -> Int {
   if (M == 0) { return N + 1 }
@@ -39,7 +39,7 @@ let ref_result = [5, 13, 29, 61, 125, 253, 509, 1021, 2045, 4093, 8189, 16381, 3
 
 @inline(never)
 public func run_Ackermann(_ N: Int) {
-  let (m, n) = (3, 9)
+  let (m, n) = (3, 6)
   var result = 0
   for _ in 1...N {
     result = Ackermann(m, n)

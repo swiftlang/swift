@@ -70,6 +70,14 @@ namespace irgen {
                                          SILDeclRef member,
                                          ProtocolConformanceRef conformance);
 
+  /// Compute the index into a witness table for a resilient protocol given
+  /// a reference to a descriptor of one of the requirements in that witness
+  /// table.
+  llvm::Value *computeResilientWitnessTableIndex(
+                                            IRGenFunction &IGF,
+                                            ProtocolDecl *proto,
+                                            llvm::Constant *reqtDescriptor);
+
   /// Given a type T and an associated type X of some protocol P to
   /// which T conforms, return the type metadata for T.X.
   ///
@@ -149,7 +157,7 @@ namespace irgen {
                                 CanSILFunctionType &SubstFnType,
                                 Explosion &nativeParam, unsigned paramIndex);
 
-  /// \brief Load a reference to the protocol descriptor for the given protocol.
+  /// Load a reference to the protocol descriptor for the given protocol.
   ///
   /// For Swift protocols, this is a constant reference to the protocol
   /// descriptor symbol.
@@ -248,9 +256,6 @@ namespace irgen {
   void enumerateGenericParamFulfillments(IRGenModule &IGM,
     CanSILFunctionType fnType,
     GenericParamFulfillmentCallback callback);
-
-  bool isDependentConformance(const NormalProtocolConformance *conformance);
-
 } // end namespace irgen
 } // end namespace swift
 

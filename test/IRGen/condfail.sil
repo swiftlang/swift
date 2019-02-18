@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -O -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-OPT-%target-os
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-NOOPT-%target-os
+// RUN: %target-swift-frontend -primary-file %s -O -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-OPT-%target-os
+// RUN: %target-swift-frontend -primary-file %s -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-NOOPT-%target-os
 
 import Builtin
 import Swift

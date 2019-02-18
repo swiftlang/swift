@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -parse-as-library %s
+// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -enforce-exclusivity=unchecked -parse-as-library %s
 
 // Check that the compiler does not crash for illegal escaping of an address
 // of a local variable.

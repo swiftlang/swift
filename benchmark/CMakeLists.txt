@@ -42,6 +42,7 @@ set(SWIFT_BENCH_MODULES
     single-source/BinaryFloatingPointConversionFromBinaryInteger
     single-source/BinaryFloatingPointProperties
     single-source/BitCount
+    single-source/Breadcrumbs
     single-source/ByteSwap
     single-source/COWTree
     single-source/COWArrayGuaranteedParameterOverhead
@@ -55,6 +56,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CharacterProperties
     single-source/Chars
     single-source/ClassArrayGetter
+    single-source/Codable
     single-source/Combos
     single-source/DataBenchmarks
     single-source/DeadArray
@@ -65,10 +67,13 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest4
     single-source/DictTest4Legacy
     single-source/DictionaryBridge
+    single-source/DictionaryBridgeToObjC
+    single-source/DictionaryCompactMapValues
     single-source/DictionaryCopy
     single-source/DictionaryGroup
     single-source/DictionaryKeysContains
     single-source/DictionaryLiteral
+    single-source/DictionaryOfAnyHashableStrings
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
@@ -80,11 +85,13 @@ set(SWIFT_BENCH_MODULES
     single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
+    single-source/FlattenList
     single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
     single-source/HashQuadratic
     single-source/Histogram
+    single-source/InsertCharacter  
     single-source/Integrate
     single-source/IterateData
     single-source/Join
@@ -111,7 +118,6 @@ set(SWIFT_BENCH_MODULES
     single-source/ObserverUnappliedMethod
     single-source/OpaqueConsumingUsers
     single-source/OpenClose
-    single-source/PartialApplyDynamicType
     single-source/Phonebook
     single-source/PointerArithmetics
     single-source/PolymorphicCalls
@@ -140,6 +146,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
+    single-source/SortIntPyramids
     single-source/SortLargeExistentials
     single-source/SortLettersInPlace
     single-source/SortStrings
@@ -167,16 +174,13 @@ set(SWIFT_BENCH_MODULES
     single-source/XorLoop
 )
 
-set(SWIFT_MULTISOURCE_SWIFT3_BENCHES
+set(SWIFT_MULTISOURCE_SWIFT_BENCHES
   multi-source/PrimsSplit
 )
 
 set(PrimsSplit_sources
     multi-source/PrimsSplit/Prims.swift
-    multi-source/PrimsSplit/main.swift)
-
-set(SWIFT_MULTISOURCE_SWIFT4_BENCHES
-)
+    multi-source/PrimsSplit/Prims_main.swift)
 
 set(BENCH_DRIVER_LIBRARY_FLAGS)
 if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
@@ -271,6 +275,7 @@ message("--   SWIFT_LIBRARY_PATH = ${SWIFT_LIBRARY_PATH}")
 message("--   CLANG_EXEC = ${CLANG_EXEC}")
 message("--   SWIFT_OPTIMIZATION_LEVELS = ${SWIFT_OPTIMIZATION_LEVELS}")
 message("--   ONLY_PLATFORMS = ${ONLY_PLATFORMS}")
+message("--   PAGE_ALIGNMENT_OPTION = ${PAGE_ALIGNMENT_OPTION}")
 
 message("--   found platforms: ${platforms}")
 message("--   found sdks:")

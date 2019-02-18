@@ -168,4 +168,58 @@ SwitchTestSuite.test("GenericVar") {
   expectTrue(l === Gesture.pinch(l).valueVar as! LifetimeTracked)
 }
 
+SwitchTestSuite.test("TupleUnforwarding") {
+  // None of these switches should leak.
+  do {
+    let l = LifetimeTracked(0)
+    let r: Optional<Any> = LifetimeTracked(0) as Any
+
+    switch (l, r) {
+    case (_, _):
+      break
+    default:
+      break
+    }
+  }
+
+  do {
+    let l = LifetimeTracked(0)
+    let r: Optional<Any> = LifetimeTracked(0) as Any
+    switch (l, r) {
+    case let (x, _):
+      break
+    case let (_, y as AnyObject):
+      break
+    default:
+      break
+    }
+  }
+
+  do {
+    let l: Optional<LifetimeTracked> = LifetimeTracked(0)
+    let r: Optional<Any> = LifetimeTracked(0) as Any
+    switch (l, r) {
+    case let (_, _):
+      break
+    case let (_, y as AnyObject):
+      break
+    default:
+      break
+    }
+  }
+
+  do {
+    let l = LifetimeTracked(0)
+    let r: Optional<Any> = LifetimeTracked(0) as Any
+    switch (l, r) {
+    case let (_, y as AnyObject):
+      break
+    case let (x as AnyObject, _):
+      break
+    default:
+      break
+    }
+  }
+}
+
 runAllTests()

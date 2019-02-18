@@ -42,6 +42,10 @@ static bool doesClosureHaveBody(AbstractClosureExpr *ACE) {
 
 /// Check whether a root AST node is unmapped, i.e not profiled.
 static bool isUnmapped(ASTNode N) {
+  // Do not map AST nodes with invalid source locations.
+  if (N.getStartLoc().isInvalid() || N.getEndLoc().isInvalid())
+    return true;
+
   if (auto *E = N.dyn_cast<Expr *>()) {
     auto *CE = dyn_cast<AbstractClosureExpr>(E);
 
@@ -86,6 +90,7 @@ bool doesASTRequireProfiling(SILModule &M, ASTNode N) {
 } // namespace swift
 
 /// Check that the input AST has at least been type-checked.
+LLVM_ATTRIBUTE_UNUSED
 static bool hasASTBeenTypeChecked(ASTNode N) {
   DeclContext *DC = N.getAsDeclContext();
   assert(DC && "Invalid AST node for profiling");
@@ -98,7 +103,7 @@ static bool canCreateProfilerForAST(ASTNode N) {
   assert(hasASTBeenTypeChecked(N) && "Cannot use this AST for profiling");
 
   if (auto *D = N.dyn_cast<Decl *>()) {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+    if (isa<AbstractFunctionDecl>(D))
       return true;
 
     if (isa<TopLevelCodeDecl>(D))
@@ -140,8 +145,8 @@ static void walkPatternForProfiling(PatternBindingDecl *PBD,
                                     ASTWalker &Walker) {
   if (PBD && !PBD->isStatic())
     for (auto E : PBD->getPatternList())
-      if (E.getInit())
-        E.getInit()->walk(Walker);
+      if (auto init = E.getNonLazyInit())
+        init->walk(Walker);
 }
 
 /// Special logic for handling closure visitation.
@@ -203,7 +208,7 @@ struct MapRegionCounters : public ASTWalker {
   void mapRegion(ASTNode N) {
     CounterMap[N] = NextCounter;
 
-    DEBUG({
+    LLVM_DEBUG({
       llvm::dbgs() << "Assigned counter #" << NextCounter << " to: ";
       auto *E = N.dyn_cast<Expr *>();
       if (E)
@@ -259,6 +264,16 @@ struct MapRegionCounters : public ASTWalker {
     } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(E)) {
       return visitClosureExpr(*this, ACE, [&] { mapRegion(ACE); });
     }
+
+    // rdar://42792053
+    // TODO: There's an outstanding issue here with LazyInitializerExpr. A LIE
+    // is copied into the body of a property getter after type-checking (before
+    // coverage). ASTWalker only visits this expression once via the property's
+    // VarDecl, and does not visit it again within the getter. This results in
+    // missing coverage. SILGen treats the init expr as part of the getter, but
+    // its SILProfiler has no information about the init because the LIE isn't
+    // visited here.
+
     return {true, E};
   }
 };
@@ -370,22 +385,27 @@ public:
 #endif
 };
 
-/// \brief A region of source code that can be mapped to a counter.
+/// A region of source code that can be mapped to a counter.
 class SourceMappingRegion {
   ASTNode Node;
 
   CounterExpr *Count;
 
-  /// \brief The region's starting location.
+  /// The region's starting location.
   Optional<SourceLoc> StartLoc;
 
-  /// \brief The region's ending location.
+  /// The region's ending location.
   Optional<SourceLoc> EndLoc;
 
 public:
   SourceMappingRegion(ASTNode Node, CounterExpr &Count,
                       Optional<SourceLoc> StartLoc, Optional<SourceLoc> EndLoc)
-      : Node(Node), Count(&Count), StartLoc(StartLoc), EndLoc(EndLoc) {}
+      : Node(Node), Count(&Count), StartLoc(StartLoc), EndLoc(EndLoc) {
+    assert((!StartLoc || StartLoc->isValid()) &&
+           "Expected start location to be valid");
+    assert((!EndLoc || EndLoc->isValid()) &&
+           "Expected end location to be valid");
+  }
 
   SourceMappingRegion(SourceMappingRegion &&Region) = default;
   SourceMappingRegion &operator=(SourceMappingRegion &&RHS) = default;
@@ -609,22 +629,22 @@ struct CoverageMapping : public ASTWalker {
 private:
   const SourceManager &SM;
 
-  /// \brief Storage for counter expressions.
+  /// Storage for counter expressions.
   std::forward_list<CounterExpr> Exprs;
 
-  /// \brief The map of statements to counter expressions.
+  /// The map of statements to counter expressions.
   llvm::DenseMap<ASTNode, CounterExpr *> CounterMap;
 
-  /// \brief The source mapping regions for this function.
+  /// The source mapping regions for this function.
   std::vector<SourceMappingRegion> SourceRegions;
 
-  /// \brief A stack of currently live regions.
+  /// A stack of currently live regions.
   std::vector<SourceMappingRegion> RegionStack;
 
-  /// \brief A stack of active repeat-while loops.
+  /// A stack of active repeat-while loops.
   std::vector<RepeatWhileStmt *> RepeatWhileStack;
 
-  /// \brief A stack of active do-catch statements.
+  /// A stack of active do-catch statements.
   std::vector<DoCatchStmt *> DoCatchStack;
 
   CounterExpr *ExitCounter = nullptr;
@@ -633,10 +653,10 @@ private:
 
   NominalTypeDecl *ParentNominalType = nullptr;
 
-  /// \brief Return true if \c Node has an associated counter.
+  /// Return true if \c Node has an associated counter.
   bool hasCounter(ASTNode Node) { return CounterMap.count(Node); }
 
-  /// \brief Return the region counter for \c Node.
+  /// Return the region counter for \c Node.
   ///
   /// This should only be called on statements that have a dedicated counter.
   CounterExpr &getCounter(ASTNode Node) {
@@ -644,13 +664,13 @@ private:
     return *CounterMap[Node];
   }
 
-  /// \brief Create a counter expression.
+  /// Create a counter expression.
   CounterExpr &createCounter(CounterExpr &&Expr) {
     Exprs.push_front(std::move(Expr));
     return Exprs.front();
   }
 
-  /// \brief Create a counter expression for \c Node and add it to the map.
+  /// Create a counter expression for \c Node and add it to the map.
   CounterExpr &assignCounter(ASTNode Node, CounterExpr &&Expr) {
     assert(Node && "Assigning counter expression to non-existent AST node");
     CounterExpr &Result = createCounter(std::move(Expr));
@@ -658,12 +678,12 @@ private:
     return Result;
   }
 
-  /// \brief Create a counter expression referencing \c Node's own counter.
+  /// Create a counter expression referencing \c Node's own counter.
   CounterExpr &assignCounter(ASTNode Node) {
     return assignCounter(Node, CounterExpr::Leaf(Node));
   }
 
-  /// \brief Add \c Expr to \c Node's counter.
+  /// Add \c Expr to \c Node's counter.
   void addToCounter(ASTNode Node, CounterExpr &Expr) {
     CounterExpr &Counter = getCounter(Node);
     if (const CounterExpr *ReferencedCounter = Counter.getReferencedNode())
@@ -674,7 +694,7 @@ private:
       Counter = CounterExpr::Add(createCounter(std::move(Counter)), Expr);
   }
 
-  /// \brief Subtract \c Expr from \c Node's counter.
+  /// Subtract \c Expr from \c Node's counter.
   void subtractFromCounter(ASTNode Node, CounterExpr &Expr) {
     CounterExpr &Counter = getCounter(Node);
     assert(!Counter.isZero() && "Cannot create a negative counter");
@@ -684,16 +704,16 @@ private:
       Counter = CounterExpr::Sub(createCounter(std::move(Counter)), Expr);
   }
 
-  /// \brief Return the current region's counter.
+  /// Return the current region's counter.
   CounterExpr &getCurrentCounter() { return getRegion().getCounter(); }
 
-  /// \brief Get the counter from the end of the most recent scope.
+  /// Get the counter from the end of the most recent scope.
   CounterExpr &getExitCounter() {
     assert(ExitCounter && "no exit counter available");
     return *ExitCounter;
   }
 
-  /// \brief Set the exit count so we can leave the scope related to \c Node
+  /// Set the exit count so we can leave the scope related to \c Node
   ///
   /// Returns the delta of the count on entering \c Node and exiting, or null if
   /// there was no change.
@@ -704,7 +724,7 @@ private:
     return nullptr;
   }
 
-  /// \brief Adjust the count for control flow when exiting a scope.
+  /// Adjust the count for control flow when exiting a scope.
   void adjustForNonLocalExits(ASTNode Scope, CounterExpr *ControlFlowAdjust) {
     if (Parent.getAsDecl())
       return;
@@ -733,24 +753,24 @@ private:
     RegionStack.emplace_back(ASTNode(), *Count, getEndLoc(Scope), None);
   }
 
-  /// \brief Push a region covering \c Node onto the stack.
+  /// Push a region covering \c Node onto the stack.
   void pushRegion(ASTNode Node) {
     RegionStack.emplace_back(Node, getCounter(Node), Node.getStartLoc(),
                              getEndLoc(Node));
   }
 
-  /// \brief Replace the current region's count by pushing an incomplete region.
+  /// Replace the current region's count by pushing an incomplete region.
   void replaceCount(CounterExpr &&Expr, Optional<SourceLoc> Start = None) {
     CounterExpr &Counter = createCounter(std::move(Expr));
     RegionStack.emplace_back(ASTNode(), Counter, Start, None);
   }
 
-  /// \brief Get the location for the end of the last token in \c Node.
+  /// Get the location for the end of the last token in \c Node.
   SourceLoc getEndLoc(ASTNode Node) {
     return Lexer::getLocForEndOfToken(SM, Node.getEndLoc());
   }
 
-  /// \brief Pop regions from the stack into the function's list of regions.
+  /// Pop regions from the stack into the function's list of regions.
   ///
   /// Adds all regions from \c ParentNode to the top of the stack to the
   /// function's \c SourceRegions.
@@ -775,13 +795,13 @@ private:
     RegionStack.erase(ParentIt, E);
   }
 
-  /// \brief Return the currently active region.
+  /// Return the currently active region.
   SourceMappingRegion &getRegion() {
     assert(!RegionStack.empty() && "statement has no region");
     return RegionStack.back();
   }
 
-  /// \brief Ensure that \c S is included in the current region.
+  /// Ensure that \c S is included in the current region.
   void extendRegion(ASTNode S) {
     SourceMappingRegion &Region = getRegion();
     SourceLoc StartLoc = S.getStartLoc();
@@ -789,7 +809,7 @@ private:
       Region.setStartLoc(StartLoc);
   }
 
-  /// \brief Mark \c S as a terminator, starting a zero region.
+  /// Mark \c S as a terminator, starting a zero region.
   void terminateRegion(ASTNode S) {
     SourceMappingRegion &Region = getRegion();
     if (!Region.hasEndLoc())
@@ -805,7 +825,7 @@ private:
 public:
   CoverageMapping(const SourceManager &SM) : SM(SM) {}
 
-  /// \brief Generate the coverage counter mapping regions from collected
+  /// Generate the coverage counter mapping regions from collected
   /// source regions.
   SILCoverageMap *emitSourceRegions(
       SILModule &M, StringRef Name, StringRef PGOFuncName, uint64_t Hash,
@@ -1092,7 +1112,8 @@ void SILProfiler::assignRegionCounters() {
       CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
       CurrentFileName);
 
-  DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName
+                          << "\n");
   Root.walk(Mapper);
 
   NumRegionCounters = Mapper.NextCounter;

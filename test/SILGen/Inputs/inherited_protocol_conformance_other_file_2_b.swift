@@ -1,3 +1,5 @@
 extension Thing : Hashable {
-    var hashValue: Int { return value }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=coverage_maps | %target-sil-opt -assume-parsing-unqualified-ownership-sil -verify -module-name=coverage_maps | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name=coverage_maps | %target-sil-opt -verify -module-name=coverage_maps | %FileCheck %s
 
 sil @someFunction : $@convention(thin) () -> () {
 bb0:

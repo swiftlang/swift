@@ -40,6 +40,23 @@ macro(configure_build)
     message(FATAL_ERROR "Unsupported platform?!")
   endif()
 
+  set(PAGE_ALIGNMENT_OPTION "-Xllvm" "-align-module-to-page-size")
+  if(EXISTS "${SWIFT_EXEC}")
+    # If we are using a pre-built compiler, check if it supports the
+    # -align-module-to-page-size option.
+    execute_process(
+        COMMAND "touch" "empty.swift"
+        RESULT_VARIABLE result
+        ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+        COMMAND "${SWIFT_EXEC}" ${PAGE_ALIGNMENT_OPTION} "empty.swift"
+        RESULT_VARIABLE result
+        ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT "${result}" MATCHES "0")
+      set(PAGE_ALIGNMENT_OPTION "")
+    endif()
+  endif()
+
   # We always infer the SWIFT_LIBRARY_PATH from SWIFT_EXEC unless
   # SWIFT_LIBRARY_PATH is specified explicitly.
   if(NOT SWIFT_LIBRARY_PATH)
@@ -293,11 +310,12 @@ function (swift_benchmark_compile_archopts)
   set(common_options
       "-c"
       "-target" "${target}"
-      "-${BENCH_COMPILE_ARCHOPTS_OPT}")
+      "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION})
 
   if (is_darwin)
     list(APPEND common_options
       "-I" "${srcdir}/utils/ObjectiveCTests"
+      "-I" "${srcdir}/utils/LibProc"
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
       "-sdk" "${sdk}"
       "-no-link-objc-runtime")
@@ -327,6 +345,7 @@ function (swift_benchmark_compile_archopts)
     list(APPEND common_options_driver
       "-sdk" "${sdk}"
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
+      "-I" "${srcdir}/utils/LibProc"
       "-no-link-objc-runtime")
   endif()
   set(bench_library_objects)
@@ -449,43 +468,7 @@ function (swift_benchmark_compile_archopts)
     endif()
   endforeach()
 
-  foreach(module_name_path ${SWIFT_MULTISOURCE_SWIFT3_BENCHES})
-    get_filename_component(module_name "${module_name_path}" NAME)
-
-    if ("${bench_flags}" MATCHES "-whole-module.*" AND
-        NOT "${bench_flags}" MATCHES "-num-threads.*")
-      set(objfile_out)
-      add_swift_multisource_wmo_benchmark_library(objfile_out
-        MODULE_PATH "${module_name_path}"
-        SOURCE_DIR "${srcdir}"
-        OBJECT_DIR "${objdir}"
-        SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
-        DEPENDS ${bench_library_objects} ${stdlib_dependencies})
-      precondition(objfile_out)
-      list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
-
-      if(opt_view_main_dir)
-        set(opt_view_dir)
-        add_opt_view(${opt_view_main_dir}, ${module_name}, opt_view_dir)
-        precondition(opt_view_dir)
-        list(APPEND opt_view_dirs ${opt_view_dir})
-      endif()
-    else()
-      set(objfiles_out)
-      add_swift_multisource_nonwmo_benchmark_library(objfiles_out
-        MODULE_PATH "${module_name_path}"
-        SOURCE_DIR "${srcdir}"
-        OBJECT_DIR "${objdir}"
-        SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
-        DEPENDS ${bench_library_objects} ${stdlib_dependencies})
-      precondition(objfiles_out)
-      list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
-    endif()
-  endforeach()
-
-  foreach(module_name_path ${SWIFT_MULTISOURCE_SWIFT4_BENCHES})
+  foreach(module_name_path ${SWIFT_MULTISOURCE_SWIFT_BENCHES})
     get_filename_component(module_name "${module_name_path}" NAME)
 
     if ("${bench_flags}" MATCHES "-whole-module.*" AND
@@ -682,11 +665,11 @@ function(swift_benchmark_compile)
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "O" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
-                  "--iterations" "${SWIFT_BENCHMARK_NUM_O_ITERATIONS}"
+                  "--independent-samples" "${SWIFT_BENCHMARK_NUM_O_ITERATIONS}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "Onone" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
-                  "--iterations" "${SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS}"
+                  "--independent-samples" "${SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "compare"
                   "--log-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"

@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Module.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
-#include "swift/Strings.h"
+#include "swift/AST/Module.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -626,10 +626,15 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
 static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   SILFunction *Callee = AI.getReferencedFunction();
   auto CalleeSig = Callee->getLoweredFunctionType()->getGenericSignature();
-  auto SubstParams = CalleeSig->getSubstitutableParams();
   auto AISubs = AI.getSubstitutionMap();
-  for (auto idx : indices(SubstParams)) {
-    auto Param = SubstParams[idx];
+
+  SmallVector<GenericTypeParamType *, 4> SubstParams;
+  CalleeSig->forEachParam([&](GenericTypeParamType *Param, bool Canonical) {
+    if (Canonical)
+      SubstParams.push_back(Param);
+  });
+
+  for (auto Param : SubstParams) {
     // Map the parameter into context
     auto ContextTy = Callee->mapTypeIntoContext(Param->getCanonicalType());
     auto Archetype = ContextTy->getAs<ArchetypeType>();
@@ -656,20 +661,21 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline) {
-  // For now, we cannot inline begin_apply at all.
-  if (isa<BeginApplyInst>(AI))
-    return nullptr;
-
   SILFunction *Callee = AI.getReferencedFunction();
-  SILFunction *EligibleCallee = nullptr;
 
   if (!Callee) {
     return nullptr;
   }
-  auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
-  bool IsInStdlib = (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT);
 
-  // Don't inline functions that are marked with the @_semantics or @effects
+  // Not all apply sites can be inlined, even if they're direct.
+  if (!SILInliner::canInlineApplySite(AI))
+    return nullptr;
+
+  ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
+  bool IsInStdlib = (SwiftModule->isStdlibModule() ||
+                     SwiftModule->isOnoneSupportModule());
+
+  // Don't inline functions that are marked with the @_semantics or @_effects
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
@@ -776,8 +782,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  EligibleCallee = Callee;
-  return EligibleCallee;
+  return Callee;
 }
 
 /// Returns true if the instruction \I has any interesting side effects which

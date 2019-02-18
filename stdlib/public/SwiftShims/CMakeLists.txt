@@ -5,7 +5,9 @@ set(sources
   GlobalObjects.h
   HeapObject.h
   KeyPath.h
+  LibcOverlayShims.h
   LibcShims.h
+  Random.h
   RefCount.h
   RuntimeShims.h
   RuntimeStubs.h
@@ -13,10 +15,13 @@ set(sources
   SwiftStddef.h
   SwiftStdint.h
   System.h
+  Target.h
+  ThreadLocalStorage.h
   UnicodeShims.h
   Visibility.h
 
   DispatchOverlayShims.h
+  NetworkOverlayShims.h
   OSOverlayShims.h
   ObjectiveCOverlayShims.h
   SafariServicesOverlayShims.h
@@ -59,7 +64,8 @@ foreach(input ${sources})
       COMMAND
         "${CMAKE_COMMAND}" "-E" "copy_if_different"
         "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
-        "${output_dir}/${input}")
+        "${output_dir}/${input}"
+      COMMENT "Copying ${input} to ${output_dir}")
   list(APPEND outputs "${output_dir}/${input}")
 endforeach()
 # Put the output dir itself last so that it isn't considered the primary output.
@@ -81,11 +87,12 @@ string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
 
 # Function to find LLVM or Clang headers
 function(find_llvm_clang_headers suffix description out_var)
+  file(TO_CMAKE_PATH "${SWIFT_PATH_TO_CLANG_BUILD}" PATH_TO_CLANG_BUILD)
+
   set(headers_locations
       "${LLVM_LIBRARY_DIR}${suffix}"
-
-      "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib${suffix}"
-      "${SWIFT_PATH_TO_CLANG_BUILD}/${LLVM_BUILD_TYPE}/lib${suffix}")
+      "${PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib${suffix}"
+      "${PATH_TO_CLANG_BUILD}/${LLVM_BUILD_TYPE}/lib${suffix}")
 
   set(headers_location)
   foreach(loc ${headers_locations})
@@ -145,7 +152,9 @@ swift_install_symlink_component(clang-resource-dir-symlink
 # Possibly install Clang headers under Clang's resource directory in case we
 # need to use a different version of the headers than the installed Clang. This
 # should be used in conjunction with clang-resource-dir-symlink.
+file(TO_CMAKE_PATH "${SWIFT_PATH_TO_CLANG_BUILD}"
+  _SWIFT_SHIMS_PATH_TO_CLANG_BUILD)
 swift_install_in_component(clang-builtin-headers-in-clang-resource-dir
-    DIRECTORY "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang"
+    DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_BUILD}/lib/clang"
     DESTINATION "lib"
     PATTERN "*.h")

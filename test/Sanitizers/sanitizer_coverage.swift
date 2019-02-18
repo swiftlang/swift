@@ -8,6 +8,7 @@
 // REQUIRES: asan_runtime
 // For now restrict this test to platforms where we know this test will pass
 // REQUIRES: CPU=x86_64
+// UNSUPPORTED: remote_run
 
 // XFAIL: linux
 

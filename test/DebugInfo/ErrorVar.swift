@@ -11,10 +11,10 @@ enum MyError : Error {
 // thrown error we create a shadow stack location holding the address of the
 // location that holds the pointer to the error instead.
 func simple(_ placeholder: Int64) throws -> () {
-  // CHECK: define {{.*}}void @"$S8ErrorVar6simpleyys5Int64VKF"(i64, %swift.refcounted* swiftself, %swift.error**)
+  // CHECK: define {{.*}}void @"$s8ErrorVar6simpleyys5Int64VKF"(i64, %swift.refcounted* swiftself, %swift.error** noalias nocapture dereferenceable(4))
   // CHECK: call void @llvm.dbg.declare
   // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[ERROR:[0-9]+]], metadata !DIExpression(DW_OP_deref))
-  // CHECK: ![[ERRTY:.*]] = !DICompositeType({{.*}}identifier: "$Ss5Error_pD"
+  // CHECK: ![[ERRTY:.*]] = !DICompositeType({{.*}}identifier: "$ss5Error_pD"
   // CHECK: ![[ERROR]] = !DILocalVariable(name: "$error", arg: 2,
   // CHECK-SAME:                          type: ![[ERRTY]],
   // CHECK-SAME:                          flags: DIFlagArtificial)

@@ -135,8 +135,8 @@ class NonObjC {}
 // Check reference storage types
 @objc class RSX {
   @IBOutlet weak var rsx1: RSX?
-  @IBOutlet unowned var rsx2: RSX? // expected-error {{'unowned' variable cannot have optional type}}
-  @IBOutlet unowned(unsafe) var rsx3: RSX? // expected-error {{'unowned(unsafe)' variable cannot have optional type}}
+  @IBOutlet unowned var rsx2: RSX?
+  @IBOutlet unowned(unsafe) var rsx3: RSX?
   init() { }
 }
 

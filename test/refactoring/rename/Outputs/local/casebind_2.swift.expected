@@ -21,7 +21,7 @@ func test3(arg: Int?) {
   case let .some(x) where x == 0:
     print(x)
   case let .some(xRenamed) where xRenamed == 1,
-       let .some(x) where xRenamed == 2: // FIXME: This 'x' in '.some(x)' isn't properly renamed in 'casebind_2' case.
+       let .some(x) where x == 2: // FIXME: This 'x' in '.some(x)' isn't properly renamed in 'casebind_2' case.
     print(xRenamed)
   default:
     break

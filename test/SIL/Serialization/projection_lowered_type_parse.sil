@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %s -module-name Swift -module-link-name swiftCore -parse-as-library -parse-sil -parse-stdlib -o - | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=Swift
+// RUN: %target-swift-frontend -emit-module %s -module-name Swift -module-link-name swiftCore -parse-as-library -parse-sil -parse-stdlib -o - | %target-sil-opt -module-name=Swift
 
 struct A {
   var f : () -> ()

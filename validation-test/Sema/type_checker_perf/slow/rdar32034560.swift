@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// REQUIRES: rdar42744631
 // REQUIRES: tools-release,no_asserts
 
 struct S {

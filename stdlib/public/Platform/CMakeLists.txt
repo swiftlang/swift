@@ -1,11 +1,9 @@
-set(swift_platform_name)
-set(swift_platform_flags)
 set(swift_platform_sources
     Platform.swift
     TiocConstants.swift
     tgmath.swift.gyb)
 
-add_swift_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Darwin.swift.gyb
     ${swift_platform_sources}
     POSIXError.swift
@@ -14,9 +12,12 @@ add_swift_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS
-    API_NOTES_NON_OVERLAY)
 
-add_swift_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    # This is overly conservative, but we have so few API notes files that
+    # haven't migrated to the Swift repo that it's probably fine in practice.
+    DEPENDS copy_apinotes)
+
+add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Glibc.swift.gyb
     ${swift_platform_sources}
 
@@ -25,7 +26,7 @@ add_swift_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX HAIKU
     DEPENDS glibc_modulemap)
 
-add_swift_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     msvcrt.swift
     ${swift_platform_sources}
 
@@ -121,3 +122,4 @@ foreach(sdk ${SWIFT_SDKS})
   endforeach()
 endforeach()
 add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})
+set_property(TARGET glibc_modulemap PROPERTY FOLDER "Miscellaneous")

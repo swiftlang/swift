@@ -133,7 +133,7 @@ void ClosureScopeData::compute(SILModule *M) {
 }
 
 ClosureScopeAnalysis::ClosureScopeAnalysis(SILModule *M)
-    : SILAnalysis(AnalysisKind::ClosureScope), M(M), scopeData(nullptr) {}
+    : SILAnalysis(SILAnalysisKind::ClosureScope), M(M), scopeData(nullptr) {}
 
 ClosureScopeAnalysis::~ClosureScopeAnalysis() = default;
 
@@ -150,7 +150,7 @@ void ClosureScopeAnalysis::invalidate() {
   if (scopeData) scopeData->reset();
 }
 
-void ClosureScopeAnalysis::notifyDeleteFunction(SILFunction *F) {
+void ClosureScopeAnalysis::notifyWillDeleteFunction(SILFunction *F) {
   if (scopeData) scopeData->erase(F);
 }
 

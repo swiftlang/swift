@@ -68,7 +68,7 @@ class Z0 {
     // expected-note @+2 {{delegation occurs here}}
 
     self.init(5, 5) // expected-error{{cannot invoke 'Z0.init' with an argument list of type '(Int, Int)'}}
-    // expected-note @-1 {{overloads for 'Z0.init' exist with these partially matching parameter lists: (), (value: Int), (value: Double)}}
+    // expected-note @-1 {{overloads for 'Z0.init' exist with these partially matching parameter lists: (), (value: Double), (value: Int)}}
   }
 
   init(value: Int) { /* ... */ }
@@ -78,7 +78,7 @@ class Z0 {
 struct Z1 {
   init() {
     self.init(5, 5) // expected-error{{cannot invoke 'Z1.init' with an argument list of type '(Int, Int)'}}
-  // expected-note @-1 {{overloads for 'Z1.init' exist with these partially matching parameter lists: (), (value: Int), (value: Double)}}
+  // expected-note @-1 {{overloads for 'Z1.init' exist with these partially matching parameter lists: (), (value: Double), (value: Int)}}
   }
 
   init(value: Int) { /* ... */ }
@@ -91,7 +91,7 @@ enum Z2 {
 
   init() {
     self.init(5, 5) // expected-error{{cannot invoke 'Z2.init' with an argument list of type '(Int, Int)'}}
-    // expected-note @-1 {{overloads for 'Z2.init' exist with these partially matching parameter lists: (), (value: Int), (value: Double)}}
+    // expected-note @-1 {{overloads for 'Z2.init' exist with these partially matching parameter lists: (), (value: Double), (value: Int)}}
   }
 
   init(value: Int) { /* ... */ }
@@ -113,7 +113,7 @@ class Z4 {
 
   convenience init(other: Z4) {
     other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}} 
-    type(of: other).init() // expected-error{{must use a 'required' initializer}} expected-warning{{unused}}
+    type(of: other).init() // expected-error{{must use a 'required' initializer}}
   }
 }
 
@@ -294,8 +294,7 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
   var cs2 = T.init(x: 0) // expected-error{{'required' initializer}}
   var cs3 = T.init() // expected-error{{'required' initializer}}
   var cs4 = T.init(proto: "")
-  var cs5 = T.init(notfound: "") // expected-error{{argument labels '(notfound:)' do not match any available overloads}}
-  // expected-note @-1 {{overloads for 'T.Type.init' exist with these partially matching parameter lists: (x: Int), (required: Double), (proto: String)}}
+  var cs5 = T.init(notfound: "") // expected-error{{incorrect argument label in call (have 'notfound:', expected 'proto:')}}
 
   var csf1: (Double) -> T = T.init
   var csf2: (Int) -> T    = T.init // expected-error{{'required' initializer}}
@@ -315,12 +314,12 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
 class TestOverloadSets {
   convenience init() {
     self.init(5, 5) // expected-error{{cannot invoke 'TestOverloadSets.init' with an argument list of type '(Int, Int)'}}
-    // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (), (a: Z0), (value: Int), (value: Double)}}
+    // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (), (a: Z0), (value: Double), (value: Int)}}
   }
   
   convenience init(a : Z0) {
     self.init(42 as Int8) // expected-error{{argument labels '(_:)' do not match any available overloads}}
-    // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (a: Z0), (value: Int), (value: Double)}}
+    // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (a: Z0), (value: Double), (value: Int)}}
   }
   
   init(value: Int) { /* ... */ }
@@ -397,6 +396,11 @@ class TestNestedExpr {
       // expected-error@-1 {{initializer delegation ('self.init') cannot be nested in another expression}}
     }
   }
+
+  convenience init(k: Int) {
+    func use(_ x: Any...) {}
+    use(self.init()) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+  }
 }
 
 class TestNestedExprSub : TestNestedExpr {
@@ -440,6 +444,11 @@ class TestNestedExprSub : TestNestedExpr {
 
   init(i: Int) {
     _ = ((), try! super.init(error: true)) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+  }
+
+  init(j: Int) {
+    func use(_ x: Any...) {}
+    use(super.init()) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 }
 

@@ -52,6 +52,7 @@ class C {
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
     foo(nil, nil, nil)
     _ = type(of: a).self
+    _ = a.`self`
     _ = A -> B.C<Int>
     _ = [(A) throws -> B]()
   }
@@ -532,10 +533,21 @@ struct S : Q, Equatable {
   @_implements(P, x)
   var y: String
   @_implements(P, g())
-  func h() {}
+  func h() { _ = \.self }
 
   @available(*, deprecated: 1.2, message: "ABC")
   fileprivate(set) var x: String
+}
+
+struct ReadModify {
+  var st0 = ("a", "b")
+  var rm0: (String, String) {
+    _read { yield (("a", "b")) }
+    _modify { yield &st0 }
+  }
+  var rm1: (String, String) {
+    _read { yield (st0) }
+  }
 }
 
 @_alignment(16) public struct float3 { public var x, y, z: Float }
@@ -547,3 +559,7 @@ func foo() {}
 #sourceLocation()
 
 "abc \( } ) def"
+
+#assert(true)
+#assert(false)
+#assert(true, "hello world")

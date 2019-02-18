@@ -1,17 +1,14 @@
 add_swift_host_tool(swift
-  api_notes.cpp
   driver.cpp
   autolink_extract_main.cpp
   modulewrap_main.cpp
   swift_format_main.cpp
-  LINK_LIBRARIES
-    swiftDriver
-    swiftFrontendTool
-  LLVM_COMPONENT_DEPENDS
-    DebugInfoCodeView
   SWIFT_COMPONENT compiler
 )
-
+target_link_libraries(swift
+                      PRIVATE
+                        swiftDriver
+                        swiftFrontendTool)
 if(HAVE_UNICODE_LIBEDIT)
   target_link_libraries(swift PRIVATE edit)
 endif()
@@ -41,11 +38,11 @@ if(NOT SWIFT_BUILT_STANDALONE)
 endif()
 
 swift_install_in_component(compiler
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "bin")
 swift_install_in_component(autolink-driver
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract"
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "bin")
 swift_install_in_component(editor-integration
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-format"
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-format${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "bin")

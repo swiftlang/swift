@@ -8,8 +8,8 @@ private struct Wrapper {
   static func test() -> InterestingType { fatalError() }
 }
 
-// CHECK-OLD: sil_global @$S4main1x{{[^ ]+}} : $Int
-// CHECK-NEW: sil_global @$S4main1x{{[^ ]+}} : $Double
+// CHECK-OLD: sil_global @$s4main1x{{[^ ]+}} : $Int
+// CHECK-NEW: sil_global @$s4main1x{{[^ ]+}} : $Double
 public var x = Wrapper.test() + 0
 
 // CHECK-DEPS-LABEL: depends-top-level:

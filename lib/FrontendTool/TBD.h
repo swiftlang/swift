@@ -25,11 +25,14 @@ class FileUnit;
 class FrontendOptions;
 struct TBDGenOptions;
 
-bool writeTBD(ModuleDecl *M, StringRef OutputFilename, TBDGenOptions &Opts);
+bool writeTBD(ModuleDecl *M, StringRef OutputFilename,
+              const TBDGenOptions &Opts);
 bool inputFileKindCanHaveTBDValidated(InputFileKind kind);
-bool validateTBD(ModuleDecl *M, llvm::Module &IRModule, TBDGenOptions &opts,
+bool validateTBD(ModuleDecl *M, llvm::Module &IRModule,
+                 const TBDGenOptions &opts,
                  bool diagnoseExtraSymbolsInTBD);
-bool validateTBD(FileUnit *M, llvm::Module &IRModule, TBDGenOptions &opts,
+bool validateTBD(FileUnit *M, llvm::Module &IRModule,
+                 const TBDGenOptions &opts,
                  bool diagnoseExtraSymbolsInTBD);
 }
 

@@ -2,11 +2,10 @@
 
 .. highlight:: none
 
-============================
+.. contents::
+
 Debugging the Swift Compiler
 ============================
-
-.. contents::
 
 Abstract
 --------
@@ -438,16 +437,35 @@ reducing SIL test cases by:
 For more information and a high level example, see:
 ./swift/utils/bug_reducer/README.md.
 
+Using ``clang-tidy`` to run the Static Analyzer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Recent versions of LLVM package the tool ``clang-tidy``. This can be used in
+combination with a json compilation database to run static analyzer checks as
+well as cleanups/modernizations on a code-base. Swift's cmake invocation by
+default creates one of these json databases at the root path of the swift host
+build, for example on macOS::
+
+    $PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json
+
+Using this file, one invokes ``clang-tidy`` on a specific file in the codebase
+as follows::
+
+    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_FILE
+
+One can also use shell regex to visit multiple files in the same directory. Example::
+
+    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
 
 Debugging Swift Executables
----------------------------
+===========================
 
 One can use the previous tips for debugging the Swift compiler with Swift
 executables as well. Here are some additional useful techniques that one can use
 in Swift executables.
 
 Determining the mangled name of a function in LLDB
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------------------------
 
 One problem that often comes up when debugging Swift code in LLDB is that LLDB
 shows the demangled name instead of the mangled name. This can lead to mistakes
@@ -461,8 +479,15 @@ function in the current frame::
     Module: file = "/Volumes/Files/work/solon/build/build-swift/validation-test-macosx-x86_64/stdlib/Output/CollectionType.swift.gyb.tmp/CollectionType3", arch = "x86_64"
     Symbol: id = {0x0000008c}, range = [0x0000000100004db0-0x00000001000056f0), name="ext.CollectionType3.CollectionType3.MutableCollectionType2<A where A: CollectionType3.MutableCollectionType2>.(subscript.materializeForSet : (Swift.Range<A.Index>) -> Swift.MutableSlice<A>).(closure #1)", mangled="_TFFeRq_15CollectionType322MutableCollectionType2_S_S0_m9subscriptFGVs5Rangeqq_s16MutableIndexable5Index_GVs12MutableSliceq__U_FTBpRBBRQPS0_MS4__T_"
 
-Debugging failures in LLDB
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Manually symbolication using LLDB
+---------------------------------
+
+One can perform manual symbolication of a crash log or an executable using LLDB
+without running the actual executable. For a detailed guide on how to do this,
+see: https://lldb.llvm.org/symbolication.html.
+
+Debugging LLDB failures
+=======================
 
 Sometimes one needs to be able to while debugging actually debug LLDB and its
 interaction with Swift itself. Some examples of problems where this can come up
@@ -483,7 +508,7 @@ For more details about any of the information below, please run::
     (lldb) help log enable
 
 "Types" Log
-```````````
+-----------
 
 The "types" log reports on LLDB's process of constructing SwiftASTContexts and
 errors that may occur. The two main tasks here are:
@@ -514,7 +539,7 @@ This will ensure that the type import command is run before /any/ modules are
 imported.
 
 "Expression" Log
-````````````````
+----------------
 
 The "expression" log reports on the process of wrapping, parsing, SILGen'ing,
 JITing, and inserting an expression into the current Swift module. Since this can
@@ -542,7 +567,7 @@ such a situation, run all expressions before the bad expression, turn on the
 logging, and only then run the bad expression.
 
 Multiple Logs at a Time
-```````````````````````
+-----------------------
 
 Note, you can also turn on more than one log at a time as well, e.x.::
 

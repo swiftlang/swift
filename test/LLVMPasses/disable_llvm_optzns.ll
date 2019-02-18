@@ -11,8 +11,8 @@ target triple = "x86_64-apple-macosx10.9"
 %objc_object = type opaque
 %swift.bridge = type opaque
 
-declare %swift.refcounted* @swift_unknownRetain(%swift.refcounted* returned)
-declare void @swift_unknownRelease(%swift.refcounted*)
+declare %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* returned)
+declare void @swift_unknownObjectRelease(%swift.refcounted*)
 declare %objc_object* @objc_retain(%objc_object*)
 declare void @objc_release(%objc_object*)
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind

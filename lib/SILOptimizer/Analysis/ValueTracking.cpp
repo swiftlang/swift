@@ -55,10 +55,6 @@ static bool isLocalObject(SILValue Obj) {
     V = getUnderlyingObject(V);
     if (isa<AllocationInst>(V))
       continue;
-    if (auto I = dyn_cast<StrongPinInst>(V)) {
-      WorkList.push_back(I->getOperand());
-      continue;
-    }
     if (isa<StructInst>(V) || isa<TupleInst>(V) || isa<EnumInst>(V)) {
       // A compound value is local, if all of its components are local.
       for (auto &Op : cast<SingleValueInstruction>(V)->getAllOperands()) {
@@ -67,11 +63,11 @@ static bool isLocalObject(SILValue Obj) {
       continue;
     }
 
-    if (auto *Arg = dyn_cast<SILPHIArgument>(V)) {
+    if (auto *Arg = dyn_cast<SILPhiArgument>(V)) {
       // A BB argument is local if all of its
       // incoming values are local.
       SmallVector<SILValue, 4> IncomingValues;
-      if (Arg->getIncomingValues(IncomingValues)) {
+      if (Arg->getSingleTerminatorOperands(IncomingValues)) {
         for (auto InValue : IncomingValues) {
           WorkList.push_back(InValue);
         }
@@ -299,25 +295,6 @@ Optional<bool> swift::computeSignBit(SILValue V) {
         Value = BI->getArguments()[0];
         continue;
       }
-
-      // Source and target type sizes are the same.
-      // S->U conversion can only succeed if
-      // the sign bit of its operand is 0, i.e. it is >= 0.
-      // The sign bit of a result is 0 only if the sign
-      // bit of a source operand is 0.
-      case BuiltinValueKind::SUCheckedConversion:
-        Value = BI->getArguments()[0];
-        continue;
-
-      // Source and target type sizes are the same.
-      // U->S conversion can only succeed if
-      // the top bit of its operand is 0, i.e.
-      // it is representable as a signed integer >=0.
-      // The sign bit of a result is 0 only if the sign
-      // bit of a source operand is 0.
-      case BuiltinValueKind::USCheckedConversion:
-        Value = BI->getArguments()[0];
-        continue;
 
       // Sign bit of the operand is promoted.
       case BuiltinValueKind::SExt:

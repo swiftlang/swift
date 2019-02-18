@@ -5,7 +5,7 @@ TYPE_NODES = [
     # simple-type-identifier -> identifier generic-argument-clause?
     Node('SimpleTypeIdentifier', kind='Type',
          children=[
-             Child('Name', kind='Token',
+             Child('Name', kind='Token', classification='TypeIdentifier',
                    token_choices=[
                        'IdentifierToken',
                        'CapitalSelfToken',
@@ -24,7 +24,7 @@ TYPE_NODES = [
                        'PeriodToken',
                        'PrefixPeriodToken',
                    ]),
-             Child('Name', kind='Token',
+             Child('Name', kind='Token', classification='TypeIdentifier',
                    token_choices=[
                        'IdentifierToken',
                        'CapitalSelfToken',

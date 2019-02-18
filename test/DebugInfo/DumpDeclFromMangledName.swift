@@ -16,12 +16,12 @@
 // RUN: not %lldb-moduleimport-test %t/DeclReconstr \
 // RUN:   --decl-from-mangled=patatino 2>&1 | \
 // RUN:   %FileCheck %s --check-prefix=INVALID-DECL
-// INVALID-DECL: patatino does not exists, exiting.
+// INVALID-DECL: patatino does not exist, exiting.
 
 // RUN: not %lldb-moduleimport-test %t/DeclReconstr \
 // RUN:   --type-from-mangled=patatino 2>&1 | \
 // RUN:   %FileCheck %s --check-prefix=INVALID-TYPE
-// INVALID-TYPE: patatino does not exists, exiting.
+// INVALID-TYPE: patatino does not exist, exiting.
 
 // RUN: %lldb-moduleimport-test %t/DeclReconstr \
 // RUN:   -decl-from-mangled=%t.input > %t.output 2>&1
@@ -48,6 +48,51 @@ class Foo<T> {
 }
 
 typealias Patatino<T> = Foo<T>
+
+public struct Outer<T> {
+  public struct Inner { }
+  public struct GenericInner<U> { }
+
+  public typealias Foo<U> = Outer<U>.Inner
+
+  public func blah() {
+    let foo: Foo<Int> = Outer<Int>.Inner()
+  }
+}
+
+extension Outer.GenericInner {
+  public typealias Bar = Int
+
+  public func useBar() {
+    let bar: Bar = 7
+  }
+}
+
+// Mangling for generic typealiases.
+protocol P {
+  associatedtype A
+}
+
+protocol Q {
+  associatedtype B: P
+  typealias ProtocolTypeAliasThing = B.A
+}
+
+struct ConformsToP: P {
+  typealias A = Int
+}
+
+struct ConformsToQ: Q {
+  typealias B = ConformsToP
+}
+
+struct Blah {
+  typealias SomeQ = ConformsToQ
+
+  func foo() {
+    let bar: SomeQ.ProtocolTypeAliasThing? = nil
+  }
+}
 
 func main() -> Int {
   var p : Patatino<Int> = Patatino(23);

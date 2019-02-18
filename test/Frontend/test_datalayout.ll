@@ -10,7 +10,7 @@
 target datalayout = "e-m:o-i64:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-apple-macosx10.13.0"
 
-define swiftcc i64 @"$S11TestBitcode3add1x1yS2i_SitF"(i64, i64) #0 {
+define swiftcc i64 @"$s11TestBitcode3add1x1yS2i_SitF"(i64, i64) #0 {
 entry:
   %2 = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %0, i64 %1)
   %3 = extractvalue { i64, i1 } %2, 0

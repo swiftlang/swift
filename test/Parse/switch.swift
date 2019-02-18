@@ -62,7 +62,7 @@ case 10,
 case _ where x % 2 == 0,
      20:
   x = 1
-case var y where y % 2 == 0:
+case var y where y % 2 == 0: // expected-warning {{variable 'y' was never mutated; consider changing to 'let' constant}}
   x = y + 1
 case _ where 0: // expected-error {{'Int' is not convertible to 'Bool'}}
   x = 0
@@ -307,7 +307,7 @@ Gronk: // expected-error {{switch must be exhaustive}} expected-note{{do you wan
 
 func enumElementSyntaxOnTuple() {
   switch (1, 1) {
-  case .Bar: // expected-error {{pattern cannot match values of type '(Int, Int)'}}
+  case .Bar: // expected-error {{value of tuple type '(Int, Int)' has no member 'Bar'}}
     break
   default:
     break

@@ -27,11 +27,11 @@ public func checkIterator<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool
-) where I.Element == Expected.Iterator.Element {
+  sameValue: (Expected.Element, Expected.Element) -> Bool
+) where I.Element == Expected.Element {
   // Copying a `IteratorProtocol` is allowed.
   var mutableGen = iterator
-  var actual: [Expected.Iterator.Element] = []
+  var actual: [Expected.Element] = []
   while let e = mutableGen.next() {
     actual.append(e)
   }
@@ -57,7 +57,7 @@ public func checkIterator<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
-) where I.Element == Expected.Iterator.Element, Expected.Iterator.Element : Equatable {
+) where I.Element == Expected.Element, Expected.Element : Equatable {
   checkIterator(
     expected, iterator, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false,
@@ -75,8 +75,8 @@ public func checkSequence<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool
-) where S.Iterator.Element == Expected.Iterator.Element {
+  sameValue: (Expected.Element, Expected.Element) -> Bool
+) where S.Element == Expected.Element {
   let expectedCount: Int = numericCast(expected.count)
   checkIterator(
     expected, sequence.makeIterator(), message(),
@@ -87,32 +87,6 @@ public func checkSequence<
   expectGE(
     expectedCount, sequence.underestimatedCount, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-
-  // Test `_copyContents(initializing:)` if we can do so without destroying the
-  // sequence.
-  _ = sequence._preprocessingPass { () -> Void in
-    var count = 0
-    for _ in sequence { count += 1 }
-    let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
-    let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
-    var (remainders,writtenUpTo) = sequence._copyContents(initializing: buf)
-    expectTrue(remainders.next() == nil,
-      "_copyContents returned unwritten elements")
-    expectTrue(writtenUpTo == buf.endIndex,
-      "_copyContents failed to use entire buffer")
-    expectEqualSequence(expected, buf, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), sameValue: sameValue)
-    ptr.deinitialize(count: count)
-    ptr.deallocate()
-  }
-
-  // Test `_copyToContiguousArray()` if we can do so
-  // without destroying the sequence.
-  _ = sequence._preprocessingPass { () -> Void in
-    let copy = sequence._copyToContiguousArray()
-    expectEqualSequence(expected, copy, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), sameValue: sameValue)
-  }
 }
 
 public func checkSequence<
@@ -126,8 +100,8 @@ public func checkSequence<
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
-  S.Iterator.Element == Expected.Iterator.Element,
-  S.Iterator.Element : Equatable {
+  S.Element == Expected.Element,
+  S.Element : Equatable {
 
   checkSequence(
     expected, sequence, message(),
@@ -195,7 +169,7 @@ public func checkSequence<
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
-) where S.Iterator.Element == Element {
+) where S.Element == Element {
   let expectedCount: Int = numericCast(expected.count)
   checkIterator(
     expected, sequence.makeIterator(), message(),
@@ -206,32 +180,6 @@ public func checkSequence<
   expectGE(
     expectedCount, sequence.underestimatedCount, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-
-  // Test `_copyContents(initializing:)` if we can do so without destroying the
-  // sequence.
-  _ = sequence._preprocessingPass { () -> Void in
-    var count = 0
-    for _ in sequence { count += 1 }
-    let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
-    let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
-    var (remainders,writtenUpTo) = sequence._copyContents(initializing: buf)
-    expectTrue(remainders.next() == nil,
-      "_copyContents returned unwritten elements")
-    expectTrue(writtenUpTo == buf.endIndex,
-      "_copyContents failed to use entire buffer")
-    expectEqualSequence(expected, buf, message(),
-    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), sameValue: sameValue)
-    ptr.deinitialize(count: count)
-    ptr.deallocate()
-  }
-
-  // Test `_copyToContiguousArray()` if we can do so
-  // without destroying the sequence.
-  _ = sequence._preprocessingPass { () -> Void in
-    let copy = sequence._copyToContiguousArray()
-    expectEqualSequence(expected, copy, message(),
-    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), sameValue: sameValue)
-  }
 }
 
 public func checkSequence<
@@ -245,8 +193,8 @@ public func checkSequence<
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
-  S.Iterator.Element == Element,
-  S.Iterator.Element : Equatable {
+  S.Element == Element,
+  S.Element : Equatable {
 
   checkSequence(
     expected, sequence, message(),

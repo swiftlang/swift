@@ -8,12 +8,18 @@
 import MyAppKit
 import MySwift
 
-func foo(_ Opt: NSOpenGLOption) {
+func foo(_ Opt: NSOpenGLOption, _ pointer: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) {
   var Value = 1
   Opt.globalValue = 1
   Value = Opt.globalValue
+  UIApplicationMain(CommandLine.argc, CommandLine.unsafeArgv, "", "")
+  UIApplicationMain(
+    CommandLine.argc, CommandLine.unsafeArgv, "", "")
+  UIApplicationMain( CommandLine . 
+    argc, CommandLine.unsafeArgv, "", "")
+  UIApplicationMain(10, pointer, "", "")
 }
 
 do {
-  _ = Swift.abs(1.0)
+  _ = abs(1.0)
 }

@@ -17,6 +17,10 @@
 // RUN: %target-swift-frontend -emit-module -o %t -I %t/secret -F %t/Frameworks -Fsystem %t/SystemFrameworks -parse-as-library %S/Inputs/has_xref.swift -application-extension
 // RUN: %target-swift-frontend %s -typecheck -I %t
 
+// Make sure -no-serialize-debugging-options has the desired effect.
+// RUN: %target-swift-frontend -emit-module -o %t -I %t/secret -F %t/Frameworks -Fsystem %t/SystemFrameworks -parse-as-library %S/Inputs/has_xref.swift -application-extension -no-serialize-debugging-options
+// RUN: %target-swift-frontend %s -typecheck -I %t -verify -show-diagnostics-after-fatal
+
 // Make sure we don't end up with duplicate search paths.
 // RUN: %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I %t/secret -F %t/Frameworks -Fsystem %t/SystemFrameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options
 // RUN: %target-swift-frontend %s -typecheck -I %t

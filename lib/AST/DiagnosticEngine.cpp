@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -55,9 +56,10 @@ struct StoredDiagnosticInfo {
   bool pointsToFirstBadToken : 1;
   bool isFatal : 1;
 
-  StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken, bool fatal)
+  constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
+                                 bool fatal)
       : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal) {}
-  StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
+  constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
       : StoredDiagnosticInfo(k,
                              opts == DiagnosticOptions::PointsToFirstBadToken,
                              opts == DiagnosticOptions::Fatal) {}
@@ -73,7 +75,7 @@ enum LocalDiagID : uint32_t {
 } // end anonymous namespace
 
 // TODO: categorization
-static StoredDiagnosticInfo storedDiagnosticInfos[] = {
+static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
 #define ERROR(ID, Options, Text, Signature)                                    \
   StoredDiagnosticInfo(DiagnosticKind::Error, DiagnosticOptions::Options),
 #define WARNING(ID, Options, Text, Signature)                                  \
@@ -88,7 +90,7 @@ static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
                   LocalDiagID::NumDiags,
               "array size mismatch");
 
-static const char *diagnosticStrings[] = {
+static constexpr const char * const diagnosticStrings[] = {
 #define ERROR(ID, Options, Text, Signature) Text,
 #define WARNING(ID, Options, Text, Signature) Text,
 #define NOTE(ID, Options, Text, Signature) Text,
@@ -111,14 +113,14 @@ static CharSourceRange toCharSourceRange(SourceManager &SM, SourceLoc Start,
   return CharSourceRange(SM, Start, End);
 }
 
-/// \brief Extract a character at \p Loc. If \p Loc is the end of the buffer,
+/// Extract a character at \p Loc. If \p Loc is the end of the buffer,
 /// return '\f'.
 static char extractCharAfter(SourceManager &SM, SourceLoc Loc) {
   auto chars = SM.extractText({Loc, 1});
   return chars.empty() ? '\f' : chars[0];
 }
 
-/// \brief Extract a character immediately before \p Loc. If \p Loc is the
+/// Extract a character immediately before \p Loc. If \p Loc is the
 /// start of the buffer, return '\f'.
 static char extractCharBefore(SourceManager &SM, SourceLoc Loc) {
   // We have to be careful not to go off the front of the buffer.
@@ -148,7 +150,7 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
   return *this;
 }
 
-/// \brief Add an insertion fix-it to the currently-active diagnostic.  The
+/// Add an insertion fix-it to the currently-active diagnostic.  The
 /// text is inserted immediately *after* the token specified.
 ///
 InFlightDiagnostic &InFlightDiagnostic::fixItInsertAfter(SourceLoc L,
@@ -157,7 +159,7 @@ InFlightDiagnostic &InFlightDiagnostic::fixItInsertAfter(SourceLoc L,
   return fixItInsert(L, Str);
 }
 
-/// \brief Add a token-based removal fix-it to the currently-active
+/// Add a token-based removal fix-it to the currently-active
 /// diagnostic.
 InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
@@ -251,15 +253,15 @@ bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
   return storedDiagnosticInfos[(unsigned) ID].pointsToFirstBadToken;
 }
 
-bool DiagnosticEngine::finishProcessing(SourceManager &SM) {
+bool DiagnosticEngine::finishProcessing() {
   bool hadError = false;
   for (auto &Consumer : Consumers) {
-    hadError |= Consumer->finishProcessing(SM);
+    hadError |= Consumer->finishProcessing();
   }
   return hadError;
 }
 
-/// \brief Skip forward to one of the given delimiters.
+/// Skip forward to one of the given delimiters.
 ///
 /// \param Text The text to search through, which will be updated to point
 /// just after the delimiter.
@@ -329,7 +331,7 @@ static void formatSelectionArgument(StringRef ModifierArguments,
 static bool isInterestingTypealias(Type type) {
   // Dig out the typealias declaration, if there is one.
   TypeAliasDecl *aliasDecl = nullptr;
-  if (auto aliasTy = dyn_cast<NameAliasType>(type.getPointer()))
+  if (auto aliasTy = dyn_cast<TypeAliasType>(type.getPointer()))
     aliasDecl = aliasTy->getDecl();
   else
     return false;
@@ -383,7 +385,7 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
   return true;
 }
 
-/// \brief Format a single diagnostic argument and write it to the given
+/// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier, 
                                      StringRef ModifierArguments,
@@ -527,7 +529,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
   }
 }
 
-/// \brief Format the given diagnostic text and place the result in the given
+/// Format the given diagnostic text and place the result in the given
 /// buffer.
 void DiagnosticEngine::formatDiagnosticText(
     llvm::raw_ostream &Out, StringRef InText, ArrayRef<DiagnosticArgument> Args,
@@ -765,6 +767,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
             case DeclContextKind::AbstractClosureExpr:
             case DeclContextKind::AbstractFunctionDecl:
             case DeclContextKind::SubscriptDecl:
+            case DeclContextKind::EnumElementDecl:
               break;
             }
 
@@ -829,4 +832,15 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
   return diagnosticStrings[(unsigned)id];
+}
+
+DiagnosticSuppression::DiagnosticSuppression(DiagnosticEngine &diags)
+  : diags(diags)
+{
+  consumers = diags.takeConsumers();
+}
+
+DiagnosticSuppression::~DiagnosticSuppression() {
+  for (auto consumer : consumers)
+    diags.addConsumer(*consumer);
 }

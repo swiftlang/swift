@@ -33,7 +33,7 @@ func f() { e() }
 
 func g() { // expected-warning {{all paths through this function will call itself}}
   while true { // expected-note {{condition always evaluates to true}}
-    g() 
+    g()
   }
 
   g() // expected-warning {{will never be executed}}
@@ -59,6 +59,57 @@ func j() -> Int {  // expected-warning {{all paths through this function will ca
 
 func k() -> Any {  // expected-warning {{all paths through this function will call itself}}
   return type(of: k())
+}
+
+@_silgen_name("exit") func exit(_: Int32) -> Never
+
+func l() {
+  guard Bool.random() else {
+    exit(0) // no warning; calling 'exit' terminates the program
+  }
+  l()
+}
+
+func m() { // expected-warning {{all paths through this function will call itself}}
+  guard Bool.random() else {
+    fatalError() // we _do_ warn here, because fatalError is a programtermination_point
+  }
+  m()
+}
+
+enum MyNever {}
+
+func blackHole() -> MyNever { // expected-warning {{all paths through this function will call itself}}
+  blackHole()
+}
+
+@_semantics("programtermination_point")
+func terminateMe() -> MyNever {
+  terminateMe() // no warning; terminateMe is a programtermination_point
+}
+
+func n() -> MyNever {
+  if Bool.random() {
+    blackHole() // no warning; blackHole() will terminate the program
+  }
+  n()
+}
+
+func o() -> MyNever {
+  if Bool.random() {
+    o()
+  }
+  blackHole() // no warning; blackHole() will terminate the program
+}
+
+func mayHaveSideEffects() {}
+
+func p() { // expected-warning {{all paths through this function will call itself}}
+  if Bool.random() {
+    mayHaveSideEffects() // presence of side-effects doesn't alter the check for the programtermination_point apply
+    fatalError()
+  }
+  p()
 }
 
 class S {

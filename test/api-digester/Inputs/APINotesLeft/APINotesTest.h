@@ -27,6 +27,10 @@ extern int ANTGlobalValue;
 + (nonnull AnimalStatusDescriptor *)animalStatusSingleAttribute:(nonnull NSString *)attributes;
 @end
 
-extern NSString *globalAttributeName;
+extern NSString * _Null_unspecified globalAttributeName;
 
 typedef NSString * CatAttributeName;
+
+@interface Cat
+- (nonnull instancetype) initWithName:(nullable NSString*) name;
+@end

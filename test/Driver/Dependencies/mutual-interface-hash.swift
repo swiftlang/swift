@@ -1,6 +1,7 @@
 /// does-change <==> does-not-change
 
-// RUN: rm -rf %t && cp -r %S/Inputs/mutual-interface-hash/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/mutual-interface-hash/* %t
 // RUN: touch -t 201401240005 %t/*
 
 // Generate the build record...

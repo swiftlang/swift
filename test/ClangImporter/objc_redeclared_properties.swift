@@ -27,4 +27,10 @@ func test(obj: RPFoo) {
 
   if let _ = obj.accessorRedeclaredAsNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
   if let _ = obj.accessorDeclaredFirstAsNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
+
+  obj.accessorInProto = nil // okay
+}
+
+func sr8490(obj: RPSub) {
+  obj.accessorInProto = nil
 }

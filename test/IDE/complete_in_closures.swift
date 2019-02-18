@@ -51,6 +51,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARGUMENT_TYPE_IN_CLOSURE_2 | %FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_1 | %FileCheck %s -check-prefix=CLOSURE_PARAM_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_2 | %FileCheck %s -check-prefix=CLOSURE_PARAM_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_1 | %FileCheck %s -check-prefix=IN_IIFE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_2 | %FileCheck %s -check-prefix=IN_IIFE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_3 | %FileCheck %s -check-prefix=IN_IIFE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_4 | %FileCheck %s -check-prefix=IN_IIFE_1
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -330,3 +334,38 @@ func testClosureParam2() {
 // CLOSURE_PARAM_2: Begin completions
 // CLOSURE_PARAM_2-DAG: Decl[LocalVar]/Local:         Value1[#Int#]{{; name=.+$}}
 // CLOSURE_PARAM_2-DAG: Decl[LocalVar]/Local:         Value2[#Int#]{{; name=.+$}}
+
+enum SomeEnum {
+  case north, south
+}
+
+struct BarStruct {
+  var enumVal: SomeEnum = .north
+}
+
+var testIIFEVar: BarStruct = {
+  var obj = BarStruct()
+  obj.enumVal = .#^IN_IIFE_1^#
+  return obj
+}()
+testIIFEVar = {
+  var obj = BarStruct()
+  obj.enumVal = .#^IN_IIFE_2^#
+  return obj
+}()
+
+func testIIFE() {
+  var testIIFEVar: FooStruct = {
+    var obj = BarStruct()
+    obj.enumVal = .#^IN_IIFE_3^#
+    return obj
+  }()
+  testIIFEVar = {
+    var obj = BarStruct()
+    obj.enumVal = .#^IN_IIFE_4^#
+    return obj
+  }()
+}
+// IN_IIFE_1: Begin completions
+// IN_IIFE_1-DAG: Decl[EnumElement]/ExprSpecific: north[#SomeEnum#]
+// IN_IIFE_1-DAG: Decl[EnumElement]/ExprSpecific: south[#SomeEnum#]
