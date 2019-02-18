@@ -150,7 +150,7 @@ struct RDar16603812 {
    var i = 42
    init() {}
    func foo() {
-      self.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{12-12=type(of: }} {{16-16=)}} 
+      self.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{12-12=type(of: }} {{16-16=)}}
       type(of: self).init() // expected-warning{{result of 'RDar16603812' initializer is unused}}
    }
 }
@@ -273,7 +273,7 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
   var ci1 = x.init(required: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
   var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
   var ci3 = x.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
-  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
+  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}} 
 
   var ci1a = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
   var ci2a = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
