@@ -86,7 +86,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     return;
   }
 
-  if (constant.isInitializerOrDestroyer())
+  if (!constant.canBeDynamicReplacement())
     return;
 
   SILDeclRef declRef(replacedDecl, constant.kind, false);

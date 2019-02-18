@@ -896,9 +896,11 @@ public:
   }
 
   static LinkEntity
-  forDynamicallyReplaceableFunctionVariable(AbstractFunctionDecl *decl) {
+  forDynamicallyReplaceableFunctionVariable(AbstractFunctionDecl *decl,
+                                            bool isAllocator) {
     LinkEntity entity;
     entity.setForDecl(Kind::DynamicallyReplaceableFunctionVariableAST, decl);
+    entity.SecondaryPointer = isAllocator ? decl : nullptr;
     return entity;
   }
 
@@ -912,16 +914,20 @@ public:
   }
 
   static LinkEntity
-  forDynamicallyReplaceableFunctionKey(AbstractFunctionDecl *decl) {
+  forDynamicallyReplaceableFunctionKey(AbstractFunctionDecl *decl,
+                                       bool isAllocator) {
     LinkEntity entity;
     entity.setForDecl(Kind::DynamicallyReplaceableFunctionKeyAST, decl);
+    entity.SecondaryPointer = isAllocator ? decl : nullptr;
     return entity;
   }
 
   static LinkEntity
-  forDynamicallyReplaceableFunctionImpl(AbstractFunctionDecl *decl) {
+  forDynamicallyReplaceableFunctionImpl(AbstractFunctionDecl *decl,
+                                        bool isAllocator) {
     LinkEntity entity;
     entity.setForDecl(Kind::DynamicallyReplaceableFunctionImpl, decl);
+    entity.SecondaryPointer = isAllocator ? decl : nullptr;
     return entity;
   }
 
@@ -998,6 +1004,12 @@ public:
   bool isDynamicallyReplaceable() const {
     assert(getKind() == Kind::SILFunction);
     return LINKENTITY_GET_FIELD(Data, IsDynamicallyReplaceableImpl);
+  }
+  bool isAllocator() const {
+    assert(getKind() == Kind::DynamicallyReplaceableFunctionImpl ||
+           getKind() == Kind::DynamicallyReplaceableFunctionKeyAST ||
+           getKind() == Kind::DynamicallyReplaceableFunctionVariableAST);
+    return SecondaryPointer != nullptr;
   }
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
   CanType getType() const {
