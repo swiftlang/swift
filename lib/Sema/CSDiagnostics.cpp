@@ -86,7 +86,9 @@ Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
 }
 
 Type RequirementFailure::getOwnerType() const {
-  return getType(getAnchor())->getInOutObjectType()->getMetatypeInstanceType();
+  return getType(getRawAnchor())
+      ->getInOutObjectType()
+      ->getMetatypeInstanceType();
 }
 
 const GenericContext *RequirementFailure::getGenericContext() const {
