@@ -197,7 +197,6 @@
     "Bitset.swift"
   ],
   "Misc": [
-    "AtomicInt.swift",
     "Atomics.swift",
     "ErrorType.swift",
     "Identifiable.swift",
@@ -224,6 +223,7 @@
     "Equatable.swift",
     "Comparable.swift",
     "Codable.swift",
+    "LegacyAtomicInt.swift",
     "LegacyABI.swift",
     "MigrationSupport.swift"
   ],

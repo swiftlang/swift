@@ -88,6 +88,7 @@ set(SWIFTLIB_ESSENTIAL
   LazyCollection.swift
   LazySequence.swift
   LegacyABI.swift
+  LegacyAtomicInt.swift
   LifetimeManager.swift
   ManagedBuffer.swift
   Map.swift
@@ -185,7 +186,6 @@ set(SWIFTLIB_ESSENTIAL
   MigrationSupport.swift)
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
-  AtomicInt.swift.gyb
   Atomics.swift.gyb
   BuiltinMath.swift.gyb
   Codable.swift.gyb
