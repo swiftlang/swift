@@ -61,6 +61,7 @@ set(SWIFTLIB_ESSENTIAL
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
+  FieldAccessor.swift
   Filter.swift
   FixedArray.swift
   FlatMap.swift

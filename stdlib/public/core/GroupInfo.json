@@ -178,7 +178,8 @@
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift",
-    "UnsafeRawBufferPointer.swift"
+    "UnsafeRawBufferPointer.swift",
+    "FieldAccessor.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",

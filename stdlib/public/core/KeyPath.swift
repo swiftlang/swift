@@ -186,6 +186,36 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
       }
     }
   }
+
+  internal var _storedInstanceOffset: Int? {
+    return withBuffer {
+      var buffer = $0
+
+      // The identity key path does not have a class offset.
+      if buffer.data.isEmpty { return nil }
+
+      var offset = 0
+      var (rawComponent, optNextType) = buffer.next()
+      switch rawComponent.header.kind {
+      case .class:
+        offset += rawComponent._structOrClassOffset
+      case .struct, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
+        return nil
+      }
+
+      while optNextType != nil {
+        (rawComponent, optNextType) = buffer.next()
+        switch rawComponent.header.kind {
+        case .struct:
+          offset += rawComponent._structOrClassOffset
+
+        case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
+          return .none
+        }
+      }
+      return offset
+    }
+  }
 }
 
 /// A partially type-erased key path, from a concrete root type to any
