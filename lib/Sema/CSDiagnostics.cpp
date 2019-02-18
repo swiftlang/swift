@@ -1632,8 +1632,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     if (auto *AMT = instanceTy->getAs<AnyMetatypeType>()) {
       instanceTy = AMT->getInstanceType();
     }
-    
-    if (expr && expr->isImplicit() &&
+
+    if (getRawAnchor() &&
         cs.DC->getContextKind() == DeclContextKind::Initializer) {
       auto *TypeDC = cs.DC->getParent();
       bool propertyInitializer = true;
