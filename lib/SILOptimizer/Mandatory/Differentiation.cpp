@@ -4720,20 +4720,7 @@ void AdjointEmitter::materializeAdjointIndirectHelper(
 
 void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
                                       SILLocation loc) {
-  // Look up `AdditiveArithmetic.zero.getter`.
-  auto *additiveArithmeticProto =
-      getASTContext().getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto initDeclLookup =
-      additiveArithmeticProto->lookupDirect(getASTContext().Id_zero);
-  auto *zeroDecl = cast<VarDecl>(initDeclLookup.front());
-  assert(zeroDecl->isProtocolRequirement());
-  auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
-  SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
-  auto methodType =
-      getContext().getTypeConverter().getConstantType(accessorDeclRef);
-  // Look up conformance to `AdditiveArithmetic`.
   auto *swiftMod = getModule().getSwiftModule();
-  auto confRef = swiftMod->lookupConformance(type, additiveArithmeticProto);
   // TODO(TF-202): Diagnose no `AdditiveArithmetic` due to generic signature
   // minimization bug.
   auto cotangentSpace = type->getAutoDiffAssociatedVectorSpace(
@@ -4742,10 +4729,23 @@ void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   assert(cotangentSpace && "No tangent space for this type");
   switch (cotangentSpace->getKind()) {
   case VectorSpace::Kind::Vector: {
+    // Look up conformance to `AdditiveArithmetic`.
+    auto *additiveArithmeticProto =
+        getASTContext().getProtocol(KnownProtocolKind::AdditiveArithmetic);
+    auto confRef = swiftMod->lookupConformance(type, additiveArithmeticProto);
     assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
+    // Look up `AdditiveArithmetic.zero.getter`.
+    auto zeroDeclLookup =
+        additiveArithmeticProto->lookupDirect(getASTContext().Id_zero);
+    auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
+    assert(zeroDecl->isProtocolRequirement());
+    auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
+    SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
+    auto silFnType =
+        getContext().getTypeConverter().getConstantType(accessorDeclRef);
     // %wm = witness_method ...
     auto *getter = builder.createWitnessMethod(
-        loc, type, *confRef, accessorDeclRef, methodType);
+        loc, type, *confRef, accessorDeclRef, silFnType);
     // %metatype = metatype $T
     auto metatypeType = CanMetatypeType::get(
         type, MetatypeRepresentation::Thick);
