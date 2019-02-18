@@ -2189,7 +2189,7 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
 
 static void initGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
-  Demangle::Demangler Dem;
+  Demangle::StackAllocatedDemangler<4096> Dem;
   // Resolve symbolic references to a unique mangling that can be encoded in
   // the class name.
   Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
@@ -2202,7 +2202,7 @@ static void initGenericClassObjCName(ClassMetadata *theClass) {
   auto globalNode = Dem.createNode(Demangle::Node::Kind::Global);
   globalNode->addChild(typeNode, Dem);
 
-  auto string = Demangle::mangleNodeOld(globalNode);
+  auto string = Demangle::mangleNodeOld(globalNode, &Dem);
 
   // If the class is in the Swift module, add a $ to the end of the ObjC
   // name. The old and new Swift libraries must be able to coexist in
@@ -5016,7 +5016,7 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   
   if (!verificationEnabled) return;
   
-  Demangle::Demangler Dem;
+  Demangle::StackAllocatedDemangler<1024> Dem;
   Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
 
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);

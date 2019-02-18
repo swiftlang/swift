@@ -676,21 +676,21 @@ class TypeDecoder {
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
-      auto member = Node->getChild(1)->getText();
       auto assocTypeChild = Node->getChild(1);
-      if (assocTypeChild->getNumChildren() < 1)
+      auto member = assocTypeChild->getFirstChild()->getText();
+      if (assocTypeChild->getNumChildren() < 2)
         return Builder.createDependentMemberType(member, base);
 
-      auto protocol = decodeMangledProtocolType(assocTypeChild->getChild(0));
+      auto protocol = decodeMangledProtocolType(assocTypeChild->getChild(1));
       if (!protocol)
         return BuiltType();
       return Builder.createDependentMemberType(member, base, protocol);
     }
     case NodeKind::DependentAssociatedTypeRef: {
-      if (Node->getNumChildren() < 1)
+      if (Node->getNumChildren() < 2)
         return BuiltType();
 
-      return decodeMangledType(Node->getChild(0));
+      return decodeMangledType(Node->getChild(1));
     }
     case NodeKind::Unowned: {
       if (Node->getNumChildren() < 1)

@@ -386,7 +386,8 @@ public:
   ///
   /// \returns true if the innermost descriptor is generic.
   bool _gatherGenericParameterCounts(const ContextDescriptor *descriptor,
-                                     std::vector<unsigned> &genericParamCounts);
+                                     std::vector<unsigned> &genericParamCounts,
+                                     Demangler &BorrowFrom);
 
   /// Map depth/index to a flat index.
   llvm::Optional<unsigned> _depthIndexToFlatIndex(
@@ -451,7 +452,8 @@ public:
   /// \endcode
   void gatherWrittenGenericArgs(const Metadata *metadata,
                                 const TypeContextDescriptor *description,
-                                std::vector<const Metadata *> &allGenericArgs);
+                                std::vector<const Metadata *> &allGenericArgs,
+                                Demangler &BorrowFrom);
 
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,
