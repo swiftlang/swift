@@ -1508,9 +1508,6 @@ WARNING(function_type_usable_from_inline_warn,none,
         "'@usableFromInline' %select{function|method|initializer}0 "
         "should be '@usableFromInline' or public",
         (unsigned, bool))
-ERROR(noreturn_not_supported,none,
-      "'@noreturn' has been removed; functions that never return should have a "
-      "return type of 'Never' instead", ())
 
 // Extensions
 ERROR(non_nominal_extension,none,
