@@ -360,17 +360,33 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     assert(elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy));
   }
 #endif
+  
+  /// Create the expression to use in the `case` statement for the provided
+  /// raw value expression.
+  std::function<decltype(cloneRawLiteralExpr)>
+  makeCaseArg = cloneRawLiteralExpr;
 
-  bool isStringEnum =
-    (rawTy->getNominalOrBoundGenericNominal() == C.getStringDecl());
   llvm::SmallVector<Expr *, 16> stringExprs;
+  if (rawTy->getNominalOrBoundGenericNominal() == C.getStringDecl()) {
+    // Override makeCaseArg() to collect the literals into a list and return
+    // integer literals to switch on instead. The list will be passed to
+    // _findStringSwitchCase(cases:string:).
+    
+    makeCaseArg = [&](
+        ASTContext &C, LiteralExpr *litExpr,
+        DerivedConformance::SourceLocSynthesizer &sourceLocs
+    ) -> LiteralExpr * {
+      auto idx = stringExprs.size();
+      stringExprs.push_back(cloneRawLiteralExpr(C, litExpr, sourceLocs));
+      return IntegerLiteralExpr::createFromUnsigned(C, idx);
+    };
+  }
 
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   auto selfDecl = cast<ConstructorDecl>(initDecl)->getImplicitSelfDecl();
   
   SmallVector<ASTNode, 4> cases;
-  unsigned Idx = 0;
   for (auto elt : enumDecl->getAllElements()) {
     // First, check case availability. If the case will definitely be
     // unavailable, skip it. If it might be unavailable at runtime, save
@@ -381,13 +397,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
       continue;
 
     // litPat = elt.rawValueExpr as a pattern
-    LiteralExpr *litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr(), sourceLocs);
-    if (isStringEnum) {
-      // In case of a string enum we are calling the _findStringSwitchCase
-      // function from the library and switching on the returned Int value.
-      stringExprs.push_back(litExpr);
-      litExpr = IntegerLiteralExpr::createFromUnsigned(C, Idx); 
-    }
+    LiteralExpr *litExpr = makeCaseArg(C, elt->getRawValueExpr(), sourceLocs);
     auto litPat = new (C) ExprPattern(litExpr, /*isResolved*/ true,
                                       nullptr, nullptr);
     litPat->setImplicit();
@@ -424,7 +434,6 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     cases.push_back(CaseStmt::create(C, SourceLoc(), CaseLabelItem(litPat),
                                      /*HasBoundDecls=*/false, SourceLoc(),
                                      SourceLoc(), body));
-    Idx++;
   }
 
   auto anyPat = new (C) AnyPattern(SourceLoc());
@@ -441,7 +450,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
   Expr *switchArg = rawRef;
-  if (isStringEnum) {
+  if (!stringExprs.empty()) {
     // Call _findStringSwitchCase with an array of strings as argument.
     auto *Fun = new (C) UnresolvedDeclRefExpr(
                   C.getIdentifier("_findStringSwitchCase"),
