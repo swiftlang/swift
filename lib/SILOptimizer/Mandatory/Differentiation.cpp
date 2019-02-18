@@ -1625,14 +1625,10 @@ static SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
 
 // Emits a release based on the value's type category (address or object).
 static void emitCleanup(SILBuilder &builder, SILLocation loc, SILValue v) {
-  if (v->getType().isAddress()) {
-    if (v->getType().isLoadable(builder.getModule()))
-      builder.createReleaseValueAddr(loc, v, builder.getDefaultAtomicity());
-    else
-      builder.createDestroyAddr(loc, v);
-  } else {
+  if (v->getType().isAddress())
+    builder.createDestroyAddr(loc, v);
+  else
     builder.createReleaseValue(loc, v, builder.getDefaultAtomicity());
-  }
 }
 
 /// When a function value is used in an instruction (usually `apply`), there's
@@ -2254,6 +2250,12 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
 
   // Create return.
   builder.createReturn(loc, retVal);
+
+  LLVM_DEBUG(auto &s = getADDebugStream() << "Created reabstraction thunk.\n";
+             s << "From type: " << fromType << '\n';
+             s << "To type: " << toType << '\n';
+             s << '\n' << *thunk);
+
   return thunk;
 }
 
@@ -2963,9 +2965,6 @@ public:
       pullback = getBuilder().createPartialApply(
           ai->getLoc(), thunkRef, thunk->getForwardingSubstitutionMap(),
           {pullback}, actualPullbackType->getCalleeConvention());
-      LLVM_DEBUG(getADDebugStream() << "Reabstract pullback from type "
-                 << actualPullbackType << " to type " << loweredPullbackType
-                 << '\n');
     }
     primalValues.push_back(pullback);
 
@@ -3496,7 +3495,7 @@ private:
   void emitZeroIndirect(CanType type, SILValue bufferAccess, SILLocation loc);
 
   /// Emit a zero value by calling `AdditiveArithmetic.zero`. The given type
-  /// must conform to `AdditiveArithmetic` and is loadable in SIL.
+  /// must conform to `AdditiveArithmetic` and be loadable in SIL.
   SILValue emitZeroDirect(CanType type, SILLocation loc);
 
   //--------------------------------------------------------------------------//
@@ -3814,12 +3813,17 @@ public:
         continue;
       addRetElt(i);
     }
+
+    // Disable cleanup for original indirect parameter adjoint buffers.
+    // Copy them to adjoint indirect results.
     assert(indParamAdjoints.size() == adjoint.getIndirectResults().size() &&
            "Indirect parameter adjoint count mismatch");
     for (auto pair : zip(indParamAdjoints, adjoint.getIndirectResults())) {
       auto &source = std::get<0>(pair);
       auto &dest = std::get<1>(pair);
       builder.createCopyAddr(adjLoc, source, dest, IsTake, IsInitialization);
+      if (auto *cleanup = source.getCleanup())
+        cleanup->disable();
     }
 
     // Deallocate local allocations.
@@ -3941,9 +3945,6 @@ public:
       pullback = builder.createPartialApply(
           ai->getLoc(), thunkRef, thunk->getForwardingSubstitutionMap(),
           {pullback}, pullbackType->getCalleeConvention());
-      LLVM_DEBUG(getADDebugStream() << "Reabstract pullback from type "
-                 << pullbackType << " to type "
-                 << *applyInfo.originalPullbackType << '\n');
     }
     args.push_back(seed);
 
