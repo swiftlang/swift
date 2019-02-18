@@ -1151,6 +1151,8 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   if (IGM.IRGen.Opts.EnableResilienceBypass)
     LoweringMode = Mode::CompletelyFragile;
 
+  const auto &Triple = IGM.Context.LangOpts.Target;
+
   // We have a bunch of -parse-stdlib tests that pass a -target in the test
   // suite. To prevent these from failing when the user hasn't build the
   // standard library for that target, we pass -disable-legacy-type-info to
@@ -1158,16 +1160,19 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   if (IGM.IRGen.Opts.DisableLegacyTypeInfo)
     return;
 
-  auto platformName = getPlatformNameForTriple(IGM.Triple);
-  auto archName = getMajorArchitectureName(IGM.Triple);
-
-  if (!doesPlatformUseLegacyLayouts(platformName, archName))
-    return;
-
   llvm::SmallString<128> defaultPath;
 
   StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
   if (path.empty()) {
+    // If the flag was not explicitly specified, look for a file in a
+    // platform-specific location, if this platform is known to require
+    // one.
+    auto platformName = getPlatformNameForTriple(Triple);
+    auto archName = swift::getMajorArchitectureName(Triple);
+
+    if (!doesPlatformUseLegacyLayouts(platformName, archName))
+      return;
+
     defaultPath.append(IGM.Context.SearchPathOpts.RuntimeLibraryPath);
     llvm::sys::path::append(defaultPath, "layouts-");
     defaultPath.append(archName);
