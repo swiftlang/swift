@@ -238,8 +238,10 @@ public func memoryLayoutDotAlignmentWithResilientStruct() -> Int {
   // CHECK-NEXT: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
   // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 10
   // CHECK: [[WITNESS_FOR_FLAGS:%.*]] = load i32, i32* [[WITNESS_ADDR]]
-  // CHECK: [[EXTENDED_FLAGS:%.*]] = zext i32 [[WITNESS_FOR_FLAGS]] to [[INT]]
-  // CHECK: [[ALIGNMENT_MASK:%.*]] = and [[INT]] [[EXTENDED_FLAGS]], 255
+
+  // Not checked because it only exists on 64-bit: [[EXTENDED_FLAGS:%.*]] = zext i32 [[WITNESS_FOR_FLAGS]] to [[INT]]
+
+  // CHECK: [[ALIGNMENT_MASK:%.*]] = and [[INT]] {{%.*}}, 255
   // CHECK: [[ALIGNMENT:%.*]] = add [[INT]] [[ALIGNMENT_MASK]], 1
 
   // CHECK: ret [[INT]] [[ALIGNMENT]]
