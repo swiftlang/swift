@@ -49,8 +49,10 @@ public struct _stdlib_ShardedAtomicCounter {
 
   public func add(_ operand: Int, randomInt: Int) {
     let shardIndex = Int(UInt(bitPattern: randomInt) % UInt(self._shardsCount))
-    _ = _swift_stdlib_atomicFetchAddInt(
-      object: self._shardsPtr + shardIndex, operand: operand)
+    // FIXME: We should use UnsafeAtomicInt here, but we don't want to constrain
+    // availability.
+    let raw = UnsafeMutableRawPointer(self._shardsPtr + shardIndex)
+    _ = raw._atomicRelaxedFetchThenAddWord(operand)
   }
 
   // FIXME: non-atomic as a whole!
@@ -59,7 +61,10 @@ public struct _stdlib_ShardedAtomicCounter {
     let shards = self._shardsPtr
     let count = self._shardsCount
     for i in 0..<count {
-      result += _swift_stdlib_atomicLoadInt(object: shards + i)
+      // FIXME: We should use UnsafeAtomicInt here, but we don't want to constrain
+      // availability.
+      let raw = UnsafeMutableRawPointer(shards + i)
+      result += raw._atomicRelaxedLoadWord()
     }
     return result
   }

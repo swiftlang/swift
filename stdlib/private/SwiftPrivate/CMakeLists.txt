@@ -9,11 +9,9 @@ add_swift_target_library(swiftSwiftPrivate ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
 
   IO.swift
   ShardedAtomicCounter.swift
+  AtomicInt.swift
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
-
-  GYB_SOURCES
-    AtomicInt.swift.gyb
 
   SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT WinSDK
   SWIFT_COMPILE_FLAGS ${swift_swiftprivate_compile_flags} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
