@@ -342,7 +342,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
 
   AccessorDecl *storageAccessor = nullptr;
   storageAccessor =
-      kind == AccessorKind::Get ? storage->getGetter() : storage->getSetter();
+      kind == AccessorKind::Read ? storage->getGetter() : storage->getSetter();
 
   bool isStatic = storage->isStatic();
   bool isMutating = storage->isGetterMutating();
