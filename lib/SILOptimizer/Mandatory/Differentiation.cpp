@@ -4809,10 +4809,10 @@ AdjointEmitter::accumulateAdjointsDirect(AdjointValue &&lhs,
     // x + y
     case AdjointValueKind::Concrete: {
       auto rhsVal = rhs.getConcreteValue();
+      auto sum = accumulateDirect(lhsVal, rhsVal);
       return makeConcreteAdjointValue(ValueWithCleanup(
-          accumulateDirect(lhsVal, rhsVal),
-              makeCleanupFromChildren({lhsVal.getCleanup(),
-                                       rhsVal.getCleanup()})));
+          sum, makeCleanup(sum, emitCleanup, {lhsVal.getCleanup(),
+                                              rhsVal.getCleanup()})));
     }
     // x + 0 => x
     case AdjointValueKind::Zero:
