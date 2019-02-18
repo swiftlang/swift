@@ -20,6 +20,10 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/TypeAlignments.h"
 
+namespace llvm {
+  class raw_ostream;
+}
+
 namespace swift {
   class Expr;
   class Stmt;
@@ -57,6 +61,11 @@ namespace swift {
     FUNC(Expr)
     FUNC(Decl)
 #undef FUNC
+    
+    LLVM_ATTRIBUTE_DEPRECATED(
+        void dump() const LLVM_ATTRIBUTE_USED,
+        "only for use within the debugger");
+    void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
     /// Whether the AST node is implicit.
     bool isImplicit() const;
