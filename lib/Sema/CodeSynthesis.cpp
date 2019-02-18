@@ -831,6 +831,11 @@ static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
                                             ASTContext &ctx) {
   assert(accessor->isCoroutine());
 
+  // Don't synthesize body if the accessor does not have storage
+  if (!accessor->getStorage()->hasStorage()) {
+    return;
+  }
+
   auto storage = accessor->getStorage();
   auto target = (accessor->hasForcedStaticDispatch()
                    ? TargetImpl::Ordinary
