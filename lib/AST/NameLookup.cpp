@@ -1937,17 +1937,21 @@ std::pair<DeclContext *, bool> UnqualifiedLookupFactory::nonASTScopeBasedLookup(
   // FIXME: We should persist this information between lookups.
   DeclContext *nextDC = dc;
   auto isCascadingUse = isCascadingUseArg;
+  DeclContext *priorDC = nullptr;
   while (!nextDC->isModuleScopeContext()) {
     auto resultAndDCAndIsCascadingUse =
         lookupInOneDeclContext(nextDC, isCascadingUse);
-    DeclContext *oldDC = nextDC; // CLEAN UP
-    nextDC = std::get<1>(resultAndDCAndIsCascadingUse);
-    isCascadingUse = std::get<2>(resultAndDCAndIsCascadingUse);
+
     switch (std::get<0>(resultAndDCAndIsCascadingUse)) {
     case ScopeLookupResult::next:
-      assert(nextDC != oldDC && "non-termination");
+      nextDC = std::get<1>(resultAndDCAndIsCascadingUse);
+      assert(nextDC != priorDC && "non-termination");
+      priorDC = nextDC;
+      isCascadingUse = std::get<2>(resultAndDCAndIsCascadingUse);
       continue;
     case ScopeLookupResult::stop:
+      nextDC = std::get<1>(resultAndDCAndIsCascadingUse);
+      isCascadingUse = std::get<2>(resultAndDCAndIsCascadingUse);
       break;
     case ScopeLookupResult::finished:
       return std::make_pair(nullptr, false);
