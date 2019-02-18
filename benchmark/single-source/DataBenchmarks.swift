@@ -419,7 +419,7 @@ public func dataFromUTF8View(_ N: Int, from string: String) {
 @inline(never)
 public func dataUsingUTF8Encoding(_ N: Int, from string: String) {
   for _ in 1...N {
-    blackHole(string.data(using: .utf8))
+    autoreleasepool { blackHole(string.data(using: .utf8)) }
   }
 }
 
