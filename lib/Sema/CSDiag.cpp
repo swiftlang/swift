@@ -5448,8 +5448,11 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
   // then diagnose with some specificity about the arguments.
   bool isInitializer = isa<TypeExpr>(fnExpr);
-  if (!fnType->is<AnyMetatypeType>() && isa<TupleExpr>(argExpr) &&
-      cast<TupleExpr>(argExpr)->getNumElements() == 1) {
+  if (!fnType->is<AnyMetatypeType>() &&
+      ((isa<TupleExpr>(argExpr) &&
+        cast<TupleExpr>(argExpr)->getNumElements() == 1) ||
+       (isa<ParenExpr>(argExpr) &&
+        !isa<LoadExpr>(cast<ParenExpr>(argExpr)->getSubExpr())))) {
     if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
       if (ctorRef->getName().isSimpleName(DeclBaseName::createConstructor())) {
         // Diagnose 'super.init', which can only appear inside another
