@@ -437,7 +437,7 @@ extension FloatingPoint {
 }
 
 protocol MethodDiffReq {
-  // expected-error @+1 {{'vjpFoo' does not have expected type '<Self where Self : Differentiable, Self : MethodDiffReq, Self.TangentVector == Self.TangentVector.TangentVector> (Self) -> () -> (Self, (Self.CotangentVector) -> Self.CotangentVector)'}}
+  // expected-error @+1 {{'vjpFoo' does not have expected type '<Self where Self : Differentiable, Self : MethodDiffReq> (Self) -> () -> (Self, (Self.CotangentVector) -> Self.CotangentVector)'}}
   @differentiable(wrt: self, vjp: vjpFoo where Self : Differentiable)
   func foo() -> Self
 }

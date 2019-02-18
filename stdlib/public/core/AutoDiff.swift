@@ -63,7 +63,7 @@ public protocol ShapedVectorNumeric : VectorNumeric {
 ///
 // TODO(TF-213): Merge this into `Differentiable` when the generic signature
 // minimization bug (SR-9595) is fixed.
-public protocol _Differentiable {
+public protocol __Differentiable {
   /// The tangent bundle of this differentiable manifold.
   associatedtype TangentVector : AdditiveArithmetic
   /// The cotangent bundle of this differentiable manifold.
@@ -85,17 +85,26 @@ public protocol _Differentiable {
 
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
+///
+/// - Note: Do not use this protocol directly. Use `Differentiable` instead.
+///
+// TODO(TF-213): Merge this into `Differentiable` when the generic signature
+// minimization bug (SR-9595) is fixed.
+public protocol _Differentiable : __Differentiable
+  where TangentVector : Differentiable, CotangentVector : Differentiable {
+}
+
+/// A type that mathematically represents a differentiable manifold whose
+/// tangent spaces are finite-dimensional.
 public protocol Differentiable : _Differentiable
-  where TangentVector : Differentiable,
-        CotangentVector : Differentiable,
-        TangentVector.TangentVector == TangentVector,
+  where TangentVector.TangentVector == TangentVector,
         TangentVector.CotangentVector == CotangentVector,
         CotangentVector.TangentVector == CotangentVector,
         CotangentVector.CotangentVector == TangentVector,
         AllDifferentiableVariables.AllDifferentiableVariables ==
           AllDifferentiableVariables,
-        TangentVector == AllDifferentiableVariables.TangentVector,
-        CotangentVector == AllDifferentiableVariables.CotangentVector {
+        AllDifferentiableVariables.TangentVector == TangentVector,
+        AllDifferentiableVariables.CotangentVector == CotangentVector {
 }
 
 public extension Differentiable where AllDifferentiableVariables == Self {

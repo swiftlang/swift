@@ -19,6 +19,7 @@ assertConformsToAdditiveArithmetic(Empty.AllDifferentiableVariables.self)
 struct EmptyAdditiveArithmetic : AdditiveArithmetic, Differentiable {}
 
 // Test structs whose stored properties all have an initial value.
+// expected-error @+3 {{does not conform to protocol '__Differentiable'}}
 // expected-error @+2 {{does not conform to protocol '_Differentiable'}}
 // expected-error @+1 {{does not conform to protocol 'Differentiable'}}
 struct AllLetStoredPropertiesHaveInitialValue : Differentiable {
@@ -30,6 +31,7 @@ struct AllVarStoredPropertiesHaveInitialValue : Differentiable {
   var y = Float(1)
 }
 // Test struct with both an empty constructor and memberwise initializer.
+// expected-error @+3 {{does not conform to protocol '__Differentiable'}}
 // expected-error @+2 {{does not conform to protocol '_Differentiable'}}
 // expected-error @+1 {{does not conform to protocol 'Differentiable'}}
 struct AllMixedStoredPropertiesHaveInitialValue : Differentiable {
@@ -77,7 +79,7 @@ struct VectorSpacesEqualSelf : AdditiveArithmetic, Differentiable {
 
 // Test generic type with vector space types to `Self`.
 struct GenericVectorSpacesEqualSelf<T> : AdditiveArithmetic, Differentiable
-  where T == T.TangentVector, T == T.CotangentVector,
+  where T : Differentiable, T == T.TangentVector, T == T.CotangentVector,
         T == T.AllDifferentiableVariables
 {
   var w: T
@@ -88,8 +90,6 @@ genericSame.allDifferentiableVariables = genericSame + genericSame
 assert(genericSame.moved(along: genericSame) == genericSame + genericSame)
 assert(genericSame.tangentVector(from: genericSame) == genericSame)
 
-// FIXME: This currently fails.
-/*
 // Test nested type.
 struct Nested : AdditiveArithmetic, Differentiable {
   var simple: Simple
@@ -99,7 +99,6 @@ struct Nested : AdditiveArithmetic, Differentiable {
 let nested = Nested(simple: simple, mixed: mixed, generic: genericSame)
 assert(nested.moved(along: nested) == nested + nested)
 assert(nested.tangentVector(from: nested) == nested)
-*/
 
 _ = pullback(at: Nested(simple: simple, mixed: mixed, generic: genericSame)) { model in
   model.simple + model.simple
@@ -131,6 +130,7 @@ assertConformsToVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
 assertConformsToVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
 
 // Test type with immutable, differentiable stored property.
+// expected-error @+3 {{does not conform to protocol '__Differentiable'}}
 // expected-error @+2 {{does not conform to protocol '_Differentiable'}}
 // expected-error @+1 {{does not conform to protocol 'Differentiable'}}
 struct ImmutableStoredProperty : Differentiable {
@@ -259,6 +259,7 @@ extension Array : Differentiable where Element : Differentiable {}
 // Test manually customizing vector space types.
 // Thees should fail. Synthesis is semantically unsupported if vector space
 // types are customized.
+// expected-error @+3 {{type 'VectorSpaceTypeAlias' does not conform to protocol '__Differentiable'}}
 // expected-error @+2 {{type 'VectorSpaceTypeAlias' does not conform to protocol '_Differentiable'}}
 // expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
 struct VectorSpaceTypeAlias : AdditiveArithmetic, Differentiable {
@@ -266,8 +267,9 @@ struct VectorSpaceTypeAlias : AdditiveArithmetic, Differentiable {
   var b: Float
   typealias TangentVector = Simple
 }
-// expected-error @+2 {{type 'VectorSpaceTypeAlias' does not conform to protocol '_Differentiable'}}
-// expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
+// expected-error @+3 {{type 'VectorSpaceCustomStruct' does not conform to protocol '__Differentiable'}}
+// expected-error @+2 {{type 'VectorSpaceCustomStruct' does not conform to protocol '_Differentiable'}}
+// expected-error @+1 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
 struct VectorSpaceCustomStruct : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float

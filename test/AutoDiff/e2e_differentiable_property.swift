@@ -73,10 +73,7 @@ E2EDifferentiablePropertyTests.test("stored property") {
   expectEqual(expectedGrad, actualGrad)
 }
 
-// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
-struct GenericMemberWrapper<T : Differentiable> : Differentiable
-  where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic
-{
+struct GenericMemberWrapper<T : Differentiable> : Differentiable {
   // Stored property.
   @differentiable(vjp: vjpX)
   var x: T

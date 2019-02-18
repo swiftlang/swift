@@ -84,7 +84,7 @@ static StructDecl *convertToStructDecl(ValueDecl *v) {
 // conformances.
 static Type getAssociatedType(VarDecl *decl, DeclContext *DC, Identifier id) {
   auto &C = decl->getASTContext();
-  auto *diffableProto = C.getProtocol(KnownProtocolKind::_Differentiable);
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::__Differentiable);
   if (!decl->hasInterfaceType())
     C.getLazyResolver()->resolveDeclSignature(decl);
   auto varType = DC->mapTypeIntoContext(decl->getValueInterfaceType());
@@ -103,7 +103,7 @@ static Type getAssociatedType(VarDecl *decl, DeclContext *DC, Identifier id) {
 static StructDecl *getAssociatedStructDecl(DeclContext *DC, Identifier id) {
   assert(DC->getSelfNominalTypeDecl() && "Must be a nominal `DeclContext`");
   auto &C = DC->getASTContext();
-  auto *diffableProto = C.getProtocol(KnownProtocolKind::_Differentiable);
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::__Differentiable);
   assert(diffableProto && "`Differentiable` protocol not found");
   auto conf = TypeChecker::conformsToProtocol(DC->getSelfTypeInContext(),
                                               diffableProto,
@@ -238,7 +238,7 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, retNominalTypeExpr);
 
   // Get method protocol requirement.
-  auto *diffProto = C.getProtocol(KnownProtocolKind::_Differentiable);
+  auto *diffProto = C.getProtocol(KnownProtocolKind::__Differentiable);
   auto *methodReq = getProtocolRequirement(diffProto, methodName);
 
   // Get references to `self` and parameter declarations.
@@ -459,7 +459,7 @@ static ValueDecl *getUnderlyingAllDiffableVariables(DeclContext *DC,
                                                     VarDecl *varDecl) {
   auto *module = DC->getParentModule();
   auto &C = module->getASTContext();
-  auto *diffableProto = C.getProtocol(KnownProtocolKind::_Differentiable);
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::__Differentiable);
   auto allDiffableVarsReq =
       getProtocolRequirement(diffableProto, C.Id_allDifferentiableVariables);
   if (!varDecl->hasInterfaceType())

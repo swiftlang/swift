@@ -72,12 +72,7 @@ TensorADTests.testAllBackends("ResultSelection") {
 
 TensorADTests.testAllBackends("GenericLayerMember") {
   // Tests TF-203.
-  // TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
-  struct GenericLayerWrapper<T: Layer> : Layer
-    where T.TangentVector : AdditiveArithmetic, T.CotangentVector : AdditiveArithmetic,
-          T.Input.TangentVector : AdditiveArithmetic, T.Input.CotangentVector : AdditiveArithmetic,
-          T.Output.TangentVector : AdditiveArithmetic, T.Output.CotangentVector : AdditiveArithmetic
-  {
+  struct GenericLayerWrapper<T: Layer> : Layer {
     var layer: T
     @differentiable(wrt: (self, input))
     func applied(to input: T.Input) -> T.Output {
@@ -87,17 +82,9 @@ TensorADTests.testAllBackends("GenericLayerMember") {
 }
 
 // Tests TF-235.
-// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
 struct Sequential<LHS: Layer, RHS: Layer>: Layer
-  where LHS.Output == RHS.Input,
-        LHS.TangentVector: AdditiveArithmetic,
-        RHS.TangentVector: AdditiveArithmetic,
-        LHS.CotangentVector: AdditiveArithmetic,
-        RHS.CotangentVector: AdditiveArithmetic,
-        LHS.Input.CotangentVector: AdditiveArithmetic,
-        LHS.Output.CotangentVector: AdditiveArithmetic,
-        RHS.Output.CotangentVector: AdditiveArithmetic,
-        RHS.Output.TangentVector: AdditiveArithmetic {
+  where LHS.Output == RHS.Input
+{
   let lhs: LHS
   let rhs: RHS
 
@@ -118,19 +105,9 @@ func >> <LHS: Layer, RHS: Layer>(_ lhs: LHS, _ rhs: RHS) -> Sequential<LHS, RHS>
   return Sequential(lhs, rhs)
 }
 
-// TODO(TF-213): Remove unnecessary conformances after generic signature minimization bug fix.
 struct LayerTriple<T: Layer, U: Layer, V : Layer>: Layer
-  where T.Output == U.Input, U.Output == V.Input,
-        T.TangentVector: AdditiveArithmetic,
-        U.TangentVector: AdditiveArithmetic,
-        V.TangentVector: AdditiveArithmetic,
-        T.CotangentVector: AdditiveArithmetic,
-        U.CotangentVector: AdditiveArithmetic,
-        V.CotangentVector: AdditiveArithmetic,
-        T.Input.CotangentVector: AdditiveArithmetic,
-        T.Output.CotangentVector: AdditiveArithmetic,
-        U.Output.CotangentVector: AdditiveArithmetic,
-        U.Output.TangentVector: AdditiveArithmetic {
+  where T.Output == U.Input, U.Output == V.Input
+{
   let first: T
   let second: U
   let third: V
