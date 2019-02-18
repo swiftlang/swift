@@ -4062,28 +4062,62 @@ public:
   ///   adj[x2] += struct_extract adj[y], #x2
   ///   ...
   void visitStructInst(StructInst *si) {
-    auto *decl = si->getStructDecl();
+    auto loc = si->getLoc();
+    auto *structDecl = si->getStructDecl();
     auto av = takeAdjointValue(si);
     switch (av.getKind()) {
     case AdjointValueKind::Zero:
-      for (auto *field : decl->getStoredProperties()) {
+      for (auto *field : structDecl->getStoredProperties()) {
         auto fv = si->getFieldValue(field);
         addAdjointValue(fv, makeZeroAdjointValue(
             getCotangentType(fv->getType(), getModule())));
       }
       break;
     case AdjointValueKind::Concrete: {
-      // FIXME(SR-9602): If `CotangentVector` is not marked
-      // `@_fieldwiseProductSpace`, call the VJP of the memberwise initializer.
-      // auto adjY = av.getMaterializedValue();
-      // for (auto *field : decl->getStoredProperties())
-      //   addAdjointValue(si->getFieldValue(field),
-      //                   builder.createStructExtract(loc, adjY, field));
-      llvm_unreachable("Unhandled. Are you trying to differentiate a "
-                       "memberwise initializer?");
+      auto adjStruct = materializeAdjointDirect(std::move(av), loc);
+      if (structDecl->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>()) {
+        // Find the struct `CotangentVector` type.
+        auto structTy = remapType(si->getType()).getASTType();
+        auto cotangentVectorTy = structTy->getAutoDiffAssociatedVectorSpace(
+            AutoDiffAssociatedVectorSpaceKind::Cotangent,
+            LookUpConformanceInModule(getModule().getSwiftModule()))
+                ->getType()->getCanonicalType();
+        assert(!getModule().Types.getTypeLowering(cotangentVectorTy)
+                   .isAddressOnly());
+        auto *cotangentVectorDecl =
+            cotangentVectorTy->getStructOrBoundGenericStruct();
+        assert(cotangentVectorDecl);
+
+        // Accumulate adjoints for the fields of the `struct` operand.
+        for (auto *field : structDecl->getStoredProperties()) {
+          // Find the corresponding field in the cotangent space.
+          VarDecl *cotanField = nullptr;
+          if (cotangentVectorDecl == structDecl)
+            cotanField = field;
+          // Otherwise, look up the field by name.
+          else {
+            auto correspondingFieldLookup =
+            cotangentVectorDecl->lookupDirect(field->getName());
+            assert(correspondingFieldLookup.size() == 1);
+            cotanField = cast<VarDecl>(correspondingFieldLookup.front());
+          }
+          auto *adjStructElt =
+              builder.createStructExtract(loc, adjStruct, cotanField);
+          addAdjointValue(
+              si->getFieldValue(field),
+              makeConcreteAdjointValue(ValueWithCleanup(
+                  adjStructElt, makeCleanup(adjStructElt, emitCleanup))));
+        }
+      } else {
+        // FIXME(TF-21): If `CotangentVector` is not marked
+        // `@_fieldwiseProductSpace`, call the VJP of the memberwise initializer.
+        llvm_unreachable("Unhandled. Are you trying to differentiate a "
+                         "memberwise initializer?");
+      }
+      break;
     }
     case AdjointValueKind::Aggregate: {
-      // FIXME(SR-9602): If `CotangentVector` is not marked
+      // FIXME(TF-21): If `CotangentVector` is not marked
       // `@_fieldwiseProductSpace`, call the VJP of the memberwise initializer.
       // for (auto pair : llvm::zip(si->getElements(), av.getAggregateElements()))
       //   addAdjointValue(std::get<0>(pair), std::get<1>(pair));
@@ -4121,16 +4155,16 @@ public:
           cotangentVectorTy->getStructOrBoundGenericStruct();
       assert(cotangentVectorDecl);
       // Find the corresponding field in the cotangent space.
-      VarDecl *correspondingField = nullptr;
+      VarDecl *cotanField = nullptr;
       // If the cotangent space is the original struct, then field is the same.
       if (cotangentVectorDecl == sei->getStructDecl())
-        correspondingField = sei->getField();
+        cotanField = sei->getField();
       // Otherwise, look up the field by name.
       else {
-        auto correspondingFieldLookup =
+        auto cotanFieldLookup =
             cotangentVectorDecl->lookupDirect(sei->getField()->getName());
-        assert(correspondingFieldLookup.size() == 1);
-        correspondingField = cast<VarDecl>(correspondingFieldLookup.front());
+        assert(cotanFieldLookup.size() == 1);
+        cotanField = cast<VarDecl>(cotanFieldLookup.front());
       }
       // Accumulate adjoint for the `struct_extract` operand.
       auto av = takeAdjointValue(sei);
@@ -4143,7 +4177,7 @@ public:
       case AdjointValueKind::Aggregate: {
         SmallVector<AdjointValue, 8> eltVals;
         for (auto *field : cotangentVectorDecl->getStoredProperties()) {
-          if (field == correspondingField)
+          if (field == cotanField)
             eltVals.push_back(av);
           else
             eltVals.push_back(makeZeroAdjointValue(

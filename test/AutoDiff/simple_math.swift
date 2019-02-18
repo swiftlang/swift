@@ -143,4 +143,32 @@ SimpleMathTests.test("TupleSideEffects") {
   */
 }
 
+// Tests TF-21.
+SimpleMathTests.test("StructMemberwiseInitializer") {
+  struct Foo : AdditiveArithmetic, Differentiable {
+    var stored: Float
+    var computed: Float {
+      return stored * stored
+    }
+  }
+
+  let 𝛁foo = pullback(at: Float(4), in: { input -> Foo in
+    let foo = Foo(stored: input)
+    return foo + foo
+  })(Foo.CotangentVector(stored: 1))
+  expectEqual(2, 𝛁foo)
+
+  let 𝛁computed = gradient(at: Float(4)) { input -> Float in
+    let foo = Foo(stored: input)
+    return foo.computed
+  }
+  expectEqual(8, 𝛁computed)
+
+  let 𝛁product = gradient(at: Float(4)) { input -> Float in
+    let foo = Foo(stored: input)
+    return foo.computed * foo.stored
+  }
+  expectEqual(16, 𝛁product)
+}
+
 runAllTests()
