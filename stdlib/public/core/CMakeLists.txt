@@ -30,6 +30,7 @@ set(SWIFTLIB_ESSENTIAL
   ASCII.swift
   Assert.swift
   AssertCommon.swift
+  Atomics.swift.gyb
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
@@ -185,6 +186,7 @@ set(SWIFTLIB_ESSENTIAL
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
+  Atomics.swift.gyb
   BuiltinMath.swift.gyb
   Codable.swift.gyb
   FloatingPointParsing.swift.gyb

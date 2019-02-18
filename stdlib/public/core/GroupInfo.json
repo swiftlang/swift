@@ -198,6 +198,7 @@
   ],
   "Misc": [
     "AtomicInt.swift",
+    "Atomics.swift",
     "ErrorType.swift",
     "Identifiable.swift",
     "InputStream.swift",
