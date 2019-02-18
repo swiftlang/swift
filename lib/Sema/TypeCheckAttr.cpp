@@ -2973,7 +2973,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
   // `value: R` result tuple element must conform to `Differentiable`.
-  auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto diffableProto = ctx.getProtocol(KnownProtocolKind::__Differentiable);
   auto valueResultType = valueResultElt.getType();
   if (valueResultType->hasTypeParameter())
     valueResultType = derivative->mapTypeIntoContext(valueResultType);

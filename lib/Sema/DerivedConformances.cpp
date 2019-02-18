@@ -75,7 +75,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveVectorNumeric(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::Differentiable)
+  if (*knownProtocol == KnownProtocolKind::__Differentiable)
     return canDeriveDifferentiable(Nominal, DC);
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
@@ -221,8 +221,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // SWIFT_ENABLE_TENSORFLOW
     // Differentiable.allDifferentiableVariables
     if (name.isSimpleName(ctx.Id_allDifferentiableVariables))
-      return getRequirement(KnownProtocolKind::Differentiable);
-    
+      return getRequirement(KnownProtocolKind::__Differentiable);
+
     return nullptr;
   }
 
@@ -271,7 +271,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 &&
           argumentNames[0] == ctx.getIdentifier("along")) {
-        return getRequirement(KnownProtocolKind::Differentiable);
+        return getRequirement(KnownProtocolKind::__Differentiable);
       }
     }
 
@@ -282,7 +282,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 &&
           argumentNames[0] == ctx.getIdentifier("from")) {
-        return getRequirement(KnownProtocolKind::Differentiable);
+        return getRequirement(KnownProtocolKind::__Differentiable);
       }
     }
 
@@ -332,7 +332,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     if (name.isSimpleName(ctx.Id_TangentVector) ||
         name.isSimpleName(ctx.Id_CotangentVector) ||
         name.isSimpleName(ctx.Id_AllDifferentiableVariables))
-      return getRequirement(KnownProtocolKind::Differentiable);
+      return getRequirement(KnownProtocolKind::__Differentiable);
 
     // SWIFT_ENABLE_TENSORFLOW
     // VectorNumeric.Scalar

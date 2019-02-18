@@ -398,7 +398,7 @@ func vjpWhere1<T : Differentiable>(x: T) -> (T, (T.CotangentVector) -> T.Cotange
   return (x, { v in v })
 }
 
-struct Tensor<Scalar> {}
+struct Tensor<Scalar> : AdditiveArithmetic {}
 extension Tensor : Differentiable where Scalar : Differentiable {
   typealias TangentVector = Tensor
   typealias CotangentVector = Tensor

@@ -58,24 +58,18 @@ public protocol ShapedVectorNumeric : VectorNumeric {
 
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
-public protocol Differentiable {
+///
+/// - Note: Do not use this protocol directly. Use `Differentiable` instead.
+///
+// TODO(TF-213): Merge this into `Differentiable` when the generic signature
+// minimization bug (SR-9595) is fixed.
+public protocol __Differentiable {
   /// The tangent bundle of this differentiable manifold.
-  associatedtype TangentVector : Differentiable & AdditiveArithmetic
-    where TangentVector.TangentVector == TangentVector,
-          TangentVector.CotangentVector == CotangentVector
-
+  associatedtype TangentVector : AdditiveArithmetic
   /// The cotangent bundle of this differentiable manifold.
-  associatedtype CotangentVector : Differentiable & AdditiveArithmetic
-    where CotangentVector.TangentVector == CotangentVector,
-          CotangentVector.CotangentVector == TangentVector
-
+  associatedtype CotangentVector : AdditiveArithmetic
   /// The type of all differentiable variables in this type.
-  associatedtype AllDifferentiableVariables
-    where AllDifferentiableVariables : Differentiable,
-          AllDifferentiableVariables.AllDifferentiableVariables ==
-              AllDifferentiableVariables,
-          AllDifferentiableVariables.TangentVector == TangentVector,
-          AllDifferentiableVariables.CotangentVector == CotangentVector
+  associatedtype AllDifferentiableVariables : Differentiable
 
   /// All differentiable variables in this type.
   var allDifferentiableVariables: AllDifferentiableVariables { get set }
@@ -87,6 +81,30 @@ public protocol Differentiable {
 
   /// Convert a cotangent vector to its corresponding tangent vector.
   func tangentVector(from cotangent: CotangentVector) -> TangentVector
+}
+
+/// A type that mathematically represents a differentiable manifold whose
+/// tangent spaces are finite-dimensional.
+///
+/// - Note: Do not use this protocol directly. Use `Differentiable` instead.
+///
+// TODO(TF-213): Merge this into `Differentiable` when the generic signature
+// minimization bug (SR-9595) is fixed.
+public protocol _Differentiable : __Differentiable
+  where TangentVector : Differentiable, CotangentVector : Differentiable {
+}
+
+/// A type that mathematically represents a differentiable manifold whose
+/// tangent spaces are finite-dimensional.
+public protocol Differentiable : _Differentiable
+  where TangentVector.TangentVector == TangentVector,
+        TangentVector.CotangentVector == CotangentVector,
+        CotangentVector.TangentVector == CotangentVector,
+        CotangentVector.CotangentVector == TangentVector,
+        AllDifferentiableVariables.AllDifferentiableVariables ==
+          AllDifferentiableVariables,
+        AllDifferentiableVariables.TangentVector == TangentVector,
+        AllDifferentiableVariables.CotangentVector == CotangentVector {
 }
 
 public extension Differentiable where AllDifferentiableVariables == Self {
