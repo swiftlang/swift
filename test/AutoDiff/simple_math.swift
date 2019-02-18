@@ -102,4 +102,45 @@ SimpleMathTests.test("SideEffects") {
   expectEqual(108, gradient(at: 3, in: foo))
 }
 
+SimpleMathTests.test("TupleSideEffects") {
+  func foo(_ x: Float) -> Float {
+    var tuple = (x, x)
+    tuple.0 = tuple.0 * x
+    tuple.0 = tuple.0 * x
+    return x * tuple.0
+  }
+  expectEqual(27, gradient(at: 3, in: foo))
+
+  func fooInout(_ x: Float) -> Float {
+    var tuple = (x, x)
+    tuple.0 *= x
+    tuple.0 *= x
+    return tuple.0 * tuple.0
+  }
+  // FIXME(TF-159): Update after activity analysis handles inout parameters.
+  // expectEqual(27, gradient(at: 3, in: fooInout))
+  expectEqual(0, gradient(at: 3, in: fooInout))
+
+  func bar(_ x: Float) -> Float {
+    var tuple = (x, x)
+    tuple.0 = tuple.0 * x
+    tuple.1 = tuple.0 * x
+    return tuple.0 * tuple.1
+  }
+  // FIXME(TF-246): Update after zero gradient bug is fixed.
+  // expectEqual(81, gradient(at: 3, in: bar))
+  expectEqual(0, gradient(at: 3, in: bar))
+
+  // FIXME(TF-201): Update after reabstraction thunks can be directly differentiated.
+  /*
+  func generic<T : Differentiable & AdditiveArithmetic>(_ x: T) -> T {
+    var tuple = (x, x)
+    tuple.0 += x
+    tuple.1 += x
+    return tuple.0 + tuple.0
+  }
+  expectEqual(1, gradient(at: 3.0, in: generic))
+  */
+}
+
 runAllTests()

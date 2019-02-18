@@ -1411,7 +1411,7 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
         // Handle `copy_addr`.
         else if (auto *cai = dyn_cast<CopyAddrInst>(&inst)) {
           if (isUseful(cai->getDest(), i))
-            setUsefulIfDifferentiable(cai->getSrc(), i);
+            propagateUsefulThroughBuffer(cai->getSrc(), i);
         }
         // Handle reads.
         else if (inst.mayReadFromMemory()) {
@@ -2252,8 +2252,8 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   builder.createReturn(loc, retVal);
 
   LLVM_DEBUG(auto &s = getADDebugStream() << "Created reabstraction thunk.\n";
-             s << "From type: " << fromType << '\n';
-             s << "To type: " << toType << '\n';
+             s << "  From type: " << fromType << '\n';
+             s << "  To type: " << toType << '\n';
              s << '\n' << *thunk);
 
   return thunk;
@@ -2549,7 +2549,6 @@ public:
                 << getPrimalInfo().getPrimalValueStruct()->getName() << ":\n";
       for (auto *var : getPrimalInfo().getPrimalValueStruct()->getMembers()) {
         var->dump(s);
-        s << '\n';
       }
     });
     LLVM_DEBUG(getADDebugStream() << "Finished PrimalGen for function "
@@ -4281,7 +4280,7 @@ public:
 
   /// Handle `tuple` instruction.
   ///   y = tuple (x0, x1, x2, ...)
-  ///   adj[x0] += tuple_extract 0, adj[y]
+  ///   adj[x0] += tuple_extract adj[y], 0
   ///   ...
   void visitTupleInst(TupleInst *ti) {
     auto av = takeAdjointValue(ti);
@@ -4308,8 +4307,8 @@ public:
   }
 
   /// Handle `tuple_extract` instruction.
-  ///   y = tuple_extract <n>, x
-  ///                      |--- n-th element
+  ///   y = tuple_extract x, <n>
+  ///                         |--- n-th element
   ///   adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
   void visitTupleExtractInst(TupleExtractInst *tei) {
     auto *tupleTy = tei->getTupleType();
@@ -4337,6 +4336,30 @@ public:
       break;
     }
     }
+  }
+
+  /// Handle `tuple_element_addr` instruction.
+  ///   y = tuple_element_addr x, <n>
+  ///                              |--- n-th element
+  ///   adj[x]#n = tuple_element_addr adj[y], <n>
+  ///   adj[x]#n += adj[y]
+  void visitTupleElementAddrInst(TupleElementAddrInst *teai) {
+    auto loc = teai->getLoc();
+    auto adjElt = getAdjointBuffer(teai);
+    auto adjTupleElt = builder.createTupleElementAddr(
+        loc, getAdjointBuffer(teai->getOperand()), teai->getFieldNo());
+    // Accumulate element address's adjoint buffer into the corresponding
+    // element address of `tuple_element_addr` operand's adjoint buffer:
+    // `adj[x]#n += adj[y]`.
+    auto *destAccess = builder.createBeginAccess(
+        loc, adjTupleElt, SILAccessKind::Modify, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    auto *readAccess = builder.createBeginAccess(
+        loc, adjElt, SILAccessKind::Read, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    accumulateIndirect(destAccess, readAccess);
+    builder.createEndAccess(loc, readAccess, /*aborted*/ false);
+    builder.createEndAccess(loc, destAccess, /*aborted*/ false);
   }
 
   // Handle `alloc_stack` instruction.
@@ -4651,16 +4674,7 @@ void AdjointEmitter::materializeAdjointIndirectHelper(
   /// since we need indirect passing for aggregate instruction, we just use
   /// `tuple_element_addr` to get element buffers and write elements to them.
   case AdjointValueKind::Zero:
-    if (auto tupleTy = val.getType().getAs<TupleType>()) {
-      SmallVector<SILValue, 8> eltVals;
-      for (unsigned i : range(tupleTy->getNumElements())) {
-        auto eltAddr = builder.createTupleElementAddr(loc, destBufferAccess, i);
-        emitZeroIndirect(tupleTy->getElementType(i)->getCanonicalType(),
-                         eltAddr, loc);
-      }
-    } else {
-      emitZeroIndirect(val.getSwiftType(), destBufferAccess, loc);
-    }
+    emitZeroIndirect(val.getSwiftType(), destBufferAccess, loc);
     break;
   /// Given a `%buf : *(T0, T1, T2, ...)` or `%buf : *Struct` recursively emit
   /// instructions to materialize the symbolic tuple or struct, filling the
@@ -4706,34 +4720,58 @@ void AdjointEmitter::materializeAdjointIndirectHelper(
 
 void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
                                       SILLocation loc) {
-  // Look up `AdditiveArithmetic.zero.getter`.
-  auto *additiveArithmeticProto =
-      getASTContext().getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto initDeclLookup =
-      additiveArithmeticProto->lookupDirect(getASTContext().Id_zero);
-  auto *zeroDecl = cast<VarDecl>(initDeclLookup.front());
-  assert(zeroDecl->isProtocolRequirement());
-  auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
-  SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
-  auto methodType =
-      getContext().getTypeConverter().getConstantType(accessorDeclRef);
-  // Look up conformance to `AdditiveArithmetic`.
   auto *swiftMod = getModule().getSwiftModule();
-  auto confRef = swiftMod->lookupConformance(type, additiveArithmeticProto);
   // TODO(TF-202): Diagnose no `AdditiveArithmetic` due to generic signature
   // minimization bug.
-  assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
-  // %wm = witness_method ...
-  auto *getter = builder.createWitnessMethod(loc, type, *confRef,
-                                             accessorDeclRef, methodType);
-  // %metatype = metatype $T
-  auto metatypeType = CanMetatypeType::get(type, MetatypeRepresentation::Thick);
-  auto metatype = builder.createMetatype(
-      loc, SILType::getPrimitiveObjectType(metatypeType));
-  auto subMap = SubstitutionMap::getProtocolSubstitutions(
-      additiveArithmeticProto, type, *confRef);
-  builder.createApply(loc, getter, subMap, {bufferAccess, metatype},
-                      /*isNonThrowing*/ false);
+  auto cotangentSpace = type->getAutoDiffAssociatedVectorSpace(
+      AutoDiffAssociatedVectorSpaceKind::Cotangent,
+      LookUpConformanceInModule(swiftMod));
+  assert(cotangentSpace && "No tangent space for this type");
+  switch (cotangentSpace->getKind()) {
+  case VectorSpace::Kind::Vector: {
+    // Look up conformance to `AdditiveArithmetic`.
+    auto *additiveArithmeticProto =
+        getASTContext().getProtocol(KnownProtocolKind::AdditiveArithmetic);
+    auto confRef = swiftMod->lookupConformance(type, additiveArithmeticProto);
+    assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
+    // Look up `AdditiveArithmetic.zero.getter`.
+    auto zeroDeclLookup =
+        additiveArithmeticProto->lookupDirect(getASTContext().Id_zero);
+    auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
+    assert(zeroDecl->isProtocolRequirement());
+    auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
+    SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
+    auto silFnType =
+        getContext().getTypeConverter().getConstantType(accessorDeclRef);
+    // %wm = witness_method ...
+    auto *getter = builder.createWitnessMethod(
+        loc, type, *confRef, accessorDeclRef, silFnType);
+    // %metatype = metatype $T
+    auto metatypeType = CanMetatypeType::get(
+        type, MetatypeRepresentation::Thick);
+    auto metatype = builder.createMetatype(
+        loc, SILType::getPrimitiveObjectType(metatypeType));
+    auto subMap = SubstitutionMap::getProtocolSubstitutions(
+        additiveArithmeticProto, type, *confRef);
+    builder.createApply(loc, getter, subMap, {bufferAccess, metatype},
+                        /*isNonThrowing*/ false);
+    return;
+  }
+  case VectorSpace::Kind::Tuple: {
+    auto tupleType = cotangentSpace->getTuple();
+    SmallVector<SILValue, 8> zeroElements;
+    for (unsigned i : range(tupleType->getNumElements())) {
+      auto eltAddr = builder.createTupleElementAddr(loc, bufferAccess, i);
+      emitZeroIndirect(tupleType->getElementType(i)->getCanonicalType(),
+                       eltAddr, loc);
+    }
+    return;
+  }
+  case VectorSpace::Kind::Function: {
+    llvm_unreachable(
+      "Unimplemented: Emit thunks for abstracting zero initialization");
+  }
+  }
 }
 
 SILValue AdjointEmitter::emitZeroDirect(CanType type, SILLocation loc) {
