@@ -225,9 +225,8 @@ public: // for exp debugging
     void dump() const;
   };
 
-  enum class ScopeLookupResult { next, stop, finished };
   struct PerScopeLookupState {
-    ScopeLookupResult result;
+    bool isDone;
     DeclContext *childOfNextDC;
     Optional<PlacesToSearch> placesToSearch;
     Optional<bool> isCascadingUse;
