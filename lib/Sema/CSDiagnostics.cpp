@@ -136,7 +136,9 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   auto *anchor = getRawAnchor();
   auto *locator = cs.getConstraintLocator(anchor);
   if (auto *AE = dyn_cast<CallExpr>(anchor)) {
-    assert(isa<TypeExpr>(AE->getFn()));
+    // NOTE: In valid code, the function can only be a TypeExpr
+    assert(isa<TypeExpr>(AE->getFn()) ||
+           isa<OverloadedDeclRefExpr>(AE->getFn()));
     ConstraintLocatorBuilder ctor(locator);
     locator = cs.getConstraintLocator(
         ctor.withPathElement(PathEltKind::ApplyFunction)
