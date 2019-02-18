@@ -402,7 +402,7 @@ func identity<T>(_: T) {
   let _: WritableKeyPath<String, String> = \String.self
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}tuples
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}tuples
 func tuples(_: T) {
   // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.a : $(Int, String); tuple_element #0 : $Int)
   let _: WritableKeyPath<T, Int> = \T.a.0
@@ -423,7 +423,7 @@ func tuples(_: T) {
   let _: KeyPath<T, String> = \T.c.x.y
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}tuples_generic
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}tuples_generic
 func tuples_generic<T, U, V>(_: T, _: U, _: V) {
   typealias TUC = (T, U, C<V>)
 

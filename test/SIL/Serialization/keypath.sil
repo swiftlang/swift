@@ -49,17 +49,17 @@ public struct External<T> {
   init()
 }
 
-struct T {
-  var x: (Int, Int)
-  var y: (a: Int, b: Int, c: Int)
-  let z: (Int, Int)
-  let w: (Int, C)
+public struct T {
+  public var x: (Int, Int)
+  public var y: (a: Int, b: Int, c: Int)
+  public let z: (Int, Int)
+  public let w: (Int, C)
 }
 
-struct GenT<A, B> {
-  var x: (A, B)
-  let y: (a: A, b: B)
-  let z: (e0: External<A>, e1: External<B>)
+public struct GenT<A, B> {
+  public var x: (A, B)
+  public let y: (a: A, b: B)
+  public let z: (e0: External<A>, e1: External<B>)
 }
 
 // CHECK-LABEL: sil shared [serialized] [ossa] @stored_properties
