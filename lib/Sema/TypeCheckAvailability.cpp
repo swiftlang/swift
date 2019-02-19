@@ -592,8 +592,7 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
     // The root type refinement context reflects the fact that all parts of
     // the source file are guaranteed to be executing on at least the minimum
     // platform version.
-    AvailabilityContext MinPlatformReq{
-        VersionRange::allGTE(AC.LangOpts.getMinPlatformVersion())};
+    auto MinPlatformReq = AvailabilityContext::forDeploymentTarget(AC);
     RootTRC = TypeRefinementContext::createRoot(&SF, MinPlatformReq);
     SF.setTypeRefinementContext(RootTRC);
   }
@@ -638,8 +637,8 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // this will be a real problem.
 
   // We can assume we are running on at least the minimum deployment target.
-  AvailabilityContext OverApproximateContext{
-    VersionRange::allGTE(getLangOpts().getMinPlatformVersion())};
+  auto OverApproximateContext =
+    AvailabilityContext::forDeploymentTarget(Context);
 
   while (DC && loc.isInvalid()) {
     const Decl *D = DC->getInnermostDeclarationDeclContext();
