@@ -694,7 +694,7 @@ SelfBounds swift::getSelfBoundsFromWhereClause(
                            SelfBoundsFromWhereClauseRequest{decl}, {});
 }
 
-// TODO: change name when ExpUnqualifiedLookup is adopted to
+// TODO: change name when UnqualifiedLookup is adopted to
 // populatePlacesToSearchFromContext
 static void
 populateLookupDeclsFromContext(DeclContext *dc,
@@ -787,19 +787,9 @@ bool shouldLookupMembers(D *decl, SourceLoc loc) {
 }
 } // end anonymous namespace
 
-UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
-                                     LazyResolver *TypeResolver, SourceLoc Loc,
-                                     Options options)
-    : UnqualifiedLookup("dummy", Name, DC, TypeResolver, Loc, options) {
-  assert(ExpUnqualifiedLookup(Name, DC, TypeResolver, Loc, options)
-             .verifyEqual(*this) &&
-         "bad refactoring");
-}
-
-UnqualifiedLookup::UnqualifiedLookup(const char *dummy, DeclName Name,
-                                     DeclContext *DC,
-                                     LazyResolver *TypeResolver, SourceLoc Loc,
-                                     Options options)
+LegacyUnqualifiedLookup::LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
+                                                 LazyResolver *TypeResolver,
+                                                 SourceLoc Loc, Options options)
     : IndexOfFirstOuterResult(0) {
   ModuleDecl &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
@@ -1306,13 +1296,13 @@ UnqualifiedLookup::UnqualifiedLookup(const char *dummy, DeclName Name,
   (void)shouldReturnBasedOnResults(/*noMoreOuterResults=*/true);
 }
 
-TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
+TypeDecl *LegacyUnqualifiedLookup::getSingleTypeResult() {
   if (Results.size() != 1)
     return nullptr;
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
 }
 
-ExpUnqualifiedLookup::PlacesToSearch::PlacesToSearch(
+UnqualifiedLookup::PlacesToSearch::PlacesToSearch(
     DeclContext *fromWhence, DeclContext *whereNonTypesAreMembers,
     DeclContext *whereTypesAreMembers, DeclContext *placesHolder)
     : fromWhence(fromWhence), whereNonTypesAreMembers(whereNonTypesAreMembers),
@@ -1320,7 +1310,7 @@ ExpUnqualifiedLookup::PlacesToSearch::PlacesToSearch(
   populateLookupDeclsFromContext(placesHolder, places);
 }
 
-void ExpUnqualifiedLookup::PlacesToSearch::dump() const {
+void UnqualifiedLookup::PlacesToSearch::dump() const {
   llvm::errs() << "fromWhence: ";
   fromWhence->dumpContext();
   llvm::errs() << "whereNonTypesAreMembers: ";
@@ -1336,10 +1326,10 @@ void ExpUnqualifiedLookup::PlacesToSearch::dump() const {
 namespace {
   class UnqualifiedLookupFactory {
   public:
-    using Flags = UnqualifiedLookup::Flags;
-    using Options = UnqualifiedLookup::Options;
-    using PlacesToSearch = ExpUnqualifiedLookup::PlacesToSearch;
-    using PerScopeLookupState = ExpUnqualifiedLookup::PerScopeLookupState;
+    using Flags = LegacyUnqualifiedLookup::Flags;
+    using Options = LegacyUnqualifiedLookup::Options;
+    using PlacesToSearch = UnqualifiedLookup::PlacesToSearch;
+    using PerScopeLookupState = UnqualifiedLookup::PerScopeLookupState;
 
   private:
     // Inputs
@@ -1377,7 +1367,7 @@ namespace {
                              LazyResolver *TypeResolver,
                              SourceLoc Loc,
                              Options options,
-                             ExpUnqualifiedLookup &lookupToBeCreated);
+                             UnqualifiedLookup &lookupToBeCreated);
     // clang-format on
 
     void fillInLookup();
@@ -1388,7 +1378,7 @@ namespace {
     astScopeBasedLookup(DeclContext *dc, Optional<bool> isCascadingUse);
 
     static NLOptions
-    computeBaseNLOptions(const UnqualifiedLookup::Options options,
+    computeBaseNLOptions(const LegacyUnqualifiedLookup::Options options,
                          const bool isOriginallyTypeLookup);
 
     /// Return true if done with lookup.
@@ -1519,10 +1509,10 @@ namespace {
   };
 } // namespace
 
-#pragma mark ExpUnqualifiedLookup functions
+#pragma mark UnqualifiedLookup functions
 
 // clang-format off
-ExpUnqualifiedLookup::ExpUnqualifiedLookup(DeclName Name,
+UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
                                            DeclContext *const DC,
                                            LazyResolver *TypeResolver,
                                            SourceLoc Loc,
@@ -1531,15 +1521,19 @@ ExpUnqualifiedLookup::ExpUnqualifiedLookup(DeclName Name,
     : IndexOfFirstOuterResult(0) {
   UnqualifiedLookupFactory(Name, DC, TypeResolver, Loc, options, *this)
       .fillInLookup();
+  assert(verifyEqual(
+             LegacyUnqualifiedLookup(Name, DC, TypeResolver, Loc, options)) &&
+         "bad refactoring");
 }
 
-TypeDecl* ExpUnqualifiedLookup::getSingleTypeResult() {
+TypeDecl *UnqualifiedLookup::getSingleTypeResult() {
   if (Results.size() != 1)
     return nullptr;
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
 }
 
-bool ExpUnqualifiedLookup::verifyEqual(const UnqualifiedLookup &other) const {
+bool UnqualifiedLookup::verifyEqual(
+    const LegacyUnqualifiedLookup &&other) const {
   assert(Results.size() == other.Results.size());
   for (size_t i: indices(Results)) {
     const auto &e = Results[i];
@@ -1560,7 +1554,7 @@ bool ExpUnqualifiedLookup::verifyEqual(const UnqualifiedLookup &other) const {
   return true;
 }
 
-void ExpUnqualifiedLookup::dumpBreadcrumbs() const {
+void UnqualifiedLookup::dumpBreadcrumbs() const {
   auto &e = llvm::errs();
   for (size_t i : indices(breadcrumbs)) {
     e << i << "\n";
@@ -1569,7 +1563,7 @@ void ExpUnqualifiedLookup::dumpBreadcrumbs() const {
   }
 }
 
-void ExpUnqualifiedLookup::PerScopeLookupState::dump() const {
+void UnqualifiedLookup::PerScopeLookupState::dump() const {
   auto &e = llvm::errs();
   e << (isDone ? "done: " : "not done: ");
   e << " dc: ";
@@ -1587,7 +1581,7 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
     LazyResolver *TypeResolver,
     SourceLoc Loc,
     Options options,
-    ExpUnqualifiedLookup &lookupToBeCreated)
+    UnqualifiedLookup &lookupToBeCreated)
     :
   Name(Name),
   DC(DC),
