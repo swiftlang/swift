@@ -2865,15 +2865,19 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
 
         if (value->getType().isAddressOnly(M)) {
           context->Emission.emitAddressOnlyInitialization(expected, value);
-        } else if (var.getSecond().box) {
+          break;
+        }
+
+        if (var.getSecond().box) {
           auto &lowering = getTypeLowering(value->getType());
           auto argValue = lowering.emitLoad(B, CurrentSILLoc, value,
                                             LoadOwnershipQualifier::Copy);
           args.push_back(argValue);
-        } else {
-          auto argValue = B.emitCopyValueOperation(CurrentSILLoc, value);
-          args.push_back(argValue);
+          break;
         }
+
+        auto argValue = B.emitCopyValueOperation(CurrentSILLoc, value);
+        args.push_back(argValue);
         break;
       }
     }
