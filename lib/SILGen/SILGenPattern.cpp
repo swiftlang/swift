@@ -2348,41 +2348,45 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock) {
 }
 
 void PatternMatchEmission::emitAddressOnlyAllocations() {
-  for (auto &entry: SharedCases) {
+  for (auto &entry : SharedCases) {
     CaseStmt *caseBlock = entry.first;
+
+    if (!caseBlock->hasBoundDecls()) {
+      continue;
+    }
 
     // If we have a shared case with bound decls, then the 0th pattern has the
     // order of variables that are the incoming BB arguments. Setup the VarLocs
     // to point to the incoming args and setup initialization so any args needing
     // cleanup will get that as well.
-    if (caseBlock->hasBoundDecls()) {
-      auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
-      pattern->forEachVariable([&](VarDecl *V) {
-        if (!V->hasName())
-          return;
+    auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
+    pattern->forEachVariable([&](VarDecl *vd) {
+      if (!vd->hasName())
+        return;
 
-        SILType ty = SGF.getLoweredType(V->getType());
-        if (ty.isNull()) {
-          // If we're making the shared block on behalf of a previous case's
-          // fallthrough, caseBlock's VarDecl's won't be in the SGF yet, so
-          // determine phi types by using current vars of the same name.
-          for (auto var : SGF.VarLocs) {
-            auto varDecl = dyn_cast<VarDecl>(var.getFirst());
-            if (varDecl && varDecl->hasName() && varDecl->getName() == V->getName()) {
-              ty = var.getSecond().value->getType();
-              if (var.getSecond().box) {
-                ty = ty.getObjectType();
-              }
-            }
+      SILType ty = SGF.getLoweredType(vd->getType());
+      if (ty.isNull()) {
+        // If we're making the shared block on behalf of a previous case's
+        // fallthrough, caseBlock's VarDecl's won't be in the SGF yet, so
+        // determine phi types by using current vars of the same name.
+        for (auto var : SGF.VarLocs) {
+          auto varDecl = dyn_cast<VarDecl>(var.getFirst());
+          if (!varDecl || !varDecl->hasName() ||
+              varDecl->getName() != vd->getName())
+            continue;
+          ty = var.getSecond().value->getType();
+          if (var.getSecond().box) {
+            ty = ty.getObjectType();
           }
         }
-        if (ty.isAddressOnly(SGF.F.getModule())) {
-          assert(!Temporaries[V]);
-          Temporaries[V] = SGF.emitTemporaryAllocation(V, ty);
-          return;
-        }
-      });
-    }
+      }
+
+      if (ty.isAddressOnly(SGF.F.getModule())) {
+        assert(!Temporaries[vd]);
+        Temporaries[vd] = SGF.emitTemporaryAllocation(vd, ty);
+        return;
+      }
+    });
   }
 
   // Now we have all of our cleanups entered, so we can record the
