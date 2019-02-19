@@ -78,19 +78,6 @@ public let DataBenchmarks = [
     _init($0, sequence: Bytes(count: 2<<15, exact: true)) }, tags: d),
   BenchmarkInfo(name: "Data.init.Sequence.64kB.Count0", runFunction: {
     _init($0, sequence: Bytes(count: 2<<15, exact: false)) }, tags: d),
-  BenchmarkInfo(name: "Array.init.Sequence.64kB.Count.I", runFunction: {
-    for _ in 1...$0 {
-      blackHole(Array(Bytes(count: 2<<15, exact: true))) } }, tags: d),
-  BenchmarkInfo(name: "Array.init.Sequence.64kB.Count0.I", runFunction: {
-    for _ in 1...$0 {
-      blackHole(Array(Bytes(count: 2<<15, exact: false))) } }, tags: d),
-  BenchmarkInfo(name: "Array.init.Sequence.64kB.Count.RE.I", runFunction: {
-    for _ in 1...$0 {
-      blackHole(Array(repeatElement(UInt8(0xA0), count: 2<<15))) } }, tags: d),
-  BenchmarkInfo(name: "Array.init.Sequence.64kB.Count0.RE.I", runFunction: {
-    for _ in 1...$0 {
-      blackHole(Array(Count0(repeatElement(UInt8(0xA0), count: 2<<15)))) } },
-    tags: d),
   BenchmarkInfo(name: "Data.init.Sequence.64kB.Count.I", runFunction: {
     for _ in 0..<$0 {
       blackHole(Data(Bytes(count: 2<<15, exact: true))) } }, tags: d),
@@ -215,20 +202,6 @@ public let DataBenchmarks = [
   BenchmarkInfo(name: "Data.append.Sequence.64kB.Count0", runFunction: {
     append($0, sequence: Bytes(count: 2<<15, exact: false), to: medium) },
     tags: d),
-  BenchmarkInfo(name: "Array.append.Sequence.64kB.Count.I", runFunction: {
-    for _ in 1...$0 { var copy = mediumArray
-      copy.append(contentsOf: Bytes(count: 2<<15, exact: true)) } }, tags: d),
-  BenchmarkInfo(name: "Array.append.Sequence.64kB.Count0.I", runFunction: {
-    for _ in 1...$0 { var copy = mediumArray
-      copy.append(contentsOf: Bytes(count: 2<<15, exact: false)) } }, tags: d),
-  BenchmarkInfo(name: "Array.append.Sequence.64kB.Count.RE.I", runFunction: {
-    for _ in 1...$0 { var copy = mediumArray
-      copy.append(contentsOf: repeatElement(UInt8(0xA0), count: 2<<15)) } },
-    tags: d),
-  BenchmarkInfo(name: "Array.append.Sequence.64kB.Count0.RE.I", runFunction: {
-    for _ in 1...$0 { var copy = mediumArray
-      copy.append(contentsOf: Count0(repeatElement(UInt8(0xA0), count: 2<<15)))
-    } }, tags: d),
   BenchmarkInfo(name: "Data.append.Sequence.64kB.Count.I", runFunction: {
     for _ in 1...$0 { var copy = medium
       copy.append(contentsOf: Bytes(count: 2<<15, exact: true)) } }, tags: d),
@@ -330,14 +303,6 @@ let mediumData = Data(mediumString.utf8)
 let small = sampleData(.small)
 let medium = sampleData(.medium)
 let large = sampleData(.large)
-
-let mediumArray: [UInt8] = (1...1033).map { UInt8(truncatingIfNeeded: $0) }
-
-let repeatElementSeq = { count in
-  return sequence(state: count) { (i: inout Int) -> UInt8? in
-    defer { i = i &- 1 }; return i > 0 ? UInt8(0xA0) : nil
-  }
-}
 
 struct Count0<S: Sequence> : Sequence {
   let base: S
