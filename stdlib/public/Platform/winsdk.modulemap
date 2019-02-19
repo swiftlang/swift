@@ -112,6 +112,16 @@ module WinSDK [system] [extern_c] {
     export *
   }
 
+  module ShellAPI {
+    header "Shlwapi.h"
+    export *
+  }
+
+  module User {
+    header "WinUser.h"
+    export *
+  }
+
   module WinCrypt {
     header "wincrypt.h"
     export *
