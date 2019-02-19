@@ -171,6 +171,65 @@ The standard library utilizes thread local storage (TLS) to cache expensive comp
 
 See [ThreadLocalStorage.swift](https://github.com/apple/swift/blob/master/stdlib/public/core/ThreadLocalStorage.swift) for more details.
 
+
+## Working with Resilience
+
+Maintaining ABI compatibility with previously released versions of the standard library makes things more complicated. This section details some of the extra rules to remember and patterns to use.
+
+### The Curiously Recursive Inlinable Switch Pattern (CRISP)
+
+When inlinable code switches over a non-frozen enum, it has to handle possible future cases (since it will be inlined into a module outside the standard library). You can see this in action with the implementation of `round(_:)` in FloatingPointTypes.swift.gyb, which takes a FloatingPointRoundingRule. It looks something like this:
+
+```swift
+@_transparent
+public mutating func round(_ rule: FloatingPointRoundingRule) {
+  switch rule {
+  case .toNearestOrAwayFromZero:
+    _value = Builtin.int_round_FPIEEE${bits}(_value)
+  case .toNearestOrEven:
+    _value = Builtin.int_rint_FPIEEE${bits}(_value)
+  // ...
+  @unknown default:
+    self._roundSlowPath(rule)
+  }
+}
+```
+
+Making `round(_:)` inlinable but still have a default case is an attempt to get the best of both worlds: if the rounding rule is known at compile time, the call will compile down to a single instruction in optimized builds; and if it dynamically turns out to be a new kind of rounding rule added in Swift 25 (e.g. `.towardFortyTwo`), there's a fallback function, `_roundSlowPath(_:)`, that can handle it.
+
+So what does `_roundSlowPath(_:)` look like? Well, it can't be inlinable, because that would defeat the purpose. It *could* just look like this:
+
+```swift
+@usableFromInline
+internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
+  switch rule {
+  case .toNearestOrAwayFromZero:
+    _value = Builtin.int_round_FPIEEE${bits}(_value)
+  case .toNearestOrEven:
+    _value = Builtin.int_rint_FPIEEE${bits}(_value)
+  // ...
+  }
+}
+```
+
+...i.e. exactly the same as `round(_:)` but with no `default` case. That's guaranteed to be up to date if any new cases are added in the future. But it seems a little silly, since it's duplicating code that's in `round(_:)`. We *could* omit cases that have always existed, but there's a better answer:
+
+```swift
+// Slow path for new cases that might have been inlined into an old
+// ABI-stable version of round(_:) called from a newer version. If this is
+// the case, this non-inlinable function will call into the _newer_ version
+// which _will_ support this rounding rule.
+@usableFromInline
+internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
+  self.round(rule)
+}
+```
+
+Because `_roundSlowPath(_:)` isn't inlinable, the version of `round(_:)` that gets called at run time will always be the version implemented in the standard library dylib. And since FloatingPointRoundingRule is *also* defined in the standard library, we know it'll never be out of sync with this version of `round(_:)`.
+
+Maybe some day we'll have special syntax in the language to say "call this method without allowing inlining" to get the same effect, but for now, this Curiously Recursive Inlinable Switch Pattern allows for safe inlining of switches over non-frozen enums with less boilerplate than you might otherwise have. Not none, but less.
+
+
 ## Productivity Hacks
 
 ### Be a Ninja
