@@ -2444,8 +2444,16 @@ namespace {
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
             /*implicit=*/expr->isImplicit(), Type(), getType);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
+
+        // FIXME: Application could fail, because some of the solutions
+        // are not expressible in AST (yet?), like certain tuple-to-tuple
+        // conversions. Better solution here would be not to form solutions
+        // which couldn't be applied by e.g. detecting situations like that
+        // and inserting fixes early.
+        if (!result)
+          return nullptr;
       }
-			
+
       // Check for ambiguous member if the base is an Optional
       if (baseTy->getOptionalObjectType()) {
         diagnoseAmbiguousNominalMember(baseTy, result);
