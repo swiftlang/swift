@@ -153,7 +153,7 @@ extension StringProtocol {
       let end = endIndex
       _internalInvariant(
         start.transcodedOffset == 0 && end.transcodedOffset == 0)
-      return Range(uncheckedBounds: (start.encodedOffset, end.encodedOffset))
+      return Range(uncheckedBounds: (start._encodedOffset, end._encodedOffset))
     }
   }
 

@@ -66,9 +66,9 @@ extension String: BidirectionalCollection {
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(startingAt: i)
-    let nextOffset = i.encodedOffset &+ stride
+    let nextOffset = i._encodedOffset &+ stride
     let nextStride = _characterStride(
-      startingAt: Index(encodedOffset: nextOffset))
+      startingAt: Index(_encodedOffset: nextOffset))
 
     return Index(
       encodedOffset: nextOffset, characterStride: nextStride)
@@ -84,7 +84,7 @@ extension String: BidirectionalCollection {
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(endingAt: i)
-    let priorOffset = i.encodedOffset &- stride
+    let priorOffset = i._encodedOffset &- stride
     return Index(encodedOffset: priorOffset, characterStride: stride)
   }
   /// Returns an index that is the specified distance from the given index.
@@ -198,7 +198,7 @@ extension String: BidirectionalCollection {
       let i = _guts.scalarAlign(i)
       let distance = _characterStride(startingAt: i)
       return _guts.errorCorrectedCharacter(
-        startingAt: i.encodedOffset, endingAt: i.encodedOffset &+ distance)
+        startingAt: i._encodedOffset, endingAt: i._encodedOffset &+ distance)
     }
   }
 
@@ -209,14 +209,14 @@ extension String: BidirectionalCollection {
 
     if i == endIndex { return 0 }
 
-    return _guts._opaqueCharacterStride(startingAt: i.encodedOffset)
+    return _guts._opaqueCharacterStride(startingAt: i._encodedOffset)
   }
 
   @inlinable @inline(__always)
   internal func _characterStride(endingAt i: Index) -> Int {
     if i == startIndex { return 0 }
 
-    return _guts._opaqueCharacterStride(endingAt: i.encodedOffset)
+    return _guts._opaqueCharacterStride(endingAt: i._encodedOffset)
   }
 }
 

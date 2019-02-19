@@ -156,7 +156,7 @@ extension _StringGuts {
   internal func isOnGraphemeClusterBoundary(_ i: String.Index) -> Bool {
     guard i.transcodedOffset == 0 else { return false }
 
-    let offset = i.encodedOffset
+    let offset = i._encodedOffset
     if offset == 0 || offset == self.count { return true }
 
     guard isOnUnicodeScalarBoundary(i) else { return false }
@@ -197,7 +197,7 @@ extension _StringGuts {
     let count = _object.largeCount
     let cocoa = _object.cocoaObject
 
-    let startIdx = String.Index(encodedOffset: i)
+    let startIdx = String.Index(_encodedOffset: i)
     let (sc1, len) = foreignErrorCorrectedScalar(startingAt: startIdx)
     if i &+ len == count {
       // Last scalar is last grapheme
@@ -263,7 +263,7 @@ extension _StringGuts {
     let count = _object.largeCount
     let cocoa = _object.cocoaObject
 
-    let endIdx = String.Index(encodedOffset: i)
+    let endIdx = String.Index(_encodedOffset: i)
     let (sc2, len) = foreignErrorCorrectedScalar(endingAt: endIdx)
     if i &- len == 0 {
       // First scalar is first grapheme
