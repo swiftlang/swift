@@ -1819,7 +1819,7 @@ private:
 
         if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(ctx)) {
           if (!AFD->hasThrows() && !isTryHandled) {
-            typeChecker.diagnose(tryLoc, diag::try_unhandled);
+            typeChecker.diagnose(tryLoc, diag::throw_in_nonthrowing_function);
           }
         }
 
