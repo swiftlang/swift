@@ -6677,7 +6677,24 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     break;
   }
 
-  default:
+#define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
+#define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
+#define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
+#define ARTIFICIAL_TYPE(Name, Parent) case TypeKind::Name:
+#define TYPE(Name, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::InOut:
+  case TypeKind::Module:
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::GenericFunction:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
     break;
   }
 
@@ -6687,7 +6704,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // Coercions from a type to an existential type.
   case TypeKind::ExistentialMetatype:
   case TypeKind::ProtocolComposition:
-  case TypeKind::Protocol: {
+  case TypeKind::Protocol:
     return coerceExistential(expr, toType, locator);
 
   // Coercion to Optional<T>.
@@ -6709,9 +6726,32 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     diagnoseOptionalInjection(result);
     return result;
   }
-  }
 
-  default:
+#define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
+#define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
+#define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
+#define ARTIFICIAL_TYPE(Name, Parent) case TypeKind::Name:
+#define TYPE(Name, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::Module:
+  case TypeKind::Tuple:
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Class:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::Metatype:
+  case TypeKind::DynamicSelf:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+  case TypeKind::Function:
+  case TypeKind::GenericFunction:
+  case TypeKind::LValue:
+  case TypeKind::InOut:
     break;
   }
 
