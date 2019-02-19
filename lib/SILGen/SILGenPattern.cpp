@@ -2844,38 +2844,41 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
 
   if (!caseStmt->hasBoundDecls()) {
     Cleanups.emitBranchAndCleanups(sharedDest, S);
-  } else {
-    // Generate branch args to pass along current vars to fallthrough case.
-    SILModule &M = F.getModule();
-    ArrayRef<CaseLabelItem> labelItems = caseStmt->getCaseLabelItems();
-    SmallVector<SILValue, 4> args;
-    SmallVector<VarDecl *, 4> expectedVarOrder;
-    labelItems[0].getPattern()->collectVariables(expectedVarOrder);
-    
-    for (auto *expected : expectedVarOrder) {
-      if (!expected->hasName())
-        continue;
-      for (auto var : VarLocs) {
-        auto varDecl = dyn_cast<VarDecl>(var.getFirst());
-        if (varDecl && varDecl->hasName() && varDecl->getName() == expected->getName()) {
-          SILValue value = var.getSecond().value;
+    return;
+  }
 
-          if (value->getType().isAddressOnly(M)) {
-            context->Emission.emitAddressOnlyInitialization(expected, value);
-          } else if (var.getSecond().box) {
-            auto &lowering = getTypeLowering(value->getType());
-            auto argValue = lowering.emitLoad(B, CurrentSILLoc, value, LoadOwnershipQualifier::Copy);
-            args.push_back(argValue);
-          } else {
-            auto argValue = B.emitCopyValueOperation(CurrentSILLoc, value);
-            args.push_back(argValue);
-          }
-          break;
+  // Generate branch args to pass along current vars to fallthrough case.
+  SILModule &M = F.getModule();
+  ArrayRef<CaseLabelItem> labelItems = caseStmt->getCaseLabelItems();
+  SmallVector<SILValue, 4> args;
+  SmallVector<VarDecl *, 4> expectedVarOrder;
+  labelItems[0].getPattern()->collectVariables(expectedVarOrder);
+
+  for (auto *expected : expectedVarOrder) {
+    if (!expected->hasName())
+      continue;
+    for (auto var : VarLocs) {
+      auto varDecl = dyn_cast<VarDecl>(var.getFirst());
+      if (varDecl && varDecl->hasName() &&
+          varDecl->getName() == expected->getName()) {
+        SILValue value = var.getSecond().value;
+
+        if (value->getType().isAddressOnly(M)) {
+          context->Emission.emitAddressOnlyInitialization(expected, value);
+        } else if (var.getSecond().box) {
+          auto &lowering = getTypeLowering(value->getType());
+          auto argValue = lowering.emitLoad(B, CurrentSILLoc, value,
+                                            LoadOwnershipQualifier::Copy);
+          args.push_back(argValue);
+        } else {
+          auto argValue = B.emitCopyValueOperation(CurrentSILLoc, value);
+          args.push_back(argValue);
         }
+        break;
       }
     }
-    Cleanups.emitBranchAndCleanups(sharedDest, S, args);
   }
+  Cleanups.emitBranchAndCleanups(sharedDest, S, args);
 }
 
 
