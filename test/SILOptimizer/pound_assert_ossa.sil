@@ -487,3 +487,51 @@ bb0(%arg : $Int64):
   %ret = tuple ()
   return %ret : $()
 }
+
+struct BiggerStruct {
+  var lhs: Int64
+  var rhs: Int64
+}
+
+// This tests the  same bug as the  previous two tests but adds  in missing code
+// coverage of destructure_tuples, tuple_extracts, and tuples.
+sil [ossa] @doubleWriteTupleElementDestructureWithMoreFeeling : $@convention(thin) (BiggerStruct) -> () {
+bb0(%arg : $BiggerStruct):
+  // Allocate and initialize the tuple to (1, 2).
+  %0 = alloc_stack $(BiggerStruct, BiggerStruct), var, name "tup"
+  %1 = tuple_element_addr %0 : $*(BiggerStruct, BiggerStruct), 0
+  %3 = integer_literal $Builtin.Int64, 1
+  %3a = struct $Int64 (%3 : $Builtin.Int64)
+  %4 = struct $BiggerStruct (%3a : $Int64, %3a : $Int64)
+  store %4 to [trivial] %1 : $*BiggerStruct
+
+  %2 = tuple_element_addr %0 : $*(BiggerStruct, BiggerStruct), 1
+  %6 = integer_literal $Builtin.Int64, 2
+  %6a = struct $Int64 (%6 : $Builtin.Int64)
+  %7 = struct $BiggerStruct (%6a : $Int64, %6a : $Int64)
+  store %7 to [trivial] %2 : $*BiggerStruct
+
+  // Read the first element from the tuple.
+  %10 = tuple_element_addr %0 : $*(BiggerStruct, BiggerStruct), 1
+  %11 = load [trivial] %10 : $*BiggerStruct
+
+  // Check that the first element is what we put in.
+  (%13, %13a) = destructure_struct %11 : $BiggerStruct
+  %13b = tuple(%13 : $Int64, %13a : $Int64)
+  (%13c, %13d) = destructure_tuple %13b : $(Int64, Int64)
+  %13e = tuple(%13c : $Int64, %13d : $Int64)
+  %13f = tuple_extract %13e : $(Int64, Int64), 0
+  %13g = struct_extract %13f : $Int64, #Int64._value
+  %14 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %13g : $Builtin.Int64) : $Builtin.Int1
+  %14a = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %13g : $Builtin.Int64) : $Builtin.Int1
+  %15 = string_literal utf8 ""
+  // Make sure that we are able to simplify this completely.
+  // expected-error @+1 {{assertion failed}}
+  %16 = builtin "poundAssert"(%14 : $Builtin.Int1, %15 : $Builtin.RawPointer) : $()
+  // Make sure that this matches.
+  %17 = builtin "poundAssert"(%14a : $Builtin.Int1, %15 : $Builtin.RawPointer) : $()
+  // Deallocate and return.
+  dealloc_stack %0 : $*(BiggerStruct, BiggerStruct)
+  %ret = tuple ()
+  return %ret : $()
+}
