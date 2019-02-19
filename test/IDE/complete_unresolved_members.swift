@@ -78,6 +78,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_INIT_1 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_INIT_2 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DECL_MEMBER_INIT_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+
 enum SomeEnum1 {
   case South
   case North
@@ -534,4 +536,8 @@ func testOverload(val: HasOverloaded) {
 
   let _ = HasOverloaded(e: .#^OVERLOADED_INIT_2^#)
 // Same as OVERLOADED_METHOD_1.
+}
+
+struct TestingStruct {
+  var value: SomeEnum1 = .#^DECL_MEMBER_INIT_1^#
 }

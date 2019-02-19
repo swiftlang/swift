@@ -5409,7 +5409,11 @@ public:
     // We cannot analyze without target.
     if (!ParsedExpr)
       return false;
-    DC->walkContext(Finder);
+
+    // For 'Initializer' context, we need to look into its parent because it
+    // might constrain the initializer's type.
+    auto analyzeDC = isa<Initializer>(DC) ? DC->getParent() : DC;
+    analyzeDC->walkContext(Finder);
 
     for (auto It = Finder.Ancestors.rbegin(); It != Finder.Ancestors.rend();
          ++ It) {
