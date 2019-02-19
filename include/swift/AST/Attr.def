@@ -387,6 +387,9 @@ DECL_ATTR(_private, PrivateImport,
   OnImport |
   UserInaccessible |
   NotSerialized, 82)
+SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
+  OnVar | OnSubscript | OnAbstractFunction | UserInaccessible,
+  83)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -72,6 +72,7 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
+  IGNORED_ATTR(AlwaysEmitIntoClient)
   IGNORED_ATTR(Available)
   IGNORED_ATTR(HasInitialValue)
   IGNORED_ATTR(CDecl)
@@ -739,6 +740,7 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     IGNORED_ATTR(Alignment)
+    IGNORED_ATTR(AlwaysEmitIntoClient)
     IGNORED_ATTR(Borrowed)
     IGNORED_ATTR(HasInitialValue)
     IGNORED_ATTR(ClangImporterSynthesizedType)
