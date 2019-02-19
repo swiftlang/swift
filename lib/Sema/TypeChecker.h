@@ -1925,6 +1925,7 @@ public:
   enum class FragileFunctionKind : unsigned {
     Transparent,
     Inlinable,
+    AlwaysEmitIntoClient,
     DefaultArgument,
     PropertyInitializer
   };
