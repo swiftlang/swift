@@ -213,11 +213,26 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return val;
   }
 
+  // If this is a destructure_result, then we can return the element being
+  // extracted.
+  if (isa<DestructureStructResult>(value) ||
+      isa<DestructureTupleResult>(value)) {
+    auto *result = cast<MultipleValueInstructionResult>(value);
+    SILValue aggValue = result->getParent()->getOperand(0);
+    auto val = getConstantValue(aggValue);
+    if (val.isConstant()) {
+      assert(val.getKind() == SymbolicValue::Aggregate);
+      return val.getAggregateValue()[result->getIndex()];
+    }
+    // Not a const.
+    return val;
+  }
+
   // TODO: If this is a single element struct, we can avoid creating an
   // aggregate to reduce # allocations.  This is extra silly in the case of zero
   // element tuples.
   if (isa<StructInst>(value) || isa<TupleInst>(value)) {
-    auto inst = cast<SingleValueInstruction>(value);
+    auto *inst = cast<SingleValueInstruction>(value);
     SmallVector<SymbolicValue, 4> elts;
 
     for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
