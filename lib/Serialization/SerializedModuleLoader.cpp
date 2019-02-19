@@ -301,10 +301,21 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
   // Search the runtime import path.
   isFramework = false;
-  return !findModuleFilesInDirectory(
-      moduleID, Ctx.SearchPathOpts.RuntimeLibraryImportPath,
-      moduleFilename.str(), moduleDocFilename.str(), moduleBuffer,
-      moduleDocBuffer);
+  currPath = Ctx.SearchPathOpts.RuntimeLibraryImportPath;
+  if (Ctx.LangOpts.Target.isOSDarwin()) {
+    // Apple platforms always use architecture-specific files within a
+    // .swiftmodule directory for the stdlib.
+    llvm::sys::path::append(currPath, moduleFilename.str());
+    return !findModuleFilesInDirectory(moduleID, currPath,
+                                       archFileNames.first,
+                                       archFileNames.second,
+                                       moduleBuffer, moduleDocBuffer);
+  }
+  // Non-Apple platforms always use single-architecture swiftmodules.
+  return !findModuleFilesInDirectory(moduleID, currPath,
+                                     moduleFilename.str(),
+                                     moduleDocFilename.str(),
+                                     moduleBuffer, moduleDocBuffer);
 }
 
 static std::pair<StringRef, clang::VersionTuple>
