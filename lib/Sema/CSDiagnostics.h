@@ -236,6 +236,10 @@ protected:
   /// Determine whether this is a conditional requirement failure.
   bool isConditional() const { return bool(Conformance); }
 
+  /// Check whether this requirement comes from the contextual type
+  /// that root expression is coerced/converted into.
+  bool isFromContextualType() const;
+
   /// Retrieve declaration contextual where current
   /// requirement has been introduced.
   const DeclContext *getRequirementDC() const;
