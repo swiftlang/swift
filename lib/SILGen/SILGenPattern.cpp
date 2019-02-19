@@ -2859,27 +2859,29 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
       continue;
     for (auto var : VarLocs) {
       auto varDecl = dyn_cast<VarDecl>(var.getFirst());
-      if (varDecl && varDecl->hasName() &&
-          varDecl->getName() == expected->getName()) {
-        SILValue value = var.getSecond().value;
+      if (!varDecl || !varDecl->hasName() ||
+          varDecl->getName() != expected->getName()) {
+        continue;
+      }
 
-        if (value->getType().isAddressOnly(M)) {
-          context->Emission.emitAddressOnlyInitialization(expected, value);
-          break;
-        }
+      SILValue value = var.getSecond().value;
 
-        if (var.getSecond().box) {
-          auto &lowering = getTypeLowering(value->getType());
-          auto argValue = lowering.emitLoad(B, CurrentSILLoc, value,
-                                            LoadOwnershipQualifier::Copy);
-          args.push_back(argValue);
-          break;
-        }
+      if (value->getType().isAddressOnly(M)) {
+        context->Emission.emitAddressOnlyInitialization(expected, value);
+        break;
+      }
 
-        auto argValue = B.emitCopyValueOperation(CurrentSILLoc, value);
+      if (var.getSecond().box) {
+        auto &lowering = getTypeLowering(value->getType());
+        auto argValue = lowering.emitLoad(B, CurrentSILLoc, value,
+                                          LoadOwnershipQualifier::Copy);
         args.push_back(argValue);
         break;
       }
+
+      auto argValue = B.emitCopyValueOperation(CurrentSILLoc, value);
+      args.push_back(argValue);
+      break;
     }
   }
   Cleanups.emitBranchAndCleanups(sharedDest, S, args);
