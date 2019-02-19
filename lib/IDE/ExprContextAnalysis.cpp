@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
@@ -691,7 +692,11 @@ public:
       } else
         return false;
     });
-    DC->walkContext(Finder);
+
+    // For 'Initializer' context, we need to look into its parent because it
+    // might constrain the initializer's type.
+    auto analyzeDC = isa<Initializer>(DC) ? DC->getParent() : DC;
+    analyzeDC->walkContext(Finder);
 
     if (Finder.Ancestors.empty())
       return;
