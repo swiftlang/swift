@@ -1669,26 +1669,34 @@ private:
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (isa<AssignExpr>(E)) {
-        return {checkPotentiallyThrowingSetter(cast<AssignExpr>(E),
-                                               contextFlags, typeChecker,
-                                               tryLoc, isTryHandled),
+        auto AE = cast<AssignExpr>(E);
+        if (auto SE = dyn_cast<SubscriptExpr>(AE->getDest())) {
+          return {checkSubscript(SE, contextFlags, typeChecker, tryLoc,
+                                 isTryHandled, true),
+                  nullptr};
+        }
+
+        return {checkComputedPropertySetter(AE, contextFlags, typeChecker,
+                                            tryLoc, isTryHandled),
                 nullptr};
       }
       if (isa<MemberRefExpr>(E)) {
-        return {checkPotentiallyThrowingGetter(cast<MemberRefExpr>(E),
-                                               contextFlags, typeChecker,
-                                               tryLoc, isTryHandled),
+        return {checkComputedPropertyGetter(cast<MemberRefExpr>(E),
+                                            contextFlags, typeChecker, tryLoc,
+                                            isTryHandled),
+                nullptr};
+      }
+      if (isa<SubscriptExpr>(E)) {
+        return {checkSubscript(cast<SubscriptExpr>(E), contextFlags,
+                               typeChecker, tryLoc, isTryHandled, false),
                 nullptr};
       }
       return {true, E};
     }
 
-    bool checkPotentiallyThrowingSetter(AssignExpr *E, ContextFlags *flags,
-                                        TypeChecker &typeChecker,
-                                        SourceLoc tryLoc, bool isTryHandled) {
-      if (!E) {
-        return false;
-      }
+    bool checkComputedPropertySetter(AssignExpr *E, ContextFlags *flags,
+                                     TypeChecker &typeChecker, SourceLoc tryLoc,
+                                     bool isTryHandled) {
 
       // If we're not assigning to a nominal member, then return
       if (!isa<MemberRefExpr>(E->getDest())) {
@@ -1696,20 +1704,17 @@ private:
       }
 
       auto *dest = cast<MemberRefExpr>(E->getDest());
-      auto accessSemantics = dest->getAccessSemantics();
 
       // If we're not accessing the getter or setter, then return
-      if (accessSemantics == AccessSemantics::DirectToImplementation ||
-          accessSemantics == AccessSemantics::DirectToStorage) {
+      if (!(hasOrdinaryAccessSemantics(dest->getAccessSemantics()))) {
         return false;
       }
 
-      // If the member does not point to a variable, then return
-      if (!dest->hasDecl() || !isa<VarDecl>(dest->getDecl().getDecl())) {
-        return false;
-      }
+      auto *decl = dest->getDecl().getDecl();
 
-      auto *variable = cast<VarDecl>(dest->getDecl().getDecl());
+      assert(decl && "Computed property does not have a decl?");
+
+      auto *variable = cast<VarDecl>(decl);
 
       if (variable->getAccessor(AccessorKind::Set)->hasThrows()) {
         flags->set(ContextFlags::HasTryThrowSite);
@@ -1724,27 +1729,20 @@ private:
       return false;
     }
 
-    bool checkPotentiallyThrowingGetter(MemberRefExpr *E, ContextFlags *flags,
-                                        TypeChecker &typeChecker,
-                                        SourceLoc tryLoc, bool isTryHandled) {
-      if (!E) {
-        return false;
-      }
-
-      auto accessSemantics = E->getAccessSemantics();
+    bool checkComputedPropertyGetter(MemberRefExpr *E, ContextFlags *flags,
+                                     TypeChecker &typeChecker, SourceLoc tryLoc,
+                                     bool isTryHandled) {
 
       // If we're not accessing the getter or setter, then return
-      if (accessSemantics == AccessSemantics::DirectToImplementation ||
-          accessSemantics == AccessSemantics::DirectToStorage) {
+      if (!(hasOrdinaryAccessSemantics(E->getAccessSemantics()))) {
         return false;
       }
 
-      // If the member does not point to a variable, then return
-      if (!E->hasDecl() || !isa<VarDecl>(E->getDecl().getDecl())) {
-        return false;
-      }
+      auto *decl = E->getDecl().getDecl();
 
-      auto *variable = cast<VarDecl>(E->getDecl().getDecl());
+      assert(decl && "Computed property does not have a decl?");
+
+      auto *variable = cast<VarDecl>(decl);
 
       if (variable->getAccessor(AccessorKind::Get)->hasThrows()) {
         flags->set(ContextFlags::HasTryThrowSite);
@@ -1758,6 +1756,45 @@ private:
       }
 
       return false;
+    }
+
+    bool checkSubscript(SubscriptExpr *E, ContextFlags *flags,
+                        TypeChecker &typeChecker, SourceLoc tryLoc,
+                        bool isTryHandled, bool isSetter) {
+
+      // If we're not accessing the getter or setter, then return
+      if (!(hasOrdinaryAccessSemantics(E->getAccessSemantics()))) {
+        return false;
+      }
+
+      auto *decl = E->getMember().getDecl();
+
+      assert(decl && "Subscript does not have a decl?");
+
+      auto *subscriptDecl = cast<SubscriptDecl>(E->getMember().getDecl());
+
+      if (subscriptDecl
+              ->getAccessor(isSetter ? AccessorKind::Set : AccessorKind::Get)
+              ->hasThrows()) {
+        flags->set(ContextFlags::HasTryThrowSite);
+        flags->set(ContextFlags::HasAnyThrowSite);
+
+        auto walker =
+            ThrowingAccessorChecker(flags, typeChecker, tryLoc, isTryHandled);
+        E->walk(walker);
+
+        return true;
+      }
+
+      return false;
+    }
+
+    bool hasOrdinaryAccessSemantics(const AccessSemantics &semantics) {
+      if (semantics == AccessSemantics::DirectToImplementation ||
+          semantics == AccessSemantics::DirectToStorage) {
+        return false;
+      }
+      return true;
     }
 
   public:
