@@ -158,8 +158,8 @@ class LinkEntity {
     SwiftMetaclassStub,
 
     /// A callback used by newer Objective-C runtimes to initialize class
-    /// metadata for classes where doesClassMetadataRequireUpdate() is true
-    /// but doesClassMetadataRequireInitialization() is false.
+    /// metadata for classes where getClassMetadataStrategy() is equal to
+    /// ClassMetadataStrategy::Update or ::FixedOrUpdate.
     ObjCMetadataUpdateFunction,
 
     /// A class metadata base offset global variable.  This stores the offset

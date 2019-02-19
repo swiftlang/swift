@@ -2749,6 +2749,14 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
   // If we're running on a older Objective-C runtime, just realize
   // the class.
   if (!requiresUpdate) {
+    // If we don't have a backward deployment layout, we cannot proceed here.
+    if (self->getInstanceSize() == 0 ||
+        self->getInstanceAlignMask() == 0) {
+      fatalError(0, "class %s does not have a fragile layout; "
+                 "the deployment target was newer than this OS\n",
+                 self->getDescription()->Name.get());
+    }
+
     // Realize the class. This causes the runtime to slide the field offsets
     // stored in the field offset globals.
     //

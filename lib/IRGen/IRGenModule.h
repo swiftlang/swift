@@ -143,6 +143,7 @@ namespace irgen {
   class TypeConverter;
   class TypeInfo;
   enum class ValueWitness : unsigned;
+  enum class ClassMetadataStrategy;
 
 class IRGenModule;
 
@@ -800,6 +801,8 @@ public:
   ClassMetadataLayout &getClassMetadataLayout(ClassDecl *decl);
   EnumMetadataLayout &getMetadataLayout(EnumDecl *decl);
   ForeignClassMetadataLayout &getForeignMetadataLayout(ClassDecl *decl);
+
+  ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
 
 private:
   TypeConverter &Types;

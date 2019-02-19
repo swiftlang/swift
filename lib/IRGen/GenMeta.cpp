@@ -138,8 +138,17 @@ static bool needsSingletonMetadataInitialization(IRGenModule &IGM,
 
   // Non-generic classes use singleton initialization if they have anything
   // non-trivial about their metadata.
-  if (auto *classDecl = dyn_cast<ClassDecl>(typeDecl))
-    return doesClassMetadataRequireUpdate(IGM, classDecl);
+  if (auto *classDecl = dyn_cast<ClassDecl>(typeDecl)) {
+    switch (IGM.getClassMetadataStrategy(classDecl)) {
+    case ClassMetadataStrategy::Resilient:
+    case ClassMetadataStrategy::Singleton:
+    case ClassMetadataStrategy::Update:
+    case ClassMetadataStrategy::FixedOrUpdate:
+      return true;
+    case ClassMetadataStrategy::Fixed:
+      return false;
+    }
+  }
 
   assert(isa<StructDecl>(typeDecl) || isa<EnumDecl>(typeDecl));
 
@@ -1812,19 +1821,36 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
   if (auto *classDecl = dyn_cast<ClassDecl>(target)) {
     // Compute class layout flags.
     ClassLayoutFlags flags = ClassLayoutFlags::Swift5Algorithm;
-    if (!doesClassMetadataRequireRelocation(IGM, classDecl))
+
+    switch (IGM.getClassMetadataStrategy(classDecl)) {
+    case ClassMetadataStrategy::Resilient:
+      break;
+
+    case ClassMetadataStrategy::Singleton:
+    case ClassMetadataStrategy::Update:
+    case ClassMetadataStrategy::FixedOrUpdate:
       flags |= ClassLayoutFlags::HasStaticVTable;
+      break;
+
+    case ClassMetadataStrategy::Fixed:
+      llvm_unreachable("Emitting metadata init for fixed class metadata?");
+    }
 
     llvm::Value *dependency;
-    if (doesClassMetadataRequireInitialization(IGM, classDecl)) {
+    
+    switch (IGM.getClassMetadataStrategy(classDecl)) {
+    case ClassMetadataStrategy::Resilient:
+    case ClassMetadataStrategy::Singleton:
       // Call swift_initClassMetadata().
       dependency =
         IGF.Builder.CreateCall(IGM.getInitClassMetadata2Fn(),
                                {metadata,
                                 IGM.getSize(Size(uintptr_t(flags))),
                                 numFields, fields.getAddress(), fieldVector});
-    } else {
-      assert(doesClassMetadataRequireUpdate(IGM, classDecl));
+      break;
+
+    case ClassMetadataStrategy::Update:
+    case ClassMetadataStrategy::FixedOrUpdate:
       assert(IGM.Context.LangOpts.EnableObjCInterop);
 
       // Call swift_updateClassMetadata(). Note that the static metadata
@@ -1835,6 +1861,10 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
                                {metadata,
                                 IGM.getSize(Size(uintptr_t(flags))),
                                 numFields, fields.getAddress(), fieldVector});
+      break;
+
+    case ClassMetadataStrategy::Fixed:
+      llvm_unreachable("Emitting metadata init for fixed class metadata?");
     }
 
     // Collect any possible dependency from initializing the class; generally
@@ -1889,7 +1919,8 @@ static void emitInitializeClassMetadata(IRGenFunction &IGF,
                                         MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
 
-  assert(doesClassMetadataRequireUpdate(IGM, classDecl));
+  assert(IGM.getClassMetadataStrategy(classDecl)
+         != ClassMetadataStrategy::Fixed);
 
   auto loweredTy =
     IGM.getLoweredType(classDecl->getDeclaredTypeInContext());
@@ -2432,6 +2463,27 @@ namespace {
 
     void noteStartOfImmediateMembers(ClassDecl *theClass) {}
 
+    void addValueWitnessTable() {
+      switch (IGM.getClassMetadataStrategy(Target)) {
+      case ClassMetadataStrategy::Resilient:
+      case ClassMetadataStrategy::Singleton:
+        // The runtime fills in the value witness table for us.
+        B.add(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+        break;
+
+      case ClassMetadataStrategy::Update:
+      case ClassMetadataStrategy::FixedOrUpdate:
+      case ClassMetadataStrategy::Fixed: {
+        auto type = (Target->checkObjCAncestry() != ObjCClassKind::NonObjC
+                    ? IGM.Context.TheUnknownObjectType
+                    : IGM.Context.TheNativeObjectType);
+        auto wtable = IGM.getAddrOfValueWitnessTable(type);
+        B.add(wtable);
+        break;
+      }
+      }
+    }
+
     /// The 'metadata flags' field in a class is actually a pointer to
     /// the metaclass object for the class.
     ///
@@ -2461,10 +2513,15 @@ namespace {
     void addSuperclass() {
       // If we might have generic ancestry, leave a placeholder since
       // swift_initClassMetdata() will fill in the superclass.
-      if (doesClassMetadataRequireInitialization(IGM, Target)) {
-        // Leave a null pointer placeholder to be filled at runtime
+      switch (IGM.getClassMetadataStrategy(Target)) {
+      case ClassMetadataStrategy::Resilient:
+      case ClassMetadataStrategy::Singleton:
         B.addNullPointer(IGM.TypeMetadataPtrTy);
         return;
+      case ClassMetadataStrategy::Update:
+      case ClassMetadataStrategy::FixedOrUpdate:
+      case ClassMetadataStrategy::Fixed:
+        break;
       }
 
       // If this is a root class, use SwiftObject as our formal parent.
@@ -2626,7 +2683,7 @@ namespace {
       emitClassMetadataBaseOffset(IGM, Target);
       createNonGenericMetadataAccessFunction(IGM, Target);
 
-      if (!doesClassMetadataRequireUpdate(IGM, Target))
+      if (IGM.getClassMetadataStrategy(Target) == ClassMetadataStrategy::Fixed)
         return;
 
       emitMetadataCompletionFunction(
@@ -2661,14 +2718,6 @@ namespace {
       B.addInt(IGM.SizeTy, getClassFieldOffset(IGM, baseType, var).getValue());
     }
 
-    void addValueWitnessTable() {
-      auto type = (Target->checkObjCAncestry() != ObjCClassKind::NonObjC
-                   ? IGM.Context.TheUnknownObjectType
-                   : IGM.Context.TheNativeObjectType);
-      auto wtable = IGM.getAddrOfValueWitnessTable(type);
-      B.add(wtable);
-    }
-
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
       llvm_unreachable("Fixed class metadata cannot have missing members");
     }
@@ -2700,11 +2749,6 @@ namespace {
       // Field offsets are either copied from the superclass or calculated
       // at runtime.
       B.addInt(IGM.SizeTy, 0);
-    }
-
-    void addValueWitnessTable() {
-      // The runtime fills in the value witness table for us.
-      B.add(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
@@ -2795,7 +2839,8 @@ namespace {
     }
 
     void createMetadataAccessFunction() {
-      assert(doesClassMetadataRequireRelocation(IGM, Target));
+      assert(IGM.getClassMetadataStrategy(Target)
+             == ClassMetadataStrategy::Resilient);
 
       assert(!Target->isGenericContext());
       emitClassMetadataBaseOffset(IGM, Target);
@@ -3025,39 +3070,52 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   auto init = builder.beginStruct();
   init.setPacked(true);
 
-  // If the class is generic or has resilient ancestry, we emit a pattern,
-  // not type metadata.
-  bool isPattern = doesClassMetadataRequireRelocation(IGM, classDecl);
-
   bool canBeConstant;
-  if (classDecl->isGenericContext()) {
-    GenericClassMetadataBuilder builder(IGM, classDecl, init,
-                                        fragileLayout);
-    builder.layout();
-    canBeConstant = true;
 
-    builder.createMetadataAccessFunction();
-  } else if (doesClassMetadataRequireRelocation(IGM, classDecl)) {
+  auto strategy = IGM.getClassMetadataStrategy(classDecl);
+
+  switch (strategy) {
+  case ClassMetadataStrategy::Resilient: {
+    if (classDecl->isGenericContext()) {
+      GenericClassMetadataBuilder builder(IGM, classDecl, init,
+                                          resilientLayout);
+      builder.layout();
+      canBeConstant = true;
+
+      builder.createMetadataAccessFunction();
+      break;
+    }
+
     ResilientClassMetadataBuilder builder(IGM, classDecl, init,
-                                          fragileLayout);
+                                          resilientLayout);
     builder.layout();
     canBeConstant = true;
 
     builder.createMetadataAccessFunction();
-  } else if (doesClassMetadataRequireInitialization(IGM, classDecl)) {
+    break;
+  }
+
+  case ClassMetadataStrategy::Singleton:
+  case ClassMetadataStrategy::Update: {
     SingletonClassMetadataBuilder builder(IGM, classDecl, init,
-                                          fragileLayout);
+                                          resilientLayout);
     builder.layout();
     canBeConstant = builder.canBeConstant();
 
     builder.createMetadataAccessFunction();
-  } else {
+    break;
+  }
+
+  case ClassMetadataStrategy::FixedOrUpdate:
+  case ClassMetadataStrategy::Fixed: {
     FixedClassMetadataBuilder builder(IGM, classDecl, init,
                                       fragileLayout);
     builder.layout();
     canBeConstant = builder.canBeConstant();
 
     builder.createMetadataAccessFunction();
+    break;
+  }
   }
 
   CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
@@ -3067,21 +3125,29 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
       IGM.TargetInfo.OutputObjectFormat == llvm::Triple::MachO)
     section = "__DATA,__objc_data, regular";
 
+  bool isPattern = (strategy == ClassMetadataStrategy::Resilient);
   auto var = IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
                                     init.finishAndCreateFuture(), section);
 
   // If the class does not require dynamic initialization, or if it only
   // requires dynamic initialization on a newer Objective-C runtime, add it
   // to the Objctive-C class list.
-  if (IGM.ObjCInterop &&
-      !doesClassMetadataRequireInitialization(IGM, classDecl)) {
-    // Emit the ObjC class symbol to make the class visible to ObjC.
-    if (classDecl->isObjC()) {
-      emitObjCClassSymbol(IGM, classDecl, var);
-    }
+  if (IGM.ObjCInterop) {
+    switch (strategy) {
+    case ClassMetadataStrategy::Resilient:
+    case ClassMetadataStrategy::Singleton:
+      break;
+    
+    case ClassMetadataStrategy::Update:
+    case ClassMetadataStrategy::FixedOrUpdate:
+    case ClassMetadataStrategy::Fixed:
+      if (classDecl->isObjC())
+        emitObjCClassSymbol(IGM, classDecl, var);
 
-    IGM.addObjCClass(var,
-              classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
+      IGM.addObjCClass(var,
+                classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
+      break;
+    }
   }
 
   IGM.IRGen.noteUseOfAnyParentTypeMetadata(classDecl);

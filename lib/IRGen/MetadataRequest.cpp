@@ -514,16 +514,19 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
   auto theDecl = type->getClassOrBoundGenericClass();
   assert(theDecl && "emitting constant heap metadata ref for non-class type?");
 
-  // If the class metadata is initialized from a pattern, we don't even have
-  // an uninitialized metadata symbol we could return, so just fail.
-  if (doesClassMetadataRequireRelocation(IGM, theDecl))
+  switch (IGM.getClassMetadataStrategy(theDecl)) {
+  case ClassMetadataStrategy::Resilient:
     return nullptr;
 
-  // If the class must not require dynamic initialization --- e.g. if it
-  // is a super reference --- then respect everything that might impose that.
-  if (!allowDynamicUninitialized) {
-    if (doesClassMetadataRequireInitialization(IGM, theDecl))
+  case ClassMetadataStrategy::Singleton:
+    if (!allowDynamicUninitialized)
       return nullptr;
+    break;
+
+  case ClassMetadataStrategy::Update:
+  case ClassMetadataStrategy::FixedOrUpdate:
+  case ClassMetadataStrategy::Fixed:
+    break;
   }
 
   // For imported classes, use the ObjC class symbol.
