@@ -547,6 +547,11 @@ bool Decl::isWeakImported(ModuleDecl *fromModule,
   if (containingModule == fromModule)
     return false;
 
+  auto containingContext =
+      AvailabilityInference::availableRange(this, fromModule->getASTContext());
+  if (!fromContext.isContainedIn(containingContext))
+    return true;
+
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
@@ -563,7 +568,6 @@ bool Decl::isWeakImported(ModuleDecl *fromModule,
   if (auto *ntd = dyn_cast<NominalTypeDecl>(dc))
     return ntd->isWeakImported(fromModule, fromContext);
 
-  // FIXME: Also check availability when containingModule is resilient.
   return false;
 }
 
