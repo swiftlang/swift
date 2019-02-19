@@ -1454,7 +1454,6 @@ namespace {
 
     /// Check the generic parameters of our context.
     /// Return true if done with lookup
-    /// TODO: Factor with addGenericParmeters below
     bool addGenericParametersHereAndInEnclosingScopes(DeclContext *dc);
 
     /// Consume generic parameters
@@ -1465,7 +1464,7 @@ namespace {
     Optional<PerScopeLookupState>
     lookupInAppropriateContext(DeclContext *dc, Optional<bool> isCascadingUse);
 
-    // TODO: use a template? Or just overload
+    // TODO: use objects & virtuals
 
     Optional<PerScopeLookupState>
     lookupInPatternBindingInitializer(PatternBindingInitializer *PBI,
@@ -1981,7 +1980,6 @@ UnqualifiedLookupFactory::lookupInOneDeclContext(
 }
 // clang-format on
 
-/// TODO: Factor with addGenericParmeters below
 bool UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
     DeclContext *dc) {
   for (GenericParamList *dcGenericParams = getGenericParams(dc);
