@@ -1388,7 +1388,7 @@ namespace {
     nonoperatorScopeForASTScopeLookup(DeclContext *dc,
                                       Optional<bool> isCascadingUse) const;
 
-    struct lookInScopeForASTScopeLookupResult {
+    struct LookInScopeForASTScopeLookupResult {
       bool isDone; // Searching outers
       DeclContext *selfDC;
       DeclContext *dc;
@@ -1396,13 +1396,13 @@ namespace {
     };
 
     /// Return status and new selfDC and new DC
-    Optional<lookInScopeForASTScopeLookupResult>
+    Optional<LookInScopeForASTScopeLookupResult>
     lookInScopeForASTScopeLookup(const ASTScope *const currentScope,
                                  DeclContext *selfDC, DeclContext *dc,
                                  const Optional<bool> isCascadingUse);
 
     /// Returns status and selfDC and DC
-    Optional<lookInScopeForASTScopeLookupResult>
+    Optional<LookInScopeForASTScopeLookupResult>
     lookIntoDeclarationContextForASTScopeLookup(DeclContext *dc,
                                                 DeclContext *selfDC,
                                                 DeclContext *wasDC,
@@ -1700,7 +1700,7 @@ UnqualifiedLookupFactory::nonoperatorScopeForASTScopeLookup(
   return std::make_pair(lookupScope, isCascadingUse);
 }
 
-Optional<UnqualifiedLookupFactory::lookInScopeForASTScopeLookupResult>
+Optional<UnqualifiedLookupFactory::LookInScopeForASTScopeLookupResult>
 UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
     const ASTScope *const currentScope, DeclContext *selfDC, DeclContext *dc,
     const Optional<bool> isCascadingUse) {
@@ -1721,7 +1721,7 @@ UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
           ->getDeclContext()
           ->isTypeContext()) {
     selfDC = currentScope->getAbstractFunctionDecl();
-    return lookInScopeForASTScopeLookupResult{false, selfDC, dc,
+    return LookInScopeForASTScopeLookupResult{false, selfDC, dc,
                                               isCascadingUse};
   }
 
@@ -1730,10 +1730,10 @@ UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
   if (auto scopeDC = currentScope->getDeclContext())
     return lookIntoDeclarationContextForASTScopeLookup(scopeDC, selfDC, dc,
                                                        isCascadingUse);
-  return lookInScopeForASTScopeLookupResult{false, selfDC, dc, isCascadingUse};
+  return LookInScopeForASTScopeLookupResult{false, selfDC, dc, isCascadingUse};
 }
 
-Optional<UnqualifiedLookupFactory::lookInScopeForASTScopeLookupResult>
+Optional<UnqualifiedLookupFactory::LookInScopeForASTScopeLookupResult>
 UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
     DeclContext *dc, DeclContext *selfDC, DeclContext *wasDC,
     Optional<bool> isCascadingUse) {
@@ -1750,46 +1750,46 @@ UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
     if (bindingInit->getImplicitSelfDecl())
       selfDC = bindingInit;
 
-    return lookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
+    return LookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
                                               isCascadingUseResult};
   }
 
   // Default arguments only have 'static' access to the members of the
   // enclosing type, if there is one.
   if (isa<DefaultArgumentInitializer>(dc))
-    return lookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
+    return LookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
                                               isCascadingUseResult};
 
   // Functions/initializers/deinitializers are only interesting insofar as
   // they affect lookup in an enclosing nominal type or extension thereof.
   if (isa<AbstractFunctionDecl>(dc))
-    return lookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
+    return LookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
                                               isCascadingUseResult};
 
   // Subscripts have no lookup of their own.
   if (isa<SubscriptDecl>(dc))
-    return lookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
+    return LookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
                                               isCascadingUseResult};
 
   // Closures have no lookup of their own.
   if (isa<AbstractClosureExpr>(dc))
-    return lookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
+    return LookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
                                               isCascadingUseResult};
 
   // Top-level declarations have no lookup of their own.
   if (isa<TopLevelCodeDecl>(dc))
-    return lookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
+    return LookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
                                               isCascadingUseResult};
 
   // Typealiases have no lookup of their own.
   if (isa<TypeAliasDecl>(dc))
-    return lookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
+    return LookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
                                               isCascadingUseResult};
 
   // Lookup in the source file's scope marks the end.
   if (isa<SourceFile>(dc)) {
     // FIXME: A bit of a hack.
-    return lookInScopeForASTScopeLookupResult{true, selfDC, dc,
+    return LookInScopeForASTScopeLookupResult{true, selfDC, dc,
                                               isCascadingUseResult};
   }
 
@@ -1797,7 +1797,7 @@ UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   // the nominal type.
   auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal)
-    return lookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
+    return LookInScopeForASTScopeLookupResult{false, selfDC, wasDC,
                                               isCascadingUseResult};
 
   // Dig out the type we're looking into.
@@ -1849,7 +1849,7 @@ UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
   // Forget the 'self' declaration.
   selfDC = nullptr;
 
-  return lookInScopeForASTScopeLookupResult{false, selfDC, dc,
+  return LookInScopeForASTScopeLookupResult{false, selfDC, dc,
                                             isCascadingUseResult};
 }
 
