@@ -139,6 +139,7 @@ public: // for exp debugging
   DeclName recordedName;
   bool recordedIsCascadingUse = false;
 
+  // TODO: move into Factory
   struct PlacesToSearch {
     // TODO: constify members?
     /// The context in which the places where found.
@@ -159,10 +160,13 @@ public: // for exp debugging
     }
     // Classify this declaration.
     // Types are formally members of the metatype.
-    DeclContext *whereValueIsMember(const ValueDecl *const member) {
+    DeclContext *whereValueIsMember(const ValueDecl *const member) const {
       return dyn_cast<TypeDecl>(member) ? whereTypesAreMembers
                                         : whereNonTypesAreMembers;
     }
+    void addToResults(const DeclName &Name, bool isCascadingUse,
+                      NLOptions baseNLOptions, DeclContext *contextForLookup,
+                      SmallVectorImpl<LookupResultEntry> &results) const;
     void dump() const;
   };
 

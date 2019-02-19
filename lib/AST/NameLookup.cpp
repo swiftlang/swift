@@ -1484,13 +1484,6 @@ namespace {
     /// Return true if lookup is done
     bool addLocalVariableResults(DeclContext *dc);
 
-    /// Return true if found any
-    // TODO: make member fn of PlacesToSearch, take ref to Result as arg
-    void searchPlacesToSearch(PlacesToSearch placesToSearch, DeclName Name,
-                              const bool isCascadingUse,
-                              const NLOptions baseNLOptions,
-                              DeclContext *contextForLookup);
-
     /// Return true if finished with lookup
     bool handleUnavailableInnerResults(const size_t startIndexOfInnerResults);
 
@@ -1960,11 +1953,8 @@ UnqualifiedLookupFactory::lookupInOneDeclContext(
   if (placesToSearch.hasValue() &&
       !placesToSearch.getValue().empty()) {
     auto startIndexOfInnerResults = Results.size();
-    searchPlacesToSearch(std::move(placesToSearch.getValue()),
-                         Name,
-                         isCascadingUse.getValue(),
-                         baseNLOptions,
-                         childOfNextDC);
+    placesToSearch.getValue().addToResults(
+        Name, isCascadingUse.getValue(), baseNLOptions, childOfNextDC, Results);
     if (handleUnavailableInnerResults(startIndexOfInnerResults))
       return None;
   }
@@ -2255,25 +2245,18 @@ bool UnqualifiedLookupFactory::addLocalVariableResults(DeclContext *dc) {
   return false;
 }
 
-// TODO: make member fn of PlacesToSearch, take ref to Result as arg
-// clang-format off
-void UnqualifiedLookupFactory::searchPlacesToSearch(
-    PlacesToSearch placesToSearch,
-    DeclName Name,
-    const bool isCascadingUse,
-    const NLOptions baseNLOptions,
-    DeclContext *contextForLookup) {
-  // clang-format on
+void UnqualifiedLookup::PlacesToSearch::addToResults(
+    const DeclName &Name, bool isCascadingUse, NLOptions baseNLOptions,
+    DeclContext *contextForLookup,
+    SmallVectorImpl<LookupResultEntry> &results) const {
   const NLOptions options =
       baseNLOptions | (isCascadingUse ? NL_KnownCascadingDependency
                                       : NL_KnownNonCascadingDependency);
 
   SmallVector<ValueDecl *, 4> Lookup;
-  contextForLookup->lookupQualified(placesToSearch.places, Name, options,
-                                    Lookup);
+  contextForLookup->lookupQualified(places, Name, options, Lookup);
   for (auto Result : Lookup)
-    Results.push_back(
-        LookupResultEntry(placesToSearch.whereValueIsMember(Result), Result));
+    results.push_back(LookupResultEntry(whereValueIsMember(Result), Result));
 }
 
 bool UnqualifiedLookupFactory::handleUnavailableInnerResults(
