@@ -137,6 +137,14 @@ ValueDecl *RequirementFailure::getDeclRef() const {
 
   auto *anchor = getRawAnchor();
   auto *locator = cs.getConstraintLocator(anchor);
+
+  if (isFromContextualType()) {
+    auto type = cs.getContextualType();
+    assert(type);
+    auto *alias = dyn_cast<TypeAliasType>(type.getPointer());
+    return alias ? alias->getDecl() : type->getAnyGeneric();
+  }
+
   if (auto *AE = dyn_cast<CallExpr>(anchor)) {
     assert(isa<TypeExpr>(AE->getFn()));
     ConstraintLocatorBuilder ctor(locator);
@@ -188,6 +196,12 @@ GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
   }
 
   llvm_unreachable("Type requirement failure should always have signature");
+}
+
+bool RequirementFailure::isFromContextualType() const {
+  auto path = getLocator()->getPath();
+  assert(!path.empty());
+  return path.front().getKind() == ConstraintLocator::ContextualType;
 }
 
 const DeclContext *RequirementFailure::getRequirementDC() const {
