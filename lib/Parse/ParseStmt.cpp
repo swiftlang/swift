@@ -868,6 +868,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
     status = parseExprList(tok::l_paren, tok::r_paren,
                            /*postfix (allow trailing closure)*/ false,
                            /*expr basic (irrelevant)*/ true,
+                           /*allow separator omission*/ false,
                            lpLoc,
                            yields, yieldLabels, yieldLabelLocs,
                            rpLoc,

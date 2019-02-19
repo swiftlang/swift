@@ -953,7 +953,8 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
 
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                  bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
+                  bool AllowSepAfterLast, bool AllowSepOmission, 
+                  Diag<> ErrorDiag, SyntaxKind Kind,
                   llvm::function_ref<ParserStatus()> callback) {
   auto TokIsStringInterpolationEOF = [&]() -> bool {
     return Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren;
@@ -1025,6 +1026,9 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       IsInputIncomplete = true;
       break;
     }
+
+    if (AllowSepOmission && Tok.isAtStartOfLine())
+        continue;
 
     diagnose(Tok, diag::expected_separator, ",")
       .fixItInsertAfter(PreviousLoc, ",");

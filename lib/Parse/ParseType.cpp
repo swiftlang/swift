@@ -880,6 +880,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
                                   /*AllowSepAfterLast=*/false,
+                                  /*AllowSepOmission=*/false,
                                   diag::expected_rparen_tuple_type_list,
                                   SyntaxKind::TupleTypeElementList,
                                   [&] () -> ParserStatus {

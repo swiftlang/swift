@@ -192,6 +192,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
   bool isClosure = paramContext == ParameterContextKind::Closure;
   return parseList(tok::r_paren, leftParenLoc, rightParenLoc,
                       /*AllowSepAfterLast=*/false,
+                      /*AllowSepOmission=*/false,
                       diag::expected_rparen_parameter,
                       SyntaxKind::FunctionParameterList,
                       [&]() -> ParserStatus {
@@ -858,6 +859,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
         ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
                                             /*isPostfix=*/true,
                                             /*isExprBasic=*/false,
+                                            /*allowSepOmission=*/false,
                                             lParenLoc, args, argLabels,
                                             argLabelLocs, rParenLoc,
                                             trailingClosure,
@@ -1033,6 +1035,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
   ParserStatus ListStatus =
     parseList(tok::r_paren, LPLoc, RPLoc,
               /*AllowSepAfterLast=*/false,
+              /*AllowSepOmission=*/false,
               diag::expected_rparen_tuple_pattern_list,
               SyntaxKind::TuplePatternElementList,
               [&] () -> ParserStatus {
