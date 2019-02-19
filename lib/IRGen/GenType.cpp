@@ -1116,6 +1116,12 @@ TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
   return found->second;
 }
 
+// The following Apple platforms support backward deployment of Swift
+// code built with Swift 5.0 running on an old Objective-C runtime
+// that does not support the class metadata update hook.
+//
+// We ship a YAML legacy type info file for these platforms as part
+// of the toolchain.
 static llvm::StringLiteral platformsWithLegacyLayouts[][2] = {
   {"appletvos", "arm64"},
   {"appletvsimulator", "x86_64"},
@@ -1140,6 +1146,26 @@ static bool doesPlatformUseLegacyLayouts(StringRef platformName,
 
   return false;
 }
+
+// The following Apple platforms ship an Objective-C runtime supporting
+// the class metadata update hook:
+//
+// - macOS 10.14.4
+// - iOS 12.2
+// - tvOS 12.2
+// - watchOS 5.2
+static bool doesPlatformSupportObjCMetadataUpdateCallback(
+    const llvm::Triple &triple) {
+  if (triple.isMacOSX())
+    return !triple.isMacOSXVersionLT(10, 14, 4);
+  if (triple.isiOS()) // also returns true on tvOS
+    return !triple.isOSVersionLT(12, 2);
+  if (triple.isWatchOS())
+    return !triple.isOSVersionLT(5, 2);
+
+  return false;
+}
+
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
@@ -1152,6 +1178,15 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     LoweringMode = Mode::CompletelyFragile;
 
   const auto &Triple = IGM.Context.LangOpts.Target;
+
+  SupportsObjCMetadataUpdateCallback =
+    ::doesPlatformSupportObjCMetadataUpdateCallback(Triple);
+
+  // If our deployment target allows us to rely on the metadata update
+  // callback being called, we don't have to emit a legacy layout for a
+  // class with resiliently-sized fields.
+  if (SupportsObjCMetadataUpdateCallback)
+    return;
 
   // We have a bunch of -parse-stdlib tests that pass a -target in the test
   // suite. To prevent these from failing when the user hasn't build the

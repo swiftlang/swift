@@ -527,16 +527,23 @@ static llvm::Value *emitSuperArgument(IRGenFunction &IGF,
   } else {
     searchClass = cast<MetatypeType>(searchClass).getInstanceType();
     ClassDecl *searchClassDecl = searchClass.getClassOrBoundGenericClass();
-    if (doesClassMetadataRequireUpdate(IGF.IGM, searchClassDecl)) {
+    switch (IGF.IGM.getClassMetadataStrategy(searchClassDecl)) {
+    case ClassMetadataStrategy::Resilient:
+    case ClassMetadataStrategy::Singleton:
+    case ClassMetadataStrategy::Update:
+    case ClassMetadataStrategy::FixedOrUpdate:
       searchValue = emitClassHeapMetadataRef(IGF, searchClass,
                                              MetadataValueType::ObjCClass,
                                              MetadataState::Complete,
                                              /*allow uninitialized*/ true);
       searchValue = emitLoadOfObjCHeapMetadataRef(IGF, searchValue);
       searchValue = IGF.Builder.CreateBitCast(searchValue, IGF.IGM.ObjCClassPtrTy);
-    } else {
+      break;
+
+    case ClassMetadataStrategy::Fixed:
       searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl,
                                                      NotForDefinition);
+      break;
     }
   }
   
