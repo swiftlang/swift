@@ -2684,30 +2684,31 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       if (!expected->hasName())
         continue;
       for (auto *var : vars) {
-        if (var->hasName() && var->getName() == expected->getName()) {
-          SILValue value = VarLocs[var].value;
-          SILType type = value->getType();
+        if (!var->hasName() || var->getName() != expected->getName())
+          continue;
 
-          // If we have an address-only type, initialize the temporary
-          // allocation. We're not going to pass the address as a block
-          // argument.
-          if (type.isAddressOnly(M)) {
-            emission.emitAddressOnlyInitialization(expected, value);
-            break;
-          }
+        SILValue value = VarLocs[var].value;
+        SILType type = value->getType();
 
-          // If we have a loadable address, perform a load [copy].
-          if (type.isAddress()) {
-            value = B.emitLoadValueOperation(CurrentSILLoc, value,
-                                             LoadOwnershipQualifier::Copy);
-            args.push_back(value);
-            break;
-          }
+        // If we have an address-only type, initialize the temporary
+        // allocation. We're not going to pass the address as a block
+        // argument.
+        if (type.isAddressOnly(M)) {
+          emission.emitAddressOnlyInitialization(expected, value);
+          break;
+        }
 
-          value = B.emitCopyValueOperation(CurrentSILLoc, value);
+        // If we have a loadable address, perform a load [copy].
+        if (type.isAddress()) {
+          value = B.emitLoadValueOperation(CurrentSILLoc, value,
+                                           LoadOwnershipQualifier::Copy);
           args.push_back(value);
           break;
         }
+
+        value = B.emitCopyValueOperation(CurrentSILLoc, value);
+        args.push_back(value);
+        break;
       }
     }
 
