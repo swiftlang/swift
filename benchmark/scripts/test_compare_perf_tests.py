@@ -445,14 +445,20 @@ class TestLogParser(unittest.TestCase):
     def test_parse_results_csv(self):
         """Ignores uknown lines, extracts data from supported formats."""
         log = """#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
-34,BitCount,20,3,4,4,0,4
+7,Array.append.Array.Int?,20,10,10,10,0,10
+21,Bridging.NSArray.as!.Array.NSString,20,11,11,11,0,11
+42,Flatten.Array.Tuple4.lazy.for-in.Reserve,20,3,4,4,0,4
 
 Total performance tests executed: 1
 """
         parser = LogParser()
         results = parser.parse_results(log.splitlines())
         self.assertTrue(isinstance(results[0], PerformanceTestResult))
-        self.assertEqual(results[0].name, 'BitCount')
+        self.assertEquals(results[0].name, 'Array.append.Array.Int?')
+        self.assertEquals(results[1].name,
+                          'Bridging.NSArray.as!.Array.NSString')
+        self.assertEquals(results[2].name,
+                          'Flatten.Array.Tuple4.lazy.for-in.Reserve')
 
     def test_parse_results_tab_delimited(self):
         log = '34\tBitCount\t20\t3\t4\t4\t0\t4'
