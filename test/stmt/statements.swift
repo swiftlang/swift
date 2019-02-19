@@ -535,6 +535,70 @@ func bad_if() {
   if (x: 1) {} // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
 }
 
+// Typo correction for loop labels
+for _ in [1] {
+  break outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+}
+while true {
+  break outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+}
+repeat {
+  break outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+} while true
+
+outerLoop: for _ in [1] { // expected-note {{'outerLoop' declared here}}
+  break outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{9-18=outerLoop}}
+}
+outerLoop: for _ in [1] { // expected-note {{'outerLoop' declared here}}
+  continue outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{12-21=outerLoop}}
+}
+outerLoop: while true { // expected-note {{'outerLoop' declared here}}
+  break outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{9-18=outerLoop}}
+}
+outerLoop: while true { // expected-note {{'outerLoop' declared here}}
+  continue outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{12-21=outerLoop}}
+}
+outerLoop: repeat { // expected-note {{'outerLoop' declared here}}
+  break outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{9-18=outerLoop}}
+} while true
+outerLoop: repeat { // expected-note {{'outerLoop' declared here}}
+  continue outerloop // expected-error {{use of unresolved label 'outerloop'; did you mean 'outerLoop'?}} {{12-21=outerLoop}}
+} while true
+
+outerLoop1: for _ in [1] { // expected-note {{did you mean 'outerLoop1'?}} {{11-20=outerLoop1}}
+  outerLoop2: for _ in [1] { // expected-note {{did you mean 'outerLoop2'?}} {{11-20=outerLoop2}}
+    break outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  }
+}
+outerLoop1: for _ in [1] { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=outerLoop1}}
+  outerLoop2: for _ in [1] { // expected-note {{did you mean 'outerLoop2'?}} {{14-23=outerLoop2}}
+    continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  }
+}
+outerLoop1: while true { // expected-note {{did you mean 'outerLoop1'?}} {{11-20=outerLoop1}}
+  outerLoop2: while true { // expected-note {{did you mean 'outerLoop2'?}} {{11-20=outerLoop2}}
+    break outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  }
+}
+outerLoop1: while true { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=outerLoop1}}
+  outerLoop2: while true { // expected-note {{did you mean 'outerLoop2'?}} {{14-23=outerLoop2}}
+    continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  }
+}
+outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{11-20=outerLoop1}}
+  outerLoop2: repeat { // expected-note {{did you mean 'outerLoop2'?}} {{11-20=outerLoop2}}
+    break outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  } while true
+} while true
+outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=outerLoop1}}
+  outerLoop2: repeat { // expected-note {{did you mean 'outerLoop2'?}} {{14-23=outerLoop2}}
+    continue outerloop // expected-error {{use of unresolved label 'outerloop'}}
+  } while true
+} while true
+
 // Errors in case syntax
 class
 case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}

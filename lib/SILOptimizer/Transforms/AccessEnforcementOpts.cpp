@@ -1130,6 +1130,10 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     if (F->empty())
       return;
 
+    // FIXME: Support ownership.
+    if (F->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "Running local AccessEnforcementOpts on "
                             << F->getName() << "\n");
 

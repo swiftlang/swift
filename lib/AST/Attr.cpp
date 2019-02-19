@@ -131,6 +131,48 @@ DeclAttributes::isUnavailableInSwiftVersion(
   return false;
 }
 
+const AvailableAttr *
+DeclAttributes::getPotentiallyUnavailable(const ASTContext &ctx) const {
+  const AvailableAttr *potential = nullptr;
+  const AvailableAttr *conditional = nullptr;
+
+  for (auto Attr : *this)
+    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+      if (AvAttr->isInvalid())
+        continue;
+
+      if (!AvAttr->isActivePlatform(ctx) &&
+          !AvAttr->isLanguageVersionSpecific() &&
+          !AvAttr->isPackageDescriptionVersionSpecific())
+        continue;
+
+      // Definitely not available.
+      if (AvAttr->isUnconditionallyUnavailable())
+        return AvAttr;
+
+      switch (AvAttr->getVersionAvailability(ctx)) {
+      case AvailableVersionComparison::Available:
+        // Doesn't limit the introduced version.
+        break;
+
+      case AvailableVersionComparison::PotentiallyUnavailable:
+        // We'll return this if we don't see something that proves it's
+        // not available in this version.
+        potential = AvAttr;
+        break;
+
+      case AvailableVersionComparison::Unavailable:
+      case AvailableVersionComparison::Obsoleted:
+        conditional = AvAttr;
+        break;
+      }
+    }
+
+  if (conditional)
+    return conditional;
+  return potential;
+}
+
 const AvailableAttr *DeclAttributes::getUnavailable(
                           const ASTContext &ctx) const {
   const AvailableAttr *conditional = nullptr;
@@ -374,7 +416,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_RawDocComment:
   case DAK_ObjCBridged:
   case DAK_SynthesizedProtocol:
-  case DAK_ShowInInterface:
   case DAK_Rethrows:
   case DAK_Infix:
     return false;
@@ -396,15 +437,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Effects:
   case DAK_Optimize:
     if (DeclAttribute::isDeclModifier(getKind())) {
-      Printer.printKeyword(getAttrName());
+      Printer.printKeyword(getAttrName(), Options);
     } else {
       Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
     return true;
 
   case DAK_SetterAccess:
-    Printer.printKeyword(getAttrName());
-    Printer << "(set)";
+    Printer.printKeyword(getAttrName(), Options, "(set)");
     return true;
 
   default:
@@ -461,8 +501,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // If there's no message, but this is specifically an imported
     // "unavailable in Swift" attribute, synthesize a message to look good in
     // the generated interface.
-    if (!Attr->Message.empty())
-      Printer << ", message: \"" << Attr->Message << "\"";
+    if (!Attr->Message.empty()) {
+      Printer << ", message: ";
+      Printer.printEscapedStringLiteral(Attr->Message);
+    }
     else if (Attr->getPlatformAgnosticAvailability()
                == PlatformAgnosticAvailabilityKind::UnavailableInSwift)
       Printer << ", message: \"Not available in Swift\"";
@@ -552,10 +594,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_ObjCRuntimeName: {
-    Printer.printAttrName("@objc");
+    Printer.printAttrName("@_objcRuntimeName");
     Printer << "(";
     auto *attr = cast<ObjCRuntimeNameAttr>(this);
-    Printer << "\"" << attr->Name << "\"";
+    Printer << attr->Name;
     Printer << ")";
     break;
   }

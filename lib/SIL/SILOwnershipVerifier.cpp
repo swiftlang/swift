@@ -139,9 +139,10 @@ public:
     SmallVector<BranchPropagatedUser, 32> allRegularUsers;
     copy(regularUsers, std::back_inserter(allRegularUsers));
     copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
-    result =
+    auto linearLifetimeResult =
         valueHasLinearLifetime(value, lifetimeEndingUsers, allRegularUsers,
                                visitedBlocks, deadEndBlocks, errorBehavior);
+    result = !linearLifetimeResult.getFoundError();
 
     return result.getValue();
   }
@@ -723,33 +724,4 @@ void SILValue::verifyOwnership(SILModule &mod,
         .check();
   }
 #endif
-}
-
-bool OwnershipChecker::checkValue(SILValue value) {
-  regularUsers.clear();
-  lifetimeEndingUsers.clear();
-  liveBlocks.clear();
-
-  // Since we do not have SILUndef, we now know that getFunction() should return
-  // a real function. Assert in case this assumption is no longer true.
-  SILFunction *f = value->getFunction();
-  assert(f && "Instructions and arguments should have a function");
-
-  // If the given function has unqualified ownership, there is nothing further
-  // to verify.
-  if (!f->hasOwnership())
-    return false;
-
-  ErrorBehaviorKind errorBehavior(ErrorBehaviorKind::ReturnFalse);
-  SILValueOwnershipChecker checker(mod, deadEndBlocks, value, errorBehavior,
-                                   liveBlocks);
-  if (!checker.check()) {
-    return false;
-  }
-
-  // TODO: Make this more efficient.
-  copy(checker.getRegularUsers(), std::back_inserter(regularUsers));
-  copy(checker.getLifetimeEndingUsers(),
-       std::back_inserter(lifetimeEndingUsers));
-  return true;
 }

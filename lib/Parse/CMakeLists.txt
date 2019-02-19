@@ -13,6 +13,7 @@ add_swift_host_library(swiftParse STATIC
   ParsedSyntaxBuilders.cpp.gyb
   ParsedSyntaxNodes.cpp.gyb
   ParsedSyntaxRecorder.cpp.gyb
+  ParsedTrivia.cpp
   ParseExpr.cpp
   ParseGeneric.cpp
   ParseIfConfig.cpp

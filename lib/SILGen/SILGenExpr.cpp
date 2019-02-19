@@ -947,13 +947,15 @@ RValue RValueEmitter::visitOtherConstructorDeclRefExpr(
 }
 
 RValue RValueEmitter::visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C) {
-  llvm_unreachable("NilLiteralExpr not lowered?");
+  return SGF.emitLiteral(E, C);
 }
 
 RValue RValueEmitter::visitIntegerLiteralExpr(IntegerLiteralExpr *E,
                                               SGFContext C) {
-  return RValue(SGF, E,
-                ManagedValue::forUnmanaged(SGF.B.createIntegerLiteral(E)));
+  if (E->getType()->is<AnyBuiltinIntegerType>())
+    return RValue(SGF, E,
+                  ManagedValue::forUnmanaged(SGF.B.createIntegerLiteral(E)));
+  return SGF.emitLiteral(E, C);
 }
 RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
                                             SGFContext C) {
@@ -963,9 +965,7 @@ RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
 
 RValue RValueEmitter::visitBooleanLiteralExpr(BooleanLiteralExpr *E, 
                                               SGFContext C) {
-  auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
-  SILValue boolValue = SGF.B.createIntegerLiteral(E, i1Ty, E->getValue());
-  return RValue(SGF, E, ManagedValue::forUnmanaged(boolValue));
+  return SGF.emitLiteral(E, C);
 }
 
 RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
@@ -2292,9 +2292,13 @@ static void emitTupleShuffleExprInto(RValueEmitter &emitter,
   // Map outer initializations into a tuple of inner initializations:
   //   - fill out the initialization elements with null
   TupleInitialization innerTupleInit;
-  CanTupleType innerTuple =
-    cast<TupleType>(E->getSubExpr()->getType()->getCanonicalType());
-  innerTupleInit.SubInitializations.resize(innerTuple->getNumElements());
+  if (E->isSourceScalar()) {
+    innerTupleInit.SubInitializations.push_back(nullptr);
+  } else {
+    CanTupleType innerTuple =
+      cast<TupleType>(E->getSubExpr()->getType()->getCanonicalType());
+    innerTupleInit.SubInitializations.resize(innerTuple->getNumElements());
+  }
 
   // Map all the outer initializations to their appropriate targets.
   for (unsigned outerIndex = 0; outerIndex != outerInits.size(); outerIndex++) {
@@ -2312,14 +2316,20 @@ static void emitTupleShuffleExprInto(RValueEmitter &emitter,
 #endif
 
   // Emit the sub-expression into the tuple initialization we just built.
-  emitter.SGF.emitExprInto(E->getSubExpr(), &innerTupleInit);
+  if (E->isSourceScalar()) {
+    emitter.SGF.emitExprInto(E->getSubExpr(),
+                             innerTupleInit.SubInitializations[0].get());
+  } else {
+    emitter.SGF.emitExprInto(E->getSubExpr(), &innerTupleInit);
+  }
 
   outerTupleInit->finishInitialization(emitter.SGF);
 }
 
 RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
                                             SGFContext C) {
-  assert(!E->isSourceScalar());
+  // FIXME: Once we're no longer using this code path for enum element payloads,
+  // also assert that !E->isSourceScalar().
   assert(!E->isResultScalar());
 
   // If we're emitting into an initialization, we can try shuffling the
@@ -2333,7 +2343,11 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
 
   // Emit the sub-expression tuple and destructure it into elements.
   SmallVector<RValue, 4> elements;
-  visit(E->getSubExpr()).extractElements(elements);
+  if (E->isSourceScalar()) {
+    elements.push_back(visit(E->getSubExpr()));
+  } else {
+    visit(E->getSubExpr()).extractElements(elements);
+  }
   
   // Prepare a new tuple to hold the shuffled result.
   RValue result(E->getType()->getCanonicalType());
@@ -3712,31 +3726,12 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
 
 RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
-  ASTContext &Ctx = SGF.getASTContext();
-  SILType Ty = SGF.getLoweredLoadableType(E->getType());
-  SourceLoc Loc = E->getStartLoc();
-  
   switch (E->getKind()) {
   case MagicIdentifierLiteralExpr::File:
   case MagicIdentifierLiteralExpr::Function:
+  case MagicIdentifierLiteralExpr::Line:
+  case MagicIdentifierLiteralExpr::Column:
     return SGF.emitLiteral(E, C);
-  case MagicIdentifierLiteralExpr::Line: {
-    unsigned Value = 0;
-    if (Loc.isValid())
-      Value = Ctx.SourceMgr.getLineAndColumn(Loc).first;
-
-    SILValue V = SGF.B.createIntegerLiteral(E, Ty, Value);
-    return RValue(SGF, E, ManagedValue::forUnmanaged(V));
-  }
-  case MagicIdentifierLiteralExpr::Column: {
-    unsigned Value = 0;
-    if (Loc.isValid())
-      Value = Ctx.SourceMgr.getLineAndColumn(Loc).second;
-
-    SILValue V = SGF.B.createIntegerLiteral(E, Ty, Value);
-    return RValue(SGF, E, ManagedValue::forUnmanaged(V));
-  }
-
   case MagicIdentifierLiteralExpr::DSOHandle: {
     auto SILLoc = SILLocation(E);
     auto UnsafeRawPointer = SGF.getASTContext().getUnsafeRawPointerDecl();

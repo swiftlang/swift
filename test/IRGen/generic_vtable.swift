@@ -41,7 +41,7 @@ public class Concrete : Derived<Int> {
 // -- destructor
 // CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseCfD"
 // -- value witness table
-// CHECK-SAME: i8** @"$sBoWV"
+// CHECK-SAME: i8** {{@"\$sBoWV"|null}}
 // -- vtable entry for 'm1()'
 // CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m1yyF"
 // -- vtable entry for 'm2()'
@@ -158,7 +158,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable7DerivedCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
-// CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
+// CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
 
 // CHECK: ret %swift.metadata_response
 
@@ -171,5 +171,5 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMr"(%swift.type*, i8*, i8**)
 // -- ClassLayoutFlags is 256 / 0x100, HasStaticVTable
-// CHECK: call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, {{.*}})
+// CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, {{.*}})
 // CHECK: ret %swift.metadata_response

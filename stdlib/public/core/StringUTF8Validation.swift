@@ -36,6 +36,10 @@ extension UTF8ValidationResult: Equatable {}
 private struct UTF8ValidationError: Error {}
 
 internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationResult {
+  if _allASCII(buf) {
+    return .success(UTF8ExtraInfo(isASCII: true))
+  }
+
   var iter = buf.makeIterator()
   var lastValidIndex = buf.startIndex
 

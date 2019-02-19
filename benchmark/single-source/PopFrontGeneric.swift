@@ -15,9 +15,9 @@ import TestsUtils
 public let PopFrontArrayGeneric = BenchmarkInfo(
   name: "PopFrontArrayGeneric",
   runFunction: run_PopFrontArrayGeneric,
-  tags: [.validation, .api, .Array])
+  tags: [.validation, .api, .Array],
+  legacyFactor: 20)
 
-let reps = 1
 let arrayCount = 1024
 
 // This test case exposes rdar://17440222 which caused rdar://17974483 (popFront
@@ -50,8 +50,7 @@ func myArrayReplace<
 public func run_PopFrontArrayGeneric(_ N: Int) {
   let orig = Array(repeating: 1, count: arrayCount)
   var a = [Int]()
-  for _ in 1...20*N {
-    for _ in 1...reps {
+  for _ in 1...N {
       var result = 0
       a.append(contentsOf: orig)
       while a.count != 0 {
@@ -59,6 +58,5 @@ public func run_PopFrontArrayGeneric(_ N: Int) {
         myArrayReplace(&a, 0..<1, EmptyCollection())
       }
       CheckResults(result == arrayCount)
-    }
   }
 }

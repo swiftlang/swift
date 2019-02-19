@@ -344,6 +344,10 @@ public:
   void run() override {
     auto &Fn = *getFunction();
 
+    // FIXME: Update for ownership.
+    if (Fn.hasOwnership())
+      return;
+
     // Propagate the elements an of array value to its users.
     llvm::SmallVector<ArrayAllocation::GetElementReplacement, 16>
       GetElementReplacements;

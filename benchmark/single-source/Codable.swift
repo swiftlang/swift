@@ -107,17 +107,33 @@ public func setup_json() {
   JSONTester = CodablePerfTester(encoder: JSONEncoder(), decoder: JSONDecoder())
 }
 
+#if !_runtime(_ObjC)
+// If we do not have an objc-runtime, then we do not have a definition for
+// autoreleasepool. Add in our own fake autoclosure for it that is inline
+// always. That should be able to be eaten through by the optimizer no problem.
+@inline(__always)
+public func autoreleasepool<Result>(
+  invoking body: () throws -> Result
+) rethrows -> Result {
+  return try body()
+}
+#endif
+
 @inline(never)
 public func run_JSONPerfEncode(_ N: Int) {
-  for _ in 0 ..< N {
-    JSONTester.encode()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      JSONTester.encode()
+    }
   }
 }
 
 @inline(never)
 public func run_JSONPerfDecode(_ N: Int) {
-  for _ in 0 ..< N {
-    JSONTester.decode()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      JSONTester.decode()
+    }
   }
 }
 
@@ -131,15 +147,19 @@ public func setup_plist() {
 
 @inline(never)
 public func run_PlistPerfEncode(_ N: Int) {
-  for _ in 0 ..< N {
-    plistTester.encode()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      plistTester.encode()
+    }
   }
 }
 
 @inline(never)
 public func run_PlistPerfDecode(_ N: Int) {
-  for _ in 0 ..< N {
-    plistTester.decode()
+  autoreleasepool {
+    for _ in 0 ..< N {
+      plistTester.decode()
+    }
   }
 }
 

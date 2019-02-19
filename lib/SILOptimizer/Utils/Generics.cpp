@@ -156,7 +156,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
     for (auto &Param : Params) {
       unsigned TypeWidth;
       unsigned TypeDepth;
-      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Param.getOldType());
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Param.getParameterType());
       if (TypeDepth > MaxTypeDepth)
         MaxTypeDepth = TypeDepth;
       Width += TypeWidth;
@@ -2033,7 +2033,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
     auto *NewPAI = Builder.createPartialApply(
         Loc, Callee, Subs, Arguments,
-        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
+        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+        PAI->isOnStack());
     PAI->replaceAllUsesWith(NewPAI);
     return NewPAI;
   }
@@ -2291,6 +2292,15 @@ void swift::trySpecializeApplyOfGeneric(
   if (shouldNotSpecialize(RefF, F))
     return;
 
+  // If our callee has ownership, do not specialize for now. This should only
+  // occur with transparent referenced functions.
+  //
+  // FIXME: Support this.
+  if (RefF->hasOwnership()) {
+    assert(RefF->isTransparent());
+    return;
+  }
+
   // If the caller and callee are both fragile, preserve the fragility when
   // cloning the callee. Otherwise, strip it off so that we can optimize
   // the body more.
@@ -2404,7 +2414,8 @@ void swift::trySpecializeApplyOfGeneric(
     auto Subs = ReInfo.getCallerParamSubstitutionMap();
     auto *NewPAI = Builder.createPartialApply(
         PAI->getLoc(), FRI, Subs, Arguments,
-        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
+        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+        PAI->isOnStack());
     PAI->replaceAllUsesWith(NewPAI);
     DeadApplies.insert(PAI);
     return;

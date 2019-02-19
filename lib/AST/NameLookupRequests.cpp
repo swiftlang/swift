@@ -74,6 +74,30 @@ void UnderlyingTypeDeclsReferencedRequest::noteCycleStep(
 //----------------------------------------------------------------------------//
 // Superclass declaration computation.
 //----------------------------------------------------------------------------//
+Optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
+  auto nominalDecl = std::get<0>(getStorage());
+
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
+    if (classDecl->LazySemanticInfo.SuperclassDecl.getInt())
+      return classDecl->LazySemanticInfo.SuperclassDecl.getPointer();
+
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
+    if (protocolDecl->LazySemanticInfo.SuperclassDecl.getInt())
+      return protocolDecl->LazySemanticInfo.SuperclassDecl.getPointer();
+
+  return None;
+}
+
+void SuperclassDeclRequest::cacheResult(ClassDecl *value) const {
+  auto nominalDecl = std::get<0>(getStorage());
+
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
+    classDecl->LazySemanticInfo.SuperclassDecl.setPointerAndInt(value, true);
+
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
+    protocolDecl->LazySemanticInfo.SuperclassDecl.setPointerAndInt(value, true);
+}
+
 void SuperclassDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
   auto subjectDecl = std::get<0>(getStorage());
@@ -87,7 +111,7 @@ void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
 }
 
 //----------------------------------------------------------------------------//
-// Superclass declaration computation.
+// Extended nominal computation.
 //----------------------------------------------------------------------------//
 Optional<NominalTypeDecl *> ExtendedNominalRequest::getCachedResult() const {
   // Note: if we fail to compute any nominal declaration, it's considered

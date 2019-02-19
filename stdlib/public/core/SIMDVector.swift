@@ -23,7 +23,7 @@ prefix operator .!
 /// conform to `SIMD`.
 public protocol SIMDStorage {
   /// The type of scalars in the vector space.
-  associatedtype Scalar : Hashable
+  associatedtype Scalar : Codable, Hashable
   
   /// The number of scalars, or elements, in the vector.
   var scalarCount: Int { get }
@@ -51,6 +51,7 @@ public protocol SIMDScalar {
 
 /// A SIMD vector of a fixed number of elements.
 public protocol SIMD : SIMDStorage,
+                       Codable,
                        Hashable,
                        CustomStringConvertible,
                        ExpressibleByArrayLiteral {
@@ -83,6 +84,42 @@ public extension SIMD {
   @inlinable
   func hash(into hasher: inout Hasher) {
     for i in indices { hasher.combine(self[i]) }
+  }
+  
+  /// Encodes the scalars of this vector into the given encoder in an unkeyed
+  /// container.
+  ///
+  /// This function throws an error if any values are invalid for the given
+  /// encoder's format.
+  ///
+  /// - Parameter encoder: The encoder to write data to.
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    for i in indices {
+      try container.encode(self[i])
+    }
+  }
+  
+  /// Creates a new vector by decoding scalars from the given decoder.
+  ///
+  /// This initializer throws an error if reading from the decoder fails, or
+  /// if the data read is corrupted or otherwise invalid.
+  ///
+  /// - Parameter decoder: The decoder to read data from.
+  init(from decoder: Decoder) throws {
+    self.init()
+    var container = try decoder.unkeyedContainer()
+    guard container.count == scalarCount else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Expected vector with exactly \(scalarCount) elements."
+        )
+      )
+    }
+    for i in indices {
+      self[i] = try container.decode(Scalar.self)
+    }
   }
   
   /// A textual description of the vector.

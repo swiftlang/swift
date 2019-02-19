@@ -24,6 +24,8 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
@@ -84,7 +86,9 @@ Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
 }
 
 Type RequirementFailure::getOwnerType() const {
-  return getType(getAnchor())->getInOutObjectType()->getMetatypeInstanceType();
+  return getType(getRawAnchor())
+      ->getInOutObjectType()
+      ->getMetatypeInstanceType();
 }
 
 const GenericContext *RequirementFailure::getGenericContext() const {
@@ -94,16 +98,57 @@ const GenericContext *RequirementFailure::getGenericContext() const {
 }
 
 const Requirement &RequirementFailure::getRequirement() const {
-  return getGenericContext()->getGenericRequirements()[getRequirementIndex()];
+  // If this is a conditional requirement failure we need to
+  // fetch conformance from constraint system associated with
+  // type requirement this conditional conformance belongs to.
+  auto requirements = isConditional()
+                          ? Conformance->getConditionalRequirements()
+                          : Signature->getRequirements();
+  return requirements[getRequirementIndex()];
+}
+
+ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
+    ConstraintLocator *locator) {
+  auto &cs = getConstraintSystem();
+  auto path = locator->getPath();
+  assert(!path.empty());
+
+  if (!path.back().isConditionalRequirement()) {
+    assert(path.back().isTypeParameterRequirement());
+    return nullptr;
+  }
+
+  auto *typeReqLoc = cs.getConstraintLocator(getRawAnchor(), path.drop_back(),
+                                             /*summaryFlags=*/0);
+
+  auto result = llvm::find_if(
+      cs.CheckedConformances,
+      [&](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
+              &conformance) { return conformance.first == typeReqLoc; });
+  assert(result != cs.CheckedConformances.end());
+
+  auto conformance = result->second;
+  assert(conformance.isConcrete());
+  return conformance.getConcrete();
 }
 
 ValueDecl *RequirementFailure::getDeclRef() const {
   auto &cs = getConstraintSystem();
 
-  auto *anchor = getAnchor();
+  auto *anchor = getRawAnchor();
   auto *locator = cs.getConstraintLocator(anchor);
+
+  if (isFromContextualType()) {
+    auto type = cs.getContextualType();
+    assert(type);
+    auto *alias = dyn_cast<TypeAliasType>(type.getPointer());
+    return alias ? alias->getDecl() : type->getAnyGeneric();
+  }
+
   if (auto *AE = dyn_cast<CallExpr>(anchor)) {
-    assert(isa<TypeExpr>(AE->getFn()));
+    // NOTE: In valid code, the function can only be a TypeExpr
+    assert(isa<TypeExpr>(AE->getFn()) ||
+           isa<OverloadedDeclRefExpr>(AE->getFn()));
     ConstraintLocatorBuilder ctor(locator);
     locator = cs.getConstraintLocator(
         ctor.withPathElement(PathEltKind::ApplyFunction)
@@ -141,7 +186,32 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   return ownerType->getAnyGeneric();
 }
 
+GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
+  if (isConditional())
+    return Conformance->getGenericSignature();
+
+  auto path = locator->getPath();
+  for (auto iter = path.rbegin(); iter != path.rend(); ++iter) {
+    const auto &elt = *iter;
+    if (elt.getKind() == ConstraintLocator::OpenedGeneric)
+      return elt.getGenericSignature();
+  }
+
+  llvm_unreachable("Type requirement failure should always have signature");
+}
+
+bool RequirementFailure::isFromContextualType() const {
+  auto path = getLocator()->getPath();
+  assert(!path.empty());
+  return path.front().getKind() == ConstraintLocator::ContextualType;
+}
+
 const DeclContext *RequirementFailure::getRequirementDC() const {
+  // In case of conditional requirement failure, we don't
+  // have to guess where the it comes from.
+  if (isConditional())
+    return Conformance->getDeclContext();
+
   const auto &req = getRequirement();
   auto *DC = AffectedDecl->getDeclContext();
 
@@ -155,27 +225,41 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
   return AffectedDecl->getAsGenericContext();
 }
 
+bool RequirementFailure::isStaticOrInstanceMember(const ValueDecl *decl) {
+  if (decl->isInstanceMember())
+    return true;
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl))
+    return AFD->isStatic() && !AFD->isOperator();
+
+  return decl->isStatic();
+}
+
 bool RequirementFailure::diagnoseAsError() {
   if (!canDiagnoseFailure())
     return false;
 
-  auto *anchor = getAnchor();
+  auto *anchor = getRawAnchor();
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
 
-  if (reqDC != genericCtx) {
+  auto lhs = resolveType(getLHS());
+  auto rhs = resolveType(getRHS());
+
+  if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
+                              isStaticOrInstanceMember(AffectedDecl))) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
     emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
                    AffectedDecl->getDescriptiveKind(),
-                   AffectedDecl->getFullName(), NTD->getDeclaredType(),
-                   getLHS(), getRHS());
+                   AffectedDecl->getFullName(), NTD->getDeclaredType(), lhs,
+                   rhs);
   } else {
     emitDiagnostic(anchor->getLoc(), getDiagnosticOnDecl(),
                    AffectedDecl->getDescriptiveKind(),
-                   AffectedDecl->getFullName(), getLHS(), getRHS());
+                   AffectedDecl->getFullName(), lhs, rhs);
   }
 
-  emitRequirementNote(reqDC->getAsDecl());
+  emitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
   return true;
 }
 
@@ -188,23 +272,31 @@ bool RequirementFailure::diagnoseAsNote() {
   return true;
 }
 
-void RequirementFailure::emitRequirementNote(const Decl *anchor) const {
+void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
+                                             Type rhs) const {
   auto &req = getRequirement();
 
-  if (getRHS()->isEqual(req.getSecondType())) {
-    emitDiagnostic(anchor, diag::where_requirement_failure_one_subst,
-                   req.getFirstType(), getLHS());
+  if (isConditional()) {
+    emitDiagnostic(anchor, diag::requirement_implied_by_conditional_conformance,
+                   resolveType(Conformance->getType()),
+                   Conformance->getProtocol()->getDeclaredInterfaceType());
     return;
   }
 
-  if (getLHS()->isEqual(req.getFirstType())) {
+  if (rhs->isEqual(req.getSecondType())) {
     emitDiagnostic(anchor, diag::where_requirement_failure_one_subst,
-                   req.getSecondType(), getRHS());
+                   req.getFirstType(), lhs);
+    return;
+  }
+
+  if (lhs->isEqual(req.getFirstType())) {
+    emitDiagnostic(anchor, diag::where_requirement_failure_one_subst,
+                   req.getSecondType(), rhs);
     return;
   }
 
   emitDiagnostic(anchor, diag::where_requirement_failure_both_subst,
-                 req.getFirstType(), getLHS(), req.getSecondType(), getRHS());
+                 req.getFirstType(), lhs, req.getSecondType(), rhs);
 }
 
 bool MissingConformanceFailure::diagnoseAsError() {
@@ -510,12 +602,18 @@ public:
   int referencesCount() { return count; }
 };
 
-static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
-  Type unwrappedType = type->getOptionalObjectType();
-  if (!unwrappedType)
+static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type baseType,
+                           Type unwrappedType) {
+
+  assert(!baseType->hasTypeVariable() &&
+         "Base type must not be a type variable");
+  assert(!unwrappedType->hasTypeVariable() &&
+         "Unwrapped type must not be a type variable");
+
+  if (!baseType->getOptionalObjectType())
     return false;
 
-  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
+  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, baseType,
                  unwrappedType);
 
   // If the expression we're unwrapping is the only reference to a
@@ -541,7 +639,8 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
         Expr *initializer = varDecl->getParentInitializer();
         if (auto declRefExpr = dyn_cast<DeclRefExpr>(initializer)) {
           if (declRefExpr->getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer, type);
+            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer,
+                           baseType);
           }
         }
 
@@ -583,9 +682,11 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   auto type = getType(anchor)->getRValueType();
 
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
-  if (!tryExpr)
-    return diagnoseUnwrap(getConstraintSystem(), unwrapped, type);
-  
+  if (!tryExpr) {
+    return diagnoseUnwrap(getConstraintSystem(), unwrapped, getBaseType(),
+                          getUnwrappedType());
+  }
+
   bool isSwift5OrGreater = getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5);
   auto subExprType = getType(tryExpr->getSubExpr());
   bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
@@ -596,11 +697,10 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     // under Swift 5+, so just report that a missing unwrap can't be handled here.
     return false;
   }
-  else {
-    emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
-    .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
-    return true;
-  }
+
+  emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
+      .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
+  return true;
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
@@ -868,6 +968,12 @@ bool AssignmentFailure::diagnoseAsError() {
   if (auto *KPE = dyn_cast_or_null<KeyPathExpr>(immInfo.first)) {
     emitDiagnostic(Loc, DeclDiagnostic, "immutable key path")
         .highlight(KPE->getSourceRange());
+    return true;
+  }
+
+  if (auto LE = dyn_cast<LiteralExpr>(immInfo.first)) {
+    emitDiagnostic(Loc, DeclDiagnostic, "literals are not mutable")
+        .highlight(LE->getSourceRange());
     return true;
   }
 
@@ -1475,5 +1581,58 @@ bool MissingMemberFailure::diagnoseAsError() {
 
   // Note all the correction candidates.
   corrections.noteAllCandidates();
+  return true;
+}
+
+bool PartialApplicationFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
+  auto *anchor = cast<UnresolvedDotExpr>(getRawAnchor());
+
+  RefKind kind = RefKind::MutatingMethod;
+
+  // If this is initializer delegation chain, we have a tailored message.
+  if (getOverloadChoiceIfAvailable(cs.getConstraintLocator(
+          anchor, ConstraintLocator::ConstructorMember))) {
+    kind = anchor->getBase()->isSuperExpr() ? RefKind::SuperInit
+                                            : RefKind::SelfInit;
+  }
+
+  auto diagnostic = CompatibilityWarning
+                        ? diag::partial_application_of_function_invalid_swift4
+                        : diag::partial_application_of_function_invalid;
+
+  emitDiagnostic(anchor->getNameLoc(), diagnostic, kind);
+  return true;
+}
+
+bool InvalidDynamicInitOnMetatypeFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::dynamic_construct_class,
+                 BaseType->getMetatypeInstanceType())
+      .highlight(BaseRange);
+  emitDiagnostic(Init, diag::note_nonrequired_initializer, Init->isImplicit(),
+                 Init->getFullName());
+  return true;
+}
+
+bool InitOnProtocolMetatypeFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  if (IsStaticallyDerived) {
+    emitDiagnostic(anchor->getLoc(), diag::construct_protocol_by_name,
+                   BaseType->getMetatypeInstanceType())
+        .highlight(BaseRange);
+  } else {
+    emitDiagnostic(anchor->getLoc(), diag::construct_protocol_value, BaseType)
+        .highlight(BaseRange);
+  }
+
+  return true;
+}
+
+bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
+  auto *apply = cast<ApplyExpr>(getRawAnchor());
+  auto loc = apply->getArg()->getStartLoc();
+  emitDiagnostic(loc, diag::missing_init_on_metatype_initialization)
+      .fixItInsert(loc, ".init");
   return true;
 }

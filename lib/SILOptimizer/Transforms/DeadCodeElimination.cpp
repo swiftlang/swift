@@ -111,6 +111,10 @@ class DCE : public SILFunctionTransform {
 
     SILFunction *F = getFunction();
 
+    // FIXME: Support ownership.
+    if (F->hasOwnership())
+      return;
+
     auto *DA = PM->getAnalysis<PostDominanceAnalysis>();
     PDT = DA->get(F);
 

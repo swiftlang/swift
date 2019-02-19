@@ -659,7 +659,7 @@ example21890157.property = "confusing"  // expected-error {{value of optional ty
 struct UnaryOp {}
 
 _ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an operand of type 'UnaryOp'}}
-// expected-note@-1 {{overloads for '-' exist with these partially matching parameter lists: (Double), (Float), (Float80)}}
+// expected-note@-1 {{overloads for '-' exist with these partially matching parameter lists: (Double), (Float)}}
 
 
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
@@ -1065,7 +1065,7 @@ let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
 // expected-error@-1 {{type 'Int' has no member 'unknown'}}
 
 // rdar://problem/32390726 - Bad Diagnostic: Don't suggest `var` to `let` when binding inside for-statement
-for var i in 0..<10 { // expected-warning {{variable 'i' was never mutated; consider changing to 'let' constant}} {{5-9=}}
+for var i in 0..<10 { // expected-warning {{variable 'i' was never mutated; consider removing 'var' to make it constant}} {{5-9=}}
   _ = i + 1
 }
 

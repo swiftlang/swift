@@ -55,10 +55,6 @@ def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
 
-def serialize_diagnostics_path
-  : Separate<["-"], "serialize-diagnostics-path">, MetaVarName<"<path>">,
-    HelpText<"Output serialized diagnostics to <path>">;
-
 def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
@@ -178,11 +174,11 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Compile the module to export resilient interfaces for all "
             "public declarations by default">;
 
-def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
-   HelpText<"Enable resilient layout for classes containing resilient value types">;
+def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
+  HelpText<"Completely disable legacy type layout">;
 
-def read_type_info_path_EQ : Joined<["-"], "read-type-info-path=">,
-  HelpText<"Read legacy type layout from the given path">;
+def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
+  HelpText<"Read legacy type layout from the given path instead of default path">;
 }
 
 
@@ -272,6 +268,10 @@ def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
 def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
   HelpText<"Add names to local values in LLVM IR">;
 
+def enable_anonymous_context_mangled_names :
+  Flag<["-"], "enable-anonymous-context-mangled-names">,
+  HelpText<"Enable emission of mangled names in anonymous context descriptors">;
+
 def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
   HelpText<"Disable emission of reflection metadata for nominal types">;
 
@@ -303,9 +303,6 @@ def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
 
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;
-
-def disable_guaranteed_normal_arguments : Flag<["-"], "disable-guaranteed-normal-arguments">,
-  HelpText<"If set to true, all normal parameters (except to inits/setters) will be passed at +1">;
 
 def enable_mandatory_semantic_arc_opts : Flag<["-"], "enable-mandatory-semantic-arc-opts">,
   HelpText<"Enable the mandatory semantic arc optimizer">;

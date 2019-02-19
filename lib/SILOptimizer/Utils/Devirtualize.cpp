@@ -464,9 +464,16 @@ static ApplyInst *replaceApplyInst(SILBuilder &B, SILLocation Loc,
                                    ApplyInst *OldAI,
                                    SILValue NewFn,
                                    SubstitutionMap NewSubs,
-                                   ArrayRef<SILValue> NewArgs) {
+                                   ArrayRef<SILValue> NewArgs,
+                                   ArrayRef<SILValue> NewArgBorrows) {
   auto *NewAI = B.createApply(Loc, NewFn, NewSubs, NewArgs,
                               OldAI->isNonThrowing());
+
+  if (!NewArgBorrows.empty()) {
+    for (SILValue Arg : NewArgBorrows) {
+      B.createEndBorrow(Loc, Arg);
+    }
+  }
 
   // Check if any casting is required for the return value.
   SILValue ResultValue =
@@ -478,11 +485,11 @@ static ApplyInst *replaceApplyInst(SILBuilder &B, SILLocation Loc,
 }
 
 static TryApplyInst *replaceTryApplyInst(SILBuilder &B, SILLocation Loc,
-                                         TryApplyInst *OldTAI,
-                                         SILValue NewFn,
+                                         TryApplyInst *OldTAI, SILValue NewFn,
                                          SubstitutionMap NewSubs,
                                          ArrayRef<SILValue> NewArgs,
-                                         SILFunctionConventions Conv) {
+                                         SILFunctionConventions Conv,
+                                         ArrayRef<SILValue> NewArgBorrows) {
   SILBasicBlock *NormalBB = OldTAI->getNormalBB();
   SILBasicBlock *ResultBB = nullptr;
 
@@ -511,13 +518,23 @@ static TryApplyInst *replaceTryApplyInst(SILBuilder &B, SILLocation Loc,
   auto NewTAI = B.createTryApply(Loc, NewFn, NewSubs, NewArgs,
                                  ResultBB, ErrorBB);
 
+  if (!NewArgBorrows.empty()) {
+    B.setInsertionPoint(NormalBB->begin());
+    for (SILValue Arg : NewArgBorrows) {
+      B.createEndBorrow(Loc, Arg);
+    }
+    B.setInsertionPoint(ErrorBB->begin());
+    for (SILValue Arg : NewArgBorrows) {
+      B.createEndBorrow(Loc, Arg);
+    }
+  }
+
   if (ResultCastRequired) {
     B.setInsertionPoint(ResultBB);
 
     SILValue ResultValue = ResultBB->getArgument(0);
     ResultValue = castValueToABICompatibleType(&B, Loc, ResultValue,
                                                NewResultTy, OldResultTy);
-
     B.createBranch(Loc, NormalBB, { ResultValue });
   }
 
@@ -529,9 +546,10 @@ static BeginApplyInst *replaceBeginApplyInst(SILBuilder &B, SILLocation Loc,
                                              BeginApplyInst *OldBAI,
                                              SILValue NewFn,
                                              SubstitutionMap NewSubs,
-                                             ArrayRef<SILValue> NewArgs) {
-  auto NewBAI = B.createBeginApply(Loc, NewFn, NewSubs, NewArgs,
-                                   OldBAI->isNonThrowing());
+                                             ArrayRef<SILValue> NewArgs,
+                                             ArrayRef<SILValue> NewArgBorrows) {
+  auto *NewBAI =
+      B.createBeginApply(Loc, NewFn, NewSubs, NewArgs, OldBAI->isNonThrowing());
 
   // Forward the token.
   OldBAI->getTokenResult()->replaceAllUsesWith(NewBAI->getTokenResult());
@@ -547,6 +565,20 @@ static BeginApplyInst *replaceBeginApplyInst(SILBuilder &B, SILLocation Loc,
                                             NewYield->getType(),
                                             OldYield->getType());
     OldYield->replaceAllUsesWith(NewYield);
+  }
+
+  if (NewArgBorrows.empty())
+    return NewBAI;
+
+  SILValue token = NewBAI->getTokenResult();
+
+  // The token will only be used by end_apply and abort_apply. Use that to
+  // insert the end_borrows we need.
+  for (auto *use : token->getUses()) {
+    SILBuilderWithScope builder(use->getUser(), B.getBuilderContext());
+    for (SILValue borrow : NewArgBorrows) {
+      builder.createEndBorrow(Loc, borrow);
+    }
   }
 
   return NewBAI;
@@ -571,20 +603,31 @@ static PartialApplyInst *replacePartialApplyInst(SILBuilder &B, SILLocation Loc,
 }
 
 static ApplySite replaceApplySite(SILBuilder &B, SILLocation Loc,
-                                  ApplySite OldAS,
-                                  SILValue NewFn,
+                                  ApplySite OldAS, SILValue NewFn,
                                   SubstitutionMap NewSubs,
                                   ArrayRef<SILValue> NewArgs,
-                                  SILFunctionConventions Conv) {
-  if (auto *OldAI = dyn_cast<ApplyInst>(OldAS)) {
-    return replaceApplyInst(B, Loc, OldAI, NewFn, NewSubs, NewArgs);
-  } else if (auto *OldTAI = dyn_cast<TryApplyInst>(OldAS)) {
-    return replaceTryApplyInst(B, Loc, OldTAI, NewFn, NewSubs, NewArgs, Conv);
-  } else if (auto *OldBAI = dyn_cast<BeginApplyInst>(OldAS)) {
-    return replaceBeginApplyInst(B, Loc, OldBAI, NewFn, NewSubs, NewArgs);
-  } else {
+                                  SILFunctionConventions Conv,
+                                  ArrayRef<SILValue> NewArgBorrows) {
+  switch (OldAS.getKind()) {
+  case ApplySiteKind::ApplyInst: {
+    auto *OldAI = cast<ApplyInst>(OldAS);
+    return replaceApplyInst(B, Loc, OldAI, NewFn, NewSubs, NewArgs, NewArgBorrows);
+  }
+  case ApplySiteKind::TryApplyInst: {
+    auto *OldTAI = cast<TryApplyInst>(OldAS);
+    return replaceTryApplyInst(B, Loc, OldTAI, NewFn, NewSubs, NewArgs, Conv,
+                               NewArgBorrows);
+  }
+  case ApplySiteKind::BeginApplyInst: {
+    auto *OldBAI = dyn_cast<BeginApplyInst>(OldAS);
+    return replaceBeginApplyInst(B, Loc, OldBAI, NewFn, NewSubs, NewArgs,
+                                 NewArgBorrows);
+  }
+  case ApplySiteKind::PartialApplyInst: {
+    assert(NewArgBorrows.empty());
     auto *OldPAI = cast<PartialApplyInst>(OldAS);
     return replacePartialApplyInst(B, Loc, OldPAI, NewFn, NewSubs, NewArgs);
+  }
   }
 }
 
@@ -717,7 +760,13 @@ FullApplySite swift::devirtualizeClassMethod(FullApplySite AI,
   // Create the argument list for the new apply, casting when needed
   // in order to handle covariant indirect return types and
   // contravariant argument types.
-  llvm::SmallVector<SILValue, 8> NewArgs;
+  SmallVector<SILValue, 8> NewArgs;
+
+  // If we have a value that is owned, but that we are going to use in as a
+  // guaranteed argument, we need to borrow/unborrow the argument. Otherwise, we
+  // will introduce new consuming uses. In contrast, if we have an owned value,
+  // we are ok due to the forwarding nature of upcasts.
+  SmallVector<SILValue, 8> NewArgBorrows;
 
   auto IndirectResultArgIter = AI.getIndirectSILResults().begin();
   for (auto ResultTy : substConv.getIndirectSILResultTypes()) {
@@ -729,23 +778,24 @@ FullApplySite swift::devirtualizeClassMethod(FullApplySite AI,
 
   auto ParamArgIter = AI.getArgumentsWithoutIndirectResults().begin();
   // Skip the last parameter, which is `self`. Add it below.
-  for (auto param : substConv.getParameters().drop_back()) {
+  for (auto param : substConv.getParameters()) {
     auto paramType = substConv.getSILType(param);
-    NewArgs.push_back(
-        castValueToABICompatibleType(&B, Loc, *ParamArgIter,
-                                     ParamArgIter->getType(), paramType));
+    SILValue arg = *ParamArgIter;
+    if (B.hasOwnership()
+        && arg->getType().isObject()
+        && arg.getOwnershipKind() == ValueOwnershipKind::Owned
+        && param.isGuaranteed()) {
+      SILBuilderWithScope builder(AI.getInstruction(), B);
+      arg = builder.createBeginBorrow(Loc, arg);
+      NewArgBorrows.push_back(arg);
+    }
+    arg = castValueToABICompatibleType(&B, Loc, arg, ParamArgIter->getType(),
+                                       paramType);
+    NewArgs.push_back(arg);
     ++ParamArgIter;
   }
-
-  // Add the self argument, upcasting if required because we're
-  // calling a base class's method.
-  auto SelfParamTy = substConv.getSILType(SubstCalleeType->getSelfParameter());
-  NewArgs.push_back(castValueToABICompatibleType(&B, Loc,
-                                                 ClassOrMetatype,
-                                                 ClassOrMetatypeType,
-                                                 SelfParamTy));
-
-  ApplySite NewAS = replaceApplySite(B, Loc, AI, FRI, Subs, NewArgs, substConv);
+  ApplySite NewAS = replaceApplySite(B, Loc, AI, FRI, Subs, NewArgs, substConv,
+                                     NewArgBorrows);
   FullApplySite NewAI = FullApplySite::isa(NewAS.getInstruction());
   assert(NewAI);
 
@@ -820,7 +870,8 @@ swift::tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
 /// \param requirementSig The generic signature of the requirement
 /// \param witnessThunkSig The generic signature of the witness method
 /// \param origSubMap The substitutions from the call instruction
-/// \param isDefaultWitness True if this is a default witness method
+/// \param isSelfAbstract True if the Self type of the witness method is
+/// still abstract (i.e., not a concrete type).
 /// \param classWitness The ClassDecl if this is a class witness method
 static SubstitutionMap
 getWitnessMethodSubstitutions(
@@ -829,13 +880,13 @@ getWitnessMethodSubstitutions(
     GenericSignature *requirementSig,
     GenericSignature *witnessThunkSig,
     SubstitutionMap origSubMap,
-    bool isDefaultWitness,
+    bool isSelfAbstract,
     ClassDecl *classWitness) {
 
   if (witnessThunkSig == nullptr)
     return SubstitutionMap();
 
-  if (isDefaultWitness)
+  if (isSelfAbstract && !classWitness)
     return origSubMap;
 
   assert(!conformanceRef.isAbstract());
@@ -897,14 +948,13 @@ swift::getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI,
   SubstitutionMap origSubs = AI.getSubstitutionMap();
 
   auto *mod = Module.getSwiftModule();
-  bool isDefaultWitness =
-    (witnessFnTy->getDefaultWitnessMethodProtocol()
-      == CRef.getRequirement());
-  auto *classWitness = witnessFnTy->getWitnessMethodClass(*mod);
+  bool isSelfAbstract =
+    witnessFnTy->getSelfInstanceType()->is<GenericTypeParamType>();
+  auto *classWitness = witnessFnTy->getWitnessMethodClass();
 
   return ::getWitnessMethodSubstitutions(mod, CRef, requirementSig,
                                          witnessThunkSig, origSubs,
-                                         isDefaultWitness, classWitness);
+                                         isSelfAbstract, classWitness);
 }
 
 /// Generate a new apply of a function_ref to replace an apply of a
@@ -930,7 +980,8 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   auto SubstCalleeCanType = CalleeCanType->substGenericArgs(Module, SubMap);
 
   // Collect arguments from the apply instruction.
-  auto Arguments = SmallVector<SILValue, 4>();
+  SmallVector<SILValue, 4> Arguments;
+  SmallVector<SILValue, 4> BorrowedArgs;
 
   // Iterate over the non self arguments and add them to the
   // new argument list, upcasting when required.
@@ -938,10 +989,21 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   SILFunctionConventions substConv(SubstCalleeCanType, Module);
   unsigned substArgIdx = AI.getCalleeArgIndexOfFirstAppliedArg();
   for (auto arg : AI.getArguments()) {
+    auto paramInfo = substConv.getSILArgumentConvention(substArgIdx);
     auto paramType = substConv.getSILArgumentType(substArgIdx++);
-    if (arg->getType() != paramType)
+    if (arg->getType() != paramType) {
+      if (B.hasOwnership()
+          && AI.getKind() != ApplySiteKind::PartialApplyInst
+          && arg->getType().isObject()
+          && arg.getOwnershipKind() == ValueOwnershipKind::Owned
+          && paramInfo.isGuaranteedConvention()) {
+        SILBuilderWithScope builder(AI.getInstruction(), B);
+        arg = builder.createBeginBorrow(AI.getLoc(), arg);
+        BorrowedArgs.push_back(arg);
+      }
       arg = castValueToABICompatibleType(&B, AI.getLoc(), arg,
                                          arg->getType(), paramType);
+    }
     Arguments.push_back(arg);
   }
   assert(substArgIdx == substConv.getNumSILArguments());
@@ -953,7 +1015,7 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   auto *FRI = Builder.createFunctionRefFor(Loc, F);
 
   ApplySite SAI = replaceApplySite(Builder, Loc, AI, FRI, SubMap, Arguments,
-                                   substConv);
+                                   substConv, BorrowedArgs);
 
   if (ORE)
     ORE->emit([&]() {

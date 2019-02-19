@@ -1368,11 +1368,31 @@ SwiftDeclCollector::constructExternalExtensionNode(NominalTypeDecl *NTD,
                                             ArrayRef<ExtensionDecl*> AllExts) {
   auto *TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
   addConformancesToTypeDecl(cast<SDKNodeDeclType>(TypeNode), NTD);
+
+  bool anyConformancesAdded = false;
   // The members of the extensions are the only members of this synthesized type.
   for (auto *Ext: AllExts) {
     HandledExtensions.insert(Ext);
     addMembersToRoot(TypeNode, Ext);
+
+    // Keep track if we've declared any conformances in this extension.
+    // FIXME: This is too conservative. We only _really_ care if this extension
+    //        declares a conformance to any public protocols outside the module
+    //        where the extended type originated. Eventually this should be
+    //        updated to filter extensions that declare conformances to internal
+    //        protocols that either don't inherit from any protocols or only
+    //        inherit from other internal protocols. It should also consider
+    //        conditional conformances with internal requirements that are still
+    //        part of the ABI.
+    if (!Ext->getInherited().empty())
+      anyConformancesAdded = true;
   }
+
+  // If none of the extensions added any public members or conformances, don't
+  // synthesize the type node.
+  if (TypeNode->getChildrenCount() == 0 && !anyConformancesAdded)
+    return nullptr;
+
   return TypeNode;
 }
 
@@ -1532,7 +1552,8 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
     }
   }
   for (auto Pair: ExtensionMap) {
-    RootNode->addChild(constructExternalExtensionNode(Pair.first, Pair.second));
+    if (auto child = constructExternalExtensionNode(Pair.first, Pair.second))
+      RootNode->addChild(child);
   }
 }
 

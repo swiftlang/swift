@@ -32,6 +32,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -563,6 +564,19 @@ void SourceFile::getPrecedenceGroups(
 
 void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
   Results.append(LocalTypeDecls.begin(), LocalTypeDecls.end());
+}
+
+TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
+  ASTContext &ctx = getASTContext();
+  for (auto typeDecl : LocalTypeDecls) {
+    auto typeMangledName = evaluateOrDefault(ctx.evaluator,
+                                             MangleLocalTypeDeclRequest { typeDecl },
+                                             std::string());
+    if (mangledName == typeMangledName)
+      return typeDecl;
+  }
+
+  return nullptr;
 }
 
 void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {

@@ -20,6 +20,25 @@ add_llvm_symbol_exports(libSwiftSyntaxParser ${LLVM_EXPORTED_SYMBOL_FILE})
 # Adds -dead_strip option
 add_link_opts(libSwiftSyntaxParser)
 
+if (SWIFT_LIBPARSER_VER)
+  set(SWIFTSYNTAX_PARSER_VERSION_STRING "${SWIFT_LIBPARSER_VER}")
+else()
+  set(SWIFTSYNTAX_PARSER_VERSION_STRING "${SWIFT_COMPILER_VERSION}")
+endif()
+
+if(SWIFTSYNTAX_PARSER_VERSION_STRING)
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    set(LIBPARSER_LINK_FLAGS " -Wl,-compatibility_version -Wl,1")
+    set(LIBPARSER_LINK_FLAGS "${LIBPARSER_LINK_FLAGS} -Wl,-current_version -Wl,${SWIFTSYNTAX_PARSER_VERSION_STRING}")
+    set_property(TARGET libSwiftSyntaxParser APPEND_STRING PROPERTY
+                 LINK_FLAGS ${LIBPARSER_LINK_FLAGS})
+  else()
+    set_target_properties(libSwiftSyntaxParser
+      PROPERTIES
+      VERSION ${SWIFTSYNTAX_PARSER_VERSION_STRING})
+  endif()
+endif()
+
 set_property(TARGET libSwiftSyntaxParser APPEND_STRING PROPERTY
   COMPILE_FLAGS " -fblocks")
 if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
@@ -28,6 +47,7 @@ endif()
 
 swift_install_in_component(parser-lib
   FILES "${SWIFT_LIBRARY_OUTPUT_INTDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${SYNTAX_PARSER_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 swift_install_in_component(parser-lib
   DIRECTORY "${SWIFT_MAIN_INCLUDE_DIR}/swift-c/SyntaxParser/"

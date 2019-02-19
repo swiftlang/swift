@@ -296,29 +296,29 @@ public let SetTests = [
   // Legacy benchmarks, kept for continuity with previous releases.
   BenchmarkInfo(
     name: "SetExclusiveOr", // ~"SetSymmetricDifferenceInt0"
-    runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setCD, countABCD, 100 * n) },
+    runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setAB, setCD]) }),
+    setUpFunction: { blackHole([setAB, setCD]) }, legacyFactor: 10),
   BenchmarkInfo(
     name: "SetExclusiveOr_OfObjects", // ~"SetSymmetricDifferenceBox0"
-    runFunction: { n in run_SetSymmetricDifferenceBox(setOAB, setOCD, countABCD, 100 * n) },
+    runFunction: { n in run_SetSymmetricDifferenceBox(setOAB, setOCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setOAB, setOCD]) }),
+    setUpFunction: { blackHole([setOAB, setOCD]) }, legacyFactor: 10),
   BenchmarkInfo(
     name: "SetIntersect", // ~"SetIntersectionInt0"
-    runFunction: { n in run_SetIntersectionInt(setAB, setCD, 0, 100 * n) },
+    runFunction: { n in run_SetIntersectionInt(setAB, setCD, 0, 10 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setAB, setCD]) }),
+    setUpFunction: { blackHole([setAB, setCD]) }, legacyFactor: 10),
   BenchmarkInfo(
     name: "SetUnion", // ~"SetUnionInt0"
-    runFunction: { n in run_SetUnionInt(setAB, setCD, countABCD, 100 * n) },
+    runFunction: { n in run_SetUnionInt(setAB, setCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setAB, setCD]) }),
+    setUpFunction: { blackHole([setAB, setCD]) }, legacyFactor: 10),
   BenchmarkInfo(
     name: "SetUnion_OfObjects", // ~"SetUnionBox0"
-    runFunction: { n in run_SetUnionBox(setOAB, setOCD, countABCD, 100 * n) },
+    runFunction: { n in run_SetUnionBox(setOAB, setOCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setOAB, setOCD]) }),
+    setUpFunction: { blackHole([setOAB, setOCD]) }, legacyFactor: 10),
 ]
 
 @inline(never)

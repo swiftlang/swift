@@ -485,3 +485,38 @@ bb0:
   %ret = tuple ()
   return %ret : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_stack_overlap_unreachable
+// CHECK: bb0:
+// CHECK:   [[A16:%.*]] = alloc_stack $Builtin.Int16
+// CHECK:   [[A32:%.*]] = alloc_stack $Builtin.Int32
+// CHECK: bb1:
+// CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
+// CHECK:   unreachable
+// CHECK: bb2:
+// CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
+// CHECK:   dealloc_stack [[A16]] : $*Builtin.Int16
+// CHECK:   unreachable
+// CHECK: bb3:
+// CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
+// CHECK:   dealloc_stack [[A16]] : $*Builtin.Int16
+// CHECK:   return
+// CHECK-LABEL: // end sil function 'test_stack_overlap_unreachable'
+sil [ossa] @test_stack_overlap_unreachable : $() -> () {
+bb0:
+  %stack = alloc_stack $Builtin.Int16
+  %0 = function_ref @stack_overlap : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
+  (%value, %token) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %stack : $*Builtin.Int16
+  unreachable
+
+bb2:
+  end_apply %token
+  dealloc_stack %stack : $*Builtin.Int16
+  %ret = tuple ()
+  return %ret : $()
+}
+

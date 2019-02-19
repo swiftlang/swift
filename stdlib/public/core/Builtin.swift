@@ -668,9 +668,6 @@ internal func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
 
-@_silgen_name("_swift_reallocObject")
-internal func _reallocObject(_ object: UnsafeMutableRawPointer, _ newSizeInBytes: Int) -> UnsafeMutableRawPointer?
-
 /// Returns `true` if `object` is uniquely referenced.
 /// This provides sanity checks on top of the Builtin.
 @_transparent
@@ -756,8 +753,8 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 /// declared for the parameter) and a dynamic type of `Int`.
 ///
 ///     func printInfo(_ value: Any) {
-///         let type = type(of: value)
-///         print("'\(value)' of type '\(type)'")
+///         let t = type(of: value)
+///         print("'\(value)' of type '\(t)'")
 ///     }
 ///
 ///     let count: Int = 5
@@ -819,8 +816,8 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 /// of `String.self` (the dynamic type inside the parameter).
 ///
 ///     func printGenericInfo<T>(_ value: T) {
-///         let type = type(of: value)
-///         print("'\(value)' of type '\(type)'")
+///         let t = type(of: value)
+///         print("'\(value)' of type '\(t)'")
 ///     }
 ///
 ///     protocol P {}
@@ -838,8 +835,8 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 /// calling `type(of:)`.
 ///
 ///     func betterPrintGenericInfo<T>(_ value: T) {
-///         let type = type(of: value as Any)
-///         print("'\(value)' of type '\(type)'")
+///         let t = type(of: value as Any)
+///         print("'\(value)' of type '\(t)'")
 ///     }
 ///
 ///     betterPrintGenericInfo(stringAsP)

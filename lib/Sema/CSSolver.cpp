@@ -327,15 +327,11 @@ void truncate(llvm::SmallSetVector<T, N> &vec, unsigned newSize) {
 } // end anonymous namespace
 
 ConstraintSystem::SolverState::SolverState(
-    Expr *const expr, ConstraintSystem &cs,
-    FreeTypeVariableBinding allowFreeTypeVariables)
+    ConstraintSystem &cs, FreeTypeVariableBinding allowFreeTypeVariables)
     : CS(cs), AllowFreeTypeVariables(allowFreeTypeVariables) {
   assert(!CS.solverState &&
          "Constraint system should not already have solver state!");
   CS.solverState = this;
-
-  if (expr)
-    ExprWeights = expr->getDepthMap();
 
   ++NumSolutionAttempts;
   SolutionAttempt = NumSolutionAttempts;
@@ -498,12 +494,12 @@ Optional<Solution>
 ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
                               bool allowFixes) {
 
-  SolverState state(nullptr, *this, allowFreeTypeVariables);
+  SolverState state(*this, allowFreeTypeVariables);
   state.recordFixes = allowFixes;
 
   SmallVector<Solution, 4> solutions;
   solve(solutions);
-  filterSolutions(solutions, state.ExprWeights);
+  filterSolutions(solutions);
 
   if (solutions.size() != 1)
     return Optional<Solution>();
@@ -538,7 +534,7 @@ bool ConstraintSystem::Candidate::solve(
   };
 
   // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(TC, DC, None);
+  ConstraintSystem cs(TC, DC, None, E);
   cs.baseCS = &BaseCS;
 
   // Set up expression type checker timer for the candidate.
@@ -589,7 +585,7 @@ bool ConstraintSystem::Candidate::solve(
   // Try to solve the system and record all available solutions.
   llvm::SmallVector<Solution, 2> solutions;
   {
-    SolverState state(E, cs, FreeTypeVariableBinding::Allow);
+    SolverState state(cs, FreeTypeVariableBinding::Allow);
 
     // Use solve which doesn't try to filter solution list.
     // Because we want the whole set of possible domain choices.
@@ -1179,7 +1175,7 @@ bool ConstraintSystem::solve(Expr *const expr,
                              SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
   // Set up solver state.
-  SolverState state(expr, *this, allowFreeTypeVariables);
+  SolverState state(*this, allowFreeTypeVariables);
 
   // Solve the system.
   solve(solutions);
@@ -1200,7 +1196,7 @@ bool ConstraintSystem::solve(Expr *const expr,
   // a single best solution to use, if not explicitly disabled
   // by constraint system options.
   if (!retainAllSolutions())
-    filterSolutions(solutions, state.ExprWeights);
+    filterSolutions(solutions);
 
   // We fail if there is no solution or the expression was too complex.
   return solutions.empty() || getExpressionTooComplex(solutions);
@@ -1504,17 +1500,33 @@ void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
   if (LiteralProtocols.size() <= 1)
     return;
 
-  llvm::SmallVector<Type, 2> defaultTypes;
-  for (auto *protocol : LiteralProtocols)
-    defaultTypes.push_back(CS.TC.getDefaultType(protocol, CS.DC));
+  llvm::SmallVector<std::pair<ProtocolDecl *, Type>, 2> candidates;
+  llvm::SmallVector<ProtocolDecl *, 2> skippedProtocols;
 
-  auto result = 0;
-  for (unsigned long i = 1; i < LiteralProtocols.size(); ++i) {
+  for (auto *protocol : LiteralProtocols) {
+    if (auto defaultType = CS.TC.getDefaultType(protocol, CS.DC)) {
+      candidates.push_back({protocol, defaultType});
+      continue;
+    }
+
+    // Looks like argument expected to conform to something like
+    // `ExpressibleByNilLiteral` which doesn't have a default
+    // type and as a result can't participate in minimalization.
+    skippedProtocols.push_back(protocol);
+  }
+
+  if (candidates.size() <= 1)
+    return;
+
+  unsigned result = 0;
+  for (unsigned i = 1, n = candidates.size(); i != n; ++i) {
+    const auto &candidate = candidates[i];
+
     auto first =
-        CS.TC.conformsToProtocol(defaultTypes[i], LiteralProtocols[result],
+        CS.TC.conformsToProtocol(candidate.second, candidates[result].first,
                                  CS.DC, ConformanceCheckFlags::InExpression);
     auto second =
-        CS.TC.conformsToProtocol(defaultTypes[result], LiteralProtocols[i],
+        CS.TC.conformsToProtocol(candidates[result].second, candidate.first,
                                  CS.DC, ConformanceCheckFlags::InExpression);
     if ((first && second) || (!first && !second))
       return;
@@ -1523,9 +1535,9 @@ void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
       result = i;
   }
 
-  auto *protocol = LiteralProtocols[result];
   LiteralProtocols.clear();
-  LiteralProtocols.insert(protocol);
+  LiteralProtocols.insert(candidates[result].first);
+  LiteralProtocols.insert(skippedProtocols.begin(), skippedProtocols.end());
 }
 
 void ConstraintSystem::ArgumentInfoCollector::dump() const {
@@ -1885,10 +1897,10 @@ Constraint *ConstraintSystem::selectDisjunction() {
   // disjunctions that we may not be able to short-circuit, allowing
   // us to eliminate behavior that is exponential in the number of
   // operators in the expression.
-  if (getASTContext().isSwiftVersionAtLeast(5) ||
-      TC.getLangOpts().SolverEnableOperatorDesignatedTypes)
+  if (TC.getLangOpts().SolverEnableOperatorDesignatedTypes) {
     if (auto *disjunction = selectApplyDisjunction())
       return disjunction;
+  }
 
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;

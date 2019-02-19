@@ -67,6 +67,17 @@ public:
   /// attempts to inline \arg AI and this returns false, an assert will fire.
   static bool canInlineApplySite(FullApplySite apply);
 
+  /// Returns true if inlining \arg apply can result in improperly nested stack
+  /// allocations.
+  ///
+  /// In this case stack nesting must be corrected after inlining with the
+  /// StackNesting utility.
+  static bool needsUpdateStackNesting(FullApplySite apply) {
+    // Inlining of coroutines can result in improperly nested stack
+    // allocations.
+    return isa<BeginApplyInst>(apply);
+  }
+
   /// Allow the client to track instructions before they are deleted. The
   /// registered callback is called from
   /// recursivelyDeleteTriviallyDeadInstructions.
@@ -98,6 +109,9 @@ public:
   /// if inlining will fail. All users /must/ check that a function is allowed
   /// to be inlined using SILInliner::canInlineApplySite before calling this
   /// function.
+  ///
+  /// *NOTE*: Inlining can result in improperly nested stack allocations, which
+  /// must be corrected after inlining. See needsUpdateStackNesting().
   ///
   /// Returns an iterator to the first inlined instruction (or the end of the
   /// caller block for empty functions) and the last block in function order

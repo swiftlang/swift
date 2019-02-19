@@ -98,7 +98,7 @@ ParsedSyntaxRecorder::record${node.syntax_kind}(${child_params},
 }
 
 Parsed${node.name}
-ParsedSyntaxRecorder::defer${node.syntax_kind}(${child_params}) {
+ParsedSyntaxRecorder::defer${node.syntax_kind}(${child_params}, SyntaxParsingContext &SPCtx) {
   auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, {
 %     for child in node.children:
 %       if child.is_optional:
@@ -107,7 +107,7 @@ ParsedSyntaxRecorder::defer${node.syntax_kind}(${child_params}) {
     ${child.name}.getRaw(),
 %       end
 %     end
-  });
+  }, SPCtx);
   return Parsed${node.name}(std::move(raw));
 }
 
@@ -115,7 +115,7 @@ Parsed${node.name}
 ParsedSyntaxRecorder::make${node.syntax_kind}(${child_params},
     SyntaxParsingContext &SPCtx) {
   if (SPCtx.isBacktracking())
-    return defer${node.syntax_kind}(${child_move_args});
+    return defer${node.syntax_kind}(${child_move_args}, SPCtx);
   return record${node.syntax_kind}(${child_move_args}, SPCtx.getRecorder());
 }
 
@@ -135,14 +135,15 @@ ParsedSyntaxRecorder::record${node.syntax_kind}(
 
 Parsed${node.name}
 ParsedSyntaxRecorder::defer${node.syntax_kind}(
-    ArrayRef<Parsed${node.collection_element_type}> elements) {
+    ArrayRef<Parsed${node.collection_element_type}> elements,
+    SyntaxParsingContext &SPCtx) {
   SmallVector<ParsedRawSyntaxNode, 16> layout;
   layout.reserve(elements.size());
   for (auto &element : elements) {
     layout.push_back(element.getRaw());
   }
   auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind},
-                             layout);
+                             layout, SPCtx);
   return Parsed${node.name}(std::move(raw));
 }
 
@@ -151,7 +152,7 @@ ParsedSyntaxRecorder::make${node.syntax_kind}(
     ArrayRef<Parsed${node.collection_element_type}> elements,
     SyntaxParsingContext &SPCtx) {
   if (SPCtx.isBacktracking())
-    return defer${node.syntax_kind}(elements);
+    return defer${node.syntax_kind}(elements, SPCtx);
   return record${node.syntax_kind}(elements, SPCtx.getRecorder());
 }
 
@@ -161,7 +162,7 @@ ParsedSyntaxRecorder::makeBlank${node.syntax_kind}(SourceLoc loc,
   ParsedRawSyntaxNode raw;
   if (SPCtx.isBacktracking()) {
     // FIXME: 'loc' is not preserved when capturing a deferred layout.
-    raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, {});
+    raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, {}, SPCtx);
   } else {
     raw = SPCtx.getRecorder().recordEmptyRawSyntaxCollection(SyntaxKind::${node.syntax_kind}, loc);
   }

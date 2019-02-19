@@ -935,6 +935,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
   switch (RangeInfo.RangeContext->getContextKind()) {
   case swift::DeclContextKind::Initializer:
   case swift::DeclContextKind::SubscriptDecl:
+  case swift::DeclContextKind::EnumElementDecl:
   case swift::DeclContextKind::AbstractFunctionDecl:
   case swift::DeclContextKind::AbstractClosureExpr:
   case swift::DeclContextKind::TopLevelCodeDecl:

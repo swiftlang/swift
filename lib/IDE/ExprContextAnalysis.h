@@ -25,6 +25,11 @@ class AnyFunctionType;
 
 namespace ide {
 
+/// Prepare the given expression for type-checking again, prinicipally by
+/// erasing any ErrorType types on the given expression, allowing later
+/// type-checking to make progress.
+void prepareForRetypechecking(Expr *E);
+
 /// Type check parent contexts of the given decl context, and the body of the
 /// given context until \c Loc if the context is a function body.
 void typeCheckContextUntil(DeclContext *DC, SourceLoc Loc);

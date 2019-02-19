@@ -265,8 +265,13 @@ class ARCSequenceOpts : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     auto *F = getFunction();
+
     // If ARC optimizations are disabled, don't optimize anything and bail.
     if (!getOptions().EnableARCOptimizations)
+      return;
+
+    // FIXME: We should support ownership.
+    if (F->hasOwnership())
       return;
 
     if (!EnableLoopARC) {

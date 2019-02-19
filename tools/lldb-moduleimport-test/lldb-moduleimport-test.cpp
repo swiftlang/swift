@@ -16,6 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTDemangler.h"
+#include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
@@ -92,15 +94,16 @@ static void resolveDeclFromMangledNameList(
 
 static void resolveTypeFromMangledNameList(
     swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
-  std::string Error;
   for (auto &Mangled : MangledNames) {
     swift::Type ResolvedType =
-        swift::ide::getTypeFromMangledSymbolname(Ctx, Mangled, Error);
+        swift::Demangle::getTypeForMangling(Ctx, Mangled);
     if (!ResolvedType) {
-      llvm::errs() << "Can't resolve type of " << Mangled << "\n";
+      llvm::outs() << "Can't resolve type of " << Mangled << "\n";
     } else {
-      ResolvedType->print(llvm::errs());
-      llvm::errs() << "\n";
+      swift::PrintOptions PO;
+      PO.PrintStorageRepresentationAttrs = true;
+      ResolvedType->print(llvm::outs(), PO);
+      llvm::outs() << "\n";
     }
   }
 }

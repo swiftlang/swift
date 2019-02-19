@@ -155,6 +155,11 @@ public:
       }
     }
     
+    // Constructor delegation.
+    if (auto otherCtorDeclRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
+      return AbstractFunction(otherCtorDeclRef->getDecl());
+    }
+
     // Normal function references.
     if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
       ValueDecl *decl = declRef->getDecl();
@@ -673,6 +678,16 @@ private:
   /// Classify an argument being passed to a rethrows function.
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
+
+    // If this argument is `nil` literal or `.none`,
+    // it doesn't cause the call to throw.
+    if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(arg)) {
+      if (auto *DE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+        auto &ctx = paramType->getASTContext();
+        if (DE->getDecl() == ctx.getOptionalNoneDecl())
+          return Classification();
+      }
+    }
 
     // If the parameter was structurally a tuple, try to look through the
     // various tuple operations.

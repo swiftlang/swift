@@ -2066,7 +2066,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
-  ConstraintSystem cs(*this, dc, csOptions);
+  ConstraintSystem cs(*this, dc, csOptions, expr);
   cs.baseCS = baseCS;
 
   // Verify that a purpose was specified if a convertType was.  Note that it is
@@ -2466,7 +2466,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       assert(!expr->isSemanticallyInOutExpr());
 
       // Save the locator we're using for the expression.
-      Locator = cs.getConstraintLocator(expr);
+      Locator =
+          cs.getConstraintLocator(expr, ConstraintLocator::ContextualType);
 
       // Collect constraints from the pattern.
       initType = cs.generateConstraints(pattern, Locator);

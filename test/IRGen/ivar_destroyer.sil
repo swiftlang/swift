@@ -8,7 +8,7 @@
 
 // CHECK-LABEL: @"$s14ivar_destroyer17NonTrivialDerivedCMf" = internal global <{ {{.*}} }> <{
 // CHECK-SAME:    i8* null,
-// CHECK-SAME:    i8** @"$sBoWV",
+// CHECK-SAME:    i8** {{@"\$sBoWV"|null}},
 // CHECK-SAME:    i64 ptrtoint ([[OBJCCLASS]]* @"$s14ivar_destroyer17NonTrivialDerivedCMm" to i64),
 // CHECK-SAME:    [[TYPE]]* bitcast (i64* getelementptr inbounds (<{ {{.*}} }>, <{ {{.*}} }>* @"$s14ivar_destroyer11TrivialBaseCMf", i32 0, i32 2) to [[TYPE]]*),
 // CHECK-SAME:    [[OPAQUE]]* @_objc_empty_cache,

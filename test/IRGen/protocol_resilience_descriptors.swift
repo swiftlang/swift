@@ -18,7 +18,7 @@
 // CHECK: @"default assoc type \01____y2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPQzG 18resilient_protocol7WrapperV" =
 
 // Protocol descriptor
-// CHECK-DEFINITION-LABEL: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" ={{( protected)?}} constant
+// CHECK-DEFINITION-LABEL: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" ={{( dllexport)?}}{{( protected)?}} constant
 // CHECK-DEFINITION-SAME: @"default associated conformance2T218resilient_protocol29ProtocolWithAssocTypeDefaultsP_AB014OtherResilientD0"
 
 // Associated type default + flags

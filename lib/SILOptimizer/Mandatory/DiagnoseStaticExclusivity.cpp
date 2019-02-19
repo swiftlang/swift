@@ -956,8 +956,10 @@ template <typename FollowUse>
 static void checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
   SILInstruction *user = oper->getUser();
 
-  // Ignore uses that are totally uninteresting.
-  if (isIncidentalUse(user) || onlyAffectsRefCount(user))
+  // Ignore uses that are totally uninteresting. partial_apply [stack] is
+  // terminated by a dealloc_stack instruction.
+  if (isIncidentalUse(user) || onlyAffectsRefCount(user) ||
+      isa<DeallocStackInst>(user))
     return;
 
   // Before checking conversions in general below (getSingleValueCopyOrCast),

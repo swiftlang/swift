@@ -46,7 +46,6 @@ import Chars
 import ClassArrayGetter
 import Codable
 import Combos
-import CountAlgo
 import DataBenchmarks
 import DeadArray
 import DictOfArraysToArrayOfDicts
@@ -215,8 +214,8 @@ registerBenchmark(CharacterPropertiesStashed)
 registerBenchmark(CharacterPropertiesStashedMemo)
 registerBenchmark(CharacterPropertiesPrecomputed)
 registerBenchmark(Chars)
+registerBenchmark(Codable)
 registerBenchmark(Combos)
-registerBenchmark(CountAlgo)
 registerBenchmark(ClassArrayGetter)
 registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
@@ -255,7 +254,6 @@ registerBenchmark(Histogram)
 registerBenchmark(InsertCharacter)
 registerBenchmark(IntegrateTest)
 registerBenchmark(IterateData)
-registerBenchmark(Codable)
 registerBenchmark(Join)
 registerBenchmark(LazyFilter)
 registerBenchmark(LinkedList)

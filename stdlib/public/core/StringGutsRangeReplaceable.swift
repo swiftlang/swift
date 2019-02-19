@@ -84,7 +84,7 @@ extension _StringGuts {
     if _fastPath(isFastUTF8) {
       let isASCII = self.isASCII
       let storage = self.withFastUTF8 {
-        _StringStorage.create(
+        __StringStorage.create(
           initializingFrom: $0, capacity: growthTarget, isASCII: isASCII)
       }
 
@@ -101,7 +101,7 @@ extension _StringGuts {
     // into a StringStorage space.
     let selfUTF8 = Array(String(self).utf8)
     selfUTF8.withUnsafeBufferPointer {
-      self = _StringGuts(_StringStorage.create(
+      self = _StringGuts(__StringStorage.create(
         initializingFrom: $0, capacity: n, isASCII: self.isASCII))
     }
   }

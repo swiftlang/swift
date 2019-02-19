@@ -180,6 +180,14 @@ option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        TRUE)
 
+# Allow building Swift with Clang's Profile Guided Optimization
+if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
+  if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+    message(FATAL_ERROR "SWIFT_PROFDATA_FILE can only be specified when compiling with clang")
+  endif()
+  add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
+endif()
+
 #
 # User-configurable Android specific options.
 #
@@ -310,10 +318,6 @@ option(SWIFT_STDLIB_USE_NONATOMIC_RC
 option(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP
   "Build the standard libraries and overlays with sil ownership enabled."
   FALSE)
-
-option(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-  "Build the standard libraries, overlays, and runtime with normal arguments at +0"
-  TRUE)
 
 option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."
@@ -803,7 +807,6 @@ message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_
 message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
 message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
-message(STATUS "  +0 Normal Args: ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
 message(STATUS "")
 
 if (SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
@@ -811,12 +814,10 @@ if (SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
   message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
   message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
-  message(STATUS "  +0 Normal Args:   ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
   message(STATUS "")
 
   message(STATUS "Building Swift runtime with:")
   message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
-  message(STATUS "  +0 Normal Args:                     ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
   message(STATUS "")
 
 else()
@@ -977,12 +978,24 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   add_dependencies(dispatch libdispatch-install)
   add_dependencies(BlocksRuntime libdispatch-install)
 
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    set(SOURCEKIT_RUNTIME_DIR bin)
+  else()
+    set(SOURCEKIT_RUNTIME_DIR lib)
+  endif()
   swift_install_in_component(sourcekit-inproc
                              FILES
                                $<TARGET_FILE:dispatch>
                                $<TARGET_FILE:BlocksRuntime>
-                             DESTINATION
-                               lib${LLVM_LIBDIR_SUFFIX})
+                             DESTINATION ${SOURCEKIT_RUNTIME_DIR})
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    swift_install_in_component(sourcekit-inproc
+                               FILES
+                                 $<TARGET_LINKER_FILE:dispatch>
+                                 $<TARGET_LINKER_FILE:BlocksRuntime>
+                               DESTINATION lib)
+  endif()
+
 
   # FIXME(compnerd) this should be taken care of by the
   # INTERFACE_INCLUDE_DIRECTORIES above

@@ -56,11 +56,11 @@ extension _StringGuts {
   }
 
   @inline(__always)
-  internal init(_ storage: _StringStorage) {
+  internal init(_ storage: __StringStorage) {
     self.init(_StringObject(storage))
   }
 
-  internal init(_ storage: _SharedStringStorage) {
+  internal init(_ storage: __SharedStringStorage) {
     self.init(_StringObject(storage))
   }
 

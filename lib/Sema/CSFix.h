@@ -37,6 +37,7 @@ class SourceManager;
 
 namespace constraints {
 
+class OverloadChoice;
 class ConstraintSystem;
 class ConstraintLocator;
 class Solution;
@@ -104,6 +105,20 @@ enum class FixKind : uint8_t {
   /// fix this issue by pretending that member exists and matches
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
+
+  /// Allow expressions where 'mutating' method is only partially applied,
+  /// which means either not applied at all e.g. `Foo.bar` or only `Self`
+  /// is applied e.g. `foo.bar` or `Foo.bar(&foo)`.
+  ///
+  /// Allow expressions where initializer call (either `self.init` or
+  /// `super.init`) is only partially applied.
+  AllowInvalidPartialApplication,
+
+  /// Non-required constructors may not be not inherited. Therefore when
+  /// constructing a class object, either the metatype must be statically
+  /// derived (rather than an arbitrary value of metatype type) or the
+  /// referenced constructor must be required.
+  AllowInvalidInitRef,
 };
 
 class ConstraintFix {
@@ -111,13 +126,20 @@ class ConstraintFix {
   FixKind Kind;
   ConstraintLocator *Locator;
 
+  /// Determines whether this fix is simplify a warning which doesn't
+  /// require immediate source changes.
+  bool IsWarning;
+
 public:
-  ConstraintFix(ConstraintSystem &cs, FixKind kind, ConstraintLocator *locator)
-      : CS(cs), Kind(kind), Locator(locator) {}
+  ConstraintFix(ConstraintSystem &cs, FixKind kind, ConstraintLocator *locator,
+                bool warning = false)
+      : CS(cs), Kind(kind), Locator(locator), IsWarning(warning) {}
 
   virtual ~ConstraintFix();
 
   FixKind getKind() const { return Kind; }
+
+  bool isWarning() const { return IsWarning; }
 
   virtual std::string getName() const = 0;
 
@@ -159,16 +181,24 @@ public:
 
 /// Introduce a '!' to force an optional unwrap.
 class ForceOptional final : public ConstraintFix {
-  ForceOptional(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ForceOptional, locator) {}
+  Type BaseType;
+  Type UnwrappedType;
+
+  ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
+                ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
+        UnwrappedType(unwrappedType) {
+    assert(baseType && "Base type must not be null");
+    assert(unwrappedType && "Unwrapped type must not be null");
+  }
 
 public:
   std::string getName() const override { return "force optional"; }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static ForceOptional *create(ConstraintSystem &cs,
-                               ConstraintLocator *locator);
+  static ForceOptional *create(ConstraintSystem &cs, Type baseType,
+                               Type unwrappedType, ConstraintLocator *locator);
 };
 
 /// Unwrap an optional base when we have a member access.
@@ -411,10 +441,10 @@ public:
 /// }
 /// ```
 class AutoClosureForwarding final : public ConstraintFix {
-public:
   AutoClosureForwarding(ConstraintSystem &cs, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AutoClosureForwarding, locator) {}
 
+public:
   std::string getName() const override { return "fix @autoclosure forwarding"; }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
@@ -426,10 +456,10 @@ public:
 class RemoveUnwrap final : public ConstraintFix {
   Type BaseType;
 
-public:
   RemoveUnwrap(ConstraintSystem &cs, Type baseType, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::RemoveUnwrap, locator), BaseType(baseType) {}
 
+public:
   std::string getName() const override {
     return "remove unwrap operator `!` or `?`";
   }
@@ -441,10 +471,10 @@ public:
 };
 
 class InsertExplicitCall final : public ConstraintFix {
-public:
   InsertExplicitCall(ConstraintSystem &cs, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::InsertCall, locator) {}
 
+public:
   std::string getName() const override {
     return "insert explicit `()` to make a call";
   }
@@ -456,10 +486,10 @@ public:
 };
 
 class UseSubscriptOperator final : public ConstraintFix {
-public:
   UseSubscriptOperator(ConstraintSystem &cs, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::UseSubscriptOperator, locator) {}
 
+public:
   std::string getName() const override {
     return "replace '.subscript(...)' with subscript operator";
   }
@@ -474,12 +504,12 @@ class DefineMemberBasedOnUse final : public ConstraintFix {
   Type BaseType;
   DeclName Name;
 
-public:
   DefineMemberBasedOnUse(ConstraintSystem &cs, Type baseType, DeclName member,
                          ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::DefineMemberBasedOnUse, locator),
         BaseType(baseType), Name(member) {}
 
+public:
   std::string getName() const override {
     llvm::SmallVector<char, 16> scratch;
     auto memberName = Name.getString(scratch);
@@ -492,6 +522,72 @@ public:
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclName member,
                                         ConstraintLocator *locator);
+};
+
+class AllowInvalidPartialApplication final : public ConstraintFix {
+  AllowInvalidPartialApplication(bool isWarning, ConstraintSystem &cs,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPartialApplication, locator,
+                      isWarning) {}
+
+public:
+  std::string getName() const override {
+    return "allow partially applied 'mutating' method";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInvalidPartialApplication *create(bool isWarning,
+                                                ConstraintSystem &cs,
+                                                ConstraintLocator *locator);
+};
+
+class AllowInvalidInitRef final : public ConstraintFix {
+  enum class RefKind {
+    DynamicOnMetatype,
+    ProtocolMetatype,
+    NonConstMetatype,
+  } Kind;
+
+  Type BaseType;
+  const ConstructorDecl *Init;
+  bool IsStaticallyDerived;
+  SourceRange BaseRange;
+
+  AllowInvalidInitRef(ConstraintSystem &cs, RefKind kind, Type baseTy,
+                      ConstructorDecl *init, bool isStaticallyDerived,
+                      SourceRange baseRange, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidInitRef, locator), Kind(kind),
+        BaseType(baseTy), Init(init), IsStaticallyDerived(isStaticallyDerived),
+        BaseRange(baseRange) {}
+
+public:
+  std::string getName() const override {
+    return "allow invalid initializer reference";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInvalidInitRef *
+  dynamicOnMetatype(ConstraintSystem &cs, Type baseTy, ConstructorDecl *init,
+                    SourceRange baseRange, ConstraintLocator *locator);
+
+  static AllowInvalidInitRef *
+  onProtocolMetatype(ConstraintSystem &cs, Type baseTy, ConstructorDecl *init,
+                     bool isStaticallyDerived, SourceRange baseRange,
+                     ConstraintLocator *locator);
+
+  static AllowInvalidInitRef *onNonConstMetatype(ConstraintSystem &cs,
+                                                 Type baseTy,
+                                                 ConstructorDecl *init,
+                                                 ConstraintLocator *locator);
+
+private:
+  static AllowInvalidInitRef *create(RefKind kind, ConstraintSystem &cs,
+                                     Type baseTy, ConstructorDecl *init,
+                                     bool isStaticallyDerived,
+                                     SourceRange baseRange,
+                                     ConstraintLocator *locator);
 };
 
 } // end namespace constraints

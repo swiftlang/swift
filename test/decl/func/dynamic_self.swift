@@ -393,3 +393,23 @@ final class FinalFactory : FactoryPattern {
     self.init(factory: FinalFactory(_string: string))
   }
 }
+
+// Operators returning Self
+
+class SelfOperator {
+  required init() {}
+
+  static func +(lhs: SelfOperator, rhs: SelfOperator) -> Self {
+    return self.init()
+  }
+
+  func double() -> Self {
+    // FIXME: Should this work?
+    return self + self // expected-error {{cannot convert return expression of type 'SelfOperator' to return type 'Self'}}
+  }
+}
+
+func useSelfOperator() {
+  let s = SelfOperator()
+  _ = s + s
+}

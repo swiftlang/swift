@@ -190,10 +190,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
     Mangler.setReturnValueOwnedToUnowned();
   }
 
-  auto MangledName = Mangler.mangle();
-  assert(!F->getModule().hasFunction(MangledName));
-
-  return MangledName;
+  return Mangler.mangle();
 }
 
 /// Collect all archetypes used by a function.
@@ -483,6 +480,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   SILFunction *F = TransformDescriptor.OriginalFunction;
   SILModule &M = F->getModule();
   std::string Name = TransformDescriptor.createOptimizedSILFunctionName();
+  // The transformed function must not already exist. This would indicate
+  // repeated application of FSO on the same function. That situation should be
+  // detected earlier by avoiding reoptimization of FSO thunks.
+  assert(!F->getModule().hasFunction(Name));
+
   SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
   LLVM_DEBUG(llvm::dbgs() << "  -> create specialized function " << Name
@@ -616,6 +618,19 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 bool FunctionSignatureTransform::run(bool hasCaller) {
   bool Changed = false;
   SILFunction *F = TransformDescriptor.OriginalFunction;
+
+  // Never repeat the same function signature optimization on the same function.
+  // Multiple function signature optimizations are composed by successively
+  // optmizing the newly created functions. Each optimization creates a new
+  // level of thunk. Those should all be ultimately inlined away.
+  //
+  // This happens, for example, when a new reference to the original function is
+  // discovered during devirtualization. That will cause the original function
+  // (now and FSO thunk) to be pushed back on the function pass pipeline.
+  if (F->isThunk() == IsSignatureOptimizedThunk) {
+    LLVM_DEBUG(llvm::dbgs() << "  FSO already performed on this thunk\n");
+    return false;
+  }
 
   if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
     LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");

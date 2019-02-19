@@ -374,6 +374,14 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
+  // Determines whether this type variable represents an object
+  // of the optional type extracted by force unwrap.
+  bool isOptionalObject = false;
+  if (auto *locator = typeVar->getImpl().getLocator()) {
+    auto *anchor = locator->getAnchor();
+    isOptionalObject = anchor && isa<ForceValueExpr>(anchor);
+  }
+
   // Gather the constraints associated with this type variable.
   llvm::SetVector<Constraint *> constraints;
   getConstraintGraph().gatherConstraints(
@@ -389,7 +397,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   auto &tc = getTypeChecker();
   bool hasNonDependentMemberRelationalConstraints = false;
   bool hasDependentMemberRelationalConstraints = false;
-  bool sawNilLiteral = false;
   for (auto constraint : constraints) {
     switch (constraint->getKind()) {
     case ConstraintKind::Bind:
@@ -425,6 +432,18 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       auto type = binding->BindingType;
       if (exactTypes.insert(type->getCanonicalType()).second) {
         result.addPotentialBinding(*binding);
+
+        // Result of force unwrap is always connected to its base
+        // optional type via `OptionalObject` constraint which
+        // preserves l-valueness, so in case where object type got
+        // inferred before optional type (because it got the
+        // type from context e.g. parameter type of a function call),
+        // we need to test type with and without l-value after
+        // delaying bindings for as long as possible.
+        if (isOptionalObject && !type->is<LValueType>()) {
+          result.addPotentialBinding(binding->withType(LValueType::get(type)));
+          result.FullyBound = true;
+        }
 
         if (auto *locator = typeVar->getImpl().getLocator()) {
           auto path = locator->getPath();
@@ -507,7 +526,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       // supertype bindings.
       if (constraint->getProtocol()->isSpecificProtocol(
               KnownProtocolKind::ExpressibleByNilLiteral)) {
-        sawNilLiteral = true;
         addOptionalSupertypeBindings = true;
       }
 
@@ -746,32 +764,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       result.FullyBound = true;
     else
       result.Bindings.clear();
-  }
-
-  // Revise any optional-of-function-types we may try to nil literals
-  // to be non-throwing so they don't inadvertantly result in rethrows
-  // diagnostics.
-  if (sawNilLiteral) {
-    for (auto &binding : result.Bindings) {
-      auto nested = binding.BindingType->lookThroughAllOptionalTypes();
-      if (!nested)
-        continue;
-
-      if (!nested->is<FunctionType>())
-        continue;
-
-      // Remove throws from the nested function type.
-      binding.BindingType =
-          binding.BindingType.transform([&](Type inner) -> Type {
-            auto *fnTy = dyn_cast<FunctionType>(inner.getPointer());
-            if (!fnTy)
-              return inner;
-
-            auto extInfo = fnTy->getExtInfo().withThrows(false);
-            return FunctionType::get(fnTy->getParams(), fnTy->getResult(),
-                                     extInfo);
-          });
-    }
   }
 
   return result;

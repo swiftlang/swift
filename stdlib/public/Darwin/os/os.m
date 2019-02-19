@@ -87,19 +87,17 @@ _swift_os_log(
   if (_os_log_encode(buf, fmt, args, saved_errno, &ob)) {
     if (os_log_pack_send) {
       size_t sz = _os_log_pack_size(ob.ob_len);
-      union {
-        os_log_pack_s pack;
-        uint8_t buf[OS_LOG_FMT_BUF_SIZE + sizeof(os_log_pack_s)];
-      } u;
+      uint8_t _Alignas(os_log_pack_s) buf[sz];
+      os_log_pack_t p = (os_log_pack_t)buf;
       /*
        * _os_log_encode has already packed `saved_errno` into a
        * OSLF_CMD_TYPE_SCALAR command as the OSLF_CMD_TYPE_ERRNO does not
        * deploy backwards, so pass zero for errno here.
        */
-      uint8_t *ptr = _os_log_pack_fill(&u.pack, sz, 0, dso, fmt);
-      u.pack.olp_pc = ra;
+      uint8_t *ptr = _os_log_pack_fill(p, sz, 0, dso, fmt);
+      p->olp_pc = ra;
       memcpy(ptr, buf, ob.ob_len);
-      os_log_pack_send(&u.pack, h, type);
+      os_log_pack_send(p, h, type);
     } else {
       _os_log_impl((void *)dso, h, type, fmt, (uint8_t *)buf, ob.ob_len);
     }
@@ -138,15 +136,13 @@ _swift_os_signpost_with_format(
       _os_log_encode(buf, fmt, args, saved_errno, &ob);
   if (encoded) {
     size_t sz = _os_log_pack_size(ob.ob_len);
-    union {
-      os_log_pack_s pack;
-      uint8_t buf[OS_LOG_FMT_BUF_SIZE + sizeof(os_log_pack_s)];
-    } u;
-    uint8_t *ptr = _os_signpost_pack_fill(&u.pack, sz, saved_errno, dso,
+    uint8_t _Alignas(os_log_pack_s) buf[sz];
+    os_log_pack_t p = (os_log_pack_t)buf;
+    uint8_t *ptr = _os_signpost_pack_fill(p, sz, saved_errno, dso,
         fmt, spnm, spid);
-    u.pack.olp_pc = ra;
+    p->olp_pc = ra;
     memcpy(ptr, buf, ob.ob_len);
-    _os_signpost_pack_send(&u.pack, h, spty);
+    _os_signpost_pack_send(p, h, spty);
   }
 }
 

@@ -1,4 +1,4 @@
-// RUN: %swift -target thumbv7--windows-itanium -parse-stdlib -parse-as-library -module-name Swift -O -emit-ir %s -o - | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target thumbv7--windows-itanium -parse-stdlib -parse-as-library -module-name Swift -O -emit-ir %s -o - | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=ARM
 
@@ -15,8 +15,14 @@ public protocol P {
   associatedtype T
 }
 
+enum E {
+  case a
+  case b
+}
+
 public struct S : P {
   public typealias T = Optional<S>
+  var e = E.a
 }
 
 var gg = S()

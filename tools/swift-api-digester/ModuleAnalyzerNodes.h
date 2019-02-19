@@ -648,6 +648,8 @@ public:
 
   void printTopLevelNames();
 
+  /// Adds all conformances from the provided NominalTypeDecl to the provided
+  /// SDK node for that type decl.
   void addConformancesToTypeDecl(SDKNodeDeclType *Root, NominalTypeDecl* NTD);
   void addMembersToRoot(SDKNode *Root, IterableDeclContext *Context);
 

@@ -58,19 +58,6 @@ maskingShifts = [
       llvmName=lambda _: 'shl'),
 ]
 
-IntMax = 'Int%s' % int_max_bits
-UIntMax = 'UInt%s' % int_max_bits
-}%
-
-// FIXME(integers): remove these two aliases
-/// The largest native signed integer type.
-@available(swift, obsoleted: 4.0, renamed: "${IntMax}")
-public typealias IntMax = ${IntMax}
-/// The largest native unsigned integer type.
-@available(swift, obsoleted: 4.0, renamed: "${UIntMax}")
-public typealias UIntMax = ${UIntMax}
-
-%{
 #===-----------------------------------------------------------------------===//
 #===--- Operator Documentation --------------------------------------------===//
 #===-----------------------------------------------------------------------===//
@@ -1628,17 +1615,6 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 % end
 
-  @available(swift, obsoleted: 4.0, message: "Use initializers instead")
-  public func to${U}IntMax() -> ${U}Int64 {
-    return numericCast(self)
-  }
-
-  @available(swift, obsoleted: 4, message: "Use bitWidth instead.")
-  public static var _sizeInBits: ${Self} { return ${bits} }
-
-  @available(swift, obsoleted: 4)
-  public static var _sizeInBytes: ${Self} { return ${bits}/8 }
-
   /// Returns `-1` if this value is negative and `1` if it's positive;
   /// otherwise, `0`.
   ///
@@ -1687,36 +1663,6 @@ extension ${Self} : _HasCustomAnyHashableRepresentation {
   }
 }
 
-% for src_type in all_integer_types(word_bits):
-%   srcBits = src_type.bits
-%   srcSigned = src_type.is_signed
-%   Src = src_type.stdlib_name
-%   if should_define_truncating_bit_pattern_init(src_ty=src_type, dst_ty=self_type):
-extension ${Self} {
-  /// Creates a new instance with the same bitwise representation as the least
-  /// significant bits of the given value.
-  ///
-  /// This initializer performs no range or overflow checking. The resulting
-  /// instance may have a different numeric value from `source`.
-  ///
-  /// - Parameter source: An integer to use as the source of the new value's
-  ///   bit pattern.
-  @available(swift, obsoleted: 4.0, renamed: "init(truncatingIfNeeded:)")
-  @_transparent
-  public init(truncatingBitPattern source: ${Src}) {
-    let src = source._value
-%     if self_type.bits == src_type.bits:
-    let dstNotWord = src
-%     else:
-    let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(src)
-%     end
-    self._value = dstNotWord
-  }
-}
-%   end
-% end
-
-
 // FIXME(integers): this section here is to help the typechecker,
 // as it seems to have problems with a pattern where the nonmutating operation
 // is defined on a protocol in terms of a mutating one that is itself defined
@@ -1731,32 +1677,6 @@ ${operatorComment(x.operator, True)}
     var lhs = lhs
     lhs ${x.operator}= rhs
     return lhs
-  }
-
-%   end
-
-%   for op in maskingShifts:
-
-${operatorComment(x.operator, True)}
-  @available(swift, obsoleted: 4)
-  @_semantics("optimize.sil.specialize.generic.partial.never")
-  @_transparent
-  public static func ${op.nonMaskingOperator}(
-    lhs: ${Self}, rhs: ${Self}
-  ) -> ${Self} {
-    var lhs = lhs
-    ${op.helper}Generic(&lhs, rhs)
-    return lhs
-  }
-
-${assignmentOperatorComment(x.operator, True)}
-  @available(swift, obsoleted: 4)
-  @_semantics("optimize.sil.specialize.generic.partial.never")
-  @_transparent
-  public static func ${op.nonMaskingOperator}=(
-    lhs: inout ${Self}, rhs: ${Self}
-  ) {
-    ${op.helper}Generic(&lhs, rhs)
   }
 
 %   end

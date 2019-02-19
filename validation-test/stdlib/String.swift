@@ -1201,8 +1201,8 @@ StringTests.test("Conversions") {
 }
 
 
-#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
-import Glibc
+#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
 #endif
 
 StringTests.test("lowercased()") {

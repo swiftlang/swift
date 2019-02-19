@@ -377,6 +377,9 @@ func keywordInCaseAndLocalArgLabel(_ for: Int, for in: Int, class _: Int) {
   case (let x, let y):
 // CHECK: <kw>case</kw> (<kw>let</kw> x, <kw>let</kw> y):
     print(x, y)
+  @unknown default:
+// CHECK: <attr-id>@unknown</attr-id> <kw>default</kw>:
+    ()
   }
 }
 

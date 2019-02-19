@@ -876,6 +876,7 @@ private:
       // non-whole-module generation.
       sil = performSILGeneration(*M->getFiles().front(), CI.getSILOptions());
       runSILDiagnosticPasses(*sil);
+      runSILOwnershipEliminatorPass(*sil);
       runSILLoweringPasses(*sil);
     }
 
@@ -1053,7 +1054,7 @@ public:
         unsigned BufferID =
             CI.getSourceMgr().addMemBufferCopy(Line, "<REPL Input>");
         Lexer L(CI.getASTContext().LangOpts,
-                CI.getSourceMgr(), BufferID, nullptr, false /*not SIL*/);
+                CI.getSourceMgr(), BufferID, nullptr, LexerMode::Swift);
         Token Tok;
         L.lex(Tok);
         assert(Tok.is(tok::colon));

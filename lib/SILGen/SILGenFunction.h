@@ -668,12 +668,6 @@ public:
                                CanAnyFunctionType blockTy,
                                CanSILFunctionType loweredBlockTy);
 
-  /// Given a non-canonical function type, create a thunk for the function's
-  /// canonical type.
-  ManagedValue emitCanonicalFunctionThunk(SILLocation loc, ManagedValue fn,
-                                          CanSILFunctionType nonCanonicalTy,
-                                          CanSILFunctionType canonicalTy);
-
   /// Thunk with the signature of a base class method calling a derived class
   /// method.
   ///
@@ -855,7 +849,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   ManagedValue emitInjectEnum(SILLocation loc,
-                              ArgumentSource payload,
+                              ArgumentSource &&payload,
                               SILType enumTy,
                               EnumElementDecl *element,
                               SGFContext C);
@@ -1225,6 +1219,10 @@ public:
                                             SubstitutionMap subs,
                                             AccessStrategy strategy,
                                             Expr *indices);
+
+  RValue prepareEnumPayload(EnumElementDecl *element,
+                            CanFunctionType substFnType,
+                            ArgumentSource &&indexExpr);
 
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,

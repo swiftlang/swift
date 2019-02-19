@@ -109,6 +109,8 @@ enum class TriviaKind {
 % end
 };
 
+bool isCommentTriviaKind(TriviaKind kind);
+
 /// A contiguous stretch of a single kind of trivia. The constituent part of
 /// a `Trivia` collection.
 ///
@@ -150,6 +152,8 @@ public:
 % end
 % end
 
+  static TriviaPiece fromText(TriviaKind kind, StringRef text);
+
   /// Return kind of the trivia.
   TriviaKind getKind() const { return Kind; }
 
@@ -174,7 +178,9 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
-  bool isComment() const;
+  bool isComment() const {
+    return isCommentTriviaKind(getKind());
+  }
 
   void accumulateAbsolutePosition(AbsolutePosition &Pos) const;
   

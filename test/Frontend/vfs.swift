@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: sed -e "s:INPUT_DIR:%S/Inputs:g" -e "s:OUT_DIR:%t:g" %S/Inputs/vfs/vfsoverlay.yaml > %t/overlay.yaml
-// RUN: sed -e "s:INPUT_DIR:%S/Inputs:g" -e "s:OUT_DIR:%t:g" %S/Inputs/vfs/secondary-vfsoverlay.yaml > %t/secondary-overlay.yaml
-// RUN: sed -e "s:INPUT_DIR:%S/Inputs:g" -e "s:OUT_DIR:%t:g" %S/Inputs/vfs/tertiary-vfsoverlay.yaml > %t/tertiary-overlay.yaml
+// RUN: sed -e "s|INPUT_DIR|%/S/Inputs|g" -e "s|OUT_DIR|%/t|g" %S/Inputs/vfs/vfsoverlay.yaml > %t/overlay.yaml
+// RUN: sed -e "s|INPUT_DIR|%/S/Inputs|g" -e "s|OUT_DIR|%/t|g" %S/Inputs/vfs/secondary-vfsoverlay.yaml > %t/secondary-overlay.yaml
+// RUN: sed -e "s|INPUT_DIR|%/S/Inputs|g" -e "s|OUT_DIR|%/t|g" %S/Inputs/vfs/tertiary-vfsoverlay.yaml > %t/tertiary-overlay.yaml
 
 // RUN: not %target-swift-frontend -vfsoverlay %t/overlay.yaml -typecheck %s %t/mapped-file.swift -serialize-diagnostics-path %t/basic.dia 2>&1 | %FileCheck -check-prefix=BASIC_MAPPING_ERROR %s
 // RUN: c-index-test -read-diagnostics %t/basic.dia 2>&1 | %FileCheck -check-prefix=BASIC_MAPPING_ERROR %s

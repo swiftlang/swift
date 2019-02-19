@@ -588,7 +588,7 @@ public:
     case Kind::IndirectValue:
       assert(Substitutions.empty());
       return IndirectValue;
-
+    case Kind::EnumElement:
     case Kind::StandaloneFunction: {
       auto constantInfo = SGF.getConstantInfo(*constant);
       SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
@@ -600,8 +600,6 @@ public:
           SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo, true);
       return ManagedValue::forUnmanaged(ref);
     }
-    case Kind::EnumElement:
-      llvm_unreachable("Should have been curried");
     case Kind::ClassMethod: {
       auto methodTy = SGF.SGM.Types.getConstantOverrideType(*constant);
 
@@ -704,8 +702,11 @@ public:
       auto constantInfo = SGF.getConstantInfo(*constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
-    case Kind::EnumElement:
-      llvm_unreachable("Should have been curried");
+    case Kind::EnumElement: {
+      // Emit a direct call to the element constructor thunk.
+      auto constantInfo = SGF.getConstantInfo(*constant);
+      return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
+    }
     case Kind::ClassMethod: {
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(*constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
@@ -4526,10 +4527,14 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
   ArgumentSource payload;
   if (element->hasAssociatedValues()) {
     assert(uncurriedSites.size() == 2);
+    SmallVector<ManagedValue, 4> argVals;
+    auto resultFnType = cast<FunctionType>(formalResultType);
+    auto arg = SGF.prepareEnumPayload(element, resultFnType,
+                                      std::move(uncurriedSites[1]).forward());
+    payload = ArgumentSource(element, std::move(arg));
     formalResultType = firstLevelResult.formalType.getResult();
     origFormalType = origFormalType.getFunctionResultType();
     claimNextParamClause(firstLevelResult.formalType);
-    payload = std::move(uncurriedSites[1]).forward();
   } else {
     assert(uncurriedSites.size() == 1);
   }
@@ -4537,7 +4542,8 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
   assert(substFnType->getNumResults() == 1);
   (void)substFnType;
   ManagedValue resultMV = SGF.emitInjectEnum(
-      uncurriedLoc, std::move(payload), SGF.getLoweredType(formalResultType),
+      uncurriedLoc, std::move(payload),
+      SGF.getLoweredType(formalResultType),
       element, uncurriedContext);
   firstLevelResult.value =
       RValue(SGF, uncurriedLoc, formalResultType, resultMV);
@@ -5247,7 +5253,7 @@ void SILGenFunction::emitRawYield(SILLocation loc,
 /// unnecessary copies by emitting the payload directly into the enum
 /// payload, or into the box in the case of an indirect payload.
 ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
-                                            ArgumentSource payload,
+                                            ArgumentSource &&payload,
                                             SILType enumTy,
                                             EnumElementDecl *element,
                                             SGFContext C) {
@@ -5290,8 +5296,8 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
     CleanupHandle uninitCleanup = enterDeallocBoxCleanup(box);
 
     BoxInitialization dest(box, addr, uninitCleanup, initCleanup);
-
-    std::move(payload).forwardInto(*this, origFormalType, &dest, payloadTL);
+    std::move(payload).forwardInto(*this, origFormalType, &dest,
+                                   payloadTL);
 
     payloadMV = dest.getManagedBox();
     loweredPayloadType = payloadMV.getType();
@@ -5325,8 +5331,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
         } else if (payloadTL.isLoadable()) {
           // The payload of this specific enum case might be loadable
           // even if the overall enum is address-only.
-          payloadMV =
-              std::move(payload).getAsSingleValue(*this, origFormalType);
+          payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
           B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
                                     StoreOwnershipQualifier::Init);
         } else {
@@ -5520,6 +5525,28 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
                                            stringLiteral->getEncoding());
     builtinInit = stringLiteral->getBuiltinInitializer();
     init = stringLiteral->getInitializer();
+  } else if (auto nilLiteral = dyn_cast<NilLiteralExpr>(literal)) {
+    builtinLiteralArgs = emitEmptyTupleRValue(literal, C);
+    builtinInit = nilLiteral->getInitializer();
+  } else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal)) {
+    auto i1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    SILValue boolValue = B.createIntegerLiteral(booleanLiteral, i1Ty,
+                                                booleanLiteral->getValue());
+    ManagedValue boolManaged = ManagedValue::forUnmanaged(boolValue);
+    CanType ty = boolManaged.getType().getASTType()->getCanonicalType();
+    builtinLiteralArgs = RValue(*this, {boolManaged}, ty);
+    builtinInit = booleanLiteral->getBuiltinInitializer();
+    init = booleanLiteral->getInitializer();
+  } else if (auto integerLiteral = dyn_cast<IntegerLiteralExpr>(literal)) {
+    ManagedValue integerManaged =
+        ManagedValue::forUnmanaged(B.createIntegerLiteral(
+            integerLiteral,
+            SILType::getBuiltinIntegerLiteralType(getASTContext()),
+            integerLiteral->getRawValue()));
+    CanType ty = integerManaged.getType().getASTType()->getCanonicalType();
+    builtinLiteralArgs = RValue(*this, {integerManaged}, ty);
+    builtinInit = integerLiteral->getBuiltinInitializer();
+    init = integerLiteral->getInitializer();
   } else {
     ASTContext &ctx = getASTContext();
     SourceLoc loc = literal->getStartLoc();
@@ -5549,7 +5576,23 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     }
 
     case MagicIdentifierLiteralExpr::Line:
-    case MagicIdentifierLiteralExpr::Column:
+    case MagicIdentifierLiteralExpr::Column: {
+      SourceLoc Loc = literal->getStartLoc();
+      unsigned Value = 0;
+      if (Loc.isValid()) {
+        Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
+                    ? ctx.SourceMgr.getLineAndColumn(Loc).first
+                    : ctx.SourceMgr.getLineAndColumn(Loc).second;
+      }
+
+      auto Ty = SILType::getBuiltinIntegerLiteralType(ctx);
+      SILValue V = B.createIntegerLiteral(literal, Ty, Value);
+      builtinLiteralArgs = RValue(*this, {ManagedValue::forUnmanaged(V)},
+                                  Ty.getASTType()->getCanonicalType());
+      builtinInit = magicLiteral->getBuiltinInitializer();
+      init = magicLiteral->getInitializer();
+      break;
+    }
     case MagicIdentifierLiteralExpr::DSOHandle:
       llvm_unreachable("handled elsewhere");
     }
@@ -5955,6 +5998,36 @@ static void collectFakeIndexParameters(SILGenModule &SGM,
                                     convention});
 }
 
+static void emitPseudoFunctionArguments(SILGenFunction &SGF,
+                                        CanFunctionType substFnType,
+                                        SmallVectorImpl<ManagedValue> &outVals,
+                                        ArgumentSource &&source) {
+  auto substParams = substFnType->getParams();
+
+  SmallVector<SILParameterInfo, 4> substParamTys;
+  for (auto substParam : substParams) {
+    auto substParamType = substParam.getParameterType()->getCanonicalType();
+    collectFakeIndexParameters(SGF.SGM, substParamType, substParamTys);
+  }
+
+  SmallVector<ManagedValue, 4> argValues;
+  SmallVector<DelayedArgument, 2> delayedArgs;
+
+  ArgEmitter emitter(SGF, SILFunctionTypeRepresentation::Thin,
+                     /*yield*/ false,
+                     /*isForCoroutine*/ false, ClaimedParamsRef(substParamTys),
+                     argValues, delayedArgs,
+                     /*foreign error*/ None, ImportAsMemberStatus());
+
+  emitter.emitTopLevel(std::move(source), AbstractionPattern(substFnType));
+
+  // TODO: do something to preserve LValues in the delayed arguments?
+  if (!delayedArgs.empty())
+    emitDelayedArguments(SGF, delayedArgs, argValues);
+
+  outVals.swap(argValues);
+}
+
 PreparedArguments
 SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
                                         SubstitutionMap subs,
@@ -5980,26 +6053,8 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
 
   auto substParams = substFnType->getParams();
 
-  SmallVector<SILParameterInfo, 4> substParamTys;
-  for (auto substParam : substParams) {
-    auto substParamType = substParam.getParameterType()->getCanonicalType();
-    collectFakeIndexParameters(SGM, substParamType, substParamTys);
-  }
-
   SmallVector<ManagedValue, 4> argValues;
-  SmallVector<DelayedArgument, 2> delayedArgs;
-
-  ArgEmitter emitter(*this, SILFunctionTypeRepresentation::Thin,
-                     /*yield*/ false,
-                     /*isForCoroutine*/ false, ClaimedParamsRef(substParamTys),
-                     argValues, delayedArgs,
-                     /*foreign error*/ None, ImportAsMemberStatus());
-
-  emitter.emitTopLevel(indexExpr, AbstractionPattern(substFnType));
-
-  // TODO: do something to preserve LValues in the delayed arguments?
-  if (!delayedArgs.empty())
-    emitDelayedArguments(*this, delayedArgs, argValues);
+  emitPseudoFunctionArguments(*this, substFnType, argValues, indexExpr);
 
   PreparedArguments result(substParams, /*isScalar=*/false);
 
@@ -6015,6 +6070,19 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
 
   assert(result.isValid());
   return result;
+}
+
+RValue
+SILGenFunction::prepareEnumPayload(EnumElementDecl *element,
+                                   CanFunctionType substFnType,
+                                   ArgumentSource &&args) {
+  SmallVector<ManagedValue, 4> argValues;
+  emitPseudoFunctionArguments(*this, substFnType, argValues, std::move(args));
+
+  auto payloadTy = AnyFunctionType::composeInput(getASTContext(),
+                                                 substFnType.getParams(),
+                                                 /*canonicalVararg*/ true);
+  return RValue(*this, argValues, payloadTy->getCanonicalType());
 }
 
 SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {

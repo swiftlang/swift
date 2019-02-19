@@ -10,12 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOTE: older overlays had Network.NWProtocolIP as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC7Network13_NWProtocolIP is the
+// mangled name for Network._NWProtocolIP.
+@_objcRuntimeName(_TtC7Network13_NWProtocolIP)
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public class NWProtocolIP : NWProtocol {
 	public static let definition: NWProtocolDefinition = {
 		NWProtocolDefinition(nw_protocol_copy_ip_definition(), "ip")
 	}()
 
+  // Set the ObjC name of this class to be nested in the customized ObjC
+  // name of NWProtocolIP.
+  @_objcRuntimeName(_TtCC7Network13_NWProtocolIP7Options)
 	public class Options : NWProtocolOptions {
 		public enum Version {
 			/// Allow any IP version
@@ -167,6 +175,9 @@ public class NWProtocolIP : NWProtocol {
 	}
 
 	/// IP Metadata can be sent or received as part of ContentContext
+  // Set the ObjC name of this class to be nested in the customized ObjC
+  // name of NWProtocolIP.
+  @_objcRuntimeName(_TtCC7Network13_NWProtocolIP8Metadata)
 	public class Metadata: NWProtocolMetadata {
 		/// Set ECN flags to be sent on a packet, or get ECN flags
 		/// received on a packet. These flags will not take effect

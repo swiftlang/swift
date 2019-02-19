@@ -1346,8 +1346,9 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
 
   // Create the storage property as an optional of VD's type.
-  SmallString<64> NameBuf = VD->getName().str();
-  NameBuf += ".storage";
+  SmallString<64> NameBuf;
+  NameBuf += "$__lazy_storage_$_";
+  NameBuf += VD->getName().str();
   auto StorageName = Context.getIdentifier(NameBuf);
   auto StorageTy = OptionalType::get(VD->getType());
   auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());

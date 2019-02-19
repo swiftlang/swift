@@ -31,6 +31,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/TopCollection.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Syntax/TokenKinds.h"
@@ -787,6 +788,7 @@ public:
 
   Stmt *visitBreakStmt(BreakStmt *S) {
     LabeledStmt *Target = nullptr;
+    TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
     // Pick the nearest break target that matches the specified name.
     if (S->getTargetName().empty()) {
       for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
@@ -806,31 +808,39 @@ public:
         if (S->getTargetName() == (*I)->getLabelInfo().Name) {
           Target = *I;
           break;
+        } else {
+          unsigned distance =
+            TC.getCallEditDistance(S->getTargetName(), (*I)->getLabelInfo().Name,
+                                   TypeChecker::UnreasonableCallEditDistance);
+          if (distance < TypeChecker::UnreasonableCallEditDistance)
+            labelCorrections.insert(distance, std::move(*I));
         }
       }
+      labelCorrections.filterMaxScoreRange(
+        TypeChecker::MaxCallEditDistanceFromBestCandidate);
     }
     
     if (!Target) {
       // If we're in a defer, produce a tailored diagnostic.
       if (isInDefer()) {
         TC.diagnose(S->getLoc(), diag::jump_out_of_defer, "break");
-        return nullptr;
+      } else if (S->getTargetName().empty()) {
+        // If we're dealing with an unlabeled break inside of an 'if' or 'do'
+        // statement, produce a more specific error.
+        if (std::any_of(ActiveLabeledStmts.rbegin(),
+                        ActiveLabeledStmts.rend(),
+                        [&](Stmt *S) -> bool {
+                          return isa<IfStmt>(S) || isa<DoStmt>(S);
+                        })) {
+          TC.diagnose(S->getLoc(), diag::unlabeled_break_outside_loop);
+        } else {
+          // Otherwise produce a generic error.
+          TC.diagnose(S->getLoc(), diag::break_outside_loop);
+        }
+      } else {
+        emitUnresolvedLabelDiagnostics(TC, S->getTargetLoc(), S->getTargetName(),
+                                       labelCorrections);
       }
-      
-      auto diagid = diag::break_outside_loop;
-
-      // If someone is using an unlabeled break inside of an 'if' or 'do'
-      // statement, produce a more specific error.
-      if (S->getTargetName().empty() &&
-          std::any_of(ActiveLabeledStmts.rbegin(),
-                      ActiveLabeledStmts.rend(),
-                      [&](Stmt *S) -> bool {
-                        return isa<IfStmt>(S) || isa<DoStmt>(S);
-                      })) {
-        diagid = diag::unlabeled_break_outside_loop;
-      }
-
-      TC.diagnose(S->getLoc(), diagid);
       return nullptr;
     }
     S->setTarget(Target);
@@ -839,6 +849,7 @@ public:
 
   Stmt *visitContinueStmt(ContinueStmt *S) {
     LabeledStmt *Target = nullptr;
+    TopCollection<unsigned, LabeledStmt *> labelCorrections(3);
     // Scan to see if we are in any non-switch labeled statements (loops).  Scan
     // inside out.
     if (S->getTargetName().empty()) {
@@ -858,30 +869,67 @@ public:
         if (S->getTargetName() == (*I)->getLabelInfo().Name) {
           Target = *I;
           break;
+        } else {
+          unsigned distance =
+            TC.getCallEditDistance(S->getTargetName(), (*I)->getLabelInfo().Name,
+                                   TypeChecker::UnreasonableCallEditDistance);
+          if (distance < TypeChecker::UnreasonableCallEditDistance)
+            labelCorrections.insert(distance, std::move(*I));
         }
       }
+      labelCorrections.filterMaxScoreRange(
+        TypeChecker::MaxCallEditDistanceFromBestCandidate);
     }
 
-    if (!Target) {
+    if (Target) {
+      // Continue cannot be used to repeat switches, use fallthrough instead.
+      if (!Target->isPossibleContinueTarget()) {
+        TC.diagnose(S->getLoc(), diag::continue_not_in_this_stmt,
+                    isa<SwitchStmt>(Target) ? "switch" : "if");
+        return nullptr;
+      }
+    } else {
       // If we're in a defer, produce a tailored diagnostic.
       if (isInDefer()) {
         TC.diagnose(S->getLoc(), diag::jump_out_of_defer, "break");
-        return nullptr;
+      } else if (S->getTargetName().empty()) {
+        // If we're dealing with an unlabeled continue, produce a generic error.
+        TC.diagnose(S->getLoc(), diag::continue_outside_loop);
+      } else {
+        emitUnresolvedLabelDiagnostics(TC, S->getTargetLoc(), S->getTargetName(),
+                                       labelCorrections);
       }
-
-      TC.diagnose(S->getLoc(), diag::continue_outside_loop);
       return nullptr;
     }
-
-    // Continue cannot be used to repeat switches, use fallthrough instead.
-    if (!Target->isPossibleContinueTarget()) {
-      TC.diagnose(S->getLoc(), diag::continue_not_in_this_stmt,
-                  isa<SwitchStmt>(Target) ? "switch" : "if");
-      return nullptr;
-    }
-
     S->setTarget(Target);
     return S;
+  }
+
+  static void
+  emitUnresolvedLabelDiagnostics(TypeChecker &tc, SourceLoc targetLoc, Identifier targetName,
+                                 TopCollection<unsigned, LabeledStmt *> corrections) {
+    // If an unresolved label was used, but we have a single correction,
+    // produce the specific diagnostic and fixit.
+    if (corrections.size() == 1) {
+      tc.diagnose(targetLoc, diag::unresolved_label_corrected,
+                  targetName, corrections.begin()->Value->getLabelInfo().Name)
+        .highlight(SourceRange(targetLoc))
+        .fixItReplace(SourceRange(targetLoc),
+                      corrections.begin()->Value->getLabelInfo().Name.str());
+      tc.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
+                  diag::identifier_declared_here,
+                  corrections.begin()->Value->getLabelInfo().Name);
+    } else {
+      // If we have multiple corrections or none, produce a generic diagnostic
+      // and all corrections available.
+      tc.diagnose(targetLoc, diag::unresolved_label, targetName)
+        .highlight(SourceRange(targetLoc));
+      for (auto &entry : corrections)
+        tc.diagnose(entry.Value->getLabelInfo().Loc, diag::note_typo_candidate,
+                    entry.Value->getLabelInfo().Name.str())
+          .fixItReplace(SourceRange(targetLoc),
+                        entry.Value->getLabelInfo().Name.str());
+    }
   }
   
   Stmt *visitFallthroughStmt(FallthroughStmt *S) {
@@ -1213,8 +1261,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     }
     return;
   }
-  
-  // Skip checking if there is no type, which presumably means there was a 
+
+  // Skip checking if there is no type, which presumably means there was a
   // type error.
   if (!E->getType()) {
     return;
@@ -1260,7 +1308,25 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   // dead?
   if (E->getType()->is<AnyFunctionType>()) {
     bool isDiscardable = false;
-    if (auto *Fn = dyn_cast<ApplyExpr>(E)) {
+
+    // The called function could be wrapped inside a `dot_syntax_call_expr`
+    // node, for example:
+    //
+    // class Bar {
+    //   @discardableResult
+    //   func foo() -> Int { return 0 }
+    //
+    //   func baz() {
+    //     self.foo
+    //     foo
+    //   }
+    // }
+    //
+    // So look through the DSCE and get the function being called.
+    auto expr =
+        isa<DotSyntaxCallExpr>(E) ? cast<DotSyntaxCallExpr>(E)->getFn() : E;
+
+    if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
       if (auto *declRef = dyn_cast<DeclRefExpr>(Fn->getFn())) {
         if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(declRef->getDecl())) {
           if (funcDecl->getAttrs().hasAttribute<DiscardableResultAttr>()) {

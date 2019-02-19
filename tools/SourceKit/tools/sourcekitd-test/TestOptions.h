@@ -22,6 +22,7 @@ namespace sourcekitd_test {
 enum class SourceKitRequest {
   None,
   ProtocolVersion,
+  CompilerVersion,
   DemangleNames,
   MangleSimpleClasses,
   Index,
@@ -32,6 +33,7 @@ enum class SourceKitRequest {
   CodeCompleteCacheOnDisk,
   CodeCompleteSetPopularAPI,
   TypeContextInfo,
+  ConformingMethodList,
   CursorInfo,
   RangeInfo,
   RelatedIdents,

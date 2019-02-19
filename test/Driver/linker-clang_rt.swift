@@ -7,32 +7,32 @@
 // RUN: rm -rf %t
 // RUN: %empty-directory(%t/bin)
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/bin/swiftc)
-// RUN: %empty-directory(%t/lib/clang/darwin/)
+// RUN: %empty-directory(%t/lib/swift/clang/lib/darwin/)
 
 // RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-NO-RUNTIME %s
 
-// RUN: touch %t/lib/clang/darwin/libclang_rt.osx.a %t/lib/clang/darwin/libclang_rt.ios.a %t/lib/clang/darwin/libclang_rt.tvos.a %t/lib/clang/darwin/libclang_rt.watchos.a
+// RUN: touch %t/lib/swift/clang/lib/darwin/libclang_rt.osx.a %t/lib/swift/clang/lib/darwin/libclang_rt.ios.a %t/lib/swift/clang/lib/darwin/libclang_rt.tvos.a %t/lib/swift/clang/lib/darwin/libclang_rt.watchos.a
 
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix MACOS %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MACOS %s
 
-// RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix IOS %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix IOS %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target armv7s-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix IOS %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target arm64-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix IOS %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOS %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOS %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target armv7s-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOS %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target arm64-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOS %s
 
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix TVOS %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target arm64-apple-tvos9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix TVOS %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-tvos9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-TVOS %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target arm64-apple-tvos9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-TVOS %s
 
-// RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix WATCHOS %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target armv7k-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix WATCHOS %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-WATCHOS %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target armv7k-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-WATCHOS %s
 
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -f %t/bin/swiftc
 
 // CHECK: {{(bin/)?}}ld{{"? }}
 // CHECK-NO-RUNTIME-NOT: libclang_rt
-// CHECK-MACOS-SAME: {{[^ ]+/lib/clang/darwin/libclang_rt.osx.a}}
-// CHECK-IOS-SAME: {{[^ ]+/lib/clang/darwin/libclang_rt.ios.a}}
-// CHECK-TVOS-SAME: {{[^ ]+/lib/clang/darwin/libclang_rt.tvos.a}}
-// CHECK-WATCHOS-SAME: {{[^ ]+/lib/clang/darwin/libclang_rt.watchos.a}}
+// CHECK-MACOS-SAME: {{[^ ]+/lib/swift/clang/lib/darwin/libclang_rt.osx.a}}
+// CHECK-IOS-SAME: {{[^ ]+/lib/swift/clang/lib/darwin/libclang_rt.ios.a}}
+// CHECK-TVOS-SAME: {{[^ ]+/lib/swift/clang/lib/darwin/libclang_rt.tvos.a}}
+// CHECK-WATCHOS-SAME: {{[^ ]+/lib/swift/clang/lib/darwin/libclang_rt.watchos.a}}
 // CHECK-SAME: -o {{[^ ]+}}

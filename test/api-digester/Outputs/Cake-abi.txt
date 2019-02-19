@@ -62,8 +62,8 @@ cake1: Var fixedLayoutStruct.b in a non-resilient type changes position from 0 t
 cake1: Var fixedLayoutStruct2.BecomeFixedBinaryOrder is now a stored property
 cake1: Var fixedLayoutStruct2.NoLongerWithFixedBinaryOrder is no longer a stored property
 cake2: EnumElement FrozenKind.AddedCase is added to a non-resilient type
+cake2: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is added to a non-resilient type
 cake2: Var fixedLayoutStruct.c is added to a non-resilient type
-cake2: Var fixedLayoutStruct.lazy_d.storage is added to a non-resilient type
 
 /* Conformance changes */
 cake1: Func ObjCProtocol.addOptional() is now an optional requirement

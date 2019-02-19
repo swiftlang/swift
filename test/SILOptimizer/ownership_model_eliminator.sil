@@ -281,3 +281,51 @@ bb0:
   () = destructure_tuple %1 : $()
   return %1 : $()
 }
+
+// CHECK-LABEL: sil [canonical] @test_destructure_struct_tuple_canonical : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Builtin.Int32, TestArrayStorage) {
+// CHECK: bb0([[TUPLE:%.*]] : $(Builtin.NativeObject, Builtin.Int32), [[STRUCT:%.*]] : $TestArray2):
+// CHECK:   [[TUP_ELT_0:%.*]] = tuple_extract [[TUPLE]] : $(Builtin.NativeObject, Builtin.Int32), 0
+// CHECK:   [[TUP_ELT_1:%.*]] = tuple_extract [[TUPLE]] : $(Builtin.NativeObject, Builtin.Int32), 1
+// CHECK:   [[STRUCT_FIELD_0:%.*]] = struct_extract [[STRUCT]] : $TestArray2, #TestArray2.storage
+// CHECK:   [[STRUCT_FIELD_1:%.*]] = struct_extract [[STRUCT]] : $TestArray2, #TestArray2.someValue
+// CHECK:   [[STRUCT_FIELD_2:%.*]] = struct_extract [[STRUCT]] : $TestArray2, #TestArray2.storage2
+// CHECK:   [[RESULT:%.*]] = tuple ([[TUP_ELT_0]] : {{.*}}, [[TUP_ELT_1]] : {{.*}}, [[STRUCT_FIELD_0]] : {{.*}}, [[STRUCT_FIELD_1]] : {{.*}}, [[STRUCT_FIELD_2]] : {{.*}})
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'test_destructure_struct_tuple_canonical'
+sil [canonical] [ossa] @test_destructure_struct_tuple_canonical : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Builtin.Int32, TestArrayStorage) {
+bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $TestArray2):
+  (%2, %3) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
+  (%4, %5, %6) = destructure_struct %1 : $TestArray2
+  %7 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %4 : $TestArrayStorage, %5 : $Builtin.Int32, %6 : $TestArrayStorage)
+  return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Builtin.Int32, TestArrayStorage)
+}
+
+// In the following test, the trivial parts do not have any actual uses... do
+// not emit any value projections for them!
+//
+// CHECK-LABEL: sil [canonical] @test_destructure_with_only_some_uses : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, TestArrayStorage, TestArrayStorage) {
+// CHECK:    bb0([[ARG0:%.*]] : $(Builtin.NativeObject, Builtin.Int32), [[ARG1:%.*]] : $TestArray2):
+// CHECK-NEXT:   [[ARG0_0:%.*]] = tuple_extract [[ARG0]]
+// CHECK-NEXT:   [[STORAGE:%.*]] = struct_extract [[ARG1]] : $TestArray2, #TestArray2.storage
+// CHECK-NEXT:   [[STORAGE2:%.*]] = struct_extract [[ARG1]] : $TestArray2, #TestArray2.storage2
+// CHECK-NEXT:   [[RESULT:%.*]] = tuple ([[ARG0_0]] : ${{.*}}, [[STORAGE]] : ${{.*}}, [[STORAGE2]] : ${{.*}})
+// CHECK-NEXT:   return [[RESULT]]
+// CHECK: } // end sil function 'test_destructure_with_only_some_uses'
+sil [canonical] [ossa] @test_destructure_with_only_some_uses : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, TestArrayStorage, TestArrayStorage) {
+bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $TestArray2):
+  (%2, %3) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
+  (%4, %5, %6) = destructure_struct %1 : $TestArray2
+  %7 = tuple (%2 : $Builtin.NativeObject, %4 : $TestArrayStorage, %6 : $TestArrayStorage)
+  return %7 : $(Builtin.NativeObject, TestArrayStorage, TestArrayStorage)
+}
+
+// CHECK-LABEL: sil [canonical] @test_simplify_instruction : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Int32) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject,
+// CHECK-NEXT:   return [[ARG]]
+// CHECK: } // end sil function 'test_simplify_instruction'
+sil [canonical] [ossa] @test_simplify_instruction : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Int32) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.Int32):
+  %2 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32)
+  (%3, %4) = destructure_tuple %2 : $(Builtin.NativeObject, Builtin.Int32)
+  return %3 : $Builtin.NativeObject
+}

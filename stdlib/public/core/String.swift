@@ -401,22 +401,31 @@ extension String {
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
+    guard _fastPath(sourceEncoding == UTF8.self) else {
+      self = String._fromCodeUnits(
+        codeUnits, encoding: sourceEncoding, repair: true)!.0
+      return
+    }
+
     if let contigBytes = codeUnits as? _HasContiguousBytes,
-       sourceEncoding == UTF8.self,
        contigBytes._providesContiguousBytesNoCopy
     {
       self = contigBytes.withUnsafeBytes { rawBufPtr in
-        let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
         return String._fromUTF8Repairing(
           UnsafeBufferPointer(
-            start: ptr.assumingMemoryBound(to: UInt8.self),
+            start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
             count: rawBufPtr.count)).0
       }
       return
     }
 
-    self = String._fromCodeUnits(
-      codeUnits, encoding: sourceEncoding, repair: true)!.0
+    // Just copying to an Array is significantly faster than performing
+    // generic operations
+    self = Array(codeUnits).withUnsafeBufferPointer {
+      let raw = UnsafeRawBufferPointer($0)
+      return String._fromUTF8Repairing(raw.bindMemory(to: UInt8.self)).0
+    }
+    return
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -561,6 +570,7 @@ extension String {
 
   // String append
   @inlinable // Forward inlinability to append
+  @_semantics("string.append")
   public static func += (lhs: inout String, rhs: String) {
     lhs.append(rhs)
   }
@@ -837,7 +847,7 @@ extension String {
     }
     return codeUnits
   }
-  
+
   public // @testable
   func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
     try _gutsSlice._withNFCCodeUnits(f)

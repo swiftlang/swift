@@ -314,6 +314,10 @@ public:
     /// \c ConstraintResult::Unresolved so the caller knows what happened.
     GenerateUnresolved = 1,
   };
+  
+  /// The set of constraints that are invalid because the constraint
+  /// type isn't constrained to a protocol or a class
+  std::vector<Constraint<Type>> invalidIsaConstraints;
 
 private:
   class InferRequirementsWalker;

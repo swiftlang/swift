@@ -56,7 +56,7 @@ static std::string normalizeReflectionName(Demangler &dem, StringRef reflectionN
   
   // Remangle the reflection name to resolve symbolic references.
   if (auto node = dem.demangleType(reflectionName)) {
-    return mangleNode(node);
+    return mangleNode(node, &dem);
   }
 
   // Fall back to the raw string.

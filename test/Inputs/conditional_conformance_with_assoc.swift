@@ -200,8 +200,9 @@ public func concrete_concrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"(i64 0)
+// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"(i64 255)
 // CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @"$s34conditional_conformance_with_assoc4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[C_P3_PTR]], align 8

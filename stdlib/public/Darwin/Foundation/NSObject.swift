@@ -52,55 +52,79 @@ fileprivate extension NSObject {
 // must coexist, so it was renamed. The old name must not be used in the
 // new runtime.
 @objc private class __KVOKeyPathBridgeMachinery : NSObject {
-    @nonobjc static var keyPathTable: [String : AnyKeyPath] = {
+    @nonobjc static let swizzler: () = {
         /*
          Move all our methods into place. We want the following:
          __KVOKeyPathBridgeMachinery's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replaces NSObject's versions of them
          NSObject's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replace NSObject's __old_unswizzled_* methods
          NSObject's _old_unswizzled_* methods replace __KVOKeyPathBridgeMachinery's methods, and are never invoked
          */
+        threeWaySwizzle(#selector(NSObject.keyPathsForValuesAffectingValue(forKey:)), with: #selector(NSObject.__old_unswizzled_keyPathsForValuesAffectingValue(forKey:)))
+        threeWaySwizzle(#selector(NSObject.automaticallyNotifiesObservers(forKey:)), with: #selector(NSObject.__old_unswizzled_automaticallyNotifiesObservers(forKey:)))
+    }()
+    
+    /// Performs a 3-way swizzle between `NSObject` and `__KVOKeyPathBridgeMachinery`.
+    ///
+    /// The end result of this swizzle is the following:
+    /// * `NSObject.selector` contains the IMP from `__KVOKeyPathBridgeMachinery.selector`
+    /// * `NSObject.unswizzledSelector` contains the IMP from the original `NSObject.selector`.
+    /// * __KVOKeyPathBridgeMachinery.selector` contains the (useless) IMP from `NSObject.unswizzledSelector`.
+    ///
+    /// This swizzle is done in a manner that modifies `NSObject.selector` last, in order to ensure thread safety
+    /// (by the time `NSObject.selector` is swizzled, `NSObject.unswizzledSelector` will contain the original IMP)
+    @nonobjc private static func threeWaySwizzle(_ selector: Selector, with unswizzledSelector: Selector) {
         let rootClass: AnyClass = NSObject.self
         let bridgeClass: AnyClass = __KVOKeyPathBridgeMachinery.self
         
-        let dependentSel = #selector(NSObject.keyPathsForValuesAffectingValue(forKey:))
-        let rootDependentImpl = class_getClassMethod(rootClass, dependentSel)!
-        let bridgeDependentImpl = class_getClassMethod(bridgeClass, dependentSel)!
-        method_exchangeImplementations(rootDependentImpl, bridgeDependentImpl) // NSObject <-> Us
+        // Swap bridge.selector <-> NSObject.unswizzledSelector
+        let unswizzledMethod = class_getClassMethod(rootClass, unswizzledSelector)!
+        let bridgeMethod = class_getClassMethod(bridgeClass, selector)!
+        method_exchangeImplementations(unswizzledMethod, bridgeMethod)
         
-        let originalDependentImpl = class_getClassMethod(bridgeClass, dependentSel)! //we swizzled it onto this class, so this is actually NSObject's old implementation
-        let originalDependentSel = #selector(NSObject.__old_unswizzled_keyPathsForValuesAffectingValue(forKey:))
-        let dummyDependentImpl = class_getClassMethod(rootClass, originalDependentSel)!
-        method_exchangeImplementations(originalDependentImpl, dummyDependentImpl) // NSObject's original version <-> NSObject's __old_unswizzled_ version
-        
-        let autoSel = #selector(NSObject.automaticallyNotifiesObservers(forKey:))
-        let rootAutoImpl = class_getClassMethod(rootClass, autoSel)!
-        let bridgeAutoImpl = class_getClassMethod(bridgeClass, autoSel)!
-        method_exchangeImplementations(rootAutoImpl, bridgeAutoImpl) // NSObject <-> Us
-        
-        let originalAutoImpl = class_getClassMethod(bridgeClass, autoSel)! //we swizzled it onto this class, so this is actually NSObject's old implementation
-        let originalAutoSel = #selector(NSObject.__old_unswizzled_automaticallyNotifiesObservers(forKey:))
-        let dummyAutoImpl = class_getClassMethod(rootClass, originalAutoSel)!
-        method_exchangeImplementations(originalAutoImpl, dummyAutoImpl) // NSObject's original version <-> NSObject's __old_unswizzled_ version
-        
-        return [:]
-    }()
-    
-    @nonobjc static var keyPathTableLock = NSLock()
-    
-    @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath: __owned AnyKeyPath) -> String {
-        guard let keyPathString = keyPath._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \(keyPath)") }
-        __KVOKeyPathBridgeMachinery.keyPathTableLock.lock()
-        defer { __KVOKeyPathBridgeMachinery.keyPathTableLock.unlock() }
-        __KVOKeyPathBridgeMachinery.keyPathTable[keyPathString] = keyPath
-        return keyPathString
+        // Swap NSObject.selector <-> NSObject.unswizzledSelector
+        // NSObject.unswizzledSelector at this point contains the bridge IMP
+        let rootMethod = class_getClassMethod(rootClass, selector)!
+        method_exchangeImplementations(rootMethod, unswizzledMethod)
+    }
+
+    private class BridgeKey : NSObject, NSCopying {
+        let value: String
+
+        init(_ value: String) {
+            self.value = value
+        }
+
+        func copy(with zone: NSZone? = nil) -> Any {
+            return self
+        }
+
+        override func isEqual(_ object: Any?) -> Bool {
+            return value == (object as? BridgeKey)?.value
+        }
+
+        override var hash: Int {
+            var hasher = Hasher()
+            hasher.combine(ObjectIdentifier(BridgeKey.self))
+            hasher.combine(value)
+            return hasher.finalize()
+        }
+    }
+
+    /// Temporarily maps a `String` to an `AnyKeyPath` that can be retrieved with `_bridgeKeyPath(_:)`.
+    ///
+    /// This uses a per-thread storage so key paths on other threads don't interfere.
+    @nonobjc fileprivate static func _withBridgeableKeyPath(from keyPathString: String, to keyPath: AnyKeyPath, block: () -> Void) {
+        _ = __KVOKeyPathBridgeMachinery.swizzler
+        let key = BridgeKey(keyPathString)
+        let oldValue = Thread.current.threadDictionary[key]
+        Thread.current.threadDictionary[key] = keyPath
+        defer { Thread.current.threadDictionary[key] = oldValue }
+        block()
     }
     
     @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath:String?) -> AnyKeyPath? {
         guard let keyPath = keyPath else { return nil }
-        __KVOKeyPathBridgeMachinery.keyPathTableLock.lock()
-        defer { __KVOKeyPathBridgeMachinery.keyPathTableLock.unlock() }
-        let path = __KVOKeyPathBridgeMachinery.keyPathTable[keyPath]
-        return path
+        return Thread.current.threadDictionary[BridgeKey(keyPath)] as? AnyKeyPath
     }
     
     @objc override class func automaticallyNotifiesObservers(forKey key: String) -> Bool {
@@ -127,11 +151,8 @@ fileprivate extension NSObject {
 }
 
 func _bridgeKeyPathToString(_ keyPath:AnyKeyPath) -> String {
-    return __KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
-}
-
-func _bridgeStringToKeyPath(_ keyPath:String) -> AnyKeyPath? {
-    return __KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
+    guard let keyPathString = keyPath._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \(keyPath)") }
+    return keyPathString
 }
 
 // NOTE: older overlays called this NSKeyValueObservation. We now use
@@ -139,53 +160,76 @@ func _bridgeStringToKeyPath(_ keyPath:String) -> AnyKeyPath? {
 // name to avoid conflicts when both are loaded into the same process.
 @objc(_NSKeyValueObservation)
 public class NSKeyValueObservation : NSObject {
-    
-    @nonobjc weak var object : NSObject?
-    @nonobjc let callback : (NSObject, NSKeyValueObservedChange<Any>) -> Void
-    @nonobjc let path : String
-    
-    //workaround for <rdar://problem/31640524> Erroneous (?) error when using bridging in the Foundation overlay
-    @nonobjc static var swizzler : NSKeyValueObservation? = {
-        let bridgeClass: AnyClass = NSKeyValueObservation.self
-        let observeSel = #selector(NSObject.observeValue(forKeyPath:of:change:context:))
-        let swapSel = #selector(NSKeyValueObservation._swizzle_me_observeValue(forKeyPath:of:change:context:))
-        let rootObserveImpl = class_getInstanceMethod(bridgeClass, observeSel)!
-        let swapObserveImpl = class_getInstanceMethod(bridgeClass, swapSel)!
-        method_exchangeImplementations(rootObserveImpl, swapObserveImpl)
-        return nil
-    }()
-    
-    fileprivate init(object: NSObject, keyPath: AnyKeyPath, callback: @escaping (NSObject, NSKeyValueObservedChange<Any>) -> Void) {
-        path = _bridgeKeyPathToString(keyPath)
-        let _ = NSKeyValueObservation.swizzler
-        self.object = object
-        self.callback = callback
+    // We use a private helper class as the actual observer. This lets us attach the helper as an associated object
+    // to the object we're observing, thus ensuring the helper will still be alive whenever a KVO change notification
+    // is broadcast, even on a background thread.
+    //
+    // For the associated object, we use the Helper instance itself as its own key. This guarantees key uniqueness.
+    private class Helper : NSObject {
+        @nonobjc weak var object : NSObject?
+        @nonobjc let path: String
+        @nonobjc let callback : (NSObject, NSKeyValueObservedChange<Any>) -> Void
+        
+        // workaround for <rdar://problem/31640524> Erroneous (?) error when using bridging in the Foundation overlay
+        // specifically, overriding observeValue(forKeyPath:of:change:context:) complains that it's not Obj-C-compatible
+        @nonobjc static let swizzler: () = {
+            let bridgeClass: AnyClass = Helper.self
+            let observeSel = #selector(NSObject.observeValue(forKeyPath:of:change:context:))
+            let swapSel = #selector(Helper._swizzle_me_observeValue(forKeyPath:of:change:context:))
+            let swapObserveMethod = class_getInstanceMethod(bridgeClass, swapSel)!
+            class_addMethod(bridgeClass, observeSel, method_getImplementation(swapObserveMethod), method_getTypeEncoding(swapObserveMethod))
+        }()
+        
+        @nonobjc init(object: NSObject, keyPath: AnyKeyPath, options: NSKeyValueObservingOptions, callback: @escaping (NSObject, NSKeyValueObservedChange<Any>) -> Void) {
+            _ = Helper.swizzler
+            let path = _bridgeKeyPathToString(keyPath)
+            self.object = object
+            self.path = path
+            self.callback = callback
+            super.init()
+            objc_setAssociatedObject(object, associationKey(), self, .OBJC_ASSOCIATION_RETAIN)
+            __KVOKeyPathBridgeMachinery._withBridgeableKeyPath(from: path, to: keyPath) {
+                object.addObserver(self, forKeyPath: path, options: options, context: nil)
+            }
+        }
+        
+        @nonobjc func invalidate() {
+            guard let object = self.object else { return }
+            object.removeObserver(self, forKeyPath: path, context: nil)
+            objc_setAssociatedObject(object, associationKey(), nil, .OBJC_ASSOCIATION_ASSIGN)
+            self.object = nil
+        }
+        
+        @nonobjc private func associationKey() -> UnsafeRawPointer {
+            return UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        }
+        
+        @objc private func _swizzle_me_observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSString : Any]?, context: UnsafeMutableRawPointer?) {
+            guard let object = object as? NSObject, object === self.object, let change = change else { return }
+            let rawKind:UInt = change[NSKeyValueChangeKey.kindKey.rawValue as NSString] as! UInt
+            let kind = NSKeyValueChange(rawValue: rawKind)!
+            let notification = NSKeyValueObservedChange(kind: kind,
+                                                        newValue: change[NSKeyValueChangeKey.newKey.rawValue as NSString],
+                                                        oldValue: change[NSKeyValueChangeKey.oldKey.rawValue as NSString],
+                                                        indexes: change[NSKeyValueChangeKey.indexesKey.rawValue as NSString] as! IndexSet?,
+                                                        isPrior: change[NSKeyValueChangeKey.notificationIsPriorKey.rawValue as NSString] as? Bool ?? false)
+            callback(object, notification)
+        }
     }
     
-    fileprivate func start(_ options: NSKeyValueObservingOptions) {
-        object?.addObserver(self, forKeyPath: path, options: options, context: nil)
+    @nonobjc private let helper: Helper
+    
+    fileprivate init(object: NSObject, keyPath: AnyKeyPath, options: NSKeyValueObservingOptions, callback: @escaping (NSObject, NSKeyValueObservedChange<Any>) -> Void) {
+        helper = Helper(object: object, keyPath: keyPath, options: options, callback: callback)
     }
     
     ///invalidate() will be called automatically when an NSKeyValueObservation is deinited
     @objc public func invalidate() {
-        object?.removeObserver(self, forKeyPath: path, context: nil)
-        object = nil
-    }
-    
-    @objc func _swizzle_me_observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSString : Any]?, context: UnsafeMutableRawPointer?) {
-        guard let ourObject = self.object, object as? NSObject == ourObject, let change = change else { return }
-        let rawKind:UInt = change[NSKeyValueChangeKey.kindKey.rawValue as NSString] as! UInt
-        let kind = NSKeyValueChange(rawValue: rawKind)!
-        let notification = NSKeyValueObservedChange(kind: kind,
-                                                    newValue: change[NSKeyValueChangeKey.newKey.rawValue as NSString],
-                                                    oldValue: change[NSKeyValueChangeKey.oldKey.rawValue as NSString],
-                                                    indexes: change[NSKeyValueChangeKey.indexesKey.rawValue as NSString] as! IndexSet?,
-                                                    isPrior: change[NSKeyValueChangeKey.notificationIsPriorKey.rawValue as NSString] as? Bool ?? false)
-        callback(ourObject, notification)
+        helper.invalidate()
     }
     
     deinit {
-        object?.removeObserver(self, forKeyPath: path, context: nil)
+        invalidate()
     }
 }
 
@@ -197,7 +241,7 @@ extension _KeyValueCodingAndObserving {
             options: NSKeyValueObservingOptions = [],
             changeHandler: @escaping (Self, NSKeyValueObservedChange<Value>) -> Void)
         -> NSKeyValueObservation {
-        let result = NSKeyValueObservation(object: self as! NSObject, keyPath: keyPath) { (obj, change) in
+        return NSKeyValueObservation(object: self as! NSObject, keyPath: keyPath, options: options) { (obj, change) in
             let notification = NSKeyValueObservedChange(kind: change.kind,
                                                         newValue: change.newValue as? Value,
                                                         oldValue: change.oldValue as? Value,
@@ -205,8 +249,6 @@ extension _KeyValueCodingAndObserving {
                                                         isPrior: change.isPrior)
             changeHandler(obj as! Self, notification)
         }
-        result.start(options)
-        return result
     }
     
     public func willChangeValue<Value>(for keyPath: __owned KeyPath<Self, Value>) {

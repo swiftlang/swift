@@ -1117,6 +1117,10 @@ bool SILInstruction::isAllocatingStack() const {
     if (ARI->canAllocOnStack())
       return true;
   }
+
+  if (auto *PA = dyn_cast<PartialApplyInst>(this))
+    return PA->isOnStack();
+
   return false;
 }
 
@@ -1188,6 +1192,9 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // nodes of objc_method type.
   if (isa<DynamicMethodBranchInst>(this))
     return false;
+
+  if (auto *PA = dyn_cast<PartialApplyInst>(this))
+    return !PA->isOnStack();
 
   // If you add more cases here, you should also update SILLoop:canDuplicate.
 

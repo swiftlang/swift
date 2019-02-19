@@ -157,7 +157,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x8000_000c>,
 // -- computed, get-only, identified by (indirected) function pointer, no args
 // CHECK-SAME: <i32 0x0200_0002>,
-// CHECK-SAME: @got.k_id
+// CHECK-SAME: @{{got.|__imp_}}k_id
 // CHECK-SAME: void (%TSi*, %T8keypaths1SV*)* @k_get
 
 // -- %l: computed
@@ -169,7 +169,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x8000_0010>,
 // -- computed, settable, nonmutating, identified by indirect pointer, no args
 // CHECK-SAME: <i32 0x0240_0002>,
-// CHECK-SAME: @"got.$s8keypaths1CC1wSivgTq"
+// CHECK-SAME: @"{{got.|__imp_}}$s8keypaths1CC1wSivgTq"
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_get
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_set
 

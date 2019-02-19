@@ -30,3 +30,10 @@ class CrashTest2 {
     }
   }
 }
+
+public struct BadCollection: Collection {
+    public var startIndex: Index { }
+    public var endIndex: Index { }
+    public func index(after index: Index) -> Index { }
+    public subscript(position: Index) -> Element { }
+}

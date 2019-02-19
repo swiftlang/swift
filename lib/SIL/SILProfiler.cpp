@@ -404,7 +404,7 @@ public:
     assert((!StartLoc || StartLoc->isValid()) &&
            "Expected start location to be valid");
     assert((!EndLoc || EndLoc->isValid()) &&
-           "Expected start location to be valid");
+           "Expected end location to be valid");
   }
 
   SourceMappingRegion(SourceMappingRegion &&Region) = default;

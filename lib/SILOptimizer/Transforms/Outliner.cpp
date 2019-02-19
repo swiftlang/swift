@@ -1229,6 +1229,10 @@ public:
   void run() override {
     auto *Fun = getFunction();
 
+    // We do not support [ossa] now.
+    if (Fun->hasOwnership())
+      return;
+
     // Only outline if we optimize for size.
     if (!Fun->optimizeForSize())
       return;

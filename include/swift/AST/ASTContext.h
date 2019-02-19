@@ -805,9 +805,6 @@ public:
   InheritedProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
-  /// Record compiler-known protocol information in the AST.
-  void recordKnownProtocols(ModuleDecl *Stdlib);
-  
   /// Get the lazy data for the given declaration.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
@@ -941,6 +938,9 @@ public:
   bool isAccessControlDisabled() const {
     return !LangOpts.EnableAccessControl;
   }
+
+  /// Each kind and SourceFile has its own cache for a Type.
+  Type &getDefaultTypeRequestCache(SourceFile *, KnownProtocolKind);
 
 private:
   friend Decl;

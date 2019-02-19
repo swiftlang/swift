@@ -35,15 +35,6 @@ public:
                                               SourceRange BodyRange) = 0;
 };
 
-class AlwaysDelayedCallbacks : public DelayedParsingCallbacks {
-  bool shouldDelayFunctionBodyParsing(Parser &TheParser,
-                                      AbstractFunctionDecl *AFD,
-                                      const DeclAttributes &Attrs,
-                                      SourceRange BodyRange) override {
-    return true;
-  }
-};
-
 /// Implementation of callbacks that guide the parser in delayed
 /// parsing for code completion.
 class CodeCompleteDelayedCallbacks : public DelayedParsingCallbacks {

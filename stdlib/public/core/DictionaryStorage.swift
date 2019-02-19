@@ -16,10 +16,13 @@ import SwiftShims
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
+// NOTE: older runtimes called this class _RawDictionaryStorage. The two
+// must coexist without a conflicting ObjC class name, so it was
+// renamed. The old name must not be used in the new runtime.
 @_fixed_layout
 @usableFromInline
 @_objc_non_lazy_realization
-internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
+internal class __RawDictionaryStorage: __SwiftNativeNSDictionary {
   // NOTE: The precise layout of this type is relied on in the runtime to
   // provide a statically allocated empty singleton.  See
   // stdlib/public/stubs/GlobalObjects.cpp for details.
@@ -109,9 +112,12 @@ internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
 
 /// The storage class for the singleton empty set.
 /// The single instance of this class is created by the runtime.
+// NOTE: older runtimes called this class _EmptyDictionarySingleton.
+// The two must coexist without a conflicting ObjC class name, so it was
+// renamed. The old name must not be used in the new runtime.
 @_fixed_layout
 @usableFromInline
-internal class _EmptyDictionarySingleton: _RawDictionaryStorage {
+internal class __EmptyDictionarySingleton: __RawDictionaryStorage {
   @nonobjc
   internal override init(_doNotCallMe: ()) {
     _internalInvariantFailure("This class cannot be directly initialized")
@@ -130,7 +136,7 @@ internal class _EmptyDictionarySingleton: _RawDictionaryStorage {
 }
 
 #if _runtime(_ObjC)
-extension _EmptyDictionarySingleton: _NSDictionaryCore {
+extension __EmptyDictionarySingleton: _NSDictionaryCore {
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     return self
@@ -167,7 +173,7 @@ extension _EmptyDictionarySingleton: _NSDictionaryCore {
 
   @objc(keyEnumerator)
   internal func keyEnumerator() -> _NSEnumerator {
-    return _SwiftEmptyNSEnumerator()
+    return __SwiftEmptyNSEnumerator()
   }
 
   @objc(getObjects:andKeys:count:)
@@ -180,13 +186,13 @@ extension _EmptyDictionarySingleton: _NSDictionaryCore {
 }
 #endif
 
-extension _RawDictionaryStorage {
+extension __RawDictionaryStorage {
   /// The empty singleton that is used for every single Dictionary that is
   /// created without any elements. The contents of the storage should never
   /// be mutated.
   @inlinable
   @nonobjc
-  internal static var empty: _EmptyDictionarySingleton {
+  internal static var empty: __EmptyDictionarySingleton {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptyDictionarySingleton))
   }
@@ -194,7 +200,7 @@ extension _RawDictionaryStorage {
 
 @usableFromInline
 final internal class _DictionaryStorage<Key: Hashable, Value>
-  : _RawDictionaryStorage, _NSDictionaryCore {
+  : __RawDictionaryStorage, _NSDictionaryCore {
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
@@ -359,7 +365,7 @@ extension _DictionaryStorage {
   @usableFromInline
   @_effects(releasenone)
   internal static func copy(
-    original: _RawDictionaryStorage
+    original: __RawDictionaryStorage
   ) -> _DictionaryStorage {
     return allocate(
       scale: original._scale,
@@ -370,7 +376,7 @@ extension _DictionaryStorage {
   @usableFromInline
   @_effects(releasenone)
   static internal func resize(
-    original: _RawDictionaryStorage,
+    original: __RawDictionaryStorage,
     capacity: Int,
     move: Bool
   ) -> _DictionaryStorage {
@@ -389,7 +395,7 @@ extension _DictionaryStorage {
   @usableFromInline
   @_effects(releasenone)
   static internal func convert(
-    _ cocoa: _CocoaDictionary,
+    _ cocoa: __CocoaDictionary,
     capacity: Int
   ) -> _DictionaryStorage {
     let scale = _HashTable.scale(forCapacity: capacity)

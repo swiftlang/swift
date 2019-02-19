@@ -116,19 +116,32 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB,
                                 bool FullParse,
-                                bool DisableDelayedParsing) {
+                                bool DelayBodyParsing) {
   assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
          "cannot parse in full with the given parameters!");
 
   std::shared_ptr<SyntaxTreeCreator> STreeCreator;
   if (SF.shouldBuildSyntaxTree()) {
     STreeCreator = std::make_shared<SyntaxTreeCreator>(
-                   SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
+        SF.getASTContext().SourceMgr, BufferID,
+        SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
   }
+
+  // Not supported right now.
+  if (SF.Kind == SourceFileKind::REPL)
+    DelayBodyParsing = false;
+  if (SF.hasInterfaceHash())
+    DelayBodyParsing = false;
+  if (SF.shouldCollectToken())
+    DelayBodyParsing = false;
+  if (SF.shouldBuildSyntaxTree())
+    DelayBodyParsing = false;
+  if (SIL)
+    DelayBodyParsing = false;
 
   SharedTimer timer("Parsing");
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
-           PersistentState, STreeCreator, DisableDelayedParsing);
+           PersistentState, STreeCreator, DelayBodyParsing);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
@@ -157,21 +170,21 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
                                 DelayedParsingCallbacks *DelayedParseCB,
-                                bool DisableDelayedParsing) {
+                                bool DelayBodyParsing) {
   return parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
                                  PersistentState, DelayedParseCB,
                                  /*FullParse=*/SF.shouldBuildSyntaxTree(),
-                                 DisableDelayedParsing);
+                                 DelayBodyParsing);
 }
 
 bool swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                                     PersistentParserState *PersistentState,
                                     DelayedParsingCallbacks *DelayedParseCB,
-                                    bool DisableDelayedParsing) {
+                                    bool DelayBodyParsing) {
   bool Done = false;
   return parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
                                  PersistentState, DelayedParseCB,
-                                 /*FullParse=*/true, DisableDelayedParsing);
+                                 /*FullParse=*/true, DelayBodyParsing);
 }
 
 
@@ -1943,6 +1956,32 @@ static bool parseStoreOwnershipQualifier(StoreOwnershipQualifier &Result,
   return false;
 }
 
+static bool parseAssignOwnershipQualifier(AssignOwnershipQualifier &Result,
+                                          SILParser &P) {
+  StringRef Str;
+  // If we do not parse '[' ... ']', we have unknown. Set value and return.
+  if (!parseSILOptional(Str, P)) {
+    Result = AssignOwnershipQualifier::Unknown;
+    return false;
+  }
+
+  // Then try to parse one of our other initialization kinds. We do not support
+  // parsing unknown here so we use that as our fail value.
+  auto Tmp = llvm::StringSwitch<AssignOwnershipQualifier>(Str)
+                 .Case("reassign", AssignOwnershipQualifier::Reassign)
+                 .Case("reinit", AssignOwnershipQualifier::Reinit)
+                 .Case("init", AssignOwnershipQualifier::Init)
+                 .Default(AssignOwnershipQualifier::Unknown);
+
+  // Thus return true (following the conventions in this file) if we fail.
+  if (Tmp == AssignOwnershipQualifier::Unknown)
+    return true;
+
+  // Otherwise, assign Result and return false.
+  Result = Tmp;
+  return false;
+}
+
 bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
   SourceLoc TyLoc;
   SmallVector<ValueDecl *, 4> values;
@@ -3435,18 +3474,25 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
 
+  case SILInstructionKind::AssignInst:
   case SILInstructionKind::StoreInst: {
     UnresolvedValueName From;
     SourceLoc ToLoc, AddrLoc;
     Identifier ToToken;
     SILValue AddrVal;
-    StoreOwnershipQualifier Qualifier;
+    StoreOwnershipQualifier StoreQualifier;
+    AssignOwnershipQualifier AssignQualifier;
+    bool IsStore = Opcode == SILInstructionKind::StoreInst;
+    bool IsAssign = Opcode == SILInstructionKind::AssignInst;
     if (parseValueName(From) ||
         parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
                            "to"))
       return true;
 
-    if (parseStoreOwnershipQualifier(Qualifier, *this))
+    if (IsStore && parseStoreOwnershipQualifier(StoreQualifier, *this))
+      return true;
+
+    if (IsAssign && parseAssignOwnershipQualifier(AssignQualifier, *this))
       return true;
 
     if (parseTypedValueRef(AddrVal, AddrLoc, B) ||
@@ -3466,8 +3512,18 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
     SILType ValType = AddrVal->getType().getObjectType();
 
-    ResultVal = B.createStore(InstLoc, getLocalValue(From, ValType, InstLoc, B),
-                              AddrVal, Qualifier);
+    if (IsStore) {
+      ResultVal = B.createStore(InstLoc,
+                                getLocalValue(From, ValType, InstLoc, B),
+                                AddrVal, StoreQualifier);
+    } else {
+      assert(IsAssign);
+
+      ResultVal = B.createAssign(InstLoc,
+                                getLocalValue(From, ValType, InstLoc, B),
+                                AddrVal, AssignQualifier);
+    }
+
     break;
   }
 
@@ -3606,8 +3662,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
-  case SILInstructionKind::StoreBorrowInst:
-  case SILInstructionKind::AssignInst: {
+  case SILInstructionKind::StoreBorrowInst: {
     UnresolvedValueName from;
     bool isRefStorage = false;
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -3660,12 +3715,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
 #include "swift/AST/ReferenceStorage.def"
 
-    SILType ValType = addrVal->getType().getObjectType();
-
-    assert(Opcode == SILInstructionKind::AssignInst);
-    ResultVal = B.createAssign(InstLoc,
-                               getLocalValue(from, ValType, InstLoc, B),
-                               addrVal);
     break;
   }
   case SILInstructionKind::AllocStackInst:
@@ -4921,13 +4970,16 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
   auto PartialApplyConvention = ParameterConvention::Direct_Owned;
   bool IsNonThrowingApply = false;
+  bool IsNoEscape = false;
   StringRef AttrName;
-  
-  if (parseSILOptional(AttrName, *this)) {
+
+  while (parseSILOptional(AttrName, *this)) {
     if (AttrName.equals("nothrow"))
       IsNonThrowingApply = true;
     else if (AttrName.equals("callee_guaranteed"))
       PartialApplyConvention = ParameterConvention::Direct_Guaranteed;
+    else if (AttrName.equals("on_stack"))
+      IsNoEscape = true;
     else
       return true;
   }
@@ -5058,8 +5110,10 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = B.createPartialApply(InstLoc, FnVal, subs, Args,
-                                     PartialApplyConvention);
+    ResultVal = B.createPartialApply(
+        InstLoc, FnVal, subs, Args, PartialApplyConvention,
+        IsNoEscape ? PartialApplyInst::OnStackKind::OnStack
+                   : PartialApplyInst::OnStackKind::NotOnStack);
     break;
   }
   case SILInstructionKind::TryApplyInst: {

@@ -51,6 +51,11 @@ extension Dictionary : _JSONStringDictionaryDecodableMarker where Key == String,
 //===----------------------------------------------------------------------===//
 
 /// `JSONEncoder` facilitates the encoding of `Encodable` values into JSON.
+// NOTE: older overlays had Foundation.JSONEncoder as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC10Foundation13__JSONEncoder is the
+// mangled name for Foundation.__JSONEncoder.
+@_objcRuntimeName(_TtC10Foundation13__JSONEncoder)
 open class JSONEncoder {
     // MARK: Options
 
@@ -245,7 +250,7 @@ open class JSONEncoder {
     /// - throws: `EncodingError.invalidValue` if a non-conforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
     /// - throws: An error if any value throws an error during encoding.
     open func encode<T : Encodable>(_ value: T) throws -> Data {
-        let encoder = _JSONEncoder(options: self.options)
+        let encoder = __JSONEncoder(options: self.options)
 
         guard let topLevel = try encoder.box_(value) else {
             throw EncodingError.invalidValue(value, 
@@ -273,9 +278,12 @@ open class JSONEncoder {
     }
 }
 
-// MARK: - _JSONEncoder
+// MARK: - __JSONEncoder
 
-fileprivate class _JSONEncoder : Encoder {
+// NOTE: older overlays called this class _JSONEncoder.
+// The two must coexist without a conflicting ObjC class name, so it
+// was renamed. The old name must not be used in the new runtime.
+fileprivate class __JSONEncoder : Encoder {
     // MARK: Properties
 
     /// The encoder's storage.
@@ -405,7 +413,7 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
     // MARK: Properties
 
     /// A reference to the encoder we're writing to.
-    private let encoder: _JSONEncoder
+    private let encoder: __JSONEncoder
 
     /// A reference to the container we're writing to.
     private let container: NSMutableDictionary
@@ -416,7 +424,7 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
     // MARK: - Initialization
 
     /// Initializes `self` with the given references.
-    fileprivate init(referencing encoder: _JSONEncoder, codingPath: [CodingKey], wrapping container: NSMutableDictionary) {
+    fileprivate init(referencing encoder: __JSONEncoder, codingPath: [CodingKey], wrapping container: NSMutableDictionary) {
         self.encoder = encoder
         self.codingPath = codingPath
         self.container = container
@@ -499,8 +507,18 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
     }
 
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
-        let dictionary = NSMutableDictionary()
-        self.container[_converted(key).stringValue] = dictionary
+        let containerKey = _converted(key).stringValue
+        let dictionary: NSMutableDictionary
+        if let existingContainer = self.container[containerKey] {
+            precondition(
+                existingContainer is NSMutableDictionary,
+                "Attempt to re-encode into nested KeyedEncodingContainer<\(Key.self)> for key \"\(containerKey)\" is invalid: non-keyed container already encoded for this key"
+            )
+            dictionary = existingContainer as! NSMutableDictionary
+        } else {
+            dictionary = NSMutableDictionary()
+            self.container[containerKey] = dictionary
+        }
 
         self.codingPath.append(key)
         defer { self.codingPath.removeLast() }
@@ -510,8 +528,18 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
     }
 
     public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        let array = NSMutableArray()
-        self.container[_converted(key).stringValue] = array
+        let containerKey = _converted(key).stringValue
+        let array: NSMutableArray
+        if let existingContainer = self.container[containerKey] {
+            precondition(
+                existingContainer is NSMutableArray,
+                "Attempt to re-encode into nested UnkeyedEncodingContainer for key \"\(containerKey)\" is invalid: keyed container/single value already encoded for this key"
+            )
+            array = existingContainer as! NSMutableArray
+        } else {
+            array = NSMutableArray()
+            self.container[containerKey] = array
+        }
 
         self.codingPath.append(key)
         defer { self.codingPath.removeLast() }
@@ -519,11 +547,11 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
     }
 
     public mutating func superEncoder() -> Encoder {
-        return _JSONReferencingEncoder(referencing: self.encoder, key: _JSONKey.super, convertedKey: _converted(_JSONKey.super), wrapping: self.container)
+        return __JSONReferencingEncoder(referencing: self.encoder, key: _JSONKey.super, convertedKey: _converted(_JSONKey.super), wrapping: self.container)
     }
 
     public mutating func superEncoder(forKey key: Key) -> Encoder {
-        return _JSONReferencingEncoder(referencing: self.encoder, key: key, convertedKey: _converted(key), wrapping: self.container)
+        return __JSONReferencingEncoder(referencing: self.encoder, key: key, convertedKey: _converted(key), wrapping: self.container)
     }
 }
 
@@ -531,7 +559,7 @@ fileprivate struct _JSONUnkeyedEncodingContainer : UnkeyedEncodingContainer {
     // MARK: Properties
 
     /// A reference to the encoder we're writing to.
-    private let encoder: _JSONEncoder
+    private let encoder: __JSONEncoder
 
     /// A reference to the container we're writing to.
     private let container: NSMutableArray
@@ -547,7 +575,7 @@ fileprivate struct _JSONUnkeyedEncodingContainer : UnkeyedEncodingContainer {
     // MARK: - Initialization
 
     /// Initializes `self` with the given references.
-    fileprivate init(referencing encoder: _JSONEncoder, codingPath: [CodingKey], wrapping container: NSMutableArray) {
+    fileprivate init(referencing encoder: __JSONEncoder, codingPath: [CodingKey], wrapping container: NSMutableArray) {
         self.encoder = encoder
         self.codingPath = codingPath
         self.container = container
@@ -610,11 +638,11 @@ fileprivate struct _JSONUnkeyedEncodingContainer : UnkeyedEncodingContainer {
     }
 
     public mutating func superEncoder() -> Encoder {
-        return _JSONReferencingEncoder(referencing: self.encoder, at: self.container.count, wrapping: self.container)
+        return __JSONReferencingEncoder(referencing: self.encoder, at: self.container.count, wrapping: self.container)
     }
 }
 
-extension _JSONEncoder : SingleValueEncodingContainer {
+extension __JSONEncoder : SingleValueEncodingContainer {
     // MARK: - SingleValueEncodingContainer Methods
 
     fileprivate func assertCanEncodeNewValue() {
@@ -704,7 +732,7 @@ extension _JSONEncoder : SingleValueEncodingContainer {
 
 // MARK: - Concrete Value Representations
 
-extension _JSONEncoder {
+extension __JSONEncoder {
     /// Returns the given value boxed in a container appropriate for pushing onto the container stack.
     fileprivate func box(_ value: Bool)   -> NSObject { return NSNumber(value: value) }
     fileprivate func box(_ value: Int)    -> NSObject { return NSNumber(value: value) }
@@ -902,7 +930,7 @@ extension _JSONEncoder {
             return try self.box(value as! [String : Encodable])
         }
 
-        // The value should request a container from the _JSONEncoder.
+        // The value should request a container from the __JSONEncoder.
         let depth = self.storage.count
         do {
             try value.encode(to: self)
@@ -924,11 +952,14 @@ extension _JSONEncoder {
     }
 }
 
-// MARK: - _JSONReferencingEncoder
+// MARK: - __JSONReferencingEncoder
 
-/// _JSONReferencingEncoder is a special subclass of _JSONEncoder which has its own storage, but references the contents of a different encoder.
+/// __JSONReferencingEncoder is a special subclass of __JSONEncoder which has its own storage, but references the contents of a different encoder.
 /// It's used in superEncoder(), which returns a new encoder for encoding a superclass -- the lifetime of the encoder should not escape the scope it's created in, but it doesn't necessarily know when it's done being used (to write to the original container).
-fileprivate class _JSONReferencingEncoder : _JSONEncoder {
+// NOTE: older overlays called this class _JSONReferencingEncoder.
+// The two must coexist without a conflicting ObjC class name, so it
+// was renamed. The old name must not be used in the new runtime.
+fileprivate class __JSONReferencingEncoder : __JSONEncoder {
     // MARK: Reference types.
 
     /// The type of container we're referencing.
@@ -943,7 +974,7 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
     // MARK: - Properties
 
     /// The encoder we're referencing.
-    fileprivate let encoder: _JSONEncoder
+    fileprivate let encoder: __JSONEncoder
 
     /// The container reference itself.
     private let reference: Reference
@@ -951,7 +982,7 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
     // MARK: - Initialization
 
     /// Initializes `self` by referencing the given array container in the given encoder.
-    fileprivate init(referencing encoder: _JSONEncoder, at index: Int, wrapping array: NSMutableArray) {
+    fileprivate init(referencing encoder: __JSONEncoder, at index: Int, wrapping array: NSMutableArray) {
         self.encoder = encoder
         self.reference = .array(array, index)
         super.init(options: encoder.options, codingPath: encoder.codingPath)
@@ -960,7 +991,7 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
     }
 
     /// Initializes `self` by referencing the given dictionary container in the given encoder.
-    fileprivate init(referencing encoder: _JSONEncoder,
+    fileprivate init(referencing encoder: __JSONEncoder,
                      key: CodingKey, convertedKey: __shared CodingKey, wrapping dictionary: NSMutableDictionary) {
         self.encoder = encoder
         self.reference = .dictionary(dictionary, convertedKey.stringValue)
@@ -1004,6 +1035,11 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
 //===----------------------------------------------------------------------===//
 
 /// `JSONDecoder` facilitates the decoding of JSON into semantic `Decodable` types.
+// NOTE: older overlays had Foundation.JSONDecoder as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC10Foundation13__JSONDecoder is the
+// mangled name for Foundation.__JSONDecoder.
+@_objcRuntimeName(_TtC10Foundation13__JSONDecoder)
 open class JSONDecoder {
     // MARK: Options
 
@@ -1174,7 +1210,7 @@ open class JSONDecoder {
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "The given data was not valid JSON.", underlyingError: error))
         }
 
-        let decoder = _JSONDecoder(referencing: topLevel, options: self.options)
+        let decoder = __JSONDecoder(referencing: topLevel, options: self.options)
         guard let value = try decoder.unbox(topLevel, as: type) else {
             throw DecodingError.valueNotFound(type, DecodingError.Context(codingPath: [], debugDescription: "The given data did not contain a top-level value."))
         }
@@ -1183,9 +1219,12 @@ open class JSONDecoder {
     }
 }
 
-// MARK: - _JSONDecoder
+// MARK: - __JSONDecoder
 
-fileprivate class _JSONDecoder : Decoder {
+// NOTE: older overlays called this class _JSONDecoder. The two must
+// coexist without a conflicting ObjC class name, so it was renamed.
+// The old name must not be used in the new runtime.
+fileprivate class __JSONDecoder : Decoder {
     // MARK: Properties
 
     /// The decoder's storage.
@@ -1291,7 +1330,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     // MARK: Properties
 
     /// A reference to the decoder we're reading from.
-    private let decoder: _JSONDecoder
+    private let decoder: __JSONDecoder
 
     /// A reference to the container we're reading from.
     private let container: [String : Any]
@@ -1302,7 +1341,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     // MARK: - Initialization
 
     /// Initializes `self` by referencing the given decoder and container.
-    fileprivate init(referencing decoder: _JSONDecoder, wrapping container: [String : Any]) {
+    fileprivate init(referencing decoder: __JSONDecoder, wrapping container: [String : Any]) {
         self.decoder = decoder
         switch decoder.options.keyDecodingStrategy {
         case .useDefaultKeys:
@@ -1621,7 +1660,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
         defer { self.decoder.codingPath.removeLast() }
 
         let value: Any = self.container[key.stringValue] ?? NSNull()
-        return _JSONDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
+        return __JSONDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
     }
 
     public func superDecoder() throws -> Decoder {
@@ -1637,7 +1676,7 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     // MARK: Properties
 
     /// A reference to the decoder we're reading from.
-    private let decoder: _JSONDecoder
+    private let decoder: __JSONDecoder
 
     /// A reference to the container we're reading from.
     private let container: [Any]
@@ -1651,7 +1690,7 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     // MARK: - Initialization
 
     /// Initializes `self` by referencing the given decoder and container.
-    fileprivate init(referencing decoder: _JSONDecoder, wrapping container: [Any]) {
+    fileprivate init(referencing decoder: __JSONDecoder, wrapping container: [Any]) {
         self.decoder = decoder
         self.container = container
         self.codingPath = decoder.codingPath
@@ -1984,11 +2023,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
 
         let value = self.container[self.currentIndex]
         self.currentIndex += 1
-        return _JSONDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
+        return __JSONDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
     }
 }
 
-extension _JSONDecoder : SingleValueDecodingContainer {
+extension __JSONDecoder : SingleValueDecodingContainer {
     // MARK: SingleValueDecodingContainer Methods
 
     private func expectNonNull<T>(_ type: T.Type) throws {
@@ -2079,7 +2118,7 @@ extension _JSONDecoder : SingleValueDecodingContainer {
 
 // MARK: - Concrete Value Representations
 
-extension _JSONDecoder {
+extension __JSONDecoder {
     /// Returns the given value unboxed from a container.
     fileprivate func unbox(_ value: Any, as type: Bool.Type) throws -> Bool? {
         guard !(value is NSNull) else { return nil }

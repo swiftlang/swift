@@ -362,7 +362,9 @@ static AccessedStorageResult getAccessedStorageFromAddress(SILValue sourceAddr) 
 
   // Access to a Builtin.RawPointer. Treat this like the inductive cases
   // above because some RawPointers originate from identified locations. See
-  // the special case for global addressors, which return RawPointer, above.
+  // the special case for global addressors, which return RawPointer,
+  // above. AddressToPointer is also handled because it results from inlining a
+  // global addressor without folding the AddressToPointer->PointerToAddress.
   //
   // If the inductive search does not find a valid addressor, it will
   // eventually reach the default case that returns in invalid location. This
@@ -381,6 +383,7 @@ static AccessedStorageResult getAccessedStorageFromAddress(SILValue sourceAddr) 
   // marks debug VarDecl access as 'Unsafe' and SIL passes don't need the
   // AccessedStorage for 'Unsafe' access.
   case ValueKind::PointerToAddressInst:
+  case ValueKind::AddressToPointerInst:
     return AccessedStorageResult::incomplete(
       cast<SingleValueInstruction>(sourceAddr)->getOperand(0));
 
@@ -420,6 +423,8 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
       storage = result.getStorage();
       continue;
     }
+    // `storage` may still be invalid. If both `storage` and `result` are
+    // invalid, this check passes, but we return an invalid storage below.
     if (!accessingIdenticalLocations(storage.getValue(), result.getStorage()))
       return AccessedStorage();
   }

@@ -184,6 +184,11 @@ public:
 
   void run() override {
     auto &Fn = *getFunction();
+
+    // FIXME: Add ownership support.
+    if (Fn.hasOwnership())
+      return;
+
     bool Changed = false;
     SmallVector<ApplyInst *, 16> DeadArrayCountCalls;
     // Propagate the count of array allocations to array.count users.

@@ -130,7 +130,7 @@ public class Base {
    var a: UInt32 = 0
 }
 // CHECK-LABEL: %swift.metadata_response @{{.*}}7DerivedCMr"(
-// CHECK: call void @swift_initClassMetadata
+// CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata
 // CHECK: ret
 public class Derived<T> : Base {
   var type : P.Type

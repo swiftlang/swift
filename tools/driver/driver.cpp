@@ -111,8 +111,6 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   return true;
 }
 
-extern int apinotes_main(ArrayRef<const char *> Args);
-
 static int run_driver(StringRef ExecName,
                        const ArrayRef<const char *> argv) {
   // Handle integrated tools.
@@ -127,10 +125,6 @@ static int run_driver(StringRef ExecName,
       return modulewrap_main(llvm::makeArrayRef(argv.data()+2,
                                                 argv.data()+argv.size()),
                              argv[0], (void *)(intptr_t)getExecutablePath);
-    }
-    if (FirstArg == "-apinotes") {
-      return apinotes_main(llvm::makeArrayRef(argv.data()+1,
-                                              argv.data()+argv.size()));
     }
   }
 

@@ -142,32 +142,38 @@ public:
   friend class NodeFactory;
   
 private:
+
+  struct NodeVector {
+    NodePointer *Nodes;
+    uint32_t Number = 0;
+    uint32_t Capacity = 0;
+  };
+
+  union {
+    llvm::StringRef Text;
+    IndexType Index;
+    NodePointer InlineChildren[2];
+    NodeVector Children;
+  };
+
+
   Kind NodeKind;
 
   enum class PayloadKind : uint8_t {
-    None, Text, Index
+    None, Text, Index, OneChild, TwoChildren, ManyChildren
   };
   PayloadKind NodePayloadKind;
-
-  union {
-    llvm::StringRef TextPayload;
-    IndexType IndexPayload;
-  };
-
-  NodePointer *Children = nullptr;
-  size_t NumChildren = 0;
-  size_t ReservedChildren = 0;
 
   Node(Kind k)
       : NodeKind(k), NodePayloadKind(PayloadKind::None) {
   }
   Node(Kind k, llvm::StringRef t)
       : NodeKind(k), NodePayloadKind(PayloadKind::Text) {
-    TextPayload = t;
+    Text = t;
   }
   Node(Kind k, IndexType index)
       : NodeKind(k), NodePayloadKind(PayloadKind::Index) {
-    IndexPayload = index;
+    Index = index;
   }
   Node(const Node &) = delete;
   Node &operator=(const Node &) = delete;
@@ -178,36 +184,32 @@ public:
   bool hasText() const { return NodePayloadKind == PayloadKind::Text; }
   llvm::StringRef getText() const {
     assert(hasText());
-    return TextPayload;
+    return Text;
   }
 
   bool hasIndex() const { return NodePayloadKind == PayloadKind::Index; }
   uint64_t getIndex() const {
     assert(hasIndex());
-    return IndexPayload;
+    return Index;
   }
 
-  using iterator = NodePointer *;
-  using const_iterator = const NodePointer *;
-  using size_type = size_t;
+  using iterator = const NodePointer *;
 
-  bool hasChildren() const { return NumChildren != 0; }
-  size_t getNumChildren() const { return NumChildren; }
-  iterator begin() { return Children; }
-  iterator end() { return Children + NumChildren; }
-  const_iterator begin() const { return Children; }
-  const_iterator end() const { return Children + NumChildren; }
+  size_t getNumChildren() const;
+
+  bool hasChildren() const { return getNumChildren() != 0; }
+
+  iterator begin() const;
+
+  iterator end() const;
 
   NodePointer getFirstChild() const {
-    assert(NumChildren >= 1);
-    return Children[0];
+    return getChild(0);
   }
   NodePointer getChild(size_t index) const {
-    assert(NumChildren > index);
-    return Children[index];
+    assert(getNumChildren() > index);
+    return begin()[index];
   }
-
-//  inline void addChild(NodePointer Child, Context &Ctx);
 
   // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
@@ -472,8 +474,10 @@ void mangleIdentifier(const char *data, size_t length,
 
 /// Remangle a demangled parse tree.
 ///
-/// This should always round-trip perfectly with demangleSymbolAsNode.
-std::string mangleNode(const NodePointer &root);
+/// If \p BorrowFrom is specified, the initial bump pointer memory is
+/// borrowed from the free memory of BorrowFrom.
+std::string mangleNode(NodePointer root,
+                       NodeFactory *BorrowFrom = nullptr);
 
 using SymbolicResolver =
   llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
@@ -482,14 +486,17 @@ using SymbolicResolver =
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
 ///
-/// This should always round-trip perfectly with demangleSymbolAsNode.
-std::string mangleNode(const NodePointer &root, SymbolicResolver resolver);
+/// If \p BorrowFrom is specified, the initial bump pointer memory is
+/// borrowed from the free memory of BorrowFrom.
+std::string mangleNode(NodePointer root, SymbolicResolver resolver,
+                       NodeFactory *BorrowFrom = nullptr);
 
 /// Remangle in the old mangling scheme.
 ///
-/// This is only used for objc-runtime names and should be removed as soon as
-/// we switch to the new mangling for those names as well.
-std::string mangleNodeOld(const NodePointer &root);
+/// This is only used for objc-runtime names.
+/// If \p BorrowFrom is specified, the initial bump pointer memory is
+/// borrowed from the free memory of BorrowFrom.
+std::string mangleNodeOld(NodePointer root, NodeFactory *BorrowFrom = nullptr);
 
 /// Transform the node structure to a string.
 ///
@@ -564,7 +571,10 @@ const char *getNodeKindString(swift::Demangle::Node::Kind k);
 /// Useful for debugging.
 std::string getNodeTreeAsString(NodePointer Root);
 
+bool nodeConsumesGenericArgs(Node *node);
+
 bool isSpecialized(Node *node);
+
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 std::string archetypeName(Node::IndexType index, Node::IndexType depth);
 

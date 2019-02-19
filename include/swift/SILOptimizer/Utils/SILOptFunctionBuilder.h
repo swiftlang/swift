@@ -55,6 +55,8 @@ public:
     pm.getModule()->eraseFunction(f);
   }
 
+  SILModule &getModule() const { return *getPassManager().getModule(); }
+
 private:
   SILPassManager &getPassManager() const {
     return *transform.getPassManager();

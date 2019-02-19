@@ -67,10 +67,25 @@
 set(_SWIFT_DEFINED_COMPONENTS
   "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;parser-lib;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
+# The default install components include all of the defined components, except
+# for the following exceptions.
+set(_SWIFT_DEFAULT_COMPONENTS "${_SWIFT_DEFINED_COMPONENTS}")
+# 'dev' takes up a lot of disk space and isn't part of a normal toolchain.
+list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "dev")
+# These clang header options conflict with 'clang-builtin-headers'.
+list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "clang-resource-dir-symlink")
+list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "clang-builtin-headers-in-clang-resource-dir")
+# The sourcekit install variants are currently mutually exclusive.
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "sourcekit-inproc")
+else()
+  list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "sourcekit-xpc-service")
+endif()
+
 macro(swift_configure_components)
   # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
-  set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_DEFINED_COMPONENTS}" CACHE STRING
-    "A semicolon-separated list of components to install ${_SWIFT_DEFINED_COMPONENTS}")
+  set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_DEFAULT_COMPONENTS}" CACHE STRING
+    "A semicolon-separated list of components to install from the set ${_SWIFT_DEFINED_COMPONENTS}")
 
   foreach(component ${_SWIFT_DEFINED_COMPONENTS})
     string(TOUPPER "${component}" var_name_piece)

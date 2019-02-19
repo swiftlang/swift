@@ -2406,14 +2406,9 @@ void ValueDecl::setInterfaceType(Type type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
 
-    // lldb creates global typealiases with archetypes in them.
-    // FIXME: Add an isDebugAlias() flag, like isDebugVar().
-    //
-    // Also, ParamDecls in closure contexts can have type variables
+    // ParamDecls in closure contexts can have type variables
     // archetype in them during constraint generation.
-    if (!isa<TypeAliasDecl>(this) &&
-        !(isa<ParamDecl>(this) &&
-          isa<AbstractClosureExpr>(getDeclContext()))) {
+    if (!(isa<ParamDecl>(this) && isa<AbstractClosureExpr>(getDeclContext()))) {
       assert(!type->hasArchetype() &&
              "Archetype in interface type");
     }
@@ -2523,12 +2518,14 @@ bool ValueDecl::isUsableFromInline() const {
   assert(getFormalAccess() == AccessLevel::Internal);
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+      getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
       getAttrs().hasAttribute<InlinableAttr>())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
     auto *storage = accessor->getStorage();
     if (storage->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+        storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
         storage->getAttrs().hasAttribute<InlinableAttr>())
       return true;
   }
@@ -2550,8 +2547,6 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
-/// Returns \c true if this declaration is *not* intended to be used directly
-/// by application developers despite of the visibility.
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
@@ -2578,9 +2573,9 @@ bool ValueDecl::shouldHideFromEditor() const {
   return false;
 }
 
-/// Return the access level of an internal or public declaration
-/// that's been testably imported.
-static AccessLevel getTestableOrPrivateImportsAccess(const ValueDecl *decl) {
+/// Return maximally open access level which could be associated with the
+/// given declaration accounting for @testable importers.
+static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
     if (!cls->isFinal())
@@ -2606,6 +2601,11 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
                                            AccessLevel access,
                                            const DeclContext *useDC,
                                            bool treatUsableFromInlineAsPublic) {
+  // If access control is disabled in the current context, adjust
+  // access level of the current declaration to be as open as possible.
+  if (useDC && VD->getASTContext().isAccessControlDisabled())
+    return getMaximallyOpenAccessFor(VD);
+
   if (treatUsableFromInlineAsPublic &&
       access == AccessLevel::Internal &&
       VD->isUsableFromInline()) {
@@ -2618,7 +2618,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
     if (!useSF) return access;
     if (useSF->hasTestableOrPrivateImport(access, VD))
-      return getTestableOrPrivateImportsAccess(VD);
+      return getMaximallyOpenAccessFor(VD);
   }
 
   return access;
@@ -2646,16 +2646,16 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   case AccessLevel::Internal:
     if (getModuleContext()->isTestingEnabled() ||
         getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getTestableOrPrivateImportsAccess(this);
+      effectiveAccess = getMaximallyOpenAccessFor(this);
     break;
   case AccessLevel::FilePrivate:
     if (getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getTestableOrPrivateImportsAccess(this);
+      effectiveAccess = getMaximallyOpenAccessFor(this);
     break;
   case AccessLevel::Private:
     effectiveAccess = AccessLevel::FilePrivate;
     if (getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getTestableOrPrivateImportsAccess(this);
+      effectiveAccess = getMaximallyOpenAccessFor(this);
     break;
   }
 
@@ -2851,9 +2851,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   case AccessLevel::FilePrivate:
     if (useDC->getModuleScopeContext() != sourceDC->getModuleScopeContext()) {
       auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
-      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
-        return true;
-      return false;
+      return useSF && useSF->hasTestableOrPrivateImport(access, VD);
     }
     return true;
   case AccessLevel::Internal: {
@@ -2862,10 +2860,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     if (useFile->getParentModule() == sourceModule)
       return true;
     auto *useSF = dyn_cast<SourceFile>(useFile);
-    if (!useSF) return false;
-    if (useSF->hasTestableOrPrivateImport(access, sourceModule))
-      return true;
-    return false;
+    return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Public:
   case AccessLevel::Open:
@@ -3385,9 +3380,11 @@ TypeLoc &AssociatedTypeDecl::getDefaultDefinitionLoc() {
 
 SourceRange AssociatedTypeDecl::getSourceRange() const {
   SourceLoc endLoc;
-  if (auto TWC = getTrailingWhereClause())
+  if (auto TWC = getTrailingWhereClause()) {
     endLoc = TWC->getSourceRange().End;
-  else if (!getInherited().empty()) {
+  } else if (getDefaultDefinitionLoc().hasLocation()) {
+    endLoc = getDefaultDefinitionLoc().getSourceRange().End;
+  } else if (!getInherited().empty()) {
     endLoc = getInherited().back().getSourceRange().End;
   } else {
     endLoc = getNameLoc();
@@ -3547,7 +3544,6 @@ void ClassDecl::addImplicitDestructor() {
   // Create an empty body for the destructor.
   DD->setBody(BraceStmt::create(ctx, getLoc(), { }, getLoc(), true));
   addMember(DD);
-  setHasDestructor();
 
   // Propagate access control and versioned-ness.
   DD->copyFormalAccessFrom(this, /*sourceIsParentContext*/true);
@@ -3910,16 +3906,19 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.ExistentialConformsToSelf = false;
   Bits.ProtocolDecl.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
+  Bits.ProtocolDecl.InheritedProtocolsValid = 0;
   Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
-  setTrailingWhereClause(TrailingWhere);
+    setTrailingWhereClause(TrailingWhere);
 }
 
-llvm::TinyPtrVector<ProtocolDecl *>
-ProtocolDecl::getInheritedProtocols() const {
-  llvm::TinyPtrVector<ProtocolDecl *> result;
-  SmallPtrSet<const ProtocolDecl *, 4> known;
+ArrayRef<ProtocolDecl *>
+ProtocolDecl::getInheritedProtocolsSlow() {
+  Bits.ProtocolDecl.InheritedProtocolsValid = true;
+
+  llvm::SmallVector<ProtocolDecl *, 2> result;
+  SmallPtrSet<const ProtocolDecl *, 2> known;
   known.insert(this);
   bool anyObject = false;
   for (const auto found :
@@ -3931,7 +3930,9 @@ ProtocolDecl::getInheritedProtocols() const {
     }
   }
 
-  return result;
+  auto &ctx = getASTContext();
+  InheritedProtocols = ctx.AllocateCopy(result);
+  return InheritedProtocols;
 }
 
 llvm::TinyPtrVector<AssociatedTypeDecl *>
@@ -3973,7 +3974,10 @@ ClassDecl *ProtocolDecl::getSuperclassDecl() const {
 void ProtocolDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
-  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassDecl.setPointerAndInt(
+    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
+    true);
 }
 
 bool ProtocolDecl::walkInheritedProtocols(
@@ -4120,8 +4124,15 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   // the parameter type.
   if (auto funcTy = type->getAs<AnyFunctionType>()) {
     auto inputKind = SelfReferenceKind::None();
-    for (auto &elt : funcTy->getParams()) {
-      inputKind |= findProtocolSelfReferences(proto, elt.getOldType(),
+    for (auto param : funcTy->getParams()) {
+      // inout parameters are invariant.
+      if (param.isInOut()) {
+        if (findProtocolSelfReferences(proto, param.getPlainType(),
+                                       skipAssocTypes)) {
+          return SelfReferenceKind::Other();
+        }
+      }
+      inputKind |= findProtocolSelfReferences(proto, param.getParameterType(),
                                               skipAssocTypes);
     }
     auto resultKind = findProtocolSelfReferences(proto, funcTy->getResult(),
@@ -4150,14 +4161,6 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   if (auto selfType = type->getAs<DynamicSelfType>()) {
     return findProtocolSelfReferences(proto, selfType->getSelfType(),
                                       skipAssocTypes);
-  }
-
-  // InOut types are invariant.
-  if (auto inOutType = type->getAs<InOutType>()) {
-    if (findProtocolSelfReferences(proto, inOutType->getObjectType(),
-                                   skipAssocTypes)) {
-      return SelfReferenceKind::Other();
-    }
   }
 
   // Bound generic types are invariant.
@@ -4230,8 +4233,15 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     // as a function result type.
     if (!allowCovariantParameters) {
       auto inputKind = SelfReferenceKind::None();
-      for (auto &elt : type->castTo<AnyFunctionType>()->getParams()) {
-        inputKind |= ::findProtocolSelfReferences(this, elt.getOldType(),
+      for (auto param : type->castTo<AnyFunctionType>()->getParams()) {
+        // inout parameters are invariant.
+        if (param.isInOut()) {
+          if (::findProtocolSelfReferences(this, param.getPlainType(),
+                                           skipAssocTypes)) {
+            return SelfReferenceKind::Other();
+          }
+        }
+        inputKind |= ::findProtocolSelfReferences(this, param.getParameterType(),
                                                   skipAssocTypes);
       }
 
@@ -4377,6 +4387,24 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
     RequirementSignature = getASTContext().AllocateCopy(requirements).data();
     Bits.ProtocolDecl.NumRequirementsInSignature = requirements.size();
   }
+}
+
+void ProtocolDecl::computeKnownProtocolKind() const {
+  auto module = getModuleContext();
+  if (module != module->getASTContext().getStdlibModule() &&
+      !module->getName().is("Foundation")) {
+    const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
+    return;
+  }
+
+  unsigned value =
+    llvm::StringSwitch<unsigned>(getBaseName().userFacingName())
+#define PROTOCOL_WITH_NAME(Id, Name) \
+      .Case(Name, static_cast<unsigned>(KnownProtocolKind::Id) + 2)
+#include "swift/AST/KnownProtocols.def"
+      .Default(1);
+
+  const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = value;
 }
 
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
@@ -6316,8 +6344,10 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       // Prior to Swift 5, cross-module initializers were permitted to be
       // non-delegating. However, if the struct isn't fixed-layout, we have to
       // be delegating because, well, we don't know the layout.
+      // A dynamic replacement is permitted to be non-delegating.
       if (NTD->isResilient() ||
-          containingModule->getASTContext().isSwiftVersionAtLeast(5)) {
+          (containingModule->getASTContext().isSwiftVersionAtLeast(5) &&
+           !getAttrs().getAttribute<DynamicReplacementAttr>())) {
         if (containingModule != NTD->getParentModule())
           Kind = BodyInitKind::Delegating;
       }
@@ -6478,7 +6508,10 @@ ClassDecl *ClassDecl::getSuperclassDecl() const {
 void ClassDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
-  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
+  LazySemanticInfo.SuperclassDecl.setPointerAndInt(
+    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
+    true);
 }
 
 ClangNode Decl::getClangNodeImpl() const {

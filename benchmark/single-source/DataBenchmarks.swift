@@ -20,8 +20,8 @@ public let DataBenchmarks = [
     runFunction: { for _ in 0..<$0*10_000 { blackHole(Data()) } },
     tags: d, legacyFactor: 10),
   BenchmarkInfo(name: "DataCreateSmall",
-    runFunction: { for _ in 0..<$0*100 { blackHole(sampleData(.small)) } },
-    tags: d, legacyFactor: 1000),
+    runFunction: { for _ in 0..<$0*10_000 { blackHole(sampleData(.small)) } },
+    tags: d, legacyFactor: 10),
   BenchmarkInfo(name: "DataCreateMedium",
     runFunction: { for _ in 0..<$0*100 { blackHole(sampleData(.medium)) } },
     tags: d, legacyFactor: 100),
@@ -154,7 +154,7 @@ public let DataBenchmarks = [
     legacyFactor: 20),
 
   BenchmarkInfo(name: "DataAppendArray",
-    runFunction: { append($0*100, arraySize: 809, to: medium) }, tags: d,
+    runFunction: { append($0*100, array: array809, to: medium) }, tags: d,
     legacyFactor: 100),
 
   BenchmarkInfo(name: "DataReset",
@@ -274,6 +274,9 @@ public let DataBenchmarks = [
   BenchmarkInfo(name: "DataToStringMedium",
     runFunction: { string($0*200, from: mediumData) }, tags: d,
     legacyFactor: 50),
+  BenchmarkInfo(name: "DataToStringLargeUnicode",
+    runFunction: { string($0*200, from: largeUnicodeData) }, tags: d,
+    legacyFactor: 50),
 
   BenchmarkInfo(name: "StringToDataEmpty",
     runFunction: { data($0*200, from: emptyString) }, tags: d,
@@ -283,6 +286,9 @@ public let DataBenchmarks = [
     legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataMedium",
     runFunction: { data($0*200, from: mediumString) }, tags: d,
+    legacyFactor: 50),
+  BenchmarkInfo(name: "StringToDataLargeUnicode",
+    runFunction: { data($0*200, from: largeUnicodeString) }, tags: d,
     legacyFactor: 50),
 
   BenchmarkInfo(name: "Data.hash.Empty",
@@ -296,13 +302,18 @@ public let DataBenchmarks = [
 let emptyString = ""
 let smallString = "\r\n"
 let mediumString = "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n"
+let largeUnicodeString = 
+  "Swiftに大幅な改良が施され、𓀀𓀁𓀂𓀃, 🇺🇸🇨🇦🇲🇽" + mediumString
 let emptyData = Data()
 let smallData = Data(smallString.utf8)
 let mediumData = Data(mediumString.utf8)
+let largeUnicodeData = Data(largeUnicodeString.utf8)
 
 let small = sampleData(.small)
 let medium = sampleData(.medium)
 let large = sampleData(.large)
+
+let array809 = byteArray(size: 809)
 
 struct Count0<S: Sequence> : Sequence {
   let base: S
@@ -336,10 +347,14 @@ enum SampleKind {
   case immutableBacking
 }
 
-func fillBuffer(_ buffer: UnsafeMutableBufferPointer<UInt8>) {
-  for i in buffer.indices {
-    buffer[i] = UInt8(truncatingIfNeeded: i)
+func byteArray(size: Int) -> [UInt8] {
+  var bytes = [UInt8](repeating: 0, count: size)
+  bytes.withUnsafeMutableBufferPointer { buffer in
+    for i in buffer.indices {
+      buffer[i] = UInt8(truncatingIfNeeded: i)
+    }
   }
+  return bytes
 }
 
 func sampleData(size: Int) -> Data {
@@ -354,11 +369,7 @@ func sampleData(size: Int) -> Data {
 
 func sampleBridgedNSData() -> Data {
   let count = 1033
-  var bytes = [UInt8](repeating: 0, count: count)
-  bytes.withUnsafeMutableBufferPointer {
-    fillBuffer($0)
-  }
-  let data = NSData(bytes: bytes, length: count)
+  let data = NSData(bytes: byteArray(size: count), length: count)
   return Data(referencing: data)
 }
 
@@ -414,11 +425,7 @@ func append(_ N: Int, bytes count: Int, to data: Data) {
 }
 
 @inline(never)
-func append(_ N: Int, arraySize: Int, to data: Data) {
-  var bytes = [UInt8](repeating: 0, count: arraySize)
-  bytes.withUnsafeMutableBufferPointer {
-    fillBuffer($0)
-  }
+func append(_ N: Int, array bytes: [UInt8], to data: Data) {
   for _ in 1...N {
     var copy = data
     copy.append(contentsOf: bytes)

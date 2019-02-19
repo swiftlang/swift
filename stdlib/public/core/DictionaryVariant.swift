@@ -35,7 +35,7 @@ extension Dictionary {
   @_fixed_layout
   internal struct _Variant {
     @usableFromInline
-    internal var object: _BridgeStorage<_RawDictionaryStorage>
+    internal var object: _BridgeStorage<__RawDictionaryStorage>
 
     @inlinable
     @inline(__always)
@@ -56,7 +56,7 @@ extension Dictionary {
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
-    init(cocoa: __owned _CocoaDictionary) {
+    init(cocoa: __owned __CocoaDictionary) {
       self.object = _BridgeStorage(objC: cocoa.object)
     }
 #endif
@@ -102,8 +102,8 @@ extension Dictionary._Variant {
 
 #if _runtime(_ObjC)
   @inlinable
-  internal var asCocoa: _CocoaDictionary {
-    return _CocoaDictionary(object.objCInstance)
+  internal var asCocoa: __CocoaDictionary {
+    return __CocoaDictionary(object.objCInstance)
   }
 #endif
 

@@ -814,6 +814,8 @@ bb0(%0 : $Int):
 // CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:      bb1:
+// CHECK-NEXT:   dealloc_stack [[BOX]]
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
 // CHECK-NEXT:   unreachable
@@ -947,6 +949,7 @@ bb2:
 // CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:      bb1:
+// CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   {{.*}} = alloc_stack $Bool
 // CHECK-NEXT:   {{.*}} = alloc_stack $Bool
 // CHECK-NEXT:   unreachable

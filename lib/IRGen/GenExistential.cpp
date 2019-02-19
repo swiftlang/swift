@@ -2108,10 +2108,9 @@ static llvm::Constant *getDeallocateBoxedOpaqueExistentialBufferFunction(
         //  Size = ((sizeof(HeapObject) + align) & ~align) + size
         auto *heapHeaderSize = llvm::ConstantInt::get(
             IGF.IGM.SizeTy, IGM.RefCountedStructSize.getValue());
-        size = Builder.CreateAdd(
-            Builder.CreateAnd(Builder.CreateAdd(heapHeaderSize, alignmentMask),
-                              Builder.CreateNot(alignmentMask)),
-            size);
+        auto *Add = Builder.CreateAdd(heapHeaderSize, alignmentMask);
+        auto *Not = Builder.CreateNot(alignmentMask);
+        size = Builder.CreateAdd(Builder.CreateAnd(Add, Not), size);
 
         // At least pointer aligned.
         //  AlignmentMask = alignmentMask | alignof(void*) - 1
@@ -2202,9 +2201,9 @@ getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
           //  StartOffset = ((sizeof(HeapObject) + align) & ~align)
           auto *heapHeaderSize = llvm::ConstantInt::get(
               IGF.IGM.SizeTy, IGM.RefCountedStructSize.getValue());
-          auto *startOffset = Builder.CreateAnd(
-              Builder.CreateAdd(heapHeaderSize, alignmentMask),
-              Builder.CreateNot(alignmentMask));
+          auto *Add = Builder.CreateAdd(heapHeaderSize, alignmentMask);
+          auto *Not = Builder.CreateNot(alignmentMask);
+          auto *startOffset = Builder.CreateAnd(Add, Not);
           auto *addressInBox =
               IGF.emitByteOffsetGEP(boxReference, startOffset, IGM.OpaqueTy);
           IGF.Builder.CreateRet(addressInBox);

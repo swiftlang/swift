@@ -63,6 +63,10 @@ public:
       SmallVectorImpl<SILPhiArgument *> *InsertedPHIs = nullptr);
   ~SILSSAUpdater();
 
+  void setInsertedPhis(SmallVectorImpl<SILPhiArgument *> *insertedPhis) {
+    InsertedPHIs = insertedPhis;
+  }
+
   /// Initialize for a use of a value of type.
   void Initialize(SILType T);
 

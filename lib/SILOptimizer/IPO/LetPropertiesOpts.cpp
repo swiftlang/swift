@@ -581,6 +581,9 @@ void LetPropertiesOpt::run(SILModuleTransform *T) {
     // properties.
     bool NonRemovable = !F.shouldOptimize();
 
+    // FIXME: We should be able to handle ownership.
+    NonRemovable &= !F.hasOwnership();
+
     for (auto &BB : F) {
       for (auto &I : BB)
         // Look for any instructions accessing let properties.

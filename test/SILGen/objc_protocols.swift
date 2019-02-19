@@ -63,7 +63,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 }
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF'
 
-// CHECK: sil shared [serializable] [thunk] [ossa] @[[THUNK1]] :
+// CHECK: sil shared [thunk] [ossa] @[[THUNK1]] :
 // CHECK: bb0([[SELF:%.*]] : @guaranteed $Self):
 // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1_THUNK:\$s14objc_protocols9NSRuncingP5runceSo8NSObjectCyFTO]] :
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -71,7 +71,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK1]]'
 
-// CHECK: sil shared [serializable] [thunk] [ossa] @[[THUNK1_THUNK]]
+// CHECK: sil shared [thunk] [ossa] @[[THUNK1_THUNK]]
 // CHECK: bb0([[SELF:%.*]] : @guaranteed $Self):
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:   [[FN:%.*]] = objc_method [[SELF_COPY]] : $Self, #NSRuncing.runce!1.foreign
@@ -80,13 +80,13 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK:   return [[RESULT]]
 // CHECK: } // end sil function '[[THUNK1_THUNK]]'
 
-// CHECK: sil shared [serializable] [thunk] [ossa] @[[THUNK2]] :
+// CHECK: sil shared [thunk] [ossa] @[[THUNK2]] :
 // CHECK:   [[FN:%.*]] = function_ref @[[THUNK2_THUNK:\$s14objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTO]]
 // CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]<Self>(%0)
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK2]]'
 
-// CHECK: sil shared [serializable] [thunk] [ossa] @[[THUNK2_THUNK]] :
+// CHECK: sil shared [thunk] [ossa] @[[THUNK2_THUNK]] :
 // CHECK:      [[METATYPE:%.*]] = thick_to_objc_metatype %0
 // CHECK:      [[FN:%.*]] = objc_method [[METATYPE]] : $@objc_metatype Self.Type, #NSRuncing.mince!1.foreign
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>([[METATYPE]])

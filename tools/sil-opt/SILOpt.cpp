@@ -208,12 +208,6 @@ DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
 static llvm::cl::opt<bool>
 PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 
-static llvm::cl::opt<bool> DisableGuaranteedNormalArguments(
-    "disable-guaranteed-normal-arguments", llvm::cl::Hidden,
-    llvm::cl::init(false),
-    llvm::cl::desc("Assume that the input module was compiled with "
-                   "-disable-guaranteed-normal-arguments enabled"));
-
 static llvm::cl::opt<bool>
 EnableExperimentalStaticAssert(
     "enable-experimental-static-assert", llvm::cl::Hidden,
@@ -263,8 +257,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
 #include "swift/SILOptimizer/PassManager/Passes.def"
   }
 
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPassPipelineForKinds(Passes));
+  PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
+      Module->getOptions(), Passes));
 
   if (Module->getOptions().VerifyAll)
     Module->verify();

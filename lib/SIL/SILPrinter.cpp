@@ -212,6 +212,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     // FIXME
     Buffer << "<subscript>";
     return;
+  case DeclContextKind::EnumElementDecl:
+    // FIXME
+    Buffer << "<enum element>";
+    return;
   }
   llvm_unreachable("bad decl context");
 }
@@ -1123,6 +1127,8 @@ public:
     case ParameterConvention::Indirect_InoutAliasable:
       llvm_unreachable("unexpected callee convention!");
     }
+    if (CI->isOnStack())
+      *this << "[on_stack] ";
     visitApplyInstBase(CI);
   }
 
@@ -1266,6 +1272,22 @@ public:
     }
   }
 
+  void printAssignOwnershipQualifier(AssignOwnershipQualifier Qualifier) {
+    switch (Qualifier) {
+    case AssignOwnershipQualifier::Unknown:
+      return;
+    case AssignOwnershipQualifier::Init:
+      *this << "[init] ";
+      return;
+    case AssignOwnershipQualifier::Reassign:
+      *this << "[reassign] ";
+      return;
+    case AssignOwnershipQualifier::Reinit:
+      *this << "[reinit] ";
+      return;
+    }
+  }
+
   void visitStoreInst(StoreInst *SI) {
     *this << Ctx.getID(SI->getSrc()) << " to ";
     printStoreOwnershipQualifier(SI->getOwnershipQualifier());
@@ -1282,7 +1304,9 @@ public:
   }
 
   void visitAssignInst(AssignInst *AI) {
-    *this << Ctx.getID(AI->getSrc()) << " to " << getIDAndType(AI->getDest());
+    *this << Ctx.getID(AI->getSrc()) << " to ";
+    printAssignOwnershipQualifier(AI->getOwnershipQualifier());
+    *this << getIDAndType(AI->getDest());
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {

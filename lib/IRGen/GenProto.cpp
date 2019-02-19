@@ -38,8 +38,10 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
@@ -327,8 +329,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
                        MetadataSource::InvalidSourceIndex,
                        selfTy);
 
-  if (fnType->getDefaultWitnessMethodProtocol() ||
-      fnType->getWitnessMethodClass(M)) {
+  if (fnType->getSelfInstanceType()->is<GenericTypeParamType>()) {
     // The Self type is abstract, so we can fulfill its metadata from
     // the Self metadata parameter.
     addSelfMetadataFulfillment(selfTy);
@@ -1112,7 +1113,7 @@ static llvm::Value *emitWitnessTableAccessorCall(
 
   // Emit the source metadata if we haven't yet.
   if (!*srcMetadataCache) {
-    *srcMetadataCache = IGF.emitTypeMetadataRef(
+    *srcMetadataCache = IGF.emitAbstractTypeMetadataRef(
       conformance->getType()->getCanonicalType());
   }
 
@@ -2079,7 +2080,10 @@ void IRGenModule::emitProtocolConformance(
   setTrueConstGlobal(var);
 }
 
-void IRGenModule::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
+void IRGenerator::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
+  if (!CurrentIGM)
+    return;
+
   // Only resilient conformances use relative pointers for witness methods.
   if (wt.isDeclaration() || isAvailableExternally(wt.getLinkage()) ||
       !isResilientConformance(wt.getConformance()))
@@ -2090,7 +2094,20 @@ void IRGenModule::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
       continue;
     auto *witness = entry.getMethodWitness().Witness;
     if (witness)
-      IRGen.forceLocalEmitOfLazyFunction(witness);
+      forceLocalEmitOfLazyFunction(witness);
+  }
+}
+
+void IRGenerator::ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt) {
+  if (!CurrentIGM)
+    return;
+
+  for (auto &entry : wt.getEntries()) {
+    if (entry.getKind() != SILWitnessTable::Method)
+      continue;
+    auto *witness = entry.getMethodWitness().Witness;
+    if (witness)
+      forceLocalEmitOfLazyFunction(witness);
   }
 }
 
@@ -2233,6 +2250,10 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Also, it is not a big benefit for LLVM to emit such witness tables.
   if (isAvailableExternally(wt->getLinkage()))
     return;
+
+  // Ensure that relatively-referenced symbols for witness thunks are collocated
+  // in the same LLVM module.
+  IRGen.ensureRelativeSymbolCollocation(*wt);
 
   auto conf = wt->getConformance();
   PrettyStackTraceConformance _st(Context, "emitting witness table for", conf);
@@ -2828,7 +2849,7 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
   }
   if (auto fn = dyn_cast<FunctionType>(type)) {
     for (const auto &elt : fn.getParams())
-      addTypeMetadata(elt.getOldType());
+      addTypeMetadata(elt.getPlainType());
     addTypeMetadata(fn.getResult());
     return;
   }

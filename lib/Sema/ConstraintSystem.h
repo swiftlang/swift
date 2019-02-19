@@ -944,6 +944,7 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
+  friend class RequirementFailure;
   friend class MissingMemberFailure;
 
   class SolverScope;
@@ -961,6 +962,8 @@ public:
   unsigned CountDisjunctions = 0;
 
 private:
+
+  llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> ExprWeights;
 
   /// Allocator used for all of the related constraint systems.
   llvm::BumpPtrAllocator Allocator;
@@ -1163,11 +1166,9 @@ private:
 
   /// Describes the current solver state.
   struct SolverState {
-    SolverState(Expr *const expr, ConstraintSystem &cs,
+    SolverState(ConstraintSystem &cs,
                 FreeTypeVariableBinding allowFreeTypeVariables);
     ~SolverState();
-
-    llvm::DenseMap<Expr *, unsigned> ExprWeights;
 
     /// The constraint system.
     ConstraintSystem &CS;
@@ -1513,7 +1514,8 @@ public:
   };
 
   ConstraintSystem(TypeChecker &tc, DeclContext *dc,
-                   ConstraintSystemOptions options);
+                   ConstraintSystemOptions options,
+                   Expr *expr = nullptr);
   ~ConstraintSystem();
 
   /// Retrieve the type checker associated with this constraint system.
@@ -1563,13 +1565,13 @@ private:
   /// set of solutions should be filtered even if there is
   /// no single best solution, see `findBestSolution` for
   /// more details.
-  void filterSolutions(SmallVectorImpl<Solution> &solutions,
-                       llvm::DenseMap<Expr *, unsigned> &weights,
-                       bool minimize = false) {
+  void
+  filterSolutions(SmallVectorImpl<Solution> &solutions,
+                  bool minimize = false) {
     if (solutions.size() < 2)
       return;
 
-    if (auto best = findBestSolution(solutions, weights, minimize)) {
+    if (auto best = findBestSolution(solutions, minimize)) {
       if (*best != 0)
         solutions[0] = std::move(solutions[*best]);
       solutions.erase(solutions.begin() + 1, solutions.end());
@@ -1761,6 +1763,12 @@ public:
                                 pathElt.getNewSummaryFlags());
   }
 
+  ConstraintLocator *
+  getConstraintLocator(const Expr *anchor,
+                       ConstraintLocator::PathElement pathElt) {
+    return getConstraintLocator(const_cast<Expr *>(anchor), pathElt);
+  }
+
   /// Extend the given constraint locator with a path element.
   ConstraintLocator *
   getConstraintLocator(ConstraintLocator *locator,
@@ -1773,6 +1781,12 @@ public:
   /// builder.
   ConstraintLocator *
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
+
+  /// Lookup and return parent associated with given expression.
+  Expr *getParentExpr(Expr *expr) const {
+    auto e = ExprWeights.find(expr);
+    return e != ExprWeights.end() ? e->second.second : nullptr;
+  }
 
 public:
 
@@ -1797,6 +1811,14 @@ public:
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix);
+
+  /// Determine whether constraint system already has a fix recorded
+  /// for a particular location.
+  bool hasFixFor(ConstraintLocator *locator) const {
+    return llvm::any_of(Fixes, [&locator](const ConstraintFix *fix) {
+      return fix->getLocator() == locator;
+    });
+  }
 
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
   /// constraint system, return the decl that it references.
@@ -2266,8 +2288,7 @@ public:
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
-                          DeclContext *useDC,
-                          const DeclRefExpr *base = nullptr);
+                          DeclContext *useDC);
 
   /// Return the type-of-reference of the given value.
   ///
@@ -2871,7 +2892,8 @@ private:
     /// A set of all constraints which contribute to pontential bindings.
     llvm::SmallPtrSet<Constraint *, 8> Sources;
 
-    PotentialBindings(TypeVariableType *typeVar) : TypeVar(typeVar) {}
+    PotentialBindings(TypeVariableType *typeVar)
+        : TypeVar(typeVar), PotentiallyIncomplete(isGenericParameter()) {}
 
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const { return !Bindings.empty(); }
@@ -2936,6 +2958,16 @@ private:
 
     /// Check if this binding is viable for inclusion in the set.
     bool isViable(PotentialBinding &binding) const;
+
+    bool isGenericParameter() const {
+      if (auto *locator = TypeVar->getImpl().getLocator()) {
+        auto path = locator->getPath();
+        return path.empty() ? false
+                            : path.back().getKind() ==
+                                  ConstraintLocator::GenericParameter;
+      }
+      return false;
+    }
 
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
@@ -3133,11 +3165,10 @@ private:
   /// \param diff The differences among the solutions.
   /// \param idx1 The index of the first solution.
   /// \param idx2 The index of the second solution.
-  /// \param weights The weights of the sub-expressions used for ranking.
   static SolutionCompareResult
   compareSolutions(ConstraintSystem &cs, ArrayRef<Solution> solutions,
                    const SolutionDiff &diff, unsigned idx1, unsigned idx2,
-                   llvm::DenseMap<Expr *, unsigned> &weights);
+                   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights);
 
 public:
   /// Increase the score of the given kind for the current (partial) solution
@@ -3152,7 +3183,6 @@ public:
   /// solution.
   ///
   /// \param solutions The set of viable solutions to consider.
-  /// \param weights The weights of the sub-expressions used for ranking.
   ///
   /// \param minimize If true, then in the case where there is no single
   /// best solution, minimize the set of solutions by removing any solutions
@@ -3161,9 +3191,9 @@ public:
   ///
   /// \returns The index of the best solution, or nothing if there was no
   /// best solution.
-  Optional<unsigned> findBestSolution(SmallVectorImpl<Solution> &solutions,
-                                      llvm::DenseMap<Expr *, unsigned> &weights,
-                                      bool minimize);
+  Optional<unsigned>
+  findBestSolution(SmallVectorImpl<Solution> &solutions,
+                   bool minimize);
 
   /// Apply a given solution to the expression, producing a fully
   /// type-checked expression.

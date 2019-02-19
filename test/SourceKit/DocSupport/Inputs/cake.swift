@@ -9,6 +9,7 @@ public class C1 : Prot {
   public typealias Element = Int
   public var p : Int = 0
   public func foo() {}
+  public __consuming func foo1(i0: __owned Int, i1: __shared Int) {}
 
   public subscript(index: Int) -> Int { return 0 }
   public subscript(index i: Float) -> Int { return 0 }

@@ -227,7 +227,7 @@ protected:
 
   void filterSolutions(SmallVectorImpl<Solution> &solutions, bool minimize) {
     if (!CS.retainAllSolutions())
-      CS.filterSolutions(solutions, CS.solverState->ExprWeights, minimize);
+      CS.filterSolutions(solutions, minimize);
   }
 
   /// Check whether constraint solver is running in "debug" mode,

@@ -114,6 +114,7 @@ private:
   const LoadableTypeInfo *SwiftRetainablePointerBoxTI = nullptr,
                          *UnknownObjectRetainablePointerBoxTI = nullptr;
 
+  bool SupportsObjCMetadataUpdateCallback = false;
   llvm::StringMap<YAMLTypeInfoNode> LegacyTypeInfos;
   llvm::DenseMap<NominalTypeDecl *, std::string> DeclMangledNames;
 
@@ -157,6 +158,10 @@ public:
 
   Mode getLoweringMode() const {
     return LoweringMode;
+  }
+
+  bool doesPlatformSupportObjCMetadataUpdateCallback() const {
+    return SupportsObjCMetadataUpdateCallback;
   }
 
   const TypeInfo *getTypeEntry(CanType type);

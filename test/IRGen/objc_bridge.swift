@@ -100,7 +100,7 @@ import Foundation
 
 // CHECK: @_PROPERTIES__TtC11objc_bridge3Bas = private constant { i32, i32, [5 x { i8*, i8* }] } {
 
-// CHECK: [[OBJC_BLOCK_PROPERTY:@.*]] = private unnamed_addr constant [11 x i8] c"T@?,N,C,Vx\00"
+// CHECK: [[OBJC_BLOCK_PROPERTY:@.*]] = private unnamed_addr constant [8 x i8] c"T@?,N,C\00"
 // CHECK: @_PROPERTIES__TtC11objc_bridge21OptionalBlockProperty = private constant {{.*}} [[OBJC_BLOCK_PROPERTY]]
 
 func getDescription(_ o: NSObject) -> String {

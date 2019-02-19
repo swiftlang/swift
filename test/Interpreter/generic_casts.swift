@@ -3,6 +3,7 @@
 // RUN: %target-codesign %t/a.out.optimized
 // RUN: %target-run %t/a.out.optimized | %FileCheck %s
 // REQUIRES: executable_test
+// XFAIL: CPU=powerpc64le
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 

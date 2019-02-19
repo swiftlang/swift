@@ -74,9 +74,24 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   // partial_apply without any substitutions or arguments is just a
   // thin_to_thick_function.
-  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0))
-    return Builder.createThinToThickFunction(PAI->getLoc(), PAI->getCallee(),
-                                             PAI->getType());
+  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0)) {
+    if (!PAI->isOnStack())
+      return Builder.createThinToThickFunction(PAI->getLoc(), PAI->getCallee(),
+                                               PAI->getType());
+
+    // Remove dealloc_stack of partial_apply [stack].
+    // Iterating while delete use a copy.
+    SmallVector<Operand *, 8> Uses(PAI->getUses());
+    for (auto *Use : Uses)
+      if (auto *dealloc = dyn_cast<DeallocStackInst>(Use->getUser()))
+        eraseInstFromFunction(*dealloc);
+    auto *thinToThick = Builder.createThinToThickFunction(
+        PAI->getLoc(), PAI->getCallee(), PAI->getType());
+    replaceInstUsesWith(*PAI, thinToThick);
+    eraseInstFromFunction(*PAI);
+    return nullptr;
+  }
+
 
   // partial_apply %reabstraction_thunk_typeAtoB(
   //    partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
@@ -138,6 +153,12 @@ public:
 
 /// Returns true on success.
 bool PartialApplyCombiner::allocateTemporaries() {
+  // A partial_apply [stack]'s argument are not owned by the partial_apply and
+  // therefore their lifetime must outlive any uses.
+  if (PAI->isOnStack()) {
+    return true;
+  }
+
   // Copy the original arguments of the partial_apply into newly created
   // temporaries and use these temporaries instead of the original arguments
   // afterwards.
@@ -397,6 +418,15 @@ SILInstruction *PartialApplyCombiner::combine() {
       Uses.append(CFI->getUses().begin(), CFI->getUses().end());
       continue;
     }
+    // Look through mark_dependence users of partial_apply [stack].
+    if (auto *MD = dyn_cast<MarkDependenceInst>(User)) {
+      if (MD->getValue() == Use->get() &&
+          MD->getValue()->getType().is<SILFunctionType>() &&
+          MD->getValue()->getType().castTo<SILFunctionType>()->isNoEscape()) {
+        Uses.append(MD->getUses().begin(), MD->getUses().end());
+      }
+      continue;
+    }
     // If this use of a partial_apply is not
     // an apply which uses it as a callee, bail.
     auto AI = FullApplySite::isa(User);
@@ -501,18 +531,20 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   }
 
   // Create the new apply inst.
-  SILInstruction *NAI;
-  if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    NAI = Builder.createTryApply(AI.getLoc(), FRI, 
-                                 SubstitutionMap(), Args,
-                                 TAI->getNormalBB(), TAI->getErrorBB());
-  else {
-    NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(), Args,
-                              cast<ApplyInst>(AI)->isNonThrowing());
-    assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
-           AI.getSubstCalleeType()->getAllResultsType() &&
-           "Function types should be the same");
+  if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
+    return Builder.createTryApply(AI.getLoc(), FRI, SubstitutionMap(), Args,
+                                  TAI->getNormalBB(), TAI->getErrorBB());
   }
+
+  // Match the throwing bit of the underlying function_ref. We assume that if
+  // we got this far it is legal to perform the transformation (since
+  // otherwise, we would be creating malformed SIL).
+  bool setNonThrowing = FRI->getFunctionType()->hasErrorResult();
+  SILInstruction *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
+                                            Args, setNonThrowing);
+  assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
+             AI.getSubstCalleeType()->getAllResultsType() &&
+         "Function types should be the same");
   return NAI;
 }
 

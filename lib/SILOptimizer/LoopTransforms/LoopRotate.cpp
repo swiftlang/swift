@@ -421,6 +421,10 @@ class LoopRotation : public SILFunctionTransform {
 
     SILFunction *F = getFunction();
     assert(F);
+    // FIXME: Add ownership support.
+    if (F->hasOwnership())
+      return;
+
     SILLoopInfo *LI = LA->get(F);
     assert(LI);
     DominanceInfo *DT = DA->get(F);

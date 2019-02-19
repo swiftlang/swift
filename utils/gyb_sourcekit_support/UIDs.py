@@ -19,6 +19,7 @@ class KIND(object):
 UID_KEYS = [
     KEY('VersionMajor', 'key.version_major'),
     KEY('VersionMinor', 'key.version_minor'),
+    KEY('VersionPatch', 'key.version_patch'),
     KEY('Results', 'key.results'),
     KEY('Request', 'key.request'),
     KEY('Notification', 'key.notification'),
@@ -160,11 +161,14 @@ UID_KEYS = [
     KEY('CompileID', 'key.compileid'),
     KEY('CompilerArgsString', 'key.compilerargs-string'),
     KEY('ImplicitMembers', 'key.implicitmembers'),
+    KEY('ExpectedTypes', 'key.expectedtypes'),
+    KEY('Members', 'key.members'),
 ]
 
 
 UID_REQUESTS = [
     REQUEST('ProtocolVersion', 'source.request.protocol_version'),
+    REQUEST('CompilerVersion', 'source.request.compiler_version'),
     REQUEST('CrashWithExit', 'source.request.crash_exit'),
     REQUEST('Demangle', 'source.request.demangle'),
     REQUEST('MangleSimpleClass', 'source.request.mangle_simple_class'),
@@ -180,6 +184,7 @@ UID_REQUESTS = [
             'source.request.codecomplete.setpopularapi'),
     REQUEST('CodeCompleteSetCustom', 'source.request.codecomplete.setcustom'),
     REQUEST('TypeContextInfo', 'source.request.typecontextinfo'),
+    REQUEST('ConformingMethodList', 'source.request.conformingmethods'),
     REQUEST('CursorInfo', 'source.request.cursorinfo'),
     REQUEST('RangeInfo', 'source.request.rangeinfo'),
     REQUEST('RelatedIdents', 'source.request.relatedidents'),

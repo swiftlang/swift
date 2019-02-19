@@ -78,7 +78,7 @@
 /// offset by that number of bytes. The following example allocates four bytes
 /// of memory and stores `0xFF` in all four bytes:
 ///
-///     let bytesPointer = UnsafeMutableRawPointer.allocate(byteCount: 4, alignment: 1)
+///     let bytesPointer = UnsafeMutableRawPointer.allocate(byteCount: 4, alignment: 4)
 ///     bytesPointer.storeBytes(of: 0xFFFF_FFFF, as: UInt32.self)
 ///
 ///     // Load a value from the memory referenced by 'bytesPointer'
@@ -234,6 +234,32 @@ public struct UnsafeRawPointer: _Pointer {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
+
+  /// Creates a new raw pointer from the given typed pointer.		
+  ///		
+  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`		
+  /// instance. This initializer creates a new pointer to the same address as		
+  /// `other` and performs no allocation or copying.		
+  ///		
+  /// - Parameter other: The typed pointer to convert.		
+  @_transparent		
+  public init<T>(_ other: UnsafeMutablePointer<T>) {		
+   _rawValue = other._rawValue		
+  }		
+
+  /// Creates a new raw pointer from the given typed pointer.		
+  ///		
+  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`		
+  /// instance. This initializer creates a new pointer to the same address as		
+  /// `other` and performs no allocation or copying.		
+  ///		
+  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the		
+  ///   result is `nil`.		
+  @_transparent		
+  public init?<T>(_ other: UnsafeMutablePointer<T>?) {		
+   guard let unwrapped = other else { return nil }		
+   _rawValue = unwrapped._rawValue		
+  }		
 
   /// Deallocates the previously allocated memory block referenced by this pointer.
   ///

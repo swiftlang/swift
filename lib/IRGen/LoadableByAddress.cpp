@@ -1317,19 +1317,22 @@ void LoadableStorageAllocation::allocateLoadableStorage() {
 SILArgument *LoadableStorageAllocation::replaceArgType(SILBuilder &argBuilder,
                                                        SILArgument *arg,
                                                        SILType newSILType) {
-  CopyValueInst *copyArg = argBuilder.createCopyValue(
-      RegularLocation(const_cast<ValueDecl *>(arg->getDecl())),
-      SILUndef::get(newSILType, pass.F->getModule()));
+  SILValue undef = SILUndef::get(newSILType, pass.F->getModule());
+  SmallVector<Operand *, 8> useList(arg->use_begin(), arg->use_end());
+  for (auto *use : useList) {
+    use->set(undef);
+  }
 
-  arg->replaceAllUsesWith(copyArg);
+  // Make sure that this is an argument we want to replace.
   assert(std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
                    arg) == pass.largeLoadableArgs.end());
 
   arg = arg->getParent()->replaceFunctionArgument(
       arg->getIndex(), newSILType, ValueOwnershipKind::Any, arg->getDecl());
 
-  copyArg->replaceAllUsesWith(arg);
-  copyArg->eraseFromParent();
+  for (auto *use : useList) {
+    use->set(arg);
+  }
 
   return arg;
 }
@@ -1384,16 +1387,17 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
 
 static void convertBBArgType(SILBuilder &argBuilder, SILType newSILType,
                              SILArgument *arg) {
-  CopyValueInst *copyArg = argBuilder.createCopyValue(
-      RegularLocation(const_cast<ValueDecl *>(arg->getDecl())),
-      SILUndef::get(newSILType, arg->getFunction()->getModule()));
+  SILValue undef = SILUndef::get(newSILType, argBuilder.getModule());
+  SmallVector<Operand *, 8> useList(arg->use_begin(), arg->use_end());
+  for (auto *use : useList) {
+    use->set(undef);
+  }
 
-  arg->replaceAllUsesWith(copyArg);
   arg = arg->getParent()->replacePhiArgument(arg->getIndex(), newSILType,
                                              arg->getOwnershipKind());
-
-  copyArg->replaceAllUsesWith(arg);
-  copyArg->eraseFromParent();
+  for (auto *use : useList) {
+    use->set(arg);
+  }
 }
 
 void LoadableStorageAllocation::convertApplyResults() {
@@ -1599,14 +1603,24 @@ class LoadableByAddress : public SILModuleTransform {
 
 private:
   void updateLoweredTypes(SILFunction *F);
-  void recreateApplies();
-  void recreateSingleApply(SILInstruction *applyInst);
-  void recreateConvInstrs();
-  void recreateBuiltinInstrs();
-  void recreateLoadInstrs();
-  void recreateUncheckedEnumDataInstrs();
-  void recreateUncheckedTakeEnumDataAddrInst();
-  void fixStoreToBlockStorageInstrs();
+  void recreateSingleApply(SILInstruction *applyInst,
+                           SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateApply(SILInstruction &I,
+                     SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateTupleInstr(SILInstruction &I,
+                          SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateConvInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateBuiltinInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateLoadInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateUncheckedEnumDataInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
+  bool recreateUncheckedTakeEnumDataAddrInst(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
+  bool fixStoreToBlockStorageInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete);
 
 private:
   llvm::SetVector<SILFunction *> modFuncs;
@@ -2369,7 +2383,8 @@ getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
   return op;
 }
 
-void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
+void LoadableByAddress::recreateSingleApply(
+    SILInstruction *applyInst, SmallVectorImpl<SILInstruction *> &Delete) {
   auto *F = applyInst->getFunction();
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
   // Collect common info
@@ -2380,7 +2395,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     // else verification will fail with wrong SubstCalleeType
     auto calleInstr = site.getInstruction();
     if (modApplies.remove(calleInstr)) {
-      recreateSingleApply(calleInstr);
+      recreateSingleApply(calleInstr, Delete);
       callee = applySite.getCallee();
     }
   }
@@ -2481,196 +2496,243 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
                                       .getAs<SILFunctionType>()
                                       ->getCalleeConvention();
 
-    auto newApply =
-      applyBuilder.createPartialApply(castedApply->getLoc(), callee,
-                                      applySite.getSubstitutionMap(), callArgs,
-                                      partialApplyConvention);
+    auto newApply = applyBuilder.createPartialApply(
+        castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
+        partialApplyConvention, castedApply->isOnStack());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
   default:
     llvm_unreachable("Unexpected instr: unknown apply type");
   }
-  applyInst->getParent()->erase(applyInst);
+  Delete.push_back(applyInst);
 }
 
-void LoadableByAddress::recreateApplies() {
-  while (!modApplies.empty()) {
-    auto *applyInst = modApplies.pop_back_val();
-    recreateSingleApply(applyInst);
-  }
+bool LoadableByAddress::recreateApply(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
+  if (!modApplies.count(&I))
+    return false;
+  recreateSingleApply(&I, Delete);
+  modApplies.remove(&I);
+  return true;
 }
 
-void LoadableByAddress::recreateLoadInstrs() {
-  for (auto *loadInstr : loadInstrsOfFunc) {
-    SILBuilderWithScope loadBuilder(loadInstr);
-    // If this is a load of a function for which we changed the return type:
-    // add UncheckedBitCast before the load
-    auto loadOp = loadInstr->getOperand();
-    loadOp = getOperandTypeWithCastIfNecessary(
-        loadInstr, loadOp, *getIRGenModule(), loadBuilder, MapperCache);
-    auto *newInstr = loadBuilder.createLoad(loadInstr->getLoc(), loadOp,
-                                            loadInstr->getOwnershipQualifier());
-    loadInstr->replaceAllUsesWith(newInstr);
-    loadInstr->getParent()->erase(loadInstr);
-  }
+bool LoadableByAddress::recreateLoadInstr(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
+  auto *loadInstr = dyn_cast<LoadInst>(&I);
+  if (!loadInstr || !loadInstrsOfFunc.count(loadInstr))
+    return false;
+
+  SILBuilderWithScope loadBuilder(loadInstr);
+  // If this is a load of a function for which we changed the return type:
+  // add UncheckedBitCast before the load
+  auto loadOp = loadInstr->getOperand();
+  loadOp = getOperandTypeWithCastIfNecessary(
+      loadInstr, loadOp, *getIRGenModule(), loadBuilder, MapperCache);
+  auto *newInstr = loadBuilder.createLoad(loadInstr->getLoc(), loadOp,
+                                          loadInstr->getOwnershipQualifier());
+  loadInstr->replaceAllUsesWith(newInstr);
+  Delete.push_back(loadInstr);
+  return true;
 }
 
-void LoadableByAddress::recreateUncheckedEnumDataInstrs() {
-  for (auto *enumInstr : uncheckedEnumDataOfFunc) {
-    SILBuilderWithScope enumBuilder(enumInstr);
-    SILFunction *F = enumInstr->getFunction();
-    IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
-    SILType origType = enumInstr->getType();
-    GenericEnvironment *genEnv = F->getGenericEnvironment();
-    SILType newType = MapperCache.getNewSILType(genEnv, origType, *currIRMod);
-    auto caseTy = enumInstr->getOperand()->getType().getEnumElementType(
-        enumInstr->getElement(), F->getModule());
-    SingleValueInstruction *newInstr = nullptr;
-    if (newType.isAddress()) {
-      newType = newType.getObjectType();
-    }
-    if (caseTy != newType) {
-      auto *takeEnum = enumBuilder.createUncheckedEnumData(
-          enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-          caseTy);
-      newInstr = enumBuilder.createUncheckedBitCast(enumInstr->getLoc(),
-                                                    takeEnum, newType);
-    } else {
-      newInstr = enumBuilder.createUncheckedEnumData(
-          enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-          newType);
-    }
-    enumInstr->replaceAllUsesWith(newInstr);
-    enumInstr->getParent()->erase(enumInstr);
+bool LoadableByAddress::recreateUncheckedEnumDataInstr(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
+  auto enumInstr = dyn_cast<UncheckedEnumDataInst>(&I);
+  if (!enumInstr || !uncheckedEnumDataOfFunc.count(enumInstr))
+    return false;
+  SILBuilderWithScope enumBuilder(enumInstr);
+  SILFunction *F = enumInstr->getFunction();
+  IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
+  SILType origType = enumInstr->getType();
+  GenericEnvironment *genEnv = F->getGenericEnvironment();
+  SILType newType = MapperCache.getNewSILType(genEnv, origType, *currIRMod);
+  auto caseTy = enumInstr->getOperand()->getType().getEnumElementType(
+      enumInstr->getElement(), F->getModule());
+  SingleValueInstruction *newInstr = nullptr;
+  if (newType.isAddress()) {
+    newType = newType.getObjectType();
   }
+  if (caseTy != newType) {
+    auto *takeEnum = enumBuilder.createUncheckedEnumData(
+        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
+        caseTy);
+    newInstr = enumBuilder.createUncheckedBitCast(enumInstr->getLoc(), takeEnum,
+                                                  newType);
+  } else {
+    newInstr = enumBuilder.createUncheckedEnumData(
+        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
+        newType);
+  }
+  enumInstr->replaceAllUsesWith(newInstr);
+  Delete.push_back(enumInstr);
+  return false;
 }
 
-void LoadableByAddress::recreateUncheckedTakeEnumDataAddrInst() {
-  for (auto *enumInstr : uncheckedTakeEnumDataAddrOfFunc) {
-    SILBuilderWithScope enumBuilder(enumInstr);
-    SILFunction *F = enumInstr->getFunction();
-    IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
-    SILType origType = enumInstr->getType();
-    GenericEnvironment *genEnv = F->getGenericEnvironment();
-    SILType newType = MapperCache.getNewSILType(genEnv, origType, *currIRMod);
-    auto caseTy = enumInstr->getOperand()->getType().getEnumElementType(
-        enumInstr->getElement(), F->getModule());
-    SingleValueInstruction *newInstr = nullptr;
-    if (caseTy != origType.getObjectType()) {
-      auto *takeEnum = enumBuilder.createUncheckedTakeEnumDataAddr(
-          enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-          caseTy.getAddressType());
-      newInstr = enumBuilder.createUncheckedAddrCast(
-          enumInstr->getLoc(), takeEnum, newType.getAddressType());
-    } else {
-      newInstr = enumBuilder.createUncheckedTakeEnumDataAddr(
-          enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-          newType.getAddressType());
-    }
-    enumInstr->replaceAllUsesWith(newInstr);
-    enumInstr->getParent()->erase(enumInstr);
+bool LoadableByAddress::recreateUncheckedTakeEnumDataAddrInst(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
+  auto *enumInstr = dyn_cast<UncheckedTakeEnumDataAddrInst>(&I);
+  if (!enumInstr || !uncheckedTakeEnumDataAddrOfFunc.count(enumInstr))
+    return false;
+  SILBuilderWithScope enumBuilder(enumInstr);
+  SILFunction *F = enumInstr->getFunction();
+  IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
+  SILType origType = enumInstr->getType();
+  GenericEnvironment *genEnv = F->getGenericEnvironment();
+  SILType newType = MapperCache.getNewSILType(genEnv, origType, *currIRMod);
+  auto caseTy = enumInstr->getOperand()->getType().getEnumElementType(
+      enumInstr->getElement(), F->getModule());
+  SingleValueInstruction *newInstr = nullptr;
+  if (caseTy != origType.getObjectType()) {
+    auto *takeEnum = enumBuilder.createUncheckedTakeEnumDataAddr(
+        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
+        caseTy.getAddressType());
+    newInstr = enumBuilder.createUncheckedAddrCast(
+        enumInstr->getLoc(), takeEnum, newType.getAddressType());
+  } else {
+    newInstr = enumBuilder.createUncheckedTakeEnumDataAddr(
+        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
+        newType.getAddressType());
   }
+  enumInstr->replaceAllUsesWith(newInstr);
+  Delete.push_back(enumInstr);
+  return true;
 }
 
-void LoadableByAddress::fixStoreToBlockStorageInstrs() {
-  for (auto *instr : storeToBlockStorageInstrs) {
-    auto dest = instr->getDest();
-    auto destBlock = cast<ProjectBlockStorageInst>(dest);
-    SILType destType = destBlock->getType();
-    auto src = instr->getSrc();
-    SILType srcType = src->getType();
-    if (destType.getObjectType() != srcType) {
-      // Add cast to destType
-      SILBuilderWithScope castBuilder(instr);
-      auto *castInstr = castBuilder.createUncheckedBitCast(
-          instr->getLoc(), src, destType.getObjectType());
-      instr->setOperand(StoreInst::Src, castInstr);
-    }
+bool LoadableByAddress::fixStoreToBlockStorageInstr(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
+  auto *instr = dyn_cast<StoreInst>(&I);
+  if (!instr || !storeToBlockStorageInstrs.count(instr))
+    return false;
+  auto dest = instr->getDest();
+  auto destBlock = cast<ProjectBlockStorageInst>(dest);
+  SILType destType = destBlock->getType();
+  auto src = instr->getSrc();
+  SILType srcType = src->getType();
+  if (destType.getObjectType() != srcType) {
+    // Add cast to destType
+    SILBuilderWithScope castBuilder(instr);
+    auto *castInstr = castBuilder.createUncheckedBitCast(
+        instr->getLoc(), src, destType.getObjectType());
+    instr->setOperand(StoreInst::Src, castInstr);
   }
+  return true;
 }
 
-void LoadableByAddress::recreateConvInstrs() {
-  for (auto *convInstr : conversionInstrs) {
-    IRGenModule *currIRMod =
-        getIRGenModule()->IRGen.getGenModule(convInstr->getFunction());
-    SILType currSILType = convInstr->getType();
-    if (auto *thinToPointer = dyn_cast<ThinFunctionToPointerInst>(convInstr)) {
-      currSILType = thinToPointer->getOperand()->getType();
-    }
-    auto currSILFunctionType = currSILType.castTo<SILFunctionType>();
-    GenericEnvironment *genEnv =
-        convInstr->getFunction()->getGenericEnvironment();
-    CanSILFunctionType newFnType = MapperCache.getNewSILFunctionType(
-        genEnv, currSILFunctionType, *currIRMod);
-    SILType newType = SILType::getPrimitiveObjectType(newFnType);
-    SILBuilderWithScope convBuilder(convInstr);
-    SingleValueInstruction *newInstr = nullptr;
-    switch (convInstr->getKind()) {
-    case SILInstructionKind::ThinToThickFunctionInst: {
-      auto instr = cast<ThinToThickFunctionInst>(convInstr);
-      newInstr = convBuilder.createThinToThickFunction(
-          instr->getLoc(), instr->getOperand(), newType);
-      break;
-    }
-    case SILInstructionKind::ThinFunctionToPointerInst: {
-      auto instr = cast<ThinFunctionToPointerInst>(convInstr);
-      newType = MapperCache.getNewSILType(genEnv, instr->getType(),
-                                          *getIRGenModule());
-      newInstr = convBuilder.createThinFunctionToPointer(
-          instr->getLoc(), instr->getOperand(), newType);
-      break;
-    }
-    case SILInstructionKind::ConvertFunctionInst: {
-      auto instr = cast<ConvertFunctionInst>(convInstr);
-      newInstr = convBuilder.createConvertFunction(
-          instr->getLoc(), instr->getOperand(), newType,
-          instr->withoutActuallyEscaping());
-      break;
-    }
-    case SILInstructionKind::ConvertEscapeToNoEscapeInst: {
-      auto instr = cast<ConvertEscapeToNoEscapeInst>(convInstr);
-      newInstr = convBuilder.createConvertEscapeToNoEscape(
-          instr->getLoc(), instr->getOperand(), newType,
-          instr->isLifetimeGuaranteed());
-      break;
-    }
-    case SILInstructionKind::MarkDependenceInst: {
-      auto instr = cast<MarkDependenceInst>(convInstr);
-      newInstr = convBuilder.createMarkDependence(
-          instr->getLoc(), instr->getValue(), instr->getBase());
-      break;
-    }
-     default:
-      llvm_unreachable("Unexpected conversion instruction");
-    }
-    convInstr->replaceAllUsesWith(newInstr);
-    convInstr->getParent()->erase(convInstr);
+bool LoadableByAddress::recreateTupleInstr(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
+  auto *tupleInstr = dyn_cast<TupleInst>(&I);
+  if (!tupleInstr)
+    return false;
+
+  // Check if we need to recreate the tuple:
+  auto *F = tupleInstr->getFunction();
+  auto *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
+  GenericEnvironment *genEnv = F->getGenericEnvironment();
+  auto resultTy = tupleInstr->getType();
+  auto newResultTy = MapperCache.getNewSILType(genEnv, resultTy, *currIRMod);
+  if (resultTy == newResultTy)
+    return true;
+
+  // The tuple type have changed based on its members.
+  // For example if one or more of them are ‘large’ loadable types
+  SILBuilderWithScope tupleBuilder(tupleInstr);
+  SmallVector<SILValue, 8> elems;
+  for (auto elem : tupleInstr->getElements()) {
+    elems.push_back(elem);
   }
+  auto *newTuple = tupleBuilder.createTuple(tupleInstr->getLoc(), elems);
+  tupleInstr->replaceAllUsesWith(newTuple);
+  Delete.push_back(tupleInstr);
+  return true;
 }
 
-void LoadableByAddress::recreateBuiltinInstrs() {
-  for (auto *builtinInstr : builtinInstrs) {
-    auto *currIRMod =
-        getIRGenModule()->IRGen.getGenModule(builtinInstr->getFunction());
-    auto *F = builtinInstr->getFunction();
-    GenericEnvironment *genEnv = F->getGenericEnvironment();
-    auto resultTy = builtinInstr->getType();
-    auto newResultTy = MapperCache.getNewSILType(genEnv, resultTy, *currIRMod);
-
-    llvm::SmallVector<SILValue, 5> newArgs;
-    for (auto oldArg : builtinInstr->getArguments()) {
-      newArgs.push_back(oldArg);
-    }
-
-    SILBuilderWithScope builtinBuilder(builtinInstr);
-    auto *newInstr = builtinBuilder.createBuiltin(
-        builtinInstr->getLoc(), builtinInstr->getName(), newResultTy,
-        builtinInstr->getSubstitutions(),
-        newArgs);
-    builtinInstr->replaceAllUsesWith(newInstr);
-    builtinInstr->getParent()->erase(builtinInstr);
+bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete) {
+  auto *convInstr = dyn_cast<SingleValueInstruction>(&I);
+  if (!convInstr || !conversionInstrs.count(convInstr))
+    return false;
+  IRGenModule *currIRMod =
+      getIRGenModule()->IRGen.getGenModule(convInstr->getFunction());
+  SILType currSILType = convInstr->getType();
+  if (auto *thinToPointer = dyn_cast<ThinFunctionToPointerInst>(convInstr)) {
+    currSILType = thinToPointer->getOperand()->getType();
   }
+  auto currSILFunctionType = currSILType.castTo<SILFunctionType>();
+  GenericEnvironment *genEnv =
+      convInstr->getFunction()->getGenericEnvironment();
+  CanSILFunctionType newFnType = MapperCache.getNewSILFunctionType(
+      genEnv, currSILFunctionType, *currIRMod);
+  SILType newType = SILType::getPrimitiveObjectType(newFnType);
+  SILBuilderWithScope convBuilder(convInstr);
+  SingleValueInstruction *newInstr = nullptr;
+  switch (convInstr->getKind()) {
+  case SILInstructionKind::ThinToThickFunctionInst: {
+    auto instr = cast<ThinToThickFunctionInst>(convInstr);
+    newInstr = convBuilder.createThinToThickFunction(
+        instr->getLoc(), instr->getOperand(), newType);
+    break;
+  }
+  case SILInstructionKind::ThinFunctionToPointerInst: {
+    auto instr = cast<ThinFunctionToPointerInst>(convInstr);
+    newType =
+        MapperCache.getNewSILType(genEnv, instr->getType(), *getIRGenModule());
+    newInstr = convBuilder.createThinFunctionToPointer(
+        instr->getLoc(), instr->getOperand(), newType);
+    break;
+  }
+  case SILInstructionKind::ConvertFunctionInst: {
+    auto instr = cast<ConvertFunctionInst>(convInstr);
+    newInstr = convBuilder.createConvertFunction(
+        instr->getLoc(), instr->getOperand(), newType,
+        instr->withoutActuallyEscaping());
+    break;
+  }
+  case SILInstructionKind::ConvertEscapeToNoEscapeInst: {
+    auto instr = cast<ConvertEscapeToNoEscapeInst>(convInstr);
+    newInstr = convBuilder.createConvertEscapeToNoEscape(
+        instr->getLoc(), instr->getOperand(), newType,
+        instr->isLifetimeGuaranteed());
+    break;
+  }
+  case SILInstructionKind::MarkDependenceInst: {
+    auto instr = cast<MarkDependenceInst>(convInstr);
+    newInstr = convBuilder.createMarkDependence(
+        instr->getLoc(), instr->getValue(), instr->getBase());
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected conversion instruction");
+  }
+  convInstr->replaceAllUsesWith(newInstr);
+  Delete.push_back(convInstr);
+  return true;
+}
+
+bool LoadableByAddress::recreateBuiltinInstr(SILInstruction &I,
+                         SmallVectorImpl<SILInstruction *> &Delete) {
+	auto builtinInstr = dyn_cast<BuiltinInst>(&I);
+  if (!builtinInstr || !builtinInstrs.count(builtinInstr))
+    return false;
+  auto *currIRMod =
+      getIRGenModule()->IRGen.getGenModule(builtinInstr->getFunction());
+  auto *F = builtinInstr->getFunction();
+  GenericEnvironment *genEnv = F->getGenericEnvironment();
+  auto resultTy = builtinInstr->getType();
+  auto newResultTy = MapperCache.getNewSILType(genEnv, resultTy, *currIRMod);
+
+  llvm::SmallVector<SILValue, 5> newArgs;
+  for (auto oldArg : builtinInstr->getArguments()) {
+    newArgs.push_back(oldArg);
+  }
+
+  SILBuilderWithScope builtinBuilder(builtinInstr);
+  auto *newInstr = builtinBuilder.createBuiltin(
+      builtinInstr->getLoc(), builtinInstr->getName(), newResultTy,
+      builtinInstr->getSubstitutions(), newArgs);
+  builtinInstr->replaceAllUsesWith(newInstr);
+  Delete.push_back(builtinInstr);
+  return true;
 }
 
 void LoadableByAddress::updateLoweredTypes(SILFunction *F) {
@@ -2817,26 +2879,33 @@ void LoadableByAddress::run() {
     instr->getParent()->erase(instr);
   }
 
-  // Re-create all conversions for which we modified the FunctionRef
-  recreateConvInstrs();
-
-  // Re-create all builtins for which we modified the FunctionRef
-  recreateBuiltinInstrs();
-
-  // Re-create all unchecked enum data instrs of function pointers
-  recreateUncheckedEnumDataInstrs();
-
-  // Same for data addr
-  recreateUncheckedTakeEnumDataAddrInst();
-
-  // Re-create all load instrs of function pointers
-  recreateLoadInstrs();
-
-  // Re-create all applies that we modified in the module
-  recreateApplies();
-
-  // Fix all instructions that rely on block storage type
-  fixStoreToBlockStorageInstrs();
+  // Recreate the instructions in topological order. Some instructions inherit
+  // their result type from their operand.
+  for (SILFunction &CurrF : *getModule()) {
+    SmallVector<SILInstruction *, 32> Delete;
+    for (SILBasicBlock &BB : CurrF) {
+      for (SILInstruction &I : BB) {
+        if (recreateTupleInstr(I, Delete))
+          continue;
+        else if (recreateConvInstr(I, Delete))
+          continue;
+        else if (recreateBuiltinInstr(I, Delete))
+          continue;
+        else if (recreateUncheckedEnumDataInstr(I, Delete))
+          continue;
+        else if (recreateUncheckedTakeEnumDataAddrInst(I, Delete))
+          continue;
+        else if (recreateLoadInstr(I, Delete))
+          continue;
+        else if (recreateApply(I, Delete))
+          continue;
+        else
+          fixStoreToBlockStorageInstr(I, Delete);
+      }
+    }
+    for (auto *Inst : Delete)
+      Inst->eraseFromParent();
+  }
 
   // Clean up the data structs:
   modFuncs.clear();
