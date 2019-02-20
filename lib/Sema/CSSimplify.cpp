@@ -3768,14 +3768,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // Check if we have unviable candidates whose reason for rejection
       // is either UR_InstanceMemberOnType or UR_TypeMemberOnInstance
 
+      SmallVector<std::pair<OverloadChoice, MemberLookupResult::UnviableReason>,
+                  4>
+          filteredURs;
+      llvm::copy_if(
+          result.UnviableCandidates, std::back_inserter(filteredURs),
+          [&](const std::pair<OverloadChoice,
+                              MemberLookupResult::UnviableReason> &e) {
+            return e.second == MemberLookupResult::UR_InstanceMemberOnType ||
+                   e.second == MemberLookupResult::UR_TypeMemberOnInstance;
+          });
+
       // If we do, then allow them
-      if (llvm::all_of(
-              result.UnviableCandidates,
-              [&](const std::pair<OverloadChoice,
-                                  MemberLookupResult::UnviableReason> &e) {
-                return e.second == MemberLookupResult::UR_InstanceMemberOnType ||
-                       e.second == MemberLookupResult::UR_TypeMemberOnInstance;
-              })) {
+      if (!filteredURs.empty()) {
 
         SmallVector<OverloadChoice, 4> choices;
 
