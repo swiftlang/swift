@@ -29,11 +29,11 @@ import CTensorFlow
 @_fixed_layout
 public struct TensorDataType {
   @usableFromInline
-  internal var cDataType: TF_DataType
+  public var _cDataType: TF_DataType
 
   @inlinable
   internal init(_ cDataType: TF_DataType) {
-    self.cDataType = cDataType
+    self._cDataType = cDataType
   }
 }
 
