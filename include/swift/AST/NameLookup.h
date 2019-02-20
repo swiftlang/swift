@@ -130,7 +130,7 @@ public:
   bool isSuccess() const { return !Results.empty(); }
 
   /// Get the result as a single type, or a null type if that fails.
-  TypeDecl *getSingleTypeResult();
+  TypeDecl *getSingleTypeResult() const;
 
   bool verifyEqual(const LegacyUnqualifiedLookup &&) const;
 
@@ -218,7 +218,7 @@ public:
   bool isSuccess() const { return !Results.empty(); }
 
   /// Get the result as a single type, or a null type if that fails.
-  TypeDecl *getSingleTypeResult();
+  TypeDecl *getSingleTypeResult() const;
 
 public: // for exp debugging
   SourceFile const *recordedSF = nullptr;

@@ -270,16 +270,16 @@ private:
   template <typename NominalTypeDeclOrExtensionDecl>
   Optional<PerScopeLookupState>
   lookupInNominalTypeOrExtension(NominalTypeDeclOrExtensionDecl *D,
-                                 Optional<bool> isCascadingUse);
+                                 Optional<bool> isCascadingUse) const;
 
   Optional<PerScopeLookupState>
   lookupInDefaultArgumentInitializer(DefaultArgumentInitializer *I,
-                                     Optional<bool> isCascadingUse);
+                                     Optional<bool> isCascadingUse) const;
 
   bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
 
   Optional<PerScopeLookupState>
-  lookupInMiscContext(DeclContext *dc, Optional<bool> isCascadingUse);
+  lookupInMiscContext(DeclContext *dc, Optional<bool> isCascadingUse) const;
 
   /// Check the generic parameters of our context.
   /// Return true if done with lookup
@@ -844,7 +844,7 @@ UnqualifiedLookupFactory::lookupInClosure(AbstractClosureExpr *ACE,
 template <typename NominalTypeDeclOrExtensionDecl>
 Optional<UnqualifiedLookupFactory::PerScopeLookupState>
 UnqualifiedLookupFactory::lookupInNominalTypeOrExtension(
-    NominalTypeDeclOrExtensionDecl *D, Optional<bool> isCascadingUse) {
+    NominalTypeDeclOrExtensionDecl *D, Optional<bool> isCascadingUse) const {
   // clang-format off
   return PerScopeLookupState{
     false,
@@ -860,7 +860,7 @@ UnqualifiedLookupFactory::lookupInNominalTypeOrExtension(
 
 Optional<UnqualifiedLookupFactory::PerScopeLookupState>
 UnqualifiedLookupFactory::lookupInDefaultArgumentInitializer(
-    DefaultArgumentInitializer *I, Optional<bool> isCascadingUse) {
+    DefaultArgumentInitializer *I, Optional<bool> isCascadingUse) const {
   // In a default argument, skip immediately out of both the
   // initializer and the function.
   // clang-format off
@@ -879,8 +879,8 @@ bool UnqualifiedLookupFactory::isOutsideBodyOfFunction(
 }
 
 Optional<UnqualifiedLookupFactory::PerScopeLookupState>
-UnqualifiedLookupFactory::lookupInMiscContext(DeclContext *dc,
-                                              Optional<bool> isCascadingUse) {
+UnqualifiedLookupFactory::lookupInMiscContext(
+    DeclContext *dc, Optional<bool> isCascadingUse) const {
   // clang-format off
   assert(isa<TopLevelCodeDecl>(dc) ||
          isa<Initializer>(dc) ||
@@ -1618,7 +1618,7 @@ LegacyUnqualifiedLookup::LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
   (void)shouldReturnBasedOnResults(/*noMoreOuterResults=*/true);
 }
 
-TypeDecl *LegacyUnqualifiedLookup::getSingleTypeResult() {
+TypeDecl *LegacyUnqualifiedLookup::getSingleTypeResult() const {
   if (Results.size() != 1)
     return nullptr;
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
@@ -1662,7 +1662,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
          "bad refactoring");
 }
 
-TypeDecl *UnqualifiedLookup::getSingleTypeResult() {
+TypeDecl *UnqualifiedLookup::getSingleTypeResult() const {
   if (Results.size() != 1)
     return nullptr;
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
