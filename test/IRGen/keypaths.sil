@@ -212,11 +212,11 @@ sil_vtable C2 {}
 //                  -- instantiable in-line, size 12
 // CHECK-SAME: <i32 0x8000_000c>,
 // -- offset of T.b
-// CHECK-32-SAME: <i32 0x0100_000c>,
+// CHECK-32-SAME: <i32 0x0100_0010>,
 // CHECK-64-SAME: <i32 0x0100_0018>,
 // CHECK: @"symbolic
 // -- tuple element #1 of T.b
-// CHECK-32-SAME: <i32 0x0180_0008> }>
+// CHECK-32-SAME: <i32 0x0180_000c> }>
 // CHECK-64-SAME: <i32 0x0180_0010> }>
 
 // -- %i: Gen<A>.x
