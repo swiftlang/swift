@@ -290,9 +290,17 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     /// or shared linkage.
     OnDemand,
     /// The declaration should never be made public.
-    NeverPublic 
+    NeverPublic,
+    /// The declaration should always be emitted into the client,
+    AlwaysEmitIntoClient,
   };
   auto limit = Limit::None;
+
+  // @_alwaysEmitIntoClient declarations are like the default arguments of
+  // public functions; they are roots for dead code elimination and have
+  // serialized bodies, but no public symbol in the generated binary.
+  if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    limit = Limit::AlwaysEmitIntoClient;
 
   // ivar initializers and destroyers are completely contained within the class
   // from which they come, and never get seen externally.
@@ -369,6 +377,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return SILLinkage::Shared;
     if (limit == Limit::NeverPublic)
       return maybeAddExternal(SILLinkage::Hidden);
+    if (limit == Limit::AlwaysEmitIntoClient)
+      return maybeAddExternal(SILLinkage::PublicNonABI);
     return maybeAddExternal(SILLinkage::Public);
   }
   llvm_unreachable("unhandled access");
@@ -464,8 +474,8 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   auto *d = getDecl();
 
-  // Default argument generators are serialized if the function was
-  // type-checked in Swift 4 mode.
+  // Default argument generators are serialized if the containing
+  // declaration is public.
   if (isDefaultArgGenerator()) {
     ResilienceExpansion expansion;
     if (auto *EED = dyn_cast<EnumElementDecl>(d)) {

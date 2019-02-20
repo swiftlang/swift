@@ -86,7 +86,9 @@ Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
 }
 
 Type RequirementFailure::getOwnerType() const {
-  return getType(getAnchor())->getInOutObjectType()->getMetatypeInstanceType();
+  return getType(getRawAnchor())
+      ->getInOutObjectType()
+      ->getMetatypeInstanceType();
 }
 
 const GenericContext *RequirementFailure::getGenericContext() const {
@@ -135,8 +137,18 @@ ValueDecl *RequirementFailure::getDeclRef() const {
 
   auto *anchor = getRawAnchor();
   auto *locator = cs.getConstraintLocator(anchor);
+
+  if (isFromContextualType()) {
+    auto type = cs.getContextualType();
+    assert(type);
+    auto *alias = dyn_cast<TypeAliasType>(type.getPointer());
+    return alias ? alias->getDecl() : type->getAnyGeneric();
+  }
+
   if (auto *AE = dyn_cast<CallExpr>(anchor)) {
-    assert(isa<TypeExpr>(AE->getFn()));
+    // NOTE: In valid code, the function can only be a TypeExpr
+    assert(isa<TypeExpr>(AE->getFn()) ||
+           isa<OverloadedDeclRefExpr>(AE->getFn()));
     ConstraintLocatorBuilder ctor(locator);
     locator = cs.getConstraintLocator(
         ctor.withPathElement(PathEltKind::ApplyFunction)
@@ -186,6 +198,12 @@ GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
   }
 
   llvm_unreachable("Type requirement failure should always have signature");
+}
+
+bool RequirementFailure::isFromContextualType() const {
+  auto path = getLocator()->getPath();
+  assert(!path.empty());
+  return path.front().getKind() == ConstraintLocator::ContextualType;
 }
 
 const DeclContext *RequirementFailure::getRequirementDC() const {

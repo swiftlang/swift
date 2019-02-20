@@ -160,7 +160,7 @@ extension String.UTF8View: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     if _fastPath(_guts.isFastUTF8) {
-      _precondition(n + i.encodedOffset <= _guts.count)
+      _precondition(n + i._encodedOffset <= _guts.count)
       return i.encoded(offsetBy: n)
     }
 
@@ -175,15 +175,15 @@ extension String.UTF8View: BidirectionalCollection {
       // Check the limit: ignore limit if it precedes `i` (in the correct
       // direction), otherwise must not be beyond limit (in the correct
       // direction).
-      let iOffset = i.encodedOffset
+      let iOffset = i._encodedOffset
       let result = iOffset + n
-      let limitOffset = limit.encodedOffset
+      let limitOffset = limit._encodedOffset
       if n >= 0 {
         guard limitOffset < iOffset || result <= limitOffset else { return nil }
       } else {
         guard limitOffset > iOffset || result >= limitOffset else { return nil }
       }
-      return Index(encodedOffset: result)
+      return Index(_encodedOffset: result)
     }
 
     return _foreignIndex(i, offsetBy: n, limitedBy: limit)
@@ -192,7 +192,7 @@ extension String.UTF8View: BidirectionalCollection {
   @inlinable @inline(__always)
   public func distance(from i: Index, to j: Index) -> Int {
     if _fastPath(_guts.isFastUTF8) {
-      return j.encodedOffset &- i.encodedOffset
+      return j._encodedOffset &- i._encodedOffset
     }
     return _foreignDistance(from: i, to: j)
   }
@@ -214,7 +214,7 @@ extension String.UTF8View: BidirectionalCollection {
     @inline(__always) get {
       String(_guts)._boundsCheck(i)
       if _fastPath(_guts.isFastUTF8) {
-        return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i.encodedOffset] }
+        return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i._encodedOffset] }
       }
 
       return _foreignSubscript(position: i)

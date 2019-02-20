@@ -2937,6 +2937,7 @@ is_escaping_closure
 ```````````````````
 
 ::
+
   sil-instruction ::= 'is_escaping_closure' sil-operand
 
   %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
@@ -2948,6 +2949,7 @@ true if it is.
 
 copy_block
 ``````````
+
 ::
 
   sil-instruction :: 'copy_block' sil-operand
@@ -2960,6 +2962,7 @@ if the block is copied from the stack to the heap.
 
 copy_block_without_escaping
 ```````````````````````````
+
 ::
 
   sil-instruction :: 'copy_block_without_escaping' sil-operand 'withoutEscaping' sil-operand

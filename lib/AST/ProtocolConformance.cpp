@@ -16,6 +16,7 @@
 
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -383,24 +384,26 @@ SourceLoc RootProtocolConformance::getLoc() const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getLoc, ())
 }
 
-bool RootProtocolConformance::isWeakImported(ModuleDecl *fromModule) const {
+bool
+RootProtocolConformance::isWeakImported(ModuleDecl *fromModule,
+                                        AvailabilityContext fromContext) const {
   auto *dc = getDeclContext();
   if (dc->getParentModule() == fromModule)
     return false;
 
   // If the protocol is weak imported, so are any conformances to it.
-  if (getProtocol()->isWeakImported(fromModule))
+  if (getProtocol()->isWeakImported(fromModule, fromContext))
     return true;
 
   // If the conforming type is weak imported, so are any of its conformances.
   if (auto *nominal = getType()->getAnyNominal())
-    if (nominal->isWeakImported(fromModule))
+    if (nominal->isWeakImported(fromModule, fromContext))
       return true;
 
   // If the conformance is declared in an extension with the @_weakLinked
   // attribute, it is weak imported.
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
-    if (ext->isWeakImported(fromModule))
+    if (ext->isWeakImported(fromModule, fromContext))
       return true;
 
   return false;

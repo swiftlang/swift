@@ -716,6 +716,27 @@ public:
                       BeginBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
+  SILValue emitLoadBorrowOperation(SILLocation loc, SILValue v) {
+    if (!hasOwnership()) {
+      return emitLoadValueOperation(loc, v,
+                                    LoadOwnershipQualifier::Unqualified);
+    }
+    return createLoadBorrow(loc, v);
+  }
+
+  SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v) {
+    if (!hasOwnership() ||
+        v.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Guaranteed))
+      return v;
+    return createBeginBorrow(loc, v);
+  }
+
+  void emitEndBorrowOperation(SILLocation loc, SILValue v) {
+    if (!hasOwnership())
+      return;
+    createEndBorrow(loc, v);
+  }
+
   // Pass in an address or value, perform a begin_borrow/load_borrow and pass
   // the value to the passed in closure. After the closure has finished
   // executing, automatically insert the end_borrow. The closure can assume that

@@ -77,6 +77,21 @@ void ASTNode::walk(ASTWalker &Walker) {
     llvm_unreachable("unsupported AST node");
 }
 
+void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
+  if (auto S = dyn_cast<Stmt*>())
+    S->dump(OS, /*context=*/nullptr, Indent);
+  else if (auto E = dyn_cast<Expr*>())
+    E->dump(OS, Indent);
+  else if (auto D = dyn_cast<Decl*>())
+    D->dump(OS, Indent);
+  else
+    OS << "<null>";
+}
+
+void ASTNode::dump() const {
+  dump(llvm::errs());
+}
+
 #define FUNC(T)                                                               \
 bool ASTNode::is##T(T##Kind Kind) const {                                     \
   if (!is<T*>())                                                              \

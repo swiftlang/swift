@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
 using namespace swift;
 
@@ -154,7 +155,7 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    if (decl->isWeakImported(/*fromModule=*/nullptr))
+    if (decl->isWeakImported(mod.getSwiftModule(), availCtx))
       F->setWeakLinked();
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {

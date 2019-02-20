@@ -72,6 +72,7 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
+  IGNORED_ATTR(AlwaysEmitIntoClient)
   IGNORED_ATTR(Available)
   IGNORED_ATTR(HasInitialValue)
   IGNORED_ATTR(CDecl)
@@ -122,66 +123,6 @@ public:
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
 #undef IGNORED_ATTR
-
-  // @noreturn has been replaced with a 'Never' return type.
-  void visitNoReturnAttr(NoReturnAttr *attr) {
-    if (auto FD = dyn_cast<FuncDecl>(D)) {
-      auto &SM = TC.Context.SourceMgr;
-
-      auto diag = TC.diagnose(attr->getLocation(),
-                              diag::noreturn_not_supported);
-      auto range = attr->getRangeWithAt();
-      if (range.isValid())
-        range.End = range.End.getAdvancedLoc(1);
-      diag.fixItRemove(range);
-
-      auto *last = FD->getParameters();
-
-      // If the declaration already has a result type, we're going
-      // to change it to 'Never'.
-      bool hadResultType = false;
-      bool isEndOfLine = false;
-      SourceLoc resultLoc;
-      if (FD->getBodyResultTypeLoc().hasLocation()) {
-        const auto &typeLoc = FD->getBodyResultTypeLoc();
-        hadResultType = true;
-        resultLoc = typeLoc.getSourceRange().Start;
-
-      // If the function 'throws', insert the result type after the
-      // 'throws'.
-      } else {
-        if (FD->getThrowsLoc().isValid()) {
-          resultLoc = FD->getThrowsLoc();
-
-        // Otherwise, insert the result type after the final parameter
-        // list.
-        } else if (last->getRParenLoc().isValid()) {
-          resultLoc = last->getRParenLoc();
-        }
-
-        if (Lexer::getLocForEndOfToken(SM, resultLoc).getAdvancedLoc(1) ==
-            Lexer::getLocForEndOfLine(SM, resultLoc))
-          isEndOfLine = true;
-
-        resultLoc = Lexer::getLocForEndOfToken(SM, resultLoc);
-      }
-
-      if (hadResultType) {
-        diag.fixItReplace(resultLoc, "Never");
-      } else {
-        std::string fix = " -> Never";
-
-        if (!isEndOfLine)
-          fix = fix + " ";
-
-        diag.fixItInsert(resultLoc, fix);
-      }
-
-      auto neverType = TC.Context.getNeverType();
-      if (neverType)
-        FD->getBodyResultTypeLoc() = TypeLoc::withoutLoc(neverType);
-    }
-  }
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
     // Alignment must be a power of two.
@@ -799,6 +740,7 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     IGNORED_ATTR(Alignment)
+    IGNORED_ATTR(AlwaysEmitIntoClient)
     IGNORED_ATTR(Borrowed)
     IGNORED_ATTR(HasInitialValue)
     IGNORED_ATTR(ClangImporterSynthesizedType)
@@ -821,7 +763,6 @@ public:
     IGNORED_ATTR(Mutating)
     IGNORED_ATTR(NonMutating)
     IGNORED_ATTR(NonObjC)
-    IGNORED_ATTR(NoReturn)
     IGNORED_ATTR(NSManaged) // checked early.
     IGNORED_ATTR(ObjC)
     IGNORED_ATTR(ObjCBridged)
