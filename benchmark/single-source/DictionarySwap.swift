@@ -29,7 +29,7 @@ public let DictionarySwap = [
   BenchmarkInfo(name: "DictionarySwapAt",
     runFunction: swapAt, tags: t, legacyFactor: 4),
   BenchmarkInfo(name: "DictionarySwapAtOfObjects",
-    runFunction: swapAtObjects, tags: t, legacyFactor: 10),
+    runFunction: swapAtObjects, tags: t, legacyFactor: 11),
 ]
 
 // Return true if correctly swapped, false otherwise
