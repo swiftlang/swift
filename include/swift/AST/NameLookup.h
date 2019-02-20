@@ -445,28 +445,28 @@ void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPath,
                     LazyResolver *typeResolver,
                     const DeclContext *moduleScopeContext,
                     ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
-  
-  template <typename Fn>
-  void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
-    DeclContext *moduleScope = DC->getModuleScopeContext();
-    if (auto file = dyn_cast<FileUnit>(moduleScope))
-      file->forAllVisibleModules(fn);
-    else
-      cast<ModuleDecl>(moduleScope)->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
-  }
-  
-  /// Only name lookup has gathered a set of results, perform any necessary
-  /// steps to prune the result set before returning it to the caller.
-  bool finishLookup(const DeclContext *dc, NLOptions options,
-                                SmallVectorImpl<ValueDecl *> &decls);
-  
-  template <typename Result>
-  void filterForDiscriminator(SmallVectorImpl<Result> &results,
-                              DebuggerClient *debugClient);
-  
-  void recordLookupOfTopLevelName(DeclContext *topLevelContext,
-                                  DeclName name,
-                                  bool isCascading);
+
+template <typename Fn>
+void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
+  DeclContext *moduleScope = DC->getModuleScopeContext();
+  if (auto file = dyn_cast<FileUnit>(moduleScope))
+    file->forAllVisibleModules(fn);
+  else
+    cast<ModuleDecl>(moduleScope)
+        ->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
+}
+
+/// Only name lookup has gathered a set of results, perform any necessary
+/// steps to prune the result set before returning it to the caller.
+bool finishLookup(const DeclContext *dc, NLOptions options,
+                  SmallVectorImpl<ValueDecl *> &decls);
+
+template <typename Result>
+void filterForDiscriminator(SmallVectorImpl<Result> &results,
+                            DebuggerClient *debugClient);
+
+void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
+                                bool isCascading);
 
 } // end namespace namelookup
 

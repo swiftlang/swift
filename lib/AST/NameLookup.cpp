@@ -513,7 +513,7 @@ matchDiscriminator(Identifier discriminator,
 
 template <typename Result>
 void namelookup::filterForDiscriminator(SmallVectorImpl<Result> &results,
-                                   DebuggerClient *debugClient) {
+                                        DebuggerClient *debugClient) {
   Identifier discriminator = debugClient->getPreferredPrivateDiscriminator();
   if (discriminator.empty())
     return;
@@ -537,16 +537,11 @@ void namelookup::filterForDiscriminator(SmallVectorImpl<Result> &results,
   results.push_back(lastMatch);
 }
 
-template
-void namelookup::filterForDiscriminator<LookupResultEntry>
-(SmallVectorImpl<LookupResultEntry> &results,
- DebuggerClient *debugClient);
-
-
+template void namelookup::filterForDiscriminator<LookupResultEntry>(
+    SmallVectorImpl<LookupResultEntry> &results, DebuggerClient *debugClient);
 
 void namelookup::recordLookupOfTopLevelName(DeclContext *topLevelContext,
-                                       DeclName name,
-                                       bool isCascading) {
+                                            DeclName name, bool isCascading) {
   auto SF = dyn_cast<SourceFile>(topLevelContext);
   if (!SF)
     return;
@@ -1378,7 +1373,7 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
 }
 
 bool namelookup::finishLookup(const DeclContext *dc, NLOptions options,
-                         SmallVectorImpl<ValueDecl *> &decls) {
+                              SmallVectorImpl<ValueDecl *> &decls) {
   // If we're supposed to remove overridden declarations, do so now.
   if (options & NL_RemoveOverridden)
     removeOverriddenDecls(decls);
