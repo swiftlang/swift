@@ -955,10 +955,21 @@ bool IRGenModule::isResilientConformance(
   if (!conformance->getProtocol()->isResilient())
     return false;
 
-  // If the protocol is in the same module as the conformance, we're
-  // not resilient.
-  if (conformance->getDeclContext()->getParentModule()
-      == conformance->getProtocol()->getParentModule())
+  auto *conformanceModule = conformance->getDeclContext()->getParentModule();
+
+  // If the protocol and the conformance are both in the current module,
+  // they're not resilient.
+  if (conformanceModule == getSwiftModule() &&
+      conformanceModule == conformance->getProtocol()->getParentModule())
+    return false;
+
+  // If the protocol and the conformance are in the same module and the
+  // conforming type is not generic, they're not resilient.
+  //
+  // This is an optimization -- a conformance of a non-generic type cannot
+  // resiliently become dependent.
+  if (!conformance->getDeclContext()->isGenericContext() &&
+      conformanceModule == conformance->getProtocol()->getParentModule())
     return false;
 
   // We have a resilient conformance.
