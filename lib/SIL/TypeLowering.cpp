@@ -152,17 +152,13 @@ namespace {
     RecursiveProperties getDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type) {
       assert(type->isDifferentiable());
-      auto extInfo = type->getExtInfo();
-      auto nondiffExtInfo = extInfo.withDifferentiable(false);
-      auto origTy = type->getWithExtInfo(nondiffExtInfo);
-      // TODO: Use the parameter indices and diff order in the @differentiable
-      // function type.
+      auto origTy = type->getWithoutDifferentiability();
       auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(
-          SmallBitVector(type->getNumParameters(), true), /*resultIndex*/ 0,
+          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
           /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP, M,
           LookUpConformanceInModule(M.getSwiftModule()));
       auto vjpTy = origTy->getAutoDiffAssociatedFunctionType(
-          SmallBitVector(type->getNumParameters(), true), /*resultIndex*/ 0,
+          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
           /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP, M,
           LookUpConformanceInModule(M.getSwiftModule()));
 
