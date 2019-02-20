@@ -47,6 +47,7 @@ namespace swift {
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
   class ApplyExpr;
+  class AvailabilityContext;
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
@@ -940,7 +941,8 @@ public:
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   /// Whether this declaration is weak-imported.
-  bool isWeakImported(ModuleDecl *fromModule) const;
+  bool isWeakImported(ModuleDecl *fromModule,
+                      AvailabilityContext fromContext) const;
 
   /// Returns true if the nature of this declaration allows overrides.
   /// Note that this does not consider whether it is final or whether
