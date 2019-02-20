@@ -4192,6 +4192,15 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
              "Cannot return an @noescape function type");
     }
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Make sure that NotDifferentiable parameters only exist on differentiable
+  // functions.
+  if (!ext.isDifferentiable())
+    for (auto param : getParameters())
+      assert(param.getDifferentiability() ==
+                 SILParameterDifferentiability::DifferentiableOrNotApplicable &&
+             "non-differentiable function has NotDifferentiable parameter");
 #endif
 }
 
