@@ -24,16 +24,16 @@ extension Int: O, O2 {
 }
 
 extension String: P {
-  func poo() -> Int /*TODO: __opaque O*/ {
+  func poo() -> __opaque O {
     return 0
   }
 }
 
 public class C: P, Q {
-  func poo() -> Int /*TODO: __opaque O*/ {
+  func poo() -> __opaque O {
     return 0
   }
-  func qoo() -> Int /*TODO: __opaque O & O2*/ {
+  func qoo() -> __opaque O & O2 {
     return 0
   }
 }
@@ -72,3 +72,7 @@ public func useFoo(x: String, y: C) {
 // CHECK: call swiftcc %swift.metadata_response @swift_getOpaqueTypeMetadata(i64 0, i8* {{.*}}, %swift.type_descriptor* [[DESCRIPTOR:@"\$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMQ"]])
 // CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(%swift.type* {{.*}}, %swift.type_descriptor* [[DESCRIPTOR]], i64 1)
 // CHECK: call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness
+
+// CHECK-LABEL: define {{.*}} @"$sSS18opaque_result_type1PAA1AAaBP_AA1OPWT"
+// CHECK: call swiftcc %swift.metadata_response @swift_getOpaqueTypeMetadata(i64 0, i8* {{.*}}, %swift.type_descriptor* [[DESCRIPTOR:@"\$sSS18opaque_result_typeE3pooQryFQOMQ"]])
+// CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(%swift.type* {{.*}}, %swift.type_descriptor* [[DESCRIPTOR]], i64 0)

@@ -3952,7 +3952,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // as it has a valid interface type.
     FD->setSignatureIsValidated();
 
-    if (FD->isInvalid())
+ '    if (FD->isInvalid())
       break;
 
     validateAttributes(*this, FD);
