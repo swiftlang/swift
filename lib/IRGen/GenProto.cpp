@@ -1011,7 +1011,6 @@ static bool hasDependentTypeWitness(
 static bool isDependentConformance(
               IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
-              bool considerResilience,
               llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
   // Self-conformances are never dependent.
   auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
@@ -1024,7 +1023,7 @@ static bool isDependentConformance(
     return false;
 
   // If the conformance is resilient, this is always true.
-  if (considerResilience && IGM.isResilientConformance(conformance))
+  if (IGM.isResilientConformance(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -1043,7 +1042,6 @@ static bool isDependentConformance(
         isDependentConformance(IGM,
                                assocConformance.getConcrete()
                                  ->getRootConformance(),
-                               considerResilience,
                                visited))
       return true;
   }
@@ -1060,11 +1058,9 @@ static bool isDependentConformance(
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
 bool IRGenModule::isDependentConformance(
-    const RootProtocolConformance *conformance,
-    bool considerResilience) {
+    const RootProtocolConformance *conformance) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
-  return ::isDependentConformance(*this, conformance, considerResilience,
-                                  visited);
+  return ::isDependentConformance(*this, conformance, visited);
 }
 
 static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
@@ -2194,13 +2190,12 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
 
   const ConformanceInfo *info;
   // If the conformance is dependent in any way, we need to unique it.
-  // TODO: maybe this should apply whenever it's out of the module?
-  // TODO: actually enable this
+  //
   // FIXME: Both implementations of ConformanceInfo are trivially-destructible,
   // so in theory we could allocate them on a BumpPtrAllocator. But there's not
   // a good one for us to use. (The ASTContext's outlives the IRGenModule in
   // batch mode.)
-  if (isDependentConformance(rootConformance, /*considerResilience=*/true) ||
+  if (isDependentConformance(rootConformance) ||
       // Foreign types need to go through the accessor to unique the witness
       // table.
       isSynthesizedNonUnique(rootConformance)) {
@@ -2272,13 +2267,13 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Produce the initializer value.
   auto initializer = wtableContents.finishAndCreateFuture();
 
+  bool isDependent = isDependentConformance(conf);
+
   llvm::GlobalVariable *global = nullptr;
   unsigned tableSize;
   if (!isResilientConformance(conf)) {
-    bool isDependent =
-      isDependentConformance(conf, /*considerResilience=*/false);
     global = cast<llvm::GlobalVariable>(
-      isDependent
+      (isDependent && conf->getDeclContext()->isGenericContext())
         ? getAddrOfWitnessTablePattern(cast<NormalProtocolConformance>(conf),
                                        initializer)
         : getAddrOfWitnessTable(conf, initializer));
@@ -2294,9 +2289,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // descriptor.
   ConformanceDescription description(conf, wt, global, tableSize,
                                      wtableBuilder.getTablePrivateSize(),
-                                     isDependentConformance(
-                                       conf,
-                                       /*considerResilience=*/true));
+                                     isDependent);
 
   // Build the instantiation function, we if need one.
   description.instantiationFn = wtableBuilder.buildInstantiationFunction();
