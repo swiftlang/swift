@@ -2661,22 +2661,21 @@ public:
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(EED->getName().str());
-    if (auto *params = EED->getParameterList()) {
-      Builder.addLeftParen();
-      addParameters(Builder, params);
-      Builder.addRightParen();
-    }
-
-    if (!EED->hasInterfaceType())
-      return;
 
     // Enum element is of function type; (Self.type) -> Self or
-    // (Self.Type) -> (Args...) -> Self. We should show only 'Self' part.
-    Type EnumType = EED->getInterfaceType();
-    if (auto FuncType = EnumType->getAs<AnyFunctionType>()) {
-      EnumType = FuncType->getResult();
-      if (auto FuncType = EnumType->getAs<FunctionType>())
-        EnumType = FuncType->getResult();
+    // (Self.Type) -> (Args...) -> Self.
+    Type EnumType = getTypeOfMember(EED);
+    if (EnumType->is<AnyFunctionType>())
+      EnumType = EnumType->castTo<AnyFunctionType>()->getResult();
+
+    if (EnumType->is<FunctionType>()) {
+      Builder.addLeftParen();
+      addParamPatternFromFunction(Builder, EnumType->castTo<FunctionType>(),
+                                  nullptr);
+      Builder.addRightParen();
+
+      // Extract result as the enum type.
+      EnumType = EnumType->castTo<FunctionType>()->getResult();
     }
 
     addTypeAnnotation(Builder, EnumType);
@@ -3678,6 +3677,7 @@ public:
     auto Ty = Switch->getSubjectExpr()->getType();
     if (!Ty)
       return;
+    ExprType = Ty;
     auto *TheEnumDecl = dyn_cast_or_null<EnumDecl>(Ty->getAnyNominal());
     if (!TheEnumDecl)
       return;
