@@ -16,6 +16,9 @@
 
 // CHECK: @"$s16class_resilience21ResilientGenericChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS:{ (i32|i64), i32, i32 }]] zeroinitializer
 
+// CHECK: @"$s16class_resilience27ClassWithEmptyThenResilientC9resilient0H7_struct0G3IntVvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s16class_resilience27ClassWithResilientThenEmptyC9resilient0H7_struct0E3IntVvpWvd" = hidden global [[INT]] 0,
+
 // CHECK: @"$s16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
 // CHECK-SAME-64: { [[INT]] 80, i32 2, i32 10 }
@@ -112,6 +115,9 @@
 // CHECK: @"$s16class_resilience24MyResilientConcreteChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-SAME-32: { [[INT]] 64, i32 2, i32 16 }
 // CHECK-SAME-64: { [[INT]] 104, i32 2, i32 13 }
+
+// CHECK: @"$s16class_resilience27ClassWithEmptyThenResilientC5emptyAA0E0VvpWvd" = hidden constant [[INT]] 0,
+// CHECK: @"$s16class_resilience27ClassWithResilientThenEmptyC5emptyAA0G0VvpWvd" = hidden constant [[INT]] 0,
 
 // CHECK: @"$s16class_resilience14ResilientChildC5fields5Int32VvgTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
 // CHECK: @"$s16class_resilience14ResilientChildC5fields5Int32VvsTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
@@ -241,6 +247,34 @@ public class MyResilientConcreteChild : MyResilientGenericParent<Int> {
 extension ResilientGenericOutsideParent {
   public func genericExtensionMethod() -> A.Type {
     return A.self
+  }
+}
+
+// rdar://48031465
+// Field offsets for empty fields in resilient classes should be initialized
+// to their best-known value and made non-constant if that value might
+// disagree with the dynamic value.
+
+@_fixed_layout
+public struct Empty {}
+
+public class ClassWithEmptyThenResilient {
+  public let empty: Empty
+  public let resilient: ResilientInt
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
+}
+
+public class ClassWithResilientThenEmpty {
+  public let resilient: ResilientInt
+  public let empty: Empty
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
   }
 }
 

@@ -157,6 +157,15 @@ public:
              Options.contains(ClassMetadataFlags::ClassHasObjCAncestry));
   }
 
+  /// Returns true if the runtime may attempt to assign non-zero offsets to
+  /// empty fields for this class.  The ObjC runtime will do this if it
+  /// decides it needs to slide ivars.  This is the one exception to the
+  /// general rule that the runtime will not try to assign a different offset
+  /// than was computed statically for a field with a fixed offset.
+  bool mayRuntimeAssignNonZeroOffsetsToEmptyFields() const {
+    return Options.contains(ClassMetadataFlags::ClassHasObjCAncestry);
+  }
+
   /// Returns true iff everything about the class metadata layout is statically
   /// known except field offsets and the instance size and alignment.
   ///
