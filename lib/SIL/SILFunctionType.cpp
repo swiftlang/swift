@@ -180,19 +180,25 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   //                 (R.CotangentVector...) -> (T.CotangentVector...))
 
   auto &ctx = getASTContext();
+  auto &typeConverter = module.Types;
+  Lowering::GenericContextScope
+      genericContextScope(module.Types, getGenericSignature());
 
   auto testParamIndex = [&](unsigned index) -> bool {
     return index < parameterIndices.size() && parameterIndices[index];
   };
 
   // Given a type, returns its formal SIL parameter info.
-  auto getParameterInfoForOriginalResult = [&](
-      CanType type, ResultConvention origResConv) -> SILParameterInfo {
+  auto getCotangentParameterInfoForOriginalResult = [&](
+      CanType cotanType, ResultConvention origResConv) -> SILParameterInfo {
+    auto &tl = typeConverter.getTypeLowering(cotanType);
     ParameterConvention conv;
     switch (origResConv) {
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
-      conv = ParameterConvention::Direct_Guaranteed;
+      conv = tl.isTrivial()
+          ? ParameterConvention::Direct_Unowned
+          : ParameterConvention::Direct_Guaranteed;
       break;
     case ResultConvention::Unowned:
     case ResultConvention::UnownedInnerPointer:
@@ -202,20 +208,21 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       conv = ParameterConvention::Indirect_In_Guaranteed;
       break;
     }
-    return {type, conv};
+    return {cotanType, conv};
   };
 
   // Given a type, returns its formal SIL result info.
-  auto getResultInfoForOriginalParameter = [&](
-      CanType type, ParameterConvention origParamConv) -> SILResultInfo {
+  auto getCotangentResultInfoForOriginalParameter = [&](
+      CanType cotanType, ParameterConvention origParamConv) -> SILResultInfo {
+    auto &tl = typeConverter.getTypeLowering(cotanType);
     ResultConvention conv;
     switch (origParamConv) {
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Guaranteed:
-      conv = ResultConvention::Owned;
-      break;
     case ParameterConvention::Direct_Unowned:
-      conv = ResultConvention::Unowned;
+      conv = tl.isTrivial()
+          ? ResultConvention::Unowned
+          : ResultConvention::Owned;
       break;
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
@@ -225,7 +232,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       conv = ResultConvention::Indirect;
       break;
     }
-    return {type, conv};
+    return {cotanType, conv};
   };
 
   // Unwrap curry levels.
@@ -329,7 +336,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
                 AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
             ->getCanonicalType();
     cotangentParams.push_back(
-        getParameterInfoForOriginalResult(cotangentAssocTy,
+        getCotangentParameterInfoForOriginalResult(cotangentAssocTy,
                                           origRes.getConvention()));
     SmallVector<SILResultInfo, 8> cotangentResults;
     for (auto &param : wrtParams) {
@@ -340,7 +347,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
                   lookupConformance)
               ->getCanonicalType();
       cotangentResults.push_back(
-          getResultInfoForOriginalParameter(paramCotangentTy,
+          getCotangentResultInfoForOriginalParameter(paramCotangentTy,
                                             param.getConvention()));
     }
     closureType = SILFunctionType::get(

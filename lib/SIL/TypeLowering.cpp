@@ -161,7 +161,6 @@ namespace {
           type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
           /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP, M,
           LookUpConformanceInModule(M.getSwiftModule()));
-
       RecursiveProperties props;
       props.addSubobject(classifyType(origTy, M, Sig, Expansion));
       props.addSubobject(classifyType(jvpTy, M, Sig, Expansion));
