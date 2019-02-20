@@ -62,6 +62,7 @@ add_swift_host_library(swiftAST STATIC
   TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeWalker.cpp
+  UnqualifiedLookup.cpp
   USRGeneration.cpp
 
   LINK_LIBRARIES
