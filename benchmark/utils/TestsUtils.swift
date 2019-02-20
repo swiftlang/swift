@@ -235,6 +235,19 @@ public func CheckResults(
     }
 }
 
+#if !_runtime(_ObjC)
+// If we do not have an objc-runtime, then we do not have a definition for
+// autoreleasepool. Add in our own fake autoclosure for it that is inline
+// always. That should be able to be eaten through by the optimizer no problem.
+@inlinable // FIXME(inline-always)
+@inline(__always)
+public func autoreleasepool<Result>(
+  invoking body: () throws -> Result
+) rethrows -> Result {
+  return try body()
+}
+#endif
+
 public func False() -> Bool { return false }
 
 /// This is a dummy protocol to test the speed of our protocol dispatch.
