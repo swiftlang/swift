@@ -279,17 +279,26 @@ public let DataBenchmarks = [
     legacyFactor: 50),
 
   BenchmarkInfo(name: "StringToDataEmpty",
-    runFunction: { data($0*200, from: emptyString) }, tags: d,
+    runFunction: { dataFromUTF8View($0*200, from: emptyString) }, tags: d,
     legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataSmall",
-    runFunction: { data($0*200, from: smallString) }, tags: d,
+    runFunction: { dataFromUTF8View($0*200, from: smallString) }, tags: d,
     legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataMedium",
-    runFunction: { data($0*200, from: mediumString) }, tags: d,
+    runFunction: { dataFromUTF8View($0*200, from: mediumString) }, tags: d,
     legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataLargeUnicode",
-    runFunction: { data($0*200, from: largeUnicodeString) }, tags: d,
+    runFunction: { dataFromUTF8View($0*200, from: largeUnicodeString) }, tags: d,
     legacyFactor: 50),
+
+  BenchmarkInfo(name: "String.data.Empty",
+    runFunction: { dataUsingUTF8Encoding($0*200, from: emptyString) }, tags: d),
+  BenchmarkInfo(name: "String.data.Small",
+    runFunction: { dataUsingUTF8Encoding($0*200, from: smallString) }, tags: d),
+  BenchmarkInfo(name: "String.data.Medium",
+    runFunction: { dataUsingUTF8Encoding($0*200, from: mediumString) }, tags: d),
+  BenchmarkInfo(name: "String.data.LargeUnicode",
+    runFunction: { dataUsingUTF8Encoding($0*200, from: largeUnicodeString) }, tags: d),
 
   BenchmarkInfo(name: "Data.hash.Empty",
     runFunction: { hash($0*10_000, data: Data()) }, tags: d),
@@ -530,9 +539,16 @@ public func string(_ N: Int, from data: Data) {
 }
 
 @inline(never)
-public func data(_ N: Int, from string: String) {
+public func dataFromUTF8View(_ N: Int, from string: String) {
   for _ in 1...N {
     blackHole(Data(string.utf8))
+  }
+}
+
+@inline(never)
+public func dataUsingUTF8Encoding(_ N: Int, from string: String) {
+  for _ in 1...N {
+    autoreleasepool { blackHole(string.data(using: .utf8)) }
   }
 }
 
