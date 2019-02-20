@@ -13,7 +13,6 @@
 // CHECK-DAG: [[NSRECT:%TSo6NSRectV]] = type <{ %TSo7NSPointV, %TSo6NSSizeV }>
 // CHECK-DAG: [[NSPOINT:%TSo7NSPointV]] = type <{ %TSd, %TSd }>
 // CHECK-DAG: [[NSSIZE:%TSo6NSSizeV]] = type <{ %TSd, %TSd }>
-// CHECK-DAG: [[OBJC:%objc_object]] = type opaque
 
 // CHECK: @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" = hidden global %objc_class {
 // CHECK-SAME:   %objc_class* @"OBJC_METACLASS_$_{{(_TtCs12_)?}}SwiftObject",

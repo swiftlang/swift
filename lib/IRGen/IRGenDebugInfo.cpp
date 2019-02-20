@@ -232,7 +232,7 @@ private:
       return L;
 
     if (auto *ClangDecl = D->getClangDecl()) {
-      auto ClangSrcLoc = ClangDecl->getLocStart();
+      auto ClangSrcLoc = ClangDecl->getBeginLoc();
       clang::SourceManager &ClangSM =
           CI.getClangASTContext().getSourceManager();
       L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
@@ -2008,8 +2008,6 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   llvm::DISubprogram *Decl = nullptr;
 
   // Various flags.
-  bool IsLocalToUnit = Fn ? Fn->hasInternalLinkage() : true;
-  bool IsDefinition = true;
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   // Mark everything that is not visible from the source code (i.e.,
   // does not have a Swift name) as artificial, so the debugger can
@@ -2040,10 +2038,14 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
 
+  llvm::DISubprogram::DISPFlags SPFlags = llvm::DISubprogram::toSPFlags(
+      /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,
+      /*IsDefinition=*/true, /*IsOptimized=*/Opts.shouldOptimize());
+
   // Construct the DISubprogram.
   llvm::DISubprogram *SP = DBuilder.createFunction(
-      Scope, Name, LinkageName, File, Line, DIFnTy, IsLocalToUnit, IsDefinition,
-      ScopeLine, Flags, Opts.shouldOptimize(), TemplateParameters, Decl, Error);
+      Scope, Name, LinkageName, File, Line, DIFnTy, ScopeLine, Flags, SPFlags,
+      TemplateParameters, Decl, Error);
 
   if (Fn && !Fn->isDeclaration())
     Fn->setSubprogram(SP);
