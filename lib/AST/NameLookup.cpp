@@ -1449,11 +1449,10 @@ namespace {
     Optional<PerScopeLookupState> lookupInClosure(AbstractClosureExpr *ACE,
                                         Optional<bool> isCascadingUse);
 
-    Optional<PerScopeLookupState> lookupInExtension(ExtensionDecl *ED,
-                                          Optional<bool> isCascadingUse);
-
-    Optional<PerScopeLookupState> lookupInNominalType(NominalTypeDecl *ND,
-                                            Optional<bool> isCascadingUse);
+    template <typename NominalTypeDeclOrExtensionDecl>
+    Optional<PerScopeLookupState>
+    lookupInNominalTypeOrExtension(NominalTypeDeclOrExtensionDecl *D,
+                                   Optional<bool> isCascadingUse);
 
     Optional<PerScopeLookupState>
     lookupInDefaultArgumentInitializer(DefaultArgumentInitializer *I,
@@ -1937,9 +1936,9 @@ UnqualifiedLookupFactory::lookupInAppropriateContext(
   if (auto *ACE = dyn_cast<AbstractClosureExpr>(dc))
     return lookupInClosure(ACE, isCascadingUse);
   if (auto *ED = dyn_cast<ExtensionDecl>(dc))
-    return lookupInExtension(ED, isCascadingUse);
+    return lookupInNominalTypeOrExtension(ED, isCascadingUse);
   if (auto *ND = dyn_cast<NominalTypeDecl>(dc))
-    return lookupInNominalType(ND, isCascadingUse);
+    return lookupInNominalTypeOrExtension(ND, isCascadingUse);
   if (auto I = dyn_cast<DefaultArgumentInitializer>(dc))
     return lookupInDefaultArgumentInitializer(I, isCascadingUse);
 
@@ -2085,35 +2084,18 @@ UnqualifiedLookupFactory::lookupInClosure(AbstractClosureExpr *ACE,
   // clang-format on
 }
 
-// TODO: calls of isCascadingContextForLookup do extra work?
-// or factor out isCascadingUse to another dispatch??
+template <typename NominalTypeDeclOrExtensionDecl>
 Optional<UnqualifiedLookupFactory::PerScopeLookupState>
-UnqualifiedLookupFactory::lookupInExtension(ExtensionDecl *ED,
-                                            Optional<bool> isCascadingUse) {
+UnqualifiedLookupFactory::lookupInNominalTypeOrExtension(
+    NominalTypeDeclOrExtensionDecl *D, Optional<bool> isCascadingUse) {
   // clang-format off
   return PerScopeLookupState{
       false,
-      ED,
-      shouldLookupMembers(ED, Loc)
-          ? Optional<PlacesToSearch>(PlacesToSearch(ED, ED, ED, ED))
+      D,
+      shouldLookupMembers(D, Loc)
+          ? Optional<PlacesToSearch>(PlacesToSearch(D, D, D, D))
           : None,
-      resolveIsCascadingUse(ED, isCascadingUse,
-                            /*onlyCareAboutFunctionBody=*/false)};
-  // clang-format on
-}
-
-// TODO: Unify lookupInNominalType w/ lookupInExtension?
-Optional<UnqualifiedLookupFactory::PerScopeLookupState>
-UnqualifiedLookupFactory::lookupInNominalType(NominalTypeDecl *ND,
-                                              Optional<bool> isCascadingUse) {
-  // clang-format off
-  return PerScopeLookupState{
-      false,
-      ND,
-      shouldLookupMembers(ND, Loc)
-          ? Optional<PlacesToSearch>(PlacesToSearch(ND, ND, ND, ND))
-          : None,
-      resolveIsCascadingUse(ND, isCascadingUse,
+      resolveIsCascadingUse(D, isCascadingUse,
                             /*onlyCareAboutFunctionBody=*/false)};
 
   // clang-format on
