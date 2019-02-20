@@ -2032,3 +2032,49 @@ semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
   static const char OncePerASTToken = 0;
   getASTManager()->processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
 }
+
+void SwiftLangSupport::collectExpressionTypes(StringRef FileName,
+                                              ArrayRef<const char *> Args,
+                  std::function<void(const ExpressionTypesInFile&)> Receiver) {
+  std::string Error;
+  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, FileName, Error);
+  if (!Invok) {
+    // FIXME: Report it as failed request.
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver({});
+    return;
+  }
+  assert(Invok);
+  class ExpressionTypeCollector: public SwiftASTConsumer {
+    std::function<void(const ExpressionTypesInFile&)> Receiver;
+  public:
+    ExpressionTypeCollector(std::function<void(const ExpressionTypesInFile&)> Receiver):
+      Receiver(std::move(Receiver)) {}
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto *SF = AstUnit->getCompilerInstance().getPrimarySourceFile();
+      std::vector<ExpressionTypeInfo> Scratch;
+      llvm::SmallString<256> TypeBuffer;
+      llvm::raw_svector_ostream OS(TypeBuffer);
+      ExpressionTypesInFile Result;
+      for (auto Item: collectExpressionType(*SF, Scratch, OS)) {
+        Result.Results.push_back({Item.offset, Item.length, Item.typeOffset,
+          Item.typeLength});
+      }
+      Result.TypeBuffer = OS.str();
+      Receiver(Result);
+    }
+
+    void cancelled() override {
+      Receiver({});
+    }
+
+    void failed(StringRef Error) override {
+      Receiver({});
+    }
+  };
+  auto Collector = std::make_shared<ExpressionTypeCollector>(Receiver);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  getASTManager()->processASTAsync(Invok, std::move(Collector), &OncePerASTToken);
+}
