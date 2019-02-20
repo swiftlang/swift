@@ -136,14 +136,53 @@ template <typename D> bool shouldLookupMembers(D *decl, SourceLoc loc) {
 } // end anonymous namespace
 
 namespace {
+class LegacyUnqualifiedLookup;
+
 class UnqualifiedLookupFactory {
 public:
-  using Flags = LegacyUnqualifiedLookup::Flags;
-  using Options = LegacyUnqualifiedLookup::Options;
-  using PlacesToSearch = UnqualifiedLookup::PlacesToSearch;
-  using PerScopeLookupState = UnqualifiedLookup::PerScopeLookupState;
+  using Flags = UnqualifiedLookup::Flags;
+  using Options = UnqualifiedLookup::Options;
 
 private:
+  struct PlacesToSearch {
+    // TODO: constify members?
+    /// The context in which the places where found.
+    DeclContext *fromWhence;
+    /// Nontypes are formally members of the base type
+    DeclContext *whereNonTypesAreMembers;
+    /// Types are formally members of the metatype
+    DeclContext *whereTypesAreMembers;
+    /// Places to search for the lookup.
+    SmallVector<NominalTypeDecl *, 2> places;
+
+    PlacesToSearch(DeclContext *fromWhence,
+                   DeclContext *whereNonTypesAreMembers,
+                   DeclContext *whereTypesAreMembers,
+                   DeclContext *placesHolder);
+    bool empty() const {
+      return whereNonTypesAreMembers == nullptr || places.empty();
+    }
+    // Classify this declaration.
+    // Types are formally members of the metatype.
+    DeclContext *whereValueIsMember(const ValueDecl *const member) const {
+      return dyn_cast<TypeDecl>(member) ? whereTypesAreMembers
+                                        : whereNonTypesAreMembers;
+    }
+    void addToResults(const DeclName &Name, bool isCascadingUse,
+                      NLOptions baseNLOptions, DeclContext *contextForLookup,
+                      SmallVectorImpl<LookupResultEntry> &results) const;
+    void dump() const;
+  };
+
+  struct PerScopeLookupState {
+    bool isDone;
+    DeclContext *childOfNextDC;
+    Optional<PlacesToSearch> placesToSearch;
+    Optional<bool> isCascadingUse;
+
+    void dump() const;
+  };
+
   // Inputs
   const DeclName Name;
   DeclContext *const DC;
@@ -162,14 +201,13 @@ private:
   // Outputs
   SmallVectorImpl<LookupResultEntry> &Results;
   size_t &IndexOfFirstOuterResult;
-
-  // For debugging:
-  SourceFile const *&recordedSF;
-  DeclName &recordedName;
-  bool &recordedIsCascadingUse;
-  std::vector<PerScopeLookupState> &breadcrumbs;
-
   SmallVector<LookupResultEntry, 4> UnavailableInnerResults;
+
+public: // for exp debugging
+  std::vector<PerScopeLookupState> breadcrumbs;
+  SourceFile const *recordedSF = nullptr;
+  DeclName recordedName;
+  bool recordedIsCascadingUse = false;
 
 public:
   // clang-format off
@@ -311,12 +349,17 @@ private:
 
 #pragma mark common helper declarations
   static NLOptions
-  computeBaseNLOptions(const LegacyUnqualifiedLookup::Options options,
+  computeBaseNLOptions(const UnqualifiedLookup::Options options,
                        const bool isOriginallyTypeLookup);
 
   static bool resolveIsCascadingUse(const DeclContext *const dc,
                                     Optional<bool> isCascadingUse,
                                     bool onlyCareAboutFunctionBody);
+
+  void dumpBreadcrumbs() const;
+
+public:
+  bool verifyEqualToLegacy(const LegacyUnqualifiedLookup &&LUL) const;
 };
 } // namespace
 
@@ -344,11 +387,8 @@ isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
 baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
 Consumer(Name, lookupToBeCreated.Results, isOriginallyTypeLookup),
 Results(lookupToBeCreated.Results),
-IndexOfFirstOuterResult(lookupToBeCreated.IndexOfFirstOuterResult),
-recordedSF(lookupToBeCreated.recordedSF),
-recordedName(lookupToBeCreated.recordedName),
-recordedIsCascadingUse(lookupToBeCreated.recordedIsCascadingUse),
-breadcrumbs(lookupToBeCreated.breadcrumbs) {}
+IndexOfFirstOuterResult(lookupToBeCreated.IndexOfFirstOuterResult)
+{}
 // clang-format on
 
 void UnqualifiedLookupFactory::fillInLookup() {
@@ -948,7 +988,7 @@ bool UnqualifiedLookupFactory::addLocalVariableResults(DeclContext *dc) {
   return false;
 }
 
-void UnqualifiedLookup::PlacesToSearch::addToResults(
+void UnqualifiedLookupFactory::PlacesToSearch::addToResults(
     const DeclName &Name, bool isCascadingUse, NLOptions baseNLOptions,
     DeclContext *contextForLookup,
     SmallVectorImpl<LookupResultEntry> &results) const {
@@ -1101,6 +1141,47 @@ bool UnqualifiedLookupFactory::resolveIsCascadingUse(
              : dc->isCascadingContextForLookup(
                    /*functionsAreNonCascading=*/onlyCareAboutFunctionBody);
 }
+
+namespace {
+/// This class implements and represents the result of performing
+/// unqualified lookup (i.e. lookup for a plain identifier).
+/// It is being kept around in order to check the refactoring against the new
+/// UnqualifiedLookup above.
+class LegacyUnqualifiedLookup {
+public:
+  using Flags = UnqualifiedLookup::Flags;
+  using Options = UnqualifiedLookup::Options;
+
+  /// Lookup an unqualified identifier \p Name in the context.
+  ///
+  /// If the current DeclContext is nested in a function body, the SourceLoc
+  /// is used to determine which declarations in that body are visible.
+  LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
+                          LazyResolver *TypeResolver,
+                          SourceLoc Loc = SourceLoc(),
+                          Options options = Options());
+
+  SmallVector<LookupResultEntry, 4> Results;
+  /// The index of the first result that isn't from the innermost scope
+  /// with results.
+  ///
+  /// That is, \c makeArrayRef(Results).take_front(IndexOfFirstOuterResults)
+  /// will be Results from the innermost scope that had results, and the
+  /// remaining elements of Results will be from parent scopes of this one.
+  size_t IndexOfFirstOuterResult;
+
+  /// Return true if anything was found by the name lookup.
+  bool isSuccess() const { return !Results.empty(); }
+
+  /// Get the result as a single type, or a null type if that fails.
+  TypeDecl *getSingleTypeResult() const;
+
+public: // for exp debugging
+  SourceFile const *recordedSF = nullptr;
+  DeclName recordedName;
+  bool recordedIsCascadingUse = false;
+};
+}; // namespace
 
 LegacyUnqualifiedLookup::LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
                                                  LazyResolver *TypeResolver,
@@ -1624,7 +1705,7 @@ TypeDecl *LegacyUnqualifiedLookup::getSingleTypeResult() const {
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
 }
 
-UnqualifiedLookup::PlacesToSearch::PlacesToSearch(
+UnqualifiedLookupFactory::PlacesToSearch::PlacesToSearch(
     DeclContext *fromWhence, DeclContext *whereNonTypesAreMembers,
     DeclContext *whereTypesAreMembers, DeclContext *placesHolder)
     : fromWhence(fromWhence), whereNonTypesAreMembers(whereNonTypesAreMembers),
@@ -1632,7 +1713,7 @@ UnqualifiedLookup::PlacesToSearch::PlacesToSearch(
   populateLookupDeclsFromContext(placesHolder, places);
 }
 
-void UnqualifiedLookup::PlacesToSearch::dump() const {
+void UnqualifiedLookupFactory::PlacesToSearch::dump() const {
   llvm::errs() << "fromWhence: ";
   fromWhence->dumpContext();
   llvm::errs() << "whereNonTypesAreMembers: ";
@@ -1655,9 +1736,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
                                      Options options)
     // clang-format on
     : IndexOfFirstOuterResult(0) {
-  UnqualifiedLookupFactory(Name, DC, TypeResolver, Loc, options, *this)
-      .fillInLookup();
-  assert(verifyEqual(
+  UnqualifiedLookupFactory factory(Name, DC, TypeResolver, Loc, options, *this);
+  factory.fillInLookup();
+  assert(factory.verifyEqualToLegacy(
              LegacyUnqualifiedLookup(Name, DC, TypeResolver, Loc, options)) &&
          "bad refactoring");
 }
@@ -1668,29 +1749,7 @@ TypeDecl *UnqualifiedLookup::getSingleTypeResult() const {
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
 }
 
-bool UnqualifiedLookup::verifyEqual(
-    const LegacyUnqualifiedLookup &&other) const {
-  assert(Results.size() == other.Results.size());
-  for (size_t i : indices(Results)) {
-    const auto &e = Results[i];
-    const auto &oe = other.Results[i];
-    assert(e.getValueDecl() == oe.getValueDecl());
-    assert(e.getDeclContext() == oe.getDeclContext());
-    // unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
-    // bool onlyAPartialLine = false) const;
-    assert(e.getBaseDecl() == oe.getBaseDecl());
-  }
-  assert(IndexOfFirstOuterResult == other.IndexOfFirstOuterResult);
-  assert(recordedSF == other.recordedSF);
-  assert(recordedName == other.recordedName);
-  if (recordedIsCascadingUse)
-    assert(other.recordedIsCascadingUse);
-  else
-    assert(!other.recordedIsCascadingUse);
-  return true;
-}
-
-void UnqualifiedLookup::dumpBreadcrumbs() const {
+void UnqualifiedLookupFactory::dumpBreadcrumbs() const {
   auto &e = llvm::errs();
   for (size_t i : indices(breadcrumbs)) {
     e << i << "\n";
@@ -1699,11 +1758,33 @@ void UnqualifiedLookup::dumpBreadcrumbs() const {
   }
 }
 
-void UnqualifiedLookup::PerScopeLookupState::dump() const {
+void UnqualifiedLookupFactory::PerScopeLookupState::dump() const {
   auto &e = llvm::errs();
   e << (isDone ? "done: " : "not done: ");
   e << " dc: ";
   childOfNextDC->dumpContext();
   if (placesToSearch.hasValue())
     placesToSearch.getValue().dump();
+}
+
+bool UnqualifiedLookupFactory::verifyEqualToLegacy(
+    const LegacyUnqualifiedLookup &&LUL) const {
+  assert(Results.size() == LUL.Results.size());
+  for (size_t i : indices(Results)) {
+    const auto &e = Results[i];
+    const auto &oe = LUL.Results[i];
+    assert(e.getValueDecl() == oe.getValueDecl());
+    assert(e.getDeclContext() == oe.getDeclContext());
+    // unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
+    // bool onlyAPartialLine = false) const;
+    assert(e.getBaseDecl() == oe.getBaseDecl());
+  }
+  assert(IndexOfFirstOuterResult == LUL.IndexOfFirstOuterResult);
+  assert(recordedSF == LUL.recordedSF);
+  assert(recordedName == LUL.recordedName);
+  if (recordedIsCascadingUse)
+    assert(LUL.recordedIsCascadingUse);
+  else
+    assert(!LUL.recordedIsCascadingUse);
+  return true;
 }

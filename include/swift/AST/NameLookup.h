@@ -84,8 +84,6 @@ public:
   ValueDecl *getBaseDecl() const;
 };
 
-class LegacyUnqualifiedLookup; // for verifyEqual below
-
 /// This class implements and represents the result of performing
 /// unqualified lookup (i.e. lookup for a plain identifier).
 class UnqualifiedLookup {
@@ -131,55 +129,6 @@ public:
 
   /// Get the result as a single type, or a null type if that fails.
   TypeDecl *getSingleTypeResult() const;
-
-  bool verifyEqual(const LegacyUnqualifiedLookup &&) const;
-
-public: // for exp debugging
-  SourceFile const *recordedSF = nullptr;
-  DeclName recordedName;
-  bool recordedIsCascadingUse = false;
-
-  // TODO: move into Factory
-  struct PlacesToSearch {
-    // TODO: constify members?
-    /// The context in which the places where found.
-    DeclContext *fromWhence;
-    /// Nontypes are formally members of the base type
-    DeclContext *whereNonTypesAreMembers;
-    /// Types are formally members of the metatype
-    DeclContext *whereTypesAreMembers;
-    /// Places to search for the lookup.
-    SmallVector<NominalTypeDecl *, 2> places;
-
-    PlacesToSearch(DeclContext *fromWhence,
-                   DeclContext *whereNonTypesAreMembers,
-                   DeclContext *whereTypesAreMembers,
-                   DeclContext *placesHolder);
-    bool empty() const {
-      return whereNonTypesAreMembers == nullptr || places.empty();
-    }
-    // Classify this declaration.
-    // Types are formally members of the metatype.
-    DeclContext *whereValueIsMember(const ValueDecl *const member) const {
-      return dyn_cast<TypeDecl>(member) ? whereTypesAreMembers
-                                        : whereNonTypesAreMembers;
-    }
-    void addToResults(const DeclName &Name, bool isCascadingUse,
-                      NLOptions baseNLOptions, DeclContext *contextForLookup,
-                      SmallVectorImpl<LookupResultEntry> &results) const;
-    void dump() const;
-  };
-
-  struct PerScopeLookupState {
-    bool isDone;
-    DeclContext *childOfNextDC;
-    Optional<PlacesToSearch> placesToSearch;
-    Optional<bool> isCascadingUse;
-
-    void dump() const;
-  };
-  std::vector<PerScopeLookupState> breadcrumbs;
-  void dumpBreadcrumbs() const;
 };
 
 inline UnqualifiedLookup::Options operator|(UnqualifiedLookup::Flags flag1,
@@ -187,44 +136,6 @@ inline UnqualifiedLookup::Options operator|(UnqualifiedLookup::Flags flag1,
   return UnqualifiedLookup::Options(flag1) | flag2;
 }
 
-/// This class implements and represents the result of performing
-/// unqualified lookup (i.e. lookup for a plain identifier).
-/// It is being kept around in order to check the refactoring against the new
-/// UnqualifiedLookup above.
-class LegacyUnqualifiedLookup {
-public:
-  using Flags = UnqualifiedLookup::Flags;
-  using Options = UnqualifiedLookup::Options;
-
-  /// Lookup an unqualified identifier \p Name in the context.
-  ///
-  /// If the current DeclContext is nested in a function body, the SourceLoc
-  /// is used to determine which declarations in that body are visible.
-  LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
-                          LazyResolver *TypeResolver,
-                          SourceLoc Loc = SourceLoc(),
-                          Options options = Options());
-
-  SmallVector<LookupResultEntry, 4> Results;
-  /// The index of the first result that isn't from the innermost scope
-  /// with results.
-  ///
-  /// That is, \c makeArrayRef(Results).take_front(IndexOfFirstOuterResults)
-  /// will be Results from the innermost scope that had results, and the
-  /// remaining elements of Results will be from parent scopes of this one.
-  size_t IndexOfFirstOuterResult;
-
-  /// Return true if anything was found by the name lookup.
-  bool isSuccess() const { return !Results.empty(); }
-
-  /// Get the result as a single type, or a null type if that fails.
-  TypeDecl *getSingleTypeResult() const;
-
-public: // for exp debugging
-  SourceFile const *recordedSF = nullptr;
-  DeclName recordedName;
-  bool recordedIsCascadingUse = false;
-};
 
 /// Describes the reason why a certain declaration is visible.
 enum class DeclVisibilityKind {
