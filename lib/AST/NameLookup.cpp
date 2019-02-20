@@ -1331,6 +1331,8 @@ namespace {
     using PlacesToSearch = UnqualifiedLookup::PlacesToSearch;
     using PerScopeLookupState = UnqualifiedLookup::PerScopeLookupState;
 
+    enum class LookupFinished { Yes, No };
+
   private:
     // Inputs
     const DeclName Name;
@@ -1376,8 +1378,13 @@ namespace {
 
 #pragma mark ASTScope-based-lookup declarations
 
-    /// Return nullptr if done with whole enchilada and isCascadingUse
-    std::pair<DeclContext *, bool>
+    // TODO: better name than DC
+    struct DCAndIsCascadingUse {
+      DeclContext *const DC;
+      const bool isCascadingUse;
+    };
+
+    Optional<DCAndIsCascadingUse>
     astScopeBasedLookup(DeclContext *dc, Optional<bool> isCascadingUse);
 
     std::pair<const ASTScope *, bool>
@@ -1414,15 +1421,15 @@ namespace {
 
 #pragma mark normal (non-ASTScope-based) lookup declarations
 
-    /// Return nullptr if lookup done.
-    std::pair<DeclContext *, bool>
-    operatorLookup(DeclContext *dc, Optional<bool> isCascadingUse);
+    /// Return None if lookup done.
+    Optional<DCAndIsCascadingUse> operatorLookup(DeclContext *dc,
+                                                 Optional<bool> isCascadingUse);
 
-    /// Return nullptr if done looking up.
-    std::pair<DeclContext *, bool>
+    /// Return None if lookup done.
+    Optional<DCAndIsCascadingUse>
     nonASTScopeBasedLookup(DeclContext *const dc,
                            const Optional<bool> isCascadingUseArg);
-    
+
     struct LookupInOneDeclContextResult {
       bool isDone;
       DeclContext* dc;
@@ -1597,36 +1604,38 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
 // clang-format on
 
 void UnqualifiedLookupFactory::fillInLookup() {
-  const Optional<bool> isCascadingUse =
+  const Optional<bool> isCascadingUseInitial =
       options.contains(Flags::KnownPrivate) ? Optional<bool>(false) : None;
   // Never perform local lookup for operators.
-  std::pair<DeclContext *, bool> dcAndIsCascadingUse =
+  auto dcAndIsCascadingUse =
       shouldUseASTScopeLookup()
-          ? astScopeBasedLookup(DC, isCascadingUse)
-          : Name.isOperator() ? operatorLookup(DC, isCascadingUse)
-                              : nonASTScopeBasedLookup(DC, isCascadingUse);
+          ? astScopeBasedLookup(DC, isCascadingUseInitial)
+          : Name.isOperator()
+                ? operatorLookup(DC, isCascadingUseInitial)
+                : nonASTScopeBasedLookup(DC, isCascadingUseInitial);
 
-  if (!dcAndIsCascadingUse.first)
+  if (!dcAndIsCascadingUse.hasValue())
     return;
+
+  DeclContext *const DC = dcAndIsCascadingUse.getValue().DC;
+  const bool isCascadingUse = dcAndIsCascadingUse.getValue().isCascadingUse;
 
   // TODO: Does the debugger client care about compound names?
   if (Name.isSimpleName() && DebugClient &&
-      DebugClient->lookupOverrides(Name.getBaseName(),
-                                   dcAndIsCascadingUse.first, Loc,
+      DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
                                    isOriginallyTypeLookup, Results))
     return;
 
-  recordDependencyOnTopLevelName(dcAndIsCascadingUse.first, Name,
-                                 dcAndIsCascadingUse.second);
-  addPrivateImports(dcAndIsCascadingUse.first);
-  if (addNamesKnownToDebugClient(dcAndIsCascadingUse.first))
+  recordDependencyOnTopLevelName(DC, Name, isCascadingUse);
+  addPrivateImports(DC);
+  if (addNamesKnownToDebugClient(DC))
     return;
   // If we still haven't found anything, but we do have some
   // declarations that are "unavailable in the current Swift", drop
   // those in.
   if (addUnavailableInnerResults())
     return;
-  if (lookForAModuleWithTheGivenName(dcAndIsCascadingUse.first))
+  if (lookForAModuleWithTheGivenName(DC))
     return;
   // Make sure we've recorded the inner-result-boundary.
   (void)isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
@@ -1640,7 +1649,9 @@ bool UnqualifiedLookupFactory::shouldUseASTScopeLookup() const {
 }
 
 #pragma mark ASTScope-based-lookup definitions
-std::pair<DeclContext *, bool>
+
+/// Return None if lookup done
+Optional<UnqualifiedLookupFactory::DCAndIsCascadingUse>
 UnqualifiedLookupFactory::astScopeBasedLookup(DeclContext *const startDC,
                                               Optional<bool> isCascadingUse) {
   const std::pair<const ASTScope *, Optional<bool>>
@@ -1657,13 +1668,13 @@ UnqualifiedLookupFactory::astScopeBasedLookup(DeclContext *const startDC,
     auto r = lookInScopeForASTScopeLookup(currentScope, selfDC, dc,
                                           currentIsCascadingUse);
     if (!r.hasValue())
-      return std::make_pair(nullptr, false);
+      return None;
     const bool isDone = r.getValue().isDone;
     selfDC = r.getValue().selfDC;
     dc = r.getValue().dc;
     currentIsCascadingUse = r.getValue().isCascadingUse;
     if (isDone)
-      return std::make_pair(dc, currentIsCascadingUse.getValue());
+      return DCAndIsCascadingUse{dc, currentIsCascadingUse.getValue()};
   }
   llvm_unreachable("impossible");
 }
@@ -1854,18 +1865,18 @@ UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
 
 #pragma mark normal (non-ASTScope-based) lookup declarations
 
-std::pair<DeclContext *, bool>
+Optional<UnqualifiedLookupFactory::DCAndIsCascadingUse>
 UnqualifiedLookupFactory::operatorLookup(DeclContext *dc,
                                          Optional<bool> isCascadingUse) {
   auto *msc = dc->getModuleScopeContext();
-  return std::make_pair(
+  return DCAndIsCascadingUse{
       addLocalVariableResults(msc) ? nullptr : msc,
       resolveIsCascadingUse(dc, isCascadingUse,
-                            /*onlyCareAboutFunctionBody*/ true));
+                            /*onlyCareAboutFunctionBody*/ true)};
 }
 
-// TODO: fix this convention w/ struct: Return nullptr if done looking up.
-std::pair<DeclContext *, bool> UnqualifiedLookupFactory::nonASTScopeBasedLookup(
+Optional<UnqualifiedLookupFactory::DCAndIsCascadingUse>
+UnqualifiedLookupFactory::nonASTScopeBasedLookup(
     DeclContext *const dc, const Optional<bool> isCascadingUseArg) {
   // If we are inside of a method, check to see if there are any ivars in
   // scope, and if so, whether this is a reference to one of them.
@@ -1877,7 +1888,7 @@ std::pair<DeclContext *, bool> UnqualifiedLookupFactory::nonASTScopeBasedLookup(
     auto r =
         lookupInOneDeclContext(nextDC, isCascadingUse);
     if (!r.hasValue())
-      return std::make_pair(nullptr, false);
+      return None;
     const bool isDone = r.getValue().isDone;
     nextDC = r.getValue().dc;
     isCascadingUse = r.getValue().isCascadingUse;
@@ -1886,9 +1897,10 @@ std::pair<DeclContext *, bool> UnqualifiedLookupFactory::nonASTScopeBasedLookup(
     assert(nextDC != priorDC && "non-termination");
     priorDC = nextDC;
   }
-  return std::make_pair(addLocalVariableResults(nextDC) ? nullptr : nextDC,
-                        isCascadingUse.hasValue() ? isCascadingUse.getValue()
-                                                  : true);
+  if (addLocalVariableResults(nextDC))
+    return None;
+  return DCAndIsCascadingUse{
+      nextDC, isCascadingUse.hasValue() ? isCascadingUse.getValue() : true};
 }
 
 // clang-format off
