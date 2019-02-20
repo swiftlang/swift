@@ -3767,26 +3767,20 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (!result.UnviableCandidates.empty()) {
       // Check if we have unviable candidates whose reason for rejection
       // is either UR_InstanceMemberOnType or UR_TypeMemberOnInstance
+      SmallVector<OverloadChoice, 4> filteredCandidates;
 
-      SmallVector<std::pair<OverloadChoice, MemberLookupResult::UnviableReason>,
-                  4>
-          filteredURs;
-      llvm::copy_if(
-          result.UnviableCandidates, std::back_inserter(filteredURs),
+      llvm::for_each(
+          result.UnviableCandidates,
           [&](const std::pair<OverloadChoice,
-                              MemberLookupResult::UnviableReason> &e) {
-            return e.second == MemberLookupResult::UR_InstanceMemberOnType ||
-                   e.second == MemberLookupResult::UR_TypeMemberOnInstance;
+                              MemberLookupResult::UnviableReason> &c) {
+            if (c.second == MemberLookupResult::UR_InstanceMemberOnType ||
+                c.second == MemberLookupResult::UR_TypeMemberOnInstance) {
+              filteredCandidates.push_back(std::move(c.first));
+            }
           });
 
       // If we do, then allow them
-      if (!filteredURs.empty()) {
-
-        SmallVector<OverloadChoice, 4> choices;
-
-        for (auto &pair : result.UnviableCandidates) {
-          choices.push_back(std::move(pair.first));
-        }
+      if (!filteredCandidates.empty()) {
 
         auto meetsProtocolBaseMetatypeCriteria =
             baseTy->is<AnyMetatypeType>() && baseTy->getMetatypeInstanceType()
@@ -3794,7 +3788,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                                  ->isAnyExistentialType();
 
         auto requiresProtocolMetatypeFix =
-            llvm::any_of(choices, [&](const OverloadChoice &c) {
+            llvm::any_of(filteredCandidates, [&](const OverloadChoice &c) {
               return c.isDecl() && isa<ConstructorDecl>(c.getDecl());
             });
 
@@ -3807,7 +3801,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             return SolutionKind::Error;
         }
 
-        addOverloadSet(memberTy, choices, useDC, locator);
+        addOverloadSet(memberTy, filteredCandidates, useDC, locator);
         return SolutionKind::Solved;
       }
     }
