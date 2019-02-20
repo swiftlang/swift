@@ -973,7 +973,7 @@ static void addOpaqueAccessorToStorage(TypeChecker &TC,
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Made public so that DerivedConformanceParameterized can call it.
+/// Made public so that DerivedConformanceDifferentiable can call it.
 void swift::addExpectedOpaqueAccessorsToStorage(TypeChecker &TC,
                                                 AbstractStorageDecl *storage) {
   // Nameless vars from interface files should not have any accessors.

@@ -304,3 +304,11 @@ struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
 struct InvalidInitializer : Differentiable {
   init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {} // expected-error {{use of undeclared type 'NonExistentType'}}
 }
+
+struct AllDiffableWithLetHasNoSetter : Differentiable {
+  var a: Float = 0.2
+  let b: Float = 0.3
+}
+let valWithoutAllDiffSetter = AllDiffableWithLetHasNoSetter()
+// expected-error {{setter not found TODO}}
+valWithoutAllDiffSetter.allDifferentiableVariables = valWithoutAllDiffSetter.allDifferentiableVariables

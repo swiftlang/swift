@@ -72,7 +72,7 @@ public protocol __Differentiable {
   associatedtype AllDifferentiableVariables : Differentiable
 
   /// All differentiable variables in this type.
-  var allDifferentiableVariables: AllDifferentiableVariables { get set }
+  var allDifferentiableVariables: AllDifferentiableVariables { get }
 
   /// Returns `self` moved along the value space towards the given tangent
   /// vector. In Riemannian geometry (mathematics), this represents an
@@ -109,8 +109,7 @@ public protocol Differentiable : _Differentiable
 
 public extension Differentiable where AllDifferentiableVariables == Self {
   var allDifferentiableVariables: AllDifferentiableVariables {
-    get { return self }
-    set { self = newValue }
+    return self
   }
 }
 

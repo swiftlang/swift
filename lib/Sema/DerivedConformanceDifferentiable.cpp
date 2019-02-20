@@ -614,20 +614,33 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
       C.Id_allDifferentiableVariables, returnInterfaceTy, returnTy,
       /*isStatic*/ false, /*isFinal*/ true);
 
+  SmallVector<AccessorDecl *, 2> accessors;
+  auto storageImplInfo = StorageImplInfo::getImmutableComputed();
+
   auto *getterDecl = derived.declareDerivedPropertyGetter(
       derived.TC, allDiffableVarsDecl, returnTy);
   getterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesGetter);
+  accessors.push_back(getterDecl);
 
-  auto *setterDecl = derived.declareDerivedPropertySetter(
-      derived.TC, allDiffableVarsDecl, returnTy);
-  setterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesSetter);
+  // If all differentiable variables are mutable, derive a setter for
+  // `allDifferentiableVariables`.
+  auto allDiffVarsMutable = llvm::all_of(
+      allDiffableVarsStruct->getStoredProperties(),
+      [](VarDecl *decl) -> bool { return decl->isSettable(nullptr); });
+  if (allDiffVarsMutable) {
+    auto *setterDecl = derived.declareDerivedPropertySetter(
+        derived.TC, allDiffableVarsDecl, returnTy);
+    setterDecl->setBodySynthesizer(
+        &derivedBody_allDifferentiableVariablesSetter);
+    accessors.push_back(setterDecl);
+    storageImplInfo = StorageImplInfo::getMutableComputed();
+  }
 
-  allDiffableVarsDecl->setAccessors(StorageImplInfo::getMutableComputed(),
-                                    SourceLoc(), {getterDecl, setterDecl},
+  allDiffableVarsDecl->setAccessors(storageImplInfo, SourceLoc(), accessors,
                                     SourceLoc());
-
-  derived.addMembersToConformanceContext(
-      {getterDecl, setterDecl, allDiffableVarsDecl, pbDecl});
+  SmallVector<Decl *, 4> childDecls(accessors.begin(), accessors.end());
+  childDecls.append({allDiffableVarsDecl, pbDecl});
+  derived.addMembersToConformanceContext(childDecls);
 
   addExpectedOpaqueAccessorsToStorage(TC, allDiffableVarsDecl);
   triggerAccessorSynthesis(TC, allDiffableVarsDecl);
