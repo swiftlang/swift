@@ -152,6 +152,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("markup-xml", SourceKitRequest::MarkupToXML)
         .Case("stats", SourceKitRequest::Statistics)
         .Case("track-compiles", SourceKitRequest::EnableCompileNotifications)
+        .Case("collect-type", SourceKitRequest::CollectExpresstionType)
         .Default(SourceKitRequest::None);
 
       if (Request == SourceKitRequest::None) {
@@ -163,7 +164,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
                "open/close/edit/print-annotations/print-diags/extract-comment/module-groups/"
                "range/syntactic-rename/find-rename-ranges/translate/markup-xml/stats/"
-               "track-compiles\n";
+               "track-compiles/collect-type\n";
         return true;
       }
       break;
