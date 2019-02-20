@@ -23,17 +23,9 @@ let boxedNumMap = Dictionary(uniqueKeysWithValues: zip(boxedNums, boxedNums))
 
 public let DictionaryRemove = [
   BenchmarkInfo(name: "DictionaryRemove",
-    runFunction: { for _ in 1...$0*100 {
-      var dict = numberMap
-      for i in 1...size { dict.removeValue(forKey: i) }
-      CheckResults(dict.isEmpty)
-    }}, tags: t, legacyFactor: 10),
+    runFunction: remove, tags: t, legacyFactor: 10),
   BenchmarkInfo(name: "DictionaryRemoveOfObjects",
-    runFunction: { for _ in 1...$0*10 {
-      var dict = boxedNumMap
-      for i in 1...size { dict.removeValue(forKey: Box(i)) }
-      CheckResults(dict.isEmpty)
-    }}, tags: t, legacyFactor: 100),
+    runFunction: removeObjects, tags: t, legacyFactor: 100),
 ]
 
 class Box<T : Hashable> : Hashable {
@@ -49,5 +41,21 @@ class Box<T : Hashable> : Hashable {
 
   static func ==(lhs: Box, rhs: Box) -> Bool {
     return lhs.value == rhs.value
+  }
+}
+
+func remove(N: Int) {
+  for _ in 1...100*N {
+    var dict = numberMap
+    for i in 1...size { dict.removeValue(forKey: i) }
+    CheckResults(dict.isEmpty)
+  }
+}
+
+func removeObjects(N: Int) {
+  for _ in 1...10*N {
+    var dict = boxedNumMap
+    for i in 1...size { dict.removeValue(forKey: Box(i)) }
+    CheckResults(dict.isEmpty)
   }
 }
