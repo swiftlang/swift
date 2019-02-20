@@ -27,6 +27,7 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "clang/Basic/Module.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Frontend/Utils.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
@@ -145,13 +146,18 @@ static std::string getCacheHash(ASTContext &Ctx,
   // The SDK path is going to affect how this module is imported, so include it.
   H = hash_combine(H, SubInvocation.getSDKPath());
 
+  // Whether or not we're tracking system dependencies affects the invalidation
+  // behavior of this cache item.
+  H = hash_combine(H, SubInvocation.getFrontendOptions().TrackSystemDeps);
+
   return llvm::APInt(64, H).toString(36, /*Signed=*/false);
 }
 
 static CompilerInvocation
 createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
                                          StringRef CacheDir,
-                                         StringRef PrebuiltCacheDir) {
+                                         StringRef PrebuiltCacheDir,
+                                         bool TrackSystemDependencies) {
   auto &SearchPathOpts = Ctx.SearchPathOpts;
   auto &LangOpts = Ctx.LangOpts;
 
@@ -169,6 +175,7 @@ createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
   SubInvocation.setModuleName(ModuleName);
   SubInvocation.setClangModuleCachePath(CacheDir);
   SubInvocation.getFrontendOptions().PrebuiltModuleCachePath = PrebuiltCacheDir;
+  SubInvocation.getFrontendOptions().TrackSystemDeps = TrackSystemDependencies;
 
   // Respect the detailed-record preprocessor setting of the parent context.
   // This, and the "raw" clang module format it implicitly enables, are required
@@ -415,7 +422,9 @@ bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
     ForwardingDiagnosticConsumer FDC(Diags);
     SubInstance.addDiagnosticConsumer(&FDC);
 
-    SubInstance.createDependencyTracker(/*TrackSystemDeps=*/false);
+    SubInstance.createDependencyTracker(
+        SubInvocation.getFrontendOptions().TrackSystemDeps);
+
     if (SubInstance.setup(SubInvocation)) {
       SubError = true;
       return;
@@ -549,6 +558,12 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
   }
 
   if (OutPath.empty()) {
+    bool TrackSystemDeps = false;
+    if (dependencyTracker) {
+      auto ClangDependencyTracker = dependencyTracker->getClangCollector();
+      TrackSystemDeps = ClangDependencyTracker->needSystemDependencies();
+    }
+
     // At this point we're either in PreferParseable mode or there's no credible
     // adjacent .swiftmodule so we'll go ahead and start trying to convert the
     // .swiftinterface.
@@ -557,7 +572,8 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
     // emit the .swiftmodule.
     CompilerInvocation SubInvocation =
         createInvocationForBuildingFromInterface(Ctx, ModuleID.first.str(),
-                                                 CacheDir, PrebuiltCacheDir);
+                                                 CacheDir, PrebuiltCacheDir,
+                                                 TrackSystemDeps);
     computeCachedOutputPath(Ctx, SubInvocation, InPath, OutPath);
 
     // Evaluate if we need to run this sub-invocation, and if so run it.
@@ -592,16 +608,17 @@ bool
 ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
     ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath) {
-  CompilerInvocation SubInvocation =
-      createInvocationForBuildingFromInterface(Ctx, ModuleName, CacheDir,
-                                               PrebuiltCacheDir);
-
-  auto &FS = *Ctx.SourceMgr.getFileSystem();
-  auto &Diags = Ctx.Diags;
   // FIXME: We don't really want to ignore dependencies here, but we have to
   // identify which ones are important, and make them relocatable
   // (SDK-relative) if we want to ship the built swiftmodules to another
   // machine. Just leave them out for now.
+  CompilerInvocation SubInvocation =
+      createInvocationForBuildingFromInterface(Ctx, ModuleName, CacheDir,
+                                               PrebuiltCacheDir,
+                                               /*TrackSystemDeps*/false);
+
+  auto &FS = *Ctx.SourceMgr.getFileSystem();
+  auto &Diags = Ctx.Diags;
   return buildSwiftModuleFromSwiftInterface(FS, Diags, /*DiagLoc*/SourceLoc(),
                                             SubInvocation, InPath, OutPath,
                                             /*CachePath*/"",
