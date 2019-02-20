@@ -134,6 +134,7 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
 
 ValueDecl *RequirementFailure::getDeclRef() const {
   auto &cs = getConstraintSystem();
+  auto &TC = getTypeChecker();
 
   auto *anchor = getRawAnchor();
   auto *locator = cs.getConstraintLocator(anchor);
@@ -156,7 +157,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
     ConstraintLocatorBuilder member(locator);
 
-    if (UDE->getName().isSimpleName(DeclBaseName::createConstructor())) {
+    if (TC.getSelfForInitDelegationInConstructor(getDC(), UDE)) {
       member = member.withPathElement(PathEltKind::ConstructorMember);
     } else {
       member = member.withPathElement(PathEltKind::Member);
