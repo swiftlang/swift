@@ -143,8 +143,6 @@ public:
   using PlacesToSearch = UnqualifiedLookup::PlacesToSearch;
   using PerScopeLookupState = UnqualifiedLookup::PerScopeLookupState;
 
-  enum class LookupFinished { Yes, No };
-
 private:
   // Inputs
   const DeclName Name;
