@@ -645,27 +645,6 @@ SelfBounds swift::getSelfBoundsFromWhereClause(
                            SelfBoundsFromWhereClauseRequest{decl}, {});
 }
 
-// TODO: change name when UnqualifiedLookup is adopted to
-// populatePlacesToSearchFromContext
-static void
-populateLookupDeclsFromContext(DeclContext *dc,
-                               SmallVectorImpl<NominalTypeDecl *> &lookupDecls) {
-  auto nominal = dc->getSelfNominalTypeDecl();
-  if (!nominal)
-    return;
-
-  lookupDecls.push_back(nominal);
-
-  // For a protocol extension, check whether there are additional "Self"
-  // constraints that can affect name lookup.
-  if (dc->getExtendedProtocolDecl()) {
-    auto ext = cast<ExtensionDecl>(dc);
-    auto bounds = getSelfBoundsFromWhereClause(ext);
-    for (auto bound : bounds.decls)
-      lookupDecls.push_back(bound);
-  }
-}
-
 TinyPtrVector<TypeDecl *>
 TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
                                           ExtensionDecl *ext) const {

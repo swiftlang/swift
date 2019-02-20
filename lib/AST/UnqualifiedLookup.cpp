@@ -83,8 +83,6 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   llvm_unreachable("Unhandled ASTScopeKind in switch.");
 }
 
-// TODO: change name when UnqualifiedLookup is adopted to
-// populatePlacesToSearchFromContext
 static void populateLookupDeclsFromContext(
     DeclContext *dc, SmallVectorImpl<NominalTypeDecl *> &lookupDecls) {
   auto nominal = dc->getSelfNominalTypeDecl();
