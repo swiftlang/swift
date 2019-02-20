@@ -23,49 +23,13 @@ let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
 
 public let DictionarySwap = [
   BenchmarkInfo(name: "DictionarySwap",
-    runFunction: {
-      var dict = numberMap
-      var swapped = false
-      for _ in 1...$0*2500 {
-          (dict[25], dict[75]) = (dict[75]!, dict[25]!)
-          swapped = !swapped
-          CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!))
-    }}, tags: t, legacyFactor: 4),
+    runFunction: swap, tags: t, legacyFactor: 4),
   BenchmarkInfo(name: "DictionarySwapOfObjects",
-    runFunction: {
-      var dict = boxedNumMap
-      var swapped = false
-      for _ in 1...$0*250 {
-        let b1 = Box(25)
-        let b2 = Box(75)
-        (dict[b1], dict[b2]) = (dict[b2]!, dict[b1]!)
-        swapped = !swapped
-        CheckResults(swappedCorrectly(swapped,
-          dict[Box(25)]!.value, dict[Box(75)]!.value))
-    }}, tags: t, legacyFactor: 40),
+    runFunction: swapObjects, tags: t, legacyFactor: 40),
   BenchmarkInfo(name: "DictionarySwapAt",
-    runFunction: {
-      var dict = numberMap
-      var swapped = false
-      for _ in 1...$0*2500 {
-        let i25 = dict.index(forKey: 25)!
-        let i75 = dict.index(forKey: 75)!
-        dict.values.swapAt(i25, i75)
-        swapped = !swapped
-        CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!))
-    }}, tags: t, legacyFactor: 4),
+    runFunction: swapAt, tags: t, legacyFactor: 4),
   BenchmarkInfo(name: "DictionarySwapAtOfObjects",
-    runFunction: {
-      var dict = boxedNumMap
-      var swapped = false
-      for _ in 1...$0*250 {
-        let i25 = dict.index(forKey: Box(25))!
-        let i75 = dict.index(forKey: Box(75))!
-        dict.values.swapAt(i25, i75)
-        swapped = !swapped
-        CheckResults(swappedCorrectly(swapped,
-          dict[Box(25)]!.value, dict[Box(75)]!.value))
-    }}, tags: t, legacyFactor: 40),
+    runFunction: swapAtObjects, tags: t, legacyFactor: 40),
 ]
 
 // Return true if correctly swapped, false otherwise
@@ -89,3 +53,50 @@ class Box<T : Hashable> : Hashable {
     return lhs.value == rhs.value
   }
 }
+
+func swap(N: Int) {
+  var dict = numberMap
+  var swapped = false
+  for _ in 1...2500*N {
+      (dict[25], dict[75]) = (dict[75]!, dict[25]!)
+      swapped = !swapped
+      CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!))
+    }
+}
+
+func swapObjects(N: Int) {
+  var dict = boxedNumMap
+  var swapped = false
+  for _ in 1...250*N {
+    let b1 = Box(25)
+    let b2 = Box(75)
+    (dict[b1], dict[b2]) = (dict[b2]!, dict[b1]!)
+    swapped = !swapped
+    CheckResults(swappedCorrectly(swapped,
+      dict[Box(25)]!.value, dict[Box(75)]!.value))
+  }
+}
+
+func swapAt(N: Int) {
+  var dict = numberMap
+  var swapped = false
+  for _ in 1...2500*N {
+    let i25 = dict.index(forKey: 25)!
+    let i75 = dict.index(forKey: 75)!
+    dict.values.swapAt(i25, i75)
+    swapped = !swapped
+    CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!))
+  }
+}
+
+func swapAtObjects(N: Int) {
+  var dict = boxedNumMap
+  var swapped = false
+  for _ in 1...250*N {
+    let i25 = dict.index(forKey: Box(25))!
+    let i75 = dict.index(forKey: Box(75))!
+    dict.values.swapAt(i25, i75)
+    swapped = !swapped
+    CheckResults(swappedCorrectly(swapped,
+      dict[Box(25)]!.value, dict[Box(75)]!.value))
+}}
