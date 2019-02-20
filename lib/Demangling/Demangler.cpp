@@ -47,18 +47,6 @@ static bool isDeclName(Node::Kind kind) {
   }
 }
 
-static bool isContext(Node::Kind kind) {
-  switch (kind) {
-#define NODE(ID)
-#define CONTEXT_NODE(ID)                                                \
-    case Node::Kind::ID:
-#include "swift/Demangling/DemangleNodes.def"
-      return true;
-    default:
-      return false;
-  }
-}
-
 static bool isAnyGeneric(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::Structure:
@@ -93,7 +81,25 @@ static bool isRequirement(Node::Kind kind) {
   }
 }
 
-static bool isFunctionAttr(Node::Kind kind) {
+} // anonymous namespace
+
+//////////////////////////////////
+// Public utility functions    //
+//////////////////////////////////
+
+bool swift::Demangle::isContext(Node::Kind kind) {
+  switch (kind) {
+#define NODE(ID)
+#define CONTEXT_NODE(ID)                                                \
+    case Node::Kind::ID:
+#include "swift/Demangling/DemangleNodes.def"
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::FunctionSignatureSpecialization:
     case Node::Kind::GenericSpecialization:
@@ -119,12 +125,6 @@ static bool isFunctionAttr(Node::Kind kind) {
       return false;
   }
 }
-
-} // anonymous namespace
-
-//////////////////////////////////
-// Public utility functions    //
-//////////////////////////////////
 
 llvm::StringRef
 swift::Demangle::makeSymbolicMangledNameStringRef(const char *base) {
