@@ -2349,7 +2349,7 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
 
     llvm::Constant *fieldOffsetOrZero;
 
-    if (element.getKind() == ElementLayout::Kind::Fixed) {
+    if (element.hasByteOffset()) {
       // Use a fixed offset if we have one.
       fieldOffsetOrZero = IGM.getSize(element.getByteOffset());
     } else {
@@ -2377,11 +2377,21 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
       // If it is constant in the fragile layout only, newer Objective-C
       // runtimes will still update them in place, so make sure to check the
       // correct layout.
+      //
+      // The one exception to this rule is with empty fields with
+      // ObjC-resilient heritage.  The ObjC runtime will attempt to slide
+      // these offsets if it slides the rest of the class, and in doing so
+      // it will compute a different offset than we computed statically.
+      // But this is ultimately unimportant because we do not care about the
+      // offset of an empty field.
       auto resilientInfo = resilientLayout.getFieldAccessAndElement(prop);
-      if (resilientInfo.first == FieldAccess::ConstantDirect) {
+      if (resilientInfo.first == FieldAccess::ConstantDirect &&
+          (!resilientInfo.second.isEmpty() ||
+           !resilientLayout.mayRuntimeAssignNonZeroOffsetsToEmptyFields())) {
         // If it is constant in the resilient layout, it should be constant in
         // the fragile layout also.
         assert(access == FieldAccess::ConstantDirect);
+        assert(element.hasByteOffset());
         offsetVar->setConstant(true);
       }
 
