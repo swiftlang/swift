@@ -420,6 +420,8 @@ endif()
 option(SWIFT_BUILD_SYNTAXPARSERLIB
     "Build the Swift Syntax Parser library"
     ${SWIFT_BUILD_SYNTAXPARSERLIB_default})
+option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+    "Only build the Swift Syntax Parser library" FALSE)
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
     ${SWIFT_BUILD_SOURCEKIT_default})
