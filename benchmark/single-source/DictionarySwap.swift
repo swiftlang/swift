@@ -29,7 +29,7 @@ public let DictionarySwap = [
   BenchmarkInfo(name: "DictionarySwapAt",
     runFunction: swapAt, tags: t, legacyFactor: 4),
   BenchmarkInfo(name: "DictionarySwapAtOfObjects",
-    runFunction: swapAtObjects, tags: t, legacyFactor: 40),
+    runFunction: swapAtObjects, tags: t, legacyFactor: 10),
 ]
 
 // Return true if correctly swapped, false otherwise
@@ -92,7 +92,7 @@ func swapAt(N: Int) {
 func swapAtObjects(N: Int) {
   var dict = boxedNumMap
   var swapped = false
-  for _ in 1...250*N {
+  for _ in 1...1000*N {
     let i25 = dict.index(forKey: Box(25))!
     let i75 = dict.index(forKey: Box(75))!
     dict.values.swapAt(i25, i75)
