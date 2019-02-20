@@ -122,7 +122,7 @@ static_assert(alignof(HeapObject) == alignof(void*),
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS
 
-#elif defined(__arm64__)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
 
 #ifdef __APPLE__
 #define _swift_abi_LeastValidPointerValue                                      \
@@ -165,10 +165,10 @@ static_assert(alignof(HeapObject) == alignof(void*),
 #define _swift_abi_LeastValidPointerValue                                      \
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER
 
-#if __i386__
+#if defined(__i386__)
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_I386_SWIFT_SPARE_BITS_MASK
-#elif __arm__
+#elif defined(__arm__) || defined(_M_ARM)
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK
 #else
