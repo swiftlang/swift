@@ -1058,9 +1058,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   }
 
   for (auto const &dep : options.Dependencies) {
-    FileDependency.emit(ScratchRecord, dep.Size,
-                        dep.ModificationTime,
-                        dep.Path);
+    FileDependency.emit(ScratchRecord, dep.Size, dep.ModificationTime,
+                        dep.SDKRelative, dep.Path);
   }
 
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;

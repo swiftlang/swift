@@ -234,9 +234,11 @@ void ParseableInterfaceModuleLoader::configureSubInvocationInputsAndOutputs(
 // Checks that a dependency read from the cached module is up to date compared
 // to the interface file it represents.
 static bool dependencyIsUpToDate(llvm::vfs::FileSystem &FS, FileDependency In,
+                                 StringRef FullDependencyPath,
                                  StringRef ModulePath, DiagnosticEngine &Diags,
                                  SourceLoc DiagLoc) {
-  auto Status = getStatusOfDependency(FS, ModulePath, In.Path, Diags, DiagLoc);
+  auto Status = getStatusOfDependency(FS, ModulePath, FullDependencyPath,
+                                      Diags, DiagLoc);
   if (!Status) return false;
   uint64_t mtime = Status->getLastModificationTime().time_since_epoch().count();
   return Status->getSize() == In.Size && mtime == In.ModificationTime;
@@ -248,6 +250,7 @@ static bool
 swiftModuleIsUpToDate(llvm::vfs::FileSystem &FS,
                       std::pair<Identifier, SourceLoc> ModuleID,
                       StringRef OutPath,
+                      StringRef SDKPath,
                       DiagnosticEngine &Diags,
                       DependencyTracker *OuterTracker) {
 
@@ -267,10 +270,18 @@ swiftModuleIsUpToDate(llvm::vfs::FileSystem &FS,
   assert(VI.name == ModuleID.first.str() &&
          "we built a module at this path with a different name?");
 
+  SmallString<128> SDKRelativeBuffer;
   for (auto In : AllDeps) {
+    StringRef DepName = In.Path;
+    if (In.SDKRelative) {
+      SDKRelativeBuffer = SDKPath;
+      llvm::sys::path::append(SDKRelativeBuffer, In.Path);
+      DepName = SDKRelativeBuffer.str();
+    }
     if (OuterTracker)
-      OuterTracker->addDependency(In.Path, /*IsSystem=*/false);
-    if (!dependencyIsUpToDate(FS, In, OutPath, Diags, ModuleID.second)) {
+      OuterTracker->addDependency(DepName, /*IsSystem=*/In.SDKRelative);
+    if (!dependencyIsUpToDate(FS, In, DepName, OutPath, Diags,
+                              ModuleID.second)) {
       LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path
                  << " is directly out of date\n");
       return false;
@@ -298,6 +309,8 @@ collectDepsForSerialization(llvm::vfs::FileSystem &FS,
                             SmallVectorImpl<FileDependency> &Deps,
                             DiagnosticEngine &Diags, SourceLoc DiagLoc,
                             DependencyTracker *OuterTracker) {
+  StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
+
   auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
   SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
   InitialDepNames.push_back(InPath);
@@ -314,7 +327,29 @@ collectDepsForSerialization(llvm::vfs::FileSystem &FS,
       return true;
     uint64_t mtime =
       Status->getLastModificationTime().time_since_epoch().count();
-    Deps.push_back(FileDependency{Status->getSize(), mtime, DepName});
+
+    bool IsSDKRelative = false;
+    StringRef DepNameToStore = DepName;
+    if (SDKPath.size() > 1 && DepName.startswith(SDKPath)) {
+      assert(DepName.size() > SDKPath.size() &&
+             "should never depend on a directory");
+      if (llvm::sys::path::is_separator(DepName[SDKPath.size()])) {
+        // Is the DepName something like "${SDKPath}/foo.h"?
+        DepNameToStore = DepName.substr(SDKPath.size() + 1);
+        IsSDKRelative = true;
+      } else if (llvm::sys::path::is_separator(SDKPath.back())) {
+        // Is the DepName something like "${SDKPath}foo.h", where SDKPath itself
+        // contains a trailing slash?
+        DepNameToStore = DepName.substr(SDKPath.size());
+        IsSDKRelative = true;
+      } else {
+        // We have something next to an SDK, like "Foo.sdk.h", that's
+        // somehow become a dependency.
+      }
+    }
+
+    Deps.push_back(FileDependency{Status->getSize(), mtime, DepNameToStore,
+                                  IsSDKRelative});
 
     if (ModuleCachePath.empty())
       continue;
@@ -530,8 +565,8 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
 
   // If we have a prebuilt cache path, check that too if the interface comes
   // from the SDK.
+  StringRef SDKPath = Ctx.SearchPathOpts.SDKPath;
   if (!PrebuiltCacheDir.empty()) {
-    StringRef SDKPath = Ctx.SearchPathOpts.SDKPath;
     if (!SDKPath.empty() && hasPrefix(path::begin(InPath),
                                       path::end(InPath),
                                       path::begin(SDKPath),
@@ -550,7 +585,7 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
       }
       path::append(OutPath, ModuleFilename);
 
-      if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags,
+      if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, SDKPath, Diags,
                                  dependencyTracker)) {
         OutPath.clear();
       }
@@ -577,7 +612,7 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
     computeCachedOutputPath(Ctx, SubInvocation, InPath, OutPath);
 
     // Evaluate if we need to run this sub-invocation, and if so run it.
-    if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags,
+    if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, SDKPath, Diags,
                                dependencyTracker)) {
       if (buildSwiftModuleFromSwiftInterface(FS, Diags, ModuleID.second,
                                              SubInvocation, InPath, OutPath,

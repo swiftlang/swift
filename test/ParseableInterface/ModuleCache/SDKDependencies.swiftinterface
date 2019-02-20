@@ -1,0 +1,24 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name SDKDependencies
+
+// RUN: %empty-directory(%t)
+
+// RUN: echo 'import SDKDependencies' | %target-swift-frontend -typecheck - -enable-parseable-module-interface -I %S -sdk %S/Inputs/mock-sdk -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies
+// RUN: test -f %t/MCP/SDKDependencies*.swiftmodule
+// RUN: %{python} %S/Inputs/make-old.py %t/MCP/SDKDependencies*.swiftmodule
+
+// Baseline: running the same command again doesn't rebuild the cached module.
+// RUN: echo 'import SDKDependencies' | %target-swift-frontend -typecheck - -enable-parseable-module-interface -I %S -sdk %S/Inputs/mock-sdk -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies
+// RUN: %{python} %S/Inputs/check-is-old.py %t/MCP/SDKDependencies*.swiftmodule
+
+// Try moving the SDK but not changing the contents.
+// RUN: cp -r %S/Inputs/mock-sdk %t/mock-sdk
+// RUN: echo 'import SDKDependencies' | %target-swift-frontend -typecheck - -enable-parseable-module-interface -I %S -sdk %t/mock-sdk -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies
+// RUN: %{python} %S/Inputs/check-is-old.py %t/MCP/SDKDependencies*.swiftmodule
+
+// Now try changing the contents.
+// RUN: echo "// size change" >> %t/mock-sdk/usr/include/SomeCModule.h
+// RUN: echo 'import SDKDependencies' | %target-swift-frontend -typecheck - -enable-parseable-module-interface -I %S -sdk %t/mock-sdk -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies
+// RUN: %{python} %S/Inputs/check-is-new.py %t/MCP/SDKDependencies*.swiftmodule
+
+import SomeCModule

@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 475; // Last change: Generalize nested archetype serialization
+const uint16_t SWIFTMODULE_VERSION_MINOR = 476; // Last change: SDK-relative dependencies flag
 
 using DeclIDField = BCFixed<31>;
 
@@ -673,6 +673,7 @@ namespace input_block {
     FILE_DEPENDENCY,
     FileSizeField,    // file size (for validation)
     FileModTimeField, // file mtime (for validation)
+    BCFixed<1>,       // SDK-relative?
     BCBlob            // path
   >;
 }

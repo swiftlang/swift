@@ -39,6 +39,7 @@ namespace swift {
       uint64_t Size;
       uint64_t ModificationTime;
       std::string Path;
+      bool SDKRelative;
     };
     ArrayRef<FileDependency> Dependencies;
 

@@ -252,10 +252,14 @@ static bool validateInputBlock(
     StringRef blobData;
     unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
     switch (kind) {
-    case input_block::FILE_DEPENDENCY:
+    case input_block::FILE_DEPENDENCY: {
+      bool isSDKRelative = false;
+      if (scratch.size() >= 2)
+        isSDKRelative = scratch[2];
       dependencies.push_back(SerializationOptions::FileDependency{
-          scratch[0], scratch[1], blobData});
+          scratch[0], scratch[1], blobData, isSDKRelative});
       break;
+    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
