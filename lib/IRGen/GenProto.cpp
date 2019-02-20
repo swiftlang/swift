@@ -1284,7 +1284,6 @@ public:
     // offsets, with conditional conformances closest to 0.
     unsigned NextPrivateDataIndex = 0;
     bool ResilientConformance;
-    bool RequiresSpecialization = false;
 
     const ProtocolInfo &PI;
 
@@ -1306,20 +1305,13 @@ public:
           PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
                                  (ResilientConformance
                                   ? ProtocolInfoKind::RequirementSignature
-                                  : ProtocolInfoKind::Full))) {
-      // If the conformance is resilient, we require runtime instantiation.
-      if (ResilientConformance)
-        RequiresSpecialization = true;
-    }
+                                  : ProtocolInfoKind::Full))) {}
 
     /// The number of entries in the witness table.
     unsigned getTableSize() const { return TableSize; }
 
     /// The number of private entries in the witness table.
     unsigned getTablePrivateSize() const { return NextPrivateDataIndex; }
-
-    /// Whether this witness table must be specialized at runtime.
-    bool requiresSpecialization() const { return RequiresSpecialization; }
 
     /// The top-level entry point.
     void build();
@@ -1370,7 +1362,6 @@ public:
       }
 
       // Otherwise, we'll need to derive it at instantiation time.
-      RequiresSpecialization = true;
       SpecializedBaseConformances.push_back({Table.size(), &conf});
       Table.addNullPointer(IGM.Int8PtrTy);
     }
@@ -1437,8 +1428,6 @@ public:
       auto associate =
         Conformance.getTypeWitness(requirement.getAssociation(), nullptr)
           ->getCanonicalType();
-      if (associate->hasTypeParameter())
-        RequiresSpecialization = true;
       llvm::Constant *witness =
           IGM.getAssociatedTypeWitness(associate, /*inProtocolContext=*/false);
       Table.addBitCast(witness, IGM.Int8PtrTy);
@@ -1462,9 +1451,6 @@ public:
         ConformanceInContext.getAssociatedConformance(
           requirement.getAssociation(),
           requirement.getAssociatedRequirement());
-
-      if (requirement.getAssociation()->hasTypeParameter())
-        RequiresSpecialization = true;
 
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
@@ -1516,7 +1502,6 @@ public:
 
     /// Allocate another word of private data storage in the conformance table.
     unsigned getNextPrivateDataIndex() {
-      RequiresSpecialization = true;
       return NextPrivateDataIndex++;
     }
 
@@ -2309,7 +2294,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // descriptor.
   ConformanceDescription description(conf, wt, global, tableSize,
                                      wtableBuilder.getTablePrivateSize(),
-                                     wtableBuilder.requiresSpecialization(),
+                                     isDependentConformance(
+                                       conf,
+                                       /*considerResilience=*/true),
                                      isDependentConformance(
                                        conf,
                                        /*considerResilience=*/false));
