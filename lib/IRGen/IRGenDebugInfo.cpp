@@ -107,7 +107,8 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DIModule *MainModule = nullptr; /// The current module.
   llvm::DIScope *EntryPointFn =
       nullptr;                     /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
-  TypeAliasDecl *MetadataTypeDecl; /// The type decl for swift.type.
+  /// The artificial type decls for named archetypes.
+  llvm::StringMap<TypeAliasDecl *> MetadataTypeDeclCache;
   llvm::DIType *InternalType;      /// Catch-all type for opaque internal types.
 
   SILLocation::DebugLoc LastDebugLoc; /// The last location that was emitted.
@@ -170,7 +171,8 @@ public:
                                      bool IsLocalToUnit, bool InFixedBuffer,
                                      Optional<SILLocation> Loc);
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        unsigned Depth, unsigned Index, StringRef AssocType);
+                        unsigned Depth, unsigned Index, StringRef ArchetypeName,
+                        StringRef AssocType);
 
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder() { return DBuilder; }
@@ -666,15 +668,17 @@ private:
     return getOrCreateModule(M, TheCU, Name, Path);
   }
 
-  TypeAliasDecl *getMetadataType() {
-    if (!MetadataTypeDecl) {
-      MetadataTypeDecl = new (IGM.Context) TypeAliasDecl(
-          SourceLoc(), SourceLoc(), IGM.Context.getIdentifier("$swift.type"),
-          SourceLoc(),
-          /*genericparams*/ nullptr, IGM.Context.TheBuiltinModule);
-      MetadataTypeDecl->setUnderlyingType(IGM.Context.TheRawPointerType);
-    }
-    return MetadataTypeDecl;
+  TypeAliasDecl *getMetadataType(StringRef ArchetypeName) {
+    TypeAliasDecl *&Entry = MetadataTypeDeclCache[ArchetypeName];
+    if (Entry)
+      return Entry;
+
+    SourceLoc NoLoc;
+    Entry = new (IGM.Context) TypeAliasDecl(
+        NoLoc, NoLoc, IGM.Context.getIdentifier(ArchetypeName), NoLoc,
+        /*genericparams*/ nullptr, IGM.Context.TheBuiltinModule);
+    Entry->setUnderlyingType(IGM.Context.TheRawPointerType);
+    return Entry;
   }
 
   /// Return the DIFile that is the ancestor of Scope.
@@ -727,8 +731,9 @@ private:
 #endif
 
   StringRef getMangledName(DebugTypeInfo DbgTy) {
-    if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
-      return BumpAllocatedString(DbgTy.getDecl()->getName().str());
+    if (DbgTy.IsMetadataType)
+      return MetadataTypeDeclCache.find(DbgTy.getDecl()->getName().str())
+          ->getKey();
 
     Type Ty = DbgTy.getType();
     if (!Ty->hasTypeParameter())
@@ -871,9 +876,8 @@ private:
         // one of the raw type as long as it is large enough to hold
         // all enum values. Use the raw type for the debug type, but
         // the storage size from the enum.
-        ElemDbgTy =
-            DebugTypeInfo(ED->getRawType(),
-                          DbgTy.StorageType, DbgTy.size, DbgTy.align, true);
+        ElemDbgTy = DebugTypeInfo(ED->getRawType(), DbgTy.StorageType,
+                                  DbgTy.size, DbgTy.align, true, false);
       else if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
         // A discriminated union. This should really be described as a
         // DW_TAG_variant_type. For now only describing the data.
@@ -884,8 +888,8 @@ private:
         // Discriminated union case without argument. Fallback to Int
         // as the element type; there is no storage here.
         Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
-        ElemDbgTy = DebugTypeInfo(
-            IntTy, DbgTy.StorageType, Size(0), Alignment(1), true);
+        ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.StorageType, Size(0),
+                                  Alignment(1), true, false);
       }
       unsigned Offset = 0;
       auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
@@ -925,8 +929,8 @@ private:
   }
 
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
-    DebugTypeInfo BlandDbgTy(
-        Ty, DbgTy.StorageType, DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
+    DebugTypeInfo BlandDbgTy(Ty, DbgTy.StorageType, DbgTy.size, DbgTy.align,
+                             DbgTy.DefaultAlignment, DbgTy.IsMetadataType);
     return getOrCreateType(BlandDbgTy);
   }
 
@@ -1400,9 +1404,9 @@ private:
       auto File = getOrCreateFile(L.Filename);
       // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
-      DebugTypeInfo AliasedDbgTy(
-         AliasedTy,
-         DbgTy.StorageType, DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
+      DebugTypeInfo AliasedDbgTy(AliasedTy, DbgTy.StorageType, DbgTy.size,
+                                 DbgTy.align, DbgTy.DefaultAlignment,
+                                 false);
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                     File, L.Line, Scope);
     }
@@ -1583,7 +1587,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        llvm::Module &M,
                                        StringRef MainOutputFilenameForDebugInfo)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), M(M), DBuilder(M),
-      IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap), MetadataTypeDecl(nullptr),
+      IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap),
       InternalType(nullptr), LastDebugLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfoLevel > IRGenDebugInfoLevel::None &&
          "no debug info should be generated");
@@ -2189,7 +2193,9 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
 
 void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
                                           llvm::Value *Metadata, unsigned Depth,
-                                          unsigned Index, StringRef AssocType) {
+                                          unsigned Index,
+                                          StringRef ArchetypeName,
+                                          StringRef AssocType) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
@@ -2199,11 +2205,11 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
     return;
 
   llvm::SmallString<8> Buf;
-  static const char *Tau = u8"\u03C4_";
+  static const char *Tau = u8"\u03C4";
   llvm::raw_svector_ostream OS(Buf);
-  OS << '$' << Tau << Depth << '_' << Index << AssocType;
-  auto DbgTy = DebugTypeInfo::getMetadata(
-      getMetadataType()->getDeclaredInterfaceType().getPointer(),
+  OS << '$' << Tau << '_' << Depth << '_' << Index << AssocType;
+  auto DbgTy = DebugTypeInfo::getArchetype(
+      getMetadataType(ArchetypeName)->getDeclaredInterfaceType().getPointer(),
       Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
@@ -2326,9 +2332,10 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                                       unsigned Depth, unsigned Index,
+                                      StringRef ArchetypeName,
                                       StringRef AssocType) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitTypeMetadata(
-      IGF, Metadata, Depth, Index, AssocType);
+    IGF, Metadata, Depth, Index, ArchetypeName, AssocType);
 }
 
 llvm::DIBuilder &IRGenDebugInfo::getBuilder() {
