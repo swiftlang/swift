@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 470; // Last change: serialize @differentiating attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 471; // Last change: add parameter differentiability to SILFunctionType serialization
 
 using DeclIDField = BCFixed<31>;
 
@@ -273,6 +273,14 @@ enum class ParameterConvention : uint8_t {
   Indirect_In_Constant,
 };
 using ParameterConventionField = BCFixed<4>;
+
+// SWIFT_ENABLE_TENSORFLOW
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class SILParameterDifferentiability : uint8_t {
+  DifferentiableOrNotApplicable,
+  NotDifferentiable,
+};
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -828,7 +836,9 @@ namespace decls_block {
     BCFixed<30>,           // number of yields
     BCFixed<30>,           // number of results
     GenericSignatureIDField, // generic signature
-    BCArray<TypeIDField>   // parameter types/conventions, alternating
+    // SWIFT_ENABLE_TENSORFLOW
+    BCArray<TypeIDField>   // for each parameter: type, convention, and (if
+                           // function is differentiable) differentiability,
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
