@@ -1498,9 +1498,11 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   // TODO: there are probably cases where we can avoid redoing the
   // entire linkage computation.
   UniversalLinkageInfo linkInfo(IGM);
+  bool weakImported = entity.isWeakImported(IGM.getSwiftModule(),
+                                            IGM.getAvailabilityContext());
   auto IRL =
       getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
-                   ForDefinition, entity.isWeakImported(IGM.getSwiftModule()));
+                   ForDefinition, weakImported);
   ApplyIRLinkage(IRL).to(global);
 
   // Everything externally visible is considered used in Swift.
@@ -1515,12 +1517,16 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
 
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
-  return LinkInfo::get(UniversalLinkageInfo(IGM), IGM.getSwiftModule(), entity,
-                       isDefinition);
+  return LinkInfo::get(UniversalLinkageInfo(IGM),
+                       IGM.getSwiftModule(),
+                       IGM.getAvailabilityContext(),
+                       entity, isDefinition);
 }
 
 LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
-                       ModuleDecl *swiftModule, const LinkEntity &entity,
+                       ModuleDecl *swiftModule,
+                       AvailabilityContext availabilityContext,
+                       const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   LinkInfo result;
   // FIXME: For anything in the standard library, we assume is locally defined.
@@ -1535,8 +1541,9 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
       ForDefinition_t(swiftModule->isStdlibModule() || isDefinition);
 
   entity.mangle(result.Name);
+  bool weakImported = entity.isWeakImported(swiftModule, availabilityContext);
   result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isStdlibOrDefinition),
-                            isDefinition, entity.isWeakImported(swiftModule));
+                            isDefinition, weakImported);
   result.ForDefinition = isDefinition;
   return result;
 }

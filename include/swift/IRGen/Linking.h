@@ -32,6 +32,8 @@ class Triple;
 }
 
 namespace swift {
+class AvailabilityContext;
+
 namespace irgen {
 class IRGenModule;
 class Alignment;
@@ -1021,7 +1023,8 @@ public:
   }
 
   /// Determine whether this entity will be weak-imported.
-  bool isWeakImported(ModuleDecl *module) const;
+  bool isWeakImported(ModuleDecl *module,
+                      AvailabilityContext fromContext) const;
   
   /// Return the source file whose codegen should trigger emission of this
   /// link entity, if one can be identified.
@@ -1089,7 +1092,9 @@ public:
                       ForDefinition_t forDefinition);
 
   static LinkInfo get(const UniversalLinkageInfo &linkInfo,
-                      ModuleDecl *swiftModule, const LinkEntity &entity,
+                      ModuleDecl *swiftModule,
+                      AvailabilityContext availabilityContext,
+                      const LinkEntity &entity,
                       ForDefinition_t forDefinition);
 
   static LinkInfo get(const UniversalLinkageInfo &linkInfo, StringRef name,

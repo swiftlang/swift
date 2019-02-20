@@ -240,6 +240,10 @@ public:
   /// Creates a context that requires certain versions of the target OS.
   explicit AvailabilityContext(VersionRange OSVersion) : OSVersion(OSVersion) {}
 
+  /// Creates a context that imposes the constraints of the ASTContext's
+  /// deployment target.
+  static AvailabilityContext forDeploymentTarget(ASTContext &Ctx);
+
   /// Creates a context that imposes no constraints.
   ///
   /// \see isAlwaysAvailable
