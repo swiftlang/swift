@@ -947,7 +947,8 @@ namespace {
 
 /// Return true if the witness table requires runtime instantiation to
 /// handle resiliently-added requirements with default implementations.
-static bool isResilientConformance(const NormalProtocolConformance *conformance) {
+bool IRGenModule::isResilientConformance(
+    const NormalProtocolConformance *conformance) {
   // If the protocol is not resilient, the conformance is not resilient
   // either.
   if (!conformance->getProtocol()->isResilient())
@@ -963,7 +964,7 @@ static bool isResilientConformance(const NormalProtocolConformance *conformance)
   return true;
 }
 
-static bool isResilientConformance(const RootProtocolConformance *root) {
+bool IRGenModule::isResilientConformance(const RootProtocolConformance *root) {
   if (auto normal = dyn_cast<NormalProtocolConformance>(root))
     return isResilientConformance(normal);
   // Self-conformances never require this.
@@ -996,6 +997,7 @@ static bool hasDependentTypeWitness(
 }
 
 static bool isDependentConformance(
+              IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
               bool considerResilience,
               llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
@@ -1010,7 +1012,7 @@ static bool isDependentConformance(
     return false;
 
   // If the conformance is resilient, this is always true.
-  if (considerResilience && isResilientConformance(conformance))
+  if (considerResilience && IGM.isResilientConformance(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -1026,7 +1028,8 @@ static bool isDependentConformance(
     auto assocConformance =
       conformance->getAssociatedConformance(req.getFirstType(), assocProtocol);
     if (assocConformance.isAbstract() ||
-        isDependentConformance(assocConformance.getConcrete()
+        isDependentConformance(IGM,
+                               assocConformance.getConcrete()
                                  ->getRootConformance(),
                                considerResilience,
                                visited))
@@ -1044,10 +1047,12 @@ static bool isDependentConformance(
 
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
-static bool isDependentConformance(const RootProtocolConformance *conformance,
-                                   bool considerResilience) {
+bool IRGenModule::isDependentConformance(
+    const RootProtocolConformance *conformance,
+    bool considerResilience) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
-  return ::isDependentConformance(conformance, considerResilience, visited);
+  return ::isDependentConformance(*this, conformance, considerResilience,
+                                  visited);
 }
 
 static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
@@ -1285,7 +1290,7 @@ public:
                                       Conformance.getDeclContext())),
           SILEntries(SILWT->getEntries()),
           SILConditionalConformances(SILWT->getConditionalConformances()),
-          ResilientConformance(isResilientConformance(&Conformance)),
+          ResilientConformance(IGM.isResilientConformance(&Conformance)),
           PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
                                  (ResilientConformance
                                   ? ProtocolInfoKind::RequirementSignature
