@@ -25,9 +25,10 @@ using namespace swift;
 using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size size,
-                             Alignment align, bool HasDefaultAlignment)
+                             Alignment align, bool HasDefaultAlignment,
+                             bool IsMetadata)
     : Type(Ty.getPointer()), StorageType(StorageTy), size(size), align(align),
-      DefaultAlignment(HasDefaultAlignment) {
+      DefaultAlignment(HasDefaultAlignment), IsMetadataType(IsMetadata) {
   assert(StorageType && "StorageType is a nullptr");
   assert(align.getValue() != 0);
 }
@@ -53,7 +54,8 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty,
     size = Size(0);
   }
   return DebugTypeInfo(Ty.getPointer(), Info.getStorageType(), size,
-                       Info.getBestKnownAlignment(), hasDefaultAlignment(Ty));
+                       Info.getBestKnownAlignment(), hasDefaultAlignment(Ty),
+                       false);
 }
 
 DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
@@ -77,7 +79,15 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
 DebugTypeInfo DebugTypeInfo::getMetadata(swift::Type Ty, llvm::Type *StorageTy,
                                          Size size, Alignment align) {
   DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, size,
-                      align, true);
+                      align, true, false);
+  assert(!DbgTy.isArchetype() && "type metadata cannot contain an archetype");
+  return DbgTy;
+}
+
+DebugTypeInfo DebugTypeInfo::getArchetype(swift::Type Ty, llvm::Type *StorageTy,
+                                          Size size, Alignment align) {
+  DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, size,
+                      align, true, true);
   assert(!DbgTy.isArchetype() && "type metadata cannot contain an archetype");
   return DbgTy;
 }
@@ -94,8 +104,8 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
     if (DeclType->isEqual(LowTy))
       Type = DeclType.getPointer();
   }
-  DebugTypeInfo DbgTy(Type, StorageTy, size, align,
-                      hasDefaultAlignment(Type));
+  DebugTypeInfo DbgTy(Type, StorageTy, size, align, hasDefaultAlignment(Type),
+                      false);
   assert(StorageTy && "StorageType is a nullptr");
   assert(!DbgTy.isArchetype() &&
          "type of global variable cannot be an archetype");
@@ -107,9 +117,16 @@ DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass,
                                           llvm::Type *StorageType, Size size,
                                           Alignment align) {
   DebugTypeInfo DbgTy(theClass->getInterfaceType().getPointer(), StorageType,
-                      size, align, true);
+                      size, align, true, false);
   assert(!DbgTy.isArchetype() && "type of objc class cannot be an archetype");
   return DbgTy;
+}
+
+DebugTypeInfo DebugTypeInfo::getErrorResult(swift::Type Ty,
+                                            llvm::Type *StorageType, Size size,
+                                            Alignment align) {
+  assert(StorageType && "StorageType is a nullptr");
+  return {Ty, StorageType, size, align, true, false};
 }
 
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
