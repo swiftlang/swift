@@ -152,9 +152,7 @@ namespace {
     RecursiveProperties getDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type) {
       assert(type->isDifferentiable());
-      auto extInfo = type->getExtInfo();
-      auto nondiffExtInfo = extInfo.withDifferentiable(false);
-      auto origTy = type->getWithExtInfo(nondiffExtInfo);
+      auto origTy = type->getWithoutDifferentiability();
       auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(
           type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
           /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP, M,

@@ -27,7 +27,7 @@ public class _AnyTensorHandle {
   /// property, and assumes that this is it. Changing the design of
   /// `TensorHandle` will require tweaking the compiler.
   public let _cTensorHandle: CTensorHandle
-  
+
   /// Private initializer from a `CTensorHandle`. Should only be called from
   /// `TensorHandle<Scalar>.init`.
   fileprivate init(base: CTensorHandle) {
@@ -45,7 +45,7 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   public init(_owning cTensorHandle: CTensorHandle) {
     super.init(base: cTensorHandle)
   }
-  
+
   @usableFromInline
   convenience init(copyingFromCTensor cTensor: CTensor) {
     let status = TF_NewStatus()
@@ -78,7 +78,7 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     bufferInitializer: (UnsafeMutableRawPointer) -> Void
   ) {
     let cTensor = TF_AllocateTensor(
-      Scalar.tensorFlowDataType.cDataType,
+      Scalar.tensorFlowDataType._cDataType,
       shape.map(Int64.init),
       Int32(shape.count),
       byteCount
@@ -143,7 +143,7 @@ extension TensorHandle : TensorSendableReceivable {
     let context = _ExecutionContext.global
     let cTensorHandle = TFE_DequeueNamedTensorFromCtx(
       context.eagerContext, Int32(tensorID),
-      Scalar.tensorFlowDataType.cDataType, status)
+      Scalar.tensorFlowDataType._cDataType, status)
     checkOk(status)
     tensorHandle = TensorHandle<Scalar>(_owning: cTensorHandle!)
     if _RuntimeConfig.printsDebugLog {
@@ -174,7 +174,7 @@ extension TensorHandle : TensorSendableReceivable {
   static func scalar(_ scalar: Scalar) -> TensorHandle<Scalar> {
     debugLog("Creating a tensor from scalar \(scalar).")
     let cTensorHandle = _TFCCreateCTensorHandle(
-        scalar, Scalar.tensorFlowDataType.cDataType)
+        scalar, Scalar.tensorFlowDataType._cDataType)
     return TensorHandle<Scalar>(_owning: cTensorHandle)
   }
 }
@@ -224,7 +224,7 @@ extension ResourceHandle : TensorSendableReceivable {
     checkOk(status)
     TF_DeleteStatus(status)
     debugLog("Done receiving resource tensor of id \(tensorID).")
-    return ResourceHandle(owning: cTensorHandle)    
+    return ResourceHandle(owning: cTensorHandle)
   }
 
   @inlinable
@@ -277,7 +277,7 @@ extension VariantHandle : TensorSendableReceivable {
     checkOk(status)
     TF_DeleteStatus(status)
     debugLog("Done receiving variant tensor of id \(tensorID).")
-    return VariantHandle(owning: cTensorHandle)    
+    return VariantHandle(owning: cTensorHandle)
   }
 
   @inlinable

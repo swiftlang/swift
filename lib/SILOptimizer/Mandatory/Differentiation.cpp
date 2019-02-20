@@ -2347,6 +2347,7 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task,
     pvStruct->setAccess(AccessLevel::Internal);
   }
   pvStruct->computeType();
+  assert(pvStruct->hasInterfaceType());
   file.addVisibleDecl(pvStruct);
   LLVM_DEBUG({
     auto &s = getADDebugStream();

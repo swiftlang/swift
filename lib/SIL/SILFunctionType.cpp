@@ -154,6 +154,20 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
              getWitnessMethodConformanceOrNone());
 }
 
+CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
+  if (!isDifferentiable())
+    return CanSILFunctionType(this);
+  auto nondiffExtInfo = getExtInfo().withDifferentiable(false);
+  SmallVector<SILParameterInfo, 8> newParams;
+  for (auto &param : getParameters())
+    newParams.push_back(param.getWithDifferentiability(
+        SILParameterDifferentiability::DifferentiableOrNotApplicable));
+  return SILFunctionType::get(getGenericSignature(), nondiffExtInfo,
+                              getCoroutineKind(), getCalleeConvention(),
+                              newParams, getYields(), getResults(),
+                              getOptionalErrorResult(), getASTContext());
+}
+
 CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     const SmallBitVector &parameterIndices, unsigned resultIndex,
     unsigned differentiationOrder,

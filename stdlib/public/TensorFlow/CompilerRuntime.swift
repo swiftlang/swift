@@ -284,7 +284,7 @@ private class TraceContext {
     var returnValues = [CTensorHandle?](repeating: nil,
                                         count: maxReturnValueCount)
     var outputReturnValueCount = Int32(maxReturnValueCount)
-    TFE_Execute(op, &returnValues, &outputReturnValueCount, status) 
+    TFE_Execute(op, &returnValues, &outputReturnValueCount, status)
     checkOk(status)
     debugLog("""
                returnValues.count=\(returnValues.count), \
@@ -856,7 +856,7 @@ private func _trace<State : _TensorArrayProtocolEnhanced,
                            "Should not be in tracing mode already!")
 
   // Switch to tracing mode.
-  let dtypes = state._dtypes + Data._typeList.map { $0.cDataType }
+  let dtypes = state._dtypes + Data._typeList.map { $0._cDataType }
   let traceCtx = TraceContext(dtypes: dtypes)
   _RuntimeConfig.traceState = .tracing(traceCtx)
 
@@ -888,14 +888,14 @@ private func _trace<State : _TensorArrayProtocolEnhanced,
   let opType = "MyTraceFn_TAP"
   return finalizeTraceFunction(opType)
 }
-  
+
 private func _graphInternal<State : _TensorArrayProtocolEnhanced,
                            Data : TensorGroup,
                            Result : TensorGroup>(
   with state: State,
   in fn: (State, Data) -> (State, Result?)
 ) -> (State, Data) -> (State, Result?) {
-  let traceContext = _trace(with: state, in : fn) 
+  let traceContext = _trace(with: state, in : fn)
   // The result is a closure that captures and executes the trace graph
   // function in the trace context.
   return { (oldState: State, data: Data) -> (State, Result?) in
@@ -946,8 +946,8 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
   in fn: @escaping (State, Data) -> State
 ) -> (State, Data) -> State {
   let wrappedFn = {
-    // The result argument needs to a type that conforms to TensorGroup. 
-    // We are arbitrarily picking Tensor<Float> here. 
+    // The result argument needs to a type that conforms to TensorGroup.
+    // We are arbitrarily picking Tensor<Float> here.
     (s: State, d: Data) -> (State, Tensor<Float>?) in
       (fn(s, d), nil)
   }
