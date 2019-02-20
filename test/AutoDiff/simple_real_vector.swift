@@ -49,9 +49,11 @@ public func test1() -> Vector {
 // CHECK: [[CLOSURE_THICK_NOESC:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_THICK]] : $@callee_guaranteed (Vector) -> Float to $@noescape @callee_guaranteed (Vector) -> Float
 // CHECK: autodiff_function [wrt 0] [order 1] [[CLOSURE_THICK_NOESC]] : $@noescape @callee_guaranteed (Vector) -> Float
 
+
+// TF-189: `TF189` is a non-trivial type but `TF189.AllDifferentiableVariables` is trivial.
+// Should pass verification.
 @_fixed_layout
 public class NonTrivial {}
-
 @_fixed_layout
 public struct TF189: Differentiable {
   @noDerivative public let x: Double
@@ -67,5 +69,3 @@ public struct TF189: Differentiable {
     return input
   }
 }
-
-// CHECK: sil hidden @AD__$s18simple_real_vector5TF189V3foo5inputAA6Vector{{.*}}___vjp_src_0_wrt_0_1 : $@convention(thin) (@guaranteed TF189, Vector) -> (Vector, @owned @callee_guaranteed (Vector) -> (TF189.AllDifferentiableVariables, Vector))
