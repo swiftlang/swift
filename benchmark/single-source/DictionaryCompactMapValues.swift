@@ -25,11 +25,23 @@ let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
 
 public let DictionaryCompactMapValues = [
   BenchmarkInfo(name: "DictionaryCompactMapValuesOfNilValue",
-    runFunction: { for _ in 1...$0*20 {
-      CheckResults(smallOddNumMap.compactMapValues({$0}) == compactOddNums) }},
-    tags: t, legacyFactor: 50),
+    runFunction: compactMapValues, tags: t,
+    setUpFunction: { blackHole(smallOddNumMap); blackHole(compactOddNums)},
+    legacyFactor: 50),
   BenchmarkInfo(name: "DictionaryCompactMapValuesOfCastValue",
-    runFunction: { for _ in 1...$0*20 {
-      CheckResults(oddStringMap.compactMapValues(Int.init) == compactOddNums) }
-    }, tags: t, legacyFactor: 54),
+    runFunction: compactMapValuesInt, tags: t,
+    setUpFunction: { blackHole(oddStringMap); blackHole(compactOddNums)},
+    legacyFactor: 54),
 ]
+
+func compactMapValues(N: Int) {
+  for _ in 1...20*N {
+    CheckResults(smallOddNumMap.compactMapValues({$0}) == compactOddNums)
+  }
+}
+
+func compactMapValuesInt(N: Int) {
+  for _ in 1...20*N {
+    CheckResults(oddStringMap.compactMapValues(Int.init) == compactOddNums)
+  }
+}
