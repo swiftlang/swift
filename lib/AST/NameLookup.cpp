@@ -1497,9 +1497,9 @@ namespace {
     computeBaseNLOptions(const LegacyUnqualifiedLookup::Options options,
                          const bool isOriginallyTypeLookup);
 
-    bool resolveIsCascadingUse(const DeclContext *const dc,
-                               Optional<bool> isCascadingUse,
-                               bool onlyCareAboutFunctionBody);
+    static bool resolveIsCascadingUse(const DeclContext *const dc,
+                                      Optional<bool> isCascadingUse,
+                                      bool onlyCareAboutFunctionBody);
   };
 } // namespace
 
@@ -2007,8 +2007,6 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
     namelookup::FindLocalVal localVal(SM, Loc, Consumer);
     localVal.visit(AFD->getBody());
     if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
-      // clang-format off
-      // TODO: when returning finished, return nulls?
       return None;
 
     if (auto *P = AFD->getImplicitSelfDecl())
@@ -2030,6 +2028,7 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
     addGenericParametersForFunction(AFD);
     if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
       return None;
+    // clang-format off
     return PerScopeLookupState{
         false,
         fnParent,
@@ -2039,9 +2038,11 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
             // might be type checking a default argument expression and
             // performing name lookup from there), the base declaration
             // is the nominal type, not 'self'.
-            isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD, fnDeclContext,
+            isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD,
+            fnDeclContext,
             AFD->getDeclContext()),
         returnValueForIsCascadingUse};
+    // clang-format on
   }
   // Look in the generic parameters after checking our local declaration.
   addGenericParametersForFunction(AFD);
