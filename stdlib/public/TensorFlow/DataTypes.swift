@@ -28,7 +28,6 @@ import CTensorFlow
 // declarations from the TF C API.
 @_fixed_layout
 public struct TensorDataType {
-  @usableFromInline
   public var _cDataType: TF_DataType
 
   @inlinable
