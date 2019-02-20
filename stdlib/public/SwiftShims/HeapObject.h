@@ -56,6 +56,13 @@ struct HeapObject {
     : metadata(newMetadata)
     , refCounts(InlineRefCounts::Initialized)
   { }
+  
+  // Initialize a HeapObject header for an immortal object
+  constexpr HeapObject(HeapMetadata const *newMetadata,
+                       InlineRefCounts::Immortal_t immortal)
+  : metadata(newMetadata)
+  , refCounts(InlineRefCounts::Immortal)
+  { }
 
 #ifndef NDEBUG
   void dump() const LLVM_ATTRIBUTE_USED;
