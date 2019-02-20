@@ -14,20 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_WIN32) || defined(__HAIKU__)
-#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__)
+#define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
 #else
-#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
+#define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
 #endif
 
 #if defined(_WIN32)
 #include <mutex>
 #endif
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 #if defined(_WIN32)
 #include <io.h>
 #else
@@ -48,9 +48,7 @@
 #include <cxxabi.h>
 #endif
 
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
-// execinfo.h is not available on Android. Checks in this file ensure that
-// fatalError behaves as expected, but without stack traces.
+#if __has_include(<execinfo.h>)
 #include <execinfo.h>
 #endif
 
@@ -97,7 +95,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   DWORD dwResult;
 
   {
-    std::lock_guard<std::mutex> lock(m);
+    std::lock_guard<std::mutex> lock(mutex);
     dwResult = UnDecorateSymbolName(syminfo.symbolName, szUndName,
                                     sizeof(szUndName), dwFlags);
   }
@@ -193,8 +191,11 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   constexpr unsigned maxSupportedStackDepth = 128;
   void *addrs[maxSupportedStackDepth];
-
+#if defined(_WIN32)
+  int symbolCount = CaptureStackBackTrace(0, maxSupportedStackDepth, addrs, NULL);
+#else
   int symbolCount = backtrace(addrs, maxSupportedStackDepth);
+#endif
   for (int i = framesToSkip; i < symbolCount; ++i) {
     dumpStackTraceEntry(i - framesToSkip, addrs[i]);
   }
