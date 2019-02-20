@@ -838,6 +838,39 @@ extension _TensorArrayProtocolEnhanced {
   }
 }
 
+private func _traceInternal(
+  with dtypes: [TF_DataType],
+  in fn: ([CTensorHandle]) -> [CTensorHandle]) -> TraceContext {
+  debugLog("""
+             Tracing over a function with \(dtypes.count) inputs.
+             """)
+
+  // Verify that we are not already tracing.
+  internalConsistencyCheck(_RuntimeConfig.traceState.context == nil,
+                           "Should not be in tracing mode already!")
+
+  // Switch to tracing mode.
+  let traceCtx = TraceContext(dtypes: dtypes)
+  _RuntimeConfig.traceState = .tracing(traceCtx)
+
+  // Handle inputs.
+  let inputSymbolicTensors = traceCtx.symbolicInputs.map {
+    TFE_NewTensorHandleFromTFOutput($0, TF_OperationOutputType($0))!
+  }
+  internalConsistencyCheck(inputSymbolicTensors.count == dtypes.count)
+
+  // Run tracee to build the trace, adding ops to the trace graph function.
+  // The tracee output can contain a mixture of symbolic and concrete tensors
+  // (see the comment block within TraceContext.finalize()).
+   debugLog("Running tracee in tracing mode.")
+  traceCtx.tracedOutputs = fn(inputSymbolicTensors)
+
+  debugLog("Finalizing trace graph function.")
+  // TAP means tensor array protocol.
+  let opType = "MyTraceFn_TAP"
+  return finalizeTraceFunction(opType)
+}
+
 // TODO: rename this to `graph` when it's ready for end users.
 /// Trace `fn` with the given state and return the generated trace context.
 private func _trace<State : _TensorArrayProtocolEnhanced,
