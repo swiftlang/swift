@@ -275,6 +275,9 @@ enum class CheckKind : unsigned {
 
   /// The witness itself is inaccessible.
   WitnessUnavailable,
+
+  /// The witness has a throwing accessor, where as the requirement doesn't
+  ThrowingAccessor,
 };
 
 /// Describes an optional adjustment made to a witness.
@@ -526,6 +529,8 @@ protected:
   bool checkWitnessAccess(ValueDecl *requirement,
                           ValueDecl *witness,
                           bool *isSetter);
+
+  bool checkWitnessThrowingAccessor(ValueDecl *requirement, ValueDecl *witness);
 
   bool checkWitnessAvailability(ValueDecl *requirement,
                                 ValueDecl *witness,
