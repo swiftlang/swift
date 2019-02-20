@@ -2667,17 +2667,19 @@ public:
       Builder.addRightParen();
     }
 
-    // Enum element is of function type such as EnumName.type -> Int ->
-    // EnumName; however we should show Int -> EnumName as the type
-    Type EnumType;
-    if (EED->hasInterfaceType()) {
-      EnumType = EED->getInterfaceType();
-      if (auto FuncType = EnumType->getAs<AnyFunctionType>()) {
+    if (!EED->hasInterfaceType())
+      return;
+
+    // Enum element is of function type; (Self.type) -> Self or
+    // (Self.Type) -> (Args...) -> Self. We should show only 'Self' part.
+    Type EnumType = EED->getInterfaceType();
+    if (auto FuncType = EnumType->getAs<AnyFunctionType>()) {
+      EnumType = FuncType->getResult();
+      if (auto FuncType = EnumType->getAs<FunctionType>())
         EnumType = FuncType->getResult();
-      }
     }
-    if (EnumType)
-      addTypeAnnotation(Builder, EnumType);
+
+    addTypeAnnotation(Builder, EnumType);
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation = Type(),
