@@ -381,7 +381,7 @@ public:
 
   /// Demangle the given symbol and return the module name of the symbol.
   ///
-  /// \param MangledName The mangled symbol string, which start a mangling
+  /// \param mangledName The mangled symbol string, which start a mangling
   /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns The module name.
