@@ -279,7 +279,6 @@ private:
                          const Optional<bool> isCascadingUseArg);
 
   struct LookupInOneDeclContextResult {
-    bool isDone;
     DeclContext *dc;
     Optional<bool> isCascadingUse;
   };
@@ -676,11 +675,8 @@ UnqualifiedLookupFactory::nonASTScopeBasedLookup(
     auto r = lookupInOneDeclContext(nextDC, isCascadingUse);
     if (!r.hasValue())
       return None;
-    const bool isDone = r.getValue().isDone;
     nextDC = r.getValue().dc;
     isCascadingUse = r.getValue().isCascadingUse;
-    if (isDone)
-      break;
     assert(nextDC != priorDC && "non-termination");
     priorDC = nextDC;
   }
@@ -706,7 +702,7 @@ UnqualifiedLookupFactory::lookupInOneDeclContext(
   auto isCascadingUse = r.getValue().isCascadingUse;
 
   if (isDone)
-    return LookupInOneDeclContextResult{false, childOfNextDC, isCascadingUse};
+    return LookupInOneDeclContextResult{childOfNextDC, isCascadingUse};
 
   if (addGenericParametersHereAndInEnclosingScopes(childOfNextDC))
     return None;
@@ -719,7 +715,7 @@ UnqualifiedLookupFactory::lookupInOneDeclContext(
   }
   // TODO: What if !BaseDC && lookupDecls non-empty?
   DeclContext *nextDC = childOfNextDC->getParentForLookup();
-  return LookupInOneDeclContextResult{false, nextDC, isCascadingUse};
+  return LookupInOneDeclContextResult{nextDC, isCascadingUse};
 }
 // clang-format on
 
@@ -1604,7 +1600,6 @@ LegacyUnqualifiedLookup::LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         DC = DC->getParentForLookup();
       }
-
       if (!isCascadingUse.hasValue())
         isCascadingUse = true;
     }
