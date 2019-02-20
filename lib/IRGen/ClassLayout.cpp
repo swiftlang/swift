@@ -28,6 +28,7 @@ ClassLayout::ClassLayout(const StructLayoutBuilder &builder,
                          bool isFixedSize,
                          bool metadataRequiresInitialization,
                          bool metadataRequiresRelocation,
+                         bool classHasObjCAncestry,
                          llvm::Type *classTy,
                          ArrayRef<VarDecl *> allStoredProps,
                          ArrayRef<FieldAccess> allFieldAccesses,
@@ -38,21 +39,29 @@ ClassLayout::ClassLayout(const StructLayoutBuilder &builder,
     IsFixedSize(isFixedSize),
     MetadataRequiresInitialization(metadataRequiresInitialization),
     MetadataRequiresRelocation(metadataRequiresRelocation),
+    ClassHasObjCAncestry(classHasObjCAncestry),
     Ty(classTy),
     AllStoredProperties(allStoredProps),
     AllFieldAccesses(allFieldAccesses),
     AllElements(allElements) { }
 
 Size ClassLayout::getInstanceStart() const {
-  if (AllElements.empty())
-    return getSize();
+  ArrayRef<ElementLayout> elements = AllElements;
+  while (!elements.empty()) {
+    auto element = elements.front();
+    elements = elements.drop_front();
 
-  auto element = AllElements[0];
-  if (element.getKind() == ElementLayout::Kind::Fixed ||
-      element.getKind() == ElementLayout::Kind::Empty) {
-    // FIXME: assumes layout is always sequential!
-    return element.getByteOffset();
+    // Ignore empty elements.
+    if (element.isEmpty()) {
+      continue;
+    } else if (element.hasByteOffset()) {
+      // FIXME: assumes layout is always sequential!
+      return element.getByteOffset();
+    } else {
+      return Size(0);
+    }
   }
 
-  return Size(0);
+  // If there are no non-empty elements, just return the computed size.
+  return getSize();
 }

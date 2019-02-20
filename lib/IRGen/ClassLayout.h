@@ -63,6 +63,9 @@ class ClassLayout {
   /// Does the class metadata require relocation?
   bool MetadataRequiresRelocation;
 
+  /// Does the class have ObjC ancestry?
+  bool ClassHasObjCAncestry;
+
   /// The LLVM type for instances of this class.
   llvm::Type *Ty;
 
@@ -82,6 +85,7 @@ public:
               bool isFixedSize,
               bool metadataRequiresInitialization,
               bool metadataRequiresRelocation,
+              bool classHasObjCAncestry,
               llvm::Type *classTy,
               ArrayRef<VarDecl *> allStoredProps,
               ArrayRef<FieldAccess> allFieldAccesses,
@@ -97,6 +101,15 @@ public:
   bool isFixedLayout() const { return IsFixedLayout; }
 
   bool isFixedSize() const { return IsFixedSize; }
+
+  /// Returns true if the runtime may attempt to assign non-zero offsets to
+  /// empty fields for this class.  The ObjC runtime will do this if it
+  /// decides it needs to slide ivars.  This is the one exception to the
+  /// general rule that the runtime will not try to assign a different offset
+  /// than was computed statically for a field with a fixed offset.
+  bool mayRuntimeAssignNonZeroOffsetsToEmptyFields() const {
+    return ClassHasObjCAncestry;
+  }
 
   bool doesMetadataRequireInitialization() const {
     return MetadataRequiresInitialization;
