@@ -100,6 +100,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_20 | %FileCheck %s -check-prefix=GENERICPARAM_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_21 | %FileCheck %s -check-prefix=GENERICPARAM_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DECL_MEMBER_INIT_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+
 enum SomeEnum1 {
   case South
   case North
@@ -644,4 +646,8 @@ func testingGenericParam2<X>(obj: C<X>) {
   // Same as GENERICPARAM_1.
   obj.t = .#^GENERICPARAM_21^#
   // Same as GENERICPARAM_1.
+}
+
+struct TestingStruct {
+  var value: SomeEnum1 = .#^DECL_MEMBER_INIT_1^#
 }
