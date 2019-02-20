@@ -181,7 +181,7 @@ class S: P {
     }
     
     var d: Int {
-        get throws {} // FIXME: A non-throwing requirement can be fulfilled by a throwing property in the conforming type
+        get {} // Okay
         set {} // Okay
     }
 
@@ -202,6 +202,24 @@ class S: P {
 
     subscript(h: Double) -> Double {
         get {} // Okay
-        set throws {} // FIXME: A non-throwing requirement can be fulfilled by a throwing subscript in the conforming type
+        set {} // Okay
+    }
+}
+
+/// Protocols with non-throwing accessors ///
+
+protocol NonThrowingP {
+    var foo: Int { get } // expected-note {{requirement 'foo' declared here}}
+    var baz: Int { get set } // expected-note {{requirement 'baz' declared here}}
+}
+
+struct NonThrowingS: NonThrowingP { // expected-error {{type 'NonThrowingS' does not conform to protocol 'NonThrowingP'}}
+    var foo: Int { // expected-error {{cannot satisfy the requirement of a non-throwing accessor with a throwing one}}
+        get throws {}
+    }
+
+    var baz: Int { // expected-error {{cannot satisfy the requirement of a non-throwing accessor with a throwing one}}
+        get {}
+        set throws {}
     }
 }
