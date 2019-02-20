@@ -1230,6 +1230,8 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
     Elem.set(KeyReceiverUSR, Info.ReceiverUSR);
   if (Info.IsDynamic)
     Elem.setBool(KeyIsDynamic, true);
+  if (Info.IsImplicit)
+    Elem.setBool(KeyIsImplicit, true);
   if (Info.IsTestCandidate)
     Elem.setBool(KeyIsTestCandidate, true);
 
