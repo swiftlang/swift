@@ -894,24 +894,26 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
                             Data : TensorGroup,
                             Result : TensorGroup>(
   with state: State,
-  in fn: @escaping (State, Data) -> (State, Result?)
+  in fn: (State, Data) -> (State, Result?)
 ) -> (State, Data) -> (State, Result?) {
-  let wrappedFn = {(inputs: [CTensorHandle]) -> [CTensorHandle] in
-    let symbolicState = state._makeInstance(
-      owning: inputs.dropLast(Data._typeList.count))
-    let symbolicData = Data(
-      _copying: inputs.dropFirst(Int(state._tensorHandleCount)))
-    let (outputState, outputResult) = fn(symbolicState, symbolicData)
+  let traceContext: TraceContext = withoutActuallyEscaping(fn) { escapableFn in
+    let wrappedFn = {(inputs: [CTensorHandle]) -> [CTensorHandle] in
+      let symbolicState = state._makeInstance(
+        owning: inputs.dropLast(Data._typeList.count))
+      let symbolicData = Data(
+        _copying: inputs.dropFirst(Int(state._tensorHandleCount)))
+      let (outputState, outputResult) = escapableFn(symbolicState, symbolicData)
 
-    debugLog("Assembling output tensor handles.")
-    let outputs =
-      outputResult != nil
-        ? (outputState.cTensorHandles + outputResult!.cTensorHandles)
-        : outputState.cTensorHandles
-    return outputs
+      debugLog("Assembling output tensor handles.")
+      let outputs =
+        outputResult != nil
+          ? (outputState.cTensorHandles + outputResult!.cTensorHandles)
+          : outputState.cTensorHandles
+      return outputs
+    }
+    let dtypes = state._dtypes + Data._typeList.map { $0._cDataType }
+    return _trace(with: dtypes, in: wrappedFn)
   }
-  let dtypes = state._dtypes + Data._typeList.map { $0._cDataType }
-  let traceContext = _trace(with: dtypes, in: wrappedFn)
   // The result is a closure that captures and executes the trace graph
   // function in the trace context.
   return { (oldState: State, data: Data) -> (State, Result?) in
@@ -945,7 +947,7 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
                    Data : TensorGroup,
                    Result : TensorGroup>(
   with state: State,
-  in fn: @escaping (State, Data) -> (State, Result)
+  in fn: (State, Data) -> (State, Result)
 ) -> (State, Data) -> (State, Result) {
   let graphFunction = _graphInternal(with: state, in: fn)
   return { (state: State, data: Data) in
@@ -959,19 +961,19 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
 public func _graph<State : _TensorArrayProtocolEnhanced,
                    Data : TensorGroup>(
   with state: State,
-  in fn: @escaping (State, Data) -> State
+  in fn: (State, Data) -> State
 ) -> (State, Data) -> State {
-  let wrappedFn = {
-    // The result argument needs to a type that conforms to TensorGroup.
-    // We are arbitrarily picking Tensor<Float> here.
-    (s: State, d: Data) -> (State, Tensor<Float>?) in
-      (fn(s, d), nil)
-  }
-  let graphFunction = _graphInternal(with: state, in: wrappedFn)
-  return { (state: State, data: Data) in
-    let result = graphFunction(state, data)
-    return result.0
-  }
+  let graphFunction: (State, Data) -> (State, Tensor<Float>?) =
+    withoutActuallyEscaping(fn) { escapableFn in
+      let wrappedFn = {
+        // The result argument needs to a type that conforms to TensorGroup.
+        // We are arbitrarily picking Tensor<Float> here.
+        (s: State, d: Data) -> (State, Tensor<Float>?) in
+          (escapableFn(s, d), nil)
+      }
+      return _graphInternal(with: state, in: wrappedFn)
+    }
+  return { (state: State, data: Data) in graphFunction(state, data).0 }
 }
 
 /// Trace the given function `fn` and return a closure that can be used to
@@ -979,18 +981,20 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
 public func _tffunc<State : _TensorArrayProtocolEnhanced,
                     Data : TensorGroup>(
   with state: State,
-  in fn: @escaping (State, Data) -> State
+  in fn:(State, Data) -> State
 ) -> (Data) -> (String) {
-  let wrappedFn = {(inputs: [CTensorHandle]) -> [CTensorHandle] in
-    let symbolicState = state._makeInstance(
-      owning: inputs.dropLast(Data._typeList.count))
-    let symbolicData = Data(
-      _copying: inputs.dropFirst(Int(state._tensorHandleCount)))
-    let outputState = fn(symbolicState, symbolicData)
-    return outputState.cTensorHandles
+  let traceContext: TraceContext = withoutActuallyEscaping(fn) { escapableFn in
+    let wrappedFn = {(inputs: [CTensorHandle]) -> [CTensorHandle] in
+      let symbolicState = state._makeInstance(
+        owning: inputs.dropLast(Data._typeList.count))
+      let symbolicData = Data(
+        _copying: inputs.dropFirst(Int(state._tensorHandleCount)))
+      let outputState = escapableFn(symbolicState, symbolicData)
+      return outputState.cTensorHandles
+    }
+    let dtypes = state._dtypes + Data._typeList.map { $0._cDataType }
+    return _trace(with: dtypes, in: wrappedFn)
   }
-  let dtypes = state._dtypes + Data._typeList.map { $0._cDataType }
-  let traceContext = _trace(with: dtypes, in: wrappedFn)
   return {
     data in traceContext.specializeTFFunction(with: data.cTensorHandles)
   }
@@ -998,24 +1002,26 @@ public func _tffunc<State : _TensorArrayProtocolEnhanced,
 
 /// Trace the given function and return a `TF_Function(In)` that returns `Out`.
 public func _tffunc<In : TensorGroup, Out : TensorGroup>(
-  _ fn: @escaping (In) -> Out
+  _ fn: (In) -> Out
 ) -> String {
-  let wrappedFn = {
-    (inputs: [CTensorHandle]) -> [CTensorHandle] in
-    let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(
-      capacity: Int(inputs.count))
-    var ptr = buffer
-    for input in inputs {
-      ptr.initialize(to: input)
-      ptr = ptr.advanced(by: 1)
+  let traceContext: TraceContext = withoutActuallyEscaping(fn) { escapableFn in
+    let wrappedFn = {
+      (inputs: [CTensorHandle]) -> [CTensorHandle] in
+      let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(
+        capacity: Int(inputs.count))
+      var ptr = buffer
+      for input in inputs {
+        ptr.initialize(to: input)
+        ptr = ptr.advanced(by: 1)
+      }
+      let symbolicIn = In(_owning: buffer)
+      let symbolicOut = escapableFn(symbolicIn)
+      return symbolicOut.cTensorHandles
     }
-    let symbolicIn = In(_owning: buffer)
-    let symbolicOut = fn(symbolicIn)
-    return symbolicOut.cTensorHandles
+    
+    let dtypes = In._typeList.map { $0._cDataType }
+    return _trace(with: dtypes, in: wrappedFn)
   }
-
-  let dtypes = In._typeList.map { $0._cDataType }
-  let traceContext = _trace(with: dtypes, in: wrappedFn)
   return traceContext.specializeTFFunction(with : [])
 }
 

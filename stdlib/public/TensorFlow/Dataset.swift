@@ -102,7 +102,7 @@ public extension Dataset {
 
   @inlinable @inline(__always)
   func map(
-    _ transform: @escaping (Element) -> Element
+    _ transform: (Element) -> Element
   ) -> Dataset {
     return Dataset(
       _handle: #tfop(
@@ -117,7 +117,7 @@ public extension Dataset {
 
   @inlinable @inline(__always)
   func filter(
-    _ isIncluded: @escaping (Element) -> Tensor<Bool>
+    _ isIncluded: (Element) -> Tensor<Bool>
   ) -> Dataset {
     return Dataset(
       _handle: #tfop(
