@@ -95,6 +95,10 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
     return false;
   }
 
+  if (t.hasOpenedExistential()) {
+    return false;
+  }
+
   auto canType = t.getASTType();
   if (canType->hasTypeParameter()) {
     assert(GenericEnv && "Expected a GenericEnv");
@@ -107,6 +111,38 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
     const TypeInfo &TI = Mod.getTypeInfoForLowered(canType);
     auto &nativeSchemaOrigParam = TI.nativeParameterValueSchema(Mod);
     return nativeSchemaOrigParam.requiresIndirect();
+  }
+  return false;
+}
+
+static SILType getNonOptionalType(SILType t) {
+  SILType nonOptionalType = t;
+  if (auto optType = t.getOptionalObjectType()) {
+    nonOptionalType = optType;
+  }
+  return nonOptionalType;
+}
+
+/// Utility to determine if this tuple contains a large loadable type
+static bool isTupleWithLargeLoadable(GenericEnvironment *GenericEnv, SILType t,
+                                     irgen::IRGenModule &Mod) {
+  if (t.hasOpenedExistential()) {
+    return false;
+  }
+  SILType nonOptionalType = getNonOptionalType(t);
+  auto tupleType = nonOptionalType.getAs<TupleType>();
+  if (!tupleType) {
+    return false;
+  }
+  for (auto canElem : tupleType.getElementTypes()) {
+    SILType currType =
+        getNonOptionalType(SILType::getPrimitiveObjectType(canElem));
+    if (isLargeLoadableType(GenericEnv, currType, Mod)) {
+      return true;
+    }
+    if (isTupleWithLargeLoadable(GenericEnv, currType, Mod)) {
+      return true;
+    }
   }
   return false;
 }
@@ -127,10 +163,7 @@ bool LargeSILTypeMapper::shouldTransformParameter(GenericEnvironment *env,
 }
 
 static bool isFuncOrOptionalFuncType(SILType Ty) {
-  SILType nonOptionalType = Ty;
-  if (auto optType = Ty.getOptionalObjectType()) {
-    nonOptionalType = optType;
-  }
+  SILType nonOptionalType = getNonOptionalType(Ty);
   return nonOptionalType.is<SILFunctionType>();
 }
 
@@ -157,15 +190,14 @@ static bool containsFunctionSignature(GenericEnvironment *genEnv,
                                       irgen::IRGenModule &Mod,
                                       SILType storageType, SILType newSILType) {
   if (!isLargeLoadableType(genEnv, storageType, Mod) &&
-      (newSILType != storageType)) {
+      (newSILType.getObjectType() != storageType.getObjectType())) {
+    // we have to test on object types in case we are returning indirect tuple
     return true;
   }
   if (auto origType = storageType.getAs<TupleType>()) {
     for (auto canElem : origType.getElementTypes()) {
-      SILType objectType = SILType::getPrimitiveObjectType(canElem);
-      if (auto optionalObject = objectType.getOptionalObjectType()) {
-        objectType = optionalObject;
-      }
+      SILType objectType =
+          getNonOptionalType(SILType::getPrimitiveObjectType(canElem));
       if (objectType.is<SILFunctionType>()) {
         return true;
       }
@@ -181,10 +213,27 @@ bool LargeSILTypeMapper::newResultsDiffer(GenericEnvironment *GenericEnv,
   for (auto result : origResults) {
     SILType currResultTy = result.getSILStorageType();
     SILType newSILType = getNewSILType(GenericEnv, currResultTy, Mod);
-    // We (currently) only care about function signatures
-    if (containsFunctionSignature(GenericEnv, Mod, currResultTy, newSILType)) {
+    if (containsFunctionSignature(GenericEnv, Mod, currResultTy, newSILType) ||
+        isTupleWithLargeLoadable(GenericEnv, currResultTy, Mod)) {
       return true;
     }
+  }
+  return false;
+}
+
+static bool
+isFormalMultiResultTupleWithLargeType(IRGenModule &Mod,
+                                      GenericEnvironment *genEnv,
+                                      const CanSILFunctionType &loweredTy) {
+  if (loweredTy->getNumResults() != 1) {
+    auto resultType = loweredTy->getAllResultsType();
+    // If one or more tuple elements is indirect - bail
+    for (auto result : loweredTy->getResults()) {
+      if (result.isFormalIndirect()) {
+        return false;
+      }
+    }
+    return isTupleWithLargeLoadable(genEnv, resultType, Mod);
   }
   return false;
 }
@@ -194,6 +243,9 @@ static bool modNonFuncTypeResultType(GenericEnvironment *genEnv,
                                      irgen::IRGenModule &Mod) {
   if (!modifiableFunction(loweredTy)) {
     return false;
+  }
+  if (isFormalMultiResultTupleWithLargeType(Mod, genEnv, loweredTy)) {
+    return true;
   }
   if (loweredTy->getNumResults() != 1) {
     return false;
@@ -210,20 +262,29 @@ SmallVector<SILResultInfo, 2>
 LargeSILTypeMapper::getNewResults(GenericEnvironment *GenericEnv,
                                   CanSILFunctionType fnType,
                                   irgen::IRGenModule &Mod) {
-  // Get new SIL Function results - same as old results UNLESS:
+  // Get new SIL Function results
   // 1) Function type results might have a different signature
-  // 2) Large loadables are replaced by @out version
+  // 2) Large loadables, not part of tuples, are replaced by @out version
   auto origResults = fnType->getResults();
+  auto resultType = fnType->getAllResultsType();
   SmallVector<SILResultInfo, 2> newResults;
+  if (isFormalMultiResultTupleWithLargeType(Mod, GenericEnv, fnType)) {
+    // Multi-result turned into a single result
+    SILType newSILType = getNewSILType(GenericEnv, resultType, Mod);
+    SILResultInfo newSILResultInfo(newSILType.getASTType(),
+                                   ResultConvention::Indirect);
+    newResults.push_back(newSILResultInfo);
+    return newResults;
+  }
   for (auto result : origResults) {
     SILType currResultTy = result.getSILStorageType();
     SILType newSILType = getNewSILType(GenericEnv, currResultTy, Mod);
-    // We (currently) only care about function signatures
     if (containsFunctionSignature(GenericEnv, Mod, currResultTy, newSILType)) {
       // Case (1) Above
       SILResultInfo newResult(newSILType.getASTType(), result.getConvention());
       newResults.push_back(newResult);
-    } else if (modNonFuncTypeResultType(GenericEnv, fnType, Mod)) {
+    } else if (modNonFuncTypeResultType(GenericEnv, fnType, Mod) &&
+               !isTupleWithLargeLoadable(GenericEnv, resultType, Mod)) {
       // Case (2) Above
       SILResultInfo newSILResultInfo(newSILType.getASTType(),
                                      ResultConvention::Indirect);
@@ -297,19 +358,15 @@ bool LargeSILTypeMapper::shouldTransformResults(GenericEnvironment *genEnv,
     return false;
   }
 
-  if (loweredTy->getNumResults() != 1) {
-    auto resultType = loweredTy->getAllResultsType();
-    auto newResultType = getNewSILType(genEnv, resultType, Mod);
-    return resultType != newResultType;
-  }
-
-  auto singleResult = loweredTy->getSingleResult();
-  auto resultStorageType = singleResult.getSILStorageType();
-  auto newResultStorageType = getNewSILType(genEnv, resultStorageType, Mod);
-  if (resultStorageType != newResultStorageType) {
+  if (modNonFuncTypeResultType(genEnv, loweredTy, Mod)) {
     return true;
   }
-  return modNonFuncTypeResultType(genEnv, loweredTy, Mod);
+
+  auto resultType = loweredTy->getAllResultsType();
+  auto newResultType = getNewSILType(genEnv, resultType, Mod);
+
+  return (resultType != newResultType) &&
+         containsFunctionSignature(genEnv, Mod, resultType, newResultType);
 }
 
 static bool modResultType(SILFunction *F, irgen::IRGenModule &Mod,
@@ -362,7 +419,8 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
     } else {
       return param;
     }
-  } else if (isLargeLoadableType(env, storageType, IGM)) {
+  } else if (isLargeLoadableType(env, storageType, IGM) ||
+             isTupleWithLargeLoadable(env, storageType, IGM)) {
     if (param.getConvention() == ParameterConvention::Direct_Guaranteed)
       return SILParameterInfo(storageType.getASTType(),
                                ParameterConvention::Indirect_In_Guaranteed);
@@ -441,14 +499,12 @@ SILType LargeSILTypeMapper::getNewSILType(GenericEnvironment *GenericEnv,
     return oldToNewTypeMap[typePair];
   }
 
-  SILType nonOptionalType = storageType;
-  if (auto optType = storageType.getOptionalObjectType()) {
-    nonOptionalType = optType;
-  }
+  SILType nonOptionalType = getNonOptionalType(storageType);
   if (nonOptionalType.getAs<TupleType>()) {
     SILType newSILType =
         getNewTupleType(GenericEnv, Mod, nonOptionalType, storageType);
-    auto typeToRet = isLargeLoadableType(GenericEnv, newSILType, Mod)
+    auto typeToRet = (isLargeLoadableType(GenericEnv, newSILType, Mod) ||
+                      isTupleWithLargeLoadable(GenericEnv, newSILType, Mod))
                          ? newSILType.getAddressType()
                          : newSILType;
     oldToNewTypeMap[typePair] = typeToRet;
@@ -1341,6 +1397,8 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
   GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
   auto loweredTy = pass.F->getLoweredFunctionType();
   SILType resultStorageType = loweredTy->getAllResultsType();
+  // Need the new type if it is a tuple of (large type, function)
+  resultStorageType = pass.getNewSILType(resultStorageType).getObjectType();
   auto canType = resultStorageType.getASTType();
   if (canType->hasTypeParameter()) {
     assert(genEnv && "Expected a GenericEnv");
@@ -1361,6 +1419,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
 void LoadableStorageAllocation::convertIndirectFunctionArgs() {
   SILBasicBlock *entry = pass.F->getEntryBlock();
   SILBuilderWithScope argBuilder(entry->begin());
+  GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
 
   for (SILArgument *arg : entry->getArguments()) {
     SILType storageType = arg->getType();
@@ -1368,7 +1427,8 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
     if (newSILType != storageType) {
       ValueOwnershipKind ownership = arg->getOwnershipKind();
       arg = replaceArgType(argBuilder, arg, newSILType);
-      if (pass.isLargeLoadableType(storageType)) {
+      if (pass.isLargeLoadableType(storageType) ||
+          isTupleWithLargeLoadable(genEnv, storageType, pass.Mod)) {
         // Add to largeLoadableArgs if and only if it wasn't a modified function
         // signature arg
         pass.largeLoadableArgs.push_back(arg);
@@ -1419,8 +1479,9 @@ void LoadableStorageAllocation::convertApplyResults() {
         continue;
       }
       auto resultStorageType = origSILFunctionType->getAllResultsType();
-      if (!pass.isLargeLoadableType(resultStorageType)) {
-        // Make sure it contains a function type
+      if (!pass.isLargeLoadableType(resultStorageType) &&
+          !isTupleWithLargeLoadable(genEnv, resultStorageType, pass.Mod)) {
+        // Make sure it contains a function type only
         auto numFuncTy = llvm::count_if(origSILFunctionType->getResults(),
             [](const SILResultInfo &origResult) {
               auto resultStorageTy = origResult.getSILStorageType();
@@ -2244,7 +2305,10 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
   SILType resultTy = loweredTy->getAllResultsType();
   SILType newSILType = pass.getNewSILType(resultTy);
   // We (currently) only care about function signatures
-  if (pass.isLargeLoadableType(resultTy)) {
+  if (isFormalMultiResultTupleWithLargeType(pass.Mod, genEnv, loweredTy)) {
+    return true;
+  } else if (loweredTy->getNumResults() == 1 &&
+             pass.isLargeLoadableType(resultTy)) {
     return true;
   } else if (containsFunctionSignature(genEnv, pass.Mod, resultTy,
                                        newSILType) &&
@@ -2278,6 +2342,7 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
     F->rewriteLoweredTypeUnsafe(NewTy);
     return true;
   }
+
   return false;
 }
 
@@ -2344,10 +2409,7 @@ getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
                                   IRGenModule &Mod, SILBuilder &builder,
                                   LargeSILTypeMapper &Mapper) {
   SILType currSILType = op->getType();
-  SILType nonOptionalType = currSILType;
-  if (auto optType = currSILType.getOptionalObjectType()) {
-    nonOptionalType = optType;
-  }
+  SILType nonOptionalType = getNonOptionalType(currSILType);
   if (auto funcType = nonOptionalType.getAs<SILFunctionType>()) {
     GenericEnvironment *genEnv =
         containingInstr->getFunction()->getGenericEnvironment();

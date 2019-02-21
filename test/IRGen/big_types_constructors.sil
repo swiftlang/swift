@@ -1,0 +1,104 @@
+// RUN: %empty-directory(%t)
+// RUN: %swift -c -primary-file %s -enable-large-loadable-types -Xllvm -sil-print-after=loadable-address -sil-verify-all -o %t/big_types_constructors.o 2>&1 | %FileCheck %s
+
+import Swift
+import Builtin
+
+public struct BigStruct {
+  var i0 : Int32 = 0
+  var i1 : Int32 = 1
+  var i2 : Int32 = 2
+  var i3 : Int32 = 3
+  var i4 : Int32 = 4
+  var i5 : Int32 = 5
+  var i6 : Int32 = 6
+  var i7 : Int32 = 7
+  var i8 : Int32 = 8
+}
+
+// CHECK-LABEL: sil @test_tuple : $@convention(thin) (@in_constant BigStruct) -> @out (BigStruct, Int32) {
+// CHECK: bb0(%0 : $*(BigStruct, Int32), %1 : $*BigStruct):
+// CHECK: [[BIG:%.*]] = load %{{.*}} : $*BigStruct
+// CHECK: [[INTLIT:%.*]] = integer_literal $Builtin.Int32, 42
+// CHECK: [[INTLITSTRUCT:%.*]] = struct $Int32 ([[INTLIT]] : $Builtin.Int32)
+// CHECK: [[TUPLE:%.*]] = tuple ([[BIG]] : $BigStruct, [[INTLITSTRUCT]] : $Int32)
+// CHECK: store [[TUPLE]] to %0 : $*(BigStruct, Int32)
+// CHECK: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'test_tuple'
+sil @test_tuple : $@convention(thin) (BigStruct) -> (BigStruct, Int32) {
+bb0(%0 : $BigStruct):
+  %2 = integer_literal $Builtin.Int32, 42
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %4 = tuple (%0 : $BigStruct, %3 : $Int32)
+  return %4 : $(BigStruct, Int32)
+}
+
+
+sil hidden @$construct_big_struct : $@convention(method) (@thin BigStruct.Type) -> BigStruct {
+bb0(%0 : $@thin BigStruct.Type):
+  %1 = alloc_stack $BigStruct, var, name "self"   // users: %36, %32, %28, %24, %20, %16, %12, %8, %4, %39
+  %2 = integer_literal $Builtin.Int32, 0          // user: %3
+  %3 = struct $Int32 (%2 : $Builtin.Int32)        // users: %38, %5
+  %4 = struct_element_addr %1 : $*BigStruct, #BigStruct.i0 // user: %5
+  store %3 to %4 : $*Int32                        // id: %5
+  %6 = integer_literal $Builtin.Int32, 1          // user: %7
+  %7 = struct $Int32 (%6 : $Builtin.Int32)        // users: %38, %9
+  %8 = struct_element_addr %1 : $*BigStruct, #BigStruct.i1 // user: %9
+  store %7 to %8 : $*Int32                        // id: %9
+  %10 = integer_literal $Builtin.Int32, 2         // user: %11
+  %11 = struct $Int32 (%10 : $Builtin.Int32)      // users: %38, %13
+  %12 = struct_element_addr %1 : $*BigStruct, #BigStruct.i2 // user: %13
+  store %11 to %12 : $*Int32                      // id: %13
+  %14 = integer_literal $Builtin.Int32, 3         // user: %15
+  %15 = struct $Int32 (%14 : $Builtin.Int32)      // users: %38, %17
+  %16 = struct_element_addr %1 : $*BigStruct, #BigStruct.i3 // user: %17
+  store %15 to %16 : $*Int32                      // id: %17
+  %18 = integer_literal $Builtin.Int32, 4         // user: %19
+  %19 = struct $Int32 (%18 : $Builtin.Int32)      // users: %38, %21
+  %20 = struct_element_addr %1 : $*BigStruct, #BigStruct.i4 // user: %21
+  store %19 to %20 : $*Int32                      // id: %21
+  %22 = integer_literal $Builtin.Int32, 5         // user: %23
+  %23 = struct $Int32 (%22 : $Builtin.Int32)      // users: %38, %25
+  %24 = struct_element_addr %1 : $*BigStruct, #BigStruct.i5 // user: %25
+  store %23 to %24 : $*Int32                      // id: %25
+  %26 = integer_literal $Builtin.Int32, 6         // user: %27
+  %27 = struct $Int32 (%26 : $Builtin.Int32)      // users: %38, %29
+  %28 = struct_element_addr %1 : $*BigStruct, #BigStruct.i6 // user: %29
+  store %27 to %28 : $*Int32                      // id: %29
+  %30 = integer_literal $Builtin.Int32, 7         // user: %31
+  %31 = struct $Int32 (%30 : $Builtin.Int32)      // users: %38, %33
+  %32 = struct_element_addr %1 : $*BigStruct, #BigStruct.i7 // user: %33
+  store %31 to %32 : $*Int32                      // id: %33
+  %34 = integer_literal $Builtin.Int32, 8         // user: %35
+  %35 = struct $Int32 (%34 : $Builtin.Int32)      // users: %38, %37
+  %36 = struct_element_addr %1 : $*BigStruct, #BigStruct.i8 // user: %37
+  store %35 to %36 : $*Int32                      // id: %37
+  %38 = struct $BigStruct (%3 : $Int32, %7 : $Int32, %11 : $Int32, %15 : $Int32, %19 : $Int32, %23 : $Int32, %27 : $Int32, %31 : $Int32, %35 : $Int32) // user: %40
+  dealloc_stack %1 : $*BigStruct                  // id: %39
+  return %38 : $BigStruct                         // id: %40
+} // end sil function '$construct_big_struct'
+
+// CHECK-LABEL: sil @call_test_tuple : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK: [[ALLOCTUPLE:%.*]] = alloc_stack $(BigStruct, Int32)
+// CHECK: [[ALLOCBIG:%.*]] = alloc_stack $BigStruct
+// CHECK: [[FREF:%.*]] = function_ref @test_tuple : $@convention(thin) (@in_constant BigStruct) -> @out (BigStruct, Int32)
+// CHECK: apply [[FREF]]([[ALLOCTUPLE]], [[ALLOCBIG]]) : $@convention(thin) (@in_constant BigStruct) -> @out (BigStruct, Int32)
+// CHECK: [[LOADTUPLE:%.*]] = load [[ALLOCTUPLE]] : $*(BigStruct, Int32)
+// CHECK: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'call_test_tuple'
+sil @call_test_tuple : $@convention(thin) () -> () {
+bb0:
+  %0 = metatype $@thin BigStruct.Type             // user: %2
+  // function_ref BigStruct.init()
+  %1 = function_ref @$construct_big_struct : $@convention(method) (@thin BigStruct.Type) -> BigStruct // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@thin BigStruct.Type) -> BigStruct // users: %5, %3
+  debug_value %2 : $BigStruct, let, name "b"      // id: %3
+  // function_ref test_tuple(_:)
+  %4 = function_ref @test_tuple : $@convention(thin) (BigStruct) -> (BigStruct, Int32) // user: %5
+  %5 = apply %4(%2) : $@convention(thin) (BigStruct) -> (BigStruct, Int32) // users: %7, %6
+  %6 = tuple_extract %5 : $(BigStruct, Int32), 0
+  %7 = tuple_extract %5 : $(BigStruct, Int32), 1
+  %8 = tuple ()                                   // user: %9
+  return %8 : $()                                 // id: %9
+}
