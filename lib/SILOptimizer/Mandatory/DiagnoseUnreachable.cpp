@@ -91,6 +91,18 @@ public:
   llvm::DenseMap<const SILBasicBlock*, UnreachableInfo> MetaMap;
 };
 
+static void deleteEndBorrows(SILValue v) {
+  SmallVector<SILInstruction *, 4> endBorrowList;
+  for (auto *use : v->getUses()) {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
+      endBorrowList.push_back(ebi);
+    }
+  }
+  while (!endBorrowList.empty()) {
+    endBorrowList.pop_back_val()->eraseFromParent();
+  }
+}
+
 /// Propagate/remove basic block input values when all predecessors
 /// supply the same arguments.
 static void propagateBasicBlockArgs(SILBasicBlock &BB) {
@@ -172,6 +184,13 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     // FIXME: These could be further propagatable now, we might want to move
     // this to CCP and trigger another round of copy propagation.
     SILArgument *Arg = *AI;
+
+    // If this argument is guaranteed and Args[Idx] is a SILFunctionArgument,
+    // delete the end_borrow.
+    if (Arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
+        isa<SILFunctionArgument>(Args[Idx])) {
+      deleteEndBorrows(Arg);
+    }
 
     // We were able to fold, so all users should use the new folded value.
     Arg->replaceAllUsesWith(Args[Idx]);
