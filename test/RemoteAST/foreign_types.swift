@@ -10,6 +10,9 @@ import ErrorEnums
 @_silgen_name("printMetadataType")
 func printType(_: Any.Type)
 
+@_silgen_name("stopRemoteAST")
+func stopRemoteAST()
+
 printType(CCRefrigerator.self)
 // CHECK: found type: CCRefrigerator
 
@@ -30,3 +33,5 @@ printType(Wrapper.MemberEnum.self)
 
 printType(WrapperByAttribute.self)
 // CHECK: found type: WrapperByAttribute{{$}}
+
+stopRemoteAST()
