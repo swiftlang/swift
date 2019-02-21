@@ -3027,7 +3027,7 @@ public:
       MF.error();
       return nullptr;
     }
-
+    
     // Set the interface type.
     fn->computeType();
 
@@ -4686,12 +4686,12 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
-  case decls_block::ARCHETYPE_TYPE: {
+  case decls_block::PRIMARY_ARCHETYPE_TYPE: {
     GenericEnvironmentID envID;
-    TypeID interfaceTypeID;
+    unsigned depth, index;
 
-    decls_block::ArchetypeTypeLayout::readRecord(scratch, envID,
-                                                 interfaceTypeID);
+    decls_block::PrimaryArchetypeTypeLayout::readRecord(scratch, envID,
+                                                        depth, index);
 
     auto env = getGenericEnvironment(envID);
     if (!env) {
@@ -4699,7 +4699,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       break;
     }
 
-    Type interfaceType = getType(interfaceTypeID);
+    Type interfaceType = GenericTypeParamType::get(depth, index, ctx);
     Type contextType = env->mapTypeIntoContext(interfaceType);
     typeOrOffset = contextType;
 
@@ -4711,13 +4711,35 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
-  case decls_block::OPENED_EXISTENTIAL_TYPE: {
+  case decls_block::OPENED_ARCHETYPE_TYPE: {
     TypeID existentialID;
 
-    decls_block::OpenedExistentialTypeLayout::readRecord(scratch,
-                                                         existentialID);
+    decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
+                                                       existentialID);
 
     typeOrOffset = OpenedArchetypeType::get(getType(existentialID));
+    break;
+  }
+      
+  case decls_block::NESTED_ARCHETYPE_TYPE: {
+    TypeID rootID, interfaceTyID;
+    decls_block::NestedArchetypeTypeLayout::readRecord(scratch,
+                                                       rootID, interfaceTyID);
+    
+    auto rootTy = getType(rootID)->castTo<ArchetypeType>();
+    auto interfaceTy = getType(interfaceTyID)->castTo<DependentMemberType>();
+    auto rootInterfaceTy = interfaceTy->getRootGenericParam();
+    
+    auto sig = rootTy->getGenericEnvironment()->getGenericSignature();
+    
+    auto subs = SubstitutionMap::get(sig,
+      [&](SubstitutableType *t) -> Type {
+        if (t->isEqual(rootInterfaceTy))
+          return rootTy;
+        return t;
+      }, LookUpConformanceInModule(getAssociatedModule()));
+    
+    typeOrOffset = Type(interfaceTy).subst(subs);
     break;
   }
 

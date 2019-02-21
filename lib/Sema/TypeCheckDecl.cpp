@@ -3995,7 +3995,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     checkDeclAttributes(FD);
-
     break;
   }
 

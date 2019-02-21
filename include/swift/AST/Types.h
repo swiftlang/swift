@@ -4695,8 +4695,11 @@ public:
   /// Register a nested type with the given name.
   void registerNestedType(Identifier name, Type nested);
 
-  /// getPrimary - Return the primary archetype parent of this archetype.
-  PrimaryArchetypeType *getPrimary() const;
+  /// Return the root archetype parent of this archetype.
+  ArchetypeType *getRoot() const;
+  
+  /// Get the generic environment this archetype lives in.
+  GenericEnvironment *getGenericEnvironment() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -4760,7 +4763,8 @@ class OpenedArchetypeType final : public ArchetypeType,
 {
   friend TrailingObjects;
   friend ArchetypeType;
-      
+  
+  mutable GenericEnvironment *Environment = nullptr;
   TypeBase *Opened;
   UUID ID;
 public:
@@ -4789,12 +4793,17 @@ public:
     return Opened;
   }
   
+  /// Get a generic environment with this opened type bound to its generic
+  /// parameter.
+  GenericEnvironment *getGenericEnvironment() const;
+  
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;
   }
   
 private:
-  OpenedArchetypeType(const ASTContext &Ctx, Type Existential,
+  OpenedArchetypeType(const ASTContext &Ctx,
+                      Type Existential,
                       ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
                       LayoutConstraint Layout, UUID uuid);
 };
@@ -4830,6 +4839,10 @@ public:
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NestedArchetype;
+  }
+  
+  DependentMemberType *getInterfaceType() const {
+    return cast<DependentMemberType>(InterfaceType.getPointer());
   }
 
 private:
