@@ -2040,7 +2040,7 @@ namespace {
       // WitnessTablePrivateSizeInWordsAndRequiresInstantiation
       B.addInt(IGM.Int16Ty,
                (Description.witnessTablePrivateSize << 1) |
-                Description.hasDependentAssociatedTypeWitnesses);
+                Description.requiresSpecialization);
       // Instantiation function
       B.addRelativeAddressOrNull(Description.instantiationFn);
       // Private data
@@ -2296,10 +2296,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
                                      wtableBuilder.getTablePrivateSize(),
                                      isDependentConformance(
                                        conf,
-                                       /*considerResilience=*/true),
-                                     isDependentConformance(
-                                       conf,
-                                       /*considerResilience=*/false));
+                                       /*considerResilience=*/true));
 
   // Build the instantiation function, we if need one.
   description.instantiationFn = wtableBuilder.buildInstantiationFunction();
