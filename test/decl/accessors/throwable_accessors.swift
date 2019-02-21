@@ -237,3 +237,35 @@ class ThrowingPropInClass: NonThrowingPropInClass {
     get throws {} // expected-error {{cannot override non-throwing method with throwing method}}
   }
 }
+
+/// Protocol with throwing accessor refinement ///
+
+protocol P1 {
+  var foo: Int { get throws }
+}
+
+protocol Q1: P1 {
+  var foo: Int { get }
+}
+
+struct S1: Q1 {
+  var foo: Int {
+    get { return 0 } // Ok
+  }
+}
+
+/// Protocol with non-throwing accessor refinement ///
+
+protocol P2 {
+  var baz: Int { get } // expected-note {{overridden declaration is here}}
+}
+
+protocol Q2: P2 {
+  var baz: Int { get throws } // expected-error {{cannot override non-throwing method with throwing method}}
+}
+
+struct S2: Q2 {
+  var baz: Int {
+    get { return 0 }
+  }
+}
