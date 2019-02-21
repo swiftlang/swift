@@ -254,6 +254,12 @@ struct S1: Q1 {
   }
 }
 
+struct S2: P1 {
+  var foo: Int {
+    get { return 0 } // Ok
+  }
+}
+
 /// Protocol with non-throwing accessor refinement ///
 
 protocol P2 {
@@ -264,8 +270,50 @@ protocol Q2: P2 {
   var baz: Int { get throws } // expected-error {{cannot override non-throwing method with throwing method}}
 }
 
-struct S2: Q2 {
+struct S3: Q2 {
   var baz: Int {
     get { return 0 }
   }
 }
+
+/// Protocol conformance tests ///
+
+protocol P3 {
+  var run: Int { get throws set throws }
+}
+
+protocol Q3: P3 {
+  var run: Int { get set }
+}
+
+struct S4: Q3 {
+  private var _run: Int = 0
+  var run: Int {
+    get { return _run }
+    set { _run = newValue }
+  }
+}
+
+let proto: Q1 = S1()
+let _ = proto.foo // Okay
+let _ = (proto as Q1).foo // Okay
+let _ = (proto as P1).foo  // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+let _ = try (proto as P1).foo // Okay
+let _ = try? (proto as P1).foo // Okay
+let _ = try! (proto as P1).foo // Okay
+
+let anotherProto: S2 = S2()
+let _ = anotherProto.foo // Okay
+let _ = (anotherProto as P1).foo // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+let _ = try (anotherProto as P1).foo // Okay
+let _ = try? (anotherProto as P1).foo // Okay
+let _ = try! (anotherProto as P1).foo // Okay
+
+var oneMoreProto: Q3 = S4()
+oneMoreProto.run = 1 // Okay
+
+var oneExtraProto: P3 = S4()
+oneExtraProto.run = 2 // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+try oneExtraProto.run = 3 // Okay
+try? oneExtraProto.run = 3 // Okay
+try! oneExtraProto.run = 3 // Okay
