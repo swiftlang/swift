@@ -299,3 +299,8 @@ struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
   var x: DifferentiableSubset
   var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
 }
+
+// TF-265: Test invalid initializer (that uses a non-existent type).
+struct InvalidInitializer : Differentiable {
+  init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {} // expected-error {{use of undeclared type 'NonExistentType'}}
+}
