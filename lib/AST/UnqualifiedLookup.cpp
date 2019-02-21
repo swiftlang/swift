@@ -262,9 +262,9 @@ private:
                                               DeclContext *selfDC,
                                               DeclContext *wasDC,
                                               Optional<bool> isCascadingUse);
-
-  /// Return true if done with lookup.
-  bool isFinishedWithLookupNowThatIsAboutToLookForOuterResults();
+  /// Can lookup stop searching for results, assuming hasn't looked for outer
+  /// results yet?
+  bool isLookupDoneWithoutIncludingOuterResults() const;
 
   void setIndexOfFirstOuterResultIfNotSetAlready();
 
@@ -456,10 +456,10 @@ UnqualifiedLookupFactory::astScopeBasedLookup(DeclContext *const startDC,
                                           currentIsCascadingUse);
     if (!r.hasValue())
       return None;
-    const bool isDone = r.getValue().isDone;
     selfDC = r.getValue().selfDC;
     dc = r.getValue().dc;
     currentIsCascadingUse = r.getValue().isCascadingUse;
+    const bool isDone = r.getValue().isDone;
     if (isDone)
       return DCAndIsCascadingUse{dc, currentIsCascadingUse.getValue()};
   }
@@ -508,8 +508,9 @@ UnqualifiedLookupFactory::lookInScopeForASTScopeLookup(
     Consumer.foundDecl(local, getLocalDeclVisibilityKind(currentScope));
   }
 
+  setIndexOfFirstOuterResultIfNotSetAlready();
   // If we found anything, we're done.
-  if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+  if (isLookupDoneWithoutIncludingOuterResults())
     return None;
 
   // When we are in the body of a method, get the 'self' declaration.
@@ -638,7 +639,8 @@ UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
       if (DebugClient)
         filterForDiscriminator(Results, DebugClient);
 
-      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+      setIndexOfFirstOuterResultIfNotSetAlready();
+      if (isLookupDoneWithoutIncludingOuterResults())
         return None;
     }
   }
@@ -747,7 +749,8 @@ UnqualifiedLookupFactory::lookupInPatternBindingInitializer(
   // instance member lookup.
   if (auto *selfParam = PBI->getImplicitSelfDecl()) {
     Consumer.foundDecl(selfParam, DeclVisibilityKind::FunctionParameter);
-    if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+    setIndexOfFirstOuterResultIfNotSetAlready();
+    if (isLookupDoneWithoutIncludingOuterResults())
       return None;
     DeclContext *const parent = PBI->getParent();
     // clang-format off
@@ -798,13 +801,15 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
 
     namelookup::FindLocalVal localVal(SM, Loc, Consumer);
     localVal.visit(AFD->getBody());
-    if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+    setIndexOfFirstOuterResultIfNotSetAlready();
+    if (isLookupDoneWithoutIncludingOuterResults())
       return None;
 
     if (auto *P = AFD->getImplicitSelfDecl())
       localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
     localVal.checkParameterList(AFD->getParameters());
-    if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+    setIndexOfFirstOuterResultIfNotSetAlready();
+    if (isLookupDoneWithoutIncludingOuterResults())
       return None;
   }
   const bool returnValueForIsCascadingUse =
@@ -818,7 +823,8 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
     DeclContext *fnDeclContext = AFD->getDeclContext();
     DeclContext *fnParent = AFD->getParent();
     addGenericParametersForFunction(AFD);
-    if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+    setIndexOfFirstOuterResultIfNotSetAlready();
+    if (isLookupDoneWithoutIncludingOuterResults())
       return None;
     // clang-format off
     return PerScopeLookupState{
@@ -838,7 +844,8 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
   }
   // Look in the generic parameters after checking our local declaration.
   addGenericParametersForFunction(AFD);
-  if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+  setIndexOfFirstOuterResultIfNotSetAlready();
+  if (isLookupDoneWithoutIncludingOuterResults())
     return None;
   // clang-format off
   return PerScopeLookupState{
@@ -859,11 +866,13 @@ UnqualifiedLookupFactory::lookupInClosure(AbstractClosureExpr *ACE,
       namelookup::FindLocalVal localVal(SM, Loc, Consumer);
       if (auto body = CE->getBody())
         localVal.visit(body);
-      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+      setIndexOfFirstOuterResultIfNotSetAlready();
+      if (isLookupDoneWithoutIncludingOuterResults())
         return None;
       if (auto params = CE->getParameters())
         localVal.checkParameterList(params);
-      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+      setIndexOfFirstOuterResultIfNotSetAlready();
+      if (isLookupDoneWithoutIncludingOuterResults())
         return None;
     }
   }
@@ -950,7 +959,8 @@ bool UnqualifiedLookupFactory::addGenericParametersHereAndInEnclosingScopes(
     namelookup::FindLocalVal localVal(SM, Loc, Consumer);
     localVal.checkGenericParams(dcGenericParams);
 
-    if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+    setIndexOfFirstOuterResultIfNotSetAlready();
+    if (isLookupDoneWithoutIncludingOuterResults())
       return true;
   }
   return false;
@@ -977,7 +987,8 @@ bool UnqualifiedLookupFactory::addLocalVariableResults(DeclContext *dc) {
       // local types.
       namelookup::FindLocalVal localVal(SM, Loc, Consumer);
       localVal.checkSourceFile(*SF);
-      if (isFinishedWithLookupNowThatIsAboutToLookForOuterResults())
+      setIndexOfFirstOuterResultIfNotSetAlready();
+      if (isLookupDoneWithoutIncludingOuterResults())
         return true;
     }
   }
@@ -1022,7 +1033,8 @@ bool UnqualifiedLookupFactory::handleUnavailableInnerResults(
   if (DebugClient)
     filterForDiscriminator(Results, DebugClient);
 
-  return isFinishedWithLookupNowThatIsAboutToLookForOuterResults();
+  setIndexOfFirstOuterResultIfNotSetAlready();
+  return isLookupDoneWithoutIncludingOuterResults();
 }
 
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
@@ -1115,10 +1127,8 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
   return baseNLOptions;
 }
 
-bool UnqualifiedLookupFactory::
-    isFinishedWithLookupNowThatIsAboutToLookForOuterResults() {
-  setIndexOfFirstOuterResultIfNotSetAlready();
-
+bool UnqualifiedLookupFactory::isLookupDoneWithoutIncludingOuterResults()
+    const {
   return !Results.empty() && !options.contains(Flags::IncludeOuterResults);
 }
 
