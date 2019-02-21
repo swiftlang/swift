@@ -6192,8 +6192,12 @@ public:
   }
 };
 
-/// MarkDependenceInst - Marks that one value depends on another for
-/// validity in a non-obvious way.
+/// Indicates that the validity of the first operand ("the value") depends on
+/// the value of the second operand ("the base").  Operations that would destroy
+/// the base must not be moved before any instructions which depend on the
+/// result of this instruction, exactly as if the address had been obviously
+/// derived from that operand (e.g. using ``ref_element_addr``). The result is
+/// always equal to the first operand.
 class MarkDependenceInst
     : public InstructionBase<SILInstructionKind::MarkDependenceInst,
                              SingleValueInstruction> {
@@ -6209,6 +6213,7 @@ public:
   enum { Value, Base };
 
   SILValue getValue() const { return Operands[Value].get(); }
+
   SILValue getBase() const { return Operands[Base].get(); }
 
   void setValue(SILValue newVal) {
