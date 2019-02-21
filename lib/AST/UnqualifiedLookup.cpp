@@ -264,8 +264,9 @@ private:
                                               Optional<bool> isCascadingUse);
 
   /// Return true if done with lookup.
-  bool isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-      bool noMoreOuterResults = false);
+  bool isFinishedWithLookupNowThatIsAboutToLookForOuterResults();
+
+  void setIndexOfFirstOuterResultIfNotSetAlready();
 
 #pragma mark normal (non-ASTScope-based) lookup declarations
 
@@ -425,8 +426,7 @@ void UnqualifiedLookupFactory::fillInLookup() {
   if (lookForAModuleWithTheGivenName(DC))
     return;
   // Make sure we've recorded the inner-result-boundary.
-  (void)isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-      /*noMoreOuterResults=*/true);
+  setIndexOfFirstOuterResultIfNotSetAlready();
 }
 
 bool UnqualifiedLookupFactory::shouldUseASTScopeLookup() const {
@@ -1062,16 +1062,15 @@ bool UnqualifiedLookupFactory::addNamesKnownToDebugClient(DeclContext *dc) {
   if (Name.isSimpleName() && DebugClient)
     DebugClient->lookupAdditions(Name.getBaseName(), dc, Loc,
                                  isOriginallyTypeLookup, Results);
-
+  setIndexOfFirstOuterResultIfNotSetAlready();
   // If we've found something, we're done.
-  return isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-      /*noMoreOuterResults=*/true);
+  return !Results.empty();
 }
 
 bool UnqualifiedLookupFactory::addUnavailableInnerResults() {
   Results = std::move(UnavailableInnerResults);
-  return isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-      /*noMoreOuterResults=*/true);
+  setIndexOfFirstOuterResultIfNotSetAlready();
+  return !Results.empty();
 }
 
 bool UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
@@ -1083,8 +1082,8 @@ bool UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
   // Look for a module with the given name.
   if (Name.isSimpleName(M.getName())) {
     Results.push_back(LookupResultEntry(&M));
-    return isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-        /*noMoreOuterResults=*/true);
+    setIndexOfFirstOuterResultIfNotSetAlready();
+    return true;
   }
   ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
   if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
@@ -1115,18 +1114,18 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     baseNLOptions |= NL_IgnoreAccessControl;
   return baseNLOptions;
 }
-// TODO: elim flag?
-// TODO: fold this into return None?
-bool UnqualifiedLookupFactory::
-    isFinishedWithLookupNowThatIsAboutToLookForOuterResults(
-        bool noMoreOuterResults) {
-  if (Results.empty())
-    return false;
 
+bool UnqualifiedLookupFactory::
+    isFinishedWithLookupNowThatIsAboutToLookForOuterResults() {
+  setIndexOfFirstOuterResultIfNotSetAlready();
+
+  return !Results.empty() && !options.contains(Flags::IncludeOuterResults);
+}
+
+void UnqualifiedLookupFactory::setIndexOfFirstOuterResultIfNotSetAlready() {
+  // OK to call (NOOP) if there are more inner results and Results is empty
   if (IndexOfFirstOuterResult == 0)
     IndexOfFirstOuterResult = Results.size();
-
-  return !options.contains(Flags::IncludeOuterResults) || noMoreOuterResults;
 }
 
 bool UnqualifiedLookupFactory::resolveIsCascadingUse(
