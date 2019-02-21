@@ -218,6 +218,8 @@ public:
       recurse = asImpl().checkApply(apply);
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
+    } else if (auto openExisential = dyn_cast<OpenExistentialExpr>(E)) {
+      recurse = asImpl().checkOpenExistentialExpr(openExisential);
     }
     // Error handling validation (via checkTopLevelErrorHandling) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -607,6 +609,10 @@ private:
     }
 
     ShouldRecurse_t checkIfConfig(IfConfigDecl *D) {
+      return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkOpenExistentialExpr(OpenExistentialExpr *E) {
       return ShouldRecurse;
     }
 
@@ -1651,17 +1657,34 @@ private:
     return ShouldNotRecurse;
   }
 
+  ShouldRecurse_t checkOpenExistentialExpr(OpenExistentialExpr *E) {
+    ContextScope scope(*this, None);
+
+    auto walker = ThrowingAccessorWalker(E, &Flags, TC, /*tryLoc*/ SourceLoc(),
+                                         /*handled*/ false);
+    auto throws = walker.checkAccessor(E->getSubExpr(), false, false);
+
+    if (throws) {
+      auto classification = Classification(ThrowingKind::Throws,
+                                           PotentialReason::forThrowingApply());
+      checkThrowSite(E, /*requiresTry*/ true, classification);
+    }
+
+    return ShouldNotRecurse;
+  }
+
   void checkPotentiallyThrowingAccessor(Expr *E, ContextScope &scope,
                                         TypeChecker &typeChecker,
                                         SourceLoc tryLoc) {
     auto isTryHandled = isa<OptionalTryExpr>(E) || isa<ForceTryExpr>(E);
-    auto walker = ThrowingAccessorWalker(&Flags, typeChecker, tryLoc,
+    auto walker = ThrowingAccessorWalker(E, &Flags, typeChecker, tryLoc,
                                          /*handled*/ isTryHandled);
     E->walk(walker);
   }
 
   class ThrowingAccessorWalker : public ASTWalker {
   private:
+    Expr *baseExpr;
     ContextFlags *contextFlags;
     TypeChecker &typeChecker;
     SourceLoc tryLoc;
@@ -1698,12 +1721,20 @@ private:
                                      TypeChecker &typeChecker, SourceLoc tryLoc,
                                      bool isTryHandled) {
 
+      Expr *expr = E;
+
+      if (isa<OpenExistentialExpr>(E->getDest())) {
+        expr = cast<OpenExistentialExpr>(E->getDest())->getSubExpr();
+      } else {
+        expr = E->getDest();
+      }
+
       // If we're not assigning to a nominal member, then return
-      if (!isa<MemberRefExpr>(E->getDest())) {
+      if (!isa<MemberRefExpr>(expr)) {
         return false;
       }
 
-      auto *dest = cast<MemberRefExpr>(E->getDest());
+      auto *dest = cast<MemberRefExpr>(expr);
 
       // If we're not accessing the getter or setter, then return
       if (!(hasOrdinaryAccessSemantics(dest->getAccessSemantics()))) {
@@ -1750,7 +1781,8 @@ private:
 
         auto walker =
             ThrowingAccessorChecker(flags, typeChecker, tryLoc, isTryHandled);
-        E->walk(walker);
+        // E->walk(walker);
+        baseExpr->walk(walker);
 
         return true;
       }
@@ -1798,10 +1830,23 @@ private:
     }
 
   public:
-    ThrowingAccessorWalker(ContextFlags *flags, TypeChecker &tc, SourceLoc loc,
-                           bool handled = false)
-        : contextFlags(flags), typeChecker(tc), tryLoc(loc),
+    ThrowingAccessorWalker(Expr *expr, ContextFlags *flags, TypeChecker &tc,
+                           SourceLoc loc, bool handled = false)
+        : baseExpr(expr), contextFlags(flags), typeChecker(tc), tryLoc(loc),
           isTryHandled(handled) {}
+
+    bool checkAccessor(Expr *E, bool isSetter, bool isSubscript) {
+      if (isSubscript)
+        return checkSubscript(cast<SubscriptExpr>(E), contextFlags, typeChecker,
+                              tryLoc, isTryHandled, isSetter);
+
+      if (isSetter)
+        return checkComputedPropertySetter(cast<AssignExpr>(E), contextFlags,
+                                           typeChecker, tryLoc, isTryHandled);
+
+      return checkComputedPropertyGetter(cast<MemberRefExpr>(E), contextFlags,
+                                         typeChecker, tryLoc, isTryHandled);
+    }
   };
 
   class ThrowingAccessorChecker : public ASTWalker {
@@ -1812,13 +1857,12 @@ private:
 
   private:
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-
       if (isa<DeclRefExpr>(E)) {
         auto decl = cast<DeclRefExpr>(E)->getDecl();
         auto ctx = decl->getDeclContext()->getLocalContext();
 
         if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(ctx)) {
-          if (!AFD->hasThrows() && !isTryHandled) {
+          if (!AFD->hasThrows() && !isTryHandled && tryLoc.isValid()) {
             typeChecker.diagnose(tryLoc, diag::throw_in_nonthrowing_function);
           }
         }
