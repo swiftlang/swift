@@ -317,3 +317,34 @@ oneExtraProto.run = 2 // expected-error {{call can throw but is not marked with 
 try oneExtraProto.run = 3 // Okay
 try? oneExtraProto.run = 3 // Okay
 try! oneExtraProto.run = 3 // Okay
+
+protocol P4 {
+  subscript(fizz: Int) -> Int { get throws set throws }
+}
+
+protocol Q4: P4 {
+  subscript(fizz: Int) -> Int { get set }
+}
+
+struct S5: Q4 {
+  subscript(fizz: Int) -> Int {
+    get { return 0 }
+    set {}
+  }
+}
+
+var subsProto: Q4 = S5()
+let _ = subsProto[0] // Okay
+let _ = (subsProto as Q4)[0] // Okay
+let _ = (subsProto as P4)[0] // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+let _ = try (subsProto as P4)[0] // Okay
+let _ = try? (subsProto as P4)[0] // Okay
+let _ = try! (subsProto as P4)[0] // Okay
+subsProto[0] = 1 // Okay
+
+var subsProto1: P4 = S5()
+let _ = subsProto1[0] // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+let _ = try subsProto1[0] // Okay
+let _ = try? subsProto1[0] // Okay
+let _ = try! subsProto1[0] // Okay
+subsProto1[0] = 1 // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
