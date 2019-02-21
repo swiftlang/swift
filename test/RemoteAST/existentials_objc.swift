@@ -8,6 +8,9 @@ import Foundation
 @_silgen_name("printDynamicTypeAndAddressForExistential")
 func printDynamicTypeAndAddressForExistential<T>(_: T)
 
+@_silgen_name("stopRemoteAST")
+func stopRemoteAST()
+
 // CHECK: NSObject
 printDynamicTypeAndAddressForExistential(NSObject() as AnyObject)
 
@@ -41,3 +44,5 @@ class ClassError : NSError {
 
 // CHECK: ClassError
 printDynamicTypeAndAddressForExistential(ClassError() as Error)
+
+stopRemoteAST()
