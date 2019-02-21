@@ -94,7 +94,6 @@ ResilientClassTestSuite.test("OutsideClassWithResilientProperty") {
   expectEqual(1, c.laziestNumber)
 }
 
-
 // Generic class with resilient stored property
 
 public class GenericClassWithResilientProperty<T> {
@@ -289,5 +288,40 @@ ResilientClassTestSuite.test("TypeByName") {
              == ChildOfOutsideParentWithResilientStoredProperty.self)
 }
 
+@_fixed_layout
+public struct Empty {}
+
+// rdar://48031465
+public class ClassWithEmptyThenResilient {
+  public let empty: Empty
+  public let resilient: ResilientInt
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
+}
+
+ResilientClassTestSuite.test("EmptyThenResilient") {
+  let c = ClassWithEmptyThenResilient(empty: Empty(),
+                                      resilient: ResilientInt(i: 17))
+  expectEqual(c.resilient.i, 17)
+}
+
+public class ClassWithResilientThenEmpty {
+  public let resilient: ResilientInt
+  public let empty: Empty
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
+}
+
+ResilientClassTestSuite.test("ResilientThenEmpty") {
+  let c = ClassWithResilientThenEmpty(empty: Empty(),
+                                      resilient: ResilientInt(i: 17))
+  expectEqual(c.resilient.i, 17)
+}
 
 runAllTests()
