@@ -1343,6 +1343,24 @@ bool WitnessChecker::checkWitnessThrowingAccessor(ValueDecl *requirement,
     }
   }
 
+  if (auto reqReadCoroutine = reqStorageDecl->getReadCoroutine()) {
+    if (auto witnessReadCoroutine = witnessStorageDecl->getReadCoroutine()) {
+      if (!reqReadCoroutine->hasThrows() && witnessReadCoroutine->hasThrows()) {
+        shouldDiagnose = true;
+      }
+    }
+  }
+
+  if (auto reqModifyCoroutine = reqStorageDecl->getModifyCoroutine()) {
+    if (auto witnessModifyCoroutine =
+            witnessStorageDecl->getModifyCoroutine()) {
+      if (!reqModifyCoroutine->hasThrows() &&
+          witnessModifyCoroutine->hasThrows()) {
+        shouldDiagnose = true;
+      }
+    }
+  }
+
   return shouldDiagnose;
 }
 
