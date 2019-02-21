@@ -223,3 +223,17 @@ struct NonThrowingS: NonThrowingP { // expected-error {{type 'NonThrowingS' does
         set throws {}
     }
 }
+
+/// Class with non-throwing accessor ///
+
+class NonThrowingPropInClass {
+  var foo: Int {
+    get { return 0 } // expected-note {{overridden declaration is here}}
+  }
+}
+
+class ThrowingPropInClass: NonThrowingPropInClass {
+  override var foo: Int {
+    get throws {} // expected-error {{cannot override non-throwing method with throwing method}}
+  }
+}
