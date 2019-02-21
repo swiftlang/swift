@@ -100,19 +100,27 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DenseSet<ModuleDecl *> ImportedModules;
 
   llvm::BumpPtrAllocator DebugInfoNames;
-  StringRef CWDName;                    /// The current working directory.
-  SmallString<0> ConfigMacros;          /// User-provided -D macro definitions.
-  llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
-  llvm::DIFile *MainFile = nullptr;     /// The main file.
-  llvm::DIModule *MainModule = nullptr; /// The current module.
-  llvm::DIScope *EntryPointFn =
-      nullptr;                     /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
+  /// The current working directory.
+  StringRef CWDName;
+  /// User-provided -D macro definitions.
+  SmallString<0> ConfigMacros;
+  /// The current compilation unit.
+  llvm::DICompileUnit *TheCU = nullptr;
+  /// The main file.
+  llvm::DIFile *MainFile = nullptr;
+  /// The current module.
+  llvm::DIModule *MainModule = nullptr;
+  /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
+  llvm::DIScope *EntryPointFn = nullptr;
   /// The artificial type decls for named archetypes.
   llvm::StringMap<TypeAliasDecl *> MetadataTypeDeclCache;
-  llvm::DIType *InternalType;      /// Catch-all type for opaque internal types.
+  /// Catch-all type for opaque internal types.
+  llvm::DIType *InternalType = nullptr;
 
-  SILLocation::DebugLoc LastDebugLoc; /// The last location that was emitted.
-  const SILDebugScope *LastScope;     /// The scope of that last location.
+  /// The last location that was emitted.
+  SILLocation::DebugLoc LastDebugLoc;
+  /// The scope of that last location.
+  const SILDebugScope *LastScope = nullptr;
 
   /// Used by pushLoc.
   SmallVector<std::pair<SILLocation::DebugLoc, const SILDebugScope *>, 8>
@@ -1587,8 +1595,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        llvm::Module &M,
                                        StringRef MainOutputFilenameForDebugInfo)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), M(M), DBuilder(M),
-      IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap),
-      InternalType(nullptr), LastDebugLoc({}), LastScope(nullptr) {
+      IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap) {
   assert(Opts.DebugInfoLevel > IRGenDebugInfoLevel::None &&
          "no debug info should be generated");
   llvm::SmallString<256> SourcePath;
