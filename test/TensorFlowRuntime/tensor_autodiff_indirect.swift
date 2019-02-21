@@ -70,6 +70,13 @@ TensorADTests.testAllBackends("ResultSelection") {
   expectEqual((0, 1), gradient(at: Double(3), 3, in: { x, y in indirect(x, y).1 }))
 }
 
+public protocol Layer: Differentiable {
+  associatedtype Input: Differentiable
+  associatedtype Output: Differentiable
+  @differentiable(wrt: (self, input))
+  func applied(to input: Input) -> Output
+}
+
 TensorADTests.testAllBackends("GenericLayerMember") {
   // Tests TF-203.
   struct GenericLayerWrapper<T: Layer> : Layer {

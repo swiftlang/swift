@@ -12,8 +12,9 @@ var ModelADTests = TestSuite("ModelAD")
 ModelADTests.testAllBackends("SimpleLayerAD") {
   let ones = Tensor<Float>(ones: [2, 2])
   let dense = Dense<Float>(inputSize: 2, outputSize: 2, activation: { $0 })
+  let context = Context(learningPhase: .inference)
   let grad = gradient(at: dense) { dense in
-    dense.applied(to: ones).sum()
+    dense.applied(to: ones, in: context).sum()
   }
   expectEqual([[2, 2], [2, 2]], grad.weight)
   expectEqual([2, 2], grad.bias)
@@ -62,7 +63,7 @@ ModelADTests.testAllBackends("WithRespectToModel") {
   }
   let x = Tensor<Float>(0)
   var model = Foo<Float>(bar: x, baz: x)
-  let context = Context(learningPhase: inference)
+  let context = Context(learningPhase: .inference)
   let d = gradient(at: model) { model in
     model.applied(to: x, in: context)
   }
