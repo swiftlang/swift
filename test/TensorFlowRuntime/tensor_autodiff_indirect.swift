@@ -70,6 +70,37 @@ TensorADTests.testAllBackends("ResultSelection") {
   expectEqual((0, 1), gradient(at: Double(3), 3, in: { x, y in indirect(x, y).1 }))
 }
 
+// Mini high-level ML library.
+public protocol Layer: Differentiable {
+  associatedtype Input: Differentiable
+  associatedtype Output: Differentiable
+  @differentiable(wrt: (self, input))
+  func applied(to input: Input) -> Output
+}
+
+@_fixed_layout
+public struct Dense<Scalar: TensorFlowFloatingPoint>: Layer {
+  public var weight: Tensor<Scalar>
+  public var bias: Tensor<Scalar>
+  public typealias Activation = @differentiable (Tensor<Scalar>) -> Tensor<Scalar>
+  @noDerivative public let activation: Activation
+
+  @differentiable(wrt: (self, input))
+  public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
+    return activation(matmul(input, weight) + bias)
+  }
+}
+
+public extension Dense where Scalar.RawSignificand: FixedWidthInteger {
+  init(inputSize: Int, outputSize: Int, activation: @escaping Activation) {
+    self.init(weight: Tensor(
+                glorotUniform: [Int32(inputSize), Int32(outputSize)]
+              ),
+              bias: Tensor(zeros: [Int32(outputSize)]),
+              activation: activation)
+  }
+}
+
 TensorADTests.testAllBackends("GenericLayerMember") {
   // Tests TF-203.
   struct GenericLayerWrapper<T: Layer> : Layer {
