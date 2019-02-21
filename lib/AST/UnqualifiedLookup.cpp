@@ -161,8 +161,8 @@ private:
     // Classify this declaration.
     // Types are formally members of the metatype.
     DeclContext *whereValueIsMember(const ValueDecl *const member) const {
-      return dyn_cast<TypeDecl>(member) ? whereTypesAreMembers
-                                        : whereNonTypesAreMembers;
+      return isa<TypeDecl>(member) ? whereTypesAreMembers
+                                   : whereNonTypesAreMembers;
     }
     void addToResults(const DeclName &Name, bool isCascadingUse,
                       NLOptions baseNLOptions, DeclContext *contextForLookup,
@@ -696,7 +696,7 @@ UnqualifiedLookupFactory::lookupInOneDeclContext(
   auto placesToSearch = std::move(r.getValue().placesToSearch);
   auto isCascadingUse = r.getValue().isCascadingUse;
 
-  if (!dyn_cast<DefaultArgumentInitializer>(dc) &&
+  if (!isa<DefaultArgumentInitializer>(dc) &&
       addGenericParametersHereAndInEnclosingScopes(lookupContextForThisDecl))
     return None;
   if (placesToSearch.hasValue() && !placesToSearch.getValue().empty()) {
