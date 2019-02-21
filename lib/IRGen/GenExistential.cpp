@@ -2366,9 +2366,9 @@ static llvm::Constant *getAssignBoxedOpaqueExistentialBufferFunction(
           Builder.emitBlock(matchInlineBB);
           {
             ConditionalDominanceScope inlineCondition(IGF);
-            emitAssignWithCopyCall(IGF, metadata,
-                                   castToOpaquePtr(IGF, destBuffer),
-                                   castToOpaquePtr(IGF, srcBuffer));
+            auto dstAddress = castToOpaquePtr(IGF, destBuffer);
+            auto srcAddress = castToOpaquePtr(IGF, srcBuffer);
+            emitAssignWithCopyCall(IGF, metadata, dstAddress, srcAddress);
             Builder.CreateBr(doneBB);
           }
 
@@ -2431,10 +2431,11 @@ static llvm::Constant *getAssignBoxedOpaqueExistentialBufferFunction(
           Builder.emitBlock(destInlineBB);
           {
             ConditionalDominanceScope destInlineCondition(IGF);
-            // Move asside so that we can destroy later.
-            emitInitializeWithTakeCall(IGF, destMetadata,
-                                       castToOpaquePtr(IGF, tmpBuffer),
-                                       castToOpaquePtr(IGF, destBuffer));
+            // Move aside so that we can destroy later.
+            auto tmpAddress = castToOpaquePtr(IGF, tmpBuffer);
+            auto destAddress = castToOpaquePtr(IGF, destBuffer);
+            emitInitializeWithTakeCall(IGF, destMetadata, tmpAddress,
+                                       destAddress);
             auto *srcInlineBB = IGF.createBasicBlock("dest-inline-src-inline");
             auto *srcOutlineBB =
                 IGF.createBasicBlock("dest-inline-src-outline");
@@ -2446,9 +2447,10 @@ static llvm::Constant *getAssignBoxedOpaqueExistentialBufferFunction(
             {
               // initializeWithCopy(dest, src)
               ConditionalDominanceScope domScope(IGF);
-              emitInitializeWithCopyCall(IGF, srcMetadata,
-                                         castToOpaquePtr(IGF, destBuffer),
-                                         castToOpaquePtr(IGF, srcBuffer));
+              auto destAddress = castToOpaquePtr(IGF, destBuffer);
+              auto srcAddress = castToOpaquePtr(IGF, srcBuffer);
+              emitInitializeWithCopyCall(IGF, srcMetadata, destAddress,
+                                         srcAddress);
               Builder.CreateBr(contBB2);
             }
 
@@ -2490,9 +2492,10 @@ static llvm::Constant *getAssignBoxedOpaqueExistentialBufferFunction(
             {
               // initializeWithCopy(dest, src)
               ConditionalDominanceScope domScope(IGF);
-              emitInitializeWithCopyCall(IGF, srcMetadata,
-                                         castToOpaquePtr(IGF, destBuffer),
-                                         castToOpaquePtr(IGF, srcBuffer));
+              auto destAddress = castToOpaquePtr(IGF, destBuffer);
+              auto srcAddress = castToOpaquePtr(IGF, srcBuffer);
+              emitInitializeWithCopyCall(IGF, srcMetadata, destAddress,
+                                         srcAddress);
               Builder.CreateBr(contBB2);
             }
 
