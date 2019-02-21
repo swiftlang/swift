@@ -1662,7 +1662,11 @@ private:
 
     auto walker = ThrowingAccessorWalker(E, &Flags, TC, /*tryLoc*/ SourceLoc(),
                                          /*handled*/ false);
-    auto throws = walker.checkAccessor(E->getSubExpr(), false, false);
+
+    auto isSetter = false;
+    auto isSubscript = isa<SubscriptExpr>(E->getSubExpr());
+
+    auto throws = walker.checkAccessor(E->getSubExpr(), isSetter, isSubscript);
 
     if (throws) {
       auto classification = Classification(ThrowingKind::Throws,
