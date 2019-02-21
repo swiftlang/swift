@@ -2229,7 +2229,23 @@ void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
     if (auto *attr = replacements[index]
                          ->getAttrs()
                          .getAttribute<DynamicReplacementAttr>()) {
-      attr->setReplacedFunction(origs[index]);
+      auto *replacedFun = origs[index];
+      auto *replacement = replacements[index];
+      if (replacedFun->isObjC() && !replacement->isObjC()) {
+        diagnose(attr->getLocation(),
+                 diag::dynamic_replacement_replacement_not_objc_dynamic,
+                 attr->getReplacedFunctionName());
+        attr->setInvalid();
+        return;
+      }
+      if (!replacedFun->isObjC() && replacement->isObjC()) {
+        diagnose(attr->getLocation(),
+                 diag::dynamic_replacement_replaced_not_objc_dynamic,
+                 attr->getReplacedFunctionName());
+        attr->setInvalid();
+        return;
+      }
+      attr->setReplacedFunction(replacedFun);
       continue;
     }
     auto *newAttr = DynamicReplacementAttr::create(
