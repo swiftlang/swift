@@ -23,47 +23,48 @@ ModelADTests.testAllBackends("XORTraining") {
   struct Classifier: Layer {
     var l1, l2: Dense<Float>
     init(hiddenSize: Int) {
-        l1 = Dense<Float>(inputSize: 2, outputSize: hiddenSize, activation: relu)
-        l2 = Dense<Float>(inputSize: hiddenSize, outputSize: 1, activation: relu)
+      l1 = Dense<Float>(inputSize: 2, outputSize: hiddenSize, activation: relu)
+      l2 = Dense<Float>(inputSize: hiddenSize, outputSize: 1, activation: relu)
     }
     @differentiable(wrt: (self, input))
-    func applied(to input: Tensor<Float>) -> Tensor<Float> {
-        let h1 = l1.applied(to: input)
-        return l2.applied(to: h1)
+    func applied(to input: Tensor<Float>, in context: Context) -> Tensor<Float> {
+      let h1 = l1.applied(to: input, in: context)
+      return l2.applied(to: h1, in: context)
     }
   }
   var classifier = Classifier(hiddenSize: 4)
+  let trainingContext = Context(learningPhase: .training)
   let optimizer = SGD<Classifier, Float>()
   let x: Tensor<Float> = [[0, 0], [0, 1], [1, 0], [1, 1]]
   let y: Tensor<Float> = [0, 1, 1, 0]
   for _ in 0..<1000 {
-      let (loss, 𝛁model) = classifier.valueWithGradient { classifier -> Tensor<Float> in
-          let ŷ = classifier.applied(to: x)
-          return meanSquaredError(predicted: ŷ, expected: y)
-      }
-      optimizer.update(&classifier.allDifferentiableVariables, along: 𝛁model)
+    let (loss, 𝛁model) = classifier.valueWithGradient { classifier -> Tensor<Float> in
+      let ŷ = classifier.applied(to: x, in: trainingContext)
+      return meanSquaredError(predicted: ŷ, expected: y)
+    }
+    optimizer.update(&classifier.allDifferentiableVariables, along: 𝛁model)
   }
-  print(classifier.applied(to: [[0, 0], [0, 1], [1, 0], [1, 1]]))
+  let inferenceContext = Context(learningPhase: .inference)
+  print(classifier.applied(to: [[0, 0], [0, 1], [1, 0], [1, 1]], in: inferenceContext))
 }
 
 ModelADTests.testAllBackends("WithRespectToModel") {
   struct Foo<Scalar>: Differentiable
     where Scalar: FloatingPoint & Differentiable & TensorFlowScalar {
-  
+
     var bar: Tensor<Scalar>
     var baz: Tensor<Scalar>
-  
+
     @differentiable(wrt: (self, input))
     func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
-        return bar + input
+      return bar + input
     }
   }
-  
   let x = Tensor<Float>(0)
   var model = Foo<Float>(bar: x, baz: x)
-  
+  let context = Context(learningPhase: inference)
   let d = gradient(at: model) { model in
-      model.applied(to: x)
+    model.applied(to: x, in: context)
   }
   expectEqual(Foo<Float>.AllDifferentiableVariables(bar: Tensor(1.0), baz: Tensor(0.0)), d)
 }
