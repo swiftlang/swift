@@ -171,7 +171,6 @@ private:
   };
 
   struct PerDeclInfo {
-    bool isDoneWithThisDecl;
     DeclContext *lookupContextForThisDecl;
     Optional<PlacesToSearch> placesToSearch;
     Optional<bool> isCascadingUse;
@@ -692,17 +691,13 @@ UnqualifiedLookupFactory::lookupInOneDeclContext(
   const auto r = lookupInAppropriateContext(dc, isCascadingUseArg);
   if (!r.hasValue())
     return None;
-  const bool isDoneWithThisDecl = r.getValue().isDoneWithThisDecl;
   breadcrumbs.push_back(r.getValue());
   auto lookupContextForThisDecl = r.getValue().lookupContextForThisDecl;
   auto placesToSearch = std::move(r.getValue().placesToSearch);
   auto isCascadingUse = r.getValue().isCascadingUse;
 
-  if (isDoneWithThisDecl)
-    return LookupInOneDeclContextResult{lookupContextForThisDecl,
-                                        isCascadingUse};
-
-  if (addGenericParametersHereAndInEnclosingScopes(lookupContextForThisDecl))
+  if (!dyn_cast<DefaultArgumentInitializer>(dc) &&
+      addGenericParametersHereAndInEnclosingScopes(lookupContextForThisDecl))
     return None;
   if (placesToSearch.hasValue() && !placesToSearch.getValue().empty()) {
     auto startIndexOfInnerResults = Results.size();
@@ -752,7 +747,6 @@ UnqualifiedLookupFactory::lookupInPatternBindingInitializer(
     DeclContext *const parent = PBI->getParent();
     // clang-format off
     return PerDeclInfo{
-      false,
       parent,
       PlacesToSearch(PBI, parent, parent),
       resolveIsCascadingUse(PBI, isCascadingUse,
@@ -765,7 +759,6 @@ UnqualifiedLookupFactory::lookupInPatternBindingInitializer(
     DeclContext *const surroundingContext = PBI->getParent();
     // clang-format off
     return PerDeclInfo{
-      false,
       surroundingContext,
       PlacesToSearch(surroundingContext,
                      surroundingContext, surroundingContext),
@@ -779,7 +772,6 @@ UnqualifiedLookupFactory::lookupInPatternBindingInitializer(
   // context.
   // clang-format off
   return PerDeclInfo{
-    false,
     PBI,
     None,
     resolveIsCascadingUse(PBI, isCascadingUse,
@@ -827,7 +819,6 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
   if (!AFD->getDeclContext()->isTypeContext())
      // clang-format off
      return PerDeclInfo{
-       false,
        AFD,
        None,
        returnValueForIsCascadingUse};
@@ -841,7 +832,6 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
   DeclContext *const BaseDC = isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD;
   // clang-format off
   return PerDeclInfo{
-    false,
     AFD->getParent(),
     PlacesToSearch(BaseDC,
                    fnDeclContext,
@@ -872,7 +862,6 @@ UnqualifiedLookupFactory::lookupInClosure(AbstractClosureExpr *ACE,
   }
   // clang-format off
   return PerDeclInfo{
-    false,
     ACE,
     None,
     resolveIsCascadingUse(ACE, isCascadingUse,
@@ -886,7 +875,6 @@ UnqualifiedLookupFactory::lookupInNominalTypeOrExtension(
     NominalTypeDeclOrExtensionDecl *D, Optional<bool> isCascadingUse) const {
   // clang-format off
   return PerDeclInfo{
-    false,
     D,
     shouldLookupMembers(D, Loc)
     ? Optional<PlacesToSearch>(PlacesToSearch(D, D, D))
@@ -904,7 +892,6 @@ UnqualifiedLookupFactory::lookupInDefaultArgumentInitializer(
   // initializer and the function.
   // clang-format off
   return PerDeclInfo{
-    true,
     I->getParent(),
     None,
     false};
@@ -927,7 +914,6 @@ UnqualifiedLookupFactory::lookupInMiscContext(
          isa<TypeAliasDecl>(dc) ||
          isa<SubscriptDecl>(dc));
   return PerDeclInfo{
-    false,
     dc,
     None,
     resolveIsCascadingUse(DC, isCascadingUse,
@@ -1757,7 +1743,6 @@ void UnqualifiedLookupFactory::dumpBreadcrumbs() const {
 
 void UnqualifiedLookupFactory::PerDeclInfo::dump() const {
   auto &e = llvm::errs();
-  e << (isDoneWithThisDecl ? "done: " : "not done: ");
   e << " dc: ";
   lookupContextForThisDecl->dumpContext();
   if (placesToSearch.hasValue())
