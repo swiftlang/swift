@@ -38,6 +38,7 @@ using pFileNameToGroupNameMap = std::unique_ptr<FileNameToGroupNameMap>;
 
 namespace {
 class YamlGroupInputParser {
+  ASTContext &Ctx;
   StringRef RecordPath;
   static constexpr const char * const Separator = "/";
 
@@ -86,10 +87,18 @@ class YamlGroupInputParser {
   }
 
 public:
-  YamlGroupInputParser(StringRef RecordPath): RecordPath(RecordPath) {}
+  YamlGroupInputParser(ASTContext &Ctx, StringRef RecordPath):
+    Ctx(Ctx), RecordPath(RecordPath) {}
 
   FileNameToGroupNameMap* getParsedMap() {
     return AllMaps[RecordPath].get();
+  }
+
+  bool diagnoseGroupInfoFile(bool FileMissing = false) {
+    Ctx.Diags.diagnose(SourceLoc(),
+      FileMissing ? diag::cannot_find_group_info_file:
+      diag::cannot_parse_group_info_file, RecordPath);
+    return true;
   }
 
   // Parse the Yaml file that contains the group information.
@@ -102,32 +111,31 @@ public:
 
     auto Buffer = llvm::MemoryBuffer::getFile(RecordPath);
     if (!Buffer) {
-      // The group info file does not exist.
-      return true;
+      return diagnoseGroupInfoFile(/*Missing File*/true);
     }
     llvm::SourceMgr SM;
     llvm::yaml::Stream YAMLStream(Buffer.get()->getMemBufferRef(), SM);
     llvm::yaml::document_iterator I = YAMLStream.begin();
     if (I == YAMLStream.end()) {
       // Cannot parse correctly.
-      return true;
+      return diagnoseGroupInfoFile();
     }
     llvm::yaml::Node *Root = I->getRoot();
     if (!Root) {
       // Cannot parse correctly.
-      return true;
+      return diagnoseGroupInfoFile();
     }
 
     // The format is a map of ("group0" : ["file1", "file2"]), meaning all
     // symbols from file1 and file2 belong to "group0".
     auto *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
     if (!Map) {
-      return true;
+      return diagnoseGroupInfoFile();
     }
     pFileNameToGroupNameMap pMap(new FileNameToGroupNameMap());
     std::string Empty;
     if (parseRoot(*pMap, Root, Empty))
-      return true;
+      return diagnoseGroupInfoFile();
 
     // Save the parsed map to the owner.
     AllMaps[RecordPath] = std::move(pMap);
@@ -168,7 +176,7 @@ class DeclGroupNameContext {
       StringRef FullPath =
           Ctx.SourceMgr.getIdentifierForBuffer(PathOp.getValue());
       if (!pMap) {
-        YamlGroupInputParser Parser(RecordPath);
+        YamlGroupInputParser Parser(Ctx, RecordPath);
         if (!Parser.parse()) {
 
           // Get the file-name to group map if parsing correctly.
