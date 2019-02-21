@@ -30,6 +30,8 @@ public protocol ProtocolWithRequirements {
 
 public struct Wrapper<T>: OtherResilientProtocol { }
 
+public struct ConcreteWrapper: OtherResilientProtocol { }
+
 public protocol ProtocolWithAssocTypeDefaults {
   associatedtype T1 = Self
   associatedtype T2: OtherResilientProtocol = Wrapper<T1>
