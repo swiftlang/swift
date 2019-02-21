@@ -5,6 +5,9 @@
 @_silgen_name("printMetadataType")
 func printType(_: Any.Type)
 
+@_silgen_name("stopRemoteAST")
+func stopRemoteAST()
+
 printType(Int.self)
 // CHECK: Int
 
@@ -137,3 +140,5 @@ struct N {
   }
 }
 N.testPrivate()
+
+stopRemoteAST()
