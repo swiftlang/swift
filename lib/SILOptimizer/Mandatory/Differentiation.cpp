@@ -972,6 +972,17 @@ public:
     return differentiationTasks[existing->getSecond()].get();
   }
 
+  /// Tries to promote origFnOperand which is of function type to an autodiff
+  /// function.
+  SILValue promoteToDifferentiableFunction(
+      SILBuilder &builder, SILLocation loc, SILValue origFnOperand,
+      const llvm::SmallBitVector &parameterIndices,
+      unsigned differentiationOrder, DifferentiationInvoker invoker);
+
+  /// For an autodiff_function instruction that is missing associated functions,
+  /// fill those in.
+  bool processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi);
+
 public:
   /// Register a differentiation task in the global worklist. This will ensure
   /// that a `[differentiable]` attribute will be generated for the specified
@@ -5605,48 +5616,90 @@ class Differentiation : public SILModuleTransform {
 public:
   Differentiation() : SILModuleTransform() {}
   void run() override;
-
-private:
-  bool processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
-                                   ADContext &context);
 };
 } // end anonymous namespace
 
-bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
-                                                  ADContext &context) {
-  if (adfi->getNumAssociatedFunctions() ==
-      autodiff::getNumAutoDiffAssociatedFunctions(
-          adfi->getDifferentiationOrder()))
-    return false;
-  assert(adfi->getNumAssociatedFunctions() == 0 &&
-         "some functions are already filled in but not all of them");
+SILValue ADContext::promoteToDifferentiableFunction(
+    SILBuilder &builder, SILLocation loc, SILValue origFnOperand,
+    const llvm::SmallBitVector &parameterIndices, unsigned differentiationOrder,
+    DifferentiationInvoker invoker) {
+  if (auto *ai = dyn_cast<ApplyInst>(origFnOperand)) {
+    if (auto *sourceFn = dyn_cast<FunctionRefInst>(ai->getCallee())) {
+      SILAutoDiffIndices desiredIndices(0, parameterIndices);
+      auto *orig = sourceFn->getReferencedFunction();
+      auto newName = "AD__" + orig->getName().str() + "__cloned_curry_thunk_" +
+                     desiredIndices.mangle();
 
-  SILFunction *parent = adfi->getFunction();
-  auto origFnOperand = adfi->getOriginalFunction();
-  SILBuilder builder(adfi);
-  auto loc = parent->getLocation();
-  SILAutoDiffIndices desiredIndices(0, adfi->getParameterIndices());
+      auto origTy = orig->getLoweredFunctionType();
 
+      auto curriedTy = origTy->getSingleResult();
+      if (auto resultFnTy = curriedTy.getType()->getAs<SILFunctionType>()) {
+        SILResultInfo resultInfo = {
+            resultFnTy->getWithExtInfo(
+                resultFnTy->getExtInfo().withDifferentiable(true)),
+            curriedTy.getConvention()};
+        auto newFnType = SILFunctionType::get(
+            origTy->getGenericSignature(), origTy->getExtInfo(),
+            origTy->getCoroutineKind(), origTy->getCalleeConvention(),
+            origTy->getParameters(), {}, {resultInfo}, {},
+            origTy->getASTContext());
+        SILOptFunctionBuilder functionBuilder(transform);
+        SILFunction *newF = functionBuilder.createFunction(
+            getSpecializedLinkage(orig, orig->getLinkage()), newName, newFnType,
+            orig->getGenericEnvironment(), orig->getLocation(), orig->isBare(),
+            orig->isTransparent(), orig->isSerialized(),
+            orig->isDynamicallyReplaceable(), orig->getEntryCount(),
+            orig->isThunk(), orig->getClassSubclassScope(),
+            orig->getInlineStrategy(), orig->getEffectsKind(), orig,
+            orig->getDebugScope());
+
+        SILFunctionCloner cloner(newF);
+        cloner.cloneFunction(orig);
+
+        auto *retInst = cast<ReturnInst>(newF->findReturnBB()->getTerminator());
+
+        AutoDiffFunctionInst *adfi;
+        {
+          SILBuilder builder(retInst);
+          adfi = builder.createAutoDiffFunction(loc, parameterIndices,
+                                                differentiationOrder,
+                                                retInst->getOperand());
+          builder.createReturn(loc, adfi);
+        }
+        retInst->eraseFromParent();
+
+        newF->setUnqualifiedOwnership();
+
+        if (processAutoDiffFunctionInst(adfi)) {
+          return nullptr;
+        }
+
+        auto *fn = builder.createFunctionRefFor(sourceFn->getLoc(), newF);
+        SmallVector<SILValue, 8> newArgs;
+        for (auto origArg : ai->getArguments())
+          newArgs.push_back(origArg);
+
+        auto *inst =
+            builder.createApply(ai->getLoc(), fn, ai->getSubstitutionMap(),
+                                newArgs, ai->isNonThrowing());
+        return inst;
+      }
+    }
+  }
+
+  SILAutoDiffIndices desiredIndices(0, parameterIndices);
   SmallVector<SILValue, 2> assocFns;
   for (auto assocFnKind : {AutoDiffAssociatedFunctionKind::JVP,
                            AutoDiffAssociatedFunctionKind::VJP}) {
-    auto getInvoker =
-        [&](AutoDiffFunctionInst *inst) -> DifferentiationInvoker {
-      if (auto *expr = findDifferentialOperator(inst))
-        return expr;
-      return inst;
-    };
-    auto invoker = getInvoker(adfi);
     auto assocFnAndIndices = emitAssociatedFunctionReference(
-        context, builder, /*parentTask*/ nullptr, desiredIndices, assocFnKind,
+        *this, builder, /*parentTask*/ nullptr, desiredIndices, assocFnKind,
         origFnOperand, invoker, [](DifferentiationTask *newTask) {});
     if (!assocFnAndIndices) {
       // Show an error at the operator, highlight the argument, and show a note
       // at the definition site of the argument.
       auto loc = invoker.getLocation();
-      context.diagnose(loc, diag::autodiff_function_not_differentiable)
-          .highlight(loc);
-      return true;
+      diagnose(loc, diag::autodiff_function_not_differentiable).highlight(loc);
+      return nullptr;
     }
     assert(assocFnAndIndices->second == desiredIndices &&
            "FIXME: We could emit a thunk that converts the VJP to have the "
@@ -5656,12 +5709,37 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
     assocFns.push_back(assocFn);
   }
 
-  auto *newADFI = builder.createAutoDiffFunction(
-      loc, adfi->getParameterIndices(), adfi->getDifferentiationOrder(),
-      origFnOperand, assocFns);
+  return builder.createAutoDiffFunction(
+      loc, parameterIndices, differentiationOrder, origFnOperand, assocFns);
+}
+
+bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
+  if (adfi->getNumAssociatedFunctions() ==
+      autodiff::getNumAutoDiffAssociatedFunctions(
+          adfi->getDifferentiationOrder()))
+    return false;
+  assert(adfi->getNumAssociatedFunctions() == 0 &&
+         "some functions are already filled in but not all of them");
+
+  SILFunction *parent = adfi->getFunction();
+  auto loc = parent->getLocation();
+  SILBuilder builder(adfi);
+
+  auto getInvoker = [&](AutoDiffFunctionInst *inst) -> DifferentiationInvoker {
+    if (auto *expr = findDifferentialOperator(inst))
+      return expr;
+    return inst;
+  };
+  auto invoker = getInvoker(adfi);
+  auto newADFI = promoteToDifferentiableFunction(
+      builder, loc, adfi->getOriginalFunction(), adfi->getParameterIndices(),
+      adfi->getDifferentiationOrder(), invoker);
+  if (!newADFI)
+    return true;
   adfi->replaceAllUsesWith(newADFI);
   adfi->eraseFromParent();
-  PM->invalidateAnalysis(parent, SILAnalysis::InvalidationKind::FunctionBody);
+  transform.invalidateAnalysis(parent,
+                               SILAnalysis::InvalidationKind::FunctionBody);
   return false;
 }
 
@@ -5717,7 +5795,7 @@ void Differentiation::run() {
 
   bool errorProcessingAutoDiffInsts = false;
   for (auto *adfi : autodiffInsts)
-    errorProcessingAutoDiffInsts |= processAutoDiffFunctionInst(adfi, context);
+    errorProcessingAutoDiffInsts |= context.processAutoDiffFunctionInst(adfi);
 
   auto cleanUp = [&]() {
     for (auto &task : context.getDifferentiationTasks())
