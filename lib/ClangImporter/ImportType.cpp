@@ -315,6 +315,18 @@ namespace {
       case clang::BuiltinType::OCLClkEvent:
       case clang::BuiltinType::OCLQueue:
       case clang::BuiltinType::OCLReserveID:
+      case clang::BuiltinType::OCLIntelSubgroupAVCMcePayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImePayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCRefPayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCSicPayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCMceResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
         return Type();
 
       // OpenMP types that don't have Swift equivalents.
@@ -1453,7 +1465,7 @@ ImportedType ClangImporter::Implementation::importType(
   // This bans some trickery that the redefinition types enable, but is a more
   // sane model overall.
   auto &clangContext = getClangASTContext();
-  if (clangContext.getLangOpts().ObjC1) {
+  if (clangContext.getLangOpts().ObjC) {
     if (clangContext.hasSameUnqualifiedType(
           type, clangContext.getObjCIdRedefinitionType()) &&
         !clangContext.hasSameUnqualifiedType(

@@ -13,3 +13,6 @@ add_swift_host_library(swiftImmediate STATIC
     mcjit
     transformutils)
 
+if(HAVE_UNICODE_LIBEDIT)
+  target_link_libraries(swiftImmediate PRIVATE edit)
+endif()

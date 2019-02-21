@@ -165,6 +165,9 @@ private:
   /// The original path to the executable.
   std::string DriverExecutable;
 
+  // Extra args to pass to the driver executable
+  SmallVector<std::string, 2> DriverExecutableArgs;
+
   DriverKind driverKind = DriverKind::Interactive;
 
   /// Default target triple.
@@ -191,7 +194,11 @@ public:
   const std::string &getSwiftProgramPath() const {
     return DriverExecutable;
   }
-  
+
+  ArrayRef<std::string> getSwiftProgramArgs() const {
+    return DriverExecutableArgs;
+  }
+
   DriverKind getDriverKind() const { return driverKind; }
   
   ArrayRef<const char *> getArgsWithoutProgramNameAndDriverMode(

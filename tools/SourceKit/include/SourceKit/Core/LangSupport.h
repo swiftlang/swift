@@ -123,6 +123,18 @@ struct CodeCompletionInfo {
   Optional<ArrayRef<ParameterStructure>> parametersStructure;
 };
 
+struct ExpressionType {
+  unsigned ExprOffset;
+  unsigned ExprLength;
+  unsigned TypeOffset;
+  unsigned TypeLength;
+};
+
+struct ExpressionTypesInFile {
+  std::vector<ExpressionType> Results;
+  StringRef TypeBuffer;
+};
+
 class CodeCompletionConsumer {
   virtual void anchor();
 
@@ -708,6 +720,10 @@ public:
                                    ArrayRef<const char*> Args,
                                    CategorizedEditsReceiver Receiver) = 0;
 
+  virtual void collectExpressionTypes(StringRef FileName,
+                                      ArrayRef<const char *> Args,
+                                      std::function<void(const ExpressionTypesInFile&)> Receiver) = 0;
+
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,
                           StringRef ModuleName,
                           ArrayRef<const char *> Args,
@@ -726,7 +742,6 @@ public:
 
   virtual void getStatistics(StatisticsReceiver) = 0;
 };
-
 } // namespace SourceKit
 
 #endif

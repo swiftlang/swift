@@ -677,3 +677,13 @@ protocol C {
 protocol D {
   associatedtype Foo where Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
 }
+
+func member_ref_with_explicit_init() {
+  struct S<T: P> { // expected-note {{where 'T' = 'Int'}}
+    init(_: T) {}
+    init(_: T, _ other: Int = 42) {}
+  }
+
+  _ = S.init(42)
+  // expected-error@-1 {{generic struct 'S' requires that 'Int' conform to 'P'}}
+}

@@ -379,6 +379,14 @@ public:
   /// function symbol.
   bool hasSwiftCallingConvention(llvm::StringRef MangledName);
 
+  /// Demangle the given symbol and return the module name of the symbol.
+  ///
+  /// \param mangledName The mangled symbol string, which start a mangling
+  /// prefix: _T, _T0, $S, _$S.
+  ///
+  /// \returns The module name.
+  std::string getModuleName(llvm::StringRef mangledName);
+
   /// Deallocates all nodes.
   ///
   /// The memory which is used for nodes is not freed but recycled for the next
@@ -577,6 +585,14 @@ bool isSpecialized(Node *node);
 
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 std::string archetypeName(Node::IndexType index, Node::IndexType depth);
+
+/// Returns true if the node \p kind refers to a context node, e.g. a nominal
+/// type or a function.
+bool isContext(Node::Kind kind);
+
+/// Returns true if the node \p kind refers to a node which is placed before a
+/// function node, e.g. a specialization attribute.
+bool isFunctionAttr(Node::Kind kind);
 
 /// Form a StringRef around the mangled name starting at base, if the name may
 /// contain symbolic references.

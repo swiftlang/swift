@@ -4316,9 +4316,26 @@ CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
       ::new (mem) OpenedArchetypeType(ctx, existential,
                                 protos, layoutSuperclass,
                                 layoutConstraint, *knownID);
+  result->InterfaceType = GenericTypeParamType::get(0, 0, ctx);
+  
   openedExistentialArchetypes[*knownID] = result;
-
   return CanOpenedArchetypeType(result);
+}
+
+GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
+  if (Environment)
+    return Environment;
+  
+  auto thisType = Type(const_cast<OpenedArchetypeType*>(this));
+  auto &ctx = thisType->getASTContext();
+  // Create a generic environment to represent the opened type.
+  auto signature = ctx.getExistentialSignature(Opened->getCanonicalType(),
+                                               nullptr);
+  auto env = signature->createGenericEnvironment();
+  env->addMapping(signature->getGenericParams()[0], thisType);
+  Environment = env;
+  
+  return env;
 }
 
 CanType OpenedArchetypeType::getAny(Type existential) {

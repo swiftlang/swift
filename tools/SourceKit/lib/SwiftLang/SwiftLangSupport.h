@@ -521,6 +521,9 @@ public:
                              unsigned Length, ArrayRef<const char *> Args,
                              CategorizedRenameRangesReceiver Receiver) override;
 
+  void collectExpressionTypes(StringRef FileName, ArrayRef<const char *> Args,
+                              std::function<void(const ExpressionTypesInFile&)> Receiver) override;
+
   void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
                            ArrayRef<const char*> Args,
                            CategorizedEditsReceiver Receiver) override;
