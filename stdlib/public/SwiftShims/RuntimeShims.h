@@ -46,6 +46,9 @@ SWIFT_RUNTIME_STDLIB_API
 const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
 
 SWIFT_RUNTIME_STDLIB_API
+void _swift_stdlib_immortalize(void *obj);
+  
+SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_flockfile_stdout(void);
 SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_funlockfile_stdout(void);

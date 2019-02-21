@@ -68,6 +68,7 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef Filename,
 static void printNameTranslationInfo(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef Filename,
                            llvm::raw_ostream &OS);
+static void printExpressionType(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII);
 static void printSemanticInfo();
@@ -614,6 +615,11 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
+  case SourceKitRequest::CollectExpresstionType: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCollectExpressionType);
+    break;
+  }
+
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:                 \
     {                                                                                     \
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSemanticRefactoring); \
@@ -1055,6 +1061,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
     case SourceKitRequest::RangeInfo:
       printRangeInfo(Info, SourceFile, llvm::outs());
+      break;
+
+    case SourceKitRequest::CollectExpresstionType:
+      printExpressionType(Info, llvm::outs());
       break;
 
     case SourceKitRequest::DocInfo:
@@ -1525,6 +1535,25 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   if (Typename)
     OS << "<type>" <<Typename << "</type>\n";
 }
+
+static void printExpressionType(sourcekitd_variant_t Info, llvm::raw_ostream &OS) {
+  auto *TypeBuffer = sourcekitd_variant_dictionary_get_string(Info, KeyTypeBuffer);
+  sourcekitd_variant_t ExprList = sourcekitd_variant_dictionary_get_value(Info,
+    KeyExpressionTypeList);
+  unsigned Count = sourcekitd_variant_array_get_count(ExprList);
+  for (unsigned i = 0; i != Count; ++i) {
+    sourcekitd_variant_t Item = sourcekitd_variant_array_get_value(ExprList, i);
+    unsigned Offset = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionOffset);
+    unsigned Length = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionLength);
+    StringRef PrintedType(TypeBuffer + sourcekitd_variant_dictionary_get_int64(Item,
+      KeyTypeOffset), sourcekitd_variant_dictionary_get_int64(Item, KeyTypeLength));
+    OS << "(" << Offset << ", " << Offset + Length << "): " << PrintedType << "\n";
+  }
+  if (!Count) {
+    OS << "cannot find expression types in the file\n";
+  }
+}
+
 static void printFoundInterface(sourcekitd_variant_t Info,
                                 llvm::raw_ostream &OS) {
   const char *Name = sourcekitd_variant_dictionary_get_string(Info,

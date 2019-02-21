@@ -172,8 +172,7 @@ namespace {
     llvm::Constant *getConstantFieldOffset(IRGenModule &IGM,
                                            VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
-      if (fieldInfo.getKind() == ElementLayout::Kind::Fixed
-          || fieldInfo.getKind() == ElementLayout::Kind::Empty) {
+      if (fieldInfo.hasFixedByteOffset()) {
         return llvm::ConstantInt::get(
             IGM.Int32Ty, fieldInfo.getFixedByteOffset().getValue());
       }
@@ -791,8 +790,7 @@ private:
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
     auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
     if (isEmpty)
-      layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal),
-                           NextOffset);
+      layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal));
     else
       layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());

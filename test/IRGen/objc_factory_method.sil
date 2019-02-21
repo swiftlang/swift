@@ -24,7 +24,7 @@ bb0(%0 : $Optional<Bee>, %1 : $@thick Hive.Type):
   %3 = objc_method %2 : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive> // user: %4
   // CHECK: call {{.*}} @objc_msgSend
   %4 = apply %3(%0, %2) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive> // users: %5, %6
-  // CHECK: call {{.*}} @objc_autorelease
+  // CHECK: call {{.*}} @llvm.objc.autorelease
   autorelease_value %4 : $Optional<Hive>
   return %4 : $Optional<Hive>
 }

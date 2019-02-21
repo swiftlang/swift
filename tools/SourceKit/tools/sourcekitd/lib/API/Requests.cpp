@@ -141,6 +141,8 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
 
 static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec);
 
+static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info, ResponseReceiver Rec);
+
 static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec);
 
 static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec);
@@ -1000,6 +1002,14 @@ handleSemanticRequest(RequestDict Req,
     return Rec(createErrorRequestInvalid("'key.line' or 'key.column' are required"));
   }
 
+  if (ReqUID == RequestCollectExpressionType) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    return Lang.collectExpressionTypes(*SourceFile, Args,
+      [Rec](const ExpressionTypesInFile &Info) {
+        reportExpressionTypeInfo(Info, Rec);
+      });
+  }
+
   if (ReqUID == RequestFindLocalRenameRanges) {
     int64_t Line = 0, Column = 0, Length = 0;
     if (Req.getInt64(KeyLine, Line, /*isOptional=*/false))
@@ -1721,6 +1731,25 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
     Elem.set(KeyIsZeroArgSelector, Info.IsZeroArgSelector);
   }
   Rec(RespBuilder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportExpressionTypeInfo
+//===----------------------------------------------------------------------===//
+static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info,
+                                     ResponseReceiver Rec) {
+  ResponseBuilder Builder;
+  auto Dict = Builder.getDictionary();
+  Dict.set(KeyTypeBuffer, Info.TypeBuffer);
+  ResponseBuilder::Array Arr = Dict.setArray(KeyExpressionTypeList);
+  for (auto Result: Info.Results) {
+    auto Elem = Arr.appendDictionary();
+    Elem.set(KeyExpressionOffset, Result.ExprOffset);
+    Elem.set(KeyExpressionLength, Result.ExprLength);
+    Elem.set(KeyTypeOffset, Result.TypeOffset);
+    Elem.set(KeyTypeLength, Result.TypeLength);
+  }
+  Rec(Builder.createResponse());
 }
 
 //===----------------------------------------------------------------------===//

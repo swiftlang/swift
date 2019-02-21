@@ -831,8 +831,12 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       return NewI;
     }
 
-    // This exact cast will fail.
-    auto *NewI = Builder.createBranch(Loc, FailureBB);
+    // This exact cast will fail. With ownership enabled, we pass a copy of the
+    // original casts value to the failure block.
+    TinyPtrVector<SILValue> Args;
+    if (Builder.hasOwnership())
+      Args.push_back(Inst->getOperand());
+    auto *NewI = Builder.createBranch(Loc, FailureBB, Args);
     EraseInstAction(Inst);
     WillFailAction();
     return NewI;
@@ -859,9 +863,11 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                          TargetType, isSourceTypeExact);
 
   SILBuilderWithScope Builder(Inst, BuilderContext);
-
   if (Feasibility == DynamicCastFeasibility::WillFail) {
-    auto *NewI = Builder.createBranch(Loc, FailureBB);
+    TinyPtrVector<SILValue> Args;
+    if (Builder.hasOwnership())
+      Args.push_back(Inst->getOperand());
+    auto *NewI = Builder.createBranch(Loc, FailureBB, Args);
     EraseInstAction(Inst);
     WillFailAction();
     return NewI;

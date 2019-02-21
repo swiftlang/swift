@@ -24,7 +24,7 @@
 // RUN: test -f %t/modulecache/LeafModule-*.swiftmodule
 // RUN: llvm-bcanalyzer -dump %t/modulecache/LeafModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-LEAFMODULE
 // CHECK-LEAFMODULE: {{MODULE_NAME.*blob data = 'LeafModule'}}
-// CHECK-LEAFMODULE: {{FILE_DEPENDENCY.*Swift.swiftmodule'}}
+// CHECK-LEAFMODULE: {{FILE_DEPENDENCY.*Swift.swiftmodule([/\\].+[.]swiftmodule)?'}}
 // CHECK-LEAFMODULE: {{FILE_DEPENDENCY.*LeafModule.swiftinterface'}}
 // CHECK-LEAFMODULE: FUNC_DECL
 //
@@ -37,7 +37,7 @@
 // RUN: test -f %t/TestModule.d
 // RUN: llvm-bcanalyzer -dump %t/modulecache/OtherModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-OTHERMODULE
 // CHECK-OTHERMODULE: {{MODULE_NAME.*blob data = 'OtherModule'}}
-// CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*Swift.swiftmodule'}}
+// CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*Swift.swiftmodule([/\\].+[.]swiftmodule)?'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*LeafModule.swiftinterface'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*LeafModule-.*.swiftmodule'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*OtherModule.swiftinterface'}}
@@ -50,21 +50,17 @@
 //
 // So we cannot write a single set of CHECK-SAME lines here that will work
 // for all targets: some will have LeafModule first, some OtherModule
-// first. So instead, we write two sets of patterns, and run FileCheck
-// twice. Yes this is silly.
+// first. So instead we just use CHECK-DAG.
 //
 // RUN: %FileCheck %s -check-prefix=CHECK-DEPENDS <%t/TestModule.d
-// RUN: %FileCheck %s -check-prefix=CHECK-DEPENDSAGAIN <%t/TestModule.d
 //
 // CHECK-DEPENDS: TestModule.swiftmodule :
-// CHECK-DEPENDS-SAME: LeafModule.swiftinterface
-// CHECK-DEPENDS-SAME: OtherModule.swiftinterface
-// CHECK-DEPENDS-SAME: {{OtherModule-[^ ]+.swiftmodule}}
-// CHECK-DEPENDS-SAME: Swift.swiftmodule
-// CHECK-DEPENDS-SAME: SwiftOnoneSupport.swiftmodule
-//
-// CHECK-DEPENDSAGAIN: TestModule.swiftmodule :
-// CHECK-DEPENDSAGAIN-SAME: {{LeafModule-[^ ]+.swiftmodule}}
+// CHECK-DEPENDS-DAG: LeafModule.swiftinterface
+// CHECK-DEPENDS-DAG: OtherModule.swiftinterface
+// CHECK-DEPENDS-DAG: {{OtherModule-[^ ]+.swiftmodule}}
+// CHECK-DEPENDS-DAG: Swift.swiftmodule
+// CHECK-DEPENDS-DAG: SwiftOnoneSupport.swiftmodule
+// CHECK-DEPENDS-DAG: {{LeafModule-[^ ]+.swiftmodule}}
 
 import OtherModule
 

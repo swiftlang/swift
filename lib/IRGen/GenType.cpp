@@ -1116,6 +1116,12 @@ TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
   return found->second;
 }
 
+// The following Apple platforms support backward deployment of Swift
+// code built with Swift 5.0 running on an old Objective-C runtime
+// that does not support the class metadata update hook.
+//
+// We ship a YAML legacy type info file for these platforms as part
+// of the toolchain.
 static llvm::StringLiteral platformsWithLegacyLayouts[][2] = {
   {"appletvos", "arm64"},
   {"appletvsimulator", "x86_64"},
@@ -1140,6 +1146,26 @@ static bool doesPlatformUseLegacyLayouts(StringRef platformName,
 
   return false;
 }
+
+// The following Apple platforms ship an Objective-C runtime supporting
+// the class metadata update hook:
+//
+// - macOS 10.14.4
+// - iOS 12.2
+// - tvOS 12.2
+// - watchOS 5.2
+static bool doesPlatformSupportObjCMetadataUpdateCallback(
+    const llvm::Triple &triple) {
+  if (triple.isMacOSX())
+    return !triple.isMacOSXVersionLT(10, 14, 4);
+  if (triple.isiOS()) // also returns true on tvOS
+    return !triple.isOSVersionLT(12, 2);
+  if (triple.isWatchOS())
+    return !triple.isOSVersionLT(5, 2);
+
+  return false;
+}
+
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
@@ -1151,6 +1177,17 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   if (IGM.IRGen.Opts.EnableResilienceBypass)
     LoweringMode = Mode::CompletelyFragile;
 
+  const auto &Triple = IGM.Context.LangOpts.Target;
+
+  SupportsObjCMetadataUpdateCallback =
+    ::doesPlatformSupportObjCMetadataUpdateCallback(Triple);
+
+  // If our deployment target allows us to rely on the metadata update
+  // callback being called, we don't have to emit a legacy layout for a
+  // class with resiliently-sized fields.
+  if (SupportsObjCMetadataUpdateCallback)
+    return;
+
   // We have a bunch of -parse-stdlib tests that pass a -target in the test
   // suite. To prevent these from failing when the user hasn't build the
   // standard library for that target, we pass -disable-legacy-type-info to
@@ -1158,16 +1195,19 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   if (IGM.IRGen.Opts.DisableLegacyTypeInfo)
     return;
 
-  auto platformName = getPlatformNameForTriple(IGM.Triple);
-  auto archName = getMajorArchitectureName(IGM.Triple);
-
-  if (!doesPlatformUseLegacyLayouts(platformName, archName))
-    return;
-
   llvm::SmallString<128> defaultPath;
 
   StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
   if (path.empty()) {
+    // If the flag was not explicitly specified, look for a file in a
+    // platform-specific location, if this platform is known to require
+    // one.
+    auto platformName = getPlatformNameForTriple(Triple);
+    auto archName = swift::getMajorArchitectureName(Triple);
+
+    if (!doesPlatformUseLegacyLayouts(platformName, archName))
+      return;
+
     defaultPath.append(IGM.Context.SearchPathOpts.RuntimeLibraryPath);
     llvm::sys::path::append(defaultPath, "layouts-");
     defaultPath.append(archName);
@@ -1468,7 +1508,7 @@ const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Get the primary archetype.
-  auto primary = t->getPrimary();
+  auto primary = dyn_cast<PrimaryArchetypeType>(t->getRoot());
   
   // If there is no primary (IOW, it's an opened archetype), the archetype is
   // an exemplar.
@@ -2179,7 +2219,7 @@ void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
 
 #ifndef NDEBUG
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
-  auto primary = arch->getPrimary();
+  auto primary = dyn_cast<PrimaryArchetypeType>(arch->getRoot());
   if (!primary) return true;
   auto genericEnv = primary->getGenericEnvironment();
 

@@ -3291,7 +3291,7 @@ void Serializer::writeDecl(const Decl *D) {
     Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
-
+    
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            contextID,
                            fn->isImplicit(),
@@ -3328,7 +3328,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     break;
   }
-
+      
   case DeclKind::Accessor: {
     auto fn = cast<AccessorDecl>(D);
     verifyAttrSerializable(fn);
@@ -3818,28 +3818,38 @@ void Serializer::writeType(Type ty) {
                                       addTypeRef(dynamicSelfTy->getSelfType()));
     break;
   }
-
-  case TypeKind::PrimaryArchetype:
-  case TypeKind::NestedArchetype: {
-    auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
-
-    auto env = archetypeTy->getPrimary()->getGenericEnvironment();
-    assert(env && "Primary archetype without generic environment?");
+      
+  case TypeKind::PrimaryArchetype: {
+    auto archetypeTy = cast<PrimaryArchetypeType>(ty.getPointer());
+    auto env = archetypeTy->getGenericEnvironment();
 
     GenericEnvironmentID envID = addGenericEnvironmentRef(env);
-    Type interfaceType = archetypeTy->getInterfaceType();
+    auto interfaceType = archetypeTy->getInterfaceType()
+      ->castTo<GenericTypeParamType>();
 
-    unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
-    ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    envID, addTypeRef(interfaceType));
+    unsigned abbrCode = DeclTypeAbbrCodes[PrimaryArchetypeTypeLayout::Code];
+    PrimaryArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           envID,
+                                           interfaceType->getDepth(),
+                                           interfaceType->getIndex());
     break;
   }
 
   case TypeKind::OpenedArchetype: {
     auto archetypeTy = cast<OpenedArchetypeType>(ty.getPointer());
-    unsigned abbrCode = DeclTypeAbbrCodes[OpenedExistentialTypeLayout::Code];
-    OpenedExistentialTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    unsigned abbrCode = DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
+    OpenedArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            addTypeRef(archetypeTy->getOpenedExistentialType()));
+    break;
+  }
+
+  case TypeKind::NestedArchetype: {
+    auto archetypeTy = cast<NestedArchetypeType>(ty.getPointer());
+    auto rootTypeID = addTypeRef(archetypeTy->getRoot());
+    auto interfaceTypeID = addTypeRef(archetypeTy->getInterfaceType());
+    unsigned abbrCode = DeclTypeAbbrCodes[NestedArchetypeTypeLayout::Code];
+    NestedArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                          rootTypeID, interfaceTypeID);
     break;
   }
 
@@ -4097,7 +4107,9 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<FunctionParamLayout>();
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
-  registerDeclTypeAbbr<ArchetypeTypeLayout>();
+  registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
+  registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
+  registerDeclTypeAbbr<NestedArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
@@ -4110,7 +4122,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
-  registerDeclTypeAbbr<OpenedExistentialTypeLayout>();
 
   registerDeclTypeAbbr<TypeAliasLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();

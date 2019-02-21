@@ -517,3 +517,25 @@ func rdar46211109() {
   let _: MyIntSequenceStruct? = foo(Int.Self)
   // expected-error@-1 {{type 'Int' has no member 'Self'}}
 }
+
+func rdar_48114578() {
+  struct S<T> {
+    var value: T
+
+    static func valueOf<T>(_ v: T) -> S<T> {
+      return S<T>(value: v)
+    }
+  }
+
+  typealias A = (a: [String]?, b: Int)
+
+  func foo(_ a: [String], _ b: Int) -> S<A> {
+    let v = (a, b)
+    return .valueOf(v)
+    // expected-error@-1 {{cannot express tuple conversion '([String], Int)' to '(a: [String]?, b: Int)'}}
+  }
+
+  func bar(_ a: [String], _ b: Int) -> S<A> {
+    return .valueOf((a, b)) // Ok
+  }
+}

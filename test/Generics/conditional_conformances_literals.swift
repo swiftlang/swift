@@ -30,11 +30,11 @@ func arraySameType() {
 
     let _: SameType = arrayWorks
     let _: SameType = arrayFails
-    // expected-error@-1 {{let 'arrayFails' requires the types 'Fails' and 'Works' be equivalent}}
+    // expected-error@-1 {{protocol 'SameType' requires the types 'Fails' and 'Works' be equivalent}}
 
     let _: SameType = [works] as [Works]
     let _: SameType = [fails] as [Fails]
-    // expected-error@-1 {{generic struct 'Array' requires the types 'Fails' and 'Works' be equivalent}}
+    // expected-error@-1 {{protocol 'SameType' requires the types 'Fails' and 'Works' be equivalent}}
 
     let _: SameType = [works] as SameType
     let _: SameType = [fails] as SameType
@@ -55,11 +55,11 @@ func dictionarySameType() {
 
     let _: SameType = dictWorks
     let _: SameType = dictFails
-    // expected-error@-1 {{let 'dictFails' requires the types 'Fails' and 'Works' be equivalent}}
+    // expected-error@-1 {{protocol 'SameType' requires the types 'Fails' and 'Works' be equivalent}}
 
     let _: SameType = [0 : works] as [Int : Works]
     let _: SameType = [0 : fails] as [Int : Fails]
-    // expected-error@-1 {{generic struct 'Dictionary' requires the types 'Fails' and 'Works' be equivalent}}
+    // expected-error@-1 {{protocol 'SameType' requires the types 'Fails' and 'Works' be equivalent}}
 
     let _: SameType = [0 : works] as SameType
     let _: SameType = [0 : fails] as SameType
@@ -76,15 +76,15 @@ func arrayConforms() {
 
     let _: Conforms = [works]
     let _: Conforms = [fails]
-    // expected-error@-1 {{generic struct 'Array' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = arrayWorks
     let _: Conforms = arrayFails
-    // expected-error@-1 {{let 'arrayFails' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = [works] as [Works]
     let _: Conforms = [fails] as [Fails]
-    // expected-error@-1 {{eneric struct 'Array' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = [works] as Conforms
     let _: Conforms = [fails] as Conforms
@@ -101,15 +101,15 @@ func dictionaryConforms() {
 
     let _: Conforms = [0 : works]
     let _: Conforms = [0 : fails]
-    // expected-error@-1 {{generic struct 'Dictionary' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = dictWorks
     let _: Conforms = dictFails
-    // expected-error@-1 {{let 'dictFails' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = [0 : works] as [Int : Works]
     let _: Conforms = [0 : fails] as [Int : Fails]
-    // expected-error@-1 {{generic struct 'Dictionary' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = [0 : works] as Conforms
     let _: Conforms = [0 : fails] as Conforms
@@ -123,7 +123,7 @@ func dictionaryConforms() {
 func combined() {
     let _: Conforms = [[0: [1 : [works]]]]
     let _: Conforms = [[0: [1 : [fails]]]]
-    // expected-error@-1 {{generic struct 'Array' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 
     // Needs self conforming protocols:
     let _: Conforms = [[0: [1 : [works]] as Conforms]]

@@ -17,66 +17,54 @@
 
 import TestsUtils
 
+let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
+
+// We run the test at a spread of sizes between 1*x and 2*x, because the
+// quadratic behavior only happens at certain load factors.
+
 public let DictionaryCopy = [
-  BenchmarkInfo(name: "DictionaryCopy", runFunction: run_DictionaryCopy,
-    tags: [.validation, .api, .Dictionary]),
-  BenchmarkInfo(name: "DictionaryFilter", runFunction: run_DictionaryFilter,
-    tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name:"Dict.CopyKeyValue.16k",
+    runFunction: copyKeyValue, tags: t, setUpFunction: { dict(16_000) }),
+  BenchmarkInfo(name:"Dict.CopyKeyValue.20k",
+    runFunction: copyKeyValue, tags: t, setUpFunction: { dict(20_000) }),
+  BenchmarkInfo(name:"Dict.CopyKeyValue.24k",
+    runFunction: copyKeyValue, tags: t, setUpFunction: { dict(24_000) }),
+  BenchmarkInfo(name:"Dict.CopyKeyValue.28k",
+    runFunction: copyKeyValue, tags: t, setUpFunction: { dict(28_000) }),
+
+  BenchmarkInfo(name:"Dict.FilterAllMatch.16k",
+    runFunction: filterAllMatch, tags: t, setUpFunction: { dict(16_000) }),
+  BenchmarkInfo(name:"Dict.FilterAllMatch.20k",
+    runFunction: filterAllMatch, tags: t, setUpFunction: { dict(20_000) }),
+  BenchmarkInfo(name:"Dict.FilterAllMatch.24k",
+    runFunction: filterAllMatch, tags: t, setUpFunction: { dict(24_000) }),
+  BenchmarkInfo(name:"Dict.FilterAllMatch.28k",
+    runFunction: filterAllMatch, tags: t, setUpFunction: { dict(28_000) }),
 ]
 
-@inline(never)
-public func testCopy(_ size: Int) {
-  var dict1 = [Int: Int](minimumCapacity: size)
+var dict: [Int: Int]?
 
-  // Fill dictionary
-  for i in 1...size {
-    dict1[i] = 2 * i
-  }
-  CheckResults(dict1.count == size)
-
-  var dict2 = [Int: Int]()
-  for (key, value) in dict1 {
-    dict2[key] = value
-  }
-  CheckResults(dict2.count == size)
+func dict(_ size: Int) {
+  dict = Dictionary(uniqueKeysWithValues: zip(1...size, 1...size))
 }
 
 @inline(never)
-public func run_DictionaryCopy(_ N: Int) {
-  for _ in 0 ..< N {
-    // We run the test at a spread of sizes between 1*x and 2*x, because the
-    // quadratic behavior only happens at certain load factors.
-    testCopy(100_000)
-    testCopy(125_000)
-    testCopy(150_000)
-    testCopy(175_000)
+func copyKeyValue(N: Int) {
+  for _ in 1...N {
+    var copy = [Int: Int]()
+    for (key, value) in dict! {
+      copy[key] = value
+    }
+    CheckResults(copy.count == dict!.count)
   }
 }
 
+// Filter with a predicate returning true is essentially the same loop as the
+// one in copyKeyValue above.
 @inline(never)
-public func testFilter(_ size: Int) {
-  var dict1 = [Int: Int](minimumCapacity: size)
-
-  // Fill dictionary
-  for i in 1...size {
-    dict1[i] = 2 * i
-  }
-  CheckResults(dict1.count == size)
-
-  // Filter with a predicate returning true is essentially the same loop as the
-  // one in testCopy above.
-  let dict2 = dict1.filter { _ in true }
-  CheckResults(dict2.count == size)
-}
-
-@inline(never)
-public func run_DictionaryFilter(_ N: Int) {
-  for _ in 0 ..< N {
-    // We run the test at a spread of sizes between 1*x and 2*x, because the
-    // quadratic behavior only happens at certain load factors.
-    testFilter(100_000)
-    testFilter(125_000)
-    testFilter(150_000)
-    testFilter(175_000)
+func filterAllMatch(N: Int) {
+  for _ in 1...N {
+    let copy = dict!.filter { _ in true }
+    CheckResults(copy.count == dict!.count)
   }
 }

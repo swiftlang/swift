@@ -82,6 +82,10 @@ public:
   ElementLayout::Kind getKind() const {
     return Layout.getKind();
   }
+
+  bool hasFixedByteOffset() const {
+    return Layout.hasByteOffset();
+  }
   
   Size getFixedByteOffset() const {
     return Layout.getByteOffset();
@@ -763,7 +767,7 @@ public:
                            Explosion &src,
                            unsigned startOffset) const override {
     for (auto &field : getFields()) {
-      if (field.getKind() != ElementLayout::Kind::Empty) {
+      if (!field.isEmpty()) {
         unsigned offset = field.getFixedByteOffset().getValueInBits()
           + startOffset;
         cast<LoadableTypeInfo>(field.getTypeInfo())
@@ -776,7 +780,7 @@ public:
                              Explosion &dest, unsigned startOffset)
                             const override {
     for (auto &field : getFields()) {
-      if (field.getKind() != ElementLayout::Kind::Empty) {
+      if (!field.isEmpty()) {
         unsigned offset = field.getFixedByteOffset().getValueInBits()
           + startOffset;
         cast<LoadableTypeInfo>(field.getTypeInfo())

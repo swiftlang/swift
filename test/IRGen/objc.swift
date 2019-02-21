@@ -48,7 +48,7 @@ class MyBlammo : Blammo {
 class Test2 : Gizmo {
   func foo() {}
 // CHECK:  define hidden swiftcc void @"$s4objc5Test2C3fooyyF"([[TEST2]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @objc_release
+// CHECK:    call {{.*}} @llvm.objc.release
 // CHECK:    ret void
 
   @objc dynamic func bar() {}
