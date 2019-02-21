@@ -220,6 +220,8 @@ public:
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
     } else if (auto openExisential = dyn_cast<OpenExistentialExpr>(E)) {
       recurse = asImpl().checkOpenExistentialExpr(openExisential);
+    } else if (auto memberRef = dyn_cast<MemberRefExpr>(E)) {
+      recurse = asImpl().checkMemberRefExpr(memberRef);
     }
     // Error handling validation (via checkTopLevelErrorHandling) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -614,6 +616,10 @@ private:
 
     ShouldRecurse_t checkOpenExistentialExpr(OpenExistentialExpr *E) {
       return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkMemberRefExpr(MemberRefExpr *E) {
+      return ShouldNotRecurse;
     }
 
     ThrowingKind checkExhaustiveDoBody(DoCatchStmt *S) {
@@ -1667,6 +1673,23 @@ private:
     auto isSubscript = isa<SubscriptExpr>(E->getSubExpr());
 
     auto throws = walker.checkAccessor(E->getSubExpr(), isSetter, isSubscript);
+
+    if (throws) {
+      auto classification = Classification(ThrowingKind::Throws,
+                                           PotentialReason::forThrowingApply());
+      checkThrowSite(E, /*requiresTry*/ true, classification);
+    }
+
+    return ShouldNotRecurse;
+  }
+
+  ShouldRecurse_t checkMemberRefExpr(MemberRefExpr *E) {
+    ContextScope scope(*this, None);
+
+    auto walker = ThrowingAccessorWalker(E, &Flags, TC, /*tryLoc*/ SourceLoc(),
+                                         /*handled*/ false);
+
+    auto throws = walker.checkAccessor(E, false, false);
 
     if (throws) {
       auto classification = Classification(ThrowingKind::Throws,
