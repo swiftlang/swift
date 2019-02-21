@@ -1702,6 +1702,14 @@ private:
                                  isTryHandled, true),
                   nullptr};
         }
+        if (auto OEE = dyn_cast<OpenExistentialExpr>(AE->getDest())) {
+          if (isa<SubscriptExpr>(OEE->getSubExpr())) {
+            return {checkSubscript(cast<SubscriptExpr>(OEE->getSubExpr()),
+                                   contextFlags, typeChecker, tryLoc,
+                                   isTryHandled, true),
+                    nullptr};
+          }
+        }
 
         return {checkComputedPropertySetter(AE, contextFlags, typeChecker,
                                             tryLoc, isTryHandled),
@@ -1757,7 +1765,7 @@ private:
 
         auto walker =
             ThrowingAccessorChecker(flags, typeChecker, tryLoc, isTryHandled);
-        E->walk(walker);
+        baseExpr->walk(walker);
         return true;
       }
 
@@ -1785,7 +1793,6 @@ private:
 
         auto walker =
             ThrowingAccessorChecker(flags, typeChecker, tryLoc, isTryHandled);
-        // E->walk(walker);
         baseExpr->walk(walker);
 
         return true;
@@ -1817,7 +1824,7 @@ private:
 
         auto walker =
             ThrowingAccessorChecker(flags, typeChecker, tryLoc, isTryHandled);
-        E->walk(walker);
+        baseExpr->walk(walker);
 
         return true;
       }
