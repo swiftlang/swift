@@ -1637,6 +1637,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
       !BaseType->getRValueType()->is<AnyMetatypeType>()) {
     if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(getRawAnchor())) {
+      if (isa<SuperRefExpr>(ctorRef->getBase())) {
+        emitDiagnostic(loc, diag::super_initializer_not_in_initializer);
+        return true;
+      }
       SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
       emitDiagnostic(loc, diag::init_not_instance_member)
           .fixItInsert(fixItRng.Start, "type(of: ")
