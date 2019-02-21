@@ -15,6 +15,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -208,6 +209,19 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     if (val.isConstant()) {
       assert(val.getKind() == SymbolicValue::Aggregate);
       return val.getAggregateValue()[sei->getFieldNo()];
+    }
+    // Not a const.
+    return val;
+  }
+
+  // If this is an unchecked_enum_data from a fragile type, then we can return
+  // the enum case value.
+  if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(value)) {
+    auto aggValue = uedi->getOperand();
+    auto val = getConstantValue(aggValue);
+    if (val.isConstant()) {
+      assert(val.getKind() == SymbolicValue::EnumWithPayload);
+      return val.getEnumPayloadValue();
     }
     // Not a const.
     return val;
@@ -1359,20 +1373,34 @@ static llvm::Optional<SymbolicValue> evaluateAndCacheCall(
       }
       if (!value.isConstant())
         return value;
+
       assert(value.getKind() == SymbolicValue::Enum ||
              value.getKind() == SymbolicValue::EnumWithPayload);
-      // Set up basic block arguments.
+
       auto *caseBB = switchInst->getCaseDestination(value.getEnumValue());
-      if (caseBB->getNumArguments() > 0) {
-        assert(value.getKind() == SymbolicValue::EnumWithPayload);
-        // When there are multiple payload components, they form a single
-        // tuple-typed argument.
-        assert(caseBB->getNumArguments() == 1);
-        auto argument = value.getEnumPayloadValue();
-        assert(argument.isConstant());
-        state.setValue(caseBB->getArgument(0), argument);
-      }
+
+      // Prepare to subsequently visit the case blocks instructions.
       nextInst = caseBB->begin();
+      // Then set up the arguments.
+      if (caseBB->getParent()->hasOwnership() &&
+          switchInst->getDefaultBBOrNull() == caseBB) {
+        // If we are visiting the default block and we are in ossa, then we may
+        // have uses of the failure parameter. That means we need to map the
+        // original value to the argument.
+        state.setValue(caseBB->getArgument(0), value);
+        continue;
+      }
+
+      if (caseBB->getNumArguments() == 0)
+        continue;
+
+      assert(value.getKind() == SymbolicValue::EnumWithPayload);
+      // When there are multiple payload components, they form a single
+      // tuple-typed argument.
+      assert(caseBB->getNumArguments() == 1);
+      auto argument = value.getEnumPayloadValue();
+      assert(argument.isConstant());
+      state.setValue(caseBB->getArgument(0), argument);
       continue;
     }
 
