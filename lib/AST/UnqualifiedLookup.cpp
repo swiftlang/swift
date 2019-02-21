@@ -145,13 +145,12 @@ public:
 
 private:
   struct PlacesToSearch {
-    // TODO: constify members?
-    /// The context in which the places where found.
-    DeclContext *fromWhence;
+    /// The context in which the places were found.
+    DeclContext *const fromWhence;
     /// Nontypes are formally members of the base type
-    DeclContext *whereNonTypesAreMembers;
+    DeclContext *const whereNonTypesAreMembers;
     /// Types are formally members of the metatype
-    DeclContext *whereTypesAreMembers;
+    DeclContext *const whereTypesAreMembers;
     /// Places to search for the lookup.
     SmallVector<NominalTypeDecl *, 2> places;
 
@@ -759,7 +758,7 @@ UnqualifiedLookupFactory::lookupInPatternBindingInitializer(
       false,
       parent,
       PlacesToSearch(parent, PBI, parent, parent),
-      resolveIsCascadingUse(PBI,isCascadingUse,
+      resolveIsCascadingUse(PBI, isCascadingUse,
                             /*onlyCareAboutFunctionBody=*/false)};
     // clang-format no
   }
@@ -802,6 +801,7 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
 
     namelookup::FindLocalVal localVal(SM, Loc, Consumer);
     localVal.visit(AFD->getBody());
+    
     setIndexOfFirstOuterResultIfNotSetAlready();
     if (isLookupDoneWithoutIncludingOuterResults())
       return None;
@@ -813,6 +813,7 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
     if (isLookupDoneWithoutIncludingOuterResults())
       return None;
   }
+  // TODO: is isOutsideBodyOfFunction better than the disjunction below?
   const bool returnValueForIsCascadingUse =
       AFD->isCascadingContextForLookup(false) &&
       (isCascadingUse.hasValue()
@@ -820,41 +821,38 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
            : !Loc.isValid() || !AFD->getBody() ||
                  !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc));
 
-  if (AFD->getDeclContext()->isTypeContext()) {
-    DeclContext *fnDeclContext = AFD->getDeclContext();
-    DeclContext *fnParent = AFD->getParent();
-    addGenericParametersForFunction(AFD);
-    setIndexOfFirstOuterResultIfNotSetAlready();
-    if (isLookupDoneWithoutIncludingOuterResults())
-      return None;
-    // clang-format off
-    return PerDeclInfo{
-      false,
-      fnParent,
-      PlacesToSearch(
-                     fnParent,
-                     // If we're not in the body of the function (for example, we
-                     // might be type checking a default argument expression and
-                     // performing name lookup from there), the base declaration
-                     // is the nominal type, not 'self'.
-                     isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD,
-                     fnDeclContext,
-                     AFD->getDeclContext()),
-      returnValueForIsCascadingUse};
-    // clang-format on
-  }
   // Look in the generic parameters after checking our local declaration.
   addGenericParametersForFunction(AFD);
   setIndexOfFirstOuterResultIfNotSetAlready();
   if (isLookupDoneWithoutIncludingOuterResults())
     return None;
+
+  if (!AFD->getDeclContext()->isTypeContext())
+     // clang-format off
+     return PerDeclInfo{
+       false,
+       AFD,
+       None,
+       returnValueForIsCascadingUse};
+  // clang-format on
+  
+  DeclContext *const fnDeclContext = AFD->getDeclContext();
+  // If we're not in the body of the function (for example, we
+  // might be type checking a default argument expression and
+  // performing name lookup from there), the base declaration
+  // is the nominal type, not 'self'.
+  DeclContext *const BaseDC = isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD;
+  DeclContext *const fnParent = AFD->getParent();
   // clang-format off
   return PerDeclInfo{
     false,
-    AFD,
-    None,
+    fnParent,
+    PlacesToSearch(fnParent,
+                   BaseDC,
+                   fnDeclContext,
+                   fnDeclContext),
     returnValueForIsCascadingUse};
-  // clang-format on
+    // clang-format on
 }
 
 Optional<UnqualifiedLookupFactory::PerDeclInfo>
