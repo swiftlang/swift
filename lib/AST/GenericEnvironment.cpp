@@ -122,7 +122,9 @@ Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
 }
 
 Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
-  return cast<ArchetypeType>(type)->getInterfaceType();
+  auto archetype = cast<ArchetypeType>(type);
+  
+  return archetype->getInterfaceType();
 }
 
 Type TypeBase::mapTypeOutOfContext() {
