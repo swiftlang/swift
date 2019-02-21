@@ -3090,8 +3090,15 @@ ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
     unsigned numStoredProperties =
         std::distance(getStoredProperties().begin(),
                       getStoredProperties().end());
+    // Return false if constructor does not have interface type set. It is not
+    // possible to determine whether it is a memberwise initializer.
+    if (!ctorDecl->hasInterfaceType())
+      return false;
     auto ctorType =
-        ctorDecl->getMethodInterfaceType()->castTo<AnyFunctionType>();
+        ctorDecl->getMethodInterfaceType()->getAs<AnyFunctionType>();
+    // Return false if constructor does not have a valid method interface type.
+    if (!ctorType)
+      return false;
     // Return false if stored property/initializer parameter count do not match.
     if (numStoredProperties != ctorType->getNumParams())
       return false;
