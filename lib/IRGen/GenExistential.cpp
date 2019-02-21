@@ -842,8 +842,11 @@ public:
     // Use copy-on-write existentials?
     auto fn = getAssignBoxedOpaqueExistentialBufferFunction(
         IGF.IGM, getLayout(), objPtrTy);
-    auto call =
-        IGF.Builder.CreateCall(fn, {dest.getAddress(), src.getAddress()});
+    auto destAddress = IGF.Builder.CreateBitCast(
+        dest.getAddress(), cast<llvm::Function>(fn)->arg_begin()[0].getType());
+    auto srcAddress = IGF.Builder.CreateBitCast(
+        src.getAddress(), cast<llvm::Function>(fn)->arg_begin()[1].getType());
+    auto call = IGF.Builder.CreateCall(fn, {destAddress, srcAddress});
     call->setCallingConv(IGF.IGM.DefaultCC);
     call->setDoesNotThrow();
     return;
