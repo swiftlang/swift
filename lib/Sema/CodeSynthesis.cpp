@@ -831,7 +831,8 @@ static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
                                             ASTContext &ctx) {
   assert(accessor->isCoroutine());
 
-  // Don't synthesize body if the accessor does not have storage
+  // FIXME: If we don't return here, then a throwing accessor can cause an
+  // infinite loop in SILGen
   if (!accessor->getStorage()->hasStorage()) {
     return;
   }
