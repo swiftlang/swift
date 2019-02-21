@@ -1184,7 +1184,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
           // We somehow let tuple unsplatting function conversions
           // through in some cases in Swift 4, so let's let that
           // continue to work, but only for Swift 4.
-          if (simplified && isa<DeclRefExpr>(simplified)) {
+          if (simplified &&
+              (isa<DeclRefExpr>(simplified) ||
+               isa<OverloadedDeclRefExpr>(simplified) ||
+               isa<UnresolvedDeclRefExpr>(simplified))) {
             implodeParams(func2Params);
           }
         }
