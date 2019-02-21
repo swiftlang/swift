@@ -145,8 +145,6 @@ public:
 
 private:
   struct PlacesToSearch {
-    /// The context in which the places were found.
-    DeclContext *const fromWhence;
     /// Nontypes are formally members of the base type
     DeclContext *const whereNonTypesAreMembers;
     /// Types are formally members of the metatype
@@ -154,8 +152,7 @@ private:
     /// Places to search for the lookup.
     SmallVector<NominalTypeDecl *, 2> places;
 
-    PlacesToSearch(DeclContext *fromWhence,
-                   DeclContext *whereNonTypesAreMembers,
+    PlacesToSearch(DeclContext *whereNonTypesAreMembers,
                    DeclContext *whereTypesAreMembers,
                    DeclContext *placesHolder);
     bool empty() const {
@@ -757,7 +754,7 @@ UnqualifiedLookupFactory::lookupInPatternBindingInitializer(
     return PerDeclInfo{
       false,
       parent,
-      PlacesToSearch(parent, PBI, parent, parent),
+      PlacesToSearch(PBI, parent, parent),
       resolveIsCascadingUse(PBI, isCascadingUse,
                             /*onlyCareAboutFunctionBody=*/false)};
     // clang-format no
@@ -770,7 +767,7 @@ UnqualifiedLookupFactory::lookupInPatternBindingInitializer(
     return PerDeclInfo{
       false,
       surroundingContext,
-      PlacesToSearch(surroundingContext, surroundingContext,
+      PlacesToSearch(surroundingContext,
                      surroundingContext, surroundingContext),
       resolveIsCascadingUse(surroundingContext,
                             None,
@@ -842,13 +839,11 @@ UnqualifiedLookupFactory::lookupInFunctionDecl(AbstractFunctionDecl *AFD,
   // performing name lookup from there), the base declaration
   // is the nominal type, not 'self'.
   DeclContext *const BaseDC = isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD;
-  DeclContext *const fnParent = AFD->getParent();
   // clang-format off
   return PerDeclInfo{
     false,
-    fnParent,
-    PlacesToSearch(fnParent,
-                   BaseDC,
+    AFD->getParent(),
+    PlacesToSearch(BaseDC,
                    fnDeclContext,
                    fnDeclContext),
     returnValueForIsCascadingUse};
@@ -894,7 +889,7 @@ UnqualifiedLookupFactory::lookupInNominalTypeOrExtension(
     false,
     D,
     shouldLookupMembers(D, Loc)
-    ? Optional<PlacesToSearch>(PlacesToSearch(D, D, D, D))
+    ? Optional<PlacesToSearch>(PlacesToSearch(D, D, D))
     : None,
     resolveIsCascadingUse(D, isCascadingUse,
                           /*onlyCareAboutFunctionBody=*/false)};
@@ -1710,16 +1705,14 @@ TypeDecl *LegacyUnqualifiedLookup::getSingleTypeResult() const {
 }
 
 UnqualifiedLookupFactory::PlacesToSearch::PlacesToSearch(
-    DeclContext *fromWhence, DeclContext *whereNonTypesAreMembers,
+    DeclContext *whereNonTypesAreMembers,
     DeclContext *whereTypesAreMembers, DeclContext *placesHolder)
-    : fromWhence(fromWhence), whereNonTypesAreMembers(whereNonTypesAreMembers),
+    : whereNonTypesAreMembers(whereNonTypesAreMembers),
       whereTypesAreMembers(whereTypesAreMembers) {
   populateLookupDeclsFromContext(placesHolder, places);
 }
 
 void UnqualifiedLookupFactory::PlacesToSearch::dump() const {
-  llvm::errs() << "fromWhence: ";
-  fromWhence->dumpContext();
   llvm::errs() << "whereNonTypesAreMembers: ";
   whereNonTypesAreMembers->dumpContext();
   llvm::errs() << "whereTypesAreMembers: ";
