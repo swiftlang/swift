@@ -1163,6 +1163,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             // Classify this declaration.
             FoundAny = true;
 
+            if (auto *TAD = dyn_cast<TypeAliasDecl>(Result))
+              if (TAD->isIgnoredByUnqualifiedLookup())
+                continue;
+
             // Types are formally members of the metatype.
             if (auto TD = dyn_cast<TypeDecl>(Result)) {
               Results.push_back(LookupResultEntry(MetaBaseDC, Result));

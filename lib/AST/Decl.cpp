@@ -3246,6 +3246,7 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
     TypeAliasLoc(TypeAliasLoc), EqualLoc(EqualLoc) {
   Bits.TypeAliasDecl.IsCompatibilityAlias = false;
   Bits.TypeAliasDecl.IsDebuggerAlias = false;
+  Bits.TypeAliasDecl.IgnoredByUnqualifiedLookup = false;
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {

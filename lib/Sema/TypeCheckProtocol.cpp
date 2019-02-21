@@ -2504,6 +2504,10 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     aliasDecl->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
     aliasDecl->setUnderlyingType(type);
 
+    if (auto *genericParamType = type->getAs<GenericTypeParamType>())
+      if (assocType->getName() == genericParamType->getName())
+        aliasDecl->markIgnoredByUnqualifiedLookup(true);
+
     aliasDecl->setImplicit();
     if (type->hasError())
       aliasDecl->setInvalid();

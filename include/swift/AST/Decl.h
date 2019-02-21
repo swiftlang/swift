@@ -478,11 +478,16 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
+  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1+1,
     /// Whether the typealias forwards perfectly to its underlying type.
     IsCompatibilityAlias : 1,
     /// Whether this was a global typealias synthesized by the debugger.
-    IsDebuggerAlias : 1
+    IsDebuggerAlias : 1,
+    /// Whether this typealias was synthesized so that a generic parameter
+    /// can witness an associated type requirement, and should be ignored
+    /// by unqualified lookup. This avoids printing names such as
+    /// MyGenericType<Key, Value>.Value.
+    IgnoredByUnqualifiedLookup : 1
   );
 
   SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1,
@@ -2789,6 +2794,14 @@ public:
   bool isDebuggerAlias() const { return Bits.TypeAliasDecl.IsDebuggerAlias; }
   void markAsDebuggerAlias(bool isDebuggerAlias) {
     Bits.TypeAliasDecl.IsDebuggerAlias = isDebuggerAlias;
+  }
+
+  /// Does this type alias witness a generic parameter?
+  bool isIgnoredByUnqualifiedLookup() const {
+    return Bits.TypeAliasDecl.IgnoredByUnqualifiedLookup;
+  }
+  void markIgnoredByUnqualifiedLookup(bool ignoredByUnqualifiedLookup) {
+    Bits.TypeAliasDecl.IgnoredByUnqualifiedLookup = ignoredByUnqualifiedLookup;
   }
 
   static bool classof(const Decl *D) {
