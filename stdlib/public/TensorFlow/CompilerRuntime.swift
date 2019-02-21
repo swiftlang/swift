@@ -910,7 +910,7 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
         : outputState.cTensorHandles
     return outputs
   }
-  let dtypes = state._dtypes + Data._typeList.map { $0.cDataType }
+  let dtypes = state._dtypes + Data._typeList.map { $0._cDataType }
   let traceContext = _trace(with: dtypes, in: wrappedFn)
   // The result is a closure that captures and executes the trace graph
   // function in the trace context.
@@ -989,7 +989,7 @@ public func _tffunc<State : _TensorArrayProtocolEnhanced,
     let outputState = fn(symbolicState, symbolicData)
     return outputState.cTensorHandles
   }
-  let dtypes = state._dtypes + Data._typeList.map { $0.cDataType }
+  let dtypes = state._dtypes + Data._typeList.map { $0._cDataType }
   let traceContext = _trace(with: dtypes, in: wrappedFn)
   return {
     data in traceContext.specializeTFFunction(with: data.cTensorHandles)
@@ -1014,7 +1014,7 @@ public func _tffunc<In : TensorGroup, Out : TensorGroup>(
     return symbolicOut.cTensorHandles
   }
 
-  let dtypes = In._typeList.map { $0.cDataType }
+  let dtypes = In._typeList.map { $0._cDataType }
   let traceContext = _trace(with: dtypes, in: wrappedFn)
   return traceContext.specializeTFFunction(with : [])
 }
