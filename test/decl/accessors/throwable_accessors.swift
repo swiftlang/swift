@@ -276,7 +276,7 @@ struct S3: Q2 {
   }
 }
 
-/// Protocol conformance tests ///
+/// Protocol conformance/refinement tests ///
 
 protocol P3 {
   var run: Int { get throws set throws }
@@ -348,3 +348,65 @@ let _ = try subsProto1[0] // Okay
 let _ = try? subsProto1[0] // Okay
 let _ = try! subsProto1[0] // Okay
 subsProto1[0] = 1 // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+
+protocol P5 {
+  var bar: Int { get throws set throws }
+}
+
+struct S6: P5 {
+  var bar: Int {
+    get { return 0 }
+    set {}
+  }
+}
+
+func protocolThrowingFunc() {
+  let instance: P5 = S6()
+  let _ = try instance.bar // expected-error {{error is not handled because the enclosing function is not declared 'throws'}}
+  let _ = try? instance.bar // Okay
+  let _ = try! instance.bar // Okay
+}
+
+func protocolThrowingFuncThrows() throws {
+  let instance: P5 = S6()
+  let _ = try instance.bar // Okay
+}
+
+protocol P6 {
+  subscript(fizz: Int) -> Int { get throws set throws }
+}
+
+struct S7: P6 {
+  subscript(fizz: Int) -> Int {
+    get { return 0 }
+    set { }
+  }
+}
+
+func protocolThrowingSubscriptFunc() {
+  var instance: P6 = S7()
+
+  let _ = instance[0] // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  let _ = try instance[0] // expected-error {{error is not handled because the enclosing function is not declared 'throws'}}
+  let _ = try? instance[0] // Okay
+  let _ = try! instance[0] // Okay
+
+  instance[1] = 0 // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  try instance[1] = 0 // expected-error {{error is not handled because the enclosing function is not declared 'throws'}}
+  try? instance[1] = 0 // Okay
+  try! instance[1] = 0 // Okay
+}
+
+func protocolThrowingSubscriptFuncThrows() throws {
+  var instance: P6 = S7()
+
+  let _ = instance[0] // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+  let _ = try instance[0] // Okay
+  let _ = try? instance[0] // Okay
+  let _ = try! instance[0] // Okay
+
+  instance[1] = 0 // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+  try instance[1] = 0 // Okay
+  try? instance[1] = 0 // Okay
+  try! instance[1] = 0 // Okay
+}
