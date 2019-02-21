@@ -32,7 +32,8 @@
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.constructor,
-          key.usr: "s:11test_module5EmptyCACycfc"
+          key.usr: "s:11test_module5EmptyCACycfc",
+          key.is_implicit: 1
         }
       ]
     },
@@ -49,12 +50,14 @@
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
               key.usr: "s:11test_module7TwoIntsC1xSivg",
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
               key.usr: "s:11test_module7TwoIntsC1xSivs",
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             }
           ]
         },
@@ -66,12 +69,14 @@
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
               key.usr: "s:11test_module7TwoIntsC1ySivg",
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
               key.usr: "s:11test_module7TwoIntsC1ySivs",
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             }
           ]
         },
@@ -108,7 +113,8 @@
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
-          key.usr: "s:11test_module16ComputedPropertyCACycfc"
+          key.usr: "s:11test_module16ComputedPropertyCACycfc",
+          key.is_implicit: 1
         }
       ]
     },
@@ -141,7 +147,8 @@
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.constructor,
-          key.usr: "s:11test_module2C2CACycfc"
+          key.usr: "s:11test_module2C2CACycfc",
+          key.is_implicit: 1
         }
       ]
     },
