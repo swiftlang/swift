@@ -410,3 +410,23 @@ func protocolThrowingSubscriptFuncThrows() throws {
   try? instance[1] = 0 // Okay
   try! instance[1] = 0 // Okay
 }
+
+/// Throw sites not marked with try ///
+
+struct ThrowingStruct1 {
+  var a: Int {
+    get throws { throw "Error" }
+    set throws { throw "Error" }
+  }
+}
+
+func functionThatUsesThrowingStructProp() {
+  var instance = ThrowingStruct1()
+  
+  let _ = instance.a // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  instance.a = 1 // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+}
+
+var outsideInstance = ThrowingStruct1()
+let _ = outsideInstance.a // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+let _ = try outsideInstance.a
