@@ -246,6 +246,10 @@ getAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
       original->getLoweredFunctionType()->getGenericSignature();
   if (!originalGenSig)
     return nullptr;
+  // TODO: GenericSignatureBuilder should just work.
+  if (attr->getRequirements().empty()) {
+    return originalGenSig->getCanonicalSignature();
+  }
   GenericSignatureBuilder builder(original->getASTContext());
   // Add original generic signature.
   builder.addGenericSignature(originalGenSig);
