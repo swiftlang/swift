@@ -7626,9 +7626,13 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
   Expr *parent;
   unsigned index;
   std::tie(parent, index) = getPrecedenceParentAndIndex(expr, rootExpr);
-  if (!parent || isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
+  if (!parent || isa<TupleExpr>(parent)) {
     return false;
   }
+
+  if (auto parenExp = dyn_cast<ParenExpr>(parent))
+    if (!parenExp->isImplicit())
+      return false;
 
   if (parent->isInfixOperator()) {
     auto parentPG = TC.lookupPrecedenceGroupForInfixOperator(DC, parent);
