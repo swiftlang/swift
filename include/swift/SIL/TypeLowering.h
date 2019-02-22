@@ -565,13 +565,6 @@ class TypeConverter {
 
   llvm::BumpPtrAllocator IndependentBPA;
 
-  enum : unsigned {
-    /// There is a unique entry with this uncurry level in the
-    /// type-lowering map for every TLI we create.  The map has the
-    /// responsibility to call the destructor for these entries.
-    UniqueLoweringEntry = ~0U
-  };
-
   struct CachingTypeKey {
     GenericSignature *Sig;
     AbstractionPattern::CachingKey OrigType;

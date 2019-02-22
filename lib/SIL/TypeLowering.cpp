@@ -1582,9 +1582,6 @@ TypeConverter::getTypeLoweringForLoweredType(TypeKey key,
   assert(type->isLegalSILType() && "type is not lowered!");
   (void)type;
 
-  // Re-using uncurry level 0 is reasonable because our uncurrying
-  // transforms are idempotent at this level.  This means we don't
-  // need a ton of redundant entries in the map.
   const TypeLowering *lowering = find(key);
   if (!lowering) {
     lowering = &getTypeLoweringForUncachedLoweredType(key);
