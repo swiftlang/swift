@@ -306,23 +306,6 @@ public:
     return Properties.isResilient();
   }
 
-  /// Return the semantic type.
-  ///
-  /// The semantic type is what a type pretends to be during
-  /// type-checking: that is, the type that getTypeOfRValue would
-  /// return on a variable of this type.
-  SILType getSemanticType() const {
-    // If you change this, change getSemanticTypeLowering() too.
-    auto storageType = getLoweredType().getASTType();
-    if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
-      return SILType::getPrimitiveType(refType.getReferentType(),
-                                       SILValueCategory::Object);
-    return getLoweredType();
-  }
-  
-  /// Return the lowering for the semantic type.
-  inline const TypeLowering &getSemanticTypeLowering(TypeConverter &TC) const;
-
   /// Produce an exact copy of the value in the given address as a
   /// scalar.  The caller is responsible for destroying this value,
   /// e.g. by releasing it.
@@ -1032,15 +1015,6 @@ private:
                                Bridgeability bridging,
                                bool suppressOptional);
 };
-
-inline const TypeLowering &
-TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
-  // If you change this, change getSemanticType() too.
-  auto storageType = getLoweredType().getASTType();
-  if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
-    return TC.getTypeLowering(refType.getReferentType());
-  return *this;
-}
 
 /// RAII interface to push a generic context.
 class GenericContextScope {
