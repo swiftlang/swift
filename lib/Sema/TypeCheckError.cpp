@@ -1676,28 +1676,11 @@ private:
   }
 
   ShouldRecurse_t checkMemberRefExpr(MemberRefExpr *E) {
-    ContextScope scope(*this, None);
-
-    auto walker = ThrowingAccessorWalker(E, &Flags, TC, /*tryLoc*/ SourceLoc(),
-                                         /*handled*/ false);
-
-    auto throws = walker.checkAccessor(E, false, false);
-
-    if (throws) {
-      auto classification = Classification(ThrowingKind::Throws,
-                                           PotentialReason::forThrowingApply());
-      checkThrowSite(E, /*requiresTry*/ true, classification);
-    }
-
-    return ShouldNotRecurse;
+    return checkPotentiallyThrowingAccessorThrowSite(E, /*isSetter*/ false,
+                                                     /*isSubscript*/ false);
   }
 
   ShouldRecurse_t checkAssignExpr(AssignExpr *E) {
-    ContextScope scope(*this, None);
-
-    auto walker = ThrowingAccessorWalker(E, &Flags, TC, /*tryLoc*/ SourceLoc(),
-                                         /*handled*/ false);
-    
     auto isSubscript = false;
     Expr *subscriptExpr = nullptr;
 
@@ -1713,50 +1696,35 @@ private:
     }
     
     auto expr = isSubscript ? subscriptExpr : E;
-    auto throws = walker.checkAccessor(expr, true, isSubscript);
-
-    if (throws) {
-      auto classification = Classification(ThrowingKind::Throws,
-                                           PotentialReason::forThrowingApply());
-      checkThrowSite(E, /*requiresTry*/ true, classification);
-    }
-
-    return ShouldNotRecurse;
+    return checkPotentiallyThrowingAccessorThrowSite(expr, /*isSetter*/ true,
+                                                     isSubscript);
   }
   
   ShouldRecurse_t checkOpenExistentialExpr(OpenExistentialExpr *E) {
-    ContextScope scope(*this, None);
-    
-    auto walker = ThrowingAccessorWalker(E, &Flags, TC, /*tryLoc*/ SourceLoc(),
-                                         /*handled*/ false);
-    
     auto isSubscript = isa<SubscriptExpr>(E->getSubExpr());
-    
     auto expr = isSubscript ? E->getSubExpr() : E;
 
-    if (!isa<AssignExpr>(expr) || !isa<MemberRefExpr>(E) ||
-        !isa<SubscriptExpr>(E)) {
+    if (!isa<AssignExpr>(expr) || !isa<MemberRefExpr>(expr) ||
+        !isa<SubscriptExpr>(expr)) {
       return ShouldRecurse;
     }
 
-    auto throws = walker.checkAccessor(expr, false, isSubscript);
-    
-    if (throws) {
-      auto classification = Classification(ThrowingKind::Throws,
-                                           PotentialReason::forThrowingApply());
-      checkThrowSite(E, /*requiresTry*/ true, classification);
-    }
-
-    return ShouldNotRecurse;
+    return checkPotentiallyThrowingAccessorThrowSite(expr, /*isSetter*/ false,
+                                                     isSubscript);
   }
 
   ShouldRecurse_t checkSubscriptExpr(SubscriptExpr *E) {
-    ContextScope scope(*this, None);
+    return checkPotentiallyThrowingAccessorThrowSite(E, /*isSetter*/ false,
+                                                     /*isSubscript*/ true);
+  }
 
+  ShouldRecurse_t checkPotentiallyThrowingAccessorThrowSite(Expr *E,
+                                                            bool isSetter,
+                                                            bool isSubscript) {
+    ContextScope scope(*this, None);
     auto walker = ThrowingAccessorWalker(E, &Flags, TC, /*tryLoc*/ SourceLoc(),
                                          /*handled*/ false);
-
-    auto throws = walker.checkAccessor(E, false, true);
+    auto throws = walker.checkAccessor(E, isSetter, isSubscript);
 
     if (throws) {
       auto classification = Classification(ThrowingKind::Throws,
@@ -1831,7 +1799,6 @@ private:
         expr = E->getDest();
       }
 
-      // If we're not assigning to a nominal member, then return
       if (!isa<MemberRefExpr>(expr)) {
         return false;
       }
@@ -1854,7 +1821,7 @@ private:
         flags->set(ContextFlags::HasAnyThrowSite);
 
         auto walker =
-            ThrowingAccessorChecker(flags, typeChecker, tryLoc, isTryHandled);
+            ThrowingAccessorChecker(typeChecker, tryLoc, isTryHandled);
         baseExpr->walk(walker);
         return true;
       }
@@ -1882,7 +1849,7 @@ private:
         flags->set(ContextFlags::HasAnyThrowSite);
 
         auto walker =
-            ThrowingAccessorChecker(flags, typeChecker, tryLoc, isTryHandled);
+            ThrowingAccessorChecker(typeChecker, tryLoc, isTryHandled);
         baseExpr->walk(walker);
 
         return true;
@@ -1913,7 +1880,7 @@ private:
         flags->set(ContextFlags::HasAnyThrowSite);
 
         auto walker =
-            ThrowingAccessorChecker(flags, typeChecker, tryLoc, isTryHandled);
+            ThrowingAccessorChecker(typeChecker, tryLoc, isTryHandled);
         baseExpr->walk(walker);
 
         return true;
@@ -1954,7 +1921,6 @@ private:
   };
 
   class ThrowingAccessorChecker : public ASTWalker {
-    ContextFlags *flags;
     TypeChecker &typeChecker;
     SourceLoc tryLoc;
     bool isTryHandled;
@@ -1978,10 +1944,9 @@ private:
     }
 
   public:
-    ThrowingAccessorChecker(ContextFlags *contextFlags, TypeChecker &tc,
-                            SourceLoc loc, bool handled = false)
-        : flags(contextFlags), typeChecker(tc), tryLoc(loc),
-          isTryHandled(handled) {}
+    ThrowingAccessorChecker(TypeChecker &tc, SourceLoc loc,
+                            bool handled = false)
+        : typeChecker(tc), tryLoc(loc), isTryHandled(handled) {}
   };
 };
 
