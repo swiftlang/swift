@@ -5,6 +5,9 @@
 @_silgen_name("printMetadataType")
 func printType(_: Any.Type)
 
+@_silgen_name("stopRemoteAST")
+func stopRemoteAST()
+
 extension Int {
   struct Inner { }
 }
@@ -76,3 +79,5 @@ extension A where T: AnyObject {
 
 // CHECK: A<C, Int>.ViaAnyObject
 printType(A<C, Int>.ViaAnyObject.self)
+
+stopRemoteAST()

@@ -755,7 +755,7 @@ public:
       return true;
 
     auto *anchor = Locator.getBaseLocator()->getAnchor();
-    if (!anchor || !isa<CallExpr>(anchor))
+    if (!anchor)
       return true;
 
     auto *locator = CS.getConstraintLocator(anchor);
@@ -1184,7 +1184,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
           // We somehow let tuple unsplatting function conversions
           // through in some cases in Swift 4, so let's let that
           // continue to work, but only for Swift 4.
-          if (simplified && isa<DeclRefExpr>(simplified)) {
+          if (simplified &&
+              (isa<DeclRefExpr>(simplified) ||
+               isa<OverloadedDeclRefExpr>(simplified) ||
+               isa<UnresolvedDeclRefExpr>(simplified))) {
             implodeParams(func2Params);
           }
         }
@@ -1229,6 +1232,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   if (func1Params.size() != func2Params.size())
     return getTypeMatchFailure(argumentLocator);
 
+  bool hasLabelingFailures = false;
   for (unsigned i : indices(func1Params)) {
     auto func1Param = func1Params[i];
     auto func2Param = func2Params[i];
@@ -1242,8 +1246,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // FIXME: We should not end up with labels here at all, but we do
     // from invalid code in diagnostics, and as a result of code completion
     // directly building constraint systems.
-    if (func1Param.getLabel() != func2Param.getLabel())
-      return getTypeMatchFailure(argumentLocator);
+    if (func1Param.getLabel() != func2Param.getLabel()) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(argumentLocator);
+
+      // If we are allowed to attempt fixes, let's ignore labeling
+      // failures, and create a fix to re-label arguments if types
+      // line up correctly.
+      hasLabelingFailures = true;
+    }
 
     // FIXME: We should check value ownership too, but it's not completely
     // trivial because of inout-to-pointer conversions.
@@ -1258,6 +1269,17 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                 LocatorPathElt::getTupleElement(i))));
     if (result.isFailure())
       return result;
+  }
+
+  if (hasLabelingFailures) {
+    SmallVector<Identifier, 4> correctLabels;
+    for (const auto &param : func2Params)
+      correctLabels.push_back(param.getLabel());
+
+    auto *fix = RelabelArguments::create(*this, correctLabels,
+                                         getConstraintLocator(argumentLocator));
+    if (recordFix(fix))
+      return getTypeMatchFailure(argumentLocator);
   }
 
   // Result type can be covariant (or equal).

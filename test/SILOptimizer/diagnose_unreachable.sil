@@ -3,6 +3,8 @@
 import Builtin
 import Swift
 
+sil @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
 sil private @test1 : $() -> () {
 bb0:
   %5 = integer_literal $Builtin.Int1, 1
@@ -499,6 +501,24 @@ bb2(%3 : @owned $Either<Klass1, Klass2>):
   br bb3
 
 bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @eliminate_end_borrow_when_propagating_bb_args : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: end_borrow
+// CHECK: [[FUNC_REF:%.*]] = function_ref @guaranteed_nativeobject_user
+// CHECK-NEXT: apply [[FUNC_REF]](%0) :
+// CHECK-NOT: end_borrow
+// CHECK: } // end sil function 'eliminate_end_borrow_when_propagating_bb_args'
+sil [ossa] @eliminate_end_borrow_when_propagating_bb_args : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @guaranteed $Builtin.NativeObject):
+  %2 = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %2(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %1 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }

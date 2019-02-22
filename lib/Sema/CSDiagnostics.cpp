@@ -366,10 +366,25 @@ bool MissingConformanceFailure::diagnoseAsError() {
 
 bool LabelingFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
-  auto *call = cast<CallExpr>(getAnchor());
-  return diagnoseArgumentLabelError(cs.getASTContext(), call->getArg(),
-                                    CorrectLabels,
-                                    isa<SubscriptExpr>(call->getFn()));
+  auto *anchor = getRawAnchor();
+
+  Expr *argExpr = nullptr;
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    if (auto *call = dyn_cast_or_null<CallExpr>(findParentExpr(UDE)))
+      argExpr = call->getArg();
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    argExpr = UME->getArgument();
+  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    argExpr = call->getArg();
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+    argExpr = SE->getIndex();
+  }
+
+  if (!argExpr)
+    return false;
+
+  return diagnoseArgumentLabelError(cs.getASTContext(), argExpr, CorrectLabels,
+                                    isa<SubscriptExpr>(anchor));
 }
 
 bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
