@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A type that represents the difference between two ordered collection states.
-@available(swift, introduced: 5.1)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 public struct CollectionDifference<ChangeElement> {
   /// A type that represents a single change to a collection.
   ///
@@ -213,10 +213,11 @@ public struct CollectionDifference<ChangeElement> {
 ///   }
 /// }
 /// ```
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 extension CollectionDifference: Collection {
   public typealias Element = Change
 
-  public struct Index {
+  public struct Index: Equatable, Hashable, Comparable {
     // Opaque index type is isomorphic to Int
     internal let _offset: Int
 
@@ -228,40 +229,37 @@ extension CollectionDifference: Collection {
   public var startIndex: Index {
     return Index(_offset: 0)
   }
-  
+
   public var endIndex: Index {
     return Index(_offset: removals.count + insertions.count)
   }
-  
+
   public func index(after index: Index) -> Index {
     return Index(_offset: index._offset + 1)
   }
-  
+
   public subscript(position: Index) -> Element {
     if position._offset < removals.count {
       return removals[removals.count - (position._offset + 1)]
     }
     return insertions[position._offset - removals.count]
   }
-  
+
   public func index(before index: Index) -> Index {
     return Index(_offset: index._offset - 1)
   }
-  
+
   public func formIndex(_ index: inout Index, offsetBy distance: Int) {
     index = Index(_offset: index._offset + distance)
   }
-  
+
   public func distance(from start: Index, to end: Index) -> Int {
     return end._offset - start._offset
   }
 }
 
-extension CollectionDifference.Index: Equatable {} // synthesized
-
-extension CollectionDifference.Index: Hashable {} // synthesized
-
-extension CollectionDifference.Index: Comparable {
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+extension CollectionDifference.Index { // Comparable
   public static func < (
     lhs: CollectionDifference.Index,
     rhs: CollectionDifference.Index
@@ -270,14 +268,19 @@ extension CollectionDifference.Index: Comparable {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 extension CollectionDifference.Change: Equatable where ChangeElement: Equatable {}
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 extension CollectionDifference: Equatable where ChangeElement: Equatable {}
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 extension CollectionDifference.Change: Hashable where ChangeElement: Hashable {}
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 extension CollectionDifference: Hashable where ChangeElement: Hashable {}
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 extension CollectionDifference where ChangeElement: Hashable {
   /// Infers which `ChangeElement`s have been both inserted and removed only
   /// once and returns a new difference with those associations.
@@ -334,6 +337,7 @@ extension CollectionDifference where ChangeElement: Hashable {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 extension CollectionDifference.Change: Codable where ChangeElement: Codable {
   private enum _CodingKeys: String, CodingKey {
     case offset
@@ -354,7 +358,7 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
       self = .insert(offset: offset, element: element, associatedWith: associatedOffset)
     }
   }
-  
+
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: _CodingKeys.self)
     switch self {
@@ -370,4 +374,5 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 extension CollectionDifference: Codable where ChangeElement: Codable {}

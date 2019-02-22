@@ -12,6 +12,7 @@
 
 // MARK: Diff application to RangeReplaceableCollection
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 extension CollectionDifference {
   fileprivate func _fastEnumeratedApply(
     _ consume: (Change) -> Void
@@ -63,7 +64,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n* + *c*), where *n* is `self.count` and *c* is the
   ///   number of changes contained by the parameter.
-  @available(swift, introduced: 5.1)
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
   public func applying(_ difference: CollectionDifference<Element>) -> Self? {
     var result = Self()
     var enumeratedRemoves = 0
@@ -109,7 +110,6 @@ extension RangeReplaceableCollection {
 
 // MARK: Definition of API
 
-@available(swift, introduced: 5.1)
 extension BidirectionalCollection {
   /// Returns the difference needed to produce the receiver's state from the
   /// parameter's state, using the provided closure to establish equivalence
@@ -128,6 +128,7 @@ extension BidirectionalCollection {
   /// - Complexity: For pathological inputs, worst case performance is
   ///   O(`self.count` * `other.count`). Faster execution can be expected
   ///   when the collections share many common elements.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
   public func difference<C: BidirectionalCollection>(
     from other: C,
     by areEquivalent: (Element, C.Element) -> Bool
@@ -183,6 +184,7 @@ extension BidirectionalCollection where Element : Equatable {
   ///   O(`self.count` * `other.count`). Faster execution can be expected
   ///   when the collections share many common elements, or if `Element`
   ///   also conforms to `Hashable`.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
   public func difference<C: BidirectionalCollection>(
     from other: C
   ) -> CollectionDifference<Element> where C.Element == Self.Element {
