@@ -29,7 +29,7 @@ public class ClassWithResilientField {
 @_optimize(none) func blackHole<T>(_: T) {}
 
 @_optimize(none) func forceMetadata() {
-  blackHole(ClassWithResilientField.self)
+  blackHole(ClassWithResilientField())
 }
 
 if #available(macOS 10.14.4, iOS 12.2, tvOS 12.2, watchOS 5.2, *) {
