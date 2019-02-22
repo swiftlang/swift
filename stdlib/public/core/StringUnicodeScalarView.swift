@@ -114,7 +114,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     // TODO(String performance): isASCII fast-path
 
     if _fastPath(_guts.isFastUTF8) {
-      let len = _guts.fastUTF8ScalarLength(startingAt: i.encodedOffset)
+      let len = _guts.fastUTF8ScalarLength(startingAt: i._encodedOffset)
       return i.encoded(offsetBy: len)
     }
 
@@ -126,12 +126,12 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   /// - Precondition: The previous location exists.
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
-    precondition(i.encodedOffset > 0)
+    precondition(i._encodedOffset > 0)
     // TODO(String performance): isASCII fast-path
 
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.withFastUTF8 { utf8 -> Int in
-        return _utf8ScalarLength(utf8, endingAt: i.encodedOffset)
+        return _utf8ScalarLength(utf8, endingAt: i._encodedOffset)
       }
       _internalInvariant(len <= 4, "invalid UTF8")
       return i.encoded(offsetBy: -len)
@@ -161,7 +161,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     @inline(__always) get {
       String(_guts)._boundsCheck(position)
       let i = _guts.scalarAlign(position)
-      return _guts.errorCorrectedScalar(startingAt: i.encodedOffset).0
+      return _guts.errorCorrectedScalar(startingAt: i._encodedOffset).0
     }
   }
 }

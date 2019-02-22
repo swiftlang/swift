@@ -1,5 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -gnone -emit-ir -o - | %FileCheck %s -check-prefix=INTEL
-// RUN: %swift -target armv7-apple-ios7 %s -gnone -emit-ir -o - | %FileCheck %s -check-prefix=ARM32
+// RUN: %swift -disable-legacy-type-info -target x86_64-apple-macosx10.9 %s -gnone -emit-ir -o - | %FileCheck %s -check-prefix=INTEL
+// RUN: %swift -disable-legacy-type-info -target armv7-apple-ios7 %s -gnone -emit-ir -o - | %FileCheck %s -check-prefix=ARM32
 
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM

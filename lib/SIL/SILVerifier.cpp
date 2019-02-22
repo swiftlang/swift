@@ -77,16 +77,14 @@ static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  if (isa<OpenedArchetypeType>(A))
+  auto root = dyn_cast<PrimaryArchetypeType>(A->getRoot());
+  if (!root)
     return true;
-
-  // Find the primary archetype.
-  auto P = A->getPrimary();
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (P->getGenericEnvironment() == genericEnv)
+    if (root->getGenericEnvironment() == genericEnv)
       return true;
 
   return false;
@@ -4496,7 +4494,7 @@ public:
   /// - accesses must be uniquely ended
   /// - flow-sensitive states must be equivalent on all paths into a block
   void verifyFlowSensitiveRules(SILFunction *F) {
-    // Do a breath-first search through the basic blocks.
+    // Do a traversal of the basic blocks.
     // Note that we intentionally don't verify these properties in blocks
     // that can't be reached from the entry block.
     llvm::DenseMap<SILBasicBlock*, VerifyFlowSensitiveRulesDetails::BBState> visitedBBs;

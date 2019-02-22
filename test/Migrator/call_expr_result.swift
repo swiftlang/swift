@@ -10,4 +10,8 @@ func foo() {
   let c1 = Cities(x: 3)
   _ = Cities.init(x: 3)
   _ = c1.noosa()
+  _ = c1.name
+  bar(c1.name)
 }
+
+func bar(_ n: String) {}

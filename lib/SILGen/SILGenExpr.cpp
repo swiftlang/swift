@@ -952,8 +952,10 @@ RValue RValueEmitter::visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitIntegerLiteralExpr(IntegerLiteralExpr *E,
                                               SGFContext C) {
-  return RValue(SGF, E,
-                ManagedValue::forUnmanaged(SGF.B.createIntegerLiteral(E)));
+  if (E->getType()->is<AnyBuiltinIntegerType>())
+    return RValue(SGF, E,
+                  ManagedValue::forUnmanaged(SGF.B.createIntegerLiteral(E)));
+  return SGF.emitLiteral(E, C);
 }
 RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
                                             SGFContext C) {
@@ -3724,31 +3726,12 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
 
 RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
-  ASTContext &Ctx = SGF.getASTContext();
-  SILType Ty = SGF.getLoweredLoadableType(E->getType());
-  SourceLoc Loc = E->getStartLoc();
-  
   switch (E->getKind()) {
   case MagicIdentifierLiteralExpr::File:
   case MagicIdentifierLiteralExpr::Function:
+  case MagicIdentifierLiteralExpr::Line:
+  case MagicIdentifierLiteralExpr::Column:
     return SGF.emitLiteral(E, C);
-  case MagicIdentifierLiteralExpr::Line: {
-    unsigned Value = 0;
-    if (Loc.isValid())
-      Value = Ctx.SourceMgr.getLineAndColumn(Loc).first;
-
-    SILValue V = SGF.B.createIntegerLiteral(E, Ty, Value);
-    return RValue(SGF, E, ManagedValue::forUnmanaged(V));
-  }
-  case MagicIdentifierLiteralExpr::Column: {
-    unsigned Value = 0;
-    if (Loc.isValid())
-      Value = Ctx.SourceMgr.getLineAndColumn(Loc).second;
-
-    SILValue V = SGF.B.createIntegerLiteral(E, Ty, Value);
-    return RValue(SGF, E, ManagedValue::forUnmanaged(V));
-  }
-
   case MagicIdentifierLiteralExpr::DSOHandle: {
     auto SILLoc = SILLocation(E);
     auto UnsafeRawPointer = SGF.getASTContext().getUnsafeRawPointerDecl();

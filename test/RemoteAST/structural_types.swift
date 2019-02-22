@@ -5,6 +5,9 @@
 @_silgen_name("printMetadataType")
 func printType(_: Any.Type)
 
+@_silgen_name("stopRemoteAST")
+func stopRemoteAST()
+
 typealias Fn1 = () -> ()
 printType(Fn1.self)
 // CHECK: found type: () -> ()
@@ -70,3 +73,5 @@ func foo<T>(_: T) {
 
 foo() { (x: Int) -> Int in return x }
 // CHECK: found type: (Int) -> Int
+
+stopRemoteAST()

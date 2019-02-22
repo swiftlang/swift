@@ -171,6 +171,43 @@ bool Context::hasSwiftCallingConvention(llvm::StringRef MangledName) {
   return true;
 }
 
+std::string Context::getModuleName(llvm::StringRef mangledName) {
+  NodePointer node = demangleSymbolAsNode(mangledName);
+  while (node) {
+    switch (node->getKind()) {
+    case Demangle::Node::Kind::Module:
+      return node->getText().str();
+    case Demangle::Node::Kind::TypeMangling:
+    case Demangle::Node::Kind::Type:
+      node = node->getFirstChild();
+      break;
+    case Demangle::Node::Kind::Global: {
+      NodePointer newNode = nullptr;
+      for (NodePointer child : *node) {
+        if (!isFunctionAttr(child->getKind())) {
+          newNode = child;
+          break;
+        }
+      }
+      node = newNode;
+      break;
+    }
+    default:
+      if (isSpecialized(node)) {
+        node = getUnspecialized(node, *D);
+        break;
+      }
+      if (isContext(node->getKind())) {
+        node = node->getFirstChild();
+        break;
+      }
+      return std::string();
+    }
+  }
+  return std::string();
+}
+
+
 //////////////////////////////////
 // Public utility functions     //
 //////////////////////////////////

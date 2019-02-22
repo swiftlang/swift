@@ -575,7 +575,7 @@ class FormatWalker : public SourceEntityWalker {
       };
 
       if (auto AE = dyn_cast_or_null<ApplyExpr>(Node.dyn_cast<Expr *>())) {
-        // PrefixUnaryExpr shouldn't be syntacticly considered as a funtion call
+        // PrefixUnaryExpr shouldn't be syntactically considered as a function call
         // for sibling alignment.
         if (!isa<PrefixUnaryExpr>(AE)) {
           collect(AE->getArg());

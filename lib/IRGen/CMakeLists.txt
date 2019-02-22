@@ -57,8 +57,13 @@ add_swift_host_library(swiftIRGen STATIC
     swiftSILGen
     swiftSILOptimizer
 
+  INTERFACE_LINK_LIBRARIES
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
     clangCodeGen
     clangAST
+
+  LLVM_COMPONENT_DEPENDS
+    target
+    transformutils
 )

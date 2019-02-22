@@ -396,7 +396,6 @@ Types
   any-generic-type ::= context decl-name 'V'     // nominal struct type
   any-generic-type ::= context decl-name 'XY'    // unknown nominal type
   any-generic-type ::= protocol 'P'              // nominal protocol type
-  any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
   any-generic-type ::= standard-substitutions
 
@@ -603,6 +602,17 @@ The number of parameters and results must match with the number of
 ``<PARAM-CONVENTION>`` and ``<RESULT-CONVENTION>`` characters after the
 ``<FUNC-REPRESENTATION>``.
 The ``<generic-signature>`` is used if the function is polymorphic.
+
+DWARF debug info and USRs also mangle sugared types, adding the following
+productions:
+
+::
+
+  any-generic-type ::= context decl-name 'a'     // typealias type
+  type ::= base-type "XSq"                       // sugared Optional type
+  type ::= base-type "XSa"                       // sugared Array type
+  type ::= key-type value-type "XSD"             // sugared Dictionary type
+  type ::= base-type "XSp"                       // sugared Paren type
 
 Generics
 ~~~~~~~~

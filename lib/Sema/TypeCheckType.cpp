@@ -1547,16 +1547,17 @@ static Type resolveIdentTypeComponent(
 static bool diagnoseAvailability(IdentTypeRepr *IdType,
                                  DeclContext *DC,
                                  bool AllowPotentiallyUnavailableProtocol) {
+  DeclAvailabilityFlags flags =
+    DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
+  if (AllowPotentiallyUnavailableProtocol)
+    flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
   ASTContext &ctx = DC->getASTContext();
   auto componentRange = IdType->getComponentRange();
   for (auto comp : componentRange) {
     if (auto *typeDecl = comp->getBoundDecl()) {
       assert(ctx.getLazyResolver() && "Must have a type checker!");
       TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
-      if (diagnoseDeclAvailability(typeDecl, tc, DC, comp->getIdLoc(),
-                                   AllowPotentiallyUnavailableProtocol,
-                                   /*SignalOnPotentialUnavailability*/false,
-                                   /*ForInout*/false)) {
+      if (diagnoseDeclAvailability(typeDecl, tc, DC, comp->getIdLoc(), flags)) {
         return true;
       }
     }
@@ -2030,7 +2031,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
-    TAK_convention, TAK_noreturn, TAK_pseudogeneric,
+    TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
     TAK_escaping, TAK_yield_once, TAK_yield_many
   };
@@ -2162,17 +2163,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                          : diag::attr_only_on_parameters,
                  "@autoclosure");
         attrs.clearAttribute(TAK_autoclosure);
-      }
-
-      // @noreturn has been replaced with a 'Never' return type.
-      if (attrs.has(TAK_noreturn)) {
-        auto loc = attrs.getLoc(TAK_noreturn);
-        auto attrRange = getTypeAttrRangeWithAt(Context, loc);
-        auto resultRange = fnRepr->getResultTypeRepr()->getSourceRange();
-
-        diagnose(loc, diag::noreturn_not_supported)
-            .fixItRemove(attrRange)
-            .fixItReplace(resultRange, "Never");
       }
 
       // Resolve the function type directly with these attributes.

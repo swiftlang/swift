@@ -73,13 +73,16 @@ func AddressOnly_cases(_ s: S) {
   _ = AddressOnly.nought
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
+  // CHECK-NEXT:  [[P_BUF:%.*]] = alloc_stack $P
+  // CHECK-NEXT:  [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[P_BUF]]
+  // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD_ADDR]]
   // CHECK-NEXT:  [[MERE:%.*]] = alloc_stack $AddressOnly
   // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
-  // CHECK-NEXT:  [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[PAYLOAD]]
-  // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD_ADDR]]
+  // CHECK-NEXT:  copy_addr [take] [[P_BUF]] to [initialization] [[PAYLOAD]] : $*P
   // CHECK-NEXT:  inject_enum_addr [[MERE]]
   // CHECK-NEXT:  destroy_addr [[MERE]]
   // CHECK-NEXT:  dealloc_stack [[MERE]]
+  // CHECK-NEXT:  dealloc_stack [[P_BUF]] : $*P
   _ = AddressOnly.mere(s)
 
   // Address-only enum vs loadable payload
@@ -129,13 +132,15 @@ func PolyOptionable_cases<T>(_ t: T) {
   _ = PolyOptionable<T>.nought
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin PolyOptionable<T>.Type
+// CHECK-NEXT:    [[T_BUF:%.*]] = alloc_stack $T
+// CHECK-NEXT:    copy_addr %0 to [initialization] [[T_BUF]]
 // CHECK-NEXT:    [[MERE:%.*]] = alloc_stack $PolyOptionable<T>
 // CHECK-NEXT:    [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[PAYLOAD]]
+// CHECK-NEXT:    copy_addr [take] [[T_BUF]] to [initialization] [[PAYLOAD]] : $*T
 // CHECK-NEXT:    inject_enum_addr [[MERE]]
 // CHECK-NEXT:    destroy_addr [[MERE]]
 // CHECK-NEXT:    dealloc_stack [[MERE]]
-
+// CHECK-NEXT:    dealloc_stack [[T_BUF]] : $*T
   _ = PolyOptionable<T>.mere(t)
 
 // CHECK-NOT:    destroy_addr %0

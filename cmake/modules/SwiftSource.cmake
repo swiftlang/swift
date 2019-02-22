@@ -61,9 +61,7 @@ function(handle_swift_sources
   endif()
 
   if(swift_sources)
-    compute_library_subdir(SWIFTSOURCES_LIBRARY_SUBDIR
-      "${SWIFTSOURCES_SDK}" "${SWIFTSOURCES_ARCHITECTURE}")
-    set(objsubdir "/${SWIFTSOURCES_LIBRARY_SUBDIR}")
+    set(objsubdir "/${SWIFTSOURCES_SDK}/${SWIFTSOURCES_ARCHITECTURE}")
 
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}")
 
@@ -255,6 +253,8 @@ function(_compile_swift_files
         "-nostdimport" "-parse-stdlib" "-module-name" "Swift")
     list(APPEND swift_flags "-Xfrontend" "-group-info-path"
                             "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
+  else()
+    list(APPEND swift_flags "-module-name" "${SWIFTFILE_MODULE_NAME}")
   endif()
 
   # Force swift 5 mode for Standard Library.
@@ -313,19 +313,32 @@ function(_compile_swift_files
     list(APPEND swift_flags "-parse-as-library")
 
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
+    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
+      set(specific_module_dir "${module_base}.swiftmodule")
+      set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
+    endif()
     set(module_file "${module_base}.swiftmodule")
+    set(module_doc_file "${module_base}.swiftdoc")
+
+    # FIXME: These don't really belong inside the swiftmodule, but there's not
+    # an obvious alternate place to put them.
     set(sib_file "${module_base}.Onone.sib")
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
-    set(module_doc_file "${module_base}.swiftdoc")
 
     if(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
-      list(APPEND swift_flags "-emit-parseable-module-interface")
+      list(APPEND swift_flags
+          "-emit-parseable-module-interface-path" "${interface_file}")
     endif()
 
-    list(APPEND command_create_dirs
-        COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
+    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
+      list(APPEND command_create_dirs
+          COMMAND "${CMAKE_COMMAND}" -E make_directory "${specific_module_dir}")
+    else()
+      list(APPEND command_create_dirs
+          COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
+    endif()
 
     # If we have extra regexp flags, check if we match any of the regexps. If so
     # add the relevant flags to our swift_flags.
@@ -349,10 +362,15 @@ function(_compile_swift_files
     set(optional_arg "OPTIONAL")
   endif()
 
-  swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-    FILES ${module_outputs}
-    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-    "${optional_arg}")
+  if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
+    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
+      DIRECTORY "${specific_module_dir}"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+  else()
+    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
+      FILES ${module_outputs}
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+  endif()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
   set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
@@ -434,6 +452,20 @@ function(_compile_swift_files
   string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
   file(WRITE "${file_path}" "'${source_files_quoted}'")
   
+  # If this platform/architecture combo supports backward deployment to old
+  # Objective-C runtimes, we need to copy a YAML file with legacy type layout
+  # information to the build directory so that the compiler can find it.
+  #
+  # See stdlib/CMakeLists.txt and TypeConverter::TypeConverter() in
+  # lib/IRGen/GenType.cpp.
+  if(SWIFTFILE_IS_STDLIB_CORE)
+    set(SWIFTFILE_PLATFORM "${SWIFT_SDK_${SWIFTFILE_SDK}_LIB_SUBDIR}")
+    set(copy_legacy_layouts_dep
+        "copy-legacy-layouts-${SWIFTFILE_PLATFORM}-${SWIFTFILE_ARCHITECTURE}")
+  else()
+    set(copy_legacy_layouts_dep)
+  endif()
+
   add_custom_command_target(
       dependency_target
       COMMAND
@@ -447,6 +479,7 @@ function(_compile_swift_files
         ${file_path} ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
         ${obj_dirs_dependency_target}
+        ${copy_legacy_layouts_dep}
       COMMENT "Compiling ${first_output}")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
 

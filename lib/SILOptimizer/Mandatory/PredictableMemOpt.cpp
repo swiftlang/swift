@@ -425,7 +425,9 @@ public:
   /// If as a result of us copying values, we may have unconsumed destroys, find
   /// the appropriate location and place the values there. Only used when
   /// ownership is enabled.
-  LoadInst *addMissingDestroysForCopiedValues(LoadInst *li, SILValue newVal);
+  SingleValueInstruction *
+  addMissingDestroysForCopiedValues(SingleValueInstruction *li,
+                                    SILValue newVal);
 
   void print(llvm::raw_ostream &os) const;
   void dump() const LLVM_ATTRIBUTE_USED;
@@ -746,14 +748,14 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   return eltVal;
 }
 
-LoadInst *
-AvailableValueAggregator::addMissingDestroysForCopiedValues(LoadInst *li,
-                                                            SILValue newVal) {
+SingleValueInstruction *
+AvailableValueAggregator::addMissingDestroysForCopiedValues(
+    SingleValueInstruction *svi, SILValue newVal) {
   // If ownership is not enabled... bail. We do not need to do this since we do
   // not need to insert an extra copy unless we have ownership since without
   // ownership stores do not consume.
   if (!B.hasOwnership())
-    return li;
+    return svi;
 
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   SmallVector<SILBasicBlock *, 8> leakingBlocks;
@@ -776,8 +778,9 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(LoadInst *li,
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
     auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
-    auto error = valueHasLinearLifetime(
-        cvi, {li}, {}, visitedBlocks, deadEndBlocks, errorKind, &leakingBlocks);
+    auto error =
+        valueHasLinearLifetime(cvi, {svi}, {}, visitedBlocks, deadEndBlocks,
+                               errorKind, &leakingBlocks);
     if (!error.getFoundError())
       continue;
 
@@ -795,17 +798,40 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(LoadInst *li,
     }
   }
 
-  // If we didn't find a loop, we are done, just return li to get RAUWed.
-  if (!foundLoop)
-    return li;
+  // If we didn't find a loop, we are done, just return svi to get RAUWed.
+  if (!foundLoop) {
+    // If we had a load_borrow, we have created an extra copy that we are going
+    // to borrow at the load point. This means we need to handle the destroying
+    // of the value along paths reachable from the load_borrow. Luckily that
+    // will exactly be after the end_borrows of the load_borrow.
+    if (isa<LoadBorrowInst>(svi)) {
+      for (auto *use : svi->getUses()) {
+        if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
+          auto next = std::next(ebi->getIterator());
+          SILBuilderWithScope(next).emitDestroyValueOperation(ebi->getLoc(),
+                                                              newVal);
+        }
+      }
+    }
+    return svi;
+  }
 
   // If we found a loop, then we know that our leaking blocks are the exiting
-  // blocks of the loop. Thus we need to change the load inst to a copy_value
-  // instead of deleting it.
-  newVal = SILBuilderWithScope(li).emitCopyValueOperation(loc, newVal);
-  li->replaceAllUsesWith(newVal);
-  SILValue addr = li->getOperand();
-  li->eraseFromParent();
+  // blocks of the loop and the value has been lifetime extended over the loop.
+  if (isa<LoadInst>(svi)) {
+    // If we have a load, we need to put in a copy so that the destroys within
+    // the loop are properly balanced.
+    newVal = SILBuilderWithScope(svi).emitCopyValueOperation(loc, newVal);
+  } else {
+    // If we have a load_borrow, we create a begin_borrow for the end_borrows in
+    // the loop.
+    assert(isa<LoadBorrowInst>(svi));
+    newVal = SILBuilderWithScope(svi).createBeginBorrow(svi->getLoc(), newVal);
+  }
+
+  svi->replaceAllUsesWith(newVal);
+  SILValue addr = svi->getOperand(0);
+  svi->eraseFromParent();
   if (auto *addrI = addr->getDefiningInstruction())
     recursivelyDeleteTriviallyDeadInstructions(addrI);
   return nullptr;
@@ -1308,19 +1334,23 @@ private:
 /// If we are able to optimize \p Inst, return the source address that
 /// instruction is loading from. If we can not optimize \p Inst, then just
 /// return an empty SILValue.
-static SILValue tryFindSrcAddrForLoad(SILInstruction *Inst) {
+static SILValue tryFindSrcAddrForLoad(SILInstruction *i) {
+  // We can always promote a load_borrow.
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(i))
+    return lbi->getOperand();
+
   // We only handle load [copy], load [trivial], load and copy_addr right
   // now. Notably we do not support load [take] when promoting loads.
-  if (auto *LI = dyn_cast<LoadInst>(Inst))
-    if (LI->getOwnershipQualifier() != LoadOwnershipQualifier::Take)
-      return LI->getOperand();
+  if (auto *li = dyn_cast<LoadInst>(i))
+    if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Take)
+      return li->getOperand();
 
   // If this is a CopyAddr, verify that the element type is loadable.  If not,
   // we can't explode to a load.
-  auto *CAI = dyn_cast<CopyAddrInst>(Inst);
-  if (!CAI || !CAI->getSrc()->getType().isLoadable(CAI->getModule()))
+  auto *cai = dyn_cast<CopyAddrInst>(i);
+  if (!cai || !cai->getSrc()->getType().isLoadable(cai->getModule()))
     return SILValue();
-  return CAI->getSrc();
+  return cai->getSrc();
 }
 
 /// At this point, we know that this element satisfies the definitive init
@@ -1385,25 +1415,30 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
     // removing the instruction from Uses for us, so we return false.
     return false;
   }
-  
+
+  assert((isa<LoadBorrowInst>(Inst) || isa<LoadInst>(Inst)) &&
+         "Unhandled instruction for this code path!");
+
   // Aggregate together all of the subelements into something that has the same
   // type as the load did, and emit smaller loads for any subelements that were
-  // not available.
-  auto *Load = cast<LoadInst>(Inst);
-  AvailableValueAggregator Agg(Load, AvailableValues, Uses, deadEndBlocks,
+  // not available. We are "propagating" a +1 available value from the store
+  // points.
+  auto *load = dyn_cast<SingleValueInstruction>(Inst);
+  AvailableValueAggregator agg(load, AvailableValues, Uses, deadEndBlocks,
                                false /*isTake*/);
-  SILValue newVal = Agg.aggregateValues(LoadTy, Load->getOperand(), FirstElt);
+  SILValue newVal = agg.aggregateValues(LoadTy, load->getOperand(0), FirstElt);
 
-  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *Load << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *load << "\n");
   LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal << "\n");
 
   // If we inserted any copies, we created the copies at our stores. We know
   // that in our load block, we will reform the aggregate as appropriate at the
-  // load implying that the value /must/ be fully consumed. Thus any leaking
+  // load implying that the value /must/ be fully consumed. If we promoted a +0
+  // value, we created dominating destroys along those paths. Thus any leaking
   // blocks that we may have can be found by performing a linear lifetime check
   // over all copies that we found using the load as the "consuming uses" (just
   // for the purposes of identifying the consuming block).
-  auto *oldLoad = Agg.addMissingDestroysForCopiedValues(Load, newVal);
+  auto *oldLoad = agg.addMissingDestroysForCopiedValues(load, newVal);
 
   ++NumLoadPromoted;
 
@@ -1412,8 +1447,14 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   if (!oldLoad)
     return true;
 
+  // If our load was a +0 value, borrow the value and the RAUW. We reuse the
+  // end_borrows of our load_borrow.
+  if (isa<LoadBorrowInst>(oldLoad)) {
+    newVal = SILBuilderWithScope(oldLoad).createBeginBorrow(oldLoad->getLoc(),
+                                                            newVal);
+  }
   oldLoad->replaceAllUsesWith(newVal);
-  SILValue addr = oldLoad->getOperand();
+  SILValue addr = oldLoad->getOperand(0);
   oldLoad->eraseFromParent();
   if (auto *addrI = addr->getDefiningInstruction())
     recursivelyDeleteTriviallyDeadInstructions(addrI);

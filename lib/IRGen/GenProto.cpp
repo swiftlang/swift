@@ -800,171 +800,39 @@ namespace {
 
     ArrayRef<WitnessTableEntry> getEntries() const { return Entries; }
   };
-
-  /// A path through a protocol hierarchy.
-  class ProtocolPath {
-    IRGenModule &IGM;
-
-    /// The destination protocol.
-    ProtocolDecl *Dest;
-
-    /// The path from the selected origin down to the destination
-    /// protocol.
-    SmallVector<WitnessIndex, 8> ReversePath;
-
-    /// The origin index to use.
-    unsigned OriginIndex;
-
-    /// The best path length we found.
-    unsigned BestPathLength;
-
-  public:
-    /// Find a path from the given set of origins to the destination
-    /// protocol.
-    ///
-    /// T needs to provide a couple of member functions:
-    ///   ProtocolDecl *getProtocol() const;
-    ///   const ProtocolInfo &getInfo() const;
-    template <class T>
-    ProtocolPath(IRGenModule &IGM, ArrayRef<T> origins, ProtocolDecl *dest)
-      : IGM(IGM), Dest(dest), BestPathLength(~0U) {
-
-      // Consider each of the origins in turn, breaking out if any of
-      // them yields a zero-length path.
-      for (unsigned i = 0, e = origins.size(); i != e; ++i) {
-        auto &origin = origins[i];
-        if (considerOrigin(origin.getProtocol(), origin.getInfo(), i))
-          break;
-      }
-
-      // Sanity check that we actually found a path at all.
-      assert(BestPathLength != ~0U);
-      assert(BestPathLength == ReversePath.size());
-    }
-
-    /// Returns the index of the origin protocol we chose.
-    unsigned getOriginIndex() const { return OriginIndex; }
-
-    /// Apply the path to the given witness table.
-    llvm::Value *apply(IRGenFunction &IGF, llvm::Value *wtable) const {
-      for (unsigned i = ReversePath.size(); i != 0; --i) {
-        wtable = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
-                                   ReversePath[i-1].forProtocolWitnessTable());
-        wtable = IGF.Builder.CreateBitCast(wtable, IGF.IGM.WitnessTablePtrTy);
-      }
-      return wtable;
-    }
-
-  private:
-    /// Consider paths starting from a new origin protocol.
-    /// Returns true if there's no point in considering other origins.
-    bool considerOrigin(ProtocolDecl *origin, const ProtocolInfo &originInfo,
-                        unsigned originIndex) {
-      assert(BestPathLength != 0);
-
-      // If the origin *is* the destination, we can stop here.
-      if (origin == Dest) {
-        OriginIndex = originIndex;
-        BestPathLength = 0;
-        ReversePath.clear();
-        return true;
-      }
-
-      // Otherwise, if the origin gives rise to a better path, that's
-      // also cool.
-      if (findBetterPath(origin, originInfo, 0)) {
-        OriginIndex = originIndex;
-        return BestPathLength == 0;
-      }
-
-      return false;
-    }
-
-    /// Consider paths starting at the given protocol.
-    bool findBetterPath(ProtocolDecl *proto, const ProtocolInfo &protoInfo,
-                        unsigned lengthSoFar) {
-      assert(lengthSoFar < BestPathLength);
-      assert(proto != Dest);
-
-      // Keep track of whether we found a better path than the
-      // previous best.
-      bool foundBetter = false;
-      for (auto base : proto->getInheritedProtocols()) {
-        // ObjC protocols do not have witnesses.
-        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(base))
-          continue;
-
-        auto baseIndex = protoInfo.getBaseIndex(base);
-
-        // Compute the length down to this base.
-        unsigned lengthToBase = lengthSoFar;
-        if (!baseIndex.isPrefix()) {
-          lengthToBase++;
-
-          // Don't consider this path if we reach a length that can't
-          // possibly be better than the best so far.
-          if (lengthToBase == BestPathLength) continue;
-        }
-        assert(lengthToBase < BestPathLength);
-
-        // If this base *is* the destination, go ahead and start
-        // building the path into ReversePath.
-        if (base == Dest) {
-          // Reset the collected best-path information.
-          BestPathLength = lengthToBase;
-          ReversePath.clear();
-
-        // Otherwise, if there isn't a better path through this base,
-        // don't accumulate anything in the path.
-        } else {
-          const ProtocolInfo &baseInfo =
-              IGM.getProtocolInfo(base, ProtocolInfoKind::RequirementSignature);
-          if (!findBetterPath(base, baseInfo, lengthToBase))
-            continue;
-        }
-
-        // Okay, we've found a better path, and ReversePath contains a
-        // path leading from base to Dest.
-        assert(BestPathLength >= lengthToBase);
-        foundBetter = true;
-
-        // Add the link from proto to base if necessary.
-        if (!baseIndex.isPrefix()) {
-          ReversePath.push_back(baseIndex);
-
-        // If it isn't necessary, then we might be able to
-        // short-circuit considering the bases of this protocol.
-        } else {
-          if (lengthSoFar == BestPathLength)
-            return true;
-        }
-      }
-
-      return foundBetter;
-    }
-  };
-
 } // end anonymous namespace
 
 /// Return true if the witness table requires runtime instantiation to
 /// handle resiliently-added requirements with default implementations.
-static bool isResilientConformance(const NormalProtocolConformance *conformance) {
+bool IRGenModule::isResilientConformance(
+    const NormalProtocolConformance *conformance) {
   // If the protocol is not resilient, the conformance is not resilient
   // either.
   if (!conformance->getProtocol()->isResilient())
     return false;
 
-  // If the protocol is in the same module as the conformance, we're
-  // not resilient.
-  if (conformance->getDeclContext()->getParentModule()
-      == conformance->getProtocol()->getParentModule())
+  auto *conformanceModule = conformance->getDeclContext()->getParentModule();
+
+  // If the protocol and the conformance are both in the current module,
+  // they're not resilient.
+  if (conformanceModule == getSwiftModule() &&
+      conformanceModule == conformance->getProtocol()->getParentModule())
+    return false;
+
+  // If the protocol and the conformance are in the same module and the
+  // conforming type is not generic, they're not resilient.
+  //
+  // This is an optimization -- a conformance of a non-generic type cannot
+  // resiliently become dependent.
+  if (!conformance->getDeclContext()->isGenericContext() &&
+      conformanceModule == conformance->getProtocol()->getParentModule())
     return false;
 
   // We have a resilient conformance.
   return true;
 }
 
-static bool isResilientConformance(const RootProtocolConformance *root) {
+bool IRGenModule::isResilientConformance(const RootProtocolConformance *root) {
   if (auto normal = dyn_cast<NormalProtocolConformance>(root))
     return isResilientConformance(normal);
   // Self-conformances never require this.
@@ -997,6 +865,7 @@ static bool hasDependentTypeWitness(
 }
 
 static bool isDependentConformance(
+              IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
               bool considerResilience,
               llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
@@ -1011,7 +880,7 @@ static bool isDependentConformance(
     return false;
 
   // If the conformance is resilient, this is always true.
-  if (considerResilience && isResilientConformance(conformance))
+  if (considerResilience && IGM.isResilientConformance(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -1027,7 +896,8 @@ static bool isDependentConformance(
     auto assocConformance =
       conformance->getAssociatedConformance(req.getFirstType(), assocProtocol);
     if (assocConformance.isAbstract() ||
-        isDependentConformance(assocConformance.getConcrete()
+        isDependentConformance(IGM,
+                               assocConformance.getConcrete()
                                  ->getRootConformance(),
                                considerResilience,
                                visited))
@@ -1045,10 +915,12 @@ static bool isDependentConformance(
 
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
-static bool isDependentConformance(const RootProtocolConformance *conformance,
-                                   bool considerResilience) {
+bool IRGenModule::isDependentConformance(
+    const RootProtocolConformance *conformance,
+    bool considerResilience) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
-  return ::isDependentConformance(conformance, considerResilience, visited);
+  return ::isDependentConformance(*this, conformance, considerResilience,
+                                  visited);
 }
 
 static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
@@ -1286,7 +1158,7 @@ public:
                                       Conformance.getDeclContext())),
           SILEntries(SILWT->getEntries()),
           SILConditionalConformances(SILWT->getConditionalConformances()),
-          ResilientConformance(isResilientConformance(&Conformance)),
+          ResilientConformance(IGM.isResilientConformance(&Conformance)),
           PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
                                  (ResilientConformance
                                   ? ProtocolInfoKind::RequirementSignature
@@ -2086,7 +1958,7 @@ void IRGenerator::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
 
   // Only resilient conformances use relative pointers for witness methods.
   if (wt.isDeclaration() || isAvailableExternally(wt.getLinkage()) ||
-      !isResilientConformance(wt.getConformance()))
+      !CurrentIGM->isResilientConformance(wt.getConformance()))
     return;
 
   for (auto &entry : wt.getEntries()) {
@@ -2871,16 +2743,6 @@ void NecessaryBindings::addProtocolConformance(CanType type,
   // TODO: pass something about the root conformance necessary to
   // reconstruct this.
   Requirements.insert({type, conf.getAbstract()});
-}
-
-llvm::Value *irgen::emitImpliedWitnessTableRef(IRGenFunction &IGF,
-                                               ArrayRef<ProtocolEntry> entries,
-                                               ProtocolDecl *target,
-                                     const GetWitnessTableFn &getWitnessTable) {
-  ProtocolPath path(IGF.IGM, entries, target);
-  auto wtable = getWitnessTable(path.getOriginIndex());
-  wtable = path.apply(IGF, wtable);
-  return wtable;
 }
 
 llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,

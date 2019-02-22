@@ -105,7 +105,8 @@ class GenericRuncer<T> : Gizmo {
 // CHECK:   [[OPTIONALADDR:%.*]] = bitcast %TSo5GizmoCSg* [[XADDR]] to i64*
 // CHECK:   [[OPTIONAL:%.*]] = load i64, i64* [[OPTIONALADDR]]
 // CHECK:   [[OBJ:%.*]] = inttoptr i64 [[OPTIONAL]] to %objc_object*
-// CHECK:    call %objc_object* @objc_retain(%objc_object* [[OBJ]]
+// CHECK:   [[OBJ_CAST:%.*]] = bitcast %objc_object* [[OBJ]] to i8*
+// CHECK:   call i8* @llvm.objc.retain(i8* [[OBJ_CAST]])
 // CHECK:   ret i64 [[OPTIONAL]]
 
   // CHECK: define hidden swiftcc void @"$s10objc_super13GenericRuncerC5runceyyFZ"(%swift.type* swiftself) {{.*}} {

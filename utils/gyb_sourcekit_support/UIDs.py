@@ -39,6 +39,7 @@ UID_KEYS = [
     KEY('Column', 'key.column'),
     KEY('ReceiverUSR', 'key.receiver_usr'),
     KEY('IsDynamic', 'key.is_dynamic'),
+    KEY('IsImplicit', 'key.is_implicit'),
     KEY('FilePath', 'key.filepath'),
     KEY('ModuleInterfaceName', 'key.module_interface_name'),
     KEY('Hash', 'key.hash'),
@@ -161,6 +162,14 @@ UID_KEYS = [
     KEY('CompileID', 'key.compileid'),
     KEY('CompilerArgsString', 'key.compilerargs-string'),
     KEY('ImplicitMembers', 'key.implicitmembers'),
+    KEY('ExpectedTypes', 'key.expectedtypes'),
+    KEY('Members', 'key.members'),
+    KEY('TypeBuffer', 'key.printedtypebuffer'),
+    KEY('ExpressionTypeList', 'key.expression_type_list'),
+    KEY('ExpressionOffset', 'key.expression_offset'),
+    KEY('ExpressionLength', 'key.expression_length'),
+    KEY('TypeOffset', 'key.type_offset'),
+    KEY('TypeLength', 'key.type_length'),
 ]
 
 
@@ -182,6 +191,7 @@ UID_REQUESTS = [
             'source.request.codecomplete.setpopularapi'),
     REQUEST('CodeCompleteSetCustom', 'source.request.codecomplete.setcustom'),
     REQUEST('TypeContextInfo', 'source.request.typecontextinfo'),
+    REQUEST('ConformingMethodList', 'source.request.conformingmethods'),
     REQUEST('CursorInfo', 'source.request.cursorinfo'),
     REQUEST('RangeInfo', 'source.request.rangeinfo'),
     REQUEST('RelatedIdents', 'source.request.relatedidents'),
@@ -216,6 +226,7 @@ UID_REQUESTS = [
     REQUEST('EnableCompileNotifications',
             'source.request.enable-compile-notifications'),
     REQUEST('TestNotification', 'source.request.test_notification'),
+    REQUEST('CollectExpressionType', 'source.request.expression.type'),
 ]
 
 

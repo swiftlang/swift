@@ -161,6 +161,28 @@ namespace swift {
     bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
     bool hasMergeGroup(MergeGroupKind Kind);
   };
+
+  /// Reported type for an expression. This expression is represented by offset
+  /// length in the source buffer;
+  struct ExpressionTypeInfo {
+
+    /// The start of the expression;
+    uint32_t offset;
+
+    /// The length of the expression;
+    uint32_t length;
+
+    /// The start of the printed type in a separately given string buffer.
+    uint32_t typeOffset;
+
+    /// The length of the printed type
+    uint32_t typeLength;
+  };
+
+  /// Collect type information for every expression in \c SF; all types will
+  /// be printed to \c OS.
+  ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
+    std::vector<ExpressionTypeInfo> &scratch, llvm::raw_ostream &OS);
 }
 
 #endif

@@ -42,6 +42,7 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   // HeapObject header;
   {
     &swift::CLASS_METADATA_SYM(s19__EmptyArrayStorage), // isa pointer
+    InlineRefCounts::Immortal
   },
   
   // _SwiftArrayBodyStorage body;
@@ -56,6 +57,7 @@ swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
   // HeapObject header;
   {
     &swift::CLASS_METADATA_SYM(s26__EmptyDictionarySingleton), // isa pointer
+    InlineRefCounts::Immortal
   },
   
   // _SwiftDictionaryBodyStorage body;
@@ -83,6 +85,7 @@ swift::_SwiftEmptySetSingleton swift::_swiftEmptySetSingleton = {
   // HeapObject header;
   {
     &swift::CLASS_METADATA_SYM(s19__EmptySetSingleton), // isa pointer
+    InlineRefCounts::Immortal
   },
   
   // _SwiftSetBodyStorage body;

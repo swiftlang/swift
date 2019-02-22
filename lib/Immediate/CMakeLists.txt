@@ -8,5 +8,11 @@ add_swift_host_library(swiftImmediate STATIC
     swiftSILOptimizer
     swiftIRGen
   LLVM_COMPONENT_DEPENDS
-    linker mcjit)
+    executionengine
+    linker
+    mcjit
+    transformutils)
 
+if(HAVE_UNICODE_LIBEDIT)
+  target_link_libraries(swiftImmediate PRIVATE edit)
+endif()

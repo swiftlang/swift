@@ -831,8 +831,12 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       return NewI;
     }
 
-    // This exact cast will fail.
-    auto *NewI = Builder.createBranch(Loc, FailureBB);
+    // This exact cast will fail. With ownership enabled, we pass a copy of the
+    // original casts value to the failure block.
+    TinyPtrVector<SILValue> Args;
+    if (Builder.hasOwnership())
+      Args.push_back(Inst->getOperand());
+    auto *NewI = Builder.createBranch(Loc, FailureBB, Args);
     EraseInstAction(Inst);
     WillFailAction();
     return NewI;
@@ -859,9 +863,11 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                          TargetType, isSourceTypeExact);
 
   SILBuilderWithScope Builder(Inst, BuilderContext);
-
   if (Feasibility == DynamicCastFeasibility::WillFail) {
-    auto *NewI = Builder.createBranch(Loc, FailureBB);
+    TinyPtrVector<SILValue> Args;
+    if (Builder.hasOwnership())
+      Args.push_back(Inst->getOperand());
+    auto *NewI = Builder.createBranch(Loc, FailureBB, Args);
     EraseInstAction(Inst);
     WillFailAction();
     return NewI;
@@ -1429,12 +1435,12 @@ static bool optimizeStaticallyKnownProtocolConformance(
     }
     case ExistentialRepresentation::Class: {
       auto Value =
-          B.createLoad(Loc, Src, swift::LoadOwnershipQualifier::Unqualified);
+          B.emitLoadValueOperation(Loc, Src, LoadOwnershipQualifier::Take);
       auto Existential =
           B.createInitExistentialRef(Loc, Dest->getType().getObjectType(),
                                      SourceType, Value, Conformances);
-      B.createStore(Loc, Existential, Dest,
-                    swift::StoreOwnershipQualifier::Unqualified);
+      B.emitStoreValueOperation(Loc, Existential, Dest,
+                                StoreOwnershipQualifier::Init);
       break;
     }
     case ExistentialRepresentation::Boxed: {
@@ -1445,8 +1451,8 @@ static bool optimizeStaticallyKnownProtocolConformance(
       // This needs to be a copy_addr (for now) because we must handle
       // address-only types.
       B.createCopyAddr(Loc, Src, Projection, IsTake, IsInitialization);
-      B.createStore(Loc, AllocBox, Dest,
-                    swift::StoreOwnershipQualifier::Unqualified);
+      B.emitStoreValueOperation(Loc, AllocBox, Dest,
+                                StoreOwnershipQualifier::Init);
       break;
     }
     };
@@ -1489,12 +1495,12 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     if (!resultTL.isAddressOnly()) {
       auto undef = SILValue(
           SILUndef::get(DestType.getObjectType(), Builder.getModule()));
-      Builder.createStore(Loc, undef, Dest,
-                          StoreOwnershipQualifier::Unqualified);
+      Builder.emitStoreValueOperation(Loc, undef, Dest,
+                                      StoreOwnershipQualifier::Init);
     }
     auto *TrapI = Builder.createBuiltinTrap(Loc);
     EraseInstAction(Inst);
-    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(TrapI)));
+    Builder.setInsertionPoint(std::next(TrapI->getIterator()));
     auto *UnreachableInst =
         Builder.createUnreachable(ArtificialUnreachableLocation());
 

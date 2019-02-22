@@ -118,6 +118,7 @@ private:
     info.Column = symbol.column;
     info.ReceiverUSR = symbol.getReceiverUSR();
     info.IsDynamic = symbol.roles & (unsigned)SymbolRole::Dynamic;
+    info.IsImplicit = symbol.roles & (unsigned)SymbolRole::Implicit;
     info.IsTestCandidate = symbol.symInfo.Properties & SymbolProperty::UnitTest;
     std::vector<UIdent> uidAttrs;
     if (!isRef) {

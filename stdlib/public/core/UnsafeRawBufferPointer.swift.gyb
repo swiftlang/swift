@@ -467,7 +467,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   buffer's type `T` must be a trivial type.
   @inlinable
   public init<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
-    self.init(start: buffer.baseAddress!,
+    self.init(start: buffer.baseAddress,
       count: buffer.count * MemoryLayout<T>.stride)
   }
 
@@ -478,7 +478,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   buffer's type `T` must be a trivial type.
   @inlinable
   public init<T>(_ buffer: UnsafeBufferPointer<T>) {
-    self.init(start: buffer.baseAddress!,
+    self.init(start: buffer.baseAddress,
       count: buffer.count * MemoryLayout<T>.stride)
   }
 %  end # !mutable
@@ -506,8 +506,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter slice: The raw buffer slice to rebase.
   @inlinable
   public init(rebasing slice: Slice<UnsafeRawBufferPointer>) {
-    self.init(start: slice.base.baseAddress! + slice.startIndex,
-      count: slice.count)
+    let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
+    self.init(start: base, count: slice.count)
   }
 %  end # !mutable
 
@@ -533,8 +533,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter slice: The raw buffer slice to rebase.
   @inlinable
   public init(rebasing slice: Slice<UnsafeMutableRawBufferPointer>) {
-    self.init(start: slice.base.baseAddress! + slice.startIndex,
-      count: slice.count)
+    let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
+    self.init(start: base, count: slice.count)
   }
 
   /// A pointer to the first byte of the buffer.

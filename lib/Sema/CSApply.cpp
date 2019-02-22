@@ -1778,19 +1778,15 @@ namespace {
       DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinIntegerLiteral });
 
-      return convertLiteral(
-               expr,
-               type,
-               cs.getType(expr),
-               protocol,
-               tc.Context.Id_IntegerLiteralType,
-               initName,
-               builtinProtocol,
-               tc.Context.TheIntegerLiteralType,
-               builtinInitName,
-               nullptr,
-               diag::integer_literal_broken_proto,
-               diag::builtin_integer_literal_broken_proto);
+      auto *result = convertLiteralInPlace(
+          expr, type, protocol, tc.Context.Id_IntegerLiteralType, initName,
+          builtinProtocol, builtinInitName, diag::integer_literal_broken_proto,
+          diag::builtin_integer_literal_broken_proto);
+      if (result) {
+        // TODO: It seems that callers expect this to have types assigned...
+        result->setType(cs.getType(result));
+      }
+      return result;
     }
     
     Expr *visitNilLiteralExpr(NilLiteralExpr *expr) {
@@ -2448,8 +2444,16 @@ namespace {
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
             /*implicit=*/expr->isImplicit(), Type(), getType);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
+
+        // FIXME: Application could fail, because some of the solutions
+        // are not expressible in AST (yet?), like certain tuple-to-tuple
+        // conversions. Better solution here would be not to form solutions
+        // which couldn't be applied by e.g. detecting situations like that
+        // and inserting fixes early.
+        if (!result)
+          return nullptr;
       }
-			
+
       // Check for ambiguous member if the base is an Optional
       if (baseTy->getOptionalObjectType()) {
         diagnoseAmbiguousNominalMember(baseTy, result);
@@ -3556,7 +3560,11 @@ namespace {
           });
         }
 
-        literalInit->setImplicit(false);
+        if (auto *literal = dyn_cast<NumberLiteralExpr>(literalInit)) {
+          literal->setExplicitConversion();
+        } else {
+          literalInit->setImplicit(false);
+        }
 
         cs.setType(expr, toType);
         // Keep the coercion around, because it contains the source range
@@ -6516,41 +6524,56 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
+  // Handle "from specific" coercions before "catch all" coercions.
+  auto desugaredFromType = fromType->getDesugaredType();
+  switch (desugaredFromType->getKind()) {
   // Coercions from an lvalue: load or perform implicit address-of. We perform
   // these coercions first because they are often the first step in a multi-step
   // coercion.
-  if (auto fromLValue = fromType->getAs<LValueType>()) {
-    if (auto *toIO = toType->getAs<InOutType>()) {
-      // In an 'inout' operator like "i += 1", the operand is converted from
-      // an implicit lvalue to an inout argument.
-      assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
-      return cs.cacheType(new (tc.Context)
-                              InOutExpr(expr->getStartLoc(), expr,
-                                        toIO->getObjectType(),
-                                        /*isImplicit*/ true));
-    }
+  case TypeKind::LValue: {
+    auto fromLValue = cast<LValueType>(desugaredFromType);
+    auto toIO = toType->getAs<InOutType>();
+    if (!toIO)
+      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
 
-    return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
+    // In an 'inout' operator like "i += 1", the operand is converted from
+    // an implicit lvalue to an inout argument.
+    assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
+    return cs.cacheType(new (tc.Context) InOutExpr(expr->getStartLoc(), expr,
+                                                   toIO->getObjectType(),
+                                                   /*isImplicit*/ true));
   }
 
-  // Coercions to tuple type.
-  if (auto toTuple = toType->getAs<TupleType>()) {
-    // Coerce from a tuple to a tuple.
-    if (auto fromTuple = fromType->getAs<TupleType>()) {
-      SmallVector<unsigned, 4> sources;
-      if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
-        return coerceTupleToTuple(expr, fromTuple, toTuple,
-                                  locator, sources);
-      }
+  // Coerce from a tuple to a tuple.
+  case TypeKind::Tuple: {
+    auto fromTuple = cast<TupleType>(desugaredFromType);
+    auto toTuple = toType->getAs<TupleType>();
+    if (!toTuple)
+      break;
+    SmallVector<unsigned, 4> sources;
+    if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
+      return coerceTupleToTuple(expr, fromTuple, toTuple,
+                                locator, sources);
     }
+    break;
   }
+
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+    if (!cast<ArchetypeType>(desugaredFromType)->requiresClass())
+      break;
+    LLVM_FALLTHROUGH;
 
   // Coercion from a subclass to a superclass.
   //
   // FIXME: Can we rig things up so that we always have a Superclass
   // conversion restriction in this case?
-  if (fromType->mayHaveSuperclass() &&
-      toType->getClassOrBoundGenericClass()) {
+  case TypeKind::DynamicSelf:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::Class: {
+    if (!toType->getClassOrBoundGenericClass())
+      break;
     for (auto fromSuperClass = fromType->getSuperclass();
          fromSuperClass;
          fromSuperClass = fromSuperClass->getSuperclass()) {
@@ -6558,10 +6581,17 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         return coerceSuperclass(expr, toType, locator);
       }
     }
+    break;
   }
 
-  // Coercions to function type.
-  if (auto toFunc = toType->getAs<FunctionType>()) {
+  // Coercion from one function type to another, this produces a
+  // FunctionConversionExpr in its full generality.
+  case TypeKind::Function: {
+    auto fromFunc = cast<FunctionType>(desugaredFromType);
+    auto toFunc = toType->getAs<FunctionType>();
+    if (!toFunc)
+      break;
+
     // Default argument generator must return escaping functions. Therefore, we
     // leave an explicit escape to noescape cast here such that SILGen can skip
     // the cast and emit a code for the escaping function.
@@ -6570,49 +6600,52 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       isInDefaultArgumentContext = (initalizerCtx->getInitializerKind() ==
                                     InitializerKind::DefaultArgument);
     auto toEI = toFunc->getExtInfo();
-    // Coercion from one function type to another, this produces a
-    // FunctionConversionExpr in its full generality.
-    if (auto fromFunc = fromType->getAs<FunctionType>()) {
-      assert(toType->is<FunctionType>());
-      // If we have a ClosureExpr, then we can safely propagate the 'no escape'
-      // bit to the closure without invalidating prior analysis.
-      auto fromEI = fromFunc->getExtInfo();
-      if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
-        auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
-        if (!isInDefaultArgumentContext &&
-            applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
-          fromFunc = newFromFuncType->castTo<FunctionType>();
-          // Propagating the 'no escape' bit might have satisfied the entire
-          // conversion.  If so, we're done, otherwise keep converting.
-          if (fromFunc->isEqual(toType))
-            return expr;
-        } else if (isInDefaultArgumentContext) {
-          // First apply the conversion *without* noescape attribute.
-          if (!newFromFuncType->isEqual(toType)) {
-            auto escapingToFuncTy =
-                toFunc->withExtInfo(toEI.withNoEscape(false));
-            maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
-            expr = cs.cacheType(new (tc.Context) FunctionConversionExpr(
-                expr, escapingToFuncTy));
-          }
-          // Apply an explict function conversion *only* for the escape to
-          // noescape conversion. This conversion will be stripped by the
-          // default argument generator. (We can't return a @noescape function)
-          auto newExpr = cs.cacheType(new (tc.Context)
-                                          FunctionConversionExpr(expr, toFunc));
-          return newExpr;
+    assert(toType->is<FunctionType>());
+    // If we have a ClosureExpr, then we can safely propagate the 'no escape'
+    // bit to the closure without invalidating prior analysis.
+    auto fromEI = fromFunc->getExtInfo();
+    if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
+      if (!isInDefaultArgumentContext &&
+          applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+        // Propagating the 'no escape' bit might have satisfied the entire
+        // conversion.  If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      } else if (isInDefaultArgumentContext) {
+        // First apply the conversion *without* noescape attribute.
+        if (!newFromFuncType->isEqual(toType)) {
+          auto escapingToFuncTy =
+              toFunc->withExtInfo(toEI.withNoEscape(false));
+          maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
+          expr = cs.cacheType(new (tc.Context) FunctionConversionExpr(
+              expr, escapingToFuncTy));
         }
+        // Apply an explict function conversion *only* for the escape to
+        // noescape conversion. This conversion will be stripped by the
+        // default argument generator. (We can't return a @noescape function)
+        auto newExpr = cs.cacheType(new (tc.Context)
+                                        FunctionConversionExpr(expr, toFunc));
+        return newExpr;
       }
-
-      maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
-
-      return cs.cacheType(new (tc.Context)
-                              FunctionConversionExpr(expr, toType));
     }
+
+    maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
+
+    return cs.cacheType(new (tc.Context)
+                            FunctionConversionExpr(expr, toType));
   }
 
-  // Coercions from metadata to objects.
-  if (auto fromMeta = fromType->getAs<AnyMetatypeType>()) {
+  // Coercions from one metatype to another.
+  case TypeKind::Metatype: {
+    if (auto toMeta = toType->getAs<MetatypeType>())
+      return cs.cacheType(new(tc.Context) MetatypeConversionExpr(expr, toMeta));
+    LLVM_FALLTHROUGH;
+  }
+  // Coercions from metatype to objects.
+  case TypeKind::ExistentialMetatype: {
+    auto fromMeta = cast<AnyMetatypeType>(desugaredFromType);
     if (toType->isAnyObject()) {
       assert(cs.getASTContext().LangOpts.EnableObjCInterop
              && "metatype-to-object conversion requires objc interop");
@@ -6648,39 +6681,86 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           new (tc.Context) ProtocolMetatypeToObjectExpr(expr, toType));
       }
     }
+
+    break;
   }
 
+#define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
+#define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
+#define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
+#define ARTIFICIAL_TYPE(Name, Parent) case TypeKind::Name:
+#define TYPE(Name, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::InOut:
+  case TypeKind::Module:
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::GenericFunction:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    break;
+  }
+
+  // "Catch all" coercions.
+  auto desugaredToType = toType->getDesugaredType();
+  switch (desugaredToType->getKind()) {
   // Coercions from a type to an existential type.
-  if (toType->isAnyExistentialType()) {
+  case TypeKind::ExistentialMetatype:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::Protocol:
     return coerceExistential(expr, toType, locator);
-  }
-
-  if (toType->getOptionalObjectType() &&
-      cs.getType(expr)->getOptionalObjectType()) {
-    return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
-  }
 
   // Coercion to Optional<T>.
-  if (auto toGenericType = toType->getAs<BoundGenericType>()) {
-    if (toGenericType->getDecl()->isOptionalDecl()) {
-      tc.requireOptionalIntrinsics(expr->getLoc());
+  case TypeKind::BoundGenericEnum: {
+    auto toGenericType = cast<BoundGenericEnumType>(desugaredToType);
+    if (!toGenericType->getDecl()->isOptionalDecl())
+      break;
+    tc.requireOptionalIntrinsics(expr->getLoc());
 
-      Type valueType = toGenericType->getGenericArgs()[0];
-      expr = coerceToType(expr, valueType, locator);
-      if (!expr) return nullptr;
+    if (cs.getType(expr)->getOptionalObjectType())
+      return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
 
-      auto *result =
-          cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, toType));
-      diagnoseOptionalInjection(result);
-      return result;
-    }
+    Type valueType = toGenericType->getGenericArgs()[0];
+    expr = coerceToType(expr, valueType, locator);
+    if (!expr) return nullptr;
+
+    auto *result =
+        cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, toType));
+    diagnoseOptionalInjection(result);
+    return result;
   }
 
-  // Coercion from one metatype to another.
-  if (fromType->is<MetatypeType>() &&
-      toType->is<MetatypeType>()) {
-    auto toMeta = toType->castTo<MetatypeType>();
-    return cs.cacheType(new (tc.Context) MetatypeConversionExpr(expr, toMeta));
+#define SUGARED_TYPE(Name, Parent) case TypeKind::Name:
+#define BUILTIN_TYPE(Name, Parent) case TypeKind::Name:
+#define UNCHECKED_TYPE(Name, Parent) case TypeKind::Name:
+#define ARTIFICIAL_TYPE(Name, Parent) case TypeKind::Name:
+#define TYPE(Name, Parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::Module:
+  case TypeKind::Tuple:
+  case TypeKind::Enum:
+  case TypeKind::Struct:
+  case TypeKind::Class:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::Metatype:
+  case TypeKind::DynamicSelf:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+  case TypeKind::Function:
+  case TypeKind::GenericFunction:
+  case TypeKind::LValue:
+  case TypeKind::InOut:
+    break;
   }
 
   // Unresolved types come up in diagnostics for lvalue and inout types.
@@ -6981,6 +7061,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
       stringLiteral->setBuiltinInitializer(witness);
     else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
       booleanLiteral->setBuiltinInitializer(witness);
+    else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
+      numberLiteral->setBuiltinInitializer(witness);
     else {
       cast<MagicIdentifierLiteralExpr>(literal)
         ->setBuiltinInitializer(witness);
@@ -7030,6 +7112,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     stringLiteral->setInitializer(witness);
   else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
     booleanLiteral->setInitializer(witness);
+  else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
+    numberLiteral->setInitializer(witness);
   else
     cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(witness);
 
@@ -8013,6 +8097,12 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   // Match the optional value against its `Some` case.
   auto &ctx = tc.Context;
   auto isSomeExpr = new (ctx) EnumIsCaseExpr(expr, ctx.getOptionalSomeDecl());
-  cs.setType(isSomeExpr, tc.lookupBoolType(cs.DC));
+  auto boolDecl = ctx.getBoolDecl();
+
+  if (!boolDecl) {
+    tc.diagnose(SourceLoc(), diag::broken_bool);
+  }
+
+  cs.setType(isSomeExpr, boolDecl ? boolDecl->getDeclaredType() : Type());
   return isSomeExpr;
 }

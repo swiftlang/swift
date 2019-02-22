@@ -2,8 +2,8 @@
 // a Darwin target and set the RC_DEBUG_OPTIONS environment variable. This
 // matches the behavior found in Clang.
 
-// RUN: %swiftc_driver %s -emit-ir -g -target x86_64-apple-macosx10.10 -parse-stdlib -module-name scratch -o - | %FileCheck %s
-// RUN: env RC_DEBUG_OPTIONS=1 %swiftc_driver %s -emit-ir -g -target x86_64-apple-macosx10.10 -parse-stdlib -module-name scratch -o - | %FileCheck --check-prefix CHECK-VAR-SET %s
+// RUN: %swiftc_driver %s -emit-ir -g -Xfrontend -disable-legacy-type-info -target x86_64-apple-macosx10.10 -parse-stdlib -module-name scratch -o - | %FileCheck %s
+// RUN: env RC_DEBUG_OPTIONS=1 %swiftc_driver %s -emit-ir -g -Xfrontend -disable-legacy-type-info -target x86_64-apple-macosx10.10 -parse-stdlib -module-name scratch -o - | %FileCheck --check-prefix CHECK-VAR-SET %s
 // CHECK:               !DICompileUnit({{.*}} producer: "{{(Apple )?Swift version [^"]+}}"
 // CHECK-NOT:                          flags: "
 // CHECK-VAR-SET:       !DICompileUnit({{.*}}producer: "{{(Apple )?Swift version [^"]+}}"

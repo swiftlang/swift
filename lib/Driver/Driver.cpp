@@ -2003,8 +2003,16 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     SuppressNoInputFilesError = true;
   }
 
-  if (const Arg *A = Args.getLastArg(options::OPT_driver_use_frontend_path))
+  if (const Arg *A = Args.getLastArg(options::OPT_driver_use_frontend_path)) {
     DriverExecutable = A->getValue();
+    std::string commandString =
+        Args.getLastArgValue(options::OPT_driver_use_frontend_path);
+    SmallVector<StringRef, 10> commandArgs;
+    StringRef(commandString).split(commandArgs, ';', -1, false);
+    DriverExecutable = commandArgs[0];
+    DriverExecutableArgs.assign(std::begin(commandArgs) + 1,
+                                std::end(commandArgs));
+  }
 
   return true;
 }

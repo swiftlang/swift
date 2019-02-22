@@ -536,7 +536,8 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   return false;
 }
 
-bool Decl::isWeakImported(ModuleDecl *fromModule) const {
+bool Decl::isWeakImported(ModuleDecl *fromModule,
+                          AvailabilityContext fromContext) const {
   // For a Clang declaration, trust Clang.
   if (auto clangDecl = getClangDecl()) {
     return clangDecl->isWeakImported();
@@ -546,22 +547,27 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   if (containingModule == fromModule)
     return false;
 
+  auto containingContext =
+      AvailabilityInference::availableRange(this, fromModule->getASTContext());
+  if (!fromContext.isContainedIn(containingContext))
+    return true;
+
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
-    return accessor->getStorage()->isWeakImported(fromModule);
+    return accessor->getStorage()->isWeakImported(fromModule, fromContext);
 
   if (auto *dtor = dyn_cast<DestructorDecl>(this))
-    return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(fromModule);
+    return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(
+        fromModule, fromContext);
 
   auto *dc = getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
-    return ext->isWeakImported(fromModule);
+    return ext->isWeakImported(fromModule, fromContext);
   if (auto *ntd = dyn_cast<NominalTypeDecl>(dc))
-    return ntd->isWeakImported(fromModule);
+    return ntd->isWeakImported(fromModule, fromContext);
 
-  // FIXME: Also check availability when containingModule is resilient.
   return false;
 }
 
@@ -2406,14 +2412,9 @@ void ValueDecl::setInterfaceType(Type type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
 
-    // lldb creates global typealiases with archetypes in them.
-    // FIXME: Add an isDebugAlias() flag, like isDebugVar().
-    //
-    // Also, ParamDecls in closure contexts can have type variables
+    // ParamDecls in closure contexts can have type variables
     // archetype in them during constraint generation.
-    if (!isa<TypeAliasDecl>(this) &&
-        !(isa<ParamDecl>(this) &&
-          isa<AbstractClosureExpr>(getDeclContext()))) {
+    if (!(isa<ParamDecl>(this) && isa<AbstractClosureExpr>(getDeclContext()))) {
       assert(!type->hasArchetype() &&
              "Archetype in interface type");
     }
@@ -2523,12 +2524,14 @@ bool ValueDecl::isUsableFromInline() const {
   assert(getFormalAccess() == AccessLevel::Internal);
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+      getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
       getAttrs().hasAttribute<InlinableAttr>())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
     auto *storage = accessor->getStorage();
     if (storage->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+        storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
         storage->getAttrs().hasAttribute<InlinableAttr>())
       return true;
   }
@@ -6347,8 +6350,10 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       // Prior to Swift 5, cross-module initializers were permitted to be
       // non-delegating. However, if the struct isn't fixed-layout, we have to
       // be delegating because, well, we don't know the layout.
+      // A dynamic replacement is permitted to be non-delegating.
       if (NTD->isResilient() ||
-          containingModule->getASTContext().isSwiftVersionAtLeast(5)) {
+          (containingModule->getASTContext().isSwiftVersionAtLeast(5) &&
+           !getAttrs().getAttribute<DynamicReplacementAttr>())) {
         if (containingModule != NTD->getParentModule())
           Kind = BodyInitKind::Delegating;
       }

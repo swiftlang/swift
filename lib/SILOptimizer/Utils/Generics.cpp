@@ -1036,7 +1036,9 @@ shouldBePartiallySpecialized(Type Replacement,
   llvm::SmallSetVector<ArchetypeType *, 2> UsedArchetypes;
   Replacement.visit([&](Type Ty) {
     if (auto Archetype = Ty->getAs<ArchetypeType>()) {
-      UsedArchetypes.insert(Archetype->getPrimary());
+      if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype->getRoot())) {
+        UsedArchetypes.insert(Primary);
+      }
     }
   });
 
@@ -1264,7 +1266,9 @@ void FunctionSignaturePartialSpecializer::collectUsedCallerArchetypes(
     // Add used generic parameters/archetypes.
     Replacement.visit([&](Type Ty) {
       if (auto Archetype = Ty->getAs<ArchetypeType>()) {
-        UsedCallerArchetypes.insert(Archetype->getPrimary());
+        if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype->getRoot())) {
+          UsedCallerArchetypes.insert(Primary);
+        }
       }
     });
   }
@@ -2291,6 +2295,15 @@ void swift::trySpecializeApplyOfGeneric(
 
   if (shouldNotSpecialize(RefF, F))
     return;
+
+  // If our callee has ownership, do not specialize for now. This should only
+  // occur with transparent referenced functions.
+  //
+  // FIXME: Support this.
+  if (RefF->hasOwnership()) {
+    assert(RefF->isTransparent());
+    return;
+  }
 
   // If the caller and callee are both fragile, preserve the fragility when
   // cloning the callee. Otherwise, strip it off so that we can optimize

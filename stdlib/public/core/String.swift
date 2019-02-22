@@ -401,8 +401,13 @@ extension String {
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
+    guard _fastPath(sourceEncoding == UTF8.self) else {
+      self = String._fromCodeUnits(
+        codeUnits, encoding: sourceEncoding, repair: true)!.0
+      return
+    }
+
     if let contigBytes = codeUnits as? _HasContiguousBytes,
-       sourceEncoding == UTF8.self,
        contigBytes._providesContiguousBytesNoCopy
     {
       self = contigBytes.withUnsafeBytes { rawBufPtr in
@@ -414,8 +419,13 @@ extension String {
       return
     }
 
-    self = String._fromCodeUnits(
-      codeUnits, encoding: sourceEncoding, repair: true)!.0
+    // Just copying to an Array is significantly faster than performing
+    // generic operations
+    self = Array(codeUnits).withUnsafeBufferPointer {
+      let raw = UnsafeRawBufferPointer($0)
+      return String._fromUTF8Repairing(raw.bindMemory(to: UInt8.self)).0
+    }
+    return
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -560,6 +570,7 @@ extension String {
 
   // String append
   @inlinable // Forward inlinability to append
+  @_semantics("string.append")
   public static func += (lhs: inout String, rhs: String) {
     lhs.append(rhs)
   }
@@ -924,8 +935,8 @@ internal func _fastWithNormalizedCodeUnitsImpl(
   var icuInputBuffer = icuInputBuffer
   var icuOutputBuffer = icuOutputBuffer
 
-  var index = String.Index(encodedOffset: 0)
-  let cachedEndIndex = String.Index(encodedOffset: sourceBuffer.count)
+  var index = String.Index(_encodedOffset: 0)
+  let cachedEndIndex = String.Index(_encodedOffset: sourceBuffer.count)
   
   var hasBufferOwnership = false
   

@@ -65,13 +65,15 @@
           key.kind: source.lang.swift.decl.function.accessor.getter,
           key.usr: "s:4main1vSo8NSObjectCSgvg",
           key.line: 9,
-          key.column: 5
+          key.column: 5,
+          key.is_implicit: 1
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
           key.usr: "s:4main1vSo8NSObjectCSgvs",
           key.line: 9,
-          key.column: 5
+          key.column: 5,
+          key.is_implicit: 1
         }
       ]
     },

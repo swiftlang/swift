@@ -1848,9 +1848,6 @@ public:
   /// operator \c name appended to the expression.
   Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 
-  /// Look up the Bool type in the standard library.
-  Type lookupBoolType(const DeclContext *dc);
-
   /// @}
 
   /// \name Overload resolution
@@ -1928,6 +1925,7 @@ public:
   enum class FragileFunctionKind : unsigned {
     Transparent,
     Inlinable,
+    AlwaysEmitIntoClient,
     DefaultArgument,
     PropertyInitializer
   };

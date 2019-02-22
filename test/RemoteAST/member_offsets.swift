@@ -9,6 +9,9 @@ func printTypeMemberOffset(_: Any.Type, _: StaticString)
 @_silgen_name("printTypeMetadataMemberOffset")
 func printTypeMetadataMemberOffset(_: Any.Type, _: StaticString)
 
+@_silgen_name("stopRemoteAST")
+func stopRemoteAST()
+
 printTypeMemberOffset((Int,Bool,Float,Bool,Int16).self, "0")
 // CHECK: found offset: 0
 
@@ -78,3 +81,5 @@ printTypeMemberOffset(B<Float>.self, "e")
 
 printTypeMemberOffset(B<Float>.self, "f")
 // CHECK-NEXT: type has no member named 'f'
+
+stopRemoteAST()

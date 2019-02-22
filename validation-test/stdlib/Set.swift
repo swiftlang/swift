@@ -1986,7 +1986,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     expectEqual(0, s.count)
 
     let emptySet = Set<Int>()
-    expectNotEqual(emptySet._rawIdentifier(), s._rawIdentifier())
+    expectEqual(emptySet._rawIdentifier(), s._rawIdentifier())
 
     s.removeAll()
     expectEqual(emptySet._rawIdentifier(), s._rawIdentifier())
@@ -2178,7 +2178,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   var s2 = getBridgedNonverbatimSet([])
   let identity2 = s2._rawIdentifier()
   expectTrue(isNativeSet(s2))
-  expectNotEqual(identity1, identity2)
+  expectEqual(identity1, identity2)
 
   expectEqual(s1, s2)
   expectEqual(identity1, s1._rawIdentifier())
@@ -2186,11 +2186,11 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
 
   s2.insert(TestObjCKeyTy(4040) as TestBridgedKeyTy)
   expectTrue(isNativeSet(s2))
-  expectEqual(identity2, s2._rawIdentifier())
+  expectNotEqual(identity2, s2._rawIdentifier())
 
   expectNotEqual(s1, s2)
   expectEqual(identity1, s1._rawIdentifier())
-  expectEqual(identity2, s2._rawIdentifier())
+  expectNotEqual(identity2, s2._rawIdentifier())
 }
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
