@@ -1,10 +1,10 @@
 from SwiftFloatingPointTypes import all_floating_point_types
 
 class SwiftMathsFunction(object):
-  def __init__(self, name, cName=None, intrinsic=False, args="x"):
+  def __init__(self, name, kind=None, swiftName=None, args="x"):
     self.name = name
-    self.cName = cName if cName is not None else name
-    self.intrinsic = intrinsic
+    self.swiftName = swiftName if swiftName is not None else name
+    self.kind = kind if kind is not None else "library"
     self.args = args
 
   def params(self, prefix="", suffix=""):
@@ -13,25 +13,34 @@ class SwiftMathsFunction(object):
     )
   
   def decl(self, type):
-    return self.name + "(" + self.params("_ ", ": " + type) + ") -> " + type
+    return self.swiftName + "(" + self.params("_ ", ": " + type) + ") -> " + type
   
   def free_decl(self, protocol="Mathsable"):
-    return self.name + "<T>(" + self.params("_ ", ": T") + ") -> T where T: " + protocol
+    return self.swiftName + "<T>(" + self.params("_ ", ": T") + ") -> T where T: " + protocol
   
   def impl(self, type):
-    if self.intrinsic:
+    if self.kind == "intrinsic":
       builtin = "Builtin.int_" + self.name + "_FPIEEE" + str(type.bits)
       return type.stdlib_name + "(" + builtin + "(" + self.params("","._value") + "))"
-    return self.cName + type.cFuncSuffix + "(" + self.params() + ")"
+    if self.kind == "builtin":
+      builtin = "Builtin." + self.name + "_FPIEEE" + str(type.bits)
+      return type.stdlib_name + "(" + builtin + "(" + self.params("","._value") + "))"
+    return "_swift_stdlib_" + self.name + type.cFuncSuffix + "(" + self.params() + ")"
 
-MathFunctions = [
-  SwiftMathsFunction(name="cos", intrinsic=True),
-  SwiftMathsFunction(name="sin", intrinsic=True),
-  SwiftMathsFunction(name="exp", intrinsic=True),
-  SwiftMathsFunction(name="exp2", intrinsic=True),
-  SwiftMathsFunction(name="log", intrinsic=True),
-  SwiftMathsFunction(name="log10", intrinsic=True),
-  SwiftMathsFunction(name="log2", intrinsic=True),
+MathsFunctions = [
+  SwiftMathsFunction(name="cos", kind="intrinsic"),
+  SwiftMathsFunction(name="sin", kind="intrinsic"),
+  SwiftMathsFunction(name="tan"),
+  SwiftMathsFunction(name="acos"),
+  SwiftMathsFunction(name="asin"),
+  SwiftMathsFunction(name="atan"),
+  SwiftMathsFunction(name="atan2", args="yx"),
+  SwiftMathsFunction(name="exp", kind="intrinsic"),
+  SwiftMathsFunction(name="exp2", kind="intrinsic"),
+  SwiftMathsFunction(name="log", kind="intrinsic"),
+  SwiftMathsFunction(name="log10", kind="intrinsic"),
+  SwiftMathsFunction(name="log2", kind="intrinsic"),
+  SwiftMathsFunction(name="pow", kind="intrinsic", args="xy"),
 ]
 
 

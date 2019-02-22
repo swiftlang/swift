@@ -42,7 +42,7 @@ public func fmod<T>(_ x: T, _ y: T) -> T where T: FloatingPoint {
 
 // MARK: - Free functions defined on Mathsable
 %from SwiftMathsFunctions import *
-%for func in MathFunctions:
+%for func in MathsFunctions:
 
 @_alwaysEmitIntoClient
 public func ${func.free_decl()} {

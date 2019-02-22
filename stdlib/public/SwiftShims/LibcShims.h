@@ -127,33 +127,108 @@ static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
-float _stdlib_remainderf(float _self, float _other) {
+float _swift_stdlib_tanf(float x) {
+  return __builtin_tanf(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+float _swift_stdlib_acosf(float x) {
+  return __builtin_acosf(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+float _swift_stdlib_asinf(float x) {
+  return __builtin_asinf(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+float _swift_stdlib_atanf(float x) {
+  return __builtin_atanf(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+float _swift_stdlib_atan2f(float y, float x) {
+  return __builtin_atan2f(y, x);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+float _swift_stdlib_remainderf(float _self, float _other) {
   return __builtin_remainderf(_self, _other);
 }
   
 static inline SWIFT_ALWAYS_INLINE
-float _stdlib_squareRootf(float _self) {
+float _swift_stdlib_squareRootf(float _self) {
   return __builtin_sqrtf(_self);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+double _swift_stdlib_tan(double x) {
+  return __builtin_tan(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+double _swift_stdlib_acos(double x) {
+  return __builtin_acos(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+double _swift_stdlib_asin(double x) {
+  return __builtin_asin(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+double _swift_stdlib_atan(double x) {
+  return __builtin_atan(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+double _swift_stdlib_atan2(double y, double x) {
+  return __builtin_atan2(y, x);
 }
 
 static inline SWIFT_ALWAYS_INLINE
-double _stdlib_remainder(double _self, double _other) {
+double _swift_stdlib_remainder(double _self, double _other) {
   return __builtin_remainder(_self, _other);
 }
 
 static inline SWIFT_ALWAYS_INLINE
-double _stdlib_squareRoot(double _self) {
+double _swift_stdlib_squareRoot(double _self) {
   return __builtin_sqrt(_self);
 }
 
 #if !defined _WIN32 && (defined __i386__ || defined __x86_64__)
 static inline SWIFT_ALWAYS_INLINE
-long double _stdlib_remainderl(long double _self, long double _other) {
+long double _swift_stdlib_tanl(long double x) {
+  return __builtin_tanl(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+long double _swift_stdlib_acosl(long double x) {
+  return __builtin_acosl(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+long double _swift_stdlib_asinl(long double x) {
+  return __builtin_asinl(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+long double _swift_stdlib_atanl(long double x) {
+  return __builtin_atanl(x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+long double _swift_stdlib_atan2l(long double y, long double x) {
+  return __builtin_atan2l(y, x);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+long double _swift_stdlib_remainderl(long double _self, long double _other) {
   return __builtin_remainderl(_self, _other);
 }
   
 static inline SWIFT_ALWAYS_INLINE
-long double _stdlib_squareRootl(long double _self) {
+long double _swift_stdlib_squareRootl(long double _self) {
   return __builtin_sqrtl(_self);
 }
 #endif
