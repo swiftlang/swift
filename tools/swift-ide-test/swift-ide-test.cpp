@@ -1701,11 +1701,11 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   }
 
   // If we were given a mangled name, only print that declaration.
-  std::string error;
-  const Decl *D = ide::getDeclFromMangledSymbolName(CI.getASTContext(),
-                                                    MangledNameToFind, error);
+  const TypeDecl *D = Demangle::getTypeDeclForMangling(CI.getASTContext(),
+                                                       MangledNameToFind);
   if (!D) {
-    llvm::errs() << "Unable to find decl for symbol: " << error << "\n";
+    llvm::errs() << "Unable to find decl for symbol: "
+                 << MangledNameToFind << "\n";
     return EXIT_FAILURE;
   }
 
