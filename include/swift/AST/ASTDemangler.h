@@ -40,6 +40,9 @@ Type getTypeForMangling(ASTContext &ctx,
 TypeDecl *getTypeDeclForMangling(ASTContext &ctx,
                                  llvm::StringRef mangling);
 
+TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
+                            llvm::StringRef usr);
+
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
 class ASTBuilder {
