@@ -1700,10 +1700,8 @@ private:
     
     auto isSubscript = false;
     Expr *subscriptExpr = nullptr;
-    bool isInsideOEE = false;
 
     if (isa<OpenExistentialExpr>(E->getDest())) {
-      isInsideOEE = true;
       auto subExpr = cast<OpenExistentialExpr>(E->getDest())->getSubExpr();
       if (isa<SubscriptExpr>(subExpr)) {
         subscriptExpr = cast<SubscriptExpr>(subExpr);
