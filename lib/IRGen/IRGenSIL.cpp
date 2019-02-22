@@ -3645,12 +3645,12 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
                              Var->Name, Var->ArgNo, false);
   if (!IGM.DebugInfo)
     return;
-  DebugTypeInfo DTI(ErrorInfo.getType(),
-                    ErrorResultSlot->getType(), IGM.getPointerSize(),
-                    IGM.getPointerAlignment(), true);
-  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI, getDebugScope(),
-                                         nullptr, Var->Name, Var->ArgNo,
-                                         IndirectValue, ArtificialValue);
+  auto DbgTy = DebugTypeInfo::getErrorResult(
+      ErrorInfo.getType(), ErrorResultSlot->getType(), IGM.getPointerSize(),
+      IGM.getPointerAlignment());
+  IGM.DebugInfo->emitVariableDeclaration(
+      Builder, Storage, DbgTy, getDebugScope(), nullptr, Var->Name, Var->ArgNo,
+      IndirectValue, ArtificialValue);
 }
 
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
