@@ -676,8 +676,16 @@ class TypeConverter {
 #include "swift/SIL/BridgedTypes.def"
 
   const TypeLowering &
-  getTypeLoweringForLoweredType(TypeKey key, ResilienceExpansion forExpansion);
-  const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
+  getTypeLoweringForLoweredType(TypeKey key,
+                                ResilienceExpansion forExpansion);
+  const TypeLowering &
+  getTypeLoweringForUncachedLoweredType(TypeKey key,
+                                        ResilienceExpansion forExpansion);
+
+  const TypeLowering &
+  getTypeLoweringForExpansion(TypeKey key,
+                              ResilienceExpansion forExpansion,
+                              const TypeLowering *lowering);
 
 public:
   SILModule &M;
@@ -739,15 +747,19 @@ public:
   
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
-  const TypeLowering &getTypeLowering(Type t) {
+  const TypeLowering &
+  getTypeLowering(Type t, ResilienceExpansion forExpansion =
+                            ResilienceExpansion::Minimal) {
     AbstractionPattern pattern(getCurGenericContext(), t->getCanonicalType());
-    return getTypeLowering(pattern, t);
+    return getTypeLowering(pattern, t, forExpansion);
   }
 
   /// Lowers a Swift type to a SILType according to the abstraction
   /// patterns of the given original type.
   const TypeLowering &getTypeLowering(AbstractionPattern origType,
-                                      Type substType);
+                                      Type substType,
+                                      ResilienceExpansion forExpansion =
+                                        ResilienceExpansion::Minimal);
 
   /// Returns the SIL TypeLowering for an already lowered SILType. If the
   /// SILType is an address, returns the TypeLowering for the pointed-to
@@ -758,16 +770,19 @@ public:
 
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(Type t) {
-    return getTypeLowering(t).getLoweredType();
+    return getTypeLowering(t, ResilienceExpansion::Minimal).getLoweredType();
   }
 
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(AbstractionPattern origType, Type substType) {
-    return getTypeLowering(origType, substType).getLoweredType();
+    return getTypeLowering(origType, substType, ResilienceExpansion::Minimal)
+      .getLoweredType();
   }
 
-  SILType getLoweredLoadableType(Type t) {
-    const TypeLowering &ti = getTypeLowering(t);
+  SILType getLoweredLoadableType(Type t,
+                                 ResilienceExpansion forExpansion =
+                                   ResilienceExpansion::Minimal) {
+    const TypeLowering &ti = getTypeLowering(t, forExpansion);
     assert(
         (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&
         "unexpected address-only type");

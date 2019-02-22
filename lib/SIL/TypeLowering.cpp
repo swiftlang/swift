@@ -97,6 +97,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
     // by its address (like a var) instead.
     if (var->isImmutable() &&
         (!SILModuleConventions(M).useLoweredAddresses() ||
+         // FIXME: Expansion
          !getTypeLowering(var->getType()).isAddressOnly()))
       return CaptureKind::Constant;
 
@@ -323,7 +324,7 @@ namespace {
       auto concreteType = getConcreteReferenceStorageReferent(referentType); \
       auto &ctx = M.getASTContext(); \
       if (Name##StorageType::get(concreteType, ctx) \
-            ->isLoadable(ResilienceExpansion::Maximal)) {         \
+            ->isLoadable(Expansion)) { \
         return asImpl().visitLoadable##Name##StorageType(type); \
       } else { \
         return asImpl().visitAddressOnly##Name##StorageType(type); \
@@ -458,14 +459,14 @@ namespace {
 
       // Consult the type lowering.
       type = getSubstitutedTypeForTypeLowering(type);
-      auto &lowering = M.Types.getTypeLowering(type);
+      auto &lowering = M.Types.getTypeLowering(type, Expansion);
       return handleClassificationFromLowering(type, lowering);
     }
 
     RecursiveProperties visitAnyStructType(CanType type, StructDecl *D) {
       // Consult the type lowering.
       type = getSubstitutedTypeForTypeLowering(type);
-      auto &lowering = M.Types.getTypeLowering(type);
+      auto &lowering = M.Types.getTypeLowering(type, Expansion);
       return handleClassificationFromLowering(type, lowering);
     }
 
@@ -850,6 +851,7 @@ namespace {
       unsigned index = 0;
       for (auto elt : tupleTy.getElementTypes()) {
         auto silElt = SILType::getPrimitiveType(elt, silTy.getCategory());
+        // FIXME: Expansion
         children.push_back(Child{index, M.Types.getTypeLowering(silElt)});
         ++index;
       }
@@ -884,6 +886,7 @@ namespace {
       
       for (auto prop : structDecl->getStoredProperties()) {
         SILType propTy = silTy.getFieldType(prop, M);        
+        // FIXME: Expansion
         children.push_back(Child{prop, M.Types.getTypeLowering(propTy)});
       }
     }
@@ -1161,7 +1164,7 @@ namespace {
     }
 
     TypeLowering *handleAddressOnly(CanType type,
-                                          RecursiveProperties properties) {
+                                    RecursiveProperties properties) {
       if (SILModuleConventions(M).useLoweredAddresses()) {
         auto silType = SILType::getPrimitiveAddressType(type);
         return new (TC, Dependent) AddressOnlyTypeLowering(silType, properties);
@@ -1187,7 +1190,7 @@ namespace {
     TypeLowering *visitTupleType(CanTupleType tupleType) {
       RecursiveProperties properties;
       for (auto eltType : tupleType.getElementTypes()) {
-        auto &lowering = TC.getTypeLowering(eltType);
+        auto &lowering = TC.getTypeLowering(eltType, Expansion);
         properties.addSubobject(lowering.getRecursiveProperties());
       }
 
@@ -1258,7 +1261,7 @@ namespace {
 
     template <class LoadableLoweringClass>
     TypeLowering *handleAggregateByProperties(CanType type,
-                                                    RecursiveProperties props) {
+                                              RecursiveProperties props) {
       if (props.isAddressOnly()) {
         return handleAddressOnly(type, props);
       }
@@ -1422,7 +1425,8 @@ TypeConverter::getSILFunctionType(AbstractionPattern origType,
 
 const TypeLowering &
 TypeConverter::getTypeLowering(AbstractionPattern origType,
-                               Type origSubstType) {
+                               Type origSubstType,
+                               ResilienceExpansion forExpansion) {
   CanType substType = origSubstType->getCanonicalType();
   auto key = getTypeKey(origType, substType);
   
@@ -1431,7 +1435,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   assert(!substType->is<InOutType>());
 
   if (auto existing = find(key))
-    return *existing;
+    return getTypeLoweringForExpansion(key, forExpansion, existing);
 
   // Lower the type.
   CanType loweredSubstType =
@@ -1441,7 +1445,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // point in re-checking the table, so just construct a type lowering
   // and cache it.
   if (loweredSubstType == substType && key.isCacheable()) {
-    return getTypeLoweringForUncachedLoweredType(key);
+    return getTypeLoweringForUncachedLoweredType(key, forExpansion);
   }
 
   // Otherwise, check the table at a key that would be used by the
@@ -1452,7 +1456,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   auto loweredKey = getTypeKey(origTypeForCaching, loweredSubstType);
 
   auto &lowering = getTypeLoweringForLoweredType(loweredKey,
-                                                 ResilienceExpansion::Minimal);
+                                                 forExpansion);
   insert(key, &lowering);
   return lowering;
 }
@@ -1583,13 +1587,21 @@ TypeConverter::getTypeLoweringForLoweredType(TypeKey key,
   (void)type;
 
   const TypeLowering *lowering = find(key);
-  if (!lowering) {
-    lowering = &getTypeLoweringForUncachedLoweredType(key);
-  }
-  assert(lowering->forExpansion == ResilienceExpansion::Minimal &&
-         "the first lowering in the list must be for minimal expansion");
+  if (!lowering)
+    lowering = &getTypeLoweringForUncachedLoweredType(key, forExpansion);
 
-  if (key.isDependent() || !lowering->isResilient()) {
+  return getTypeLoweringForExpansion(key, forExpansion, lowering);
+}
+
+/// When we've found a type lowering for one resilience expansion,
+/// check if its the one we want; if not, walk the list until we
+/// find the right one, or create a new lowering and add it to
+/// the end of the list.
+const TypeLowering & TypeConverter::
+getTypeLoweringForExpansion(TypeKey key,
+                            ResilienceExpansion forExpansion,
+                            const TypeLowering *lowering) {
+  if (!lowering->isResilient()) {
     // Don't try to refine the lowering for other resilience expansions if
     // we don't expect to get a different lowering anyway.
     return *lowering;
@@ -1619,8 +1631,9 @@ TypeConverter::getTypeLoweringForLoweredType(TypeKey key,
 
 /// Do type-lowering for a lowered type which is not already in the cache,
 /// then insert it into the cache.
-const TypeLowering &
-TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
+const TypeLowering & TypeConverter::
+getTypeLoweringForUncachedLoweredType(TypeKey key,
+                                      ResilienceExpansion forExpansion) {
   assert(!find(key) && "re-entrant or already cached");
   assert(key.SubstType->isLegalSILType() && "type is not already lowered");
 
@@ -1629,11 +1642,12 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   insert(key, nullptr);
 #endif
 
-  // FIXME: Get expansion from SILFunction
   auto *theInfo = LowerType(*this,
                             CanGenericSignature(),
-                            ResilienceExpansion::Minimal,
+                            forExpansion,
                             key.isDependent()).visit(key.SubstType);
+
+  theInfo->forExpansion = forExpansion;
 
   if (key.OrigType.isForeign()) {
     assert(theInfo->isLoadable() && "Cannot lower address-only type with "
@@ -2489,6 +2503,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
 static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
                                      SILType Ty) {
   if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
+    // FIXME: Expansion
     assert(!structDecl->isResilient(Module.getSwiftModule(),
                                     ResilienceExpansion::Minimal) &&
            " FSO should not be trying to explode resilient (ie address-only) "
@@ -2516,6 +2531,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
     if (enumDecl->isIndirect()) {
       return;
     }
+    // FIXME: Expansion
     assert(!enumDecl->isResilient(Module.getSwiftModule(),
                                   ResilienceExpansion::Minimal) &&
            " FSO should not be trying to explode resilient (ie address-only) "
