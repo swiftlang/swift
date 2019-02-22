@@ -3633,35 +3633,27 @@ private:
     // If so, recurse until the buffer is such a projection but its operand is
     // not. Then, get the adjoint buffer of the operand and return a
     // corresponding projection into it.
-    if (auto *inst = dyn_cast_or_null<SingleValueInstruction>(
-            originalBuffer->getDefiningInstruction())) {
-      if (Projection::isAddressProjection(inst) &&
-          !Projection::isObjectToAddressProjection(inst)) {
-        // Get operand of the projection (i.e. the base memory).
-        Projection proj(inst);
-        auto loc = inst->getLoc();
-        auto base = inst->getOperand(0);
-
-        // Get the corresponding projection into the adjoint buffer.
-        SILValue adjProj;
-        auto adjBase = getAdjointBuffer(base);
-        switch (proj.getKind()) {
-        case ProjectionKind::Struct: {
-          auto cotanField = proj.getVarDecl(remapType(adjBase.getType()));
-          adjProj = builder.createStructElementAddr(loc, adjBase.getValue(),
-                                                    cotanField);
-          break;
-        }
-        default:
-          adjProj =
-              proj.createAddressProjection(builder, inst->getLoc(), adjBase.getValue())
-                  .get();
-          break;
-        }
-        ValueWithCleanup bufWithCleanup(
-            adjProj, makeCleanup(adjProj, emitCleanup, {adjBase.getCleanup()}));
-        return (bufferMap[originalBuffer] = bufWithCleanup);
+    if (Projection::isAddressProjection(originalBuffer) &&
+        !Projection::isObjectToAddressProjection(originalBuffer)) {
+      // Get operand of the projection (i.e. the base memory).
+      auto *inst = cast<SingleValueInstruction>(originalBuffer);
+      Projection proj(inst);
+      auto loc = inst->getLoc();
+      auto base = inst->getOperand(0);
+      // Get the corresponding projection into the adjoint buffer.
+      SILValue adjProj;
+      auto adjBase = getAdjointBuffer(base);
+      if (proj.getKind() == ProjectionKind::Struct) {
+        auto cotanField = proj.getVarDecl(remapType(adjBase.getType()));
+        adjProj = builder.createStructElementAddr(loc, adjBase.getValue(),
+                                                  cotanField);
+      } else {
+        adjProj = proj.createAddressProjection(builder, loc, adjBase.getValue())
+                      .get();
       }
+      ValueWithCleanup bufWithCleanup(
+          adjProj, makeCleanupFromChildren({adjBase.getCleanup()}));
+      return (bufferMap[originalBuffer] = bufWithCleanup);
     }
 
     // Set insertion point for local allocation builder: before the last local
