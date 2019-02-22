@@ -2750,8 +2750,13 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
                                       ->castTo<AnyFunctionType>()
                                       ->getParams();
     }
+
+    // @escaping is not valid in enum element position, even though the
+    // attribute is implicitly added. Ignore it when printing the parameters.
+    Options.ExcludeAttrList.push_back(TAK_escaping);
     printParameterList(PL, params,
                        /*isAPINameByDefault*/true);
+    Options.ExcludeAttrList.pop_back();
   }
 
   auto *raw = elt->getRawValueExpr();
