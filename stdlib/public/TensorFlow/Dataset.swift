@@ -101,16 +101,16 @@ public extension Dataset {
   // feature, which is not robust and does not have great diagnostics yet.
 
   @inlinable @inline(__always)
-  func map(
-    _ transform: (Element) -> Element
-  ) -> Dataset {
-    return Dataset(
+  func map<ResultElement : TensorGroup>(
+    _ transform: (Element) -> ResultElement
+  ) -> Dataset<ResultElement> {
+    return Dataset<ResultElement>(
       _handle: #tfop(
         "MapDataset", _handle, [Tensor<Int32>(0)],
         f$func: _tffunc(transform),
         Targuments$dtype: [Int32.tensorFlowDataType],
-        output_types$dtype: Element._typeList,
-        output_shapes: Element._unknownShapeList
+        output_types$dtype: ResultElement._typeList,
+        output_shapes: ResultElement._unknownShapeList
       )
     )
   }
