@@ -5,9 +5,6 @@
 //
 // REQUIRES: executable_test
 //
-// FIXME(TF-199): Indirect passing differentiation crashes with `-O`.
-// UNSUPPORTED: swift_test_mode_optimize
-//
 // Tensor indirect passing AD runtime tests.
 
 import TensorFlow
