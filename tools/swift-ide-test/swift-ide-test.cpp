@@ -2845,6 +2845,9 @@ private:
   }
 
   void tryDemangleDecl(ValueDecl *VD, CharSourceRange range, bool isRef) {
+    if (!isa<TypeDecl>(VD) || isa<GenericTypeParamDecl>(VD))
+      return;
+
     std::string USR;
     {
       llvm::raw_string_ostream OS(USR);
@@ -2858,7 +2861,7 @@ private:
       Stream << "decl: ";
     }
 
-    if (Decl *reDecl = getDeclFromUSR(Ctx, USR, error)) {
+    if (TypeDecl *reDecl = Demangle::getTypeDeclForUSR(Ctx, USR)) {
       PrintOptions POpts;
       POpts.PreferTypeRepr = false;
       POpts.PrintParameterSpecifiers = true;
@@ -2866,8 +2869,7 @@ private:
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << range.str() << "' usr=" << USR << " " << error
-           << "\n";
+    Stream << "\tfor '" << range.str() << "' usr=" << USR << "\n";
   }
 };
 
