@@ -651,15 +651,23 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
   // Generate a getter from InitF which returns the value of the global.
   auto *GetterF = genGetterFromInit(FunctionBuilder, InitF, SILG->getDecl());
 
-  // Replace all calls of an addressor by calls of a getter .
+  // Replace all calls of an addressor by calls of a getter.
   for (int i = 0, e = Calls.size(); i < e; ++i) {
     auto *Call = Calls[i];
 
-    // Now find all uses of Call. They all should be loads, so that
-    // we can replace it.
+    // Make sure that we can go ahead and replace all uses of the
+    // address with the value.
     bool isValid = true;
     for (auto Use : Call->getUses()) {
-      if (!isa<PointerToAddressInst>(Use->getUser())) {
+      if (auto *PTAI = dyn_cast<PointerToAddressInst>(Use->getUser())) {
+        for (auto PTAIUse : PTAI->getUses()) {
+          SILInstruction *Use = PTAIUse->getUser();
+          if (!canReplaceLoadSequence(Use)) {
+            isValid = false;
+            break;
+          }
+        }
+      } else {
         isValid = false;
         break;
       }
@@ -668,6 +676,8 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     if (!isValid)
       continue;
 
+    // Now find all uses of Call. They all should be loads, so that
+    // we can replace it.
     SILBuilderWithScope B(Call);
     SmallVector<SILValue, 1> Args;
     auto *GetterRef = B.createFunctionRef(Call->getLoc(), GetterF);
@@ -681,16 +691,10 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
       auto *PTAI = dyn_cast<PointerToAddressInst>(Use->getUser());
       assert(PTAI && "All uses should be pointer_to_address");
       for (auto PTAIUse : PTAI->getUses()) {
-        SILInstruction *Load = PTAIUse->getUser();
-        if (auto *CA = dyn_cast<CopyAddrInst>(Load)) {
-          // The result of the initializer is stored to another location.
-          SILBuilder B(CA);
-          B.createStore(CA->getLoc(), NewAI, CA->getDest(),
-                        StoreOwnershipQualifier::Unqualified);
-        } else {
-          // The result of the initializer is used as a value.
-          replaceLoadSequence(Load, NewAI, B);
-        }
+        SILInstruction *Use = PTAIUse->getUser();
+
+        // The result of the getter is used as a value.
+        replaceLoadSequence(Use, NewAI);
       }
     }
 
