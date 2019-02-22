@@ -322,26 +322,20 @@ public:
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
 
     if (!Name.empty()) {
-      StringRef NameStr = Name.str();
-
-      // 'self' is a keyword, we cannot allow to insert it into the source
-      // buffer.
-      bool IsAnnotation = (NameStr == "self");
-
       llvm::SmallString<16> EscapedKeyword;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterName,
-          // if the name is not annotation, we need to escape keyword
-          IsAnnotation ? NameStr
-                       : escapeArgumentLabel(NameStr, !Outermost,
-                                             EscapedKeyword));
-      if (IsAnnotation)
-        getLastChunk().setIsAnnotation();
-
+          escapeArgumentLabel(Name.str(), !Outermost, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
-      if (IsAnnotation)
-        getLastChunk().setIsAnnotation();
+    } else if (!LocalName.empty()) {
+      // Use local (non-API) parameter name if we have nothing else.
+      llvm::SmallString<16> EscapedKeyword;
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
+            escapeArgumentLabel(LocalName.str(), !Outermost, EscapedKeyword));
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
 
     // 'inout' arguments are printed specially.
@@ -349,16 +343,6 @@ public:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::Ampersand, "&");
       Ty = Ty->getInOutObjectType();
-    }
-
-    if (Name.empty() && !LocalName.empty()) {
-      llvm::SmallString<16> EscapedKeyword;
-      // Use local (non-API) parameter name if we have nothing else.
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-            escapeArgumentLabel(LocalName.str(), !Outermost, EscapedKeyword));
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
 
     // If the parameter is of the type @autoclosure ()->output, then the
