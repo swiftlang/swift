@@ -226,7 +226,7 @@
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "clang": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swift": "tensorflow",
-                "lldb": "03a57a13f5df7466db56eb1611126269c7768434",
+                "lldb": "c1e5da4f5f5b06254f13125e70554b23adb0199a",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
@@ -242,7 +242,7 @@
                 "icu": "release-61-1",
                 "tensorflow": "95f8fd4f30b1e59ea3cb64fbf0036bd7474842cc",
                 "tensorflow-swift-bindings": "10e591340134c37a6c3a1df735a7334a77d5cbc7",
-                "tensorflow-swift-apis": "34de02a8ddb58af3b9bcc03f172613616e4436f1"
+                "tensorflow-swift-apis": "470dbd7e7f27f761fd01686f5526803857e4bb7f"
             }
         }
     }

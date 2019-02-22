@@ -52,14 +52,29 @@ DatasetAPITests.testAllBackends("SingleValueTransformations") {
   expectEqual([0, 4, 1, 3, 2], shuffled.map { $0.scalar! })
 }
 
+// TODO(TF-263): Make this test work in graph mode
+#if !TF_NODYNAMIC_COMPILATION
 DatasetAPITests.testAllBackends("SingleValueHOFs") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
   let dataset = Dataset(elements: scalars)
   let addedOne: Dataset = dataset.map { $0 + 1 }
   expectEqual([1, 2, 3, 4, 5], addedOne.flatMap { $0.scalars })
-  let evens: Dataset = dataset.filter { Tensor($0 % 2 == Tensor(0)) }
+  // Use '.==' in the following closure to avoid any conversions to
+  // host data types, which is not handled correctly in tracing. 
+  let evens: Dataset = dataset.filter { Tensor($0 % 2) .== Tensor(0) }
   expectEqual([0, 2, 4], evens.flatMap { $0.scalars })
 }
+
+DatasetAPITests.testAllBackends("MapToDifferentType") {
+  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+  let dataset = Dataset(elements: scalars)
+  let shuffled = dataset.shuffled(sampleCount: 5, randomSeed: 42)
+  expectEqual([0, 4, 1, 3, 2], shuffled.map { $0.scalar! })
+  let evens = shuffled.map { Tensor($0 % 2) .== Tensor(0) }
+  expectEqual([true, true, false, false, true], evens.map { $0.scalar! })
+}
+
+#endif // !TF_NODYNAMIC_COMPILATION
 
 DatasetAPITests.testAllBackends("SingleValueBatched") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
@@ -72,7 +87,7 @@ DatasetAPITests.testAllBackends("SingleValueBatched") {
   expectEqual([4], iterator.next()!.scalars)
 }
 
-// TODO(SR-9156): Make this test work in graph mode.
+// TODO(TF-263): Make this test work in graph mode.
 #if !TF_NODYNAMIC_COMPILATION
 DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
   let scalars1 = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)

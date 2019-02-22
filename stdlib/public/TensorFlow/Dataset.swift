@@ -95,41 +95,35 @@ extension Dataset : Sequence {
   }
 }
 
-/// FIXME(SR-8684): @convention(tensorflow) types crash SILGen when their
-/// parameters or results have generic parameters. This is blocking generic
-/// higher-order dataset transformation functions.
-public extension Dataset where Element == Tensor<Float> {
+public extension Dataset {
+
+  // Note that this Dataset API implementation uses an experimental tracing
+  // feature, which is not robust and does not have great diagnostics yet.
+
   @inlinable @inline(__always)
-  func map(
-    _ transform: @convention(tensorflow) (Element) -> Element
-  ) -> Dataset {
-    // FIXME(SR-8570): If we pass an empty Array<TensorHandle<T>> as
-    // other_arguments and an empty Array<Any.Type> as Targuments, partitioning
-    // won't recognize the attribute:
-    //    error: unknown array attribute
-    return Dataset(
+  func map<ResultElement : TensorGroup>(
+    _ transform: (Element) -> ResultElement
+  ) -> Dataset<ResultElement> {
+    return Dataset<ResultElement>(
       _handle: #tfop(
-        "MapDataset", _handle, [Tensor<Int32>(0)], f: transform,
+        "MapDataset", _handle, [Tensor<Int32>(0)],
+        f$func: _tffunc(transform),
         Targuments$dtype: [Int32.tensorFlowDataType],
-        output_types$dtype: Element._typeList,
-        output_shapes: Element._unknownShapeList
+        output_types$dtype: ResultElement._typeList,
+        output_shapes: ResultElement._unknownShapeList
       )
     )
   }
 
   @inlinable @inline(__always)
   func filter(
-    _ isIncluded:
-      @convention(tensorflow) (Element) -> Tensor<Bool>
+    _ isIncluded: (Element) -> Tensor<Bool>
   ) -> Dataset {
-    // FIXME(SR-8570): If we pass an empty Array<TensorHandle<T>> as
-    // other_arguments and an empty Array<Any.Type> as Targuments, partitioning
-    // won't recognize the attribute:
-    //    error: unknown array attribute
     return Dataset(
       _handle: #tfop(
         "FilterDataset", _handle, [Tensor<Int32>(0)],
-        predicate: isIncluded, Targuments$dtype: [Int32.tensorFlowDataType],
+        predicate$func: _tffunc(isIncluded),
+        Targuments$dtype: [Int32.tensorFlowDataType],
         output_types$dtype: Element._typeList,
         output_shapes: Element._unknownShapeList
       )
