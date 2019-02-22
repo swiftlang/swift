@@ -418,6 +418,16 @@ struct ThrowingStruct1 {
     get throws { throw "Error" }
     set throws { throw "Error" }
   }
+
+  var b: Int {
+    get {}
+    set throws { throw "Error" }
+  }
+
+  subscript(x: Int) -> Int {
+    get {}
+    set throws {}
+  }
 }
 
 func functionThatUsesThrowingStructProp() {
@@ -434,3 +444,34 @@ outsideInstance.a = 1 // expected-error {{call can throw but is not marked with 
 let _ = try outsideInstance.a // Okay
 let _ = try? outsideInstance.a // Okay
 let _ = try! outsideInstance.a // Okay
+
+let _ = outsideInstance.b // Okay
+outsideInstance.b = 1 // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+try outsideInstance.b = 1 // Okay
+try? outsideInstance.b = 1 // Okay
+try! outsideInstance.b = 1 // Okay
+
+let _ = outsideInstance[0] // Okay
+outsideInstance[0] = 1 // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+try outsideInstance[0] = 1 // Okay
+try? outsideInstance[0] = 1 // Okay
+try! outsideInstance[0] = 1 // Okay
+
+struct ThrowingStruct2 {
+  subscript(y: Int) -> Int {
+    get throws {}
+    set throws {}
+  }
+}
+
+var outsideInstance2 = ThrowingStruct2()
+
+let _ = outsideInstance2[0] // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+let _ = try outsideInstance2[0] // Okay
+let _ = try? outsideInstance2[0] // Okay
+let _ = try! outsideInstance2[0] // Okay
+
+outsideInstance2[0] = 1 // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+try outsideInstance2[0] = 1 // Okay
+try? outsideInstance2[0] = 1 // Okay
+try! outsideInstance2[0] = 1 // Okay
