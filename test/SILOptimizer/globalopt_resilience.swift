@@ -15,5 +15,20 @@ public struct ResilientStruct {
   var rawValue: Int
 
   public static let staticVal = ResilientStruct(rawValue: 27)
+
+  @_optimize(none)
+  public func method() {}
 }
 
+public func cannotConvertToValueUse() {
+  // We can't optimize this because the method takes the resilient value as
+  // @in_guaranteed
+  ResilientStruct.staticVal.method()
+}
+
+// CHECK-LABEL: sil @$s4test23cannotConvertToValueUseyyF : $@convention(thin) () -> ()
+// CHECK: [[ADDR:%.*]] = global_addr @$s4test15ResilientStructV9staticValACvpZ : $*ResilientStruct
+// CHECK: [[METHOD:%.*]] = function_ref @$s4test15ResilientStructV6methodyyF : $@convention(method) (@in_guaranteed ResilientStruct) -> ()
+// CHECK: apply [[METHOD]]([[ADDR]]) : $@convention(method) (@in_guaranteed ResilientStruct) -> ()
+// CHECK: [[RESULT:%.*]] = tuple ()
+// CHECK: return [[RESULT]] : $()
