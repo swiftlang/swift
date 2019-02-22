@@ -155,8 +155,7 @@ public func replacement_for_public_global_generic_func<T>(_ t: T.Type) -> String
 
 extension PublicClass {
   @_dynamicReplacement(for: init(x:))
-  convenience public init(y: Int) {
-    self.init(x: y)
+  public init(y: Int) {
     str = "replacement of public_class_init"
   }
 

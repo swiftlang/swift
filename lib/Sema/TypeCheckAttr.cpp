@@ -2253,6 +2253,22 @@ void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
     DeclAttributes &attrs = replacements[index]->getAttrs();
     attrs.add(newAttr);
   }
+  if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+    auto *attr = CD->getAttrs().getAttribute<DynamicReplacementAttr>();
+    auto replacedIsConvenienceInit =
+        cast<ConstructorDecl>(attr->getReplacedFunction())->isConvenienceInit();
+    if (replacedIsConvenienceInit &&!CD->isConvenienceInit()) {
+      diagnose(attr->getLocation(),
+               diag::dynamic_replacement_replaced_constructor_is_convenience,
+               attr->getReplacedFunctionName());
+    } else if (!replacedIsConvenienceInit && CD->isConvenienceInit()) {
+      diagnose(
+          attr->getLocation(),
+          diag::dynamic_replacement_replaced_constructor_is_not_convenience,
+          attr->getReplacedFunctionName());
+    }
+  }
+
 
   // Remove the attribute on the abstract storage (we have moved it to the
   // accessor decl).
