@@ -167,17 +167,17 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   ModuleFilenamePair fileNames(moduleName);
 
   StringRef archName = Ctx.LangOpts.Target.getArchName();
-  ModuleFilenamePair archFileNames(archName);
+
+  SmallVector<ModuleFilenamePair, 4> targetFileNamePairs;
+  targetFileNamePairs.push_back(archName);
 
   // FIXME: We used to use "major architecture" names for these files---the
   // names checked in "#if arch(...)". Fall back to that name in the one case
   // where it's different from what Swift 4.2 supported: 32-bit ARM platforms.
   // We should be able to drop this once there's an Xcode that supports the
   // new names.
-  StringRef alternateArchName;
   if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
-    alternateArchName = "arm";
-  ModuleFilenamePair alternateArchFileNames(alternateArchName);
+    targetFileNamePairs.push_back(StringRef("arm"));
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
   isFramework = false;
@@ -188,30 +188,25 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   /// was diagnosed, or None if neither one happened and the search should
   /// continue.
   auto findTargetSpecificModuleFiles = [&]() -> Optional<bool> {
-    auto result = findModuleFilesInDirectory(moduleID, currPath,
-                                             archFileNames.module,
-                                             archFileNames.moduleDoc,
-                                             moduleBuffer, moduleDocBuffer);
-
-    if (result == std::errc::no_such_file_or_directory &&
-        !alternateArchName.empty()) {
-      result = findModuleFilesInDirectory(moduleID, currPath,
-                                          alternateArchFileNames.module,
-                                          alternateArchFileNames.moduleDoc,
-                                          moduleBuffer, moduleDocBuffer);
-    }
-
-    if (result == std::errc::no_such_file_or_directory) {
-      if (maybeDiagnoseArchitectureMismatch(moduleID.second, moduleName,
-                                            archName, currPath)) {
-        return false;
+    for (const auto &targetFileNames : targetFileNamePairs) {
+      auto result = findModuleFilesInDirectory(moduleID, currPath,
+                        targetFileNames.module, targetFileNames.moduleDoc,
+                        moduleBuffer, moduleDocBuffer);
+      if (!result) {
+        return true;
+      } else if (result != std::errc::no_such_file_or_directory) {
+        return None;
       }
     }
 
-    if (!result)
-      return true;
-    else
+    // We can only get here if all targetFileNamePairs failed with
+    // 'std::errc::no_such_file_or_directory'.
+    if (maybeDiagnoseArchitectureMismatch(moduleID.second,
+                                          moduleName, archName, currPath)) {
+      return false;
+    } else {
       return None;
+    }
   };
 
   for (auto path : Ctx.SearchPathOpts.ImportSearchPaths) {
