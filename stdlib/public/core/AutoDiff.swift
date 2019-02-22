@@ -129,7 +129,13 @@ public extension Differentiable
 //===----------------------------------------------------------------------===//
 
 /// Create a differentiable function from a vector-Jacobian products function.
-@inlinable
+//
+// FIXME: Make serialized. Currently it's not serialized because JVP/VJP's
+// linkage does not yet respect whether a function conversion's source is a
+// function with a `@differentiable` attribute. Fixing this will require a
+// non-flow-sensitive AD conversion AST node.
+//
+// @inlinable
 public func differentiableFunction<T : Differentiable, R : Differentiable>(
   from vjp: @escaping (T)
            -> (value: R, pullback: (R.CotangentVector) -> T.CotangentVector)
@@ -145,7 +151,8 @@ public func differentiableFunction<T : Differentiable, R : Differentiable>(
 }
 
 /// Create a differentiable function from a vector-Jacobian products function.
-@inlinable
+// FIXME: Make serialized.
+// @inlinable
 public func differentiableFunction<T, U, R>(
   from vjp: @escaping (T, U)
            -> (value: R, pullback: (R.CotangentVector)

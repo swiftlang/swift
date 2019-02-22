@@ -685,6 +685,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
     }
     nameBuffer = "AD__" + nameBuffer + "_" + kindString + "_" +
                  autoDiffFuncId->getParameterIndices()->getString();
+    // TODO: Make the thunk serialized.
+    isSerialized = IsNotSerialized;
   }
 
   // If the thunked-to function is set to be always inlined, do the
