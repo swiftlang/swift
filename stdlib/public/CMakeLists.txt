@@ -18,7 +18,11 @@ list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree"
 
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
-list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-Wall")
+if(SWIFT_COMPILER_IS_MSVC_LIKE)
+  list(APPEND SWIFT_RUNTIME_CXX_FLAGS "/W3")
+else()
+  list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-Wall")
+endif()
 
 set(SWIFT_RUNTIME_CORE_CXX_FLAGS "${SWIFT_RUNTIME_CXX_FLAGS}")
 set(SWIFT_RUNTIME_CORE_LINK_FLAGS "${SWIFT_RUNTIME_LINK_FLAGS}")

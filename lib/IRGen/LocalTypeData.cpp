@@ -366,7 +366,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   }
   auto *typeParam = cast<GenericTypeParamType>(oocTy);
   IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, typeParam->getDepth(),
-                                      typeParam->getIndex(), AssocType);
+                                      typeParam->getIndex(), name, AssocType);
 }
 
 void
