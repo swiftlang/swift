@@ -224,6 +224,8 @@ public:
       recurse = asImpl().checkMemberRefExpr(memberRef);
     } else if (auto openExistential = dyn_cast<OpenExistentialExpr>(E)) {
       recurse = asImpl().checkOpenExistentialExpr(openExistential);
+    } else if (auto subscript = dyn_cast<SubscriptExpr>(E)) {
+      recurse = asImpl().checkSubscriptExpr(subscript);
     }
     // Error handling validation (via checkTopLevelErrorHandling) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -625,6 +627,10 @@ private:
     }
         
     ShouldRecurse_t checkOpenExistentialExpr(OpenExistentialExpr *E) {
+      return ShouldNotRecurse;
+    }
+
+    ShouldRecurse_t checkSubscriptExpr(SubscriptExpr *E) {
       return ShouldNotRecurse;
     }
 
@@ -1694,8 +1700,10 @@ private:
     
     auto isSubscript = false;
     Expr *subscriptExpr = nullptr;
-    
+    bool isInsideOEE = false;
+
     if (isa<OpenExistentialExpr>(E->getDest())) {
+      isInsideOEE = true;
       auto subExpr = cast<OpenExistentialExpr>(E->getDest())->getSubExpr();
       if (isa<SubscriptExpr>(subExpr)) {
         subscriptExpr = cast<SubscriptExpr>(subExpr);
@@ -1727,7 +1735,12 @@ private:
     auto isSubscript = isa<SubscriptExpr>(E->getSubExpr());
     
     auto expr = isSubscript ? E->getSubExpr() : E;
-    
+
+    if (!isa<AssignExpr>(expr) || !isa<MemberRefExpr>(E) ||
+        !isa<SubscriptExpr>(E)) {
+      return ShouldRecurse;
+    }
+
     auto throws = walker.checkAccessor(expr, false, isSubscript);
     
     if (throws) {
@@ -1736,8 +1749,24 @@ private:
       checkThrowSite(E, /*requiresTry*/ true, classification);
     }
 
-    
-    return ShouldRecurse;
+    return ShouldNotRecurse;
+  }
+
+  ShouldRecurse_t checkSubscriptExpr(SubscriptExpr *E) {
+    ContextScope scope(*this, None);
+
+    auto walker = ThrowingAccessorWalker(E, &Flags, TC, /*tryLoc*/ SourceLoc(),
+                                         /*handled*/ false);
+
+    auto throws = walker.checkAccessor(E, false, true);
+
+    if (throws) {
+      auto classification = Classification(ThrowingKind::Throws,
+                                           PotentialReason::forThrowingApply());
+      checkThrowSite(E, /*requiresTry*/ true, classification);
+    }
+
+    return ShouldNotRecurse;
   }
 
   void checkPotentiallyThrowingAccessor(Expr *E, ContextScope &scope,
