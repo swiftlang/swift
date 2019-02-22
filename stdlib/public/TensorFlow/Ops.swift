@@ -372,6 +372,23 @@ public extension Tensor where Scalar : Numeric {
   }
 }
 
+/// Performs batched matrix multiplication with another tensor and produces the
+/// result.
+@inlinable @inline(__always)
+@differentiable(
+  wrt: (lhs, rhs),
+  vjp: _vjpBatchedMatmul
+  where Scalar : Differentiable & FloatingPoint
+)
+public func batchedMatmul<Scalar : Numeric>(
+  _ lhs: Tensor<Scalar>,
+  _ rhs: Tensor<Scalar>,
+  adjointLHS: Bool = false,
+  adjointRHS: Bool = false
+) -> Tensor<Scalar> {
+  return Raw.batchMatMul(lhs, rhs, adjX: adjointLHS, adjY: adjointRHS)
+}
+
 //===----------------------------------------------------------------------===//
 // Element-wise binary comparison
 //===----------------------------------------------------------------------===//

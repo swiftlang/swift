@@ -477,8 +477,38 @@ func _vjpMatmul<Scalar : Differentiable & FloatingPoint>(
   _ lhs: Tensor<Scalar>, _ rhs: Tensor<Scalar>
 ) -> (Tensor<Scalar>, (Tensor<Scalar>) -> (Tensor<Scalar>, Tensor<Scalar>)) {
   let value = matmul(lhs, rhs)
-  return (value, { v in 
+  return (value, { v in
     return (matmul(v, rhs.transposed()), matmul(lhs.transposed(), v))
+  })
+}
+
+@inlinable
+func _vjpBatchedMatmul<Scalar : Differentiable & FloatingPoint>(
+  _ lhs: Tensor<Scalar>, _ rhs: Tensor<Scalar>, adjointLHS: Bool, adjointRHS: Bool
+) -> (Tensor<Scalar>, (Tensor<Scalar>) -> (Tensor<Scalar>, Tensor<Scalar>)) {
+  let value = batchedMatmul(lhs, rhs, adjointLHS: adjointLHS, adjointRHS: adjointRHS)
+  return (value, { v in
+    if !adjointLHS {
+      if !adjointRHS {
+        return (
+          batchedMatmul(v, rhs, adjointLHS: false, adjointRHS: true),
+          batchedMatmul(lhs, v, adjointLHS: true, adjointRHS: false))
+      } else {
+        return (
+          batchedMatmul(v, rhs, adjointLHS: false, adjointRHS: false),
+          batchedMatmul(v, lhs, adjointLHS: true, adjointRHS: false))
+      }
+    } else {
+      if !adjointRHS {
+        return (
+          batchedMatmul(rhs, v, adjointLHS: false, adjointRHS: true),
+          batchedMatmul(lhs, v, adjointLHS: false, adjointRHS: false))
+      } else {
+        return (
+          batchedMatmul(rhs, v, adjointLHS: true, adjointRHS: true),
+          batchedMatmul(v, lhs, adjointLHS: true, adjointRHS: true))
+      }
+    }
   })
 }
 
