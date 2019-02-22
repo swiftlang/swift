@@ -3925,6 +3925,10 @@ ERROR(dynamic_replacement_replaced_not_objc_dynamic, none,
       "%0 is not marked @objc dynamic", (DeclName))
 ERROR(dynamic_replacement_replacement_not_objc_dynamic, none,
       "%0 is marked @objc dynamic", (DeclName))
+ERROR(dynamic_replacement_replaced_constructor_is_convenience, none,
+      "replaced constructor %0 is marked as convenience", (DeclName))
+ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
+      "replaced constructor %0 is not marked as convenience", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: @available
