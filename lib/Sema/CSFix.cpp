@@ -145,7 +145,8 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, ConstraintLocator *locator,
 }
 
 bool RelabelArguments::diagnose(Expr *root, bool asNote) const {
-  LabelingFailure failure(getConstraintSystem(), getLocator(), getLabels());
+  LabelingFailure failure(root, getConstraintSystem(), getLocator(),
+                          getLabels());
   return failure.diagnose(asNote);
 }
 
