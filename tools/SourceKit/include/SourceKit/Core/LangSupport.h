@@ -127,7 +127,6 @@ struct ExpressionType {
   unsigned ExprOffset;
   unsigned ExprLength;
   unsigned TypeOffset;
-  unsigned TypeLength;
 };
 
 struct ExpressionTypesInFile {
