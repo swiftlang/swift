@@ -287,3 +287,11 @@ let _: Int = thing?.e?.a() // expected-error {{value of optional type 'Int?' mus
 let _: Int? = thing?.e?.b // expected-error {{value of optional type 'Int??' must be unwrapped to a value of type 'Int?'}}
 // expected-note@-1{{coalesce}}
 // expected-note@-2{{force-unwrap}}
+
+// SR-9851 - https://bugs.swift.org/browse/SR-9851
+func coalesceWithParensRootExprFix() {
+  let optionalBool: Bool? = false
+  if !optionalBool { }  // expected-error{{value of optional type 'Bool?' must be unwrapped to a value of type 'Bool'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{7-7=(}}{{19-19= ?? <#default value#>)}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}

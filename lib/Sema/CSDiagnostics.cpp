@@ -531,7 +531,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
 }
 
 // Suggest a default value via ?? <default value>
-static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr *expr) {
+static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr) {
   auto diag =
   TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
 
@@ -539,7 +539,7 @@ static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr 
   bool needsParensInside =
   exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
   bool needsParensOutside =
-  exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
+  exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, rootExpr);
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -603,7 +603,7 @@ public:
   int referencesCount() { return count; }
 };
 
-static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type baseType,
+static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Expr *rootExpr, Type baseType,
                            Type unwrappedType) {
 
   assert(!baseType->hasTypeVariable() &&
@@ -658,14 +658,14 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type baseType,
         }
         diag.flush();
 
-        offerDefaultValueUnwrapFixit(CS.TC, varDecl->getDeclContext(),
-                                     initializer);
+        offerDefaultValueUnwrapFixit(CS.TC, varDecl->getDeclContext(), 
+                                     initializer, rootExpr);
         offerForceUnwrapFixit(CS, initializer);
       }
     }
   }
 
-  offerDefaultValueUnwrapFixit(CS.TC, CS.DC, expr);
+  offerDefaultValueUnwrapFixit(CS.TC, CS.DC, expr, rootExpr);
   offerForceUnwrapFixit(CS, expr);
   return true;
 }
@@ -675,6 +675,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     return false;
 
   auto *anchor = getAnchor();
+  auto *rootExpr = getParentExpr();
 
   if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
     anchor = assignExpr->getSrc();
@@ -684,7 +685,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
   if (!tryExpr) {
-    return diagnoseUnwrap(getConstraintSystem(), unwrapped, getBaseType(),
+    return diagnoseUnwrap(getConstraintSystem(), unwrapped, rootExpr, getBaseType(),
                           getUnwrappedType());
   }
 
