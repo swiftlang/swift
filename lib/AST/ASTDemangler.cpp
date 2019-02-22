@@ -31,6 +31,7 @@
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
 
 using namespace swift;
 
@@ -54,6 +55,17 @@ TypeDecl *swift::Demangle::getTypeDeclForMangling(ASTContext &ctx,
 
   ASTBuilder builder(ctx);
   return builder.createTypeDecl(node);
+}
+
+TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
+                                             StringRef usr) {
+  if (!usr.startswith("s:"))
+    return nullptr;
+
+  std::string mangling(usr);
+  mangling.replace(0, 2, MANGLING_PREFIX_STR);
+
+  return getTypeDeclForMangling(ctx, mangling);
 }
 
 TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
