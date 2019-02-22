@@ -1774,7 +1774,7 @@ function(add_swift_target_library name)
       # building both simultaneously.  Effectively, only shared builds are
       # supported on windows currently.
       if(SWIFTLIB_SHARED)
-        list(APPEND swiftlib_swift_compile_flags_all -D_USRDLL)
+        list(APPEND swiftlib_swift_compile_flags_all -D_WINDLL)
         if(SWIFTLIB_IS_STDLIB_CORE)
           list(APPEND swiftlib_swift_compile_flags_all -DswiftCore_EXPORTS)
         endif()
