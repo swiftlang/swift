@@ -25,7 +25,7 @@ public struct CollectionDifference<ChangeElement> {
     case remove(offset: Int, element: ChangeElement, associatedWith: Int?)
 
     // Internal common field accessors
-    var offset: Int {
+    internal var _offset: Int {
       get {
         switch self {
         case .insert(offset: let o, element: _, associatedWith: _):
@@ -35,7 +35,7 @@ public struct CollectionDifference<ChangeElement> {
         }
       }
     }
-    var element: ChangeElement {
+    internal var _element: ChangeElement {
       get {
         switch self {
         case .insert(offset: _, element: let e, associatedWith: _):
@@ -45,7 +45,7 @@ public struct CollectionDifference<ChangeElement> {
         }
       }
     }
-    var associatedOffset: Int? {
+    internal var _associatedOffset: Int? {
       get {
         switch self {
         case .insert(offset: _, element: _, associatedWith: let o):
@@ -56,6 +56,12 @@ public struct CollectionDifference<ChangeElement> {
       }
     }
   }
+
+  /// The `.insert` changes contained by this difference, from lowest offset to highest
+  public let insertions: [Change]
+  
+  /// The `.remove` changes contained by this difference, from lowest offset to highest
+  public let removals: [Change]
 
   /// The public initializer calls this function to ensure that its parameter
   /// meets the conditions set in its documentation.
@@ -71,7 +77,9 @@ public struct CollectionDifference<ChangeElement> {
   ///   3. All associations between insertions and removals are symmetric
   ///
   /// Complexity: O(`changes.count`)
-  private static func validateChanges<C>(_ changes : C) -> Bool where C:Collection, C.Element == Change {
+  private static func _validateChanges<Changes: Collection>(
+    _ changes : Changes
+  ) -> Bool where Changes.Element == Change {
     if changes.count == 0 { return true }
 
     var insertAssocToOffset = Dictionary<Int,Int>()
@@ -80,7 +88,7 @@ public struct CollectionDifference<ChangeElement> {
     var removeOffset = Set<Int>()
 
     for c in changes {
-      let offset = c.offset
+      let offset = c._offset
       if offset < 0 { return false }
 
       switch c {
@@ -92,7 +100,7 @@ public struct CollectionDifference<ChangeElement> {
         insertOffset.insert(offset)
       }
 
-      if let assoc = c.associatedOffset {
+      if let assoc = c._associatedOffset {
         if assoc < 0 { return false }
         switch c {
         case .remove(_, _, _):
@@ -126,12 +134,14 @@ public struct CollectionDifference<ChangeElement> {
   ///
   /// - Complexity: O(*n* * log(*n*)), where *n* is the length of the
   ///   parameter.
-  public init?<C>(_ c: C) where C:Collection, C.Element == Change {
-    if !CollectionDifference<ChangeElement>.validateChanges(c) {
+  public init?<Changes: Collection>(
+    _ changes: Changes
+  ) where Changes.Element == Change {
+    if !CollectionDifference<ChangeElement>._validateChanges(changes) {
       return nil
     }
 
-    self.init(validatedChanges: c)
+    self.init(_validatedChanges: changes)
   }
 
   /// Internal initializer for use by algorithms that cannot produce invalid
@@ -146,27 +156,29 @@ public struct CollectionDifference<ChangeElement> {
   ///
   /// - Complexity: O(*n* * log(*n*)), where *n* is the length of the
   ///   parameter.
-  init<C>(validatedChanges c: C) where C:Collection, C.Element == Change {
-    let changes = c.sorted { (a, b) -> Bool in
+  internal init<Changes: Collection>(
+    _validatedChanges changes: Changes
+  ) where Changes.Element == Change {
+    let sortedChanges = changes.sorted { (a, b) -> Bool in
       switch (a, b) {
       case (.remove(_, _, _), .insert(_, _, _)):
         return true
       case (.insert(_, _, _), .remove(_, _, _)):
         return false
       default:
-        return a.offset < b.offset
+        return a._offset < b._offset
       }
     }
 
     // Find first insertion via binary search
     let firstInsertIndex: Int
-    if changes.count == 0 {
+    if sortedChanges.count == 0 {
       firstInsertIndex = 0
     } else {
-      var range = 0...changes.count
+      var range = 0...sortedChanges.count
       while range.lowerBound != range.upperBound {
         let i = (range.lowerBound + range.upperBound) / 2
-        switch changes[i] {
+        switch sortedChanges[i] {
         case .insert(_, _, _):
           range = range.lowerBound...i
         case .remove(_, _, _):
@@ -176,15 +188,9 @@ public struct CollectionDifference<ChangeElement> {
       firstInsertIndex = range.lowerBound
     }
 
-    removals = Array(changes[0..<firstInsertIndex])
-    insertions = Array(changes[firstInsertIndex..<changes.count])
+    removals = Array(sortedChanges[0..<firstInsertIndex])
+    insertions = Array(sortedChanges[firstInsertIndex..<sortedChanges.count])
   }
-
-  /// The `.insert` changes contained by this difference, from lowest offset to highest
-  public let insertions: [Change]
-  
-  /// The `.remove` changes contained by this difference, from lowest offset to highest
-  public let removals: [Change]
 }
 
 /// A CollectionDifference is itself a Collection.
@@ -207,47 +213,60 @@ public struct CollectionDifference<ChangeElement> {
 ///   }
 /// }
 /// ```
-extension CollectionDifference : Collection {
-  public typealias Element = CollectionDifference<ChangeElement>.Change
+extension CollectionDifference: Collection {
+  public typealias Element = Change
 
-  // Opaque index type is isomorphic to Int
-  public struct Index: Comparable, Hashable {
-    public static func < (lhs: CollectionDifference<ChangeElement>.Index, rhs: CollectionDifference<ChangeElement>.Index) -> Bool {
-      return lhs.i < rhs.i
-    }
-    
-    let i: Int
-    init(_ index: Int) {
-      i = index
+  public struct Index {
+    // Opaque index type is isomorphic to Int
+    internal let _offset: Int
+
+    internal init(_offset offset: Int) {
+      _offset = offset
     }
   }
 
-  public var startIndex: CollectionDifference<ChangeElement>.Index {
-    return Index(0)
+  public var startIndex: Index {
+    return Index(_offset: 0)
   }
   
-  public var endIndex: CollectionDifference<ChangeElement>.Index {
-    return Index(removals.count + insertions.count)
+  public var endIndex: Index {
+    return Index(_offset: removals.count + insertions.count)
   }
   
-  public func index(after index: CollectionDifference<ChangeElement>.Index) -> CollectionDifference<ChangeElement>.Index {
-    return Index(index.i + 1)
+  public func index(after index: Index) -> Index {
+    return Index(_offset: index._offset + 1)
   }
   
-  public subscript(position: CollectionDifference<ChangeElement>.Index) -> Element {
-    return position.i < removals.count ? removals[removals.count - (position.i + 1)] : insertions[position.i - removals.count]
+  public subscript(position: Index) -> Element {
+    if position._offset < removals.count {
+      return removals[removals.count - (position._offset + 1)]
+    }
+    return insertions[position._offset - removals.count]
   }
   
-  public func index(before index: CollectionDifference<ChangeElement>.Index) -> CollectionDifference<ChangeElement>.Index {
-    return Index(index.i - 1)
+  public func index(before index: Index) -> Index {
+    return Index(_offset: index._offset - 1)
   }
   
-  public func formIndex(_ index: inout CollectionDifference<ChangeElement>.Index, offsetBy distance: Int) {
-    index = Index(index.i + distance)
+  public func formIndex(_ index: inout Index, offsetBy distance: Int) {
+    index = Index(_offset: index._offset + distance)
   }
   
-  public func distance(from start: CollectionDifference<ChangeElement>.Index, to end: CollectionDifference<ChangeElement>.Index) -> Int {
-    return end.i - start.i
+  public func distance(from start: Index, to end: Index) -> Int {
+    return end._offset - start._offset
+  }
+}
+
+extension CollectionDifference.Index: Equatable {} // synthesized
+
+extension CollectionDifference.Index: Hashable {} // synthesized
+
+extension CollectionDifference.Index: Comparable {
+  public static func < (
+    lhs: CollectionDifference.Index,
+    rhs: CollectionDifference.Index
+  ) -> Bool {
+    return lhs._offset < rhs._offset
   }
 }
 
@@ -257,8 +276,9 @@ extension CollectionDifference: Equatable where ChangeElement: Equatable {}
 
 extension CollectionDifference.Change: Hashable where ChangeElement: Hashable {}
 
-extension CollectionDifference: Hashable where ChangeElement: Hashable {
+extension CollectionDifference: Hashable where ChangeElement: Hashable {}
 
+extension CollectionDifference where ChangeElement: Hashable {
   /// Infers which `ChangeElement`s have been both inserted and removed only
   /// once and returns a new difference with those associations.
   ///
@@ -269,11 +289,11 @@ extension CollectionDifference: Hashable where ChangeElement: Hashable {
     let removeDict: [ChangeElement:Int?] = {
       var res = [ChangeElement:Int?](minimumCapacity: Swift.min(removals.count, insertions.count))
       for r in removals {
-        let element = r.element
+        let element = r._element
         if res[element] != .none {
           res[element] = .some(.none)
         } else {
-          res[element] = .some(r.offset)
+          res[element] = .some(r._offset)
         }
       }
       return res.filter { (_, v) -> Bool in v != .none }
@@ -282,17 +302,17 @@ extension CollectionDifference: Hashable where ChangeElement: Hashable {
     let insertDict: [ChangeElement:Int?] = {
       var res = [ChangeElement:Int?](minimumCapacity: Swift.min(removals.count, insertions.count))
       for i in insertions {
-        let element = i.element
+        let element = i._element
         if res[element] != .none {
           res[element] = .some(.none)
         } else {
-          res[element] = .some(i.offset)
+          res[element] = .some(i._offset)
         }
       }
       return res.filter { (_, v) -> Bool in v != .none }
     }()
 
-    return CollectionDifference.init(validatedChanges:map({ (c: CollectionDifference<ChangeElement>.Change) -> CollectionDifference<ChangeElement>.Change in
+    return CollectionDifference(_validatedChanges: map({ (c: Change) -> Change in
       switch c {
       case .remove(offset: let o, element: let e, associatedWith: _):
         if removeDict[e] == nil {
@@ -315,7 +335,7 @@ extension CollectionDifference: Hashable where ChangeElement: Hashable {
 }
 
 extension CollectionDifference.Change: Codable where ChangeElement: Codable {
-  private enum CodingKeys: String, CodingKey {
+  private enum _CodingKeys: String, CodingKey {
     case offset
     case element
     case associatedOffset
@@ -323,7 +343,7 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
   }
 
   public init(from decoder: Decoder) throws {
-    let values = try decoder.container(keyedBy: CodingKeys.self)
+    let values = try decoder.container(keyedBy: _CodingKeys.self)
     let offset = try values.decode(Int.self, forKey: .offset)
     let element = try values.decode(ChangeElement.self, forKey: .element)
     let associatedOffset = try values.decode(Int?.self, forKey: .associatedOffset)
@@ -336,7 +356,7 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
   }
   
   public func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
+    var container = encoder.container(keyedBy: _CodingKeys.self)
     switch self {
     case .remove(_, _, _):
       try container.encode(true, forKey: .isRemove)
@@ -344,9 +364,9 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
       try container.encode(false, forKey: .isRemove)
     }
     
-    try container.encode(offset, forKey: .offset)
-    try container.encode(element, forKey: .element)
-    try container.encode(associatedOffset, forKey: .associatedOffset)
+    try container.encode(_offset, forKey: .offset)
+    try container.encode(_element, forKey: .element)
+    try container.encode(_associatedOffset, forKey: .associatedOffset)
   }
 }
 
