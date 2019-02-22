@@ -648,17 +648,6 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
   // Make this addressor transparent.
   AddrF->setTransparent(IsTransparent_t::IsTransparent);
 
-  for (int i = 0, e = Calls.size(); i < e; ++i) {
-    auto *Call = Calls[i];
-    SILBuilderWithScope B(Call);
-    SmallVector<SILValue, 1> Args;
-    auto *NewAI = B.createApply(Call->getLoc(), Call->getCallee(), Args, false);
-    Call->replaceAllUsesWith(NewAI);
-    eraseUsesOfInstruction(Call);
-    recursivelyDeleteTriviallyDeadInstructions(Call, true);
-    Calls[i] = NewAI;
-  }
-
   // Generate a getter from InitF which returns the value of the global.
   auto *GetterF = genGetterFromInit(FunctionBuilder, InitF, SILG->getDecl());
 
