@@ -3512,6 +3512,8 @@ public:
     if (auto parent = T->getParent()) {
       visit(parent);
       Printer << ".";
+    } else if (shouldPrintFullyQualified(T)) {
+      printModuleContext(T);
     }
 
     printTypeDeclName(T);
