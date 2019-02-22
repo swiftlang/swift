@@ -253,4 +253,14 @@ PythonRuntimeTestSuite.test("PythonConvertible") {
   expectEqual(five, Double(5).pythonObject)
 }
 
+// TF-78: isType() consumed refcount for type objects like `PyBool_Type`.
+PythonRuntimeTestSuite.test("PythonRefCount") {
+  let b: PythonObject = true
+  for _ in 0...20 {
+    // This triggers isType(), which used to crash after repeated invocation
+    // because of reduced refcount for `PyBool_Type`.
+    _ = Bool.init(b)
+  }
+}
+
 runAllTests()
