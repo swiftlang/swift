@@ -1204,7 +1204,10 @@ ConstraintSystem::getTypeOfMemberReference(
     return getTypeOfReference(value, functionRefKind, locator, useDC, base);
   }
 
-  FunctionType::Param baseObjParam(baseObjTy);
+  // SWIFT_ENABLE_TENSORFLOW
+  FunctionType::Param baseObjParam(
+      baseObjTy->getInOutObjectType(), Identifier(),
+      ParameterTypeFlags().withInOut(baseObjTy->is<InOutType>()));
 
   // Don't open existentials when accessing typealias members of
   // protocols.
