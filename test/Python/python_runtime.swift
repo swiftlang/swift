@@ -84,6 +84,20 @@ PythonRuntimeTestSuite.test("PartialRangeUpTo") {
   expectNil(PartialRangeUpTo<Int>(PythonObject(5...)))
 }
 
+PythonRuntimeTestSuite.test("Strideable") {
+  let strideTo = stride(from: PythonObject(0), to: 100, by: 2)
+  expectEqual(0, strideTo.min()!)
+  expectEqual(98, strideTo.max()!)
+  expectEqual([0, 2, 4, 6, 8], Array(strideTo.prefix(5)))
+  expectEqual([90, 92, 94, 96, 98], Array(strideTo.suffix(5)))
+
+  let strideThrough = stride(from: PythonObject(0), through: 100, by: 2)
+  expectEqual(0, strideThrough.min()!)
+  expectEqual(100, strideThrough.max()!)
+  expectEqual([0, 2, 4, 6, 8], Array(strideThrough.prefix(5)))
+  expectEqual([92, 94, 96, 98, 100], Array(strideThrough.suffix(5)))
+}
+
 PythonRuntimeTestSuite.test("BinaryOps") {
   expectEqual(42, PythonObject(42))
   expectEqual(42, PythonObject(2) + PythonObject(40))
