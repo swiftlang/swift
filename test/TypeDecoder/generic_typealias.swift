@@ -1,8 +1,12 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -emit-executable %s -g -o %t/generic_typealias -emit-module
-// RUN: sed -ne '/\/\/ *DEMANGLE: /s/\/\/ *DEMANGLE: *//p' < %s > %t/input
-// RUN: %lldb-moduleimport-test %t/generic_typealias -type-from-mangled=%t/input | %FileCheck %s
+
+// RUN: sed -ne '/\/\/ *DEMANGLE-TYPE: /s/\/\/ *DEMANGLE-TYPE: *//p' < %s > %t/input
+// RUN: %lldb-moduleimport-test-with-sdk %t/generic_typealias -type-from-mangled=%t/input | %FileCheck %s --check-prefix=CHECK-TYPE
+
+// RUN: sed -ne '/\/\/ *DEMANGLE-DECL: /s/\/\/ *DEMANGLE-DECL: *//p' < %s > %t/input
+// RUN: %lldb-moduleimport-test-with-sdk %t/generic_typealias -decl-from-mangled=%t/input | %FileCheck %s --check-prefix=CHECK-DECL
 
 typealias Alias<T> = Int
 
@@ -77,32 +81,51 @@ do {
   blackHole(x1)
 }
 
-// DEMANGLE: $s17generic_typealias5AliasaySSGD
-// DEMANGLE: $s17generic_typealias5OuterV5Aliasay_SSGD
-// DEMANGLE: $s17generic_typealias5OuterV5InnerV5Aliasay__SSGD
+// DEMANGLE-TYPE: $s17generic_typealias5AliasaySSGD
+// DEMANGLE-TYPE: $s17generic_typealias5OuterV5Aliasay_SSGD
+// DEMANGLE-TYPE: $s17generic_typealias5OuterV5InnerV5Aliasay__SSGD
 
-// CHECK: Alias<String>
-// CHECK: Outer.Alias<String>
-// CHECK: Outer.Inner.Alias<String>
+// CHECK-TYPE: Alias<String>
+// CHECK-TYPE: Outer.Alias<String>
+// CHECK-TYPE: Outer.Inner.Alias<String>
 
-// DEMANGLE: $s17generic_typealias12GenericOuterV5AliasaySi_SSGD
-// DEMANGLE: $s17generic_typealias12GenericOuterV5InnerV5AliasaySi__SSGD
+// DEMANGLE-TYPE: $s17generic_typealias12GenericOuterV5AliasaySi_SSGD
+// DEMANGLE-TYPE: $s17generic_typealias12GenericOuterV5InnerV5AliasaySi__SSGD
 
-// CHECK: GenericOuter<Int>.Alias<String>
-// CHECK: GenericOuter<Int>.Inner.Alias<String>
+// CHECK-TYPE: GenericOuter<Int>.Alias<String>
+// CHECK-TYPE: GenericOuter<Int>.Inner.Alias<String>
 
-// DEMANGLE: $s17generic_typealias5ProtoP5AliasayAA8ConformsV_SSGD
-// DEMANGLE: $s17generic_typealias5ProtoPAAE10OtherAliasayAA8ConformsV_SSGD
+// DEMANGLE-TYPE: $s17generic_typealias5ProtoP5AliasayAA8ConformsV_SSGD
+// DEMANGLE-TYPE: $s17generic_typealias5ProtoPAAE10OtherAliasayAA8ConformsV_SSGD
 
-// CHECK: Conforms.Alias<String>
-// CHECK: Conforms.OtherAlias<String>
+// CHECK-TYPE: Conforms.Alias<String>
+// CHECK-TYPE: Conforms.OtherAlias<String>
 
-// DEMANGLE: $s17generic_typealias5ProtoP5Aliasayx_SSGD
-// DEMANGLE: $s17generic_typealias5ProtoPAAE10OtherAliasayx_SSGD
+// DEMANGLE-TYPE: $s17generic_typealias5ProtoP5Aliasayx_SSGD
+// DEMANGLE-TYPE: $s17generic_typealias5ProtoPAAE10OtherAliasayx_SSGD
 
-// CHECK: τ_0_0.Alias<String>
-// CHECK: τ_0_0.OtherAlias<String>
+// CHECK-TYPE: τ_0_0.Alias<String>
+// CHECK-TYPE: τ_0_0.OtherAlias<String>
 
-// DEMANGLE: $s17generic_typealias12GenericOuterVA2A5ProtoRzlE16ConditionalAliasayAA8ConformsV_SSGD
+// DEMANGLE-TYPE: $s17generic_typealias12GenericOuterVA2A5ProtoRzlE16ConditionalAliasayAA8ConformsV_SSGD
 
-// CHECK: GenericOuter<Conforms>.ConditionalAlias<String>
+// CHECK-TYPE: GenericOuter<Conforms>.ConditionalAlias<String>
+
+
+// DEMANGLE-DECL: $s17generic_typealias5Aliasa
+// DEMANGLE-DECL: $s17generic_typealias5OuterV5Aliasa
+// DEMANGLE-DECL: $s17generic_typealias5OuterV5InnerV5Aliasa
+// DEMANGLE-DECL: $s17generic_typealias12GenericOuterV5Aliasa
+// DEMANGLE-DECL: $s17generic_typealias12GenericOuterV5InnerV5Aliasa
+// DEMANGLE-DECL: $s17generic_typealias5ProtoP5Aliasa
+// DEMANGLE-DECL: $s17generic_typealias5ProtoPAAE10OtherAliasa
+// DEMANGLE-DECL: $s17generic_typealias12GenericOuterVA2A5ProtoRzlE16ConditionalAliasa
+
+// CHECK-DECL: generic_typealias.(file).Alias
+// CHECK-DECL: generic_typealias.(file).Outer.Alias
+// CHECK-DECL: generic_typealias.(file).Outer.Inner.Alias
+// CHECK-DECL: generic_typealias.(file).GenericOuter.Alias
+// CHECK-DECL: generic_typealias.(file).GenericOuter.Inner.Alias
+// CHECK-DECL: generic_typealias.(file).Proto.Alias
+// CHECK-DECL: generic_typealias.(file).Proto extension.OtherAlias
+// CHECK-DECL: generic_typealias.(file).GenericOuter extension.ConditionalAlias
