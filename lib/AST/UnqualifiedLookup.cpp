@@ -393,15 +393,20 @@ void UnqualifiedLookupFactory::fillInLookup() {
   const Optional<bool> isCascadingUseInitial =
       options.contains(Flags::KnownPrivate) ? Optional<bool>(false) : None;
   // Never perform local lookup for operators.
-  auto dcAndIsCascadingUse =
-      shouldUseASTScopeLookup()
-          ? astScopeBasedLookup(DC, isCascadingUseInitial)
-          : Name.isOperator()
-                ? operatorLookup(DC, isCascadingUseInitial)
-                : nonASTScopeBasedLookup(DC, isCascadingUseInitial);
-
-  if (!dcAndIsCascadingUse.hasValue())
-    return;
+  Optional<DCAndResolvedIsCascadingUse> dcAndIsCascadingUse;
+  if (shouldUseASTScopeLookup()) {
+    dcAndIsCascadingUse = astScopeBasedLookup(DC, isCascadingUseInitial);
+    if (!dcAndIsCascadingUse.hasValue())
+      return;
+  } else {
+    dcAndIsCascadingUse =
+        Name.isOperator() ? operatorLookup(DC, isCascadingUseInitial)
+                          : nonASTScopeBasedLookup(DC, isCascadingUseInitial);
+    if (!dcAndIsCascadingUse.hasValue())
+      return;
+    if (addLocalVariableResults(dcAndIsCascadingUse.getValue().DC))
+      return;
+  }
 
   DeclContext *const DC = dcAndIsCascadingUse.getValue().DC;
   const bool isCascadingUse = dcAndIsCascadingUse.getValue().isCascadingUse;
@@ -424,7 +429,7 @@ void UnqualifiedLookupFactory::fillInLookup() {
   if (lookForAModuleWithTheGivenName(DC))
     return;
   // Make sure we've recorded the inner-result-boundary.
-  setIndexOfFirstOuterResultIfNotSetAlready();
+  setIndexOfFirstOuterResultIfNotSetAlready(); // DMU elim?
 }
 
 bool UnqualifiedLookupFactory::shouldUseASTScopeLookup() const {
@@ -634,8 +639,7 @@ UnqualifiedLookupFactory::lookIntoDeclarationContextForASTScopeLookup(
       UnavailableInnerResults.append(begin, Results.end());
       Results.erase(begin, Results.end());
     } else {
-      if (DebugClient)
-        filterForDiscriminator(Results, DebugClient);
+      filterForDiscriminator(Results, DebugClient);
 
       setIndexOfFirstOuterResultIfNotSetAlready();
       if (isLookupDoneWithoutIncludingOuterResults())
@@ -657,9 +661,8 @@ UnqualifiedLookupFactory::operatorLookup(DeclContext *dc,
                                          Optional<bool> isCascadingUse) {
   auto *msc = dc->getModuleScopeContext();
   return DCAndResolvedIsCascadingUse{
-      addLocalVariableResults(msc) ? nullptr : msc,
-      resolveIsCascadingUse(dc, isCascadingUse,
-                            /*onlyCareAboutFunctionBody*/ true)};
+      msc, resolveIsCascadingUse(dc, isCascadingUse,
+                                 /*onlyCareAboutFunctionBody*/ true)};
 }
 
 // TODO: Unify with LookupVisibleDecls.cpp::lookupVisibleDeclsImpl
@@ -673,7 +676,7 @@ UnqualifiedLookupFactory::nonASTScopeBasedLookup(
       DCAndUnresolvedIsCascadingUse{dcArg, isCascadingUseArg});
   while (r.hasValue() && !r.getValue().whereToLook->isModuleScopeContext())
     r = lookupInOneDeclContext(r.getValue());
-  if (!r.hasValue() || addLocalVariableResults(r.getValue().whereToLook))
+  if (!r.hasValue())
     return None;
   return r.getValue().resolve(true);
 }
@@ -955,7 +958,7 @@ void UnqualifiedLookupFactory::addGenericParametersForFunction(
   }
 }
 
-// TODO enum instead of bool?
+// TODO enum instead of bool for return type?
 bool UnqualifiedLookupFactory::addLocalVariableResults(DeclContext *dc) {
   if (auto SF = dyn_cast<SourceFile>(dc)) {
     if (Loc.isValid()) {
@@ -1007,8 +1010,7 @@ bool UnqualifiedLookupFactory::handleUnavailableInnerResults(
     Results.erase(begin, Results.end());
     return false;
   }
-  if (DebugClient)
-    filterForDiscriminator(Results, DebugClient);
+  filterForDiscriminator(Results, DebugClient);
 
   setIndexOfFirstOuterResultIfNotSetAlready();
   return isLookupDoneWithoutIncludingOuterResults();
@@ -1043,8 +1045,7 @@ void UnqualifiedLookupFactory::addPrivateImports(DeclContext *const dc) {
   for (auto VD : CurModuleResults)
     Results.push_back(LookupResultEntry(VD));
 
-  if (DebugClient)
-    filterForDiscriminator(Results, DebugClient);
+  filterForDiscriminator(Results, DebugClient);
 }
 
 bool UnqualifiedLookupFactory::addNamesKnownToDebugClient(DeclContext *dc) {
@@ -1345,8 +1346,7 @@ LegacyUnqualifiedLookup::LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
             UnavailableInnerResults.append(begin, Results.end());
             Results.erase(begin, Results.end());
           } else {
-            if (DebugClient)
-              filterForDiscriminator(Results, DebugClient);
+            filterForDiscriminator(Results, DebugClient);
 
             if (shouldReturnBasedOnResults())
               return;
@@ -1575,8 +1575,7 @@ LegacyUnqualifiedLookup::LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
               UnavailableInnerResults.append(begin, Results.end());
               Results.erase(begin, Results.end());
             } else {
-              if (DebugClient)
-                filterForDiscriminator(Results, DebugClient);
+              filterForDiscriminator(Results, DebugClient);
 
               if (shouldReturnBasedOnResults())
                 return;
@@ -1634,7 +1633,6 @@ LegacyUnqualifiedLookup::LegacyUnqualifiedLookup(DeclName Name, DeclContext *DC,
   for (auto VD : CurModuleResults)
     Results.push_back(LookupResultEntry(VD));
 
-  if (DebugClient)
     filterForDiscriminator(Results, DebugClient);
 
   // Now add any names the DebugClient knows about to the lookup.

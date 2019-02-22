@@ -514,6 +514,8 @@ matchDiscriminator(Identifier discriminator,
 template <typename Result>
 void namelookup::filterForDiscriminator(SmallVectorImpl<Result> &results,
                                         DebuggerClient *debugClient) {
+  if (debugClient == nullptr)
+    return;
   Identifier discriminator = debugClient->getPreferredPrivateDiscriminator();
   if (discriminator.empty())
     return;
@@ -1362,8 +1364,7 @@ bool namelookup::finishLookup(const DeclContext *dc, NLOptions options,
   if (options & NL_RemoveNonVisible)
     removeShadowedDecls(decls, M);
 
-  if (auto *debugClient = M->getDebugClient())
-    filterForDiscriminator(decls, debugClient);
+  filterForDiscriminator(decls, M->getDebugClient());
 
   // We're done. Report success/failure.
   return !decls.empty();

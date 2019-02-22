@@ -372,6 +372,7 @@ void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
 bool finishLookup(const DeclContext *dc, NLOptions options,
                   SmallVectorImpl<ValueDecl *> &decls);
 
+/// Do nothing if debugClient is null.
 template <typename Result>
 void filterForDiscriminator(SmallVectorImpl<Result> &results,
                             DebuggerClient *debugClient);
