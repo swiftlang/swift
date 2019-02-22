@@ -988,6 +988,12 @@ static void mergeEndAccesses(BeginAccessInst *parentIns,
 }
 
 static bool canMergeEnd(BeginAccessInst *parentIns, BeginAccessInst *childIns) {
+  // A [read] access cannot be converted to a [modify] without potentially
+  // introducing new conflicts that were previously ignored. Merging read/modify
+  // will require additional data flow information.
+  if (childIns->getAccessKind() != parentIns->getAccessKind())
+    return false;
+
   auto *endP = getSingleEndAccess(parentIns);
   if (!endP)
     return false;
@@ -1086,13 +1092,6 @@ static bool mergeAccesses(
 
     LLVM_DEBUG(llvm::dbgs()
                << "Merging: " << *childIns << " into " << *parentIns << "\n");
-
-    // Change the type of access of parent:
-    // should be the worse between it and child
-    auto childAccess = childIns->getAccessKind();
-    if (parentIns->getAccessKind() < childAccess) {
-      parentIns->setAccessKind(childAccess);
-    }
 
     // Change the no nested conflict of parent:
     // should be the worst case scenario: we might merge to non-conflicting
