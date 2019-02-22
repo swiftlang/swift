@@ -16,6 +16,8 @@ class B {
 class D : B {
   override init() {
     super.init()
+    super.init(42)
+    // expected-error@-1 {{missing argument label 'x:' in call}}
   }
 
   override init(x:Int) {
