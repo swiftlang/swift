@@ -2148,12 +2148,18 @@ private:
   }
 
   bool isLoadableOrOpaque(SILType Ty) {
-    if (!F) {
-      // We are inserting into the static initializer of a SILGlobalVariable.
-      // All types used there are loadable by definition.
+    auto &M = C.Module;
+
+    if (!SILModuleConventions(M).useLoweredAddresses())
       return true;
-    }
-    return Ty.isLoadableOrOpaque(F);
+
+    auto expansion = ResilienceExpansion::Maximal;
+    // If there's no current SILFunction, we're inserting into a global
+    // variable initializer.
+    if (F)
+      expansion = F->getResilienceExpansion();
+
+    return M.getTypeLowering(Ty, expansion).isLoadable();
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
