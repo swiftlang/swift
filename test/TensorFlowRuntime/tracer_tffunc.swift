@@ -27,7 +27,6 @@ TracerTests.testAllBackends("SimpleTFFunction") {
     return (Tensor<Int32>(i .< n))
   }
 
-  @TensorFlowGraph
   func body(i: Tensor<Int32>) -> Tensor<Int32> {
     return i + 1
   }
@@ -40,7 +39,7 @@ TracerTests.testAllBackends("SimpleTFFunction") {
       Tensor<Int32>(0),
       T$dtype: [Int32.tensorFlowDataType],
       cond$func: tffunc(Tensor<Int32>(n)),
-      body: body)
+      body$func: _tffunc(body))
   }
 
   expectEqualWithScalarTensor(10, runWhile(10))
