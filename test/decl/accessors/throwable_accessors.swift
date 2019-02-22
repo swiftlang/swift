@@ -429,4 +429,8 @@ func functionThatUsesThrowingStructProp() {
 
 var outsideInstance = ThrowingStruct1()
 let _ = outsideInstance.a // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
-let _ = try outsideInstance.a
+outsideInstance.a = 1 // expected-error {{call can throw but is not marked with 'try'}} // expected-note {{did you mean to use 'try'?}} // expected-note {{did you mean to handle error as optional value?}} // expected-note {{did you mean to disable error propagation?}}
+
+let _ = try outsideInstance.a // Okay
+let _ = try? outsideInstance.a // Okay
+let _ = try! outsideInstance.a // Okay
