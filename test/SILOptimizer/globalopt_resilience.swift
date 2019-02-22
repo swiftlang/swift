@@ -32,3 +32,23 @@ public func cannotConvertToValueUse() {
 // CHECK: apply [[METHOD]]([[ADDR]]) : $@convention(method) (@in_guaranteed ResilientStruct) -> ()
 // CHECK: [[RESULT:%.*]] = tuple ()
 // CHECK: return [[RESULT]] : $()
+
+internal struct WrapperStruct {
+  var inner: ResilientStruct = .staticVal
+
+  init() {}
+}
+
+func returnWrapperStruct() -> WrapperStruct {
+  return WrapperStruct()
+}
+
+// CHECK-LABEL: sil hidden @$s4test19returnWrapperStructAA0cD0VyF : $@convention(thin) () -> @out WrapperStruct
+// CHECK: bb0(%0 : $*WrapperStruct):
+// CHECK: [[INT:%.*]] = integer_literal $Builtin.Int{{32|64}}, 27
+// CHECK: [[S1:%.*]] = struct $Int ([[INT]] : $Builtin.Int{{32|64}})
+// CHECK: [[S2:%.*]] = struct $ResilientStruct ([[S1]] : $Int)
+// CHECK: [[S3:%.*]] = struct $WrapperStruct ([[S2]] : $ResilientStruct)
+// CHECK: store [[S3]] to %0 : $*WrapperStruct
+// CHECK: [[RESULT:%.*]] = tuple ()
+// CHECK: return [[RESULT]] : $()
