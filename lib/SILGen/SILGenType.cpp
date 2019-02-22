@@ -487,9 +487,18 @@ public:
     } else {
       // This is the "real" rule; the above case should go away once we
       // figure out what's going on.
-      witnessLinkage = (witnessSerialized
-                        ? SILLinkage::Shared
-                        : SILLinkage::Private);
+
+      // Normally witness thunks can be private.
+      witnessLinkage = SILLinkage::Private;
+
+      // Unless the witness table is going to be serialized.
+      if (witnessSerialized)
+        witnessLinkage = SILLinkage::Shared;
+
+      // Or even if its not serialized, it might be for an imported
+      // conformance in which case it can be emitted multiple times.
+      if (Linkage == SILLinkage::Shared)
+        witnessLinkage = SILLinkage::Shared;
     }
 
     SILFunction *witnessFn = SGM.emitProtocolWitness(
